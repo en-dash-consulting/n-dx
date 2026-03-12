@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web (`web-viewer/web-viewer/web`)
-Files: 129, Cohesion: 0.86, Coupling: 0.14
+Files: 129, Cohesion: 0.85, Coupling: 0.15
 Description: 129 files, primarily TypeScript
 Entry points: packages/web/src/schema/features.ts, packages/web/src/viewer/components/copy-link-button.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/components/sidebar.ts, packages/web/src/viewer/components/theme-toggle.ts, packages/web/src/viewer/external.ts, packages/web/src/viewer/hooks/index.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-manager.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/polling/tab-visibility.ts, packages/web/src/viewer/polling/tick-visibility-gate.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/views/architecture.ts, packages/web/src/viewer/views/feature-toggles.ts, packages/web/src/viewer/views/files.ts, packages/web/src/viewer/views/hench-runs.ts, packages/web/src/viewer/views/overview.ts, packages/web/src/viewer/views/prd.ts, packages/web/src/viewer/views/problems.ts, packages/web/src/viewer/views/routes.ts, packages/web/src/viewer/views/suggestions.ts, packages/web/src/viewer/views/task-audit.ts, packages/web/src/viewer/views/zones.ts, packages/web/src/viewer/visualization/index.ts
-Lines: 33866
+Lines: 33806
 
 </zone>
 
@@ -88,7 +88,7 @@ packages/web/src/viewer/views/architecture.ts (TypeScript, 103 lines, source)
 packages/web/src/viewer/views/feature-toggles.ts (TypeScript, 318 lines, source)
 packages/web/src/viewer/views/files.ts (TypeScript, 278 lines, source)
 packages/web/src/viewer/views/hench-runs.ts (TypeScript, 752 lines, source)
-packages/web/src/viewer/views/overview.ts (TypeScript, 362 lines, source)
+packages/web/src/viewer/views/overview.ts (TypeScript, 302 lines, source)
 packages/web/src/viewer/views/prd.ts (TypeScript, 355 lines, source)
 packages/web/src/viewer/views/problems.ts (TypeScript, 102 lines, source)
 packages/web/src/viewer/views/routes.ts (TypeScript, 354 lines, source)
@@ -303,10 +303,9 @@ Internal:
   packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/hooks/index.ts {usePolling}
   packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/types.ts {NavigateTo}
   packages/web/src/viewer/views/hench-runs.ts → packages/web/src/viewer/visualization/index.ts {MetricCard}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/external.ts {Zone, Finding}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/utils.ts {basename}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, CollapsibleSection, HealthGauge, PatternBadge, MetricCard, ZoneMap, ZoneDetail, getZoneColorByIndex}
+  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, HealthGauge, PatternBadge, MetricCard, getZoneColorByIndex}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/prd-tree/bulk-actions.ts {BulkActions}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/hooks/index.ts {useToast, usePRDData, usePRDWebSocket, usePRDActions, usePRDDeepLink, usePersistentFilter, useFeatureToggle, useFacetState}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/types.ts {DetailItem, NavigateTo}
@@ -461,7 +460,7 @@ Cross-dependencies between sub-zones:
 This zone has 6 sub-zone(s):
 
 - **Web Viewer/web Viewer/web/unit** (`web-viewer/web-viewer/web/unit`): 3 files, cohesion 1, coupling 0
-- **Web Viewer/web Viewer/web/viewer** (`web-viewer/web-viewer/web/viewer`): 19 files, cohesion 0.55, coupling 0.45
+- **Web Viewer/web Viewer/web/viewer** (`web-viewer/web-viewer/web/viewer`): 19 files, cohesion 0.54, coupling 0.46
 - **Web Viewer/web Viewer/web/viewer Components** (`web-viewer/web-viewer/web/viewer-components`): 46 files, cohesion 0.7, coupling 0.3
 - **Web Viewer/web Viewer/web/viewer Hooks** (`web-viewer/web-viewer/web/viewer-hooks`): 6 files, cohesion 0.4, coupling 0.6
 - **Web Viewer/web Viewer/web/viewer Performance** (`web-viewer/web-viewer/web/viewer-performance`): 47 files, cohesion 0.85, coupling 0.15

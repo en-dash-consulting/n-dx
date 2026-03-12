@@ -59,6 +59,7 @@ Internal:
 [observation] [info] Non-source artifacts like .DS_Store should be excluded from zone analysis via .sourcevisionignore to keep inventory metrics accurate and prevent noise in cohesion calculations.
 [observation] [info] Perfect cohesion (1.0) and zero coupling are misleading for this zone — these files have no import edges, so the metrics reflect isolation rather than internal coherence. The zone is more a catch-all for root-level artifacts than a structurally unified module.
 [observation] [info] The orchestration entry points (cli.js, web.js, ci.js, config.js) correctly implement the spawn-only tier contract, making the boundary between orchestration and execution tiers explicit and auditable.
+[suggestion] [info] claude-integration.js archetype was changed from entrypoint to service and help.js from entrypoint to utility. These files sit at the orchestration tier alongside cli.js and web.js — verify the new archetypes correctly reflect their role before any inventory-based tooling (e.g. entrypoint discovery, spawn-only enforcement) relies on archetype for classification.
 
 </findings>
 
@@ -71,6 +72,8 @@ Internal:
 - Perfect cohesion (1.0) and zero coupling are misleading for this zone — these files have no import edges, so the metrics reflect isolation rather than internal coherence. The zone is more a catch-all for root-level artifacts than a structurally unified module.
 - The orchestration entry points (cli.js, web.js, ci.js, config.js) correctly implement the spawn-only tier contract, making the boundary between orchestration and execution tiers explicit and auditable.
 - Non-source artifacts like .DS_Store should be excluded from zone analysis via .sourcevisionignore to keep inventory metrics accurate and prevent noise in cohesion calculations.
+- classifications.json reclassified claude-integration.js from entrypoint to service and help.js from entrypoint to utility. In the monorepo-orchestration zone these files have zero import edges so the archetype changes do not affect cohesion or coupling metrics, but they do affect archetype-based filtering in inventory views — consumers that query inventory for entrypoints will no longer surface these two files.
+- claude-integration.js archetype was changed from entrypoint to service and help.js from entrypoint to utility. These files sit at the orchestration tier alongside cli.js and web.js — verify the new archetypes correctly reflect their role before any inventory-based tooling (e.g. entrypoint discovery, spawn-only enforcement) relies on archetype for classification.
 - [call graph] 479 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

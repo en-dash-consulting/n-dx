@@ -37,8 +37,8 @@
     "packages/web/src/viewer/views/routes.ts",
     "packages/web/src/viewer/visualization/index.ts"
   ],
-  "cohesion": 0.55,
-  "coupling": 0.45,
+  "cohesion": 0.54,
+  "coupling": 0.46,
   "fileCount": 19,
-  "lineCount": 3507
+  "lineCount": 3447
 }

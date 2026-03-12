@@ -9,7 +9,7 @@ Files: 270, Cohesion: 0.95, Coupling: 0.05
 Risk: healthy (score: 0.05)
 Description: The Preact UI hub for the n-dx dashboard, encompassing all components, hooks, views, shared utilities, schema types, and the viewer-side gateway boundary that wires together the full client-side rendering pipeline.
 Entry points: packages/web/src/server/rex-gateway.ts, packages/web/src/shared/view-id.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/prd-tree/prd-tree.ts, packages/web/src/viewer/components/prd-tree/types.ts, packages/web/src/viewer/components/theme-toggle.ts, packages/web/src/viewer/external.ts, packages/web/src/viewer/hooks/index.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/polling/tab-visibility.ts, packages/web/src/viewer/polling/tick-visibility-gate.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/visualization/index.ts
-Lines: 77527
+Lines: 77467
 
 </zone>
 
@@ -154,7 +154,7 @@ packages/web/src/viewer/views/hench-runs.ts (TypeScript, 752 lines, source)
 packages/web/src/viewer/views/hench-templates.ts (TypeScript, 422 lines, source)
 packages/web/src/viewer/views/integration-config.ts (TypeScript, 796 lines, source)
 packages/web/src/viewer/views/notion-config.ts (TypeScript, 567 lines, source)
-packages/web/src/viewer/views/overview.ts (TypeScript, 362 lines, source)
+packages/web/src/viewer/views/overview.ts (TypeScript, 302 lines, source)
 packages/web/src/viewer/views/pr-markdown.ts (TypeScript, 466 lines, source)
 packages/web/src/viewer/views/prd.ts (TypeScript, 355 lines, source)
 packages/web/src/viewer/views/problems.ts (TypeScript, 102 lines, source)
@@ -622,10 +622,9 @@ Internal:
   packages/web/src/viewer/views/notion-config.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/notion-config.ts → packages/web/src/viewer/components/notion-schema-wizard.ts {NotionSchemaWizard}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/external.ts {Zone, Finding}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/utils.ts {basename}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, CollapsibleSection, HealthGauge, PatternBadge, MetricCard, ZoneMap, ZoneDetail, getZoneColorByIndex}
+  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, HealthGauge, PatternBadge, MetricCard, getZoneColorByIndex}
   packages/web/src/viewer/views/pr-markdown.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/prd-tree/add-item-form.ts {AddItemForm}
@@ -881,10 +880,16 @@ Incoming (other zones → this zone):
 
 [observation] [warning] 16 entry points — wide API surface, consider consolidating exports
 [observation] [info] High cohesion (0.95) — files are tightly interconnected
-[observation] [info] 16 entry points span viewer, server-gateway, shared, schema, and sub-feature directories — consider documenting which entry points are public API vs internal cross-zone seams to guide future contributors.
-[observation] [info] Cohesion of 0.95 across 270 files is excellent and should be treated as a health baseline — any addition that drops cohesion below 0.90 warrants explicit architectural review.
-[observation] [info] The zone acts as the composition hub with 84 imports from web-server and 15 from the viewer-message-pipeline zone; the api.ts and external.ts gateway files are critical choke-points and should be kept strictly re-export-only with no embedded logic.
 [suggestion] [info] Zone "web-dashboard-viewer" has files across 18 directories — consider consolidating under a dedicated directory
+[suggestion] [warning] Three different cohesion thresholds are in use: attentionCount filter uses < 0.4 (overview.ts:120), health dot uses 0.4/0.7 (overview.ts:254), CLAUDE.md governance uses < 0.5. Align all dashboard thresholds to the governance definition (cohesion < 0.5 AND coupling > 0.5) so the dashboard is a reliable indicator of actual dual-fragility risk.
+[suggestion] [info] overview.css lines 183-239 define .attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, and .insight-more but none of these classes appear in any viewer TypeScript file. Remove the dead CSS rules to reduce style bundle size and prevent future confusion about available UI components.
+[suggestion] [info] overview.ts:241 labels the zone summary panel 'Top Zones' but sorts exclusively by file count (b.files.length - a.files.length). Rename the panel to 'Largest Zones' or change the sort to a composite health score (e.g., cohesion desc) to match the label's implied meaning.
+[suggestion] [warning] overview.ts:254-256 health dot coloring derives color from cohesion alone (>= 0.7 green, >= 0.4 orange), ignoring coupling. A zone with cohesion=0.9 and coupling=0.9 renders green. Add coupling to the health-dot color calculation (e.g., flag orange when coupling > 0.5 regardless of cohesion) to surface the coupling half of dual-fragility.
+[suggestion] [warning] reset-badge CSS class is applied at overview.ts:199 but undefined in overview.css or any imported stylesheet. The reset badge renders identically to the enrichment badge. Define .reset-badge in overview.css (e.g., different background-color and text color) to restore the intended visual distinction.
+[pattern] [info] Call graph asymmetry (77 outgoing calls from messaging into viewer vs 11 incoming) confirms the bidirectional import relationship is structurally one-directional at runtime. The 12 inbound import edges from viewer into messaging should be audited — if they are only type imports, the runtime coupling is effectively zero and the zone boundary can be simplified.
+[relationship] [warning] api.ts is declared as the sanctioned import surface for sibling zones (crash, route, performance) but has zero detectable consumers importing through it at analysis time. Sibling zones may be bypassing the gateway and importing viewer internals directly, which would make api.ts a paper boundary with no enforcement.
+[anti-pattern] [warning] api.ts is declared as the inbound gateway for sibling zones (crash, route, performance) but is absent from CLAUDE.md's gateway module registry table. external.ts appears in the table; api.ts does not. This asymmetry means gateway audits using the table as their source of truth will miss the api.ts contract entirely — add api.ts to the registry with its declared consumers and an enforcement note.
+[anti-pattern] [warning] execution-panel.ts (packages/web/src/viewer/components/prd-tree/execution-panel.ts) imports createFetchPipeline directly from ../../messaging/index.js — it is the only UI component (vs hook) bypassing external.ts. Components should delegate pipeline construction to hooks, not import messaging factories directly. This couples a UI component to messaging implementation details and is not caught by hook-focused gateway reviews.
 
 </findings>
 
@@ -899,7 +904,25 @@ Incoming (other zones → this zone):
 - The zone acts as the composition hub with 84 imports from web-server and 15 from the viewer-message-pipeline zone; the api.ts and external.ts gateway files are critical choke-points and should be kept strictly re-export-only with no embedded logic.
 - 16 entry points span viewer, server-gateway, shared, schema, and sub-feature directories — consider documenting which entry points are public API vs internal cross-zone seams to guide future contributors.
 - Zone "web-dashboard-viewer" has files across 18 directories — consider consolidating under a dedicated directory
-- [call graph] 4843 internal calls, 183 outgoing, 81 incoming (cohesion: 0.96, coupling: 0.04)
+- The call graph records 77 outgoing calls from viewer-message-pipeline into web-dashboard-viewer but only 11 incoming, confirming the import-level bidirectionality is asymmetric at runtime — messaging is predominantly a one-way dependency on the viewer, with the 12 inbound import edges likely representing type imports or narrow utility re-exports rather than structural coupling
+- api.ts is documented as the inbound gateway for sibling zones (crash, route, performance) but grep finds zero runtime consumers importing via that path — either sibling zones reach into viewer internals directly, or they access symbols through a different path, making api.ts a declared-but-unenforced boundary
+- api.ts is declared as the sanctioned import surface for sibling zones (crash, route, performance) but has zero detectable consumers importing through it at analysis time. Sibling zones may be bypassing the gateway and importing viewer internals directly, which would make api.ts a paper boundary with no enforcement.
+- Call graph asymmetry (77 outgoing calls from messaging into viewer vs 11 incoming) confirms the bidirectional import relationship is structurally one-directional at runtime. The 12 inbound import edges from viewer into messaging should be audited — if they are only type imports, the runtime coupling is effectively zero and the zone boundary can be simplified.
+- execution-panel.ts is a UI component (not a hook) that directly imports createFetchPipeline from ../../messaging/index.js. The three other messaging bypassers (use-prd-data.ts, use-prd-websocket.ts, use-project-status.ts) are hooks — components should delegate pipeline construction to hooks rather than importing messaging factories directly. execution-panel.ts is the only component in this pattern, making it an outlier missed in hook-focused gateway enforcement reviews.
+- api.ts is absent from CLAUDE.md's gateway module registry table even though external.ts is listed there. The asymmetric registry means api.ts is formally invisible to gateway governance — a contributor auditing the gateway table would see external.ts as the sole viewer gateway and not know api.ts exists as a declared inbound contract surface.
+- execution-panel.ts (packages/web/src/viewer/components/prd-tree/execution-panel.ts) imports createFetchPipeline directly from ../../messaging/index.js — it is the only UI component (vs hook) bypassing external.ts. Components should delegate pipeline construction to hooks, not import messaging factories directly. This couples a UI component to messaging implementation details and is not caught by hook-focused gateway reviews.
+- api.ts is declared as the inbound gateway for sibling zones (crash, route, performance) but is absent from CLAUDE.md's gateway module registry table. external.ts appears in the table; api.ts does not. This asymmetry means gateway audits using the table as their source of truth will miss the api.ts contract entirely — add api.ts to the registry with its declared consumers and an enforcement note.
+- overview.ts:254-256 health dot coloring uses only cohesion (>= 0.7 green, >= 0.4 orange) and ignores coupling entirely — a zone with cohesion=0.9 and coupling=0.9 renders green with no visual warning, making the health dot blind to the coupling half of dual-fragility
+- overview.ts:120 attentionCount uses cohesion < 0.4 OR coupling > 0.5 (threshold 0.4), overview.ts:254 health dot uses thresholds 0.7/0.4, and CLAUDE.md governance policy uses cohesion < 0.5 AND coupling > 0.5 — three distinct cohesion thresholds coexist across the dashboard, none aligned with the governance definition
+- overview.ts:241 panel is titled 'Top Zones' but sorts by files.length descending — it displays the five largest zones by file count, not the architecturally most significant zones; the label implies a quality or importance ranking but delivers a size ranking
+- reset-badge class is applied at overview.ts:199 as a modifier on enrichment-badge but is not defined in overview.css or any other CSS file — reset badge renders identically to the enrichment badge, losing the intended visual distinction between enrichment pass and reset annotations
+- CSS classes .attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, .insight-more are defined in overview.css lines 183-239 but have no matching usage in any viewer TypeScript file — orphaned rules from a previous UI iteration adding dead weight to the style bundle
+- overview.ts:254-256 health dot coloring derives color from cohesion alone (>= 0.7 green, >= 0.4 orange), ignoring coupling. A zone with cohesion=0.9 and coupling=0.9 renders green. Add coupling to the health-dot color calculation (e.g., flag orange when coupling > 0.5 regardless of cohesion) to surface the coupling half of dual-fragility.
+- Three different cohesion thresholds are in use: attentionCount filter uses < 0.4 (overview.ts:120), health dot uses 0.4/0.7 (overview.ts:254), CLAUDE.md governance uses < 0.5. Align all dashboard thresholds to the governance definition (cohesion < 0.5 AND coupling > 0.5) so the dashboard is a reliable indicator of actual dual-fragility risk.
+- reset-badge CSS class is applied at overview.ts:199 but undefined in overview.css or any imported stylesheet. The reset badge renders identically to the enrichment badge. Define .reset-badge in overview.css (e.g., different background-color and text color) to restore the intended visual distinction.
+- overview.css lines 183-239 define .attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, and .insight-more but none of these classes appear in any viewer TypeScript file. Remove the dead CSS rules to reduce style bundle size and prevent future confusion about available UI components.
+- overview.ts:241 labels the zone summary panel 'Top Zones' but sorts exclusively by file count (b.files.length - a.files.length). Rename the panel to 'Largest Zones' or change the sort to a composite health score (e.g., cohesion desc) to match the label's implied meaning.
+- [call graph] 4842 internal calls, 183 outgoing, 81 incoming (cohesion: 0.96, coupling: 0.04)
 
 </insights>
 

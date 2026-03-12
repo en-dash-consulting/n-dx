@@ -295,7 +295,7 @@
   "cohesion": 0.95,
   "coupling": 0.05,
   "fileCount": 270,
-  "lineCount": 77527,
+  "lineCount": 77467,
   "riskMetrics": {
     "cohesion": 0.95,
     "coupling": 0.05,

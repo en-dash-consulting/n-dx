@@ -63,6 +63,7 @@ Incoming (other zones → this zone):
 [observation] [info] Good cohesion (0.8) and low coupling (0.2) confirm the guard layer maintains a clean separation of concerns — policy logic is not entangled with agent execution logic.
 [observation] [info] The shell.test.ts file lives in the guard zone rather than the agent zone, suggesting shell tool tests are primarily testing guard policy interactions. Verify this aligns with actual test intent to avoid coverage gaps in direct shell execution paths.
 [observation] [info] Two entry points (guard/index.ts and guard/paths.ts) expose the guard API surface. Exporting paths.ts directly alongside the index barrel creates a dual-entry risk — consumers may bypass index.ts and import paths.ts directly, undermining the intended abstraction boundary.
+[relationship] [warning] hench-safety-guard makes ~13 call-graph calls per file-level import edge into hench-agent-engine (53 calls / 4 edges), indicating deep runtime coupling not visible from static import counts alone. A named interface contract between the two zones would make this surface explicit and type-safe.
 
 </findings>
 
@@ -75,6 +76,8 @@ Incoming (other zones → this zone):
 - Good cohesion (0.8) and low coupling (0.2) confirm the guard layer maintains a clean separation of concerns — policy logic is not entangled with agent execution logic.
 - The shell.test.ts file lives in the guard zone rather than the agent zone, suggesting shell tool tests are primarily testing guard policy interactions. Verify this aligns with actual test intent to avoid coverage gaps in direct shell execution paths.
 - Two entry points (guard/index.ts and guard/paths.ts) expose the guard API surface. Exporting paths.ts directly alongside the index barrel creates a dual-entry risk — consumers may bypass index.ts and import paths.ts directly, undermining the intended abstraction boundary.
+- The call graph shows 53 runtime calls from hench-safety-guard to hench-agent-engine across only 4 file-level import edges — approximately 13 call-graph calls per import edge. This ratio indicates the guard layer reaches deeply into agent-engine internals per imported symbol, suggesting the guard is not using a narrow interface but rather calling broadly into engine functions. A formal interface contract (TypeScript interface or type alias) between the two zones would reduce the risk of undetected API surface changes.
+- hench-safety-guard makes ~13 call-graph calls per file-level import edge into hench-agent-engine (53 calls / 4 edges), indicating deep runtime coupling not visible from static import counts alone. A named interface contract between the two zones would make this surface explicit and type-safe.
 - [call graph] 114 internal calls, 53 outgoing, 1 incoming (cohesion: 0.68, coupling: 0.32)
 
 </insights>

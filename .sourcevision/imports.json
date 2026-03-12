@@ -22625,15 +22625,6 @@
     },
     {
       "from": "packages/web/src/viewer/views/overview.ts",
-      "to": "packages/web/src/viewer/external.ts",
-      "type": "type",
-      "symbols": [
-        "Zone",
-        "Finding"
-      ]
-    },
-    {
-      "from": "packages/web/src/viewer/views/overview.ts",
       "to": "packages/web/src/viewer/types.ts",
       "type": "type",
       "symbols": [
@@ -22656,12 +22647,9 @@
       "type": "static",
       "symbols": [
         "BarChart",
-        "CollapsibleSection",
         "HealthGauge",
         "PatternBadge",
         "MetricCard",
-        "ZoneMap",
-        "ZoneDetail",
         "getZoneColorByIndex"
       ]
     },
@@ -27292,7 +27280,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 2819,
+    "totalEdges": 2818,
     "totalExternal": 18,
     "circularCount": 0,
     "circulars": [],

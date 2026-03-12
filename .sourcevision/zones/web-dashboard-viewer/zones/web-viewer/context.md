@@ -8,7 +8,7 @@ Zone: Web Viewer/web Viewer (`web-viewer/web-viewer`)
 Files: 205, Cohesion: 0.97, Coupling: 0.03
 Description: 205 files, primarily TypeScript
 Entry points: packages/web/src/schema/features.ts, packages/web/src/viewer/components/logos.ts, packages/web/src/viewer/components/prd-tree/index.ts, packages/web/src/viewer/components/prd-tree/prd-tree.ts, packages/web/src/viewer/components/prd-tree/types.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/components/theme-toggle.ts, packages/web/src/viewer/external.ts, packages/web/src/viewer/hooks/index.ts, packages/web/src/viewer/performance/index.ts, packages/web/src/viewer/polling/index.ts, packages/web/src/viewer/polling/polling-state.ts, packages/web/src/viewer/polling/tab-visibility.ts, packages/web/src/viewer/polling/tick-visibility-gate.ts, packages/web/src/viewer/types.ts, packages/web/src/viewer/utils.ts, packages/web/src/viewer/visualization/index.ts
-Lines: 57158
+Lines: 57098
 
 </zone>
 
@@ -135,7 +135,7 @@ packages/web/src/viewer/views/hench-runs.ts (TypeScript, 752 lines, source)
 packages/web/src/viewer/views/hench-templates.ts (TypeScript, 422 lines, source)
 packages/web/src/viewer/views/integration-config.ts (TypeScript, 796 lines, source)
 packages/web/src/viewer/views/notion-config.ts (TypeScript, 567 lines, source)
-packages/web/src/viewer/views/overview.ts (TypeScript, 362 lines, source)
+packages/web/src/viewer/views/overview.ts (TypeScript, 302 lines, source)
 packages/web/src/viewer/views/prd.ts (TypeScript, 355 lines, source)
 packages/web/src/viewer/views/problems.ts (TypeScript, 102 lines, source)
 packages/web/src/viewer/views/routes.ts (TypeScript, 354 lines, source)
@@ -517,10 +517,9 @@ Internal:
   packages/web/src/viewer/views/notion-config.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/notion-config.ts → packages/web/src/viewer/components/notion-schema-wizard.ts {NotionSchemaWizard}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/external.ts {Zone, Finding}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/types.ts {LoadedData, NavigateTo, DetailItem}
   packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/utils.ts {basename}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, CollapsibleSection, HealthGauge, PatternBadge, MetricCard, ZoneMap, ZoneDetail, getZoneColorByIndex}
+  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, HealthGauge, PatternBadge, MetricCard, getZoneColorByIndex}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/logos.ts {BrandedHeader}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/prd-tree/add-item-form.ts {AddItemForm}
   packages/web/src/viewer/views/prd.ts → packages/web/src/viewer/components/prd-tree/bulk-actions.ts {BulkActions}
@@ -756,7 +755,7 @@ This zone has 8 sub-zone(s):
 
 - **Web Viewer/web Viewer/domain** (`web-viewer/web-viewer/domain`): 5 files, cohesion 0.28, coupling 0.72
 - **Web Viewer/web Viewer/prune** (`web-viewer/web-viewer/prune`): 3 files, cohesion 0.29, coupling 0.71
-- **Web Viewer/web Viewer/web** (`web-viewer/web-viewer/web`): 129 files, cohesion 0.86, coupling 0.14
+- **Web Viewer/web Viewer/web** (`web-viewer/web-viewer/web`): 129 files, cohesion 0.85, coupling 0.15
   - Has 6 nested sub-zone(s)
 - **Web Viewer/web Viewer/web 2** (`web-viewer/web-viewer/web-2`): 41 files, cohesion 0.79, coupling 0.21
 - **Web Viewer/web Viewer/web 3** (`web-viewer/web-viewer/web-3`): 9 files, cohesion 0.56, coupling 0.44

@@ -58,6 +58,7 @@ Internal:
 [observation] [info] At 22 files, this is a large E2E suite; consider grouping tests into subdirectories by concern (cli/, mcp/, architecture/) to make navigation and selective test runs easier as the suite grows.
 [observation] [info] Perfect cohesion and zero coupling are ideal for an E2E test zone — these tests are consumers of the system under test, not producers, and should remain import-free from production modules.
 [observation] [info] The architecture-policy and domain-isolation tests serve a dual role as living documentation of the four-tier hierarchy; they should be reviewed whenever a new cross-package dependency is introduced.
+[pattern] [warning] High internal call count (471) relative to file count (22) suggests non-trivial shared test utilities. Audit shared helpers for transitive production imports to preserve the zero-coupling contract.
 
 </findings>
 
@@ -70,6 +71,8 @@ Internal:
 - Perfect cohesion and zero coupling are ideal for an E2E test zone — these tests are consumers of the system under test, not producers, and should remain import-free from production modules.
 - At 22 files, this is a large E2E suite; consider grouping tests into subdirectories by concern (cli/, mcp/, architecture/) to make navigation and selective test runs easier as the suite grows.
 - The architecture-policy and domain-isolation tests serve a dual role as living documentation of the four-tier hierarchy; they should be reviewed whenever a new cross-package dependency is introduced.
+- 471 internal calls across 22 files implies significant shared helper imports between e2e test files. Verify shared test helpers do not transitively import production modules — any such import would silently break the zero-coupling guarantee and could cause e2e tests to load production side-effects during test runs.
+- High internal call count (471) relative to file count (22) suggests non-trivial shared test utilities. Audit shared helpers for transitive production imports to preserve the zero-coupling contract.
 - [call graph] 471 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

@@ -25,6 +25,12 @@
         "Dual-fragility thresholds exceeded (cohesion 0.36, coupling 0.64) — active governance required: apply the two-consumer rule before adding any new module to this zone.",
         "batch-types.ts is a shared type definition that rex-prd-engine imports (rex-unit → rex-cli: 2 imports); moving it into the main engine would collapse this satellite's coupling footprint.",
         "Zone size (5 files) is below the 5-file threshold for reliable metrics — current cohesion and coupling readings are directionally correct but should be re-evaluated after any structural change.",
+        "chunked-review-pipeline → rex-prd-engine (30 calls) is one-directional with no reverse flow from rex-prd-engine back into this zone, confirming there is no runtime dependency reason to keep this as a separate zone — it is a pure consumer of the engine",
+        "batch-types.ts sits in packages/rex/src/analyze/ (inside the engine directory tree) but is pinned to the chunked-review-pipeline satellite zone — physical location and zone assignment are misaligned, causing confusion about where new batch-related types should land",
+        "batch-types.ts sits in packages/rex/src/analyze/ which places it physically inside the directory tree owned by rex-prd-engine (analyze/ is an engine subdirectory). The zone pinning override that keeps it in chunked-review-pipeline means contributors adding new analyze-phase types have no reliable heuristic for which zone a new file belongs to — physical location and zone assignment point in opposite directions for this file",
+        "batch-types.ts is physically located in packages/rex/src/analyze/ — the same directory as ~40 rex-prd-engine source files — but is zone-pinned to chunked-review-pipeline. This directory-zone mismatch means any new batch-related type added to analyze/ will silently land in rex-prd-engine rather than chunked-review-pipeline, eroding the satellite boundary without any import-graph signal.",
+        "zones.json entryPoints array references batch-types.ts but the file is absent from the zone's files array — a zone's entry points must be resolvable within its own file list; this inconsistency means any tooling that validates 'entryPoints ⊆ files' will report a data integrity error, and file-count metrics will undercount the zone by one",
+        "batch-types.ts appears in the zone's entryPoints array in zones.json but is absent from the files array (files lists 4 entries; batch-types.ts is excluded). Zone entry points must be a subset of zone files for metadata integrity. Either add batch-types.ts back to the files array or remove it from entryPoints — the current state produces a silent count mismatch that affects file-count metrics and zone tooling.",
         "[call graph] 638 internal calls, 30 outgoing, 6 incoming (cohesion: 0.96, coupling: 0.04)"
       ],
       "riskMetrics": {
@@ -64,6 +70,8 @@
         "Cohesion (0.6) and coupling (0.4) are healthy for an 8-file zone. The internal layering (service → hook → component) is clean and intentional.",
         "Bidirectional coupling with web-viewer (2 imports each direction) is an acknowledged architectural exception documented in CLAUDE.md; ensure new crash zone additions continue to follow the two-consumer rule before cohesion degrades.",
         "crash-detector-test-support.ts in tests/helpers/ is a shared test fixture — verify it is not imported by any production code path, as helper files in test directories can blur the production/test boundary.",
+        "The call graph reports 0 outgoing and 0 incoming calls for this zone, but cross-zone import data shows 2 imports each direction with web-viewer. This discrepancy reveals that call-graph analysis and static import analysis use different traversal methods — call-graph may undercount type-only or re-export-only imports.",
+        "Call graph (0 outgoing/incoming) contradicts cross-zone import counts (2 each direction with web-viewer). The import graph is the authoritative source for architectural boundary enforcement; call-graph cohesion/coupling scores for this zone should be treated as unreliable.",
         "[call graph] 91 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -2169,6 +2177,7 @@
         "At 141 files, this is the second-largest zone in the monorepo. Formal boundary assertions (analogous to web/boundary-check.test.ts) would prevent gradual erosion of sub-zone separation as the codebase grows.",
         "The three declared entry points (llm-gateway.ts, schema/v1.ts, tools/shell.ts) cover the primary cross-package API surface, but shell.ts being a public entry point warrants review — shell execution utilities are high-risk and should ideally be accessed only via the guard layer.",
         "Zone \"hench-agent-engine\" has files across 26 directories — consider consolidating under a dedicated directory",
+        "hench-agent-engine's call graph reports 1 outgoing runtime call to hench-safety-guard despite having 2 static import edges. One of the two hench → hench-guard imports is type-only (`import type`), generating zero runtime calls. This means the static import graph overstates the runtime bidirectionality: only 1 value edge and 53 incoming call-graph calls exist at runtime, not 2 outgoing edges. Tools that count static import edges for coupling will report higher apparent bidirectionality than actually exists.",
         "[call graph] 2594 internal calls, 1 outgoing, 53 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -2209,6 +2218,8 @@
         "Good cohesion (0.8) and low coupling (0.2) confirm the guard layer maintains a clean separation of concerns — policy logic is not entangled with agent execution logic.",
         "The shell.test.ts file lives in the guard zone rather than the agent zone, suggesting shell tool tests are primarily testing guard policy interactions. Verify this aligns with actual test intent to avoid coverage gaps in direct shell execution paths.",
         "Two entry points (guard/index.ts and guard/paths.ts) expose the guard API surface. Exporting paths.ts directly alongside the index barrel creates a dual-entry risk — consumers may bypass index.ts and import paths.ts directly, undermining the intended abstraction boundary.",
+        "The call graph shows 53 runtime calls from hench-safety-guard to hench-agent-engine across only 4 file-level import edges — approximately 13 call-graph calls per import edge. This ratio indicates the guard layer reaches deeply into agent-engine internals per imported symbol, suggesting the guard is not using a narrow interface but rather calling broadly into engine functions. A formal interface contract (TypeScript interface or type alias) between the two zones would reduce the risk of undetected API surface changes.",
+        "hench-safety-guard makes ~13 call-graph calls per file-level import edge into hench-agent-engine (53 calls / 4 edges), indicating deep runtime coupling not visible from static import counts alone. A named interface contract between the two zones would make this surface explicit and type-safe.",
         "[call graph] 114 internal calls, 53 outgoing, 1 incoming (cohesion: 0.68, coupling: 0.32)"
       ],
       "riskMetrics": {
@@ -2277,6 +2288,7 @@
         "Perfect cohesion (1.0) and zero external coupling across 41 files confirm this is a true foundation layer — it imports from no other monorepo packages and is the correct architectural anchor for vendor-neutral LLM abstractions.",
         "The package correctly appears in the dependency graph only as a target, never as a source of cross-zone imports. This unidirectional relationship should be protected by the domain-isolation.test.js assertions.",
         "With 41 files and no entry points declared in the zone manifest, confirm that the public API surface is fully governed by src/public.ts and that no consumers import from internal paths (e.g., dist/*) outside the documented subpath exports escape hatch.",
+        "cli/output.ts in rex re-exports `setQuiet`, `isQuiet`, `info`, and `result` from `@n-dx/llm-client` as a convenience barrel. This pattern means llm-client is the true provider of rex's CLI output primitives, yet domain modules that import via cli/output.ts incur a CLI-tier dependency for a foundation-tier capability. The llm-client foundation's output primitives are correctly placed, but the re-export barrel in rex CLI tier creates unnecessary indirection and layer pressure for domain consumers.",
         "[call graph] 494 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -2326,6 +2338,8 @@
         "Perfect cohesion and zero coupling are ideal for an E2E test zone — these tests are consumers of the system under test, not producers, and should remain import-free from production modules.",
         "At 22 files, this is a large E2E suite; consider grouping tests into subdirectories by concern (cli/, mcp/, architecture/) to make navigation and selective test runs easier as the suite grows.",
         "The architecture-policy and domain-isolation tests serve a dual role as living documentation of the four-tier hierarchy; they should be reviewed whenever a new cross-package dependency is introduced.",
+        "471 internal calls across 22 files implies significant shared helper imports between e2e test files. Verify shared test helpers do not transitively import production modules — any such import would silently break the zero-coupling guarantee and could cause e2e tests to load production side-effects during test runs.",
+        "High internal call count (471) relative to file count (22) suggests non-trivial shared test utilities. Audit shared helpers for transitive production imports to preserve the zero-coupling contract.",
         "[call graph] 471 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -2358,6 +2372,8 @@
         "Perfect cohesion and zero coupling are correct for an integration test zone; these tests exercise production seams without becoming part of them.",
         "hench-rex-gateway-pipeline.test.js and gateway-pipeline.test.js may have overlapping coverage of the rex gateway; periodically audit for duplication to keep the suite maintainable.",
         "As new cross-package contracts are introduced (e.g. new gateway exports), a corresponding integration test should be added here to prevent silent contract breakage.",
+        "web-server-viewer-boundary.test.js validates the server↔viewer seam but no integration test covers the use ↔ web-viewer bidirectional import loop, leaving the second known undocumented architectural smell entirely unguarded at the integration test layer.",
+        "Integration test coverage is asymmetric: the documented crash ↔ web-viewer exception is backed by CLAUDE.md policy, but the undocumented use ↔ web-viewer bidirectional loop has no integration-level assertion enforcing either its dissolution or its documented exception status.",
         "[call graph] 30 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -2403,6 +2419,8 @@
         "Perfect cohesion (1.0) and zero coupling are misleading for this zone — these files have no import edges, so the metrics reflect isolation rather than internal coherence. The zone is more a catch-all for root-level artifacts than a structurally unified module.",
         "The orchestration entry points (cli.js, web.js, ci.js, config.js) correctly implement the spawn-only tier contract, making the boundary between orchestration and execution tiers explicit and auditable.",
         "Non-source artifacts like .DS_Store should be excluded from zone analysis via .sourcevisionignore to keep inventory metrics accurate and prevent noise in cohesion calculations.",
+        "classifications.json reclassified claude-integration.js from entrypoint to service and help.js from entrypoint to utility. In the monorepo-orchestration zone these files have zero import edges so the archetype changes do not affect cohesion or coupling metrics, but they do affect archetype-based filtering in inventory views — consumers that query inventory for entrypoints will no longer surface these two files.",
+        "claude-integration.js archetype was changed from entrypoint to service and help.js from entrypoint to utility. These files sit at the orchestration tier alongside cli.js and web.js — verify the new archetypes correctly reflect their role before any inventory-based tooling (e.g. entrypoint discovery, spawn-only enforcement) relies on archetype for classification.",
         "[call graph] 479 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -2435,6 +2453,11 @@
         "Lowest cohesion (0.18) in this batch combined with high coupling (0.82) — the two source files share no internal dependencies and exist as a grouping artifact; absorption into rex-prd-engine is the recommended resolution.",
         "keywords.ts and verify.ts serve distinct purposes (search vs. validation) with no shared imports between them; if kept separate from the engine, they warrant separate zones rather than a forced pairing.",
         "rex-core → rex-unit (3 imports) confirms the dependency flows upward into the engine; inlining these files would remove a cross-zone edge without any architectural cost.",
+        "Zero internal calls combined with 58 outgoing calls means keywords.ts and verify.ts have no internal cohesion whatsoever — the zone boundary exists only as an artifact of clustering, not as an intentional design decision",
+        "keywords.ts and verify.ts are consumed by rex-prd-engine (3 inbound imports from rex-unit → rex-core) but have no imports from any other zone, making them exclusive satellites with a single consumer — violating the two-consumer rule and qualifying for mandatory absorption",
+        "prd-verification-utilities has a single consumer zone (rex-prd-engine) and zero internal cohesion — it is the strongest absorption candidate in the Rex package and violates the two-consumer governance rule; absorbing it eliminates a dual-fragility warning with no architectural trade-off",
+        "verify.ts and keywords.ts both live in packages/rex/src/core/ alongside 30+ other engine utilities (canonical.ts, dag.ts, tree.ts, etc.). The core/ directory is the physical home of rex-prd-engine domain logic, making the prd-verification-utilities zone boundary invisible at the filesystem level — a contributor browsing core/ has no indication these two files belong to a different zone",
+        "keywords.ts and verify.ts are zone-pinned to prd-verification-utilities but live in packages/rex/src/core/ alongside 30+ rex-prd-engine files with no subdirectory or ZONE_BOUNDARY.md to mark the satellite boundary. The absence of a physical boundary marker means the zone designation exists only in sourcevision metadata — invisible to contributors without tooling access.",
         "[call graph] 0 internal calls, 58 outgoing, 0 incoming (cohesion: 0, coupling: 1)"
       ],
       "riskMetrics": {
@@ -2468,6 +2491,12 @@
         "Cohesion 0.25 and coupling 0.75 place this zone in the dual-fragility range; at 3 files the metrics are unreliable, but the bidirectional dependency with web-viewer suggests the zone boundary should be dissolved by absorbing these hooks into web-viewer.",
         "Only one test file exists for two production hooks; use-polling.ts currently lacks a dedicated unit test, leaving the retry and interval logic untested in isolation.",
         "If the zone is dissolved into web-viewer, the hooks must continue to be re-exported through web-viewer's barrel so external consumers are not broken.",
+        "boundary-check.test.ts has no assertion preventing the bidirectional import loop between this zone and web-viewer — the architectural smell can grow unchecked without automated detection",
+        "Before dissolving this zone into web-viewer, a unit test for use-polling.ts retry and interval logic must be written first; dissolution without tests would leave that logic permanently untested",
+        "The bidirectional use ↔ web-viewer loop is undocumented in CLAUDE.md and unenforced in boundary-check.test.ts, unlike the crash ↔ web-viewer exception which is explicitly documented. This creates an invisible architectural debt that will grow without automated guards.",
+        "use-polling.ts has no dedicated unit test; dissolving this zone into web-viewer before adding one would permanently bury retry and interval logic without isolated test coverage.",
+        "The dissolution prerequisite (write use-polling.ts unit test first) has no automated gating mechanism — boundary-check.test.ts cannot enforce a 'test must exist before zone dissolved' constraint, leaving the sequencing dependency entirely to human review discipline.",
+        "Dissolution prerequisite (use-polling.ts unit test) is untracked: there is no automated gate preventing zone dissolution from proceeding before the required test exists. A missed prerequisite would permanently bury retry and interval logic without isolated test coverage.",
         "[call graph] 3 internal calls, 5 outgoing, 1 incoming (cohesion: 0.38, coupling: 0.63)"
       ],
       "riskMetrics": {
@@ -2535,6 +2564,8 @@
         "Perfect cohesion and zero coupling — a textbook isolated test zone; no governance concerns.",
         "The fix e2e test (cli-fix.test.ts) provides black-box coverage for the prd-fix-command satellite zone, which has no standalone integration tests — this is the primary regression safety net for that zone.",
         "A separate 'Rex CLI E2E Coverage' zone (algorithmicId: rex, 10 files) exists in the codebase; confirm the two zones do not duplicate coverage scenarios and that test ownership boundaries are documented.",
+        "cli-fix.test.ts provides the only regression safety net for the prd-fix-command satellite; if prd-fix-command is absorbed into rex-prd-engine, this e2e test must be retained to preserve black-box coverage for the fix command surface",
+        "The e2e test zone covers exactly the four Rex CLI surfaces that correspond to satellite zones (adapter, analyze, fix, import) — each satellite has a matching e2e file, meaning absorption of any satellite must preserve its e2e test to maintain the coverage contract",
         "[call graph] 83 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -6126,6 +6157,9 @@
         "rex-unit → rex-core (8 imports) and rex-unit → rex-cli (2 imports) represent the only outward couplings; both target small utility satellites that may be candidates for absorption if they remain below 5 files.",
         "Zone \"rex-prd-engine\" has files across 22 directories — consider consolidating under a dedicated directory",
         "File \"packages/rex/src/analyze/batch-types.ts\" is pinned to zone \"Rex PRD Engine\" but lives in packages/rex/src/analyze/ — consider moving to packages/rex/src/core/ to align physical location with architectural zone",
+        "The three satellite zones (chunked-review-pipeline, prd-fix-command, prd-verification-utilities) import exclusively from rex-prd-engine without importing from each other — forming a clean star topology with rex-prd-engine at the hub",
+        "Call graph weight confirms absorption priority order: prd-verification-utilities (58 outgoing calls) > chunked-review-pipeline (30 calls) > fix (7 calls) — absorption should proceed in this order to minimize regression surface per PR",
+        "Three satellites (chunked-review-pipeline, prd-fix-command, prd-verification-utilities) all import exclusively from rex-prd-engine with no lateral imports between satellites — star topology is clean but artificial; absorbing all three in a single pass would eliminate three dual-fragility zones with one PR",
         "[call graph] 7464 internal calls, 6 outgoing, 88 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -7926,6 +7960,8 @@
         "The analyzers directory contains at least 8 visible service-archetyed files covering distinct concerns (classify, callgraph, branch-work, archetypes). As the package grows, consider sub-directory grouping to keep the flat directory manageable.",
         "Single entry point via web's domain-gateway.ts enforces the gateway pattern correctly — no leaf-file imports from consumers are detectable at this boundary.",
         "Zone \"sourcevision-analysis-engine\" has files across 22 directories — consider consolidating under a dedicated directory",
+        "4596 internal calls with 0 outgoing calls exactly mirrors the cohesion=1, coupling=0 import metrics, providing dual-signal validation that the domain package is structurally isolated at both the static-analysis and runtime call levels — this dual confirmation is the strongest architectural health signal in the monorepo",
+        "Import metrics (cohesion=1, coupling=0) and call graph (4596 internal, 0 outgoing) provide dual-signal confirmation of structural isolation — the only zone in the monorepo where both static and runtime analyses agree perfectly. This is the reference model for domain-layer package health.",
         "[call graph] 4596 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -8000,6 +8036,14 @@
         "build.js and dev.js are build-config files that likely belong in the package root or a build-tools zone; their presence here may distort zone cohesion and coupling metrics.",
         "Polling utilities (batched-tick-dispatcher, tick-timer) and view constants (enrichment-thresholds, token-usage) are co-located with messaging middleware; separating polling infrastructure into its own sub-directory would improve cohesion and clarify the zone boundary.",
         "Zone \"viewer-message-pipeline\" has files across 7 directories — consider consolidating under a dedicated directory",
+        "Viewer hooks (use-project-status.ts, use-prd-data.ts, use-prd-websocket.ts, execution-panel.ts) import createFetchPipeline and createWSPipeline directly from messaging/index.js, bypassing external.ts — external.ts only re-exports createRequestDedup from messaging, leaving the two pipeline factories outside the gateway contract",
+        "The zone classification algorithm groups use-facet-state.ts (a viewer hook) alongside messaging middleware, suggesting the boundary detection treats polling-adjacent hooks as part of the messaging pipeline — this misclassification inflates the apparent bidirectional coupling count",
+        "Viewer hooks (use-project-status.ts, use-prd-data.ts, use-prd-websocket.ts, execution-panel.ts) import createFetchPipeline and createWSPipeline directly from messaging/index.js rather than through external.ts. external.ts only re-exports createRequestDedup, leaving the two most-used pipeline factories outside the gateway contract — a partial gateway that provides incomplete boundary enforcement.",
+        "use-facet-state.ts appears in the viewer-message-pipeline zone rather than web-dashboard-viewer, indicating the community detection algorithm is treating polling-adjacent hooks as messaging infrastructure. This artificially inflates the bidirectional cross-zone edge count between the two zones.",
+        "tree-search.ts is a pure Preact algorithmic utility (case-insensitive tree search, facet matching) with zero messaging, WebSocket, or polling imports — it appears in this zone because use-facet-state.ts imports SearchFacets from it (line 17), causing the Louvain algorithm to propagate the zone assignment transitively. The root misclassification is use-facet-state.ts; tree-search.ts is a collateral victim.",
+        "The import chain use-facet-state.ts → tree-search.ts means fixing the use-facet-state.ts zone pin automatically resolves the tree-search.ts misclassification without a separate archetype override — dissolving both into web-dashboard-viewer is the single fix.",
+        "tree-search.ts (packages/web/src/viewer/components/prd-tree/tree-search.ts) has zero messaging, WebSocket, or polling imports — it is a pure algorithmic utility classified here only because use-facet-state.ts imports SearchFacets from it, creating a transitive zone grouping artifact. It belongs in web-dashboard-viewer. Fixing the use-facet-state.ts zone pin removes both misclassifications.",
+        "build.js and dev.js are spawn-based orchestration scripts (esbuild, tsc, ESLint child processes) with no runtime viewer imports. Their presence in a runtime messaging zone inflates coupling metrics. These files should be excluded from zone classification via archetype pinning (config archetype) rather than left to distort cohesion signals.",
         "[call graph] 940 internal calls, 77 outgoing, 11 incoming (cohesion: 0.92, coupling: 0.08)"
       ],
       "riskMetrics": {
@@ -10203,8 +10247,8 @@
                 "packages/web/src/viewer/views/zones.ts",
                 "packages/web/src/viewer/visualization/index.ts"
               ],
-              "cohesion": 0.86,
-              "coupling": 0.14,
+              "cohesion": 0.85,
+              "coupling": 0.15,
               "depth": 2,
               "subCrossings": [
                 {
@@ -10642,8 +10686,8 @@
                     "packages/web/src/viewer/views/routes.ts",
                     "packages/web/src/viewer/visualization/index.ts"
                   ],
-                  "cohesion": 0.55,
-                  "coupling": 0.45,
+                  "cohesion": 0.54,
+                  "coupling": 0.46,
                   "depth": 3
                 },
                 {
@@ -11012,7 +11056,25 @@
         "The zone acts as the composition hub with 84 imports from web-server and 15 from the viewer-message-pipeline zone; the api.ts and external.ts gateway files are critical choke-points and should be kept strictly re-export-only with no embedded logic.",
         "16 entry points span viewer, server-gateway, shared, schema, and sub-feature directories — consider documenting which entry points are public API vs internal cross-zone seams to guide future contributors.",
         "Zone \"web-dashboard-viewer\" has files across 18 directories — consider consolidating under a dedicated directory",
-        "[call graph] 4843 internal calls, 183 outgoing, 81 incoming (cohesion: 0.96, coupling: 0.04)"
+        "The call graph records 77 outgoing calls from viewer-message-pipeline into web-dashboard-viewer but only 11 incoming, confirming the import-level bidirectionality is asymmetric at runtime — messaging is predominantly a one-way dependency on the viewer, with the 12 inbound import edges likely representing type imports or narrow utility re-exports rather than structural coupling",
+        "api.ts is documented as the inbound gateway for sibling zones (crash, route, performance) but grep finds zero runtime consumers importing via that path — either sibling zones reach into viewer internals directly, or they access symbols through a different path, making api.ts a declared-but-unenforced boundary",
+        "api.ts is declared as the sanctioned import surface for sibling zones (crash, route, performance) but has zero detectable consumers importing through it at analysis time. Sibling zones may be bypassing the gateway and importing viewer internals directly, which would make api.ts a paper boundary with no enforcement.",
+        "Call graph asymmetry (77 outgoing calls from messaging into viewer vs 11 incoming) confirms the bidirectional import relationship is structurally one-directional at runtime. The 12 inbound import edges from viewer into messaging should be audited — if they are only type imports, the runtime coupling is effectively zero and the zone boundary can be simplified.",
+        "execution-panel.ts is a UI component (not a hook) that directly imports createFetchPipeline from ../../messaging/index.js. The three other messaging bypassers (use-prd-data.ts, use-prd-websocket.ts, use-project-status.ts) are hooks — components should delegate pipeline construction to hooks rather than importing messaging factories directly. execution-panel.ts is the only component in this pattern, making it an outlier missed in hook-focused gateway enforcement reviews.",
+        "api.ts is absent from CLAUDE.md's gateway module registry table even though external.ts is listed there. The asymmetric registry means api.ts is formally invisible to gateway governance — a contributor auditing the gateway table would see external.ts as the sole viewer gateway and not know api.ts exists as a declared inbound contract surface.",
+        "execution-panel.ts (packages/web/src/viewer/components/prd-tree/execution-panel.ts) imports createFetchPipeline directly from ../../messaging/index.js — it is the only UI component (vs hook) bypassing external.ts. Components should delegate pipeline construction to hooks, not import messaging factories directly. This couples a UI component to messaging implementation details and is not caught by hook-focused gateway reviews.",
+        "api.ts is declared as the inbound gateway for sibling zones (crash, route, performance) but is absent from CLAUDE.md's gateway module registry table. external.ts appears in the table; api.ts does not. This asymmetry means gateway audits using the table as their source of truth will miss the api.ts contract entirely — add api.ts to the registry with its declared consumers and an enforcement note.",
+        "overview.ts:254-256 health dot coloring uses only cohesion (>= 0.7 green, >= 0.4 orange) and ignores coupling entirely — a zone with cohesion=0.9 and coupling=0.9 renders green with no visual warning, making the health dot blind to the coupling half of dual-fragility",
+        "overview.ts:120 attentionCount uses cohesion < 0.4 OR coupling > 0.5 (threshold 0.4), overview.ts:254 health dot uses thresholds 0.7/0.4, and CLAUDE.md governance policy uses cohesion < 0.5 AND coupling > 0.5 — three distinct cohesion thresholds coexist across the dashboard, none aligned with the governance definition",
+        "overview.ts:241 panel is titled 'Top Zones' but sorts by files.length descending — it displays the five largest zones by file count, not the architecturally most significant zones; the label implies a quality or importance ranking but delivers a size ranking",
+        "reset-badge class is applied at overview.ts:199 as a modifier on enrichment-badge but is not defined in overview.css or any other CSS file — reset badge renders identically to the enrichment badge, losing the intended visual distinction between enrichment pass and reset annotations",
+        "CSS classes .attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, .insight-more are defined in overview.css lines 183-239 but have no matching usage in any viewer TypeScript file — orphaned rules from a previous UI iteration adding dead weight to the style bundle",
+        "overview.ts:254-256 health dot coloring derives color from cohesion alone (>= 0.7 green, >= 0.4 orange), ignoring coupling. A zone with cohesion=0.9 and coupling=0.9 renders green. Add coupling to the health-dot color calculation (e.g., flag orange when coupling > 0.5 regardless of cohesion) to surface the coupling half of dual-fragility.",
+        "Three different cohesion thresholds are in use: attentionCount filter uses < 0.4 (overview.ts:120), health dot uses 0.4/0.7 (overview.ts:254), CLAUDE.md governance uses < 0.5. Align all dashboard thresholds to the governance definition (cohesion < 0.5 AND coupling > 0.5) so the dashboard is a reliable indicator of actual dual-fragility risk.",
+        "reset-badge CSS class is applied at overview.ts:199 but undefined in overview.css or any imported stylesheet. The reset badge renders identically to the enrichment badge. Define .reset-badge in overview.css (e.g., different background-color and text color) to restore the intended visual distinction.",
+        "overview.css lines 183-239 define .attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, and .insight-more but none of these classes appear in any viewer TypeScript file. Remove the dead CSS rules to reduce style bundle size and prevent future confusion about available UI components.",
+        "overview.ts:241 labels the zone summary panel 'Top Zones' but sorts exclusively by file count (b.files.length - a.files.length). Rename the panel to 'Largest Zones' or change the sort to a composite health score (e.g., cohesion desc) to match the label's implied meaning.",
+        "[call graph] 4842 internal calls, 183 outgoing, 81 incoming (cohesion: 0.96, coupling: 0.04)"
       ],
       "riskMetrics": {
         "cohesion": 0.95,
@@ -11041,6 +11103,12 @@
         "These two integration tests cover structurally distinct concerns (boundary policy vs. build artifacts); keeping them separate files within the same zone is intentional and should not be merged.",
         "boundary-check.test.ts is the enforcement mechanism for several CLAUDE.md governance rules; any relaxation of those rules must be mirrored in this file to keep policy and tests in sync.",
         "Zero coupling is expected and correct — integration tests must not be imported by production code, and this zone correctly has no outward edges.",
+        "boundary-check.test.ts enforces web-shared two-consumer rule and messaging exemption but has no assertion guarding against the undocumented project-status-polling ↔ web-viewer bidirectional import loop — one of the two known architectural smells has automated enforcement (crash exception documented) while the other does not.",
+        "The boundary-check governance test covers web-shared and messaging exemptions but is silent on the use ↔ web-viewer bidirectional dependency. Adding an assertion (or a comment documenting the intended dissolution path) would bring policy and tests into sync for this zone pair.",
+        "boundary-check.test.ts uses regex-based import extraction with documented blind spots (dynamic imports, template literals, multiline statements). If an assertion for the use ↔ web-viewer loop is ever added here, it would inherit these blind spots — type-only or dynamically constructed imports in the loop would pass undetected. An AST-based check would be more reliable for enforcing type-import boundaries.",
+        "boundary-check.test.ts regex extraction misses dynamic imports and multiline statements. Any future assertion guarding the use ↔ web-viewer dissolution would inherit these blind spots, providing false confidence that the boundary is enforced.",
+        "boundary-check.test.ts has no assertions guarding the three divergent health threshold definitions across overview.ts and CLAUDE.md — threshold drift between attentionCount (OR, 0.4), healthColor (0.7/0.4 cohesion-only), and dual-fragility policy (AND, 0.5) is undetectable at test time.",
+        "Add a comment or assertion in boundary-check.test.ts documenting the canonical dual-fragility thresholds (cohesion < 0.5 AND coupling > 0.5) so that future changes to overview.ts health metric logic can be cross-checked against policy. Currently threshold drift is completely unguarded.",
         "[call graph] 27 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -11070,6 +11138,8 @@
         "Zero coupling and co-located test indicate the landing page is correctly treated as a leaf module with no upward dependencies — this is the right pattern for a thin entry surface.",
         "With only 2 files, zone metrics are statistically unreliable; treat cohesion and coupling values as directional indicators only, not architectural signals.",
         "No declared entry points means this zone is not consumed by other zones at analysis time; confirm the landing page is wired into the server composition root via a build artifact or direct HTML reference rather than a runtime import.",
+        "23 internal calls with 0 outgoing and 0 incoming in the call graph corroborates zero import coupling — the landing page is isolated at both the module graph and runtime call level, confirming it is wired via build artifact rather than module imports",
+        "Call graph (23 internal, 0 outgoing, 0 incoming) confirms the landing page has no runtime call edges to any other zone, consistent with build-artifact wiring. No further import-boundary enforcement is needed for this zone.",
         "[call graph] 23 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -11148,6 +11218,10 @@
         "Cohesion of 0.87 is strong for a 48-file composition root that must wire together gateways, schedulers, and usage services — this reflects disciplined separation of server concerns from viewer concerns.",
         "The injection seam (start.ts → register-scheduler.ts) bypasses static boundary analysis; any refactor of broadcast or loadPRD signatures must include a manual audit of RegisterSchedulerOptions to prevent silent interface drift.",
         "shared-types.ts and task-usage.ts are declared entry points, indicating these types and services are consumed by other zones; ensure they remain thin re-export or type-only modules to prevent the server's internal implementation from leaking outward.",
+        "The call graph shows 172 incoming calls into web-server-api with 0 outgoing, while the import graph records 5 imports from web-server into web-dashboard-viewer — this discrepancy indicates the 5 import edges are type-only or narrow utility imports that generate no runtime calls, confirming the server is a pure consumer of the viewer's public API with no callback into web-server from viewer at runtime",
+        "Call graph (0 outgoing, 172 incoming) vs import graph (5 outbound imports into web-dashboard-viewer) discrepancy confirms the 5 server→viewer imports are type-only or build-time references generating no runtime calls. The server is a strict consumer of the viewer's public API, not a peer — the asymmetry is architecturally correct.",
+        "RegisterSchedulerOptions declares broadcast, collectAllIds, and loadPRD as optional (?: syntax, lines 28, 31, 37) but start.ts always provides all three at the injection call site. The optional-but-always-provided pattern means a future caller that accidentally omits a callback will receive undefined at runtime rather than a compile-time error — the interface under-specifies the actual contract established by the injection seam registry in CLAUDE.md.",
+        "RegisterSchedulerOptions (packages/web/src/server/register-scheduler.ts lines 28, 31, 37) declares broadcast, collectAllIds, and loadPRD as optional, but the CLAUDE.md injection seam registry lists all four injected callbacks as always-provided by start.ts. Required callbacks marked optional silently accept undefined callers — future injection sites that omit a callback will fail at runtime rather than at compile time. Required callbacks should be non-optional in the interface.",
         "[call graph] 1208 internal calls, 0 outgoing, 172 incoming (cohesion: 1, coupling: 0)"
       ],
       "riskMetrics": {
@@ -12080,6 +12154,87 @@
     "packages/rex/tests/e2e/ contains files from 3 zones (rex-cli-e2e-coverage, rex-package-e2e-tests, rex-prd-engine) — consider grouping into subdirectories to clarify architectural boundaries",
     "packages/web/tests/unit/server/ contains files from 4 zones (rex-prd-engine, sourcevision-analysis-engine, web-dashboard-viewer, web-server-api) — consider grouping into subdirectories to clarify architectural boundaries",
     "File \"packages/hench/tests/e2e/cli-init.test.ts\" has 100% of import neighbors in packages/hench/src/schema/ but lives in packages/hench/tests/e2e/ — consider relocating",
+    "The rex public.ts boundary is the sole architectural location where a CLI-tier module (mcp-tools.ts, mcp.ts) is exported as domain API. This is structurally distinct from the documented gateway exceptions — gateways re-export, they don't promote CLI code to domain API. The two exports (createRexMcpServer, handleEditItem) should be evaluated for relocation to a domain module or for exposure through a separate subpath export that signals their CLI-tier nature.",
+    "Comparing hench-agent-engine (cohesion 0.99, 141 files, 53 incoming call-graph edges to guard) with web-viewer (cohesion 0.95, 270 files, 121 cross-zone import edges) reveals a structural divergence: hench achieves high cohesion through disciplined sub-zone directories and gateway concentration, while web-viewer's high cohesion coexists with the monorepo's highest external coupling — suggesting web-viewer's cohesion metric reflects internal tightness rather than external isolation.",
+    "The rex package exhibits three distinct cross-zone coupling patterns simultaneously: layer inversion (rex-unit → rex-cli), circular dependency (rex-unit ↔ rex-core), and satellite over-coupling (fix → rex-unit at 1.75 imports/file). These patterns cluster in the same package, suggesting rex's internal zone boundaries were drawn around directory structure rather than semantic responsibility — a systematic re-zoning pass would likely consolidate to 2-3 well-defined zones.",
+    "All circular zone dependencies in the monorepo are intra-package (rex-unit ↔ rex-core within rex; web-viewer ↔ web within web package). There are no circular cross-package zone dependencies, confirming the four-tier hierarchy and gateway pattern are successfully preventing the most dangerous class of cycles. The intra-package cycles are structural concerns but are contained within package boundaries.",
+    "The fix satellite zone contains packages/rex/src/core/fix.ts alongside packages/rex/src/cli/commands/fix.ts — a core/ file inside a zone governed by the rex-satellite CLI-only policy; this violates the documented constraint that satellite zones must contain only CLI command handlers, with domain logic belonging in rex-prd-engine",
+    "The three satellite zones form a pure consumer graph: all import from rex-prd-engine, none import from each other, and none are imported by any other zone except their paired e2e tests — this topology means absorbing all three simultaneously carries no cross-satellite dependency risk",
+    "Call graph data reveals that prd-verification-utilities has the highest outgoing call density per file (58 calls / 2 source files = 29 calls/file) despite being the smallest satellite — this high call density per file, combined with zero internal calls, is the strongest quantitative signal that these two files are misplaced utilities rather than a zone",
+    "The zone naming collision (two entries both labeled rex-prd-engine — one 216 files, one 4 files) is a zone-pinning artifact where the fix satellite was pinned to the engine zone ID; this makes boundary-check tooling unable to distinguish the satellite from the engine, reducing governance effectiveness",
+    "All three satellite zones have their source files spread across at least two package directories (analyze/, cli/commands/, core/) rather than grouped under a single subdirectory — the rex-satellite zone policy recommends grouping into subdirectories under packages/rex/src/cli/commands/ but is not yet enforced",
+    "The external.ts gateway contract is partially enforced: createRequestDedup is correctly routed through external.ts, but createFetchPipeline and createWSPipeline — the two higher-volume pipeline factories — are imported directly from messaging/index.js by four viewer files. The gateway provides the appearance of boundary enforcement while leaving the most-used surface unprotected.",
+    "Call graph data reveals a consistent pattern across zones: import-edge bidirectionality between viewer-message-pipeline and web-dashboard-viewer (27 cross-edges) collapses to near-unidirectionality at runtime (77 out vs 11 in). Import-level cycle analysis overstates the actual runtime coupling when type imports are counted alongside value imports — a type-import stripping pass would reduce the apparent bidirectional edge count.",
+    "The crash zone imports directly from ../../shared/view-id.js rather than through external.ts, which is documented as an approved exception (crash imports web-shared directly). However, this makes crash the only sibling zone with a confirmed import path — it is also the only sibling zone NOT using api.ts, raising the question of whether api.ts has any real consumers at all.",
+    "Zone metric reliability stratifies cleanly by size: zones above 40 files (sourcevision-analysis-engine 133, web-dashboard-viewer 270, web-server-api 48, rex-unit 216, hench 141) all show cohesion ≥0.87 and stable coupling signals; zones below 10 files (web-landing-page 2, rex-cli 5, fix 4, use 3, crash 8) show high variance metrics that reflect isolation artifacts rather than structural quality. Cohesion thresholds for governance decisions should be applied only to zones above the 10-file reliability floor.",
+    "The call graph consistently shows intra-zone call density far exceeding cross-zone calls: sourcevision-analysis-engine 4596:0, web-dashboard-viewer 4843:183, web-server-api 1208:0, viewer-message-pipeline 940:77. This density-to-coupling ratio (internal calls / outgoing calls) is highest for sourcevision (infinity) and web-server-api (infinity), confirming these two zones have the cleanest runtime boundaries despite very different structural sizes.",
+    "The monorepo has two bidirectional zone loops involving web-viewer (crash ↔ web-viewer and use ↔ web-viewer), but they receive asymmetric treatment: crash is documented in CLAUDE.md and acknowledged as an architectural exception, while use ↔ web-viewer is undocumented, unenforced, and unresolved. Consistent policy requires either documenting the use loop as an explicit exception or enforcing its dissolution in boundary-check.test.ts.",
+    "Call-graph-based cohesion/coupling metrics and static-import-based cross-zone counts are produced by different analysis passes and can disagree (crash zone: call graph shows 0 outgoing, import graph shows 2). Architectural governance decisions (zone dissolution, boundary enforcement) should always prefer the static import graph as the authoritative source, with call graph data treated as supplementary.",
+    "The monorepo's two highest-risk architectural patterns — the web-viewer hub centrality (6 cross-zone edges) and the undocumented use ↔ web-viewer bidirectional loop — are related: dissolving project-status-polling into web-viewer would increase web-viewer's file count but eliminate one bidirectional edge, a net structural improvement provided the hooks are re-exported through web-viewer's barrel to avoid breaking external consumers.",
+    "Test governance is layered correctly (e2e → integration → unit → boundary-check), but the layers are not aligned on which architectural smells they guard: boundary-check.test.ts guards web-shared and messaging, web-server-viewer-boundary.test.js guards the server↔viewer seam, but no layer guards the use ↔ web-viewer loop. This gap should be filled before the project-status-polling zone is formally dissolved.",
+    "Rex package has three concurrent structural anti-patterns (layer inversion, circular zone dependency, satellite over-coupling) all within the same package. This clustering suggests the internal zone boundaries were defined by directory proximity rather than by semantic or dependency direction — a re-zoning of rex internals is warranted.",
+    "All detected circular zone dependencies are intra-package. No cross-package circular dependencies exist, confirming the gateway pattern and four-tier hierarchy are structurally enforced at the package boundary level.",
+    "packages/rex/src/core/fix.ts is inside the prd-fix-command satellite zone but lives in the core/ directory — satellite zone policy requires CLI-only content with domain logic in rex-prd-engine; this file should be relocated to rex-prd-engine or the satellite policy needs an explicit documented exception",
+    "No satellite zone has a lateral import to any other satellite — the star topology from all three satellites to rex-prd-engine means there is zero lateral coupling risk when planning absorption; each satellite can be absorbed independently without affecting the others",
+    "api.ts (viewer inbound gateway for sibling zones) has zero detectable consumers in the codebase. If no sibling zones import through api.ts, it provides documentation value only — either enforce it with a boundary-check.test.ts assertion or document that sibling zone access is currently uncontrolled.",
+    "Runtime call graph and import graph produce divergent coupling signals for bidirectional zone pairs. For governance decisions, both signals should be consulted: import-graph bidirectionality may reflect type-import inflation, while call-graph unidirectionality confirms the actual runtime dependency direction.",
+    "Static import analysis and call-graph analysis produce conflicting metrics for the crash zone. The monorepo should establish a single canonical source of truth for zone boundary enforcement (recommend: static import graph) and deprecate call-graph cohesion scores for zones with documented import-only cross-zone edges.",
+    "The project-status-polling dissolution into web-viewer is the single highest-ROI structural change available: it eliminates a dual-fragility zone, removes an undocumented bidirectional import loop, and reduces total zone count by one — all without requiring changes to any consumer outside web-viewer.",
+    "web-viewer and hench-agent-engine both achieve high cohesion (0.95 and 0.99 respectively) but through different mechanisms: hench achieves it through gateway concentration and sub-zone directories; web-viewer achieves it while maintaining 121 cross-zone import edges. Cohesion alone is insufficient as a health metric for hub zones — coupling must be weighted equally in assessments.",
+    "The three Rex satellite zones collectively represent 13 files, 3 dual-fragility warnings, and 95 total outgoing calls into rex-prd-engine — a single absorption PR targeting all three would reduce zone count by 3, eliminate all dual-fragility warnings in the Rex package, and add only 13 files to a 216-file zone whose cohesion can absorb them without measurable degradation",
+    "external.ts re-exports createRequestDedup from messaging but omits createFetchPipeline and createWSPipeline, which are imported directly by four viewer files. The gateway is incomplete: the two most-called pipeline factories bypass the documented boundary, creating an undetected leaky abstraction in the viewer's outbound import surface.",
+    "Asymmetric documentation of bidirectional zone loops (crash exception documented in CLAUDE.md; use ↔ web-viewer not documented) creates a governance gap where future contributors cannot distinguish intentional exceptions from unresolved debt. All bidirectional loops should be either documented as exceptions or tracked as active dissolution targets.",
+    "The rex layer inversion (rex-unit → rex-cli) is not a broad structural problem — it is a single concrete file: packages/rex/src/analyze/guided.ts importing `info` from cli/output.ts. The 2 static import edges attributed to this inversion both trace to this one file (guided.ts imports two symbols: `info`, and indirectly shares cli/output.ts with callers). Resolving this one file eliminates the entire rex-unit → rex-cli inversion finding.",
+    "The practice of placing re-export barrels in CLI-tier modules (cli/output.ts) for foundation-tier symbols creates a gravity well: domain modules are attracted to the convenience barrel and unknowingly cross a tier boundary. This pattern is currently contained to one file in rex, but its presence as a precedent makes proactive enforcement (e.g., a domain-isolation.test.js assertion blocking `from.*cli/output`) valuable before it spreads.",
+    "The web-server zone's 4 concrete imports from ../shared/index.js and the reported `web-server → web-viewer: 5` cross-zone count do not match — either one import edge is unaccounted for, or zone classification assigns some shared/ files to web-viewer rather than web. This is an analysis-pipeline discrepancy that affects governance accuracy: if shared/ files are counted as web-viewer, web-viewer's coupling and size metrics are inflated, and web-server appears to violate the no-runtime-import contract when it does not.",
+    "The hench-agent-engine's 1 runtime outgoing call-graph edge vs 2 static import edges to hench-safety-guard confirms that type-import erosion is already occurring in this zone pair: one edge is purely structural (type-only import), not behavioral. Auditing all bidirectional zone pairs for type-vs-value import composition would identify which apparent cycles are type-import artifacts vs genuine runtime coupling.",
+    "packages/hench/src/tools/files.ts imports simpleGlobMatch directly from ../guard/paths.js — the tools layer has a runtime import dependency on the security guard module. If guard/paths.js is refactored for security policy changes, file tool behavior changes with it. simpleGlobMatch is a pure utility with no guard-specific logic and should be relocated to a shared hench utilities module to decouple tool implementation from the security layer.",
+    "packages/hench/src/agent/lifecycle/loop.ts imports GuardRails directly from ../../guard/index.js — the core agent loop holds a direct compile-time dependency on the guard implementation class. This means the guard cannot be replaced with an alternate safety implementation or mocked in unit tests without modifying the core loop. The dependency direction should be inverted: loop.ts should accept a guard interface injected at construction, not import the concrete GuardRails class.",
+    "The web/src/schema/ directory is the only shared-types surface in the web package that is consumed by both the server tier (routes-features.ts) and the viewer tier (external.ts), yet it is not represented as a zone in web-shared or as its own zone. This creates a structural blind spot: changes to schema types have a cross-tier blast radius that zone coupling metrics do not surface.",
+    "The rex-cli zone (27+ files in packages/rex/src/cli/commands/) has a ZONE_BOUNDARY.md present but is not included in the analysis batch. With 27 flat-directory command files and high coupling to rex-prd-engine, it is the highest-file-count satellite zone in the rex package and the most likely source of future dual-fragility drift — its absence from governance analysis rounds means incremental additions will not trigger cohesion regression alerts until a full re-analysis.",
+    "use-facet-state.ts and tree-search.ts ended up in viewer-message-pipeline through a two-hop Louvain propagation: use-facet-state.ts was grouped with messaging due to polling-adjacent import patterns, then its import of SearchFacets from tree-search.ts pulled tree-search into the same zone. The misclassification cascades from a single boundary error — correcting use-facet-state.ts's zone pin removes both files without separate archetype overrides.",
+    "api.ts and external.ts are a declared symmetric gateway pair (external.ts for viewer→messaging outbound; api.ts for sibling zones→viewer inbound), but only external.ts appears in CLAUDE.md's gateway module registry table and only external.ts has enforcement via boundary-check.test.ts. The asymmetric documentation and enforcement mean api.ts is a paper boundary while external.ts is an active one — either enroll api.ts in the registry and add a boundary assertion, or explicitly document it as aspirational only.",
+    "Four files bypass external.ts for messaging imports, but they split into two architectural categories: hooks (use-prd-data.ts, use-prd-websocket.ts, use-project-status.ts) where direct pipeline factory imports are debatable infrastructure composition, and a component (execution-panel.ts) where direct pipeline construction is a clear separation-of-concerns violation. Enforcement strategies for the two categories differ: hooks could be exempted with documentation, but execution-panel.ts requires refactoring to delegate to a hook.",
+    "The overview dashboard (packages/web/src/viewer/views/overview.ts:120) counts 'zones needing attention' using OR logic (cohesion < 0.4 OR coupling > 0.5) with a cohesion threshold of 0.4 — but CLAUDE.md defines dual-fragility as BOTH thresholds simultaneously (cohesion < 0.5 AND coupling > 0.5). The dashboard therefore overcounts attention zones using a lower cohesion bar and looser boolean logic, making it an unreliable indicator of actual governance risk.",
+    "The bidirectional anti-pattern count in overview.ts (line 86–90) is computed by text-matching f.text.includes('Bidirectional') against finding strings. This creates an invisible coupling between finding serialization format and UI rendering logic: any change to finding text structure (capitalization, wording) silently zeros the antipattern badge without a compile-time or test-time error.",
+    "The web (messaging) zone's 15 imports into web-viewer likely include type dependencies (schema types, view IDs) that already have a valid home in web-shared. If those 15 edges are predominantly type imports rather than value imports, redirecting them to web-shared — which the messaging zone is already permitted to import directly per the messaging exemption — would eliminate the bidirectional loop structurally without dissolving or merging either zone.",
+    "packages/hench/src/process/ files (limiter.ts, memory-monitor.ts, memory-throttle.ts) import directly from hench-guard. This means the agent's process-management sub-zone has a mandatory compile-time dependency on the guard sub-zone, making it architecturally impossible to run the process layer without the guard present. The guard is nominally an optional safety wrapper, but these reverse-direction imports from process/ → guard make guard load-bearing inside the engine — a stronger coupling than the documented 'guard wraps agent' pattern implies.",
+    "The three Rex structural anti-patterns (layer inversion rex-unit → rex-cli, circular dependency rex-unit ↔ rex-core, satellite over-coupling fix/rex-core → rex-unit) are structurally independent failures. Fixing the circular dependency alone (e.g., by moving rex-core content into rex-unit) does not fix the layer inversion; fixing the layer inversion (moving the 2 rex-unit → rex-cli edges) does not resolve the satellites. A piecemeal approach risks introducing new violations while resolving existing ones — the three patterns require a coordinated re-zoning pass, not sequential individual fixes.",
+    "packages/rex/src/analyze/guided.ts is the only domain module in the monorepo that imports a logging primitive from a CLI-tier module (cli/output.ts) when the same primitive is available from the foundation tier (@n-dx/llm-client). This creates the sole concrete rex-unit → rex-cli layer inversion. The fix is a one-line import change; leaving it unresolved creates precedent for future domain modules to import from CLI tier.",
+    "Zone classification of src/shared/ files within the web package may be inconsistent between analysis passes, causing web-server → web-viewer cross-zone import counts to include what are actually web-server → web-shared edges. This inflates web-viewer's apparent inbound coupling metrics and makes the web-server composition root appear to violate its documented no-runtime-import contract. Zone pin verification for src/shared/ files is needed to establish accurate governance baselines.",
+    "hench tools/files.ts imports simpleGlobMatch from guard/paths.js, creating a hard compile-time dependency from the tools sub-zone into the security guard zone. The guard zone is supposed to wrap the agent (unidirectional), but this import inverts the dependency at the utility level — tools cannot be tested or deployed without the guard module present.",
+    "hench agent/lifecycle/loop.ts imports the concrete GuardRails class from guard/index.js. This couples the core agent loop to a specific guard implementation, preventing guard substitution (test doubles, alternate policies) without modifying loop.ts. The injection seam registry in CLAUDE.md documents callback injection as the preferred pattern for this type of cross-zone wiring — GuardRails should be injected rather than imported directly.",
+    "web/src/schema/ (shared type definitions used by both web-server and web-viewer) has no dedicated zone classification and no governance policy in CLAUDE.md. It is the only cross-tier shared surface in the web package without explicit boundary enforcement — adding a server-only import (e.g., a node: type) to schema/ would silently contaminate the viewer bundle at next build without triggering any boundary-check assertion.",
+    "api.ts is missing from CLAUDE.md's gateway module registry table (the table lists external.ts, hench/rex-gateway.ts, hench/llm-gateway.ts, web/rex-gateway.ts, web/domain-gateway.ts, but not web/viewer/api.ts). A contributor auditing the gateway surface sees no record of api.ts, creating an invisible enforcement gap for the viewer's inbound contract. Add api.ts to the table with its intended consumers (crash, route, performance zones) and an enforcement status note.",
+    "overview.ts:120 uses cohesion < 0.4 OR coupling > 0.5 to flag attention zones, but CLAUDE.md dual-fragility policy is cohesion < 0.5 AND coupling > 0.5. The mismatch means the dashboard both overcounts (OR vs AND) and uses a misaligned cohesion threshold (0.4 vs 0.5), creating a misleading governance indicator visible to every dashboard consumer.",
+    "overview.ts detects bidirectional anti-patterns via f.text.includes('Bidirectional') string match. This is an undocumented coupling between finding serialization format and dashboard rendering; changes to finding text format silently break the antipattern count with no compile-time or test-time signal.",
+    "The overview.ts refactor introduced a divergence between what the dashboard renders (compact attentionCount summary) and what the CSS defines (full attention-item/issue-tag block layout). CSS and component code are now out of sync, creating a documentation hazard — future contributors reading overview.css will expect DOM structure that does not exist.",
+    "The ZoneMap component removal from overview.ts reduces the dashboard's visual architectural coverage — users can no longer see the zone graph from the overview page and must navigate to the zones view. If this was intentional, document the navigation path in the overview UI; if unintentional, the ZoneMap component should be restored before the export becomes stale.",
+    "riskMetrics removal from zones.json and retention in v1.ts schema creates a schema drift pattern: the type says the field may exist, the data says it never does. This kind of optional-but-absent pattern accumulates over time and erodes schema trust — a follow-up pass should either remove the type field or restore the data, not leave both in an inconsistent state.",
+    "overview.ts:198 applies both 'enrichment-badge' and 'reset-badge' CSS classes to the post-reset indicator, but overview.css defines no .reset-badge rule — the badge renders identically to a normal enrichment badge, making it visually impossible to distinguish a reset event from an incremental pass",
+    "The 'green' cohesion threshold diverges across three viewer files: architecture.ts:49 uses cohesion ≥ 0.6, while overview.ts:254 and zone-map.ts:125 both use cohesion ≥ 0.7. A zone with cohesion 0.65 displays as healthy (green) on the architecture view and degraded (orange) on the overview and zone-map views simultaneously — three views cannot agree on the same zone's health status",
+    "faq.ts:43 documents coupling > 0.6 as the threshold for suggesting a zone merge, but overview.ts:120 flags zones for attention at coupling > 0.5. A zone with coupling 0.55 is counted in the UI attention badge while the FAQ text explicitly tells users coupling below 0.6 is acceptable — the in-product documentation actively contradicts the UI behavior it describes",
+    "The monorepo now has four distinct cohesion threshold values in active production code: 0.4 (orange floor in overview/architecture/zone-map), 0.5 (CLAUDE.md dual-fragility warning threshold), 0.6 (green floor in architecture.ts), 0.7 (green floor in overview.ts and zone-map.ts). Four thresholds for a single concept with no shared constant means any future threshold adjustment requires hunting four separate files",
+    "The overview dashboard has three independent cohesion threshold values (0.4 for attentionCount, 0.4/0.7 for health dots, 0.5 in CLAUDE.md governance) — this means the 'zones needing attention' count, the per-zone health indicator, and the written governance policy will never agree on which zones are at risk, making the dashboard an unreliable signal for the documented dual-fragility governance process",
+    "overview.css contains orphaned CSS rules (.attention-list, .attention-item, .insight-item, etc.) for UI components that no longer exist in overview.ts — this is evidence that a UI iteration removed rendered sections without cleaning up their styles, a pattern that will recur unless CSS removal is part of the component-change review checklist",
+    "The health dot color calculation in overview.ts is cohesion-only while CLAUDE.md's governance definition is dual-axis (cohesion AND coupling). This creates a systematic blind spot: any zone that is healthy on cohesion but fragile on coupling will appear green in the dashboard while simultaneously meeting the dual-fragility criterion in the governance policy — the dashboard actively contradicts the written governance definition for this class of zones",
+    "overview.ts:254-256 computes the Top Zones health-dot color using cohesion alone (>= 0.7 green, >= 0.4 orange, else red) with no coupling component. A zone with adequate cohesion (e.g. 0.7) but very high coupling (e.g. 0.9) receives a green dot despite representing a significant structural risk. The health-dot is therefore silent on the coupling half of the dual-fragility definition.",
+    "overview.ts applies two distinct cohesion thresholds within the same file: 0.4 for the attentionCount badge and 0.7/0.4 for healthColor in Top Zones. Neither matches the CLAUDE.md dual-fragility threshold of 0.5. Three threshold definitions for the same governance concept exist across two locations with no shared constant, making future realignment require coordinated edits in multiple places with no automated consistency check.",
+    "overview.css defines seven CSS classes — .attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, .insight-more — that have no usages in any production component. responsive.css also carries orphaned overrides for .attention-item and .attention-issues. These appear to be remnants of a removed 'zones needing attention' detail list that was replaced by the simpler zone-attention-note badge; the dead rules add maintenance noise and inflate the CSS surface.",
+    "overview.ts:199 applies class 'enrichment-badge reset-badge' to the lastReset indicator, but reset-badge has no CSS definition anywhere in the codebase. The reset badge renders identically to a regular enrichment badge with no visual differentiation — a silent UI regression where the reset state is visually indistinguishable from an enrichment pass badge.",
+    "overview.ts (the primary governance dashboard view) has zero unit tests. The three threshold-dependent governance indicators — attentionCount (boolean logic + threshold), healthColor (cohesion-only color bands), and bidirectional antipattern count (text.includes string match) — are all untested. Bugs in these calculations produce misleading governance signals without any compile-time or test-time detection.",
+    "overview.css and overview.ts are now structurally misaligned: the CSS defines layout for attention-item, issue-tag, and insight-item blocks that the component no longer renders. Establish a pattern of co-locating CSS with its component (or using CSS-in-JS / scoped styles) to make dead style detection mechanical rather than requiring manual cross-file audits.",
+    "The ZoneRiskMetrics type should be deprecated or removed from sourcevision/src/schema/v1.ts in a follow-up PR now that riskMetrics has been removed from all zone data. Leaving an optional type field for data that is never populated erodes schema reliability and will silently mislead future consumers who write code against the type.",
+    "overview.ts:198 applies CSS class 'reset-badge' alongside 'enrichment-badge' for the post-reset state indicator, but overview.css contains no .reset-badge rule. The badge is visually indistinguishable from a normal enrichment badge. Add a distinct .reset-badge style (e.g., different background color or border) so users can identify when a reset has occurred.",
+    "The 'green' (healthy) cohesion threshold is 0.6 in architecture.ts:49 but 0.7 in overview.ts:254 and zone-map.ts:125. The same zone can simultaneously appear green on the architecture view and orange on the overview and zone-map views. Extract a single ZONE_HEALTH_GREEN_THRESHOLD constant into web-shared (or a viewer constants file) and import it in all three view files to eliminate the cross-view contradiction.",
+    "faq.ts:43 hardcodes coupling > 0.6 as the high-coupling threshold ('high coupling (>0.6) suggests merging'), but overview.ts:120 flags attention zones at coupling > 0.5. A user reading the FAQ will not understand why their zone with coupling 0.55 is flagged by the UI. Align the FAQ text to the actual attention threshold (0.5), or extract the threshold to a named constant that the FAQ text and the attention logic both reference.",
+    "Four distinct cohesion threshold values are scattered across governance docs and viewer code: 0.4 (orange floor), 0.5 (CLAUDE.md dual-fragility), 0.6 (architecture.ts green floor), 0.7 (overview.ts/zone-map.ts green floor). Consolidate to two named canonical thresholds — COHESION_WARN (0.5, aligning with CLAUDE.md) and COHESION_CRITICAL (0.4) — defined in a single location and imported by both governance tooling and viewer components.",
+    "CSS orphan prevention: when removing a rendered section from a Preact component, the corresponding CSS class definitions must be removed in the same PR. The current state (7 orphaned classes in overview.css) suggests this step is not on the component-change review checklist. Adding a CSS-unused-class lint rule or a reviewer checklist item would prevent accumulation of dead style rules.",
+    "Governance threshold synchronization: CLAUDE.md defines dual-fragility as cohesion < 0.5 AND coupling > 0.5. The dashboard (overview.ts:120, 254) uses different thresholds (0.4 and 0.7) inconsistently. Introduce a shared constant (e.g., DUAL_FRAGILITY_COHESION_THRESHOLD = 0.5, DUAL_FRAGILITY_COUPLING_THRESHOLD = 0.5) imported by both the dashboard and any test assertions to ensure all three signals remain synchronized when governance thresholds change.",
+    "Extract the dual-fragility thresholds (cohesion < 0.5, coupling > 0.5) into named constants shared by overview.ts and any future governance-reporting code. Currently overview.ts hard-codes 0.4 (attentionCount) and 0.7/0.4 (healthColor) in two places that do not match each other or CLAUDE.md policy — a single constant would make threshold alignment mechanical rather than requiring human coordination.",
+    "Remove the seven dead CSS rules in overview.css (.attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, .insight-more) and their responsive.css overrides. These classes have no production consumers and appear to be remnants of a removed attention-detail list section.",
+    "Define a CSS rule for .reset-badge in overview.css to visually differentiate the enrichment reset badge from a normal enrichment pass badge. Currently the two states are rendered identically because reset-badge has no styles, defeating the purpose of showing reset information separately.",
+    "Update the Top Zones health-dot color logic in overview.ts to incorporate coupling in addition to cohesion — for example, using red when cohesion < 0.5 AND coupling > 0.5 (dual-fragility), orange when either threshold is crossed individually, and green only when both are healthy. The current cohesion-only calculation makes the health dot blind to high-coupling zones.",
     "[call graph] 172 calls: \"web-dashboard-viewer\" → \"web-server-api\"",
     "[call graph] 77 calls: \"viewer-message-pipeline\" → \"web-dashboard-viewer\"",
     "[call graph] 58 calls: \"prd-verification-utilities\" → \"rex-prd-engine\"",
@@ -12148,83 +12303,6 @@
       "pass": 0,
       "scope": "global",
       "text": "Size imbalance: largest zone has 270 files vs smallest with 2 — uneven decomposition",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "All five zones in this batch have cohesion at or above 0.56 — none fall into the dual-fragility (<0.4 cohesion AND >0.6 coupling) risk zone, which is a positive signal compared to rex-cli and prd-fix-command in previous batches.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Foundation packages (llm-client, root orchestration) correctly show zero outbound coupling, validating the four-tier dependency hierarchy. Any future addition that introduces imports from these tiers into domain packages should be flagged as an architectural violation.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Gateway modules (hench/src/prd/rex-gateway.ts, web/src/server/rex-gateway.ts, web/src/viewer/external.ts) are the sole cross-package import surfaces and correctly appear as high-weight edges in the cross-zone import counts — this confirms the gateway pattern is structurally enforced, not just documented.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "The hench-agent-engine zone at 141 files is approaching the scale where sub-zone boundary drift becomes a risk. Adding automated boundary assertions (similar to web/boundary-check.test.ts) before it reaches web-viewer's 270-file scale would prevent gradual erosion.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "The monorepo has three separate test zones at the root level (monorepo-e2e-tests, monorepo-integration-tests) plus package-level test zones (web-integration-tests, rex-e2e). This layered test strategy is intentional and provides good coverage at each architectural seam — preserve the separation rather than consolidating all tests into one location.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "The project-status-polling zone (use) meets both dual-fragility thresholds (cohesion 0.25, coupling 0.75) and has a bidirectional dependency with web-viewer. It should be dissolved into web-viewer's hooks/ directory to eliminate the artificial zone boundary and the import cycle.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "The rex-prd-engine's 216-file scale with cohesion 0.98 is architecturally admirable, but at this size internal sub-zone documentation (similar to hench-agent's sub-zone governance in CLAUDE.md) would reduce onboarding friction and make future decomposition easier.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "The viewer-message-pipeline ↔ web-dashboard-viewer bidirectional import cycle (27 total cross-edges) is the only structural concern in this batch and should be resolved by enforcing strict directionality: messaging imports viewer types but viewer never imports messaging internals directly.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Three of five Rex zones fall into dual-fragility territory; the common pattern is a 2-4 file satellite with high outbound coupling to rex-prd-engine — a planned absorption pass would consolidate these into the engine and eliminate three warning-level zones in one PR.",
-      "severity": "warning"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Web-landing-page's total isolation (no consumers, no imports) suggests it may be wired via build artifact rather than module graph — confirm this is intentional and document the wiring mechanism to prevent future contributors from adding incorrect runtime imports.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "global",
-      "text": "Zone cohesion metrics for zones containing only test files (or predominantly test files) are structurally biased toward 0 because test files rarely import each other. The analysis pipeline should weight test-zone cohesion differently or exclude test-only zones from cohesion health reporting.",
       "severity": "info"
     },
     {
@@ -12620,27 +12698,6 @@
     },
     {
       "type": "observation",
-      "pass": 1,
-      "scope": "web-dashboard-viewer",
-      "text": "16 entry points span viewer, server-gateway, shared, schema, and sub-feature directories — consider documenting which entry points are public API vs internal cross-zone seams to guide future contributors.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "web-dashboard-viewer",
-      "text": "Cohesion of 0.95 across 270 files is excellent and should be treated as a health baseline — any addition that drops cohesion below 0.90 warrants explicit architectural review.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
-      "pass": 1,
-      "scope": "web-dashboard-viewer",
-      "text": "The zone acts as the composition hub with 84 imports from web-server and 15 from the viewer-message-pipeline zone; the api.ts and external.ts gateway files are critical choke-points and should be kept strictly re-export-only with no embedded logic.",
-      "severity": "info"
-    },
-    {
-      "type": "observation",
       "pass": 0,
       "scope": "web-integration-tests",
       "text": "High cohesion (1) — files are tightly interconnected",
@@ -12753,6 +12810,90 @@
     },
     {
       "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "CSS orphan prevention: when removing a rendered section from a Preact component, the corresponding CSS class definitions must be removed in the same PR. The current state (7 orphaned classes in overview.css) suggests this step is not on the component-change review checklist. Adding a CSS-unused-class lint rule or a reviewer checklist item would prevent accumulation of dead style rules.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "Define a CSS rule for .reset-badge in overview.css to visually differentiate the enrichment reset badge from a normal enrichment pass badge. Currently the two states are rendered identically because reset-badge has no styles, defeating the purpose of showing reset information separately.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "Extract the dual-fragility thresholds (cohesion < 0.5, coupling > 0.5) into named constants shared by overview.ts and any future governance-reporting code. Currently overview.ts hard-codes 0.4 (attentionCount) and 0.7/0.4 (healthColor) in two places that do not match each other or CLAUDE.md policy — a single constant would make threshold alignment mechanical rather than requiring human coordination.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "Four distinct cohesion threshold values are scattered across governance docs and viewer code: 0.4 (orange floor), 0.5 (CLAUDE.md dual-fragility), 0.6 (architecture.ts green floor), 0.7 (overview.ts/zone-map.ts green floor). Consolidate to two named canonical thresholds — COHESION_WARN (0.5, aligning with CLAUDE.md) and COHESION_CRITICAL (0.4) — defined in a single location and imported by both governance tooling and viewer components.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "Governance threshold synchronization: CLAUDE.md defines dual-fragility as cohesion < 0.5 AND coupling > 0.5. The dashboard (overview.ts:120, 254) uses different thresholds (0.4 and 0.7) inconsistently. Introduce a shared constant (e.g., DUAL_FRAGILITY_COHESION_THRESHOLD = 0.5, DUAL_FRAGILITY_COUPLING_THRESHOLD = 0.5) imported by both the dashboard and any test assertions to ensure all three signals remain synchronized when governance thresholds change.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "Remove the seven dead CSS rules in overview.css (.attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, .insight-more) and their responsive.css overrides. These classes have no production consumers and appear to be remnants of a removed attention-detail list section.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "The 'green' (healthy) cohesion threshold is 0.6 in architecture.ts:49 but 0.7 in overview.ts:254 and zone-map.ts:125. The same zone can simultaneously appear green on the architecture view and orange on the overview and zone-map views. Extract a single ZONE_HEALTH_GREEN_THRESHOLD constant into web-shared (or a viewer constants file) and import it in all three view files to eliminate the cross-view contradiction.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "The ZoneRiskMetrics type should be deprecated or removed from sourcevision/src/schema/v1.ts in a follow-up PR now that riskMetrics has been removed from all zone data. Leaving an optional type field for data that is never populated erodes schema reliability and will silently mislead future consumers who write code against the type.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "Update the Top Zones health-dot color logic in overview.ts to incorporate coupling in addition to cohesion — for example, using red when cohesion < 0.5 AND coupling > 0.5 (dual-fragility), orange when either threshold is crossed individually, and green only when both are healthy. The current cohesion-only calculation makes the health dot blind to high-coupling zones.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "faq.ts:43 hardcodes coupling > 0.6 as the high-coupling threshold ('high coupling (>0.6) suggests merging'), but overview.ts:120 flags attention zones at coupling > 0.5. A user reading the FAQ will not understand why their zone with coupling 0.55 is flagged by the UI. Align the FAQ text to the actual attention threshold (0.5), or extract the threshold to a named constant that the FAQ text and the attention logic both reference.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "overview.css and overview.ts are now structurally misaligned: the CSS defines layout for attention-item, issue-tag, and insight-item blocks that the component no longer renders. Establish a pattern of co-locating CSS with its component (or using CSS-in-JS / scoped styles) to make dead style detection mechanical rather than requiring manual cross-file audits.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "global",
+      "text": "overview.ts:198 applies CSS class 'reset-badge' alongside 'enrichment-badge' for the post-reset state indicator, but overview.css contains no .reset-badge rule. The badge is visually indistinguishable from a normal enrichment badge. Add a distinct .reset-badge style (e.g., different background color or border) so users can identify when a reset has occurred.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
       "pass": 0,
       "scope": "global",
       "text": "Hub function: walkTree in packages/rex/src/core/tree.ts is called from 30 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed",
@@ -12820,6 +12961,41 @@
       "severity": "info"
     },
     {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-dashboard-viewer",
+      "text": "Three different cohesion thresholds are in use: attentionCount filter uses < 0.4 (overview.ts:120), health dot uses 0.4/0.7 (overview.ts:254), CLAUDE.md governance uses < 0.5. Align all dashboard thresholds to the governance definition (cohesion < 0.5 AND coupling > 0.5) so the dashboard is a reliable indicator of actual dual-fragility risk.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-dashboard-viewer",
+      "text": "overview.css lines 183-239 define .attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, and .insight-more but none of these classes appear in any viewer TypeScript file. Remove the dead CSS rules to reduce style bundle size and prevent future confusion about available UI components.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-dashboard-viewer",
+      "text": "overview.ts:241 labels the zone summary panel 'Top Zones' but sorts exclusively by file count (b.files.length - a.files.length). Rename the panel to 'Largest Zones' or change the sort to a composite health score (e.g., cohesion desc) to match the label's implied meaning.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-dashboard-viewer",
+      "text": "overview.ts:254-256 health dot coloring derives color from cohesion alone (>= 0.7 green, >= 0.4 orange), ignoring coupling. A zone with cohesion=0.9 and coupling=0.9 renders green. Add coupling to the health-dot color calculation (e.g., flag orange when coupling > 0.5 regardless of cohesion) to surface the coupling half of dual-fragility.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-dashboard-viewer",
+      "text": "reset-badge CSS class is applied at overview.ts:199 but undefined in overview.css or any imported stylesheet. The reset badge renders identically to the enrichment badge. Define .reset-badge in overview.css (e.g., different background-color and text color) to restore the intended visual distinction.",
+      "severity": "warning"
+    },
+    {
       "type": "move-file",
       "pass": 0,
       "scope": "global",
@@ -12869,25 +13045,249 @@
       "severity": "info"
     },
     {
-      "type": "observation",
-      "pass": 1,
-      "scope": "prd-fix-command",
-      "text": "Dual-fragility zone (cohesion 0.25, coupling 0.75) — the lowest cohesion of any zone in this batch; evaluate whether core/fix.ts warrants its own file or can be absorbed into the CLI command handler.",
+      "type": "pattern",
+      "pass": 2,
+      "scope": "monorepo-e2e-tests",
+      "text": "High internal call count (471) relative to file count (22) suggests non-trivial shared test utilities. Audit shared helpers for transitive production imports to preserve the zero-coupling contract.",
       "severity": "warning"
     },
     {
-      "type": "observation",
-      "pass": 1,
-      "scope": "prd-fix-command",
-      "text": "Four-file zone with paired CLI/core structure matches the rex-satellite subdirectory convention; confirm both files live under packages/rex/src/cli/commands/ per the governance policy.",
+      "type": "pattern",
+      "pass": 2,
+      "scope": "project-status-polling",
+      "text": "use-polling.ts has no dedicated unit test; dissolving this zone into web-viewer before adding one would permanently bury retry and interval logic without isolated test coverage.",
+      "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "rex-package-e2e-tests",
+      "text": "The e2e test zone covers exactly the four Rex CLI surfaces that correspond to satellite zones (adapter, analyze, fix, import) — each satellite has a matching e2e file, meaning absorption of any satellite must preserve its e2e test to maintain the coverage contract",
       "severity": "info"
     },
     {
-      "type": "observation",
-      "pass": 1,
-      "scope": "prd-fix-command",
-      "text": "Seven outbound imports to rex-prd-engine indicate this zone orchestrates rather than owns behavior — a healthy pattern for a CLI satellite but one that should not grow without adding internal cohesion.",
+      "type": "pattern",
+      "pass": 2,
+      "scope": "rex-prd-engine",
+      "text": "Three satellites (chunked-review-pipeline, prd-fix-command, prd-verification-utilities) all import exclusively from rex-prd-engine with no lateral imports between satellites — star topology is clean but artificial; absorbing all three in a single pass would eliminate three dual-fragility zones with one PR",
       "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "sourcevision-analysis-engine",
+      "text": "Import metrics (cohesion=1, coupling=0) and call graph (4596 internal, 0 outgoing) provide dual-signal confirmation of structural isolation — the only zone in the monorepo where both static and runtime analyses agree perfectly. This is the reference model for domain-layer package health.",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "viewer-message-pipeline",
+      "text": "use-facet-state.ts appears in the viewer-message-pipeline zone rather than web-dashboard-viewer, indicating the community detection algorithm is treating polling-adjacent hooks as messaging infrastructure. This artificially inflates the bidirectional cross-zone edge count between the two zones.",
+      "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "web-dashboard-viewer",
+      "text": "Call graph asymmetry (77 outgoing calls from messaging into viewer vs 11 incoming) confirms the bidirectional import relationship is structurally one-directional at runtime. The 12 inbound import edges from viewer into messaging should be audited — if they are only type imports, the runtime coupling is effectively zero and the zone boundary can be simplified.",
+      "severity": "info"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "web-integration-tests",
+      "text": "The boundary-check governance test covers web-shared and messaging exemptions but is silent on the use ↔ web-viewer bidirectional dependency. Adding an assertion (or a comment documenting the intended dissolution path) would bring policy and tests into sync for this zone pair.",
+      "severity": "warning"
+    },
+    {
+      "type": "pattern",
+      "pass": 2,
+      "scope": "web-landing-page",
+      "text": "Call graph (23 internal, 0 outgoing, 0 incoming) confirms the landing page has no runtime call edges to any other zone, consistent with build-artifact wiring. No further import-boundary enforcement is needed for this zone.",
+      "severity": "info"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "chunked-review-pipeline",
+      "text": "batch-types.ts sits in packages/rex/src/analyze/ (inside the engine directory tree) but is pinned to the chunked-review-pipeline satellite zone — physical location and zone assignment are misaligned, causing confusion about where new batch-related types should land",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "crash",
+      "text": "Call graph (0 outgoing/incoming) contradicts cross-zone import counts (2 each direction with web-viewer). The import graph is the authoritative source for architectural boundary enforcement; call-graph cohesion/coupling scores for this zone should be treated as unreliable.",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "hench-safety-guard",
+      "text": "hench-safety-guard makes ~13 call-graph calls per file-level import edge into hench-agent-engine (53 calls / 4 edges), indicating deep runtime coupling not visible from static import counts alone. A named interface contract between the two zones would make this surface explicit and type-safe.",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "monorepo-integration-tests",
+      "text": "Integration test coverage is asymmetric: the documented crash ↔ web-viewer exception is backed by CLAUDE.md policy, but the undocumented use ↔ web-viewer bidirectional loop has no integration-level assertion enforcing either its dissolution or its documented exception status.",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "prd-verification-utilities",
+      "text": "prd-verification-utilities has a single consumer zone (rex-prd-engine) and zero internal cohesion — it is the strongest absorption candidate in the Rex package and violates the two-consumer governance rule; absorbing it eliminates a dual-fragility warning with no architectural trade-off",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "project-status-polling",
+      "text": "The bidirectional use ↔ web-viewer loop is undocumented in CLAUDE.md and unenforced in boundary-check.test.ts, unlike the crash ↔ web-viewer exception which is explicitly documented. This creates an invisible architectural debt that will grow without automated guards.",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "viewer-message-pipeline",
+      "text": "Viewer hooks (use-project-status.ts, use-prd-data.ts, use-prd-websocket.ts, execution-panel.ts) import createFetchPipeline and createWSPipeline directly from messaging/index.js rather than through external.ts. external.ts only re-exports createRequestDedup, leaving the two most-used pipeline factories outside the gateway contract — a partial gateway that provides incomplete boundary enforcement.",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "web-dashboard-viewer",
+      "text": "api.ts is declared as the sanctioned import surface for sibling zones (crash, route, performance) but has zero detectable consumers importing through it at analysis time. Sibling zones may be bypassing the gateway and importing viewer internals directly, which would make api.ts a paper boundary with no enforcement.",
+      "severity": "warning"
+    },
+    {
+      "type": "relationship",
+      "pass": 2,
+      "scope": "web-server-api",
+      "text": "Call graph (0 outgoing, 172 incoming) vs import graph (5 outbound imports into web-dashboard-viewer) discrepancy confirms the 5 server→viewer imports are type-only or build-time references generating no runtime calls. The server is a strict consumer of the viewer's public API, not a peer — the asymmetry is architecturally correct.",
+      "severity": "info"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "chunked-review-pipeline",
+      "text": "batch-types.ts is physically located in packages/rex/src/analyze/ — the same directory as ~40 rex-prd-engine source files — but is zone-pinned to chunked-review-pipeline. This directory-zone mismatch means any new batch-related type added to analyze/ will silently land in rex-prd-engine rather than chunked-review-pipeline, eroding the satellite boundary without any import-graph signal.",
+      "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "prd-verification-utilities",
+      "text": "keywords.ts and verify.ts are zone-pinned to prd-verification-utilities but live in packages/rex/src/core/ alongside 30+ rex-prd-engine files with no subdirectory or ZONE_BOUNDARY.md to mark the satellite boundary. The absence of a physical boundary marker means the zone designation exists only in sourcevision metadata — invisible to contributors without tooling access.",
+      "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "project-status-polling",
+      "text": "Dissolution prerequisite (use-polling.ts unit test) is untracked: there is no automated gate preventing zone dissolution from proceeding before the required test exists. A missed prerequisite would permanently bury retry and interval logic without isolated test coverage.",
+      "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "viewer-message-pipeline",
+      "text": "build.js and dev.js are spawn-based orchestration scripts (esbuild, tsc, ESLint child processes) with no runtime viewer imports. Their presence in a runtime messaging zone inflates coupling metrics. These files should be excluded from zone classification via archetype pinning (config archetype) rather than left to distort cohesion signals.",
+      "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "viewer-message-pipeline",
+      "text": "tree-search.ts (packages/web/src/viewer/components/prd-tree/tree-search.ts) has zero messaging, WebSocket, or polling imports — it is a pure algorithmic utility classified here only because use-facet-state.ts imports SearchFacets from it, creating a transitive zone grouping artifact. It belongs in web-dashboard-viewer. Fixing the use-facet-state.ts zone pin removes both misclassifications.",
+      "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "web-dashboard-viewer",
+      "text": "api.ts is declared as the inbound gateway for sibling zones (crash, route, performance) but is absent from CLAUDE.md's gateway module registry table. external.ts appears in the table; api.ts does not. This asymmetry means gateway audits using the table as their source of truth will miss the api.ts contract entirely — add api.ts to the registry with its declared consumers and an enforcement note.",
+      "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "web-dashboard-viewer",
+      "text": "execution-panel.ts (packages/web/src/viewer/components/prd-tree/execution-panel.ts) imports createFetchPipeline directly from ../../messaging/index.js — it is the only UI component (vs hook) bypassing external.ts. Components should delegate pipeline construction to hooks, not import messaging factories directly. This couples a UI component to messaging implementation details and is not caught by hook-focused gateway reviews.",
+      "severity": "warning"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "web-integration-tests",
+      "text": "boundary-check.test.ts regex extraction misses dynamic imports and multiline statements. Any future assertion guarding the use ↔ web-viewer dissolution would inherit these blind spots, providing false confidence that the boundary is enforced.",
+      "severity": "info"
+    },
+    {
+      "type": "anti-pattern",
+      "pass": 3,
+      "scope": "web-server-api",
+      "text": "RegisterSchedulerOptions (packages/web/src/server/register-scheduler.ts lines 28, 31, 37) declares broadcast, collectAllIds, and loadPRD as optional, but the CLAUDE.md injection seam registry lists all four injected callbacks as always-provided by start.ts. Required callbacks marked optional silently accept undefined callers — future injection sites that omit a callback will fail at runtime rather than at compile time. Required callbacks should be non-optional in the interface.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "chunked-review-pipeline",
+      "text": "batch-types.ts appears in the zone's entryPoints array in zones.json but is absent from the files array (files lists 4 entries; batch-types.ts is excluded). Zone entry points must be a subset of zone files for metadata integrity. Either add batch-types.ts back to the files array or remove it from entryPoints — the current state produces a silent count mismatch that affects file-count metrics and zone tooling.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 0,
+      "scope": "chunked-review-pipeline",
+      "text": "Zone \"Chunked Review Pipeline\" (chunked-review-pipeline) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — unreliable: zone has only 4 files (minimum 5 for reliable metrics)",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "monorepo-orchestration",
+      "text": "claude-integration.js archetype was changed from entrypoint to service and help.js from entrypoint to utility. These files sit at the orchestration tier alongside cli.js and web.js — verify the new archetypes correctly reflect their role before any inventory-based tooling (e.g. entrypoint discovery, spawn-only enforcement) relies on archetype for classification.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "sourcevision",
+      "text": "riskMetrics was removed from all zone records in zones.json but ZoneRiskMetrics and the optional riskMetrics field remain in the v1 schema type. Audit MCP tool handlers and server routes for reads of zone.riskMetrics before confirming this is a clean removal — the optional field marker silences TypeScript errors even when callers assume the field is present.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-integration-tests",
+      "text": "Add a comment or assertion in boundary-check.test.ts documenting the canonical dual-fragility thresholds (cohesion < 0.5 AND coupling > 0.5) so that future changes to overview.ts health metric logic can be cross-checked against policy. Currently threshold drift is completely unguarded.",
+      "severity": "info"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-viewer",
+      "text": "ZoneMap and ZoneDetail (from zone-map.js) are still re-exported via visualization/index.ts:57 but have no consumers after overview.ts removed its imports. These are dead exports — either remove the re-export or confirm another view will consume them before the next release.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-viewer",
+      "text": "overview.css contains at least 7 dead CSS class definitions (.attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, .insight-more) whose corresponding HTML was removed in the overview refactor. Remove these unused rules to prevent false documentation of expected DOM structure.",
+      "severity": "warning"
+    },
+    {
+      "type": "suggestion",
+      "pass": 4,
+      "scope": "web-viewer",
+      "text": "overview.ts now uses three distinct cohesion thresholds: 0.4 (attentionCount OR condition), 0.4/0.7 (health-dot colorization), and the CLAUDE.md-mandated 0.5 (dual-fragility AND). Define a single set of named governance constants (e.g. COHESION_WARN = 0.5, COHESION_CRITICAL = 0.4) and use them consistently across all three sites to align dashboard signals with documented policy.",
+      "severity": "warning"
     },
     {
       "type": "anti-pattern",
@@ -12927,19 +13327,12 @@
     {
       "type": "suggestion",
       "pass": 0,
-      "scope": "chunked-review-pipeline",
-      "text": "Zone \"Chunked Review Pipeline\" (chunked-review-pipeline) has critical risk (score: 0.64, cohesion: 0.36, coupling: 0.64) — unreliable: zone has only 4 files (minimum 5 for reliable metrics)",
-      "severity": "info"
-    },
-    {
-      "type": "suggestion",
-      "pass": 0,
       "scope": "rex-cli-e2e-coverage",
       "text": "Zone \"Rex CLI E2E Coverage\" (rex-cli-e2e-coverage) has at-risk risk (score: 0.50, cohesion: 0.00, coupling: 0.00) — approaching architectural risk thresholds",
       "severity": "info"
     }
   ],
-  "enrichmentPass": 1,
+  "enrichmentPass": 4,
   "metaEvaluationCount": 3,
   "structureHash": "bf432429e37c7ce8",
   "zoneContentHashes": {
@@ -12950,12 +13343,12 @@
     "rex-cli-e2e-coverage": "fb6525526170fe7e",
     "rex-prd-engine": "262c9d1e879052b1",
     "chunked-review-pipeline": "919db77813ba878a",
-    "prd-fix-command": "ad949987284d3453",
+    "rex-prd-engine-2": "ad949987284d3453",
     "prd-verification-utilities": "1b47aba43aff9c31",
     "rex-package-e2e-tests": "50f0f9549d178b0d",
     "sourcevision-analysis-engine": "e35e2744e6aec0be",
     "viewer-message-pipeline": "52622a5833f052e3",
-    "web-dashboard-viewer": "5af9b5f62809236b",
+    "web-dashboard-viewer": "954de82015a23512",
     "web-landing-page": "037dd0b86d5748ea",
     "web-server-api": "797733255b63d883",
     "crash": "108433178fd0fd79",
@@ -12963,9 +13356,5 @@
     "web-integration-tests": "d2e223d4156cca5e",
     "monorepo-e2e-tests": "d9cba77eab4728a8",
     "monorepo-integration-tests": "0ae074cf776ce69e"
-  },
-  "lastReset": {
-    "from": 4,
-    "to": 1
   }
 }

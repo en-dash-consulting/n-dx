@@ -57,6 +57,7 @@ Incoming (other zones → this zone):
 [observation] [info] Bidirectional coupling with web-viewer (2 imports each direction) is an acknowledged architectural exception documented in CLAUDE.md; ensure new crash zone additions continue to follow the two-consumer rule before cohesion degrades.
 [observation] [info] Cohesion (0.6) and coupling (0.4) are healthy for an 8-file zone. The internal layering (service → hook → component) is clean and intentional.
 [observation] [info] crash-detector-test-support.ts in tests/helpers/ is a shared test fixture — verify it is not imported by any production code path, as helper files in test directories can blur the production/test boundary.
+[relationship] [warning] Call graph (0 outgoing/incoming) contradicts cross-zone import counts (2 each direction with web-viewer). The import graph is the authoritative source for architectural boundary enforcement; call-graph cohesion/coupling scores for this zone should be treated as unreliable.
 
 </findings>
 
@@ -70,6 +71,8 @@ Incoming (other zones → this zone):
 - Cohesion (0.6) and coupling (0.4) are healthy for an 8-file zone. The internal layering (service → hook → component) is clean and intentional.
 - Bidirectional coupling with web-viewer (2 imports each direction) is an acknowledged architectural exception documented in CLAUDE.md; ensure new crash zone additions continue to follow the two-consumer rule before cohesion degrades.
 - crash-detector-test-support.ts in tests/helpers/ is a shared test fixture — verify it is not imported by any production code path, as helper files in test directories can blur the production/test boundary.
+- The call graph reports 0 outgoing and 0 incoming calls for this zone, but cross-zone import data shows 2 imports each direction with web-viewer. This discrepancy reveals that call-graph analysis and static import analysis use different traversal methods — call-graph may undercount type-only or re-export-only imports.
+- Call graph (0 outgoing/incoming) contradicts cross-zone import counts (2 each direction with web-viewer). The import graph is the authoritative source for architectural boundary enforcement; call-graph cohesion/coupling scores for this zone should be treated as unreliable.
 - [call graph] 91 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

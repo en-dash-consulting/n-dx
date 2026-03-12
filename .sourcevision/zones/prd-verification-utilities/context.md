@@ -34,6 +34,8 @@ Outgoing (this zone → other zones):
 [observation] [warning] Lowest cohesion (0.18) in this batch combined with high coupling (0.82) — the two source files share no internal dependencies and exist as a grouping artifact; absorption into rex-prd-engine is the recommended resolution.
 [observation] [warning] keywords.ts and verify.ts serve distinct purposes (search vs. validation) with no shared imports between them; if kept separate from the engine, they warrant separate zones rather than a forced pairing.
 [observation] [info] rex-core → rex-unit (3 imports) confirms the dependency flows upward into the engine; inlining these files would remove a cross-zone edge without any architectural cost.
+[relationship] [warning] prd-verification-utilities has a single consumer zone (rex-prd-engine) and zero internal cohesion — it is the strongest absorption candidate in the Rex package and violates the two-consumer governance rule; absorbing it eliminates a dual-fragility warning with no architectural trade-off
+[anti-pattern] [warning] keywords.ts and verify.ts are zone-pinned to prd-verification-utilities but live in packages/rex/src/core/ alongside 30+ rex-prd-engine files with no subdirectory or ZONE_BOUNDARY.md to mark the satellite boundary. The absence of a physical boundary marker means the zone designation exists only in sourcevision metadata — invisible to contributors without tooling access.
 [suggestion] [info] Zone "PRD Verification Utilities" (prd-verification-utilities) has catastrophic risk (score: 0.82, cohesion: 0.18, coupling: 0.82) — unreliable: zone has only 2 files (minimum 5 for reliable metrics)
 
 </findings>
@@ -47,6 +49,11 @@ Outgoing (this zone → other zones):
 - Lowest cohesion (0.18) in this batch combined with high coupling (0.82) — the two source files share no internal dependencies and exist as a grouping artifact; absorption into rex-prd-engine is the recommended resolution.
 - keywords.ts and verify.ts serve distinct purposes (search vs. validation) with no shared imports between them; if kept separate from the engine, they warrant separate zones rather than a forced pairing.
 - rex-core → rex-unit (3 imports) confirms the dependency flows upward into the engine; inlining these files would remove a cross-zone edge without any architectural cost.
+- Zero internal calls combined with 58 outgoing calls means keywords.ts and verify.ts have no internal cohesion whatsoever — the zone boundary exists only as an artifact of clustering, not as an intentional design decision
+- keywords.ts and verify.ts are consumed by rex-prd-engine (3 inbound imports from rex-unit → rex-core) but have no imports from any other zone, making them exclusive satellites with a single consumer — violating the two-consumer rule and qualifying for mandatory absorption
+- prd-verification-utilities has a single consumer zone (rex-prd-engine) and zero internal cohesion — it is the strongest absorption candidate in the Rex package and violates the two-consumer governance rule; absorbing it eliminates a dual-fragility warning with no architectural trade-off
+- verify.ts and keywords.ts both live in packages/rex/src/core/ alongside 30+ other engine utilities (canonical.ts, dag.ts, tree.ts, etc.). The core/ directory is the physical home of rex-prd-engine domain logic, making the prd-verification-utilities zone boundary invisible at the filesystem level — a contributor browsing core/ has no indication these two files belong to a different zone
+- keywords.ts and verify.ts are zone-pinned to prd-verification-utilities but live in packages/rex/src/core/ alongside 30+ rex-prd-engine files with no subdirectory or ZONE_BOUNDARY.md to mark the satellite boundary. The absence of a physical boundary marker means the zone designation exists only in sourcevision metadata — invisible to contributors without tooling access.
 - [call graph] 0 internal calls, 58 outgoing, 0 incoming (cohesion: 0, coupling: 1)
 
 </insights>

@@ -25,6 +25,9 @@ packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 289 li
 [observation] [info] These two integration tests cover structurally distinct concerns (boundary policy vs. build artifacts); keeping them separate files within the same zone is intentional and should not be merged.
 [observation] [info] Zero coupling is expected and correct — integration tests must not be imported by production code, and this zone correctly has no outward edges.
 [observation] [info] boundary-check.test.ts is the enforcement mechanism for several CLAUDE.md governance rules; any relaxation of those rules must be mirrored in this file to keep policy and tests in sync.
+[pattern] [warning] The boundary-check governance test covers web-shared and messaging exemptions but is silent on the use ↔ web-viewer bidirectional dependency. Adding an assertion (or a comment documenting the intended dissolution path) would bring policy and tests into sync for this zone pair.
+[anti-pattern] [info] boundary-check.test.ts regex extraction misses dynamic imports and multiline statements. Any future assertion guarding the use ↔ web-viewer dissolution would inherit these blind spots, providing false confidence that the boundary is enforced.
+[suggestion] [info] Add a comment or assertion in boundary-check.test.ts documenting the canonical dual-fragility thresholds (cohesion < 0.5 AND coupling > 0.5) so that future changes to overview.ts health metric logic can be cross-checked against policy. Currently threshold drift is completely unguarded.
 
 </findings>
 
@@ -37,6 +40,12 @@ packages/web/tests/integration/build-output-contract.test.ts (TypeScript, 289 li
 - These two integration tests cover structurally distinct concerns (boundary policy vs. build artifacts); keeping them separate files within the same zone is intentional and should not be merged.
 - boundary-check.test.ts is the enforcement mechanism for several CLAUDE.md governance rules; any relaxation of those rules must be mirrored in this file to keep policy and tests in sync.
 - Zero coupling is expected and correct — integration tests must not be imported by production code, and this zone correctly has no outward edges.
+- boundary-check.test.ts enforces web-shared two-consumer rule and messaging exemption but has no assertion guarding against the undocumented project-status-polling ↔ web-viewer bidirectional import loop — one of the two known architectural smells has automated enforcement (crash exception documented) while the other does not.
+- The boundary-check governance test covers web-shared and messaging exemptions but is silent on the use ↔ web-viewer bidirectional dependency. Adding an assertion (or a comment documenting the intended dissolution path) would bring policy and tests into sync for this zone pair.
+- boundary-check.test.ts uses regex-based import extraction with documented blind spots (dynamic imports, template literals, multiline statements). If an assertion for the use ↔ web-viewer loop is ever added here, it would inherit these blind spots — type-only or dynamically constructed imports in the loop would pass undetected. An AST-based check would be more reliable for enforcing type-import boundaries.
+- boundary-check.test.ts regex extraction misses dynamic imports and multiline statements. Any future assertion guarding the use ↔ web-viewer dissolution would inherit these blind spots, providing false confidence that the boundary is enforced.
+- boundary-check.test.ts has no assertions guarding the three divergent health threshold definitions across overview.ts and CLAUDE.md — threshold drift between attentionCount (OR, 0.4), healthColor (0.7/0.4 cohesion-only), and dual-fragility policy (AND, 0.5) is undetectable at test time.
+- Add a comment or assertion in boundary-check.test.ts documenting the canonical dual-fragility thresholds (cohesion < 0.5 AND coupling > 0.5) so that future changes to overview.ts health metric logic can be cross-checked against policy. Currently threshold drift is completely unguarded.
 - [call graph] 27 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

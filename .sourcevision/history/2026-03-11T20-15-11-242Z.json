@@ -1,0 +1,197 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshots": [
+    {
+      "zoneId": "chunked-review-pipeline",
+      "zoneName": "Chunked Review Pipeline",
+      "cohesion": 0.36,
+      "coupling": 0.64,
+      "riskScore": 0.64,
+      "fileCount": 4,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "crash",
+      "zoneName": "Crash Recovery UI",
+      "cohesion": 0.6,
+      "coupling": 0.4,
+      "riskScore": 0.4,
+      "fileCount": 8,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "hench-agent-engine",
+      "zoneName": "Hench Agent Engine",
+      "cohesion": 0.99,
+      "coupling": 0.01,
+      "riskScore": 0.010000000000000005,
+      "fileCount": 141,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "hench-safety-guard",
+      "zoneName": "Hench Safety Guard",
+      "cohesion": 0.8,
+      "coupling": 0.2,
+      "riskScore": 0.19999999999999998,
+      "fileCount": 10,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "llm-client-foundation",
+      "zoneName": "LLM Client Foundation",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 41,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "monorepo-e2e-tests",
+      "zoneName": "Monorepo E2E Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 22,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "monorepo-integration-tests",
+      "zoneName": "Monorepo Integration Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 5,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "monorepo-orchestration",
+      "zoneName": "Monorepo Orchestration",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 18,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "prd-verification-utilities",
+      "zoneName": "PRD Verification Utilities",
+      "cohesion": 0.18,
+      "coupling": 0.82,
+      "riskScore": 0.8200000000000001,
+      "fileCount": 2,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "project-status-polling",
+      "zoneName": "Project Status Polling Hooks",
+      "cohesion": 0.25,
+      "coupling": 0.75,
+      "riskScore": 0.75,
+      "fileCount": 3,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "rex-cli-e2e-coverage",
+      "zoneName": "Rex CLI E2E Coverage",
+      "cohesion": 0,
+      "coupling": 0,
+      "riskScore": 0.5,
+      "fileCount": 9,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "rex-package-e2e-tests",
+      "zoneName": "Rex Package E2E Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 4,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "rex-prd-engine",
+      "zoneName": "Rex PRD Engine",
+      "cohesion": 0.98,
+      "coupling": 0.02,
+      "riskScore": 0.02000000000000001,
+      "fileCount": 224,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "sourcevision-analysis-engine",
+      "zoneName": "Sourcevision Analysis Engine",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 133,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "viewer-message-pipeline",
+      "zoneName": "Viewer Message Pipeline",
+      "cohesion": 0.56,
+      "coupling": 0.44,
+      "riskScore": 0.43999999999999995,
+      "fileCount": 34,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-dashboard-viewer",
+      "zoneName": "Web Dashboard Viewer",
+      "cohesion": 0.95,
+      "coupling": 0.05,
+      "riskScore": 0.050000000000000024,
+      "fileCount": 270,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-integration-tests",
+      "zoneName": "Web Integration Tests",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 2,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-landing-page",
+      "zoneName": "Web Landing Page",
+      "cohesion": 1,
+      "coupling": 0,
+      "riskScore": 0,
+      "fileCount": 2,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    },
+    {
+      "zoneId": "web-server-api",
+      "zoneName": "Web Server API",
+      "cohesion": 0.87,
+      "coupling": 0.13,
+      "riskScore": 0.13,
+      "fileCount": 48,
+      "timestamp": "2026-03-11T20:15:11.241Z",
+      "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+    }
+  ],
+  "analyzedAt": "2026-03-11T20:15:11.242Z",
+  "gitSha": "8c2a2e8798450de1ce46170ab123d4a467e50093"
+}

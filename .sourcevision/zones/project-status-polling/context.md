@@ -43,6 +43,9 @@ Incoming (other zones → this zone):
 [observation] [warning] Cohesion 0.25 and coupling 0.75 place this zone in the dual-fragility range; at 3 files the metrics are unreliable, but the bidirectional dependency with web-viewer suggests the zone boundary should be dissolved by absorbing these hooks into web-viewer.
 [observation] [info] If the zone is dissolved into web-viewer, the hooks must continue to be re-exported through web-viewer's barrel so external consumers are not broken.
 [observation] [info] Only one test file exists for two production hooks; use-polling.ts currently lacks a dedicated unit test, leaving the retry and interval logic untested in isolation.
+[pattern] [warning] use-polling.ts has no dedicated unit test; dissolving this zone into web-viewer before adding one would permanently bury retry and interval logic without isolated test coverage.
+[relationship] [warning] The bidirectional use ↔ web-viewer loop is undocumented in CLAUDE.md and unenforced in boundary-check.test.ts, unlike the crash ↔ web-viewer exception which is explicitly documented. This creates an invisible architectural debt that will grow without automated guards.
+[anti-pattern] [warning] Dissolution prerequisite (use-polling.ts unit test) is untracked: there is no automated gate preventing zone dissolution from proceeding before the required test exists. A missed prerequisite would permanently bury retry and interval logic without isolated test coverage.
 [suggestion] [info] Zone "Project Status Polling Hooks" (project-status-polling) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — unreliable: zone has only 3 files (minimum 5 for reliable metrics)
 
 </findings>
@@ -56,6 +59,12 @@ Incoming (other zones → this zone):
 - Cohesion 0.25 and coupling 0.75 place this zone in the dual-fragility range; at 3 files the metrics are unreliable, but the bidirectional dependency with web-viewer suggests the zone boundary should be dissolved by absorbing these hooks into web-viewer.
 - Only one test file exists for two production hooks; use-polling.ts currently lacks a dedicated unit test, leaving the retry and interval logic untested in isolation.
 - If the zone is dissolved into web-viewer, the hooks must continue to be re-exported through web-viewer's barrel so external consumers are not broken.
+- boundary-check.test.ts has no assertion preventing the bidirectional import loop between this zone and web-viewer — the architectural smell can grow unchecked without automated detection
+- Before dissolving this zone into web-viewer, a unit test for use-polling.ts retry and interval logic must be written first; dissolution without tests would leave that logic permanently untested
+- The bidirectional use ↔ web-viewer loop is undocumented in CLAUDE.md and unenforced in boundary-check.test.ts, unlike the crash ↔ web-viewer exception which is explicitly documented. This creates an invisible architectural debt that will grow without automated guards.
+- use-polling.ts has no dedicated unit test; dissolving this zone into web-viewer before adding one would permanently bury retry and interval logic without isolated test coverage.
+- The dissolution prerequisite (write use-polling.ts unit test first) has no automated gating mechanism — boundary-check.test.ts cannot enforce a 'test must exist before zone dissolved' constraint, leaving the sequencing dependency entirely to human review discipline.
+- Dissolution prerequisite (use-polling.ts unit test) is untracked: there is no automated gate preventing zone dissolution from proceeding before the required test exists. A missed prerequisite would permanently bury retry and interval logic without isolated test coverage.
 - [call graph] 3 internal calls, 5 outgoing, 1 incoming (cohesion: 0.38, coupling: 0.63)
 
 </insights>

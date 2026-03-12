@@ -162,8 +162,8 @@
     "packages/web/src/viewer/views/zones.ts",
     "packages/web/src/viewer/visualization/index.ts"
   ],
-  "cohesion": 0.86,
-  "coupling": 0.14,
+  "cohesion": 0.85,
+  "coupling": 0.15,
   "fileCount": 129,
-  "lineCount": 33866
+  "lineCount": 33806
 }

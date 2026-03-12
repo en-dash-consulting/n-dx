@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Web Viewer/web Viewer/web/viewer (`web-viewer/web-viewer/web/viewer`)
-Files: 19, Cohesion: 0.55, Coupling: 0.45
+Files: 19, Cohesion: 0.54, Coupling: 0.46
 Description: 19 files, primarily TypeScript
 Entry points: packages/web/src/schema/features.ts, packages/web/src/schema/v1.ts, packages/web/src/viewer/components/active-tasks-panel.ts, packages/web/src/viewer/components/elapsed-time.ts, packages/web/src/viewer/components/rex-task-link.ts, packages/web/src/viewer/components/search-filter.ts, packages/web/src/viewer/external.ts, packages/web/src/viewer/views/feature-toggles.ts, packages/web/src/viewer/views/overview.ts, packages/web/src/viewer/views/problems.ts, packages/web/src/viewer/views/routes.ts, packages/web/src/viewer/visualization/index.ts
-Lines: 3507
+Lines: 3447
 
 </zone>
 
@@ -27,7 +27,7 @@ packages/web/src/viewer/components/rex-task-link.ts (TypeScript, 320 lines, sour
 packages/web/src/viewer/components/search-filter.ts (TypeScript, 68 lines, source)
 packages/web/src/viewer/external.ts (TypeScript, 45 lines, source)
 packages/web/src/viewer/views/feature-toggles.ts (TypeScript, 318 lines, source)
-packages/web/src/viewer/views/overview.ts (TypeScript, 362 lines, source)
+packages/web/src/viewer/views/overview.ts (TypeScript, 302 lines, source)
 packages/web/src/viewer/views/problems.ts (TypeScript, 102 lines, source)
 packages/web/src/viewer/views/routes.ts (TypeScript, 354 lines, source)
 packages/web/src/viewer/visualization/index.ts (TypeScript, 57 lines, source)
@@ -49,8 +49,7 @@ Internal:
   packages/web/src/viewer/external.ts → packages/web/src/schema/v1.ts {*}
   packages/web/src/viewer/external.ts → packages/web/src/schema/v1.ts {Manifest, Inventory, Imports, Zones, Components, CallGraph, CallEdge, ComponentUsageEdge, ExternalImport, FileEntry, Finding, RouteExportKind, RouteTreeNode, Zone, ZoneCrossing}
   packages/web/src/viewer/views/feature-toggles.ts → packages/web/src/viewer/external.ts {FeatureToggle, FeaturesResponse}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/external.ts {Zone, Finding}
-  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, CollapsibleSection, HealthGauge, PatternBadge, MetricCard, ZoneMap, ZoneDetail, getZoneColorByIndex}
+  packages/web/src/viewer/views/overview.ts → packages/web/src/viewer/visualization/index.ts {BarChart, HealthGauge, PatternBadge, MetricCard, getZoneColorByIndex}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/external.ts {Finding}
   packages/web/src/viewer/views/problems.ts → packages/web/src/viewer/visualization/index.ts {FindingsList, BarChart}
   packages/web/src/viewer/views/routes.ts → packages/web/src/viewer/components/search-filter.ts {SearchFilter}

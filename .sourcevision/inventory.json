@@ -8662,13 +8662,13 @@
     },
     {
       "path": "packages/web/src/viewer/styles/overview.css",
-      "size": 3556,
+      "size": 4097,
       "language": "CSS",
-      "lineCount": 219,
-      "hash": "1100b5249caba9af85130a1bec4ee04986f036facc557af9574a918e21f04596",
+      "lineCount": 251,
+      "hash": "23df81c33144dc37354abbe9e915250e332483f6131b0f613b2f7dfbbdbc932b",
       "role": "other",
       "category": "web",
-      "lastModified": 1771394316107
+      "lastModified": 1773257716615
     },
     {
       "path": "packages/web/src/viewer/styles/polling-suspension.css",
@@ -9042,13 +9042,13 @@
     },
     {
       "path": "packages/web/src/viewer/views/overview.ts",
-      "size": 12069,
+      "size": 10582,
       "language": "TypeScript",
-      "lineCount": 362,
-      "hash": "a53d0e5288da19a0902eb15f6bd8eeb58abb8971bacebce00a90fa20d940011f",
+      "lineCount": 302,
+      "hash": "c7c1c6e260ea9c85b189b2451d1429891dd80a3a5b9e89ed781efa0147338dfd",
       "role": "source",
       "category": "web",
-      "lastModified": 1773086029522
+      "lastModified": 1773257683660
     },
     {
       "path": "packages/web/src/viewer/views/pr-markdown.ts",
@@ -11163,7 +11163,7 @@
   ],
   "summary": {
     "totalFiles": 1116,
-    "totalLines": 353388,
+    "totalLines": 353360,
     "byLanguage": {
       "Other": 15,
       "Markdown": 43,

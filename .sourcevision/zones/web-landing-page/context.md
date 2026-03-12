@@ -32,6 +32,7 @@ Internal:
 [observation] [info] No declared entry points means this zone is not consumed by other zones at analysis time; confirm the landing page is wired into the server composition root via a build artifact or direct HTML reference rather than a runtime import.
 [observation] [info] With only 2 files, zone metrics are statistically unreliable; treat cohesion and coupling values as directional indicators only, not architectural signals.
 [observation] [info] Zero coupling and co-located test indicate the landing page is correctly treated as a leaf module with no upward dependencies — this is the right pattern for a thin entry surface.
+[pattern] [info] Call graph (23 internal, 0 outgoing, 0 incoming) confirms the landing page has no runtime call edges to any other zone, consistent with build-artifact wiring. No further import-boundary enforcement is needed for this zone.
 
 </findings>
 
@@ -44,6 +45,8 @@ Internal:
 - Zero coupling and co-located test indicate the landing page is correctly treated as a leaf module with no upward dependencies — this is the right pattern for a thin entry surface.
 - With only 2 files, zone metrics are statistically unreliable; treat cohesion and coupling values as directional indicators only, not architectural signals.
 - No declared entry points means this zone is not consumed by other zones at analysis time; confirm the landing page is wired into the server composition root via a build artifact or direct HTML reference rather than a runtime import.
+- 23 internal calls with 0 outgoing and 0 incoming in the call graph corroborates zero import coupling — the landing page is isolated at both the module graph and runtime call level, confirming it is wired via build artifact rather than module imports
+- Call graph (23 internal, 0 outgoing, 0 incoming) confirms the landing page has no runtime call edges to any other zone, consistent with build-artifact wiring. No further import-boundary enforcement is needed for this zone.
 - [call graph] 23 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

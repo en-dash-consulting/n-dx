@@ -540,6 +540,7 @@ Outgoing (this zone → other zones):
 [observation] [info] Single entry point via web's domain-gateway.ts enforces the gateway pattern correctly — no leaf-file imports from consumers are detectable at this boundary.
 [observation] [info] The analyzers directory contains at least 8 visible service-archetyed files covering distinct concerns (classify, callgraph, branch-work, archetypes). As the package grows, consider sub-directory grouping to keep the flat directory manageable.
 [suggestion] [info] Zone "sourcevision-analysis-engine" has files across 22 directories — consider consolidating under a dedicated directory
+[pattern] [info] Import metrics (cohesion=1, coupling=0) and call graph (4596 internal, 0 outgoing) provide dual-signal confirmation of structural isolation — the only zone in the monorepo where both static and runtime analyses agree perfectly. This is the reference model for domain-layer package health.
 
 </findings>
 
@@ -553,6 +554,8 @@ Outgoing (this zone → other zones):
 - The analyzers directory contains at least 8 visible service-archetyed files covering distinct concerns (classify, callgraph, branch-work, archetypes). As the package grows, consider sub-directory grouping to keep the flat directory manageable.
 - Single entry point via web's domain-gateway.ts enforces the gateway pattern correctly — no leaf-file imports from consumers are detectable at this boundary.
 - Zone "sourcevision-analysis-engine" has files across 22 directories — consider consolidating under a dedicated directory
+- 4596 internal calls with 0 outgoing calls exactly mirrors the cohesion=1, coupling=0 import metrics, providing dual-signal validation that the domain package is structurally isolated at both the static-analysis and runtime call levels — this dual confirmation is the strongest architectural health signal in the monorepo
+- Import metrics (cohesion=1, coupling=0) and call graph (4596 internal, 0 outgoing) provide dual-signal confirmation of structural isolation — the only zone in the monorepo where both static and runtime analyses agree perfectly. This is the reference model for domain-layer package health.
 - [call graph] 4596 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

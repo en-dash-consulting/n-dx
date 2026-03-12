@@ -1193,6 +1193,7 @@ Incoming (other zones → this zone):
 [observation] [info] rex-unit → rex-core (8 imports) and rex-unit → rex-cli (2 imports) represent the only outward couplings; both target small utility satellites that may be candidates for absorption if they remain below 5 files.
 [suggestion] [info] Zone "rex-prd-engine" has files across 22 directories — consider consolidating under a dedicated directory
 [move-file] [warning] File "packages/rex/src/analyze/batch-types.ts" is pinned to zone "Rex PRD Engine" but lives in packages/rex/src/analyze/ — consider moving to packages/rex/src/core/ to align physical location with architectural zone
+[pattern] [info] Three satellites (chunked-review-pipeline, prd-fix-command, prd-verification-utilities) all import exclusively from rex-prd-engine with no lateral imports between satellites — star topology is clean but artificial; absorbing all three in a single pass would eliminate three dual-fragility zones with one PR
 
 </findings>
 
@@ -1207,6 +1208,9 @@ Incoming (other zones → this zone):
 - rex-unit → rex-core (8 imports) and rex-unit → rex-cli (2 imports) represent the only outward couplings; both target small utility satellites that may be candidates for absorption if they remain below 5 files.
 - Zone "rex-prd-engine" has files across 22 directories — consider consolidating under a dedicated directory
 - File "packages/rex/src/analyze/batch-types.ts" is pinned to zone "Rex PRD Engine" but lives in packages/rex/src/analyze/ — consider moving to packages/rex/src/core/ to align physical location with architectural zone
+- The three satellite zones (chunked-review-pipeline, prd-fix-command, prd-verification-utilities) import exclusively from rex-prd-engine without importing from each other — forming a clean star topology with rex-prd-engine at the hub
+- Call graph weight confirms absorption priority order: prd-verification-utilities (58 outgoing calls) > chunked-review-pipeline (30 calls) > fix (7 calls) — absorption should proceed in this order to minimize regression surface per PR
+- Three satellites (chunked-review-pipeline, prd-fix-command, prd-verification-utilities) all import exclusively from rex-prd-engine with no lateral imports between satellites — star topology is clean but artificial; absorbing all three in a single pass would eliminate three dual-fragility zones with one PR
 - [call graph] 7464 internal calls, 6 outgoing, 88 incoming (cohesion: 1, coupling: 0)
 
 </insights>

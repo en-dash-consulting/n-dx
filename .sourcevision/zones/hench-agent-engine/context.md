@@ -612,6 +612,7 @@ Incoming (other zones → this zone):
 - At 141 files, this is the second-largest zone in the monorepo. Formal boundary assertions (analogous to web/boundary-check.test.ts) would prevent gradual erosion of sub-zone separation as the codebase grows.
 - The three declared entry points (llm-gateway.ts, schema/v1.ts, tools/shell.ts) cover the primary cross-package API surface, but shell.ts being a public entry point warrants review — shell execution utilities are high-risk and should ideally be accessed only via the guard layer.
 - Zone "hench-agent-engine" has files across 26 directories — consider consolidating under a dedicated directory
+- hench-agent-engine's call graph reports 1 outgoing runtime call to hench-safety-guard despite having 2 static import edges. One of the two hench → hench-guard imports is type-only (`import type`), generating zero runtime calls. This means the static import graph overstates the runtime bidirectionality: only 1 value edge and 53 incoming call-graph calls exist at runtime, not 2 outgoing edges. Tools that count static import edges for coupling will report higher apparent bidirectionality than actually exists.
 - [call graph] 2594 internal calls, 1 outgoing, 53 incoming (cohesion: 1, coupling: 0)
 
 </insights>

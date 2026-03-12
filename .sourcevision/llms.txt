@@ -6,11 +6,11 @@
 ## Project Overview
 
 - **Files**: 1116
-- **Lines of code**: 353,388
+- **Lines of code**: 353,360
 - **Languages**: TypeScript (935), JavaScript (45), CSS (44), Markdown (43), JSON (28)
 - **Zones**: 19 (19 with descriptions)
 - **Git**: feature/sv-fixes-0306 @ 8c2a2e8
-- **Analyzed**: 2026-03-11T17:20:28.196Z
+- **Analyzed**: 2026-03-11T20:15:14.023Z
 
 ## Architecture Zones
 
@@ -357,10 +357,40 @@ POST    /api/hench/workflow/suggestions/:id
 
 ### Anti-patterns
 
+- batch-types.ts is physically located in packages/rex/src/analyze/ — the same directory as ~40 rex-prd-engine source files — but is zone-pinned to chunked-review-pipeline. This directory-zone mismatch means any new batch-related type added to analyze/ will silently land in rex-prd-engine rather than chunked-review-pipeline, eroding the satellite boundary without any import-graph signal. [warning] (chunked-review-pipeline)
+- keywords.ts and verify.ts are zone-pinned to prd-verification-utilities but live in packages/rex/src/core/ alongside 30+ rex-prd-engine files with no subdirectory or ZONE_BOUNDARY.md to mark the satellite boundary. The absence of a physical boundary marker means the zone designation exists only in sourcevision metadata — invisible to contributors without tooling access. [warning] (prd-verification-utilities)
+- Dissolution prerequisite (use-polling.ts unit test) is untracked: there is no automated gate preventing zone dissolution from proceeding before the required test exists. A missed prerequisite would permanently bury retry and interval logic without isolated test coverage. [warning] (project-status-polling)
+- build.js and dev.js are spawn-based orchestration scripts (esbuild, tsc, ESLint child processes) with no runtime viewer imports. Their presence in a runtime messaging zone inflates coupling metrics. These files should be excluded from zone classification via archetype pinning (config archetype) rather than left to distort cohesion signals. [warning] (viewer-message-pipeline)
+- tree-search.ts (packages/web/src/viewer/components/prd-tree/tree-search.ts) has zero messaging, WebSocket, or polling imports — it is a pure algorithmic utility classified here only because use-facet-state.ts imports SearchFacets from it, creating a transitive zone grouping artifact. It belongs in web-dashboard-viewer. Fixing the use-facet-state.ts zone pin removes both misclassifications. [warning] (viewer-message-pipeline)
+- api.ts is declared as the inbound gateway for sibling zones (crash, route, performance) but is absent from CLAUDE.md's gateway module registry table. external.ts appears in the table; api.ts does not. This asymmetry means gateway audits using the table as their source of truth will miss the api.ts contract entirely — add api.ts to the registry with its declared consumers and an enforcement note. [warning] (web-dashboard-viewer)
+- execution-panel.ts (packages/web/src/viewer/components/prd-tree/execution-panel.ts) imports createFetchPipeline directly from ../../messaging/index.js — it is the only UI component (vs hook) bypassing external.ts. Components should delegate pipeline construction to hooks, not import messaging factories directly. This couples a UI component to messaging implementation details and is not caught by hook-focused gateway reviews. [warning] (web-dashboard-viewer)
+- boundary-check.test.ts regex extraction misses dynamic imports and multiline statements. Any future assertion guarding the use ↔ web-viewer dissolution would inherit these blind spots, providing false confidence that the boundary is enforced. [info] (web-integration-tests)
+- RegisterSchedulerOptions (packages/web/src/server/register-scheduler.ts lines 28, 31, 37) declares broadcast, collectAllIds, and loadPRD as optional, but the CLAUDE.md injection seam registry lists all four injected callbacks as always-provided by start.ts. Required callbacks marked optional silently accept undefined callers — future injection sites that omit a callback will fail at runtime rather than at compile time. Required callbacks should be non-optional in the interface. [warning] (web-server-api)
 - God function: cmdPrune in packages/rex/src/cli/commands/prune.ts calls 33 unique functions — consider decomposing into smaller, focused functions [warning]
+
+### Patterns
+
+- High internal call count (471) relative to file count (22) suggests non-trivial shared test utilities. Audit shared helpers for transitive production imports to preserve the zero-coupling contract. [warning] (monorepo-e2e-tests)
+- use-polling.ts has no dedicated unit test; dissolving this zone into web-viewer before adding one would permanently bury retry and interval logic without isolated test coverage. [warning] (project-status-polling)
+- The e2e test zone covers exactly the four Rex CLI surfaces that correspond to satellite zones (adapter, analyze, fix, import) — each satellite has a matching e2e file, meaning absorption of any satellite must preserve its e2e test to maintain the coverage contract [info] (rex-package-e2e-tests)
+- Three satellites (chunked-review-pipeline, prd-fix-command, prd-verification-utilities) all import exclusively from rex-prd-engine with no lateral imports between satellites — star topology is clean but artificial; absorbing all three in a single pass would eliminate three dual-fragility zones with one PR [info] (rex-prd-engine)
+- Import metrics (cohesion=1, coupling=0) and call graph (4596 internal, 0 outgoing) provide dual-signal confirmation of structural isolation — the only zone in the monorepo where both static and runtime analyses agree perfectly. This is the reference model for domain-layer package health. [info] (sourcevision-analysis-engine)
+- use-facet-state.ts appears in the viewer-message-pipeline zone rather than web-dashboard-viewer, indicating the community detection algorithm is treating polling-adjacent hooks as messaging infrastructure. This artificially inflates the bidirectional cross-zone edge count between the two zones. [warning] (viewer-message-pipeline)
+- Call graph asymmetry (77 outgoing calls from messaging into viewer vs 11 incoming) confirms the bidirectional import relationship is structurally one-directional at runtime. The 12 inbound import edges from viewer into messaging should be audited — if they are only type imports, the runtime coupling is effectively zero and the zone boundary can be simplified. [info] (web-dashboard-viewer)
+- The boundary-check governance test covers web-shared and messaging exemptions but is silent on the use ↔ web-viewer bidirectional dependency. Adding an assertion (or a comment documenting the intended dissolution path) would bring policy and tests into sync for this zone pair. [warning] (web-integration-tests)
+- Call graph (23 internal, 0 outgoing, 0 incoming) confirms the landing page has no runtime call edges to any other zone, consistent with build-artifact wiring. No further import-boundary enforcement is needed for this zone. [info] (web-landing-page)
 
 ### Relationships
 
+- batch-types.ts sits in packages/rex/src/analyze/ (inside the engine directory tree) but is pinned to the chunked-review-pipeline satellite zone — physical location and zone assignment are misaligned, causing confusion about where new batch-related types should land [warning] (chunked-review-pipeline)
+- Call graph (0 outgoing/incoming) contradicts cross-zone import counts (2 each direction with web-viewer). The import graph is the authoritative source for architectural boundary enforcement; call-graph cohesion/coupling scores for this zone should be treated as unreliable. [warning] (crash)
+- hench-safety-guard makes ~13 call-graph calls per file-level import edge into hench-agent-engine (53 calls / 4 edges), indicating deep runtime coupling not visible from static import counts alone. A named interface contract between the two zones would make this surface explicit and type-safe. [warning] (hench-safety-guard)
+- Integration test coverage is asymmetric: the documented crash ↔ web-viewer exception is backed by CLAUDE.md policy, but the undocumented use ↔ web-viewer bidirectional loop has no integration-level assertion enforcing either its dissolution or its documented exception status. [warning] (monorepo-integration-tests)
+- prd-verification-utilities has a single consumer zone (rex-prd-engine) and zero internal cohesion — it is the strongest absorption candidate in the Rex package and violates the two-consumer governance rule; absorbing it eliminates a dual-fragility warning with no architectural trade-off [warning] (prd-verification-utilities)
+- The bidirectional use ↔ web-viewer loop is undocumented in CLAUDE.md and unenforced in boundary-check.test.ts, unlike the crash ↔ web-viewer exception which is explicitly documented. This creates an invisible architectural debt that will grow without automated guards. [warning] (project-status-polling)
+- Viewer hooks (use-project-status.ts, use-prd-data.ts, use-prd-websocket.ts, execution-panel.ts) import createFetchPipeline and createWSPipeline directly from messaging/index.js rather than through external.ts. external.ts only re-exports createRequestDedup, leaving the two most-used pipeline factories outside the gateway contract — a partial gateway that provides incomplete boundary enforcement. [warning] (viewer-message-pipeline)
+- api.ts is declared as the sanctioned import surface for sibling zones (crash, route, performance) but has zero detectable consumers importing through it at analysis time. Sibling zones may be bypassing the gateway and importing viewer internals directly, which would make api.ts a paper boundary with no enforcement. [warning] (web-dashboard-viewer)
+- Call graph (0 outgoing, 172 incoming) vs import graph (5 outbound imports into web-dashboard-viewer) discrepancy confirms the 5 server→viewer imports are type-only or build-time references generating no runtime calls. The server is a strict consumer of the viewer's public API, not a peer — the asymmetry is architecturally correct. [info] (web-server-api)
 - Tightly coupled modules: packages/web/src/server/routes-hench.ts and packages/web/src/server/types.ts — 79 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
 
 ### Observations
@@ -374,8 +404,8 @@ POST    /api/hench/workflow/suggestions/:id
 - Bidirectional coupling: "hench-agent-engine" ↔ "hench-safety-guard" (2+4 crossings) — consider extracting shared interface [warning]
 - Bidirectional coupling: "web-dashboard-viewer" ↔ "web-server-api" (84+5 crossings) — consider extracting shared interface [warning]
 - Size imbalance: largest zone has 270 files vs smallest with 2 — uneven decomposition [info]
-- All five zones in this batch have cohesion at or above 0.56 — none fall into the dual-fragility (<0.4 cohesion AND >0.6 coupling) risk zone, which is a positive signal compared to rex-cli and prd-fix-command in previous batches. [info]
-- ... and 86 more
+- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects [warning]
+- ... and 69 more
 
 ### Suggestions
 
@@ -383,13 +413,13 @@ POST    /api/hench/workflow/suggestions/:id
 - Zone "crash" was identified from filename patterns, not directory structure — consider creating packages/web/src/viewer/components/crash/ and moving related files there [info] (crash)
 - packages/rex/tests/e2e/ contains files from 3 zones (rex-cli-e2e-coverage, rex-package-e2e-tests, rex-prd-engine) — consider grouping into subdirectories to clarify architectural boundaries [info]
 - packages/web/tests/unit/server/ contains files from 4 zones (rex-prd-engine, sourcevision-analysis-engine, web-dashboard-viewer, web-server-api) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Hub function: walkTree in packages/rex/src/core/tree.ts is called from 30 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
-- 2 potentially unused exports in packages/web/src/viewer/hooks/use-project-metadata.ts have no incoming calls: getCachedProjectMetadata, useProjectMetadata [info]
-- Potentially unused export: getAggregationCacheInstance in packages/web/src/server/routes-token-usage.ts has no incoming calls — verify if still needed [info]
-- Zone "hench-agent-engine" has files across 26 directories — consider consolidating under a dedicated directory [info] (hench-agent-engine)
-- Zone "rex-prd-engine" has files across 22 directories — consider consolidating under a dedicated directory [info] (rex-prd-engine)
-- Zone "sourcevision-analysis-engine" has files across 22 directories — consider consolidating under a dedicated directory [info] (sourcevision-analysis-engine)
-- ... and 6 more
+- CSS orphan prevention: when removing a rendered section from a Preact component, the corresponding CSS class definitions must be removed in the same PR. The current state (7 orphaned classes in overview.css) suggests this step is not on the component-change review checklist. Adding a CSS-unused-class lint rule or a reviewer checklist item would prevent accumulation of dead style rules. [info]
+- Define a CSS rule for .reset-badge in overview.css to visually differentiate the enrichment reset badge from a normal enrichment pass badge. Currently the two states are rendered identically because reset-badge has no styles, defeating the purpose of showing reset information separately. [info]
+- Extract the dual-fragility thresholds (cohesion < 0.5, coupling > 0.5) into named constants shared by overview.ts and any future governance-reporting code. Currently overview.ts hard-codes 0.4 (attentionCount) and 0.7/0.4 (healthColor) in two places that do not match each other or CLAUDE.md policy — a single constant would make threshold alignment mechanical rather than requiring human coordination. [warning]
+- Four distinct cohesion threshold values are scattered across governance docs and viewer code: 0.4 (orange floor), 0.5 (CLAUDE.md dual-fragility), 0.6 (architecture.ts green floor), 0.7 (overview.ts/zone-map.ts green floor). Consolidate to two named canonical thresholds — COHESION_WARN (0.5, aligning with CLAUDE.md) and COHESION_CRITICAL (0.4) — defined in a single location and imported by both governance tooling and viewer components. [info]
+- Governance threshold synchronization: CLAUDE.md defines dual-fragility as cohesion < 0.5 AND coupling > 0.5. The dashboard (overview.ts:120, 254) uses different thresholds (0.4 and 0.7) inconsistently. Introduce a shared constant (e.g., DUAL_FRAGILITY_COHESION_THRESHOLD = 0.5, DUAL_FRAGILITY_COUPLING_THRESHOLD = 0.5) imported by both the dashboard and any test assertions to ensure all three signals remain synchronized when governance thresholds change. [warning]
+- Remove the seven dead CSS rules in overview.css (.attention-list, .attention-item, .attention-name, .attention-issues, .issue-tag, .insight-item, .insight-more) and their responsive.css overrides. These classes have no production consumers and appear to be remnants of a removed attention-detail list section. [info]
+- ... and 30 more
 
 ## Next Steps
 
@@ -398,6 +428,15 @@ Prioritized work items derived from analysis:
 ### High Priority
 
 1. **Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files —…**
+
+1. **use-polling.ts has no dedicated unit test; dissolving this … (+1 related)**
+   Files: `packages/web/src/viewer/hooks/use-polling.ts`, `packages/web/src/viewer/hooks/use-project-status.ts`, `packages/web/tests/unit/viewer/use-project-status.test.ts`
+
+1. **keywords.ts and verify.ts are zone-pinned to prd-verification-utilities but liv…**
+   Files: `packages/rex/tests/unit/core/keywords.test.ts`, `packages/rex/tests/unit/core/verify.test.ts`
+
+1. **prd-verification-utilities has a single consumer zone (rex-prd-engine) and zero…**
+   Files: `packages/rex/tests/unit/core/keywords.test.ts`, `packages/rex/tests/unit/core/verify.test.ts`
 
 1. **High coupling (0.82) — 3 imports target "rex-prd-engine"**
    Files: `packages/rex/tests/unit/core/keywords.test.ts`, `packages/rex/tests/unit/core/verify.test.ts`
@@ -408,25 +447,22 @@ Prioritized work items derived from analysis:
 1. **keywords.ts and verify.ts serve distinct purposes (search vs. validation) with …**
    Files: `packages/rex/tests/unit/core/keywords.test.ts`, `packages/rex/tests/unit/core/verify.test.ts`
 
+1. **Dissolution prerequisite (use-polling.ts unit test) is untracked: there is no a…**
+   Files: `packages/web/src/viewer/hooks/use-polling.ts`, `packages/web/src/viewer/hooks/use-project-status.ts`, `packages/web/tests/unit/viewer/use-project-status.test.ts`
+
 1. **High coupling (0.75) — 2 imports target "web-dashboard-viewer"**
    Files: `packages/web/src/viewer/hooks/use-polling.ts`, `packages/web/src/viewer/hooks/use-project-status.ts`, `packages/web/tests/unit/viewer/use-project-status.test.ts`
 
 1. **Cohesion 0.25 and coupling 0.75 place this zone in the dual-fragility range; at…**
    Files: `packages/web/src/viewer/hooks/use-polling.ts`, `packages/web/src/viewer/hooks/use-project-status.ts`, `packages/web/tests/unit/viewer/use-project-status.test.ts`
 
-1. **High coupling (0.64) — 8 imports target "rex-prd-engine"**
-   Files: `packages/rex/src/cli/commands/chunked-review-state.ts`, `packages/rex/src/cli/commands/chunked-review.ts`, `packages/rex/tests/unit/cli/commands/chunked-review.test.ts`
-
-1. **Low cohesion (0.36) — files are loosely related, consider splitting this zone**
-   Files: `packages/rex/src/cli/commands/chunked-review-state.ts`, `packages/rex/src/cli/commands/chunked-review.ts`, `packages/rex/tests/unit/cli/commands/chunked-review.test.ts`
-
-1. **Dual-fragility thresholds exceeded (cohesion 0.36, coupling 0.64) — active gove…**
-   Files: `packages/rex/src/cli/commands/chunked-review-state.ts`, `packages/rex/src/cli/commands/chunked-review.ts`, `packages/rex/tests/unit/cli/commands/chunked-review.test.ts`
-
-1. **batch-types.ts is a shared type definition that rex-prd-engine imports (rex-uni…**
-   Files: `packages/rex/src/cli/commands/chunked-review-state.ts`, `packages/rex/src/cli/commands/chunked-review.ts`, `packages/rex/tests/unit/cli/commands/chunked-review.test.ts`
-
 ### Medium Priority
+
+1. **build.js and dev.js are spawn-based orchestration scripts (… (+1 related)**
+   Files: `packages/web/build.js`, `packages/web/dev.js`, `packages/web/src/viewer/components/prd-tree/tree-search.ts`
+
+1. **use-facet-state.ts appears in the viewer-message-pipeline z… (+1 related)**
+   Files: `packages/web/build.js`, `packages/web/dev.js`, `packages/web/src/viewer/components/prd-tree/tree-search.ts`
 
 1. **File "packages/rex/src/analyze/batch-types.ts" is pinned to zone "Rex PRD Engin…**
    Files: `packages/rex/src/analyze/acknowledge.ts`, `packages/rex/src/analyze/analyze-shared.ts`, `packages/rex/src/analyze/batch-types.ts`
@@ -442,16 +478,14 @@ Prioritized work items derived from analysis:
 1. **Bidirectional imports with web-viewer (15 outbound + 12 inbound) suggest tight …**
    Files: `packages/web/build.js`, `packages/web/dev.js`, `packages/web/src/viewer/components/prd-tree/tree-search.ts`
 
-1. **16 entry points — wide API surface, consider consolidating exports**
-   Files: `packages/web/src/cli/index.ts`, `packages/web/src/public.ts`, `packages/web/src/schema/features.ts`
+1. **Call graph (0 outgoing/incoming) contradicts cross-zone import counts (2 each d…**
+   Files: `packages/web/src/viewer/components/crash-recovery-banner.ts`, `packages/web/src/viewer/crash/crash-detector.ts`, `packages/web/src/viewer/crash/index.ts`
 
-1. **Bidirectional coupling: "chunked-review-pipeline" ↔ "rex-prd-engine" (8+1 cross…**
+1. **hench-safety-guard makes ~13 call-graph calls per file-level import edge into h…**
+   Files: `packages/hench/src/guard/commands.ts`, `packages/hench/src/guard/contracts.ts`, `packages/hench/src/guard/index.ts`
 
-1. **Bidirectional coupling: "hench-agent-engine" ↔ "hench-safety-guard" (2+4 crossi…**
-
-1. **Bidirectional coupling: "web-dashboard-viewer" ↔ "web-server-api" (84+5 crossin…**
-
-1. **The project-status-polling zone (use) meets both dual-fragility thresholds (coh…**
+1. **RegisterSchedulerOptions (packages/web/src/server/register-scheduler.ts lines 2…**
+   Files: `packages/web/src/server/aggregation-cache.ts`, `packages/web/src/server/concurrent-execution-metrics.ts`, `packages/web/src/server/domain-gateway.ts`
 
 ### Low Priority
 
@@ -509,7 +543,7 @@ Prioritized work items derived from analysis:
 | `README.md` | docs |  |  |
 | `TESTING.md` | docs |  |  |
 | `ci.js` | source | entrypoint | monorepo-orchestration |
-| `claude-integration.js` | source | entrypoint | monorepo-orchestration |
+| `claude-integration.js` | source | service | monorepo-orchestration |
 | `cli.js` | source | entrypoint | monorepo-orchestration |
 | `config.js` | source | config | monorepo-orchestration |
 | `docs/analysis/2026-03-03-refresh-orchestration-memory-analysis.md` | docs |  |  |
@@ -529,7 +563,7 @@ Prioritized work items derived from analysis:
 | `docs/process/memory-os-behavior.md` | docs |  |  |
 | `docs/process/rex-smart-add-duplicate-detection.md` | docs |  |  |
 | `gateway-rules.json` | other |  |  |
-| `help.js` | source | entrypoint | monorepo-orchestration |
+| `help.js` | source | utility | monorepo-orchestration |
 | `n-dx.png` | asset |  |  |
 | `package.json` | config |  |  |
 | `packages/hench/Hench-F.png` | asset |  |  |
@@ -564,13 +598,13 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/cli/commands/task-lookup.ts` | source | cli-command | hench-agent-engine |
 | `packages/hench/src/cli/commands/template.ts` | source | cli-command | hench-agent-engine |
 | `packages/hench/src/cli/errors.ts` | source | utility | hench-agent-engine |
-| `packages/hench/src/cli/help.ts` | source | cli-command | hench-agent-engine |
+| `packages/hench/src/cli/help.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/cli/index.ts` | source | entrypoint | hench-agent-engine |
 | `packages/hench/src/cli/output.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/guard/commands.ts` | source | service | hench-safety-guard |
 | `packages/hench/src/guard/contracts.ts` | source | types | hench-safety-guard |
 | `packages/hench/src/guard/index.ts` | source | entrypoint | hench-safety-guard |
-| `packages/hench/src/guard/paths.ts` | source | utility | hench-safety-guard |
+| `packages/hench/src/guard/paths.ts` | source | service | hench-safety-guard |
 | `packages/hench/src/guard/policy.ts` | source | service | hench-safety-guard |
 | `packages/hench/src/prd/llm-gateway.ts` | source | gateway | hench-agent-engine |
 | `packages/hench/src/prd/rex-gateway.ts` | source | gateway | hench-agent-engine |
@@ -578,17 +612,17 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/process/exec-shell.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/process/exec.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/process/index.ts` | source | entrypoint | hench-agent-engine |
-| `packages/hench/src/process/lifecycle.ts` | source | service | hench-agent-engine |
-| `packages/hench/src/process/limiter.ts` | source | service | hench-agent-engine |
+| `packages/hench/src/process/lifecycle.ts` | source | utility | hench-agent-engine |
+| `packages/hench/src/process/limiter.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/process/memory-monitor.ts` | source | utility | hench-agent-engine |
-| `packages/hench/src/process/memory-throttle.ts` | source | service | hench-agent-engine |
-| `packages/hench/src/process/pool.ts` | source | service | hench-agent-engine |
-| `packages/hench/src/process/process-memory-tracker.ts` | source | service | hench-agent-engine |
+| `packages/hench/src/process/memory-throttle.ts` | source | utility | hench-agent-engine |
+| `packages/hench/src/process/pool.ts` | source | utility | hench-agent-engine |
+| `packages/hench/src/process/process-memory-tracker.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/public.ts` | source | entrypoint | hench-agent-engine |
-| `packages/hench/src/queue/execution-queue.ts` | source | service | hench-agent-engine |
+| `packages/hench/src/queue/execution-queue.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/queue/format.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/queue/index.ts` | source | entrypoint | hench-agent-engine |
-| `packages/hench/src/queue/priority-scheduler.ts` | source | service | hench-agent-engine |
+| `packages/hench/src/queue/priority-scheduler.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/schema/index.ts` | source | entrypoint | hench-agent-engine |
 | `packages/hench/src/schema/templates.ts` | source | schema | hench-agent-engine |
 | `packages/hench/src/schema/v1.ts` | source | schema | hench-agent-engine |
@@ -605,17 +639,17 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/store/suggestions.ts` | source | store | hench-agent-engine |
 | `packages/hench/src/store/templates.ts` | source | store | hench-agent-engine |
 | `packages/hench/src/tools/contracts.ts` | source | types | hench-agent-engine |
-| `packages/hench/src/tools/dispatch.ts` | source | gateway | hench-agent-engine |
+| `packages/hench/src/tools/dispatch.ts` | source | service | hench-agent-engine |
 | `packages/hench/src/tools/exec-shell.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/tools/files.ts` | source | service | hench-agent-engine |
 | `packages/hench/src/tools/git.ts` | source | service | hench-agent-engine |
 | `packages/hench/src/tools/index.ts` | source | entrypoint | hench-agent-engine |
 | `packages/hench/src/tools/rex.ts` | source | service | hench-agent-engine |
 | `packages/hench/src/tools/shell.ts` | source | service | hench-agent-engine |
-| `packages/hench/src/tools/test-runner.ts` | source | service | hench-agent-engine |
+| `packages/hench/src/tools/test-runner.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/types/index.ts` | source | entrypoint | hench-agent-engine |
 | `packages/hench/src/types/output.ts` | source | utility | hench-agent-engine |
-| `packages/hench/src/validation/completion.ts` | source | service | hench-agent-engine |
+| `packages/hench/src/validation/completion.ts` | source | utility | hench-agent-engine |
 | `packages/hench/src/validation/index.ts` | source | entrypoint | hench-agent-engine |
 | `packages/hench/tests/e2e/cli-init.test.ts` | test |  | hench-agent-engine |
 | `packages/hench/tests/fixtures/token-usage-regression.json` | test |  |  |
@@ -696,7 +730,7 @@ Prioritized work items derived from analysis:
 | `packages/llm-client/src/cli-provider.ts` | source | service | llm-client-foundation |
 | `packages/llm-client/src/codex-cli-provider.ts` | source | service | llm-client-foundation |
 | `packages/llm-client/src/config.ts` | source | config | llm-client-foundation |
-| `packages/llm-client/src/create-client.ts` | source | service | llm-client-foundation |
+| `packages/llm-client/src/create-client.ts` | source | utility | llm-client-foundation |
 | `packages/llm-client/src/exec.ts` | source | utility | llm-client-foundation |
 | `packages/llm-client/src/help-format.ts` | source | utility | llm-client-foundation |
 | `packages/llm-client/src/json.ts` | source | utility | llm-client-foundation |
@@ -704,7 +738,7 @@ Prioritized work items derived from analysis:
 | `packages/llm-client/src/llm-config.ts` | source | config | llm-client-foundation |
 | `packages/llm-client/src/llm-types.ts` | source | types | llm-client-foundation |
 | `packages/llm-client/src/output.ts` | source | utility | llm-client-foundation |
-| `packages/llm-client/src/project-config.ts` | source | utility | llm-client-foundation |
+| `packages/llm-client/src/project-config.ts` | source | config | llm-client-foundation |
 | `packages/llm-client/src/project-dirs.ts` | source | types | llm-client-foundation |
 | `packages/llm-client/src/provider-interface.ts` | source | types | llm-client-foundation |
 | `packages/llm-client/src/provider-registry.ts` | source | service | llm-client-foundation |
@@ -745,21 +779,21 @@ Prioritized work items derived from analysis:
 | `packages/rex/llms.txt` | docs |  | rex-cli-e2e-coverage |
 | `packages/rex/package.json` | config |  |  |
 | `packages/rex/src/analyze/acknowledge.ts` | source | service | rex-prd-engine |
-| `packages/rex/src/analyze/analyze-shared.ts` | source | types | rex-prd-engine |
+| `packages/rex/src/analyze/analyze-shared.ts` | source | utility | rex-prd-engine |
 | `packages/rex/src/analyze/batch-types.ts` | source | types | rex-prd-engine |
 | `packages/rex/src/analyze/consolidation-guard.ts` | source | service | rex-prd-engine |
 | `packages/rex/src/analyze/decompose.ts` | source | service | rex-prd-engine |
 | `packages/rex/src/analyze/dedupe.ts` | source | utility | rex-prd-engine |
 | `packages/rex/src/analyze/diff.ts` | source | utility | rex-prd-engine |
-| `packages/rex/src/analyze/extract.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/analyze/extract.ts` | source | service | rex-prd-engine |
 | `packages/rex/src/analyze/file-validation.ts` | source | utility | rex-prd-engine |
 | `packages/rex/src/analyze/guided.ts` | source | service | rex-prd-engine |
 | `packages/rex/src/analyze/index.ts` | source | entrypoint | rex-prd-engine |
-| `packages/rex/src/analyze/llm-bridge.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/llm-bridge.ts` | source | gateway | rex-prd-engine |
 | `packages/rex/src/analyze/modify-reason.ts` | source | service | rex-prd-engine |
-| `packages/rex/src/analyze/propose.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/propose.ts` | source | types | rex-prd-engine |
 | `packages/rex/src/analyze/reason.ts` | source | service | rex-prd-engine |
-| `packages/rex/src/analyze/reconcile.ts` | source | service | rex-prd-engine |
+| `packages/rex/src/analyze/reconcile.ts` | source | utility | rex-prd-engine |
 | `packages/rex/src/analyze/reshape-reason.ts` | source | service | rex-prd-engine |
 | `packages/rex/src/analyze/scanners.ts` | source | service | rex-prd-engine |
 | `packages/rex/src/analyze/validate-modification.ts` | source | utility | rex-prd-engine |
@@ -796,9 +830,9 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/cli/commands/validate.ts` | source | cli-command | rex-prd-engine |
 | `packages/rex/src/cli/commands/verify.ts` | source | cli-command | rex-prd-engine |
 | `packages/rex/src/cli/errors.ts` | source | utility | rex-prd-engine |
-| `packages/rex/src/cli/help.ts` | source | utility | rex-prd-engine |
+| `packages/rex/src/cli/help.ts` | source | types | rex-prd-engine |
 | `packages/rex/src/cli/index.ts` | source | entrypoint | rex-prd-engine |
-| `packages/rex/src/cli/mcp-tools.ts` | source | route-handler | rex-prd-engine |
+| `packages/rex/src/cli/mcp-tools.ts` | source | service | rex-prd-engine |
 | `packages/rex/src/cli/mcp.ts` | source | service | rex-prd-engine |
 | `packages/rex/src/cli/output.ts` | source | utility | rex-prd-engine |
 | `packages/rex/src/cli/validate-input.ts` | source | utility | rex-prd-engine |
@@ -859,7 +893,7 @@ Prioritized work items derived from analysis:
 | `packages/rex/src/store/notion-client.ts` | source | store | rex-prd-engine |
 | `packages/rex/src/store/notion-map.ts` | source | store | rex-prd-engine |
 | `packages/rex/src/store/project-config.ts` | source | store | rex-prd-engine |
-| `packages/rex/src/workflow/default.ts` | source | types | rex-prd-engine |
+| `packages/rex/src/workflow/default.ts` | source | config | rex-prd-engine |
 | `packages/rex/tests/e2e/README.md` | test |  |  |
 | `packages/rex/tests/e2e/cli-adapter.test.ts` | test |  | rex-package-e2e-tests |
 | `packages/rex/tests/e2e/cli-analyze.test.ts` | test |  | rex-package-e2e-tests |
@@ -1009,15 +1043,15 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/analyzers/callgraph.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/classify.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/claude-client.ts` | source | service | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/completion-reader.ts` | source | service | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/completion-reader.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/components.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/context.ts` | source | service | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/convergence.ts` | source | service | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/convergence.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/enrich-batch.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/enrich-config.ts` | source | config | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/enrich-parsing.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | source | service | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/enrich.ts` | source | entrypoint | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/enrich.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/imports.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/index.ts` | source | entrypoint | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/inventory.ts` | source | service | sourcevision-analysis-engine |
@@ -1026,7 +1060,7 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/analyzers/manifest.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/move-recommendations.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/next-steps.ts` | source | service | sourcevision-analysis-engine |
-| `packages/sourcevision/src/analyzers/risk-scoring.ts` | source | service | sourcevision-analysis-engine |
+| `packages/sourcevision/src/analyzers/risk-scoring.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/route-detection.ts` | source | route-handler | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/server-route-detection.ts` | source | service | sourcevision-analysis-engine |
 | `packages/sourcevision/src/analyzers/token-usage.ts` | source | utility | sourcevision-analysis-engine |
@@ -1048,7 +1082,7 @@ Prioritized work items derived from analysis:
 | `packages/sourcevision/src/cli/commands/validate.ts` | source | cli-command | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/commands/workspace.ts` | source | cli-command | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/errors.ts` | source | utility | sourcevision-analysis-engine |
-| `packages/sourcevision/src/cli/help.ts` | source | cli-command | sourcevision-analysis-engine |
+| `packages/sourcevision/src/cli/help.ts` | source | utility | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/index.ts` | source | entrypoint | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/mcp.ts` | source | cli-command | sourcevision-analysis-engine |
 | `packages/sourcevision/src/cli/output.ts` | source | utility | sourcevision-analysis-engine |
@@ -1145,7 +1179,7 @@ Prioritized work items derived from analysis:
 | `packages/web/src/cli/index.ts` | source | entrypoint | web-dashboard-viewer |
 | `packages/web/src/landing/index.html` | other |  |  |
 | `packages/web/src/landing/landing.css` | other |  |  |
-| `packages/web/src/landing/landing.ts` | source | service | web-landing-page |
+| `packages/web/src/landing/landing.ts` | source | page | web-landing-page |
 | `packages/web/src/public.ts` | source | entrypoint | web-dashboard-viewer |
 | `packages/web/src/schema/features.ts` | source | schema | web-dashboard-viewer |
 | `packages/web/src/schema/v1.ts` | source | schema | web-dashboard-viewer |
@@ -1158,7 +1192,7 @@ Prioritized work items derived from analysis:
 | `packages/web/src/server/pr-markdown-refresh-diagnostics.ts` | source | service | web-server-api |
 | `packages/web/src/server/prd-io.ts` | source | service | web-server-api |
 | `packages/web/src/server/process-memory-tracker.ts` | source | service | web-server-api |
-| `packages/web/src/server/register-scheduler.ts` | source | middleware | web-server-api |
+| `packages/web/src/server/register-scheduler.ts` | source | service | web-server-api |
 | `packages/web/src/server/rex-gateway.ts` | source | gateway | web-server-api |
 | `packages/web/src/server/routes-adaptive.ts` | source | route-handler | web-server-api |
 | `packages/web/src/server/routes-config.ts` | source | route-handler | web-server-api |
@@ -1188,7 +1222,7 @@ Prioritized work items derived from analysis:
 | `packages/web/src/server/search-index.ts` | source | service | web-server-api |
 | `packages/web/src/server/shared-types.ts` | source | types | web-server-api |
 | `packages/web/src/server/start.ts` | source | entrypoint | web-server-api |
-| `packages/web/src/server/task-usage.ts` | source | service | web-server-api |
+| `packages/web/src/server/task-usage.ts` | source | gateway | web-server-api |
 | `packages/web/src/server/types.ts` | source | types | web-server-api |
 | `packages/web/src/server/usage-cleanup-scheduler.ts` | source | service | web-server-api |
 | `packages/web/src/server/websocket.ts` | source | service | web-server-api |
@@ -1302,29 +1336,29 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/lightmode_logo.png` | asset |  |  |
 | `packages/web/src/viewer/loader.ts` | source | service | web-dashboard-viewer |
 | `packages/web/src/viewer/main.ts` | source | entrypoint | web-dashboard-viewer |
-| `packages/web/src/viewer/messaging/call-rate-limiter.ts` | source | middleware | viewer-message-pipeline |
-| `packages/web/src/viewer/messaging/fetch-pipeline.ts` | source | middleware | viewer-message-pipeline |
+| `packages/web/src/viewer/messaging/call-rate-limiter.ts` | source | utility | viewer-message-pipeline |
+| `packages/web/src/viewer/messaging/fetch-pipeline.ts` | source | utility | viewer-message-pipeline |
 | `packages/web/src/viewer/messaging/index.ts` | source | entrypoint | viewer-message-pipeline |
-| `packages/web/src/viewer/messaging/message-coalescer.ts` | source | middleware | viewer-message-pipeline |
-| `packages/web/src/viewer/messaging/message-throttle.ts` | source | middleware | viewer-message-pipeline |
-| `packages/web/src/viewer/messaging/request-dedup.ts` | source | middleware | viewer-message-pipeline |
-| `packages/web/src/viewer/messaging/ws-pipeline.ts` | source | middleware | viewer-message-pipeline |
+| `packages/web/src/viewer/messaging/message-coalescer.ts` | source | utility | viewer-message-pipeline |
+| `packages/web/src/viewer/messaging/message-throttle.ts` | source | utility | viewer-message-pipeline |
+| `packages/web/src/viewer/messaging/request-dedup.ts` | source | utility | viewer-message-pipeline |
+| `packages/web/src/viewer/messaging/ws-pipeline.ts` | source | utility | viewer-message-pipeline |
 | `packages/web/src/viewer/performance/dom-performance-monitor.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/performance/dom-update-gate.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/performance/graceful-degradation.ts` | source | service | web-dashboard-viewer |
 | `packages/web/src/viewer/performance/index.ts` | source | entrypoint | web-dashboard-viewer |
 | `packages/web/src/viewer/performance/memory-monitor.ts` | source | service | web-dashboard-viewer |
 | `packages/web/src/viewer/performance/refresh-throttle.ts` | source | utility | web-dashboard-viewer |
-| `packages/web/src/viewer/performance/response-buffer-gate.ts` | source | middleware | web-dashboard-viewer |
+| `packages/web/src/viewer/performance/response-buffer-gate.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/performance/update-batcher.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/polling/batched-tick-dispatcher.ts` | source | utility | viewer-message-pipeline |
 | `packages/web/src/viewer/polling/index.ts` | source | entrypoint | web-dashboard-viewer |
-| `packages/web/src/viewer/polling/polling-manager.ts` | source | service | web-dashboard-viewer |
+| `packages/web/src/viewer/polling/polling-manager.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/polling/polling-restart.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/polling/polling-state.ts` | source | store | web-dashboard-viewer |
 | `packages/web/src/viewer/polling/tab-visibility.ts` | source | utility | web-dashboard-viewer |
-| `packages/web/src/viewer/polling/tick-timer.ts` | source | service | viewer-message-pipeline |
-| `packages/web/src/viewer/polling/tick-visibility-gate.ts` | source | middleware | web-dashboard-viewer |
+| `packages/web/src/viewer/polling/tick-timer.ts` | source | utility | viewer-message-pipeline |
+| `packages/web/src/viewer/polling/tick-visibility-gate.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/route-state.ts` | source | route-handler | web-dashboard-viewer |
 | `packages/web/src/viewer/schema-compat.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/styles/a11y.css` | other |  |  |
@@ -1405,7 +1439,7 @@ Prioritized work items derived from analysis:
 | `packages/web/src/viewer/views/workflow-optimization.ts` | source | page | web-dashboard-viewer |
 | `packages/web/src/viewer/views/zone-types.ts` | source | page | web-dashboard-viewer |
 | `packages/web/src/viewer/views/zones.ts` | source | page | web-dashboard-viewer |
-| `packages/web/src/viewer/visualization/colors.ts` | source | types | web-dashboard-viewer |
+| `packages/web/src/viewer/visualization/colors.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/visualization/flow.ts` | source | utility | web-dashboard-viewer |
 | `packages/web/src/viewer/visualization/index.ts` | source | entrypoint | web-dashboard-viewer |
 | `packages/web/src/viewer/visualization/metrics.ts` | source | utility | web-dashboard-viewer |
@@ -1561,7 +1595,7 @@ Prioritized work items derived from analysis:
 | `packages/web/vitest.config.ts` | config |  | viewer-message-pipeline |
 | `pnpm-lock.yaml` | generated |  |  |
 | `pnpm-workspace.yaml` | other |  |  |
-| `pr-check.js` | source | utility | monorepo-orchestration |
+| `pr-check.js` | source | service | monorepo-orchestration |
 | `prd.md` | docs |  |  |
 | `refresh-artifacts.js` | source | utility | monorepo-orchestration |
 | `refresh-plan.js` | source | utility | monorepo-orchestration |

@@ -196,6 +196,7 @@ Internal:
 - Perfect cohesion (1.0) and zero external coupling across 41 files confirm this is a true foundation layer — it imports from no other monorepo packages and is the correct architectural anchor for vendor-neutral LLM abstractions.
 - The package correctly appears in the dependency graph only as a target, never as a source of cross-zone imports. This unidirectional relationship should be protected by the domain-isolation.test.js assertions.
 - With 41 files and no entry points declared in the zone manifest, confirm that the public API surface is fully governed by src/public.ts and that no consumers import from internal paths (e.g., dist/*) outside the documented subpath exports escape hatch.
+- cli/output.ts in rex re-exports `setQuiet`, `isQuiet`, `info`, and `result` from `@n-dx/llm-client` as a convenience barrel. This pattern means llm-client is the true provider of rex's CLI output primitives, yet domain modules that import via cli/output.ts incur a CLI-tier dependency for a foundation-tier capability. The llm-client foundation's output primitives are correctly placed, but the re-export barrel in rex CLI tier creates unnecessary indirection and layer pressure for domain consumers.
 - [call graph] 494 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

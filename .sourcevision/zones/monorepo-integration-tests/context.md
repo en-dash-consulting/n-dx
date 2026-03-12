@@ -28,6 +28,7 @@ tests/integration/web-server-viewer-boundary.test.js (JavaScript, 112 lines, tes
 [observation] [info] As new cross-package contracts are introduced (e.g. new gateway exports), a corresponding integration test should be added here to prevent silent contract breakage.
 [observation] [info] Perfect cohesion and zero coupling are correct for an integration test zone; these tests exercise production seams without becoming part of them.
 [observation] [info] hench-rex-gateway-pipeline.test.js and gateway-pipeline.test.js may have overlapping coverage of the rex gateway; periodically audit for duplication to keep the suite maintainable.
+[relationship] [warning] Integration test coverage is asymmetric: the documented crash ↔ web-viewer exception is backed by CLAUDE.md policy, but the undocumented use ↔ web-viewer bidirectional loop has no integration-level assertion enforcing either its dissolution or its documented exception status.
 
 </findings>
 
@@ -40,6 +41,8 @@ tests/integration/web-server-viewer-boundary.test.js (JavaScript, 112 lines, tes
 - Perfect cohesion and zero coupling are correct for an integration test zone; these tests exercise production seams without becoming part of them.
 - hench-rex-gateway-pipeline.test.js and gateway-pipeline.test.js may have overlapping coverage of the rex gateway; periodically audit for duplication to keep the suite maintainable.
 - As new cross-package contracts are introduced (e.g. new gateway exports), a corresponding integration test should be added here to prevent silent contract breakage.
+- web-server-viewer-boundary.test.js validates the server↔viewer seam but no integration test covers the use ↔ web-viewer bidirectional import loop, leaving the second known undocumented architectural smell entirely unguarded at the integration test layer.
+- Integration test coverage is asymmetric: the documented crash ↔ web-viewer exception is backed by CLAUDE.md policy, but the undocumented use ↔ web-viewer bidirectional loop has no integration-level assertion enforcing either its dissolution or its documented exception status.
 - [call graph] 30 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

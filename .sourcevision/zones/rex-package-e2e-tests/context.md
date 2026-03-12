@@ -27,6 +27,7 @@ packages/rex/tests/e2e/cli-import.test.ts (TypeScript, 123 lines, test)
 [observation] [info] A separate 'Rex CLI E2E Coverage' zone (algorithmicId: rex, 10 files) exists in the codebase; confirm the two zones do not duplicate coverage scenarios and that test ownership boundaries are documented.
 [observation] [info] Perfect cohesion and zero coupling — a textbook isolated test zone; no governance concerns.
 [observation] [info] The fix e2e test (cli-fix.test.ts) provides black-box coverage for the prd-fix-command satellite zone, which has no standalone integration tests — this is the primary regression safety net for that zone.
+[pattern] [info] The e2e test zone covers exactly the four Rex CLI surfaces that correspond to satellite zones (adapter, analyze, fix, import) — each satellite has a matching e2e file, meaning absorption of any satellite must preserve its e2e test to maintain the coverage contract
 
 </findings>
 
@@ -39,6 +40,8 @@ packages/rex/tests/e2e/cli-import.test.ts (TypeScript, 123 lines, test)
 - Perfect cohesion and zero coupling — a textbook isolated test zone; no governance concerns.
 - The fix e2e test (cli-fix.test.ts) provides black-box coverage for the prd-fix-command satellite zone, which has no standalone integration tests — this is the primary regression safety net for that zone.
 - A separate 'Rex CLI E2E Coverage' zone (algorithmicId: rex, 10 files) exists in the codebase; confirm the two zones do not duplicate coverage scenarios and that test ownership boundaries are documented.
+- cli-fix.test.ts provides the only regression safety net for the prd-fix-command satellite; if prd-fix-command is absorbed into rex-prd-engine, this e2e test must be retained to preserve black-box coverage for the fix command surface
+- The e2e test zone covers exactly the four Rex CLI surfaces that correspond to satellite zones (adapter, analyze, fix, import) — each satellite has a matching e2e file, meaning absorption of any satellite must preserve its e2e test to maintain the coverage contract
 - [call graph] 83 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>
