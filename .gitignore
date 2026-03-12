@@ -17,3 +17,4 @@ packages/rex/.rex/execution-log*.jsonl
 .claude/settings.local.json
 .claude/worktrees/
 scripts/HENCH_CALLGRAPH_FINDINGS.md
+.sourcevision/history/
