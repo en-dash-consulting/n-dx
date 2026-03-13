@@ -55,7 +55,6 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "pr-markdown":         { product: "sourcevision", label: "PR Markdown",     productLabel: "SourceVision" },
   "rex-dashboard":       { product: "rex",          label: "Dashboard",       productLabel: "Rex" },
   prd:                   { product: "rex",          label: "Tasks",           productLabel: "Rex" },
-  "rex-analysis":        { product: "rex",          label: "Analysis",        productLabel: "Rex" },
   "token-usage":         { product: "global",       label: "Token Usage",     productLabel: "Global" },
   validation:            { product: "rex",          label: "Validation",      productLabel: "Rex" },
   "notion-config":       { product: "rex",          label: "Notion",          productLabel: "Rex" },

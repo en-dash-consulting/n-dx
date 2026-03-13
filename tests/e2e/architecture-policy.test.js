@@ -41,6 +41,7 @@ const ALLOWED = new Set([
   "ci.js",
   "web.js",
   "config.js",
+  "export.js",
   "pr-check.js",
   // Development scripts
   "packages/web/dev.js",
@@ -792,14 +793,12 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["chunked-review", "Small CLI feature zone (2 files) with linear dependency; Louvain cohesion underestimates due to low edge count"],
-  ["prd-fix-command", "Small CLI feature zone (2 files); Louvain cohesion underestimates due to low edge count"],
+  ["chunked-review-pipeline", "Small CLI pipeline zone (4 files); linear review pipeline with low internal edge count"],
+  ["prd-verification-utilities", "Small utility zone (2 files); unrelated verification helpers grouped by Louvain; low edge count"],
+  ["project-status-polling", "Small viewer zone (3 files); polling infrastructure with linear dependency chain"],
   ["rex", "Package config and metadata zone; no internal import structure"],
-  ["rex-core-utilities", "Two unrelated utility files (keywords.ts, verify.ts) grouped by Louvain; zero internal imports; pinned to rex-prd-engine to dissolve zone over time"],
-  ["rex-e2e-config", "Configuration/metadata zone with no internal import structure"],
-  ["viewer-prd-interaction", "Dual-fragility zone (cohesion 0.26); contains single-consumer hooks — governed by containment assertion in boundary-check.test.ts"],
-  ["web-shared", "Small foundation zone (5 files) with high outbound utility; cohesion 0.46 is near threshold — governed by two-consumer addition policy (CLAUDE.md)"],
-  ["web-viewer-unit-tests", "Test-only zone; cohesion 0 is expected for test infrastructure files"],
+  ["rex-cli-e2e-coverage", "Test configuration zone (9 files); test fixtures have no internal import structure"],
+  ["web-shared", "Small foundation zone (5 files) with high outbound utility; cohesion 0.36 — governed by two-consumer addition policy (CLAUDE.md)"],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {

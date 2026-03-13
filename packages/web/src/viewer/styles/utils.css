@@ -237,9 +237,8 @@
   flex-shrink: 0;
 }
 
-/* Shared button style for page-context help buttons */
-.guide-btn,
-.header-faq-btn {
+/* Page-context help button */
+.guide-btn {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -256,14 +255,12 @@
   padding: 0;
 }
 
-.guide-btn:hover,
-.header-faq-btn:hover {
+.guide-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.guide-btn:active,
-.header-faq-btn:active {
+.guide-btn:active {
   background: var(--bg-hover);
 }
 

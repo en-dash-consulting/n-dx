@@ -175,6 +175,13 @@ const COMMAND_REGISTRY = [
     related: [],
   },
   {
+    name: "export",
+    category: "Orchestration",
+    summary: "Export static deployable dashboard",
+    keywords: ["export", "static", "deploy", "gh-pages", "dashboard", "GitHub Pages", "Netlify", "S3"],
+    related: ["start", "status"],
+  },
+  {
     name: "self-heal",
     category: "Orchestration",
     summary: "Iterative codebase improvement loop",
@@ -784,6 +791,23 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["start"],
   },
+  export: {
+    summary: "export static deployable dashboard",
+    description: "Generates a self-contained static directory from the current\nSourceVision and Rex data. Deployable to GitHub Pages, Netlify, S3,\nor any static host. All read-only views work; mutation UI is hidden.",
+    usage: "ndx export [options] [dir]",
+    options: [
+      { flag: "--out-dir=<path>", description: "Output directory (default: ./ndx-export)" },
+      { flag: "--base-path=<path>", description: "Base URL path for deployment (default: /)" },
+      { flag: "--deploy=gh-pages", description: "Push to gh-pages branch after export" },
+    ],
+    examples: [
+      { command: "ndx export", description: "Export to ./ndx-export" },
+      { command: "ndx export --out-dir=dist .", description: "Export to ./dist" },
+      { command: "ndx export --base-path=/my-project/ .", description: "Export with subpath" },
+      { command: "ndx export --deploy=gh-pages .", description: "Export and deploy to GitHub Pages" },
+    ],
+    related: ["start", "status"],
+  },
   "self-heal": {
     summary: "iterative codebase improvement loop",
     description:
@@ -914,6 +938,7 @@ export function formatMainHelp() {
     ["web [dir]", "Alias for start (--port=N, --background, stop, status)"],
     ["ci [dir]", "Run analysis pipeline and validate PRD health"],
     ["config [key] [value]", "View and edit settings (--json, --help)"],
+    ["export [dir]", "Export static deployable dashboard (--out-dir, --base-path, --deploy=gh-pages)"],
     ["self-heal [N] [dir]", "Iterative improvement loop (analyze → recommend → accept → execute)"],
   ];
   const maxOrchLen = Math.max(...orchestrationItems.map(([n]) => n.length));

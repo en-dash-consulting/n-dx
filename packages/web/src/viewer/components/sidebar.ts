@@ -12,7 +12,7 @@ import {
   HenchActivityIndicator,
 } from "./status-indicators.js";
 import { ConfigFooter } from "./config-footer.js";
-import { useProjectMetadata } from "../hooks/index.js";
+import { useProjectMetadata, useFeatureToggle } from "../hooks/index.js";
 import { SOURCEVISION_TABS } from "../views/sourcevision-tabs.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
@@ -28,7 +28,7 @@ interface SidebarProps {
   scope?: string | null;
 }
 
-type NavItem = { type: "item"; id: ViewId; icon: string; label: string; minPass: number };
+type NavItem = { type: "item"; id: ViewId; icon: string; label: string; minPass: number; featureGate?: string };
 type NavSection = { type: "section"; label: string; product?: "sourcevision" | "rex" | "hench" };
 type NavEntry = NavItem | NavSection;
 
@@ -44,10 +44,9 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "section", label: "REX", product: "rex" },
   { type: "item", id: "rex-dashboard", icon: "\u25A8", label: "Dashboard", minPass: 0 },
   { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
-  { type: "item", id: "rex-analysis", icon: "\u2699", label: "Analysis", minPass: 0 },
   { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
-  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "Notion", minPass: 0 },
-  { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0 },
+  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "Notion", minPass: 0, featureGate: "rex.notionSync" },
+  { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0, featureGate: "rex.integrations" },
   { type: "section", label: "HENCH", product: "hench" },
   { type: "item", id: "hench-runs", icon: "\u25B6", label: "Runs", minPass: 0 },
   { type: "item", id: "hench-audit", icon: "\u2638", label: "Audit", minPass: 0 },
@@ -106,11 +105,32 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const projectStatus = useProjectStatus();
   const projectMeta = useProjectMetadata();
 
-  /** Sections filtered by scope — when scoped, show only the matching section + cross-cutting sections. */
+  // Feature-gated nav items: subscribe to toggle state
+  const callGraphEnabled = useFeatureToggle("sourcevision.callGraph", false);
+  const notionSyncEnabled = useFeatureToggle("rex.notionSync", false);
+  const integrationsEnabled = useFeatureToggle("rex.integrations", false);
+  const enabledGates = useMemo(() => {
+    const m = new Map<string, boolean>();
+    m.set("sourcevision.callGraph", callGraphEnabled);
+    m.set("rex.notionSync", notionSyncEnabled);
+    m.set("rex.integrations", integrationsEnabled);
+    return m;
+  }, [callGraphEnabled, notionSyncEnabled, integrationsEnabled]);
+
+  /** Sections filtered by scope and feature gates. */
   const visibleSections = useMemo(() => {
-    if (!scope) return SECTIONS;
-    return SECTIONS.filter((s) => s.product === scope || !s.product);
-  }, [scope]);
+    const scopeFiltered = scope
+      ? SECTIONS.filter((s) => s.product === scope || !s.product)
+      : SECTIONS;
+    // Filter out feature-gated items that are disabled
+    return scopeFiltered.map((s) => ({
+      ...s,
+      items: s.items.filter((item) => {
+        if (!item.featureGate) return true;
+        return enabledGates.get(item.featureGate) ?? false;
+      }),
+    }));
+  }, [scope, enabledGates]);
 
   const [expandedSection, setExpandedSection] = useState<string>(() =>
     scope ? (visibleSections[0]?.label ?? getInitialExpanded(view)) : getInitialExpanded(view)

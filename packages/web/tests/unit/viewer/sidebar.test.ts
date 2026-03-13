@@ -587,8 +587,8 @@ describe("Sidebar", () => {
     it("shows sourcevision nav items + token usage + settings when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 9 sourcevision items + 1 token usage item + 1 settings item (Feature Flags)
-      expect(navItems.length).toBe(11);
+      // 8 sourcevision items (graph is feature-gated, default off) + 1 token usage item + 1 settings item (Feature Flags)
+      expect(navItems.length).toBe(10);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

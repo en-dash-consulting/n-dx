@@ -8,8 +8,6 @@
  *
  *   1. Viewer types (packages/web/src/viewer/components/prd-tree/types.ts)
  *      — browser-bundled code that cannot import Node.js packages.
- *   2. Viewer LogEntry (packages/web/src/viewer/views/analysis.ts)
- *      — local interface for log display.
  *
  * These tests verify those viewer mirrors stay in sync with canonical
  * Rex definitions, and that the gateway re-exports are correct.

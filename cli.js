@@ -66,6 +66,7 @@ import {
   formatOrchestratorCommandHelp,
 } from "./help.js";
 import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integration.js";
+import { runExport } from "./export.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
@@ -781,6 +782,16 @@ async function handleSelfHeal(rest) {
   process.exit(0);
 }
 
+async function handleExport(rest) {
+  try {
+    const code = await runExport(rest);
+    process.exit(code);
+  } catch (err) {
+    console.error(formatError(err));
+    process.exit(1);
+  }
+}
+
 async function handleConfig(rest) {
   try {
     await runConfig(rest);
@@ -883,6 +894,7 @@ async function main() {
     case "dev":     return handleDev(rest);
     case "start":   return handleStart(rest, "start");
     case "web":     return handleStart(rest, "web");
+    case "export":    return handleExport(rest);
     case "config":    return handleConfig(rest);
     case "self-heal": return handleSelfHeal(rest);
   }

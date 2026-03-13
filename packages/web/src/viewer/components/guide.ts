@@ -74,12 +74,6 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Tasks stuck in 'in_progress' for too long. Blocked items with unresolved dependencies. Orphaned subtasks without clear parent context. Items missing acceptance criteria.",
     actions: "Click items to view details in the side panel. Use bulk actions to update multiple items at once. Merge duplicate tasks. Add new items at any level of the hierarchy.",
   },
-  "rex-analysis": {
-    title: "Analysis",
-    description: "Review AI-generated proposals for your PRD. Rex analyzes your codebase using SourceVision data and suggests epics, features, and tasks to add.",
-    lookFor: "Proposals that overlap with existing PRD items. Suggestions that don't align with project priorities. Overly granular or overly broad proposals.",
-    actions: "Accept relevant proposals to add them to the PRD. Edit proposals before accepting to refine scope. Reject proposals that don't fit. Run new analysis after codebase changes.",
-  },
   "token-usage": {
     title: "Token Usage",
     description: "Analytics dashboard showing token consumption across autonomous agent runs. Tracks input/output tokens, costs, and usage trends over time.",

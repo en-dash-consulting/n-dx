@@ -129,7 +129,7 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
 // Known SPA view paths — keep in sync with ViewId in types.ts
 const SPA_VIEWS = new Set([
   "overview", "graph", "zones", "files", "routes", "architecture",
-  "problems", "suggestions", "rex-dashboard", "prd", "rex-analysis",
+  "problems", "suggestions", "rex-dashboard", "prd",
   "token-usage", "validation", "hench-runs", "hench-audit",
   "hench-config", "hench-templates", "hench-optimization",
 ]);

@@ -100,8 +100,17 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
   {
     key: "rex.notionSync",
     label: "Notion Sync",
-    description: "Enable two-way synchronization between the local PRD and a Notion database.",
+    description: "Enable two-way synchronization between the local PRD and a Notion database. Shows the Notion tab in the Rex sidebar.",
     impact: "Requires Notion integration setup. Sync operations may modify both local and remote data.",
+    package: "rex",
+    stability: "experimental",
+    defaultValue: false,
+  },
+  {
+    key: "rex.integrations",
+    label: "Integrations",
+    description: "Show the Integrations tab in the Rex sidebar for configuring external service connections.",
+    impact: "No performance impact. Hides integration configuration UI when disabled.",
     package: "rex",
     stability: "experimental",
     defaultValue: false,

@@ -78,7 +78,7 @@ export { Sidebar } from "./sidebar.js";
 // ── Content ─────────────────────────────────────────────────────────
 
 export { Guide } from "./guide.js";
-export { GlobalFAQ, HeaderFAQ } from "./faq.js";
+export { GlobalFAQ } from "./faq.js";
 export { NotionSchemaWizard } from "./notion-schema-wizard.js";
 export { ZoneSlideout } from "./zone-slideout.js";
 

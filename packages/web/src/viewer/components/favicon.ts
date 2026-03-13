@@ -46,7 +46,6 @@ const VIEW_TO_PRODUCT: Partial<Record<ViewId, Product>> = {
   "pr-markdown": "sourcevision",
   "rex-dashboard": "rex",
   prd: "rex",
-  "rex-analysis": "rex",
   validation: "rex",
   "hench-runs": "hench",
   "hench-audit": "hench",

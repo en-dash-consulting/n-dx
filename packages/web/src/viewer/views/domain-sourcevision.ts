@@ -19,4 +19,3 @@ export { ProblemsView } from "./problems.js";
 export { SuggestionsView } from "./suggestions.js";
 export { PRMarkdownView } from "./pr-markdown.js";
 export { RoutesView } from "./routes.js";
-export { AnalysisView } from "./analysis.js";

@@ -158,14 +158,14 @@ describe("PR Markdown tab parity integration", () => {
   it("shows PR Markdown as a SourceVision tab and selects it like existing tabs", async () => {
     await bootViewer("/overview", createMockApi());
 
-    const graphItem = findNavItem("Import Graph");
+    const zonesItem = findNavItem("Zones");
     const prMarkdownItem = findNavItem("PR Markdown");
-    expect(graphItem).not.toBeNull();
+    expect(zonesItem).not.toBeNull();
     expect(prMarkdownItem).not.toBeNull();
 
-    graphItem?.click();
-    await waitFor(() => window.location.pathname === "/graph");
-    await waitFor(() => document.querySelector(".nav-item.active")?.textContent?.includes("Import Graph") ?? false);
+    zonesItem?.click();
+    await waitFor(() => window.location.pathname === "/zones");
+    await waitFor(() => document.querySelector(".nav-item.active")?.textContent?.includes("Zones") ?? false);
 
     prMarkdownItem?.click();
     await waitFor(() => window.location.pathname === "/pr-markdown");

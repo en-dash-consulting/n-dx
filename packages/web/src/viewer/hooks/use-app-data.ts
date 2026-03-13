@@ -28,6 +28,7 @@ import {
   stopPolling,
 } from "../loader.js";
 import { isFeatureDisabled, onDegradationChange } from "../performance/index.js";
+import { isDeployedMode } from "../deployed-mode.js";
 
 export interface AppDataState {
   data: LoadedData;
@@ -106,7 +107,10 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
         await loadModules(PRIORITY_MODULES);
         setLoading(false);
         initialLoad.current = false;
-        startPolling(5000);
+        // In deployed mode, data is static — polling would be wasteful.
+        if (!isDeployedMode()) {
+          startPolling(5000);
+        }
 
         // Load remaining modules in the background (non-blocking).
         // Uses requestIdleCallback where available to avoid blocking the main

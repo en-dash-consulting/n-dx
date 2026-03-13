@@ -78,7 +78,7 @@ describe("favicon", () => {
 
     it("maps rex views correctly", () => {
       const rexViews: ViewId[] = [
-        "rex-dashboard", "prd", "rex-analysis", "validation",
+        "rex-dashboard", "prd", "validation",
       ];
       for (const view of rexViews) {
         expect(VIEW_TO_PRODUCT[view]).toBe("rex");

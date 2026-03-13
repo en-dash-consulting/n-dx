@@ -18,7 +18,6 @@ export type ViewId =
   | "pr-markdown"
   | "rex-dashboard"
   | "prd"
-  | "rex-analysis"
   | "token-usage"
   | "validation"
   | "notion-config"

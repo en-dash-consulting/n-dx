@@ -610,10 +610,6 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                 }, "Browse Tasks"),
                 h("button", {
                   class: "rex-dash-action-btn",
-                  onClick: () => navigateTo("rex-analysis" as ViewId),
-                }, "Run Analysis"),
-                h("button", {
-                  class: "rex-dash-action-btn",
                   onClick: () => navigateTo("validation" as ViewId),
                 }, "Validate PRD"),
                 h("button", {

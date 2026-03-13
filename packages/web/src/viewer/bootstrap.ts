@@ -4,6 +4,10 @@
  * Initializes theme, tab-visibility monitoring, polling infrastructure,
  * and tick-visibility gating.  Called once at application startup before
  * the first render.
+ *
+ * In deployed (static export) mode, the fetch adapter is installed first
+ * so all subsequent network requests are transparently rewritten to hit
+ * pre-rendered JSON files instead of a live server.
  */
 
 import { initTheme } from "./components/index.js";
@@ -13,9 +17,15 @@ import {
   startPollingRestart,
   createTickVisibilityGate,
 } from "./polling/index.js";
+import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 
 /** Run all one-time setup operations. */
 export function bootstrap(): void {
+  if (isDeployedMode()) {
+    installFetchAdapter();
+    document.body.classList.add("ndx-deployed");
+  }
+
   initTheme();
 
   // Start tab visibility and polling manager so they're available before
