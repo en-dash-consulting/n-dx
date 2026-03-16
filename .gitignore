@@ -14,7 +14,8 @@ package-lock.json
 packages/rex/.rex/execution-log*.jsonl
 .sv2/
 .sv3/
+ndx-export/
+.ndx-gh-pages-tmp/
 .claude/settings.local.json
 .claude/worktrees/
 scripts/HENCH_CALLGRAPH_FINDINGS.md
-.sourcevision/history/
