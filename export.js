@@ -363,28 +363,29 @@ export async function runExport(args) {
 }
 
 /**
- * Recursively copy viewer JS/CSS/map assets, preserving directory structure.
- * Skips index.html (already handled) and PNG files (already handled).
+ * Copy only the viewer assets needed for the deployed dashboard.
+ *
+ * The viewer dist/ contains both the bundled index.html (with inline JS)
+ * and raw TypeScript compilation output (.js, .d.ts, .js.map). Only the
+ * bundled HTML + CSS + images are needed for deployment. The raw TS output
+ * must NOT be copied — it bloats the export and exposes source internals.
  */
 function copyViewerAssets(srcDir, destDir) {
+  // The viewer is fully bundled into index.html (inline script).
+  // Only copy explicitly needed asset types from the top-level viewer dir.
   const entries = readdirSync(srcDir, { withFileTypes: true });
   for (const entry of entries) {
-    const srcPath = join(srcDir, entry.name);
-    const destPath = join(destDir, entry.name);
-
-    if (entry.isDirectory()) {
-      ensureDir(destPath);
-      copyViewerAssets(srcPath, destPath);
-    } else if (entry.isFile()) {
-      // Skip files we've already handled
-      if (entry.name === "index.html") continue;
-      if (entry.name.endsWith(".png")) continue;
-      if (entry.name === "styles.css") continue;
-
-      // Copy JS, CSS, source maps, and other assets
-      ensureDir(dirname(destPath));
-      copyFileSync(srcPath, destPath);
-    }
+    if (!entry.isFile()) continue;
+    // Skip files already handled
+    if (entry.name === "index.html") continue;
+    if (entry.name === "styles.css") continue;
+    if (entry.name.endsWith(".png")) continue;
+    // Skip TypeScript artifacts — these are raw tsc output, not bundle assets
+    if (entry.name.endsWith(".js")) continue;
+    if (entry.name.endsWith(".js.map")) continue;
+    if (entry.name.endsWith(".d.ts")) continue;
+    // Copy any other assets (fonts, SVGs, etc.)
+    copyFileSync(join(srcDir, entry.name), join(destDir, entry.name));
   }
 }
 
