@@ -268,7 +268,7 @@ export type {
 
 export {
   computeFindingHash, loadAcknowledged, saveAcknowledged,
-  acknowledgeFinding, isAcknowledged,
+  acknowledgeFinding, isAcknowledged, isAcknowledgedFuzzy,
 } from "./analyze/acknowledge.js";
 export type { AcknowledgedFinding, AcknowledgedStore } from "./analyze/acknowledge.js";
 

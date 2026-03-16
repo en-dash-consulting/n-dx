@@ -12,6 +12,7 @@ import {
   saveAcknowledged,
   acknowledgeFinding,
   isAcknowledged,
+  isAcknowledgedFuzzy,
 } from "../../analyze/acknowledge.js";
 import {
   createItemsFromRecommendations,
@@ -31,6 +32,7 @@ import type {
 } from "../../recommend/conflict-detection.js";
 
 interface Finding {
+  type: string;
   severity: string;
   category: string;
   message: string;
@@ -197,6 +199,7 @@ async function readFindings(
   return rawFindings
     .filter((f) => f.severity && sevSet.has(f.severity))
     .map((f) => ({
+      type: f.type ?? "general",
       severity: f.severity!,
       category: f.category ?? f.type ?? "general",
       message: f.message ?? f.text ?? "",
@@ -344,7 +347,7 @@ async function handleAcknowledge(
   if (flag === "all") {
     let updated = ackStore;
     for (const f of findings) {
-      updated = acknowledgeFinding(updated, f.hash, f.message, "acknowledged", "user");
+      updated = acknowledgeFinding(updated, f.hash, f.message, "acknowledged", "user", f.type, f.scope);
     }
     await saveAcknowledged(rexDir, updated);
     result(`Acknowledged all ${findings.length} findings.`);
@@ -360,7 +363,7 @@ async function handleAcknowledge(
       console.error(`Finding index ${idx} out of range (1-${findings.length}).`);
       continue;
     }
-    updated = acknowledgeFinding(updated, f.hash, f.message, "acknowledged", "user");
+    updated = acknowledgeFinding(updated, f.hash, f.message, "acknowledged", "user", f.type, f.scope);
     acked.push(`${idx}. ${f.message.slice(0, 60)}`);
   }
   await saveAcknowledged(rexDir, updated);
@@ -616,7 +619,7 @@ export async function cmdRecommend(
     const showAll = flags["show-all"] !== undefined;
     const findings = showAll
       ? allFindings
-      : allFindings.filter((f) => !isAcknowledged(ackStore, f.hash));
+      : allFindings.filter((f) => !isAcknowledgedFuzzy(ackStore, { hash: f.hash, type: f.type, scope: f.scope ?? "global", text: f.message }));
     await handleAcknowledge(flags.acknowledge, { rexDir, ackStore, findings });
     return;
   }
@@ -627,6 +630,8 @@ export async function cmdRecommend(
     const doc = await store.loadDocument();
     let updated = ackStore;
     let count = 0;
+    // Build a hash→finding map for type+scope lookup
+    const findingsByHash = new Map(allFindings.map((f) => [f.hash, f]));
     const walk = (items: typeof doc.items): void => {
       for (const item of items) {
         if (item.status === "completed" && item.source === "sourcevision") {
@@ -634,7 +639,11 @@ export async function cmdRecommend(
           if (meta?.findingHashes) {
             for (const hash of meta.findingHashes) {
               if (!isAcknowledged(updated, hash)) {
-                updated = acknowledgeFinding(updated, hash, item.title, "completed", "self-heal");
+                const finding = findingsByHash.get(hash);
+                updated = acknowledgeFinding(
+                  updated, hash, item.title, "completed", "self-heal",
+                  finding?.type, finding?.scope,
+                );
                 count++;
               }
             }
@@ -655,15 +664,26 @@ export async function cmdRecommend(
 
   // Filter acknowledged findings unless --show-all
   const showAll = flags["show-all"] !== undefined;
+  const isFuzzyAcked = (f: Finding) => isAcknowledgedFuzzy(ackStore, { hash: f.hash, type: f.type, scope: f.scope ?? "global", text: f.message });
   const findings = showAll
     ? allFindings
-    : allFindings.filter((f) => !isAcknowledged(ackStore, f.hash));
-  const acknowledgedCount = allFindings.length - allFindings.filter((f) => !isAcknowledged(ackStore, f.hash)).length;
+    : allFindings.filter((f) => !isFuzzyAcked(f));
+  const acknowledgedCount = allFindings.length - allFindings.filter((f) => !isFuzzyAcked(f)).length;
 
-  if (findings.length === 0) {
+  // --actionable-only: keep only concretely actionable finding types
+  const ACTIONABLE_TYPES = new Set(["anti-pattern", "suggestion", "move-file"]);
+  const actionableOnly = flags["actionable-only"] !== undefined;
+  const filteredFindings = actionableOnly
+    ? findings.filter((f) => ACTIONABLE_TYPES.has(f.type))
+    : findings;
+
+  if (filteredFindings.length === 0) {
     result("No findings to recommend.");
     if (acknowledgedCount > 0) {
       info(`(${acknowledgedCount} finding${acknowledgedCount === 1 ? "" : "s"} acknowledged, use --show-all to include)`);
+    }
+    if (actionableOnly && findings.length > 0) {
+      info(`(${findings.length} non-actionable finding${findings.length === 1 ? "" : "s"} filtered out by --actionable-only)`);
     }
     return;
   }
@@ -671,14 +691,14 @@ export async function cmdRecommend(
   const maxPerTask = flags["max-findings-per-task"]
     ? parseInt(flags["max-findings-per-task"], 10)
     : 10;
-  const recommendations = mapFindingsToRecommendations(findings, maxPerTask);
+  const recommendations = mapFindingsToRecommendations(filteredFindings, maxPerTask);
 
   if (flags.format === "json") {
     result(JSON.stringify(recommendations, null, 2));
     return;
   }
 
-  displayRecommendations(recommendations, findings, ackStore, showAll, acknowledgedCount);
+  displayRecommendations(recommendations, filteredFindings, ackStore, showAll, acknowledgedCount);
 
   if (flags.accept) {
     await acceptRecommendations(rexDir, flags.accept, recommendations, flags);

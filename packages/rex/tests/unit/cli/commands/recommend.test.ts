@@ -999,3 +999,130 @@ describe("cmdRecommend --accept conflict detection", () => {
     expect(skippedLine).toBeUndefined();
   });
 });
+
+// ── --actionable-only filter ──────────────────────────────────────────────
+
+describe("cmdRecommend --actionable-only", () => {
+  let tmpDir: string;
+  let cmdRecommend: typeof import("../../../../src/cli/commands/recommend.js")["cmdRecommend"];
+  let resultCalls: string[];
+  let infoCalls: string[];
+
+  beforeEach(async () => {
+    resultCalls = [];
+    infoCalls = [];
+
+    vi.resetModules();
+    vi.doMock("@n-dx/llm-client", () => ({
+      PROJECT_DIRS: {
+        REX: ".rex",
+        SOURCEVISION: ".sourcevision",
+      },
+      formatUsage: () => "",
+      toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
+      result: (...args: unknown[]) => { resultCalls.push(args.map(String).join(" ")); },
+      info: (...args: unknown[]) => { infoCalls.push(args.map(String).join(" ")); },
+      setQuiet: () => {},
+      isQuiet: () => false,
+    }));
+    ({ cmdRecommend } = await import("../../../../src/cli/commands/recommend.js"));
+
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-actionable-"));
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+
+    await writeFile(
+      join(tmpDir, ".rex", "config.json"),
+      JSON.stringify({ schema: "rex/v1", project: "test", adapter: "file" }),
+      "utf-8",
+    );
+    await writeFile(
+      join(tmpDir, ".rex", "prd.json"),
+      JSON.stringify({ schema: "rex/v1", title: "test", items: [] }),
+      "utf-8",
+    );
+  });
+
+  afterEach(async () => {
+    vi.doUnmock("@n-dx/llm-client");
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("filters out observation and pattern types", async () => {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: [
+          { type: "observation", severity: "warning", text: "Contains 52% of files", scope: "core" },
+          { type: "pattern", severity: "warning", text: "Barrel exports used", scope: "core" },
+          { type: "anti-pattern", severity: "warning", text: "God object detected", scope: "core" },
+          { type: "suggestion", severity: "warning", text: "Consider splitting module", scope: "core" },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { "actionable-only": "" });
+
+    // Should only show anti-pattern and suggestion
+    const tasks = resultCalls.filter((c) => /^\s+\d+\./.test(c));
+    expect(tasks).toHaveLength(2);
+  });
+
+  it("keeps move-file type findings", async () => {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: [
+          { type: "move-file", severity: "warning", text: "Move utils.ts to shared/", scope: "core" },
+          { type: "relationship", severity: "warning", text: "High coupling between A and B", scope: "core" },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { "actionable-only": "" });
+
+    const tasks = resultCalls.filter((c) => /^\s+\d+\./.test(c));
+    expect(tasks).toHaveLength(1);
+  });
+
+  it("shows filtered-out count when all findings are non-actionable", async () => {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: [
+          { type: "observation", severity: "warning", text: "Zone has 3 files", scope: "core" },
+          { type: "pattern", severity: "warning", text: "Uses barrel exports", scope: "core" },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { "actionable-only": "" });
+
+    const noFindings = resultCalls.find((c) => c.includes("No findings to recommend"));
+    expect(noFindings).toBeDefined();
+    const filteredMsg = infoCalls.find((c) => c.includes("filtered out by --actionable-only"));
+    expect(filteredMsg).toBeDefined();
+  });
+
+  it("shows all findings without --actionable-only flag", async () => {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: [
+          { type: "observation", severity: "warning", text: "Contains 52% of files", scope: "core" },
+          { type: "anti-pattern", severity: "warning", text: "God object detected", scope: "core" },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, {});
+
+    // Without the flag, both findings should appear
+    const tasks = resultCalls.filter((c) => /^\s+\d+\./.test(c));
+    expect(tasks).toHaveLength(2);
+  });
+});

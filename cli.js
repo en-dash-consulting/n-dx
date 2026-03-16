@@ -472,6 +472,22 @@ async function handleInit(rest) {
   process.exit(0);
 }
 
+async function handleAnalyze(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".sourcevision"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.sourcevision, ["analyze", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleRecommend(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex", ".sourcevision"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["recommend", ...flags, dir]);
+  process.exit(0);
+}
+
 async function handleAdd(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex"]);
@@ -785,11 +801,11 @@ async function handleSelfHeal(rest) {
     console.log("[self-heal] step 1/5: sourcevision analyze --deep --full");
     await runOrDie(tools.sourcevision, ["analyze", "--deep", "--full", dir]);
 
-    console.log("\n[self-heal] step 2/5: rex recommend");
-    await runOrDie(tools.rex, ["recommend", dir]);
+    console.log("\n[self-heal] step 2/5: rex recommend --actionable-only");
+    await runOrDie(tools.rex, ["recommend", "--actionable-only", dir]);
 
-    console.log("\n[self-heal] step 3/5: rex recommend --accept");
-    await runOrDie(tools.rex, ["recommend", "--accept", dir]);
+    console.log("\n[self-heal] step 3/5: rex recommend --actionable-only --accept");
+    await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", dir]);
 
     console.log("\n[self-heal] step 4/5: hench run --auto --loop --self-heal");
     await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", dir]);
@@ -798,7 +814,7 @@ async function handleSelfHeal(rest) {
     await runOrDie(tools.rex, ["recommend", "--acknowledge-completed", dir]);
 
     // Check progress: count remaining findings
-    const { code, stdout } = await runCapture(tools.rex, ["recommend", "--format=json", dir]);
+    const { code, stdout } = await runCapture(tools.rex, ["recommend", "--actionable-only", "--format=json", dir]);
     if (code === 0 && stdout.trim()) {
       try {
         const remaining = JSON.parse(stdout.trim());
@@ -923,12 +939,14 @@ async function main() {
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   switch (command) {
-    case "help":    return handleHelp(rest);
-    case "init":    return handleInit(rest);
-    case "plan":    return handlePlan(rest);
-    case "add":     return handleAdd(rest);
-    case "refresh": return handleRefresh(rest);
-    case "work":    return handleWork(rest);
+    case "help":      return handleHelp(rest);
+    case "init":      return handleInit(rest);
+    case "analyze":   return handleAnalyze(rest);
+    case "recommend": return handleRecommend(rest);
+    case "plan":      return handlePlan(rest);
+    case "add":       return handleAdd(rest);
+    case "refresh":   return handleRefresh(rest);
+    case "work":      return handleWork(rest);
     case "status":  return handleStatus(rest);
     case "usage":   return handleUsage(rest);
     case "sync":    return handleSync(rest);

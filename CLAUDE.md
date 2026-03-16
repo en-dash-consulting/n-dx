@@ -232,6 +232,8 @@ Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
 
 ```sh
 ndx init [dir]            # sourcevision init → rex init → hench init
+ndx analyze [dir]         # sourcevision analyze (--deep, --full, --lite)
+ndx recommend [dir]       # rex recommend (--accept, --actionable-only, --acknowledge)
 ndx config llm.vendor ... # set active LLM vendor (claude|codex)
 ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
 ndx plan --accept [dir]   # ...then accept proposals into PRD

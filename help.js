@@ -91,6 +91,20 @@ const COMMAND_REGISTRY = [
     related: ["plan", "status"],
   },
   {
+    name: "analyze",
+    category: "Orchestration",
+    summary: "Run SourceVision codebase analysis",
+    keywords: ["analyze", "codebase", "scan", "sourcevision", "zones", "imports", "inventory", "deep"],
+    related: ["recommend", "plan", "init"],
+  },
+  {
+    name: "recommend",
+    category: "Orchestration",
+    summary: "Show or accept SourceVision-based recommendations",
+    keywords: ["recommend", "findings", "suggestions", "acknowledge", "accept", "sourcevision", "actionable"],
+    related: ["analyze", "plan", "work"],
+  },
+  {
     name: "plan",
     category: "Orchestration",
     summary: "Analyze codebase and generate PRD proposals",
@@ -591,6 +605,45 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["plan", "status", "config"],
   },
+  analyze: {
+    summary: "run SourceVision codebase analysis",
+    description: "Runs the SourceVision static analysis pipeline on the target directory.\nProduces zone maps, import graphs, component catalogs, and findings.\nOutput is written to .sourcevision/.",
+    usage: "ndx analyze [options] [dir]",
+    options: [
+      { flag: "--deep", description: "Enable AI-enriched zone analysis (slower, richer findings)" },
+      { flag: "--full", description: "Re-analyze all phases, ignoring cache" },
+      { flag: "--lite", description: "File-name-only scan (faster, less detail)" },
+      { flag: "--quiet, -q", description: "Suppress informational output" },
+    ],
+    examples: [
+      { command: "ndx analyze", description: "Run analysis in current directory" },
+      { command: "ndx analyze --deep .", description: "Deep analysis with AI enrichment" },
+      { command: "ndx analyze --deep --full .", description: "Full deep re-analysis" },
+    ],
+    related: ["recommend", "plan", "init"],
+  },
+  recommend: {
+    summary: "show or accept SourceVision-based recommendations",
+    description: "Reads SourceVision findings and maps them to actionable PRD recommendations.\nFindings are grouped by zone and category into hierarchical tasks.\nUse --accept to add recommendations to the PRD, --acknowledge to dismiss findings.",
+    usage: "ndx recommend [options] [dir]",
+    options: [
+      { flag: "--accept", description: "Accept all recommendations into the PRD" },
+      { flag: "--accept=<sel>", description: "Accept specific recommendations (=1,3,5 or =all)" },
+      { flag: "--actionable-only", description: "Filter to anti-patterns, suggestions, and move-file findings only" },
+      { flag: "--acknowledge=<sel>", description: "Acknowledge specific findings (=all or =1,2,3)" },
+      { flag: "--acknowledge-completed", description: "Acknowledge findings from completed PRD tasks" },
+      { flag: "--show-all", description: "Include acknowledged findings in output" },
+      { flag: "--format=json", description: "Machine-readable JSON output" },
+      { flag: "--max-findings-per-task=<n>", description: "Findings per task (default: 10)" },
+    ],
+    examples: [
+      { command: "ndx recommend", description: "Show current recommendations" },
+      { command: "ndx recommend --accept .", description: "Accept all into PRD" },
+      { command: "ndx recommend --actionable-only .", description: "Show only actionable findings" },
+      { command: "ndx recommend --acknowledge=all .", description: "Acknowledge all findings" },
+    ],
+    related: ["analyze", "plan", "work"],
+  },
   plan: {
     summary: "analyze codebase and generate PRD proposals",
     description: "Runs SourceVision analysis then Rex analyze to scan the codebase and\ngenerate PRD proposals. Proposals are reviewed interactively unless\n--accept is passed.",
@@ -924,25 +977,37 @@ export function formatMainHelp() {
   lines.push(`${bold("n-dx")} ${dim("—")} AI-powered development toolkit`);
   lines.push("");
 
-  // ── Orchestration ──
-  lines.push(bold("ORCHESTRATION"));
-  const orchestrationItems = [
+  // ── Primary workflow ──
+  lines.push(bold("COMMANDS"));
+  const primaryItems = [
     ["init [dir]", "Initialize all tools (sourcevision + rex + hench)"],
-    ["plan [dir]", "Analyze codebase and show PRD proposals (--guided for new projects)"],
-    ["plan --accept [dir]", "Analyze and accept proposals into PRD"],
+    ["analyze [dir]", "Run SourceVision codebase analysis (--deep, --full, --lite)"],
+    ["recommend [dir]", "Show or accept SourceVision recommendations (--accept, --actionable-only)"],
     ['add "<desc>" [dir]', "Add PRD items from descriptions, files, or stdin"],
-    ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only, --pr-markdown, --no-build)"],
-    ["work [dir]", "Run next task (--task=ID, --epic=ID, --epic-by-epic, --auto)"],
+    ["work [dir]", "Run next task (--task=ID, --epic=ID, --auto, --loop)"],
+    ["self-heal [N] [dir]", "Iterative improvement loop (analyze → recommend → execute)"],
+    ["start [dir]", "Start server: dashboard + MCP (--port=N, --background, stop, status)"],
+  ];
+  const maxPrimaryLen = Math.max(...primaryItems.map(([n]) => n.length));
+  const primaryPad = Math.max(maxPrimaryLen + 4, 24);
+  for (const [name, desc] of primaryItems) {
+    const spacing = " ".repeat(Math.max(primaryPad - name.length - 2, 2));
+    lines.push(`  ${cmd(name)}${spacing}${desc}`);
+  }
+  lines.push("");
+
+  // ── Secondary commands ──
+  lines.push(bold("MORE COMMANDS"));
+  const orchestrationItems = [
+    ["plan [dir]", "Analyze codebase and generate PRD proposals (--guided, --accept)"],
     ["status [dir]", "Show PRD status (--format=json, --since, --until)"],
+    ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only, --no-build)"],
     ["usage [dir]", "Token usage analytics (--format=json, --group=day|week|month)"],
     ["sync [dir]", "Sync local PRD with remote adapter (--push, --pull)"],
-    ["start [dir]", "Start server: dashboard + MCP (--port=N, --background, stop, status)"],
     ["dev [dir]", "Start dev server with live reload (--port=N, --scope=<pkg>)"],
-    ["web [dir]", "Alias for start (--port=N, --background, stop, status)"],
     ["ci [dir]", "Run analysis pipeline and validate PRD health"],
     ["config [key] [value]", "View and edit settings (--json, --help)"],
-    ["export [dir]", "Export static deployable dashboard (--out-dir, --base-path, --deploy=github)"],
-    ["self-heal [N] [dir]", "Iterative improvement loop (analyze → recommend → accept → execute)"],
+    ["export [dir]", "Export static deployable dashboard (--out-dir, --deploy=github)"],
   ];
   const maxOrchLen = Math.max(...orchestrationItems.map(([n]) => n.length));
   const orchPad = Math.max(maxOrchLen + 4, 24);
