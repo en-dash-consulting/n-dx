@@ -178,7 +178,7 @@ const COMMAND_REGISTRY = [
     name: "export",
     category: "Orchestration",
     summary: "Export static deployable dashboard",
-    keywords: ["export", "static", "deploy", "gh-pages", "dashboard", "GitHub Pages", "Netlify", "S3"],
+    keywords: ["export", "static", "deploy", "dashboard", "GitHub Pages", "Netlify", "S3"],
     related: ["start", "status"],
   },
   {
@@ -798,13 +798,13 @@ const ORCHESTRATOR_HELP_DEFS = {
     options: [
       { flag: "--out-dir=<path>", description: "Output directory (default: ./ndx-export)" },
       { flag: "--base-path=<path>", description: "Base URL path for deployment (default: /)" },
-      { flag: "--deploy=gh-pages", description: "Push to gh-pages branch after export" },
+      { flag: "--deploy=github", description: "Push to dashboard-deployment branch for GitHub Pages" },
     ],
     examples: [
       { command: "ndx export", description: "Export to ./ndx-export" },
       { command: "ndx export --out-dir=dist .", description: "Export to ./dist" },
       { command: "ndx export --base-path=/my-project/ .", description: "Export with subpath" },
-      { command: "ndx export --deploy=gh-pages .", description: "Export and deploy to GitHub Pages" },
+      { command: "ndx export --deploy=github .", description: "Export and deploy to GitHub Pages" },
     ],
     related: ["start", "status"],
   },
@@ -941,7 +941,7 @@ export function formatMainHelp() {
     ["web [dir]", "Alias for start (--port=N, --background, stop, status)"],
     ["ci [dir]", "Run analysis pipeline and validate PRD health"],
     ["config [key] [value]", "View and edit settings (--json, --help)"],
-    ["export [dir]", "Export static deployable dashboard (--out-dir, --base-path, --deploy=gh-pages)"],
+    ["export [dir]", "Export static deployable dashboard (--out-dir, --base-path, --deploy=github)"],
     ["self-heal [N] [dir]", "Iterative improvement loop (analyze → recommend → accept → execute)"],
   ];
   const maxOrchLen = Math.max(...orchestrationItems.map(([n]) => n.length));

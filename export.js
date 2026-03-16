@@ -354,9 +354,9 @@ export async function runExport(args) {
 
   console.log(`[export] done — ${outDir}`);
 
-  // ── Optional: deploy to gh-pages ───────────────────────────────────────
-  if (deploy === "gh-pages") {
-    return deployGhPages(outDir, dir);
+  // ── Optional: deploy to GitHub Pages ────────────────────────────────────
+  if (deploy === "github") {
+    return deployToGitHubPages(outDir, dir);
   }
 
   return 0;
@@ -389,32 +389,32 @@ function copyViewerAssets(srcDir, destDir) {
 }
 
 /**
- * Deploy output directory to gh-pages branch.
+ * Deploy output directory to the dashboard-deployment branch (GitHub Pages).
  */
-function deployGhPages(outDir, projectDir) {
-  console.log("[export] deploying to gh-pages...");
+function deployToGitHubPages(outDir, projectDir) {
+  const branch = "dashboard-deployment";
+  console.log(`[export] deploying to ${branch}...`);
   try {
-    // Check if gh-pages branch exists
+    // Check if branch exists
     try {
-      execSync("git rev-parse --verify gh-pages", { cwd: projectDir, stdio: "pipe" });
+      execSync(`git rev-parse --verify ${branch}`, { cwd: projectDir, stdio: "pipe" });
     } catch {
-      // Create orphan branch
-      console.log("[export] creating gh-pages orphan branch...");
+      console.log(`[export] creating ${branch} orphan branch...`);
     }
 
     // Use a temporary worktree approach
-    const tmpWorktree = join(projectDir, ".ndx-gh-pages-tmp");
+    const tmpWorktree = join(projectDir, ".ndx-deploy-tmp");
     try {
       // Clean up any stale worktree
       try { execSync(`git worktree remove "${tmpWorktree}" --force`, { cwd: projectDir, stdio: "pipe" }); } catch { /* ok */ }
 
-      // Create or checkout gh-pages
+      // Create or checkout branch
       try {
-        execSync(`git worktree add "${tmpWorktree}" gh-pages`, { cwd: projectDir, stdio: "pipe" });
+        execSync(`git worktree add "${tmpWorktree}" ${branch}`, { cwd: projectDir, stdio: "pipe" });
       } catch {
         // Branch doesn't exist — create orphan
         execSync(`git worktree add --detach "${tmpWorktree}"`, { cwd: projectDir, stdio: "pipe" });
-        execSync("git checkout --orphan gh-pages", { cwd: tmpWorktree, stdio: "pipe" });
+        execSync(`git checkout --orphan ${branch}`, { cwd: tmpWorktree, stdio: "pipe" });
         execSync("git rm -rf . 2>/dev/null || true", { cwd: tmpWorktree, stdio: "pipe" });
       }
 
@@ -431,12 +431,12 @@ function deployGhPages(outDir, projectDir) {
 
       const hasChanges = execSync("git status --porcelain", { cwd: tmpWorktree }).toString().trim();
       if (!hasChanges) {
-        console.log("[export] gh-pages is already up to date");
+        console.log(`[export] ${branch} is already up to date`);
       } else {
         const timestamp = new Date().toISOString();
-        execSync(`git commit -m "Deploy dashboard export (${timestamp})"`, { cwd: tmpWorktree, stdio: "pipe" });
-        execSync("git push origin gh-pages", { cwd: tmpWorktree, stdio: "inherit" });
-        console.log("[export] pushed to gh-pages");
+        execSync(`git commit -m "Deploy dashboard (${timestamp})"`, { cwd: tmpWorktree, stdio: "pipe" });
+        execSync(`git push origin ${branch}`, { cwd: tmpWorktree, stdio: "inherit" });
+        console.log(`[export] pushed to ${branch}`);
       }
     } finally {
       try { execSync(`git worktree remove "${tmpWorktree}" --force`, { cwd: projectDir, stdio: "pipe" }); } catch { /* ok */ }
@@ -444,7 +444,7 @@ function deployGhPages(outDir, projectDir) {
 
     return 0;
   } catch (err) {
-    console.error(`[export] gh-pages deployment failed: ${err.message}`);
+    console.error(`[export] deployment failed: ${err.message}`);
     return 1;
   }
 }
