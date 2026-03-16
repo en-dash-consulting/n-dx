@@ -18,4 +18,6 @@ ndx-export/
 .ndx-deploy-tmp/
 .claude/settings.local.json
 .claude/worktrees/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
 scripts/HENCH_CALLGRAPH_FINDINGS.md

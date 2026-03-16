@@ -37,7 +37,7 @@ Each tier handles a distinct concern but they communicate via WebSocket broadcas
 Provides cross-platform system memory readings and pre-spawn gating. Before any child process is spawned, the monitor checks whether the system has enough available memory.
 
 **How it works:**
-1. Reads available memory using platform-specific methods (see [OS Behavior](./memory-os-behavior.md))
+1. Reads available memory using platform-specific methods (see [OS Behavior](/process/memory-os-behavior))
 2. Computes usage percentage: `(total - available) / total * 100`
 3. Compares against `spawnThreshold` (default: 90%)
 4. Returns a `SpawnMemoryCheck` with `allowed: boolean` and a reason string if blocked

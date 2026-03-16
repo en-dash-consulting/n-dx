@@ -21,9 +21,13 @@
     "test": "vitest run && pnpm -r run test",
     "validate": "pnpm -r run validate",
     "verify": "vitest run tests/e2e && node ci.js .",
-    "pr-check": "node pr-check.js"
+    "pr-check": "node pr-check.js",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
+    "vitepress": "^1.6.4",
     "vitest": "^4.0.18"
   },
   "codeOfConduct": "./CODE_OF_CONDUCT.md",

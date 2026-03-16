@@ -1,6 +1,6 @@
 # Memory Management: Areas of Improvement
 
-Prioritized improvements to the memory management subsystem, organized by impact and effort. Each item references the specific risk or gap it addresses from the [Risks and Flaws](./memory-risks-and-flaws.md) document.
+Prioritized improvements to the memory management subsystem, organized by impact and effort. Each item references the specific risk or gap it addresses from the [Risks and Flaws](/analysis/memory-risks-and-flaws) document.
 
 ---
 
