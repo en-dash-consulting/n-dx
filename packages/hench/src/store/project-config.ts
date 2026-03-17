@@ -13,14 +13,14 @@ import {
   loadLLMConfig as loadLLMConfigFromDir,
   resolveApiKey as sharedResolveApiKey,
   resolveCliPath as sharedResolveCliPath,
-} from "@n-dx/llm-client";
-import type { ClaudeConfig, LLMConfig, LLMVendor } from "@n-dx/llm-client";
+} from "../prd/llm-gateway.js";
+import type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
 
 // Re-export the shared ClaudeConfig type so existing consumers keep working
-export type { ClaudeConfig, LLMConfig, LLMVendor } from "@n-dx/llm-client";
+export type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
 
 // Re-export shared project config utilities — previously duplicated here.
-export { loadProjectOverrides, mergeWithOverrides } from "@n-dx/llm-client";
+export { loadProjectOverrides, mergeWithOverrides } from "../prd/llm-gateway.js";
 
 /**
  * Load the "claude" section from .n-dx.json.

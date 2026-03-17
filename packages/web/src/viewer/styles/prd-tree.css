@@ -666,14 +666,22 @@
   border-radius: 3px;
 }
 
-.prd-usage-chip {
+/* Token usage badge — always visible when non-zero, neutral chip style */
+.prd-token-badge {
   font-size: var(--font-sm);
-  color: var(--brand-teal);
-  background: color-mix(in srgb, var(--brand-teal) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand-teal) 35%, transparent);
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--text-dim) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-dim) 20%, transparent);
   border-radius: 999px;
   padding: 1px var(--space-1-5);
   white-space: nowrap;
+}
+
+/* Accented variant when budget info is shown */
+.prd-token-badge--budget {
+  color: var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 10%, transparent);
+  border-color: color-mix(in srgb, var(--brand-teal) 35%, transparent);
 }
 
 /* Timestamp */
@@ -769,6 +777,80 @@
   margin-top: var(--space-1);
   font-size: var(--font-sm);
   color: var(--text-dim);
+}
+
+/* Hench runs list in task detail */
+.task-runs-section {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-2);
+}
+
+.task-runs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-run-entry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.task-run-entry.clickable {
+  cursor: pointer;
+}
+
+.task-run-entry.clickable:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.task-run-entry.clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.task-run-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.task-run-status {
+  font-size: var(--font-sm);
+  line-height: 1;
+}
+
+.task-run-time {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.task-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding-left: calc(var(--font-sm) + var(--space-1-5));
+}
+
+.task-run-chip {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  background: var(--bg-inset);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.task-run-chip-tokens {
+  color: var(--brand-teal);
+  font-weight: var(--weight-medium);
 }
 
 /* Status selector buttons */
@@ -1049,6 +1131,60 @@
   }
 }
 
+/* Editable title */
+.task-title-display {
+  font-size: var(--font-lg, 1.1rem);
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.task-title-display.editable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+}
+
+.task-title-display.editable:hover {
+  background: var(--bg-hover);
+}
+
+.task-title-display.editable:hover .task-edit-icon,
+.task-description.editable:hover .task-edit-icon {
+  opacity: 1;
+}
+
+.task-edit-icon {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.task-title-edit {
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
+}
+
+.task-title-input {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: var(--font-lg, 1.1rem);
+  font-weight: 600;
+  font-family: inherit;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-sizing: border-box;
+}
+
 /* Description */
 .task-description {
   font-size: var(--font-base);
@@ -1061,6 +1197,94 @@
   word-break: break-word;
   overflow-wrap: break-word;
   overflow-x: hidden;
+}
+
+.task-description.editable {
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  transition: background 0.15s;
+}
+
+.task-description.editable:hover {
+  background: var(--bg-surface);
+}
+
+.task-description-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-description-textarea {
+  width: 100%;
+  padding: var(--space-2-5) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: var(--font-base);
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-sizing: border-box;
+}
+
+.task-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.task-edit-save,
+.task-edit-cancel {
+  padding: var(--space-1) var(--space-2-5);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: var(--font-sm);
+  cursor: pointer;
+  background: var(--bg-surface);
+  color: var(--text);
+}
+
+.task-edit-save {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.task-edit-save:hover {
+  opacity: 0.9;
+}
+
+.task-edit-cancel:hover {
+  border-color: var(--text-dim);
+}
+
+.task-edit-hint {
+  font-size: var(--font-xs, 0.7rem);
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.task-add-description-btn {
+  padding: var(--space-1-5) var(--space-2-5);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.task-add-description-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Acceptance criteria */
@@ -1076,6 +1300,140 @@
   padding: var(--space-1) 0 var(--space-1) var(--space-5);
   border-bottom: 1px solid var(--border);
   position: relative;
+}
+
+.task-criterion.editable {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding-right: var(--space-6);
+}
+
+.task-criterion.editable:hover {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+.task-criterion.editing {
+  padding-left: var(--space-5);
+}
+
+.task-criterion.editing::before {
+  content: "☐";
+  position: absolute;
+  left: 0;
+  color: var(--text-dim);
+  font-size: var(--font-base);
+}
+
+.task-criterion-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-criterion-remove {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: var(--font-base);
+  cursor: pointer;
+  padding: var(--space-1);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.task-criterion.editable:hover .task-criterion-remove {
+  opacity: 1;
+}
+
+.task-criterion-remove:hover {
+  color: var(--red, #e74c3c);
+}
+
+.task-criterion-input {
+  width: 100%;
+  padding: var(--space-1) var(--space-1-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: var(--font-base);
+  font-family: inherit;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-sizing: border-box;
+}
+
+.task-criterion-add-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.task-criterion-add-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.task-criterion-add-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.task-criterion-add-confirm,
+.task-criterion-add-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-1-5);
+}
+
+.task-criterion-add-confirm:hover {
+  color: var(--green, #2ecc71);
+  border-color: var(--green, #2ecc71);
+}
+
+.task-criterion-add-cancel:hover {
+  color: var(--red, #e74c3c);
+  border-color: var(--red, #e74c3c);
+}
+
+.task-criterion-add-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.task-criterion-add-btn {
+  display: inline-block;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.task-criterion-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .task-criterion:last-child {
@@ -2753,25 +3111,17 @@
   border-color: var(--accent);
 }
 
-/* ── Bulk Selection Checkboxes ────────────────────────────────────── */
-
-.prd-bulk-checkbox-wrapper {
-  display: inline-flex;
-  align-items: center;
-  margin-right: 4px;
-  flex-shrink: 0;
-}
-
-.prd-bulk-checkbox {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: var(--accent);
-}
+/* ── Bulk Selection Highlight ─────────────────────────────────────── */
 
 .prd-node-bulk-selected {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  outline-offset: -1px;
+  border-radius: 4px;
+}
+
+.prd-node-bulk-selected:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 /* ── Merge Preview Panel ─────────────────────────────────────────── */
@@ -4318,6 +4668,18 @@
   opacity: 0.9;
 }
 
+.smart-add-btn-generate {
+  margin-top: var(--space-2);
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  align-self: flex-end;
+}
+
+.smart-add-btn-generate:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
 /* Compact variant (dashboard embedding) */
 .smart-add-panel-compact {
   padding: var(--space-3);
@@ -5101,4 +5463,321 @@
 @keyframes delete-modal-slide-in {
   from { opacity: 0; transform: scale(0.95) translateY(-8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Inline tree search ──────────────────────────────────────── */
+
+.prd-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.prd-search-input {
+  flex: 1;
+  padding: var(--space-1-5) var(--space-3);
+  font-size: var(--font-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+
+.prd-search-input::placeholder {
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.prd-search-input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.prd-search-count {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.prd-search-clear {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: var(--font-base);
+  padding: var(--space-1);
+  line-height: 1;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.prd-search-clear:hover {
+  color: var(--text);
+  background: var(--bg-surface);
+}
+
+/* Search match highlight in tree node titles */
+.prd-search-highlight {
+  background: rgba(255, 230, 0, 0.35);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+[data-theme="light"] .prd-search-highlight {
+  background: rgba(255, 210, 0, 0.4);
+}
+
+/* Subtle background tint on rows that directly match the search */
+.prd-node-search-match {
+  background: rgba(255, 230, 0, 0.06);
+}
+
+[data-theme="light"] .prd-node-search-match {
+  background: rgba(255, 210, 0, 0.08);
+}
+
+/* ── Facet filter chips ─────────────────────────────────────────────── */
+
+.prd-facet-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  margin-top: var(--space-1);
+}
+
+.prd-facet-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.prd-facet-label {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  min-width: 48px;
+}
+
+.prd-facet-chips {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.prd-facet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  cursor: pointer;
+  transition: all 0.15s;
+  opacity: 0.6;
+}
+
+.prd-facet-chip:hover {
+  opacity: 0.9;
+  border-color: var(--text-dim);
+}
+
+.prd-facet-chip.active {
+  opacity: 1;
+  font-weight: var(--weight-medium);
+}
+
+/* Active status facet chips — reuse status color scheme */
+.prd-facet-chip.active.prd-status-completed {
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.prd-facet-chip.active.prd-status-in-progress {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.prd-facet-chip.active.prd-status-pending {
+  background: var(--bg-hover);
+  border-color: var(--text-dim);
+  color: var(--text-dim);
+}
+
+.prd-facet-chip.active.prd-status-failing {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.prd-facet-chip.active.prd-status-blocked {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.prd-facet-chip.active.prd-status-deferred {
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+/* Active tag facet chips — accent color */
+.prd-facet-tag.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.prd-facet-chip-icon {
+  font-size: var(--font-xs);
+}
+
+.prd-facet-chip-label {
+  font-size: var(--font-xs);
+}
+
+.prd-facet-clear {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  padding: 2px var(--space-2);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.prd-facet-clear:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.prd-facet-empty {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 2px 0;
+}
+
+/* ── Tag typeahead ────────────────────────────────────────────────────── */
+
+.prd-facet-row--tags {
+  align-items: flex-start;
+}
+
+.prd-tag-typeahead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.prd-tag-selected {
+  flex-wrap: wrap;
+}
+
+.prd-tag-remove {
+  margin-left: 2px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.prd-facet-tag.active:hover .prd-tag-remove {
+  opacity: 1;
+}
+
+.prd-tag-input-wrap {
+  position: relative;
+}
+
+.prd-tag-input {
+  width: 100%;
+  max-width: 260px;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: var(--font-xs);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.prd-tag-input::placeholder {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.prd-tag-input:focus {
+  border-color: var(--accent);
+}
+
+.prd-tag-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-width: 260px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 2px 0 0;
+  padding: 2px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  list-style: none;
+  z-index: 50;
+}
+
+.prd-tag-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.prd-tag-option:hover,
+.prd-tag-option.highlighted {
+  background: var(--bg-hover);
+}
+
+.prd-tag-option-hash {
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+
+.prd-tag-no-match,
+.prd-tag-more {
+  color: var(--text-dim);
+  font-style: italic;
+  cursor: default;
+}
+
+.prd-tag-no-match:hover,
+.prd-tag-more:hover {
+  background: transparent;
 }

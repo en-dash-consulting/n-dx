@@ -7,11 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from "preact/hooks";
-import type { MemoryLevel } from "../performance/memory-monitor.js";
-import type {
-  DegradableFeature,
-  DegradationState,
-} from "../performance/graceful-degradation.js";
+import type { MemoryLevel, DegradableFeature, DegradationState } from "../performance/index.js";
 import {
   startDegradation,
   stopDegradation,

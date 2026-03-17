@@ -30,6 +30,8 @@ export interface ProposalTask {
   acceptanceCriteria?: string[];
   priority?: string;
   tags?: string[];
+  /** Status override — used in baseline mode to mark existing work as completed. */
+  status?: ItemStatus;
   /** Level of effort estimate in engineer-weeks. */
   loe?: number;
   /** Rationale behind the LoE estimate. */
@@ -58,6 +60,8 @@ export interface ProposalFeature {
   title: string;
   source: string;
   description?: string;
+  /** Status override — used in baseline mode to mark existing work as completed. */
+  status?: ItemStatus;
   tasks: ProposalTask[];
   duplicateReason?: DuplicateReasonMetadata;
   /** When set, references an existing PRD item to place children under instead of creating a new feature. */
@@ -68,6 +72,8 @@ export interface ProposalEpic {
   title: string;
   source: string;
   description?: string;
+  /** Status override — used in baseline mode to mark existing work as completed. */
+  status?: ItemStatus;
   duplicateReason?: DuplicateReasonMetadata;
   /** When set, references an existing PRD item to place children under instead of creating a new epic. */
   existingId?: string;

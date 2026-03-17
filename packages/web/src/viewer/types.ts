@@ -1,4 +1,8 @@
-import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../schema/v1.js";
+import type { Manifest, Inventory, Imports, Zones, Components, CallGraph, ViewId } from "./external.js";
+
+// ViewId is canonically defined in the shared layer (framework-agnostic).
+// Re-exported here for backward compatibility with viewer consumers.
+export type { ViewId };
 
 export interface LoadedData {
   manifest: Manifest | null;
@@ -8,8 +12,6 @@ export interface LoadedData {
   components: Components | null;
   callGraph: CallGraph | null;
 }
-
-export type ViewId = "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown" | "rex-dashboard" | "prd" | "rex-analysis" | "token-usage" | "validation" | "notion-config" | "integrations" | "hench-runs" | "hench-audit" | "hench-config" | "hench-templates" | "hench-optimization" | "feature-toggles";
 
 export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string }) => void;
 

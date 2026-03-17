@@ -7,7 +7,8 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./types.js";
-import { ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/data-files.js";
+import { ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/index.js";
+import { prdExists, prdPath } from "./prd-io.js";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -43,10 +44,9 @@ export function createDataWatcher(ctx: ServerContext, viewerPath?: string): Data
         }
       }
       // Track prd.json mtime
-      const prdPath = join(ctx.rexDir, "prd.json");
       try {
-        if (existsSync(prdPath)) {
-          watcher.fileMtimes["prd.json"] = statSync(prdPath).mtimeMs;
+        if (prdExists(ctx.rexDir)) {
+          watcher.fileMtimes["prd.json"] = statSync(prdPath(ctx.rexDir)).mtimeMs;
         }
       } catch {
         // ignore
@@ -89,7 +89,7 @@ export function handleDataRoute(
   if (url === "/data") {
     const files: string[] = [...ALL_DATA_FILES, ...SUPPLEMENTARY_FILES];
     const available: string[] = files.filter((f) => existsSync(join(ctx.svDir, f)));
-    if (existsSync(join(ctx.rexDir, "prd.json"))) {
+    if (prdExists(ctx.rexDir)) {
       available.push("prd.json");
     }
     jsonResponse(res, 200, { files: available });
@@ -102,15 +102,15 @@ export function handleDataRoute(
 
     // Serve prd.json from .rex/ directory
     if (dataFile === "prd.json") {
-      const prdPath = join(ctx.rexDir, "prd.json");
-      if (existsSync(prdPath)) {
-        const stat = statSync(prdPath);
+      const resolvedPrdPath = prdPath(ctx.rexDir);
+      if (prdExists(ctx.rexDir)) {
+        const stat = statSync(resolvedPrdPath);
         res.writeHead(200, {
           "Content-Type": "application/json",
           "Content-Length": stat.size,
           "Cache-Control": "no-cache",
         });
-        createReadStream(prdPath).pipe(res);
+        createReadStream(resolvedPrdPath).pipe(res);
       } else {
         res.writeHead(404);
         res.end("Not found");

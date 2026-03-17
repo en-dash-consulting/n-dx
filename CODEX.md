@@ -1,3 +1,20 @@
+<!--
+  SYNC NOTICE — Sections that must be mirrored in CLAUDE.md:
+    • Packages (list and descriptions)
+    • Monorepo Structure (directory tree)
+    • Architecture (four-tier hierarchy diagram)
+    • Gateway modules (table and rules)
+    • Package conventions (table)
+    • Build and test commands
+    • Command Aliases
+    • Orchestration Commands
+    • Direct Tool Access (rex, sourcevision, hench commands)
+    • MCP Servers (HTTP/stdio setup, tool lists)
+    • Development Workflow
+    • Key Files table
+  When updating any of these sections, update CLAUDE.md as well.
+  CODEX.md additionally contains the Codex Troubleshooting section (unique to this file).
+-->
 # n-dx
 
 AI-powered development toolkit. Three packages that chain together: analyze a codebase, build a PRD, execute tasks autonomously.
@@ -40,6 +57,22 @@ Four-tier dependency hierarchy (each layer imports only from the layer below):
 
 Zero circular dependencies. The web package sits alongside orchestration — it imports all domain packages to serve the unified dashboard.
 
+#### Web package internal zone layering
+
+Within the web package, four internal zones form a directed dependency stack:
+
+```
+  web-server          (composition root — Express routes, gateways, MCP handlers)
+       ↓
+  web-viewer          (Preact UI components, hooks, views)
+       ↓
+  viewer-message-pipeline  (messaging middleware — coalescer, throttle, rate-limiter, request-dedup)
+       ↓
+  web-shared          (framework-agnostic utilities — data-files, node-culler)
+```
+
+Import direction flows downward only. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). The `viewer-message-pipeline` zone owns all messaging primitives; `web-viewer` consumes them through `external.ts`. `web-shared` is the foundation layer with zero framework dependencies.
+
 ### Gateway modules
 
 Packages that import from other packages at runtime concentrate **all** cross-package imports into a single gateway module. This makes the dependency surface explicit, auditable, and easy to update when upstream APIs change.
@@ -48,11 +81,13 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 |---------|-------------|--------------|------------|
 | hench | `src/prd/rex-gateway.ts` | rex | 8 functions (store, tree, task selection) |
 | web | `src/server/domain-gateway.ts` | rex, sourcevision | 2 MCP server factories + rex domain types/constants |
+| web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
 
 Rules:
 - **One gateway per package** — all runtime cross-package imports pass through it.
 - **Re-export only** — gateways re-export; they contain no logic.
 - **Type imports excluded** — `import type` is erased at compile time and stays at the call-site.
+- **Messaging exemption** — `src/viewer/messaging/` files may import directly from `src/shared/` without going through `external.ts`. The shared/ directory is neutral (neither server nor viewer), so messaging utilities access it directly to avoid zone-level dependency inversion. Enforced by `boundary-check.test.ts`.
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
 See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.
@@ -83,17 +118,20 @@ Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
 
 ```sh
 ndx init [dir]            # sourcevision init → rex init → hench init
-ndx config llm.vendor ... # set active LLM vendor (claude|codex)
+ndx analyze [dir]         # run SourceVision codebase analysis
+ndx recommend [dir]       # show/accept SourceVision recommendations (--accept, --actionable-only)
+ndx add "<desc>" [dir]    # add PRD items from descriptions or files
 ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
 ndx plan --accept [dir]   # ...then accept proposals into PRD
-ndx work [dir]            # hench run (pass --task=ID, --dry-run, etc.)
+ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, etc.)
+ndx self-heal [N] [dir]   # iterative improvement loop (analyze → recommend → execute)
 ndx status [dir]          # rex status (pass --format=json)
+ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
 ndx usage [dir]           # token usage analytics (--format=json, --group=day|week|month)
 ndx sync [dir]            # sync local PRD with remote adapter (--push, --pull)
-ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
-ndx web [dir]             # alias for start (legacy name)
 ndx ci [dir]              # run analysis pipeline and validate PRD health (--format=json)
 ndx config [key] [value]  # view/edit settings (--json, --help)
+ndx export [dir]          # export static deployable dashboard (--out-dir, --deploy=github)
 ```
 
 ## Direct Tool Access
@@ -253,13 +291,13 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 ## Development Workflow
 
 1. `ndx init .` — set up all tool directories
-2. `ndx start .` — start server (dashboard + MCP endpoints)
-3. `ndx plan .` — analyze codebase, review proposals
-4. `ndx plan --accept .` — accept proposals into PRD
-5. `ndx work .` — execute next task autonomously
+2. `ndx analyze .` — run SourceVision codebase analysis
+3. `ndx recommend --accept .` — turn findings into PRD tasks
+4. `ndx add "feature description" .` — add custom feature requests
+5. `ndx work --auto .` — execute the next task autonomously
 6. `ndx status .` — check progress
 
-Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `ndx start stop .` to stop.
+Use `ndx start .` for the dashboard + MCP server, `ndx self-heal 3 .` for iterative improvement loops.
 
 ## Key Files
 
@@ -272,5 +310,10 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `.rex/config.json` | Rex project configuration |
 | `.hench/config.json` | Hench agent configuration (model, max turns) |
 | `.hench/runs/` | Run history and transcripts |
+| `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
 | `.n-dx.json` | Project-level config overrides (web.port, etc.) |
 | `.n-dx-web.pid` | Background web server PID file (auto-managed) |
+| `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
+| `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
+| `tests/e2e/mcp-transport.test.js` | MCP HTTP transport end-to-end validation (session management, tool calls) |
+| `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |

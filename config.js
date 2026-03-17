@@ -194,7 +194,7 @@ async function validateCodexCliPath(value) {
     throw new Error("CLI path must be a non-empty string.");
   }
 
-  if (!value.includes("/")) {
+  if (!value.includes("/") && !value.includes("\\")) {
     const probe = testCliPath(value);
     if (!probe.ok) {
       throw new Error(
@@ -335,6 +335,7 @@ function testCliPath(cliPath) {
       encoding: "utf-8",
       timeout: 10000,
       stdio: "pipe",
+      shell: process.platform === "win32",
     });
     return { ok: true, version: output.trim() };
   } catch (err) {
@@ -423,6 +424,7 @@ function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
       encoding: "utf-8",
       timeout: 15000,
       stdio: "pipe",
+      shell: process.platform === "win32",
     });
     return { ok: true, binary, args };
   } catch (err) {
@@ -489,30 +491,9 @@ function printSection(label, config, logFn = console.log) {
   }
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// ── Help text ────────────────────────────────────────────────────────────────
 
-export async function runConfig(args) {
-  // Parse flags and positional args
-  const flags = {};
-  const positional = [];
-
-  for (const arg of args) {
-    if (arg.startsWith("--")) {
-      const eq = arg.indexOf("=");
-      if (eq !== -1) {
-        flags[arg.slice(2, eq)] = arg.slice(eq + 1);
-      } else {
-        flags[arg.slice(2)] = "true";
-      }
-    } else if (arg === "-h") {
-      flags.help = "true";
-    } else {
-      positional.push(arg);
-    }
-  }
-
-  if (flags.help) {
-    console.log(`n-dx config — view and edit settings across all packages
+const HELP_TEXT = `n-dx config — view and edit settings across all packages
 
 Usage:
   n-dx config [dir]                    Show all package configurations
@@ -596,6 +577,19 @@ LLM vendor settings (.n-dx.json — preferred for multi-vendor setup):
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
   llm.codex.model          string    Codex default model (optional)
 
+Feature toggles (.n-dx.json — managed via web UI or ndx config):
+  features.rex.showTokenBudget      boolean   Show token budget on task items (default: false)
+  features.rex.autoComplete         boolean   Auto-complete parents when children done (default: true)
+  features.rex.budgetEnforcement    boolean   Enforce token/cost budgets (default: false)
+  features.rex.notionSync           boolean   Enable Notion two-way sync (default: false)
+  features.sourcevision.callGraph   boolean   Enable call graph extraction (default: false)
+  features.sourcevision.enrichment  boolean   AI enrichment passes (default: true)
+  features.sourcevision.componentCatalog
+                                    boolean   React component catalog (default: true)
+  features.hench.autoRetry          boolean   Auto-retry on failure (default: true)
+  features.hench.guardRails         boolean   Security guard rails (default: true)
+  features.hench.adaptiveWorkflow   boolean   Adaptive workflow adjustment (default: false)
+
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
 
@@ -652,60 +646,78 @@ Examples:
                                                Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
+  n-dx config features.rex.showTokenBudget true
+                                               Enable token budget display on tasks
   n-dx config --test-connection                Test API key and/or CLI path
   n-dx config --json                           Show all settings as JSON
   n-dx config hench --json                     Show hench settings as JSON
-  n-dx config claude --json                    Show Claude settings as JSON`);
-    return;
+  n-dx config claude --json                    Show Claude settings as JSON`;
+
+// ── Arg parsing ──────────────────────────────────────────────────────────────
+
+/** Parse CLI args into flags and positional args. */
+function parseArgs(args) {
+  const flags = {};
+  const positional = [];
+
+  for (const arg of args) {
+    if (arg.startsWith("--")) {
+      const eq = arg.indexOf("=");
+      if (eq !== -1) {
+        flags[arg.slice(2, eq)] = arg.slice(eq + 1);
+      } else {
+        flags[arg.slice(2)] = "true";
+      }
+    } else if (arg === "-h") {
+      flags.help = "true";
+    } else {
+      positional.push(arg);
+    }
   }
 
-  // Resolve dir: last positional arg that looks like a directory
+  return { flags, positional };
+}
+
+/** Resolve dir, keyArg, and valueArg from positional args. */
+async function resolvePositionalArgs(positional) {
   let dir = process.cwd();
   let keyArg = positional[0];
   let valueArg = positional[1];
 
-  // If there are 3 positional args, last is dir
-  // If there are 2, check if last is a dir
-  // If there is 1, check if it's a dir (show mode) or a key (get mode)
   if (positional.length >= 3) {
     dir = resolve(positional[positional.length - 1]);
     valueArg = positional[positional.length - 2];
     keyArg = positional[0];
   } else if (positional.length === 2) {
-    // Could be: key value, OR key dir
-    // If valueArg looks like a package key, treat as key+value
-    // Otherwise try to detect if it's a directory
     if (await fileExists(resolve(positional[1]))) {
-      // It's a directory — this is get mode
       dir = resolve(positional[1]);
       keyArg = positional[0];
       valueArg = undefined;
     }
-    // Otherwise keep as key + value
   } else if (positional.length === 1) {
     if (await fileExists(resolve(positional[0]))) {
-      // It's a directory — show mode
       dir = resolve(positional[0]);
       keyArg = undefined;
     }
-    // Otherwise it's a key — get mode
   }
 
-  // Load project-level .n-dx.json overrides
-  const projectConfig = await loadProjectConfig(dir);
+  return { dir, keyArg, valueArg };
+}
 
-  // Load all available configs; keep raw copies for set operations.
-  // Merged configs (with project overrides) are used for display and get;
-  // raw configs are used for set so project overrides don't leak into package files.
+// ── Config loading ───────────────────────────────────────────────────────────
+
+/** Load all package configs and project-level overrides. */
+async function loadAllConfigs(dir) {
+  const projectConfig = await loadProjectConfig(dir);
   const configs = {};
   const rawConfigs = {};
+
   for (const [pkg, meta] of Object.entries(PACKAGES)) {
     const configPath = join(dir, meta.dir, meta.file);
     if (await fileExists(configPath)) {
       try {
         const pkgConfig = await loadJSON(configPath);
         rawConfigs[pkg] = pkgConfig;
-        // Merge project config overrides (project takes precedence)
         configs[pkg] = projectConfig[pkg]
           ? deepMerge(pkgConfig, projectConfig[pkg])
           : pkgConfig;
@@ -715,295 +727,256 @@ Examples:
     }
   }
 
-  // Load project-level sections (claude, web) from .n-dx.json
   for (const section of PROJECT_SECTIONS) {
     if (projectConfig[section] && typeof projectConfig[section] === "object") {
       configs[section] = projectConfig[section];
     }
   }
 
-  const keyTargetsProjectSection = (() => {
-    if (!keyArg) return false;
-    const dotIdx = keyArg.indexOf(".");
-    if (dotIdx === -1) return PROJECT_SECTIONS.has(keyArg);
-    return PROJECT_SECTIONS.has(keyArg.slice(0, dotIdx));
-  })();
+  return { configs, rawConfigs };
+}
 
-  if (Object.keys(configs).length === 0 && !keyTargetsProjectSection) {
-    console.error("No n-dx configuration found. Run 'n-dx init' first.");
+// ── Test connection handler ──────────────────────────────────────────────────
+
+/** Handle --test-connection mode. */
+async function handleTestConnection(configs) {
+  const claudeConfig = configs.claude;
+  if (!claudeConfig) {
+    console.error("No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.");
     process.exit(1);
   }
 
-  // --- Test connection mode: --test-connection ---
-  if (flags["test-connection"] === "true") {
-    const claudeConfig = configs.claude;
-    if (!claudeConfig) {
-      console.error("No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.");
-      process.exit(1);
-    }
+  let tested = false;
+  let hasFailure = false;
 
-    let tested = false;
-    let hasFailure = false;
-
-    if (claudeConfig.api_key) {
-      tested = true;
-      const result = await testApiConnection(
-        claudeConfig.api_key,
-        claudeConfig.api_endpoint,
-        claudeConfig.model,
-      );
-      if (result.ok) {
-        const endpoint = claudeConfig.api_endpoint || "https://api.anthropic.com";
-        console.log(`Testing API key... ✓ API key is valid (endpoint: ${endpoint}).`);
-      } else {
-        console.error("Testing API key... ✗ " + result.error);
-        hasFailure = true;
-      }
+  if (claudeConfig.api_key) {
+    tested = true;
+    const result = await testApiConnection(
+      claudeConfig.api_key,
+      claudeConfig.api_endpoint,
+      claudeConfig.model,
+    );
+    if (result.ok) {
+      const endpoint = claudeConfig.api_endpoint || "https://api.anthropic.com";
+      console.log(`Testing API key... ✓ API key is valid (endpoint: ${endpoint}).`);
+    } else {
+      console.error("Testing API key... ✗ " + result.error);
+      hasFailure = true;
     }
-
-    if (claudeConfig.cli_path) {
-      tested = true;
-      const result = testCliPath(claudeConfig.cli_path);
-      if (result.ok) {
-        console.log("Testing CLI path... ✓ " + (result.version || "CLI is available."));
-      } else {
-        console.error("Testing CLI path... ✗ " + result.error);
-        hasFailure = true;
-      }
-    }
-
-    if (!tested) {
-      console.error("No claude.api_key or claude.cli_path configured to test.");
-      process.exit(1);
-    }
-    if (hasFailure) {
-      process.exit(1);
-    }
-    return;
   }
 
-  // --- SET mode: key + value ---
-  if (keyArg && valueArg !== undefined) {
-    const dotIdx = keyArg.indexOf(".");
-    if (dotIdx === -1) {
-      console.error(
-        `Invalid key "${keyArg}". Use dot notation: <package>.<setting>`,
-      );
-      process.exit(1);
+  if (claudeConfig.cli_path) {
+    tested = true;
+    const result = testCliPath(claudeConfig.cli_path);
+    if (result.ok) {
+      console.log("Testing CLI path... ✓ " + (result.version || "CLI is available."));
+    } else {
+      console.error("Testing CLI path... ✗ " + result.error);
+      hasFailure = true;
     }
+  }
 
-    const pkg = keyArg.slice(0, dotIdx);
-    const settingPath = keyArg.slice(dotIdx + 1);
+  if (!tested) {
+    console.error("No claude.api_key or claude.cli_path configured to test.");
+    process.exit(1);
+  }
+  if (hasFailure) {
+    process.exit(1);
+  }
+}
 
-    // Handle project-level sections (claude, web) — stored in .n-dx.json
-    if (PROJECT_SECTIONS.has(pkg)) {
-      if (!configs[pkg]) configs[pkg] = {};
+// ── SET mode handlers ────────────────────────────────────────────────────────
 
-      const existing = getByPath(configs[pkg], settingPath);
-      if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
-        console.error(
-          `Cannot set "${keyArg}" — it's an object. Set individual keys instead.`,
-        );
-        process.exit(1);
-      }
+/** Coerce and validate a value for a project-level section key. */
+async function coerceAndValidateProjectValue(pkg, settingPath, valueArg, keyArg, configs, flags) {
+  const existing = getByPath(configs[pkg], settingPath);
+  if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
+    console.error(`Cannot set "${keyArg}" — it's an object. Set individual keys instead.`);
+    process.exit(1);
+  }
 
-      let coerced;
-      try {
-        coerced = coerceValue(valueArg, existing);
-      } catch (err) {
-        console.error(`Invalid value for "${keyArg}": ${err.message}`);
-        process.exit(1);
-      }
+  let coerced;
+  try {
+    coerced = coerceValue(valueArg, existing);
+  } catch (err) {
+    console.error(`Invalid value for "${keyArg}": ${err.message}`);
+    process.exit(1);
+  }
 
-      // Validate claude-specific settings (skip with --force)
-      if (pkg === "claude" && CLAUDE_VALIDATORS[settingPath] && flags.force !== "true") {
-        try {
-          await CLAUDE_VALIDATORS[settingPath](coerced);
-        } catch (err) {
-          console.error(`Invalid value for "${keyArg}": ${err.message}`);
-          console.error("  Use --force to set this value anyway.");
-          process.exit(1);
-        }
-      }
-
-      // Validate llm-specific settings (skip with --force)
-      if (pkg === "llm" && LLM_VALIDATORS[settingPath] && flags.force !== "true") {
-        try {
-          await LLM_VALIDATORS[settingPath](coerced);
-        } catch (err) {
-          console.error(`Invalid value for "${keyArg}": ${err.message}`);
-          console.error("  Use --force to set this value anyway.");
-          process.exit(1);
-        }
-      }
-
-      // Provider auth preflight: when selecting llm.vendor, run the matching
-      // vendor CLI auth check and branch deterministically on pass/fail.
-      if (pkg === "llm" && settingPath === "vendor") {
-        const currentLLM = configs.llm && typeof configs.llm === "object" ? configs.llm : {};
-        const llmForPreflight = {
-          ...currentLLM,
-          vendor: coerced,
-        };
-        const preflight = runVendorAuthPreflight(
-          coerced,
-          llmForPreflight,
-          configs.claude && typeof configs.claude === "object" ? configs.claude : undefined,
-        );
-
-        if (!preflight.ok) {
-          const loginCommand = getVendorLoginCommand(
-            coerced,
-            llmForPreflight,
-            configs.claude && typeof configs.claude === "object" ? configs.claude : undefined,
-          );
-          console.error(
-            `Provider auth preflight failed for "${coerced}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
-          );
-          if (preflight.detail) {
-            console.error(`Details: ${preflight.detail}`);
-          }
-          console.error(`Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${coerced}'.`);
-          process.exit(1);
-        }
-      }
-
-      setByPath(configs[pkg], settingPath, coerced);
-
-      // Write back to .n-dx.json (with restricted permissions if it contains an API key)
-      const configPath = join(dir, PROJECT_CONFIG_FILE);
-      const current = await loadProjectConfig(dir);
-      current[pkg] = configs[pkg];
-
-      // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
-      if (pkg === "llm" && settingPath.startsWith("claude.")) {
-        if (!current.claude || typeof current.claude !== "object") {
-          current.claude = {};
-        }
-        const legacySetting = settingPath.slice("claude.".length);
-        setByPath(current.claude, legacySetting, coerced);
-      }
-
-      await saveProjectJSON(configPath, current);
-
-      console.log(`${keyArg} = ${formatValue(coerced)}`);
-      return;
-    }
-
-    if (!PACKAGES[pkg]) {
-      console.error(
-        `Unknown package "${pkg}". Available: ${[...Object.keys(PACKAGES), ...PROJECT_SECTIONS].join(", ")}`,
-      );
-      process.exit(1);
-    }
-
-    if (pkg === "sourcevision") {
-      console.error("Sourcevision manifest is read-only (generated by analysis).");
-      process.exit(1);
-    }
-
-    if (!configs[pkg]) {
-      console.error(
-        `Package "${pkg}" is not initialized. Run 'n-dx init' first.`,
-      );
-      process.exit(1);
-    }
-
-    if (configs[pkg]._error) {
-      console.error(`Cannot load ${pkg} config: ${configs[pkg]._error}`);
-      process.exit(1);
-    }
-
-    // Prevent editing schema version
-    if (settingPath === "schema") {
-      console.error("Cannot modify schema version.");
-      process.exit(1);
-    }
-
-    const existing = getByPath(configs[pkg], settingPath);
-    if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
-      console.error(
-        `Cannot set "${keyArg}" — it's an object. Set individual keys instead.`,
-      );
-      process.exit(1);
-    }
-
-    let coerced;
+  // Validate section-specific settings (skip with --force)
+  const validators = pkg === "claude" ? CLAUDE_VALIDATORS : pkg === "llm" ? LLM_VALIDATORS : null;
+  if (validators && validators[settingPath] && flags.force !== "true") {
     try {
-      coerced = coerceValue(valueArg, existing);
+      await validators[settingPath](coerced);
     } catch (err) {
       console.error(`Invalid value for "${keyArg}": ${err.message}`);
+      console.error("  Use --force to set this value anyway.");
       process.exit(1);
     }
-
-    // Write to raw (un-merged) config so project overrides don't leak
-    setByPath(rawConfigs[pkg], settingPath, coerced);
-
-    const meta = PACKAGES[pkg];
-    const configPath = join(dir, meta.dir, meta.file);
-    await saveJSON(configPath, rawConfigs[pkg]);
-
-    console.log(`${keyArg} = ${formatValue(coerced)}`);
-    return;
   }
 
-  // --- GET mode: single key ---
-  if (keyArg) {
-    const dotIdx = keyArg.indexOf(".");
-    if (dotIdx === -1) {
-      // Show whole package/section config
-      const pkg = keyArg;
-      if (!configs[pkg]) {
-        if (PROJECT_SECTIONS.has(pkg)) {
-          console.error(
-            `No ${pkg} configuration set. Use 'n-dx config ${pkg}.<key> <value>' to add settings.`,
-          );
-        } else {
-          console.error(
-            `Package "${pkg}" is not initialized or has no config.`,
-          );
-        }
-        process.exit(1);
-      }
+  return coerced;
+}
 
-      if (flags.json) {
-        console.log(JSON.stringify(configs[pkg], null, 2));
-      } else {
-        printSection(pkg, configs[pkg]);
-        console.log();
-      }
-      return;
+/** Run vendor auth preflight when setting llm.vendor. */
+function runLLMVendorPreflight(coerced, configs) {
+  const currentLLM = configs.llm && typeof configs.llm === "object" ? configs.llm : {};
+  const llmForPreflight = { ...currentLLM, vendor: coerced };
+  const legacyClaude = configs.claude && typeof configs.claude === "object" ? configs.claude : undefined;
+
+  const preflight = runVendorAuthPreflight(coerced, llmForPreflight, legacyClaude);
+  if (!preflight.ok) {
+    const loginCommand = getVendorLoginCommand(coerced, llmForPreflight, legacyClaude);
+    console.error(
+      `Provider auth preflight failed for "${coerced}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
+    );
+    if (preflight.detail) {
+      console.error(`Details: ${preflight.detail}`);
     }
+    console.error(`Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${coerced}'.`);
+    process.exit(1);
+  }
+}
 
-    const pkg = keyArg.slice(0, dotIdx);
-    const settingPath = keyArg.slice(dotIdx + 1);
+/** Handle SET mode for a project-level section (claude, llm, web, features). */
+async function handleSetProjectSection(dir, pkg, settingPath, keyArg, valueArg, configs, flags) {
+  if (!configs[pkg]) configs[pkg] = {};
 
+  const coerced = await coerceAndValidateProjectValue(pkg, settingPath, valueArg, keyArg, configs, flags);
+
+  // Vendor auth preflight for llm.vendor
+  if (pkg === "llm" && settingPath === "vendor") {
+    runLLMVendorPreflight(coerced, configs);
+  }
+
+  setByPath(configs[pkg], settingPath, coerced);
+
+  // Write back to .n-dx.json
+  const configPath = join(dir, PROJECT_CONFIG_FILE);
+  const current = await loadProjectConfig(dir);
+  current[pkg] = configs[pkg];
+
+  // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
+  if (pkg === "llm" && settingPath.startsWith("claude.")) {
+    if (!current.claude || typeof current.claude !== "object") {
+      current.claude = {};
+    }
+    const legacySetting = settingPath.slice("claude.".length);
+    setByPath(current.claude, legacySetting, coerced);
+  }
+
+  await saveProjectJSON(configPath, current);
+  console.log(`${keyArg} = ${formatValue(coerced)}`);
+}
+
+/** Handle SET mode for a package config (rex, hench). */
+async function handleSetPackageConfig(dir, pkg, settingPath, keyArg, valueArg, configs, rawConfigs) {
+  if (!PACKAGES[pkg]) {
+    console.error(
+      `Unknown package "${pkg}". Available: ${[...Object.keys(PACKAGES), ...PROJECT_SECTIONS].join(", ")}`,
+    );
+    process.exit(1);
+  }
+
+  if (pkg === "sourcevision") {
+    console.error("Sourcevision manifest is read-only (generated by analysis).");
+    process.exit(1);
+  }
+
+  if (!configs[pkg]) {
+    console.error(`Package "${pkg}" is not initialized. Run 'n-dx init' first.`);
+    process.exit(1);
+  }
+
+  if (configs[pkg]._error) {
+    console.error(`Cannot load ${pkg} config: ${configs[pkg]._error}`);
+    process.exit(1);
+  }
+
+  if (settingPath === "schema") {
+    console.error("Cannot modify schema version.");
+    process.exit(1);
+  }
+
+  const existing = getByPath(configs[pkg], settingPath);
+  if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
+    console.error(`Cannot set "${keyArg}" — it's an object. Set individual keys instead.`);
+    process.exit(1);
+  }
+
+  let coerced;
+  try {
+    coerced = coerceValue(valueArg, existing);
+  } catch (err) {
+    console.error(`Invalid value for "${keyArg}": ${err.message}`);
+    process.exit(1);
+  }
+
+  // Write to raw (un-merged) config so project overrides don't leak
+  setByPath(rawConfigs[pkg], settingPath, coerced);
+
+  const meta = PACKAGES[pkg];
+  const configPath = join(dir, meta.dir, meta.file);
+  await saveJSON(configPath, rawConfigs[pkg]);
+
+  console.log(`${keyArg} = ${formatValue(coerced)}`);
+}
+
+// ── GET mode handler ─────────────────────────────────────────────────────────
+
+/** Handle GET mode: retrieve and display a single key or whole section. */
+function handleGet(keyArg, configs, flags) {
+  const dotIdx = keyArg.indexOf(".");
+  if (dotIdx === -1) {
+    // Show whole package/section config
+    const pkg = keyArg;
     if (!configs[pkg]) {
       if (PROJECT_SECTIONS.has(pkg)) {
-        console.error(`Key "${keyArg}" not found.`);
+        console.error(`No ${pkg} configuration set. Use 'n-dx config ${pkg}.<key> <value>' to add settings.`);
       } else {
-        console.error(
-          `Package "${pkg}" is not initialized or has no config.`,
-        );
+        console.error(`Package "${pkg}" is not initialized or has no config.`);
       }
-      process.exit(1);
-    }
-
-    const value = getByPath(configs[pkg], settingPath);
-    if (value === undefined) {
-      console.error(`Key "${keyArg}" not found.`);
       process.exit(1);
     }
 
     if (flags.json) {
-      console.log(JSON.stringify(value, null, 2));
+      console.log(JSON.stringify(configs[pkg], null, 2));
     } else {
-      console.log(formatValue(value));
+      printSection(pkg, configs[pkg]);
+      console.log();
     }
     return;
   }
 
-  // --- SHOW mode: all configs ---
+  const pkg = keyArg.slice(0, dotIdx);
+  const settingPath = keyArg.slice(dotIdx + 1);
+
+  if (!configs[pkg]) {
+    if (PROJECT_SECTIONS.has(pkg)) {
+      console.error(`Key "${keyArg}" not found.`);
+    } else {
+      console.error(`Package "${pkg}" is not initialized or has no config.`);
+    }
+    process.exit(1);
+  }
+
+  const value = getByPath(configs[pkg], settingPath);
+  if (value === undefined) {
+    console.error(`Key "${keyArg}" not found.`);
+    process.exit(1);
+  }
+
+  if (flags.json) {
+    console.log(JSON.stringify(value, null, 2));
+  } else {
+    console.log(formatValue(value));
+  }
+}
+
+// ── SHOW mode handler ────────────────────────────────────────────────────────
+
+/** Handle SHOW mode: display all configs. */
+function handleShowAll(configs, flags) {
   if (flags.json) {
     console.log(JSON.stringify(configs, null, 2));
     return;
@@ -1018,4 +991,64 @@ Examples:
     }
   }
   console.log();
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+export async function runConfig(args) {
+  const { flags, positional } = parseArgs(args);
+
+  if (flags.help) {
+    console.log(HELP_TEXT);
+    return;
+  }
+
+  const { dir, keyArg, valueArg } = await resolvePositionalArgs(positional);
+  const { configs, rawConfigs } = await loadAllConfigs(dir);
+
+  const keyTargetsProjectSection = (() => {
+    if (!keyArg) return false;
+    const dotIdx = keyArg.indexOf(".");
+    if (dotIdx === -1) return PROJECT_SECTIONS.has(keyArg);
+    return PROJECT_SECTIONS.has(keyArg.slice(0, dotIdx));
+  })();
+
+  if (Object.keys(configs).length === 0 && !keyTargetsProjectSection) {
+    console.error("No n-dx configuration found. Run 'n-dx init' first.");
+    process.exit(1);
+  }
+
+  // Test connection mode
+  if (flags["test-connection"] === "true") {
+    await handleTestConnection(configs);
+    return;
+  }
+
+  // SET mode: key + value
+  if (keyArg && valueArg !== undefined) {
+    const dotIdx = keyArg.indexOf(".");
+    if (dotIdx === -1) {
+      console.error(`Invalid key "${keyArg}". Use dot notation: <package>.<setting>`);
+      process.exit(1);
+    }
+
+    const pkg = keyArg.slice(0, dotIdx);
+    const settingPath = keyArg.slice(dotIdx + 1);
+
+    if (PROJECT_SECTIONS.has(pkg)) {
+      await handleSetProjectSection(dir, pkg, settingPath, keyArg, valueArg, configs, flags);
+    } else {
+      await handleSetPackageConfig(dir, pkg, settingPath, keyArg, valueArg, configs, rawConfigs);
+    }
+    return;
+  }
+
+  // GET mode: single key
+  if (keyArg) {
+    handleGet(keyArg, configs, flags);
+    return;
+  }
+
+  // SHOW mode: all configs
+  handleShowAll(configs, flags);
 }

@@ -10,7 +10,7 @@
 
 import { stat, open } from "node:fs/promises";
 import { extname, basename } from "node:path";
-import type { FileFormat } from "./reason.js";
+import type { FileFormat } from "./analyze-shared.js";
 
 // ── Constants ─────────────────────────────────────────────────────
 

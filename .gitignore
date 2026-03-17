@@ -1,5 +1,6 @@
 node_modules/
 dist/
+package-lock.json
 *.tsbuildinfo
 .hench/runs/
 .n-dx.json
@@ -7,6 +8,16 @@ dist/
 .n-dx-web.pid
 .n-dx-web.port
 .rex/adapters.json
+.rex/pending-proposals.json
+.rex/acknowledged-findings.json
+.rex/execution-log*.jsonl
+packages/rex/.rex/execution-log*.jsonl
 .sv2/
 .sv3/
-.claude/
+ndx-export/
+.ndx-deploy-tmp/
+.claude/settings.local.json
+.claude/worktrees/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+scripts/HENCH_CALLGRAPH_FINDINGS.md

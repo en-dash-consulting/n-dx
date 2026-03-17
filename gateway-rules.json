@@ -1,0 +1,50 @@
+{
+  "description": "Authoritative source of gateway file paths and allowed import patterns. Consumed by ci.js (checkGatewayImports) and domain-isolation.test.js (gateway enforcement tests) to enforce the gateway pattern consistently — both load this file directly, so adding or changing a rule here automatically updates both enforcement paths. Domain-tier packages (rex, sourcevision) are not listed here because they do not import from sibling or upper-tier packages — their isolation is enforced by domain-isolation.test.js instead. Foundation-tier imports (@n-dx/llm-client) are gated in hench via llm-gateway.ts; other tiers may import directly.",
+  "gateways": [
+    {
+      "consumer": "packages/hench/src",
+      "externalPackage": "@n-dx/llm-client",
+      "gatewayFiles": ["packages/hench/src/prd/llm-gateway.ts"]
+    },
+    {
+      "consumer": "packages/hench/src",
+      "externalPackage": "rex",
+      "gatewayFiles": ["packages/hench/src/prd/rex-gateway.ts"]
+    },
+    {
+      "consumer": "packages/web/src",
+      "externalPackage": "rex",
+      "gatewayFiles": ["packages/web/src/server/rex-gateway.ts"]
+    },
+    {
+      "consumer": "packages/web/src",
+      "externalPackage": "sourcevision",
+      "gatewayFiles": ["packages/web/src/server/domain-gateway.ts"]
+    }
+  ],
+  "internalBarrels": [
+    {
+      "file": "packages/web/src/viewer/messaging/index.ts",
+      "description": "Sole public surface for the viewer messaging subsystem — must remain re-export-only"
+    },
+    {
+      "file": "packages/web/src/viewer/crash/index.ts",
+      "description": "Sole public surface for the crash recovery sub-zone — cross-zone consumers must import from this barrel, not crash internals"
+    },
+    {
+      "file": "packages/web/src/viewer/external.ts",
+      "description": "Viewer outbound gateway — concentrates all viewer-side imports from schema/, shared/, and messaging/"
+    },
+    {
+      "file": "packages/web/src/viewer/api.ts",
+      "description": "Viewer inbound API barrel — sanctioned import surface for sibling zones (crash, route, performance, usage)"
+    }
+  ],
+  "boundaries": [
+    {
+      "sourceDir": "packages/web/src/server",
+      "forbiddenImportPattern": "from\\s+[\"']\\.\\.\/viewer\/",
+      "message": "server/ must not import from viewer/ (use gateway or shared types)"
+    }
+  ]
+}

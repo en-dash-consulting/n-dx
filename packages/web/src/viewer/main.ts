@@ -2,26 +2,30 @@ import { h, render, Fragment } from "preact";
 import type { VNode } from "preact";
 import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
 import type { ViewId, DetailItem } from "./types.js";
-import { ALL_DATA_FILES } from "../shared/data-files.js";
-import { Sidebar } from "./components/sidebar.js";
-import { DetailPanel } from "./components/detail-panel.js";
-import { Guide } from "./components/guide.js";
-import { HeaderFAQ } from "./components/faq.js";
-import { Breadcrumb } from "./components/breadcrumb.js";
-import { updateFavicon } from "./components/favicon.js";
-import { MemoryWarningBanner } from "./components/memory-warning.js";
-import { CrashRecoveryBanner } from "./components/crash-recovery-banner.js";
-import { DegradationBanner } from "./components/degradation-banner.js";
-import { RefreshQueueStatus } from "./components/refresh-queue-status.js";
-import { PollingSuspensionIndicator } from "./components/polling-suspension-indicator.js";
-import { SearchOverlay, useSearchOverlay } from "./components/search-overlay.js";
-import { useRouteState } from "./hooks/use-route-state.js";
-import { useAppData } from "./hooks/use-app-data.js";
-import { useMemoryMonitor } from "./hooks/use-memory-monitor.js";
-import { useCrashRecovery } from "./hooks/use-crash-recovery.js";
-import { useGracefulDegradation } from "./hooks/use-graceful-degradation.js";
-import { useRefreshThrottle } from "./hooks/use-refresh-throttle.js";
-import { usePollingSuspension } from "./hooks/use-polling-suspension.js";
+import { ALL_DATA_FILES } from "./external.js";
+import {
+  Sidebar,
+  DetailPanel,
+  Guide,
+  Breadcrumb,
+  updateFavicon,
+  MemoryWarningBanner,
+  CrashRecoveryBanner,
+  DegradationBanner,
+  RefreshQueueStatus,
+  PollingSuspensionIndicator,
+  SearchOverlay,
+  useSearchOverlay,
+} from "./components/index.js";
+import {
+  useRouteState,
+  useAppData,
+  useMemoryMonitor,
+  useCrashRecovery,
+  useGracefulDegradation,
+  useRefreshThrottle,
+  usePollingSuspension,
+} from "./hooks/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
 
@@ -161,7 +165,6 @@ function App({ scope }: { scope: string | null }) {
       h("div", { class: "page-context-bar", role: "group", "aria-label": "Page navigation and help" },
         h(Breadcrumb, { view, navigateTo, scope }),
         h("div", { class: "page-context-actions" },
-          h(HeaderFAQ, { view }),
           h(Guide, { view }),
         ),
       ),

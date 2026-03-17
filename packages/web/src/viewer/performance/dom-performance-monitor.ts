@@ -9,8 +9,7 @@
  * the Preact hook (`useDOMPerformanceMonitor`) is provided separately.
  *
  * @see ./memory-monitor.ts — complementary heap-level memory monitoring
- * @see ./components/prd-tree/node-culler.ts — off-screen culling integration
- * @see ./components/prd-tree/progressive-loader.ts — progressive load integration
+ * @see ./components/progressive-loader.ts — progressive load integration
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -98,7 +97,7 @@ export type DOMSnapshotHandler = (snapshot: DOMNodeSnapshot) => void;
 
 import {
   registerPollingSource,
-} from "../polling/polling-state.js";
+} from "../polling/index.js";
 
 // ─── Chrome-specific type augmentation ───────────────────────────────────────
 

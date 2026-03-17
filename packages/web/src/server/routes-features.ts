@@ -16,31 +16,11 @@ import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — canonical definitions in src/schema/features.ts
 // ---------------------------------------------------------------------------
 
-export interface FeatureToggle {
-  /** Dot-notation key (e.g., "sourcevision.showCallGraph"). */
-  key: string;
-  /** Human-readable label. */
-  label: string;
-  /** Description of what the feature does. */
-  description: string;
-  /** Impact warning — shown to explain consequences. */
-  impact: string;
-  /** Which package owns this toggle. */
-  package: "sourcevision" | "rex" | "hench";
-  /** Whether this is experimental, stable, or deprecated. */
-  stability: "experimental" | "stable" | "deprecated";
-  /** Current value (true = enabled). */
-  enabled: boolean;
-  /** Default value if not set in config. */
-  defaultValue: boolean;
-}
-
-export interface FeaturesResponse {
-  toggles: FeatureToggle[];
-}
+export type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
+import type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
 
 // ---------------------------------------------------------------------------
 // Feature registry — defines all known feature flags
@@ -100,6 +80,15 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     defaultValue: true,
   },
   {
+    key: "rex.showTokenBudget",
+    label: "Show Token Budget",
+    description: "Display token budget information on Rex task line items and in the detail side panel. When disabled, only non-zero token usage badges are shown.",
+    impact: "Adds budget percentage and remaining capacity indicators to task views. No performance impact.",
+    package: "rex",
+    stability: "stable",
+    defaultValue: false,
+  },
+  {
     key: "rex.budgetEnforcement",
     label: "Budget Enforcement",
     description: "Enforce token and cost budgets during rex analyze operations. When exceeded, operations are blocked or warned.",
@@ -111,8 +100,17 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
   {
     key: "rex.notionSync",
     label: "Notion Sync",
-    description: "Enable two-way synchronization between the local PRD and a Notion database.",
+    description: "Enable two-way synchronization between the local PRD and a Notion database. Shows the Notion tab in the Rex sidebar.",
     impact: "Requires Notion integration setup. Sync operations may modify both local and remote data.",
+    package: "rex",
+    stability: "experimental",
+    defaultValue: false,
+  },
+  {
+    key: "rex.integrations",
+    label: "Integrations",
+    description: "Show the Integrations tab in the Rex sidebar for configuring external service connections.",
+    impact: "No performance impact. Hides integration configuration UI when disabled.",
     package: "rex",
     stability: "experimental",
     defaultValue: false,

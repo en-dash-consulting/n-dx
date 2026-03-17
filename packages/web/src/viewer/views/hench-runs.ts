@@ -12,16 +12,18 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { MetricCard } from "../visualization/index.js";
-import { BrandedHeader } from "../components/logos.js";
-import { usePolling } from "../hooks/use-polling.js";
-import { RexTaskLink } from "../components/rex-task-link.js";
-import { CopyLinkButton } from "../components/copy-link-button.js";
-import { ActiveTasksPanel } from "../components/active-tasks-panel.js";
-import type { ActiveRun } from "../components/active-tasks-panel.js";
-import { ConcurrencyPanel } from "../components/concurrency-panel.js";
-import { MemoryPanel } from "../components/memory-panel.js";
-import { WsHealthPanel } from "../components/ws-health-panel.js";
-import { ThrottleControlsPanel } from "../components/throttle-controls.js";
+import {
+  BrandedHeader,
+  RexTaskLink,
+  CopyLinkButton,
+  ActiveTasksPanel,
+  ConcurrencyPanel,
+  MemoryPanel,
+  WsHealthPanel,
+  ThrottleControlsPanel,
+} from "../components/index.js";
+import type { ActiveRun } from "../components/index.js";
+import { usePolling } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────

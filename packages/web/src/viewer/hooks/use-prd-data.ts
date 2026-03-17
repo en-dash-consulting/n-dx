@@ -13,8 +13,7 @@
  * - Cleanup of rate limiter timers on unmount
  *
  * @see ../components/prd-tree/tree-differ.ts — structural sharing implementation
- * @see ../messaging/request-dedup.ts — request deduplication
- * @see ../messaging/call-rate-limiter.ts — rate limiting
+ * @see ../messaging/fetch-pipeline.ts — composed dedup + rate limiting
  */
 
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
@@ -23,8 +22,7 @@ import type { TaskUsageSummary, WeeklyBudgetResolution } from "../components/prd
 import { resolveTaskUtilization } from "../components/prd-tree/task-utilization.js";
 import { diffDocument } from "../components/prd-tree/tree-differ.js";
 import { usePolling } from "./use-polling.js";
-import { createRequestDedup } from "../messaging/request-dedup.js";
-import { createCallRateLimiter } from "../messaging/call-rate-limiter.js";
+import { createFetchPipeline } from "../messaging/index.js";
 
 /** Shape returned by the incremental /api/hench/task-usage endpoint. */
 interface ServerTaskUsage {
@@ -111,46 +109,37 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
   const weeklyBudgetRef = useRef(weeklyBudget);
   weeklyBudgetRef.current = weeklyBudget;
 
-  // ── PRD data fetching ────────────────────────────────────────────
+  // ── PRD data fetching (dedup + rate-limited) ─────────────────────
 
-  const prdDedup = useRef(
-    createRequestDedup(async () => {
-      const res = await fetch("/data/prd.json");
-      if (!res.ok) {
-        if (res.status === 404) {
-          setError("No PRD data found. Run 'rex init' then 'rex analyze' to create one.");
-        } else {
-          setError(`Failed to load PRD data (${res.status})`);
+  const prdPipeline = useRef(
+    createFetchPipeline(async () => {
+      try {
+        const res = await fetch("/data/prd.json");
+        if (!res.ok) {
+          if (res.status === 404) {
+            setError("No PRD data found. Run 'rex init' then 'rex analyze' to create one.");
+          } else {
+            setError(`Failed to load PRD data (${res.status})`);
+          }
+          return;
         }
-        return;
+        const json = await res.json();
+        setData((prev) => diffDocument(prev, json));
+        setError(null);
+      } catch (_err) {
+        setError("Could not fetch PRD data. Is the server running?");
       }
-      const json = await res.json();
-      setData((prev) => diffDocument(prev, json));
-      setError(null);
-    }),
-  );
-
-  const prdRateLimiter = useRef(
-    createCallRateLimiter(
-      async () => {
-        try {
-          await prdDedup.current.execute();
-        } catch (_err) {
-          setError("Could not fetch PRD data. Is the server running?");
-        }
-      },
-      { minIntervalMs: 500 },
-    ),
+    }, { minIntervalMs: 500 }),
   );
 
   const fetchPRDData = useCallback(async () => {
-    await prdRateLimiter.current.execute();
+    await prdPipeline.current.execute();
   }, []);
 
-  // ── Task usage fetching ──────────────────────────────────────────
+  // ── Task usage fetching (dedup + rate-limited) ─────────────────
 
-  const usageDedup = useRef(
-    createRequestDedup(async () => {
+  const usagePipeline = useRef(
+    createFetchPipeline(async () => {
       const [taskUsageResult, utilizationResult] = await Promise.allSettled([
         fetch("/api/hench/task-usage"),
         fetch("/api/token/utilization"),
@@ -176,24 +165,11 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
           // Keep existing values on parse errors.
         }
       }
-    }),
-  );
-
-  const usageRateLimiter = useRef(
-    createCallRateLimiter(
-      async () => {
-        try {
-          await usageDedup.current.execute();
-        } catch {
-          // Usage fetch failures are non-critical — keep existing state.
-        }
-      },
-      { minIntervalMs: 500 },
-    ),
+    }, { minIntervalMs: 500 }),
   );
 
   const fetchTaskUsage = useCallback(async () => {
-    await usageRateLimiter.current.execute();
+    await usagePipeline.current.execute();
   }, []);
 
   // ── Initial fetch ────────────────────────────────────────────────
@@ -217,11 +193,11 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
   // ── Cleanup ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    const prdLimiter = prdRateLimiter.current;
-    const usageLimiter = usageRateLimiter.current;
+    const prd = prdPipeline.current;
+    const usage = usagePipeline.current;
     return () => {
-      prdLimiter.dispose();
-      usageLimiter.dispose();
+      prd.dispose();
+      usage.dispose();
     };
   }, []);
 

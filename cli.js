@@ -65,6 +65,8 @@ import {
   formatMainHelp,
   formatOrchestratorCommandHelp,
 } from "./help.js";
+import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integration.js";
+import { runExport } from "./export.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
@@ -435,7 +437,8 @@ async function handleInit(rest) {
     process.exit(1);
   }
 
-  const initArgs = stripInitProviderFlag(rest);
+  const noClaude = rest.includes("--no-claude");
+  const initArgs = stripInitProviderFlag(rest).filter((a) => a !== "--no-claude");
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
 
@@ -453,6 +456,42 @@ async function handleInit(rest) {
   await runOrDie(tools.rex, ["init", ...flags, dir]);
   await runOrDie(tools.hench, ["init", ...flags, dir]);
   await runConfig(["llm.vendor", selectedProvider, dir]);
+
+  // Claude Code integration (settings, skills, MCP servers)
+  if (!noClaude) {
+    try {
+      const result = setupClaudeIntegration(dir);
+      printClaudeSetupSummary(result);
+    } catch (err) {
+      // Non-fatal — init succeeded even if Claude integration fails
+      console.log("");
+      console.log(`Claude Code integration: skipped (${err instanceof Error ? err.message : String(err)})`);
+    }
+  }
+
+  process.exit(0);
+}
+
+async function handleAnalyze(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".sourcevision"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.sourcevision, ["analyze", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleRecommend(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex", ".sourcevision"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["recommend", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleAdd(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  await runOrDie(tools.rex, ["add", ...rest]);
   process.exit(0);
 }
 
@@ -719,6 +758,98 @@ async function handleStart(rest, commandName = "start") {
   }
 }
 
+/**
+ * Spawn a tool and capture its stdout (instead of inheriting it).
+ * Returns { code, stdout }.
+ */
+function runCapture(script, args) {
+  return new Promise((res) => {
+    const child = spawn(process.execPath, [resolve(__dir, script), ...args], {
+      stdio: ["inherit", "pipe", "inherit"],
+    });
+    let stdout = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.on("close", (code) => res({ code: code ?? 1, stdout }));
+  });
+}
+
+async function handleSelfHeal(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex", ".hench", ".sourcevision"]);
+
+  const vendor = readLLMVendor(dir);
+  if (!vendor) {
+    console.error("Error: No LLM vendor configured for this project.");
+    console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+    process.exit(1);
+  }
+
+  // Parse iteration count from positional args (e.g. `ndx self-heal 3 .` or `ndx self-heal . 3`)
+  const positionals = rest.filter((a) => !a.startsWith("-"));
+  const iterCount = positionals.reduce((found, arg) => {
+    const n = parseInt(arg, 10);
+    return !isNaN(n) && n > 0 ? n : found;
+  }, 1);
+
+  console.log(`[self-heal] starting ${iterCount} iteration${iterCount === 1 ? "" : "s"}`);
+
+  let prevFindingCount = Infinity;
+
+  for (let i = 1; i <= iterCount; i++) {
+    console.log(`\n[self-heal] ── iteration ${i}/${iterCount} ──\n`);
+
+    console.log("[self-heal] step 1/5: sourcevision analyze --deep --full");
+    await runOrDie(tools.sourcevision, ["analyze", "--deep", "--full", dir]);
+
+    console.log("\n[self-heal] step 2/5: rex recommend --actionable-only");
+    await runOrDie(tools.rex, ["recommend", "--actionable-only", dir]);
+
+    console.log("\n[self-heal] step 3/5: rex recommend --actionable-only --accept");
+    await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", dir]);
+
+    console.log("\n[self-heal] step 4/5: hench run --auto --loop --self-heal");
+    await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", dir]);
+
+    console.log("\n[self-heal] step 5/5: acknowledge completed findings");
+    await runOrDie(tools.rex, ["recommend", "--acknowledge-completed", dir]);
+
+    // Check progress: count remaining findings
+    const { code, stdout } = await runCapture(tools.rex, ["recommend", "--actionable-only", "--format=json", dir]);
+    if (code === 0 && stdout.trim()) {
+      try {
+        const remaining = JSON.parse(stdout.trim());
+        const currentCount = remaining.filter(r => r.level === "task").reduce((sum, r) => sum + (r.meta?.findingCount ?? 0), 0);
+
+        if (currentCount === 0) {
+          console.log(`\n[self-heal] all findings resolved after iteration ${i}.`);
+          break;
+        }
+        if (currentCount >= prevFindingCount) {
+          console.log(`\n[self-heal] no improvement after iteration ${i} (${currentCount} findings remaining). Stopping.`);
+          break;
+        }
+        console.log(`\n[self-heal] ${currentCount} findings remaining (was ${prevFindingCount === Infinity ? "unknown" : prevFindingCount}).`);
+        prevFindingCount = currentCount;
+      } catch {
+        // JSON parse failed — continue without progress tracking
+      }
+    }
+  }
+
+  console.log(`\n[self-heal] completed`);
+  process.exit(0);
+}
+
+async function handleExport(rest) {
+  try {
+    const code = await runExport(rest);
+    process.exit(code);
+  } catch (err) {
+    console.error(formatError(err));
+    process.exit(1);
+  }
+}
+
 async function handleConfig(rest) {
   try {
     await runConfig(rest);
@@ -726,7 +857,6 @@ async function handleConfig(rest) {
     console.error(formatError(err));
     process.exit(1);
   }
-  process.exit(0);
 }
 
 function handleHelp(rest) {
@@ -809,11 +939,14 @@ async function main() {
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   switch (command) {
-    case "help":    return handleHelp(rest);
-    case "init":    return handleInit(rest);
-    case "plan":    return handlePlan(rest);
-    case "refresh": return handleRefresh(rest);
-    case "work":    return handleWork(rest);
+    case "help":      return handleHelp(rest);
+    case "init":      return handleInit(rest);
+    case "analyze":   return handleAnalyze(rest);
+    case "recommend": return handleRecommend(rest);
+    case "plan":      return handlePlan(rest);
+    case "add":       return handleAdd(rest);
+    case "refresh":   return handleRefresh(rest);
+    case "work":      return handleWork(rest);
     case "status":  return handleStatus(rest);
     case "usage":   return handleUsage(rest);
     case "sync":    return handleSync(rest);
@@ -821,7 +954,9 @@ async function main() {
     case "dev":     return handleDev(rest);
     case "start":   return handleStart(rest, "start");
     case "web":     return handleStart(rest, "web");
-    case "config":  return handleConfig(rest);
+    case "export":    return handleExport(rest);
+    case "config":    return handleConfig(rest);
+    case "self-heal": return handleSelfHeal(rest);
   }
 
   // ── Tool delegation ───────────────────────────────────────────────────────

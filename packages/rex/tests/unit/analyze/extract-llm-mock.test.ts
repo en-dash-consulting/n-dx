@@ -14,8 +14,8 @@ const { mockSpawnClaude } = vi.hoisted(() => ({
   mockSpawnClaude: vi.fn(),
 }));
 
-vi.mock("../../../src/analyze/reason.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../src/analyze/reason.js")>();
+vi.mock("../../../src/analyze/llm-bridge.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/analyze/llm-bridge.js")>();
   return {
     ...actual,
     spawnClaude: mockSpawnClaude,

@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useRef } from "preact/hooks";
-import { registerPoller, unregisterPoller } from "../polling/polling-manager.js";
+import { registerPoller, unregisterPoller } from "../polling/index.js";
 
 /**
  * Register a visibility-aware polling interval.

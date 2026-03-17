@@ -35,6 +35,8 @@ export interface RecommendationMeta {
  * (sourcevision findings, manual input, etc.).
  */
 export interface EnrichedRecommendation {
+  /** Pre-assigned ID. When set, creation uses this instead of generating a new UUID. */
+  id?: string;
   /** Title for the PRD item. */
   title: string;
   /** PRD hierarchy level (epic, feature, task, subtask). */

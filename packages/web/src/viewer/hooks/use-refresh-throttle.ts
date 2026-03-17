@@ -7,11 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from "preact/hooks";
-import type { MemoryLevel } from "../performance/memory-monitor.js";
-import type {
-  RefreshQueueState,
-  RefreshPriority,
-} from "../performance/refresh-throttle.js";
+import type { MemoryLevel, RefreshQueueState, RefreshPriority } from "../performance/index.js";
 import {
   startRefreshThrottle,
   stopRefreshThrottle,

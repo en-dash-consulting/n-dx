@@ -121,6 +121,11 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
           description: "New status",
           enum: ["pending", "in_progress", "completed", "deferred"],
         },
+        resolutionType: {
+          type: "string",
+          description: "How the task was resolved (required when status=completed)",
+          enum: ["code-change", "config-override", "acknowledgment"],
+        },
       },
       required: ["status"],
     },

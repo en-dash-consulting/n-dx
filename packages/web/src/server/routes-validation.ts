@@ -6,8 +6,6 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./types.js";
 import {
@@ -20,6 +18,7 @@ import {
   findItem,
   collectAllIds,
 } from "./rex-gateway.js";
+import { loadPRDSync } from "./prd-io.js";
 
 const VALIDATION_PREFIX = "/api/rex/validate";
 const DEPGRAPH_PREFIX = "/api/rex/dependency-graph";
@@ -458,13 +457,7 @@ function buildDependencyGraph(items: PRDItem[]): DependencyGraph {
 // ── Load PRD ─────────────────────────────────────────────────────────
 
 function loadPRD(ctx: ServerContext): PRDDocument | null {
-  const prdPath = join(ctx.rexDir, "prd.json");
-  if (!existsSync(prdPath)) return null;
-  try {
-    return JSON.parse(readFileSync(prdPath, "utf-8")) as PRDDocument;
-  } catch {
-    return null;
-  }
+  return loadPRDSync(ctx.rexDir);
 }
 
 // ── Route handler ────────────────────────────────────────────────────

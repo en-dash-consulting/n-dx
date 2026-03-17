@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem } from "../../prd/rex-gateway.js";
-import type { PRDItem, PRDStore } from "rex";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION } from "../../prd/rex-gateway.js";
+import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import { loadConfig, listRuns } from "../../store/index.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
@@ -15,6 +15,26 @@ import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "..
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
 import { MemoryThrottle } from "../../process/memory-throttle.js";
+
+// ---------------------------------------------------------------------------
+// Schema compatibility
+// ---------------------------------------------------------------------------
+
+/**
+ * Verify the loaded PRD document uses a schema version compatible with this
+ * build of hench. Catches mismatches early (at startup) rather than letting
+ * them surface as mysterious runtime failures deep in the agent loop.
+ */
+async function assertSchemaCompatibility(store: PRDStore): Promise<void> {
+  const doc = await store.loadDocument();
+  if (doc.schema !== SCHEMA_VERSION) {
+    throw new CLIError(
+      `PRD schema mismatch: document uses "${doc.schema}" but this version ` +
+      `of hench expects "${SCHEMA_VERSION}". Rebuild packages or run ` +
+      `"ndx init" to upgrade.`,
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -406,6 +426,7 @@ async function runOne(
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
+  await assertSchemaCompatibility(store);
 
   // Apply CLI token budget override to config for CLI provider
   const effectiveConfig = tokenBudget != null
@@ -518,6 +539,12 @@ export async function cmdRun(
   const model = flags.model;
   const auto = flags.auto === "true";
   const loop = flags.loop === "true";
+  const selfHeal = flags["self-heal"] === "true";
+
+  // Apply self-heal mode to config so it flows through to prompt building
+  if (selfHeal) {
+    config.selfHeal = true;
+  }
 
   if (llmVendor === "codex" && provider === "api" && !dryRun) {
     throw new CLIError(
@@ -887,6 +914,7 @@ async function runEpicByEpic(
 
   try {
     const store = await resolveStore(rexDir);
+    await assertSchemaCompatibility(store);
     const allEpics = await getOrderedEpics(store);
 
     if (allEpics.length === 0) {

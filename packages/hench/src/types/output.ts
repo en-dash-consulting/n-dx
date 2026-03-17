@@ -18,9 +18,9 @@
  */
 
 // Re-export shared foundation primitives.
-export { setQuiet, isQuiet, info, result } from "@n-dx/llm-client";
+export { setQuiet, isQuiet, info, result } from "../prd/llm-gateway.js";
 
-import { isQuiet } from "@n-dx/llm-client";
+import { isQuiet } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Streaming output — section headers and labelled lines for agent runs

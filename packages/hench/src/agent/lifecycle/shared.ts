@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { PRDStore } from "rex";
+import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief } from "../../schema/index.js";
 import { getCurrentHead } from "../../process/index.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";

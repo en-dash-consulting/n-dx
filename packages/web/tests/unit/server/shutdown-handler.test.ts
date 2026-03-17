@@ -33,8 +33,8 @@ vi.mock("../../../src/server/routes-hench.js", async (importOriginal) => {
 });
 
 // ── Mock routes-rex so shutdownRexExecution is controllable ──────────────
-vi.mock("../../../src/server/routes-rex.js", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../../src/server/routes-rex.js")>();
+vi.mock("../../../src/server/routes-rex/index.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../src/server/routes-rex/index.js")>();
   return {
     ...original,
     // Default: no active process
@@ -50,7 +50,7 @@ import {
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
 } from "../../../src/server/start.js";
 import { shutdownActiveExecutions } from "../../../src/server/routes-hench.js";
-import { shutdownRexExecution } from "../../../src/server/routes-rex.js";
+import { shutdownRexExecution } from "../../../src/server/routes-rex/index.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 

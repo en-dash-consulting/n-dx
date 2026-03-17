@@ -9,10 +9,11 @@ function renderDetail(
   item: PRDItemData,
   taskUsage?: { totalTokens: number; runCount: number },
   weeklyBudget?: { budget: number | null; source: "vendor_model" | "vendor_default" | "global_default" | "missing_budget" },
+  showTokenBudget = true,
 ) {
   const root = document.createElement("div");
   act(() => {
-    render(h(TaskDetail, { item, allItems: [item], taskUsage, weeklyBudget }), root);
+    render(h(TaskDetail, { item, allItems: [item], taskUsage, weeklyBudget, showTokenBudget }), root);
   });
   return root;
 }
@@ -56,5 +57,24 @@ describe("TaskDetail usage", () => {
     expect(root.textContent).toContain("reason: missing_budget");
     const utilNode = root.querySelector(".task-usage-value[data-utilization-reason='missing_budget']");
     expect(utilNode).not.toBeNull();
+  });
+
+  it("hides budget fields when showTokenBudget is false", () => {
+    const item: PRDItemData = {
+      id: "task-4",
+      title: "Task Four",
+      status: "pending",
+      level: "task",
+    };
+    const root = renderDetail(item, { totalTokens: 1234, runCount: 2 }, { budget: 50_000, source: "vendor_default" }, false);
+    // Token count should still be visible
+    expect(root.textContent).toContain("1.2k tokens");
+    expect(root.textContent).toContain("2 associated runs");
+    // Budget-specific UI should NOT render
+    expect(root.textContent).not.toContain("Weekly Utilization");
+    expect(root.textContent).not.toContain("2%");
+    expect(root.textContent).not.toContain("reason:");
+    const utilNode = root.querySelector(".task-usage-value[data-utilization-reason]");
+    expect(utilNode).toBeNull();
   });
 });

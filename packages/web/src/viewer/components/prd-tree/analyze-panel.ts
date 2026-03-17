@@ -6,36 +6,16 @@
  */
 
 import { h, Fragment } from "preact";
-import { useState, useCallback } from "preact/hooks";
+import { useState, useCallback, useEffect } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
+import type { Proposal, ProposalFeature, ProposalTask } from "rex";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface AnalyzePanelProps {
   /** Called when proposals are accepted and PRD should be refreshed. */
   onPrdChanged: () => void;
-}
-
-interface ProposalTask {
-  title: string;
-  source: string;
-  sourceFile: string;
-  description?: string;
-  priority?: string;
-  tags?: string[];
-}
-
-interface ProposalFeature {
-  title: string;
-  source: string;
-  description?: string;
-  tasks: ProposalTask[];
-}
-
-interface Proposal {
-  epic: { title: string; source: string; description?: string };
-  features: ProposalFeature[];
 }
 
 type AnalyzeState = "idle" | "running" | "done" | "error";
@@ -70,8 +50,8 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
     }
   }, []);
 
-  // Load pending on first idle render
-  useState(() => { loadPending(); });
+  // Load pending on first render
+  useEffect(() => { loadPending(); }, []);
 
   const handleAnalyze = useCallback(async () => {
     setState("running");

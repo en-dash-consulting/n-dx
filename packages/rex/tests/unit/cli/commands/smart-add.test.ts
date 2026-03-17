@@ -652,4 +652,23 @@ describe("classifySmartAddError", () => {
     const result = classifySmartAddError(new Error("specific error detail"), "description");
     expect(result.message).toContain("specific error detail");
   });
+
+  it("does not false-positive on user input containing 'authentication' or 'unauthorized'", () => {
+    // User descriptions like "Add authentication for unauthorized API calls" should not
+    // be classified as auth errors — only actual API error patterns should match.
+    const result = classifySmartAddError(
+      new Error("LLM failed: unexpected response for input: Add authentication for unauthorized API calls"),
+      "description",
+    );
+    expect(result.message).not.toContain("Authentication failed");
+    expect(result.message).toContain("analyze description");
+  });
+
+  it("still matches real authentication error patterns", () => {
+    const r1 = classifySmartAddError(new Error("authentication failed: invalid token"), "description");
+    expect(r1.message).toContain("Authentication failed");
+
+    const r2 = classifySmartAddError(new Error("unauthorized request: check credentials"), "description");
+    expect(r2.message).toContain("Authentication failed");
+  });
 });

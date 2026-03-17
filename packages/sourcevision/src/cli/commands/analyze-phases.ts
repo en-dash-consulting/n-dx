@@ -28,6 +28,8 @@ import type { CallGraph, Classifications, ImportEdge, Inventory } from "../../sc
 import { readManifest, writeManifest, updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
 import { detectSubAnalyses, buildSubAnalysisRefs } from "../../analyzers/workspace.js";
 import { info } from "../output.js";
+import { createSnapshot, computeDeltas, loadLatestReport, saveReport, formatDeltaReport } from "../../analyzers/convergence.js";
+import type { ConvergenceReport } from "../../analyzers/convergence.js";
 import type { AnalyzeTokenUsage } from "../../schema/index.js";
 import { loadProjectOverrides } from "@n-dx/llm-client";
 
@@ -260,8 +262,18 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
       info(`  Detected changes, resetting from Pass ${fromPass} to Pass ${toPass}`);
     };
 
+    // Load zone pins from .n-dx.json
+    const svZoneOverrides = await loadProjectOverrides(ctx.svDir, "sourcevision");
+    const zonesConfig = (svZoneOverrides as Record<string, unknown>).zones as Record<string, unknown> | undefined;
+    const zonePins = (zonesConfig?.pins ?? {}) as Record<string, string>;
+    const pinCount = Object.keys(zonePins).length;
+    if (pinCount > 0) {
+      info(`  Applying ${pinCount} zone pin(s) from .n-dx.json`);
+    }
+
     let zonesResult = await analyzeZones(inventory, importsData, {
       enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset, hints,
+      zonePins: pinCount > 0 ? zonePins : undefined,
     });
     let zones = zonesResult.zones;
     if (zonesResult.tokenUsage) {
@@ -280,6 +292,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
         info(`\n[phase 4] Enrichment pass ${currentPass + p + 2}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
+          zonePins: Object.keys(zonePins).length > 0 ? zonePins : undefined,
         });
         zones = zonesResult.zones;
         if (zonesResult.tokenUsage) {
@@ -298,6 +311,31 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
 
     updateManifestModule(ctx.absDir, "zones", "complete");
     info(`  ${zones.zones.length} zones, ${zones.crossings.length} crossings, ${zones.unzoned.length} unzoned → ${outPath}`);
+
+    // ── Convergence tracking ──
+    try {
+      const manifest = readManifest(ctx.absDir);
+      const snapshots = createSnapshot(zones.zones, manifest.gitSha);
+      const report: ConvergenceReport = {
+        schemaVersion: "1.0.0",
+        snapshots,
+        analyzedAt: new Date().toISOString(),
+        gitSha: manifest.gitSha,
+      };
+
+      const previousReport = await loadLatestReport(ctx.svDir);
+      if (previousReport) {
+        const delta = computeDeltas(snapshots, previousReport.snapshots);
+        const lines = formatDeltaReport(delta);
+        for (const line of lines) {
+          info(`  ${line}`);
+        }
+      }
+
+      await saveReport(ctx.svDir, report);
+    } catch {
+      // Convergence tracking is non-critical — don't fail the analysis
+    }
 
     reportZoneInsights(zones);
   } catch (err) {

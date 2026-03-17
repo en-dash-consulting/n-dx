@@ -23,6 +23,25 @@ import {
 // ── generateStructuralInsights ──────────────────────────────────────────────
 
 describe("generateStructuralInsights", () => {
+  it("generates isolated-files insight for multi-file zones with no edges", () => {
+    const zones: Zone[] = [
+      { id: "landing", name: "Landing", description: "", files: ["scripts/a.mjs", "scripts/b.mjs"], entryPoints: [], cohesion: 0, coupling: 0 },
+    ];
+    const { zoneInsights } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(zoneInsights.get("landing")!.some((i) => i.includes("Isolated files"))).toBe(true);
+    expect(zoneInsights.get("landing")!.some((i) => i.includes("2 files"))).toBe(true);
+    // Should NOT generate "High cohesion" for isolated files
+    expect(zoneInsights.get("landing")!.some((i) => i.includes("High cohesion"))).toBe(false);
+  });
+
+  it("does not generate isolated-files insight for single-file zones", () => {
+    const zones: Zone[] = [
+      { id: "single", name: "Single", description: "", files: ["src/only.ts"], entryPoints: [], cohesion: 1, coupling: 0 },
+    ];
+    const { zoneInsights } = generateStructuralInsights(zones, [], makeImports([]), 10);
+    expect(zoneInsights.get("single")!.some((i) => i.includes("Isolated files"))).toBe(false);
+  });
+
   it("generates high-cohesion insight", () => {
     const zones: Zone[] = [
       { id: "core", name: "Core", description: "", files: ["a.ts", "b.ts", "c.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 },
@@ -234,7 +253,7 @@ describe("analyzeZones insights", () => {
     expect(result.structureHash).toBeDefined();
   });
 
-  it("assigns proximity files to reduce unzoned count", async () => {
+  it("excludes non-importable files from zone detection and unzoned list", async () => {
     const inventory = makeInventory([
       makeFileEntry("src/m/a.ts"),
       makeFileEntry("src/m/b.ts"),
@@ -250,9 +269,11 @@ describe("analyzeZones insights", () => {
 
     const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
-    // README.md and styles.css should be assigned to the zone by proximity
-    expect(result.zones[0].files).toContain("src/m/README.md");
-    expect(result.zones[0].files).toContain("src/m/styles.css");
+    // Non-importable files (.md, .css) should be excluded from both zone files
+    // and the unzoned list — they cannot form import edges, so including them
+    // in zone detection produces noise zones with distorted metrics.
+    expect(result.zones[0].files).not.toContain("src/m/README.md");
+    expect(result.zones[0].files).not.toContain("src/m/styles.css");
     expect(result.unzoned).not.toContain("src/m/README.md");
     expect(result.unzoned).not.toContain("src/m/styles.css");
   });
@@ -372,8 +393,8 @@ describe("analyzeZones structureChanged", () => {
 
     // Structure changed, so enrichmentPass should not carry over from previous
     expect(result.structureChanged).toBe(true);
-    // The enrichmentPass should be 0 (structural only, no AI enrich)
-    expect(result.zones.enrichmentPass).toBe(0);
+    // No AI enrichment ran, so enrichmentPass should be undefined
+    expect(result.zones.enrichmentPass).toBeUndefined();
   });
 
   it("calls onReset callback when structure changes and previousZones had enrichmentPass", async () => {
@@ -506,8 +527,8 @@ describe("analyzeZones findings", () => {
     expect(result.findings!.every((f) => f.pass === 0)).toBe(true);
     expect(result.findings!.every((f) => f.type === "observation")).toBe(true);
 
-    // enrichmentPass should be 0 (not undefined) to indicate structural analysis completed
-    expect(result.enrichmentPass).toBe(0);
+    // No AI enrichment ran (enrich: false), so enrichmentPass should be undefined
+    expect(result.enrichmentPass).toBeUndefined();
   });
 
   it("populates both findings and insights for backward compat", async () => {
@@ -847,8 +868,8 @@ describe("maxZones scaling", () => {
       scopeFiles: files,
     });
 
-    // Should have at most 10 zones (scaled from 150 files)
-    expect(result.zones.length).toBeLessThanOrEqual(10);
+    // Should have at most 12 zones (scaled from 150 files, floor(150/12) = 12)
+    expect(result.zones.length).toBeLessThanOrEqual(12);
   });
 
   it("respects explicit maxZones when lower than scaled value", () => {

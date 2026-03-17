@@ -81,27 +81,27 @@
 }
 
 .cg-detail-btn-bg {
-  fill: transparent;
-  stroke: var(--border);
-  stroke-width: 1;
-  transition: fill 0.1s ease, stroke 0.1s ease;
+  fill: var(--bg-hover, rgba(128, 128, 128, 0.1));
+  stroke: var(--accent, #4a9eff);
+  stroke-width: 1.5;
+  transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
 }
 
 .cg-zone-detail-btn:hover .cg-detail-btn-bg {
-  fill: var(--bg-hover);
-  stroke: var(--border-strong);
+  fill: var(--accent-bg, rgba(74, 158, 255, 0.15));
+  stroke: var(--accent, #4a9eff);
+  stroke-width: 2;
 }
 
 .cg-detail-btn-text {
-  font-family: var(--font-mono, monospace);
-  font-size: 8px;
-  fill: var(--text-muted);
+  font-size: 14px;
+  fill: var(--accent, #4a9eff);
   pointer-events: none;
-  transition: fill 0.1s ease;
+  transition: fill 0.15s ease;
 }
 
 .cg-zone-detail-btn:hover .cg-detail-btn-text {
-  fill: var(--text);
+  fill: var(--accent-strong, #2b7de9);
 }
 
 /* ── Drill-down button (on zones with sub-zones) ──────────────────── */

@@ -58,6 +58,11 @@ export interface ZoneSummary {
   lineCount: number;
   /** Computed architectural risk metrics (present when risk scoring is enabled). */
   riskMetrics?: ZoneRiskMetrics;
+  /**
+   * Indicates whether this zone is a detection artifact rather than a genuine
+   * architectural unit. Mirrors Zone.detectionQuality.
+   */
+  detectionQuality?: "genuine" | "artifact" | "residual";
 }
 
 // ── Inventory ───────────────────────────────────────────────────────────────
@@ -136,7 +141,7 @@ export interface Imports {
 
 // ── Findings ─────────────────────────────────────────────────────────────────
 
-export type FindingType = "observation" | "pattern" | "relationship" | "anti-pattern" | "suggestion";
+export type FindingType = "observation" | "pattern" | "relationship" | "anti-pattern" | "suggestion" | "move-file";
 
 export interface Finding {
   type: FindingType;
@@ -148,6 +153,28 @@ export interface Finding {
   severity?: "info" | "warning" | "critical";
   /** Related zone IDs or file paths */
   related?: string[];
+}
+
+/** Reason a file-move is recommended. */
+export type MoveFileReason = "zone-pin-override" | "import-neighbor-majority" | "directory-consolidation";
+
+/**
+ * Concrete file-move recommendation with predicted metric impact.
+ *
+ * Emitted when a file's physical location diverges from its architectural
+ * zone membership — either because a zone pin overrides Louvain placement,
+ * or because a file's import neighbors are predominantly in another directory.
+ */
+export interface MoveFileFinding extends Finding {
+  type: "move-file";
+  /** Current file path (relative to project root). */
+  from: string;
+  /** Recommended destination directory. */
+  to: string;
+  /** Why this move is recommended. */
+  moveReason: MoveFileReason;
+  /** Number of cross-zone edges this move would eliminate. */
+  predictedImpact: number;
 }
 
 // ── Zones ───────────────────────────────────────────────────────────────────
@@ -178,6 +205,14 @@ export interface Zone {
   subCrossings?: ZoneCrossing[];
   /** Computed architectural risk metrics (deterministic, from cohesion/coupling). */
   riskMetrics?: ZoneRiskMetrics;
+  /**
+   * Indicates whether this zone is a detection artifact rather than a genuine
+   * architectural unit. Artifact zones arise from residual Louvain community
+   * detection when most files have been pinned elsewhere. Dashboards and CI
+   * gates should filter or annotate artifact zones to prevent misleading
+   * cohesion/coupling scores from influencing architectural decisions.
+   */
+  detectionQuality?: "genuine" | "artifact" | "residual";
 }
 
 // ── Risk Metrics ────────────────────────────────────────────────────────────
@@ -202,6 +237,23 @@ export interface ZoneRiskMetrics {
   riskLevel: RiskLevel;
   /** Whether the zone fails the governance threshold (cohesion < 0.4 AND coupling > 0.6). */
   failsThreshold: boolean;
+  /**
+   * Human-provided justification for why the current risk level is acceptable.
+   * When present, the zone is still reported but findings are downgraded to
+   * informational rather than actionable warnings.
+   */
+  riskJustification?: string;
+}
+
+/**
+ * Configuration entry for a zone risk justification.
+ * Stored in .n-dx.json under `sourcevision.riskJustifications`.
+ */
+export interface RiskJustificationEntry {
+  /** Zone ID (e.g., "packages-rex:unit-core"). */
+  zone: string;
+  /** Human-readable explanation of why the risk level is acceptable. */
+  reason: string;
 }
 
 /** Token usage tracked per zone during per-zone enrichment */

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleRexRoute } from "../../../src/server/routes-rex.js";
+import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 
 /** PRD fixture with requirements. */
 function makePRD() {

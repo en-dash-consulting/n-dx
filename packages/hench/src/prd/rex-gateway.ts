@@ -19,20 +19,73 @@
  * ```
  *
  * By concentrating all hench→rex runtime imports here, we ensure:
- * - The cross-package surface is **explicit** (8 re-exports, not 14
- *   scattered imports).
+ * - The cross-package surface is **explicit** (re-exports, not scattered
+ *   imports).
  * - The DAG stays **acyclic** — rex never imports from hench.
  * - Future changes to rex's public API need only be updated in this
  *   single file.
  *
- * **Type-only** imports (`import type { PRDStore, … } from "rex"`)
- * are deliberately excluded — they are erased at compile time and
- * create zero runtime coupling.  Those stay at the call-site where
- * they provide local type-safety.
+ * ## Migration safety
+ *
+ * This gateway is the sole cross-zone coupling surface for ~160 hench
+ * files. To mitigate blast radius from rex API changes:
+ *
+ * 1. **Contract test** — `tests/unit/prd/rex-gateway.test.ts` verifies
+ *    every re-export exists and is callable, catching API drift at test
+ *    time rather than in production agent loops.
+ *
+ * 2. **Domain-aligned sections** — re-exports are grouped by concern
+ *    (store, tree, task-selection, validation, etc.). If rex ever splits
+ *    into sub-packages, each section can be migrated independently.
+ *
+ * 3. **Narrow consumer surface** — only 3 files import from this
+ *    gateway (cli/commands/run.ts, agent/planning/brief.ts,
+ *    tools/rex.ts). Each imports only the subset it needs.
+ *
+ * ## Maximum-scope policy
+ *
+ * This gateway intentionally limits its surface to the rex APIs that
+ * hench needs for its core mission: picking a task, running an agent
+ * loop, and recording the result. Categories explicitly in-scope and
+ * out-of-scope are listed below. New re-exports must fit an in-scope
+ * category — if they don't, the feature should be reconsidered or the
+ * policy updated with a documented rationale.
+ *
+ * **In-scope (re-export permitted):**
+ * - Schema version contract (read/validate prd.json compatibility)
+ * - Store factory (open a PRDStore for reading/writing)
+ * - Tree traversal (findItem, walkTree — locate items in the tree)
+ * - Task selection (findNextTask, findActionableTasks, collectCompletedIds)
+ * - Timestamp computation (status change timestamps)
+ * - Parent auto-completion (bubble-up completion when children finish)
+ * - Requirements validation (verify task acceptance criteria)
+ * - Level helpers (isRootLevel, isWorkItem — classify items)
+ * - Finding acknowledgment (load/save/acknowledge sourcevision findings)
+ *
+ * **Out-of-scope (must NOT be re-exported):**
+ * - PRD mutation (insertChild, updateInTree, removeFromTree — hench
+ *   mutates via rex MCP tools, not direct tree manipulation)
+ * - Analytics & health (computeEpicStats, computeHealthScore — these
+ *   serve the dashboard/UI, not the agent loop)
+ * - Merge/consolidation (validateMerge, mergeItems — user-facing operations)
+ * - Reorganize/reshape (detectReorganizations, applyReshape — LLM-powered
+ *   restructuring is an interactive workflow, not an agent concern)
+ * - MCP server factory (createRexMcpServer — web-tier concern only)
+ * - Domain constants (PRIORITY_ORDER, LEVEL_HIERARCHY — UI display aids)
+ *
+ * **Type-only** imports (`import type { PRDStore, … }`) must also
+ * flow through this gateway to prevent the type-import promotion
+ * erosion path — a type import can be promoted to a runtime import
+ * during refactoring, silently bypassing the gateway pattern.
+ * This is enforced by domain-isolation.test.js.
  *
  * @module hench/prd/rex-gateway
  * @see packages/web/src/server/domain-gateway.ts — web's equivalent gateway
+ * @see packages/hench/tests/unit/prd/rex-gateway.test.ts — contract test
  */
+
+// ---- Schema version contract ------------------------------------------------
+export { SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion } from "rex";
 
 // ---- Store factory ----------------------------------------------------------
 export { resolveStore } from "rex";
@@ -61,3 +114,9 @@ export { isRootLevel, isWorkItem } from "rex";
 
 // ---- Finding acknowledgment -------------------------------------------------
 export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "rex";
+
+// ---- Type re-exports --------------------------------------------------------
+// All type imports from rex must flow through this gateway to prevent
+// type-import promotion erosion (a type import can be promoted to a
+// runtime import during refactoring, silently bypassing the gateway).
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry } from "rex";

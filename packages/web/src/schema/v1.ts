@@ -132,7 +132,7 @@ export interface Imports {
 
 // ── Findings ─────────────────────────────────────────────────────────────────
 
-export type FindingType = "observation" | "pattern" | "relationship" | "anti-pattern" | "suggestion";
+export type FindingType = "observation" | "pattern" | "relationship" | "anti-pattern" | "suggestion" | "move-file";
 
 export interface Finding {
   type: FindingType;

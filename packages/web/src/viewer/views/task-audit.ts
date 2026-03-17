@@ -12,9 +12,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { BrandedHeader } from "../components/logos.js";
-import { RexTaskLink } from "../components/rex-task-link.js";
-import { ElapsedTime } from "../components/elapsed-time.js";
+import { BrandedHeader, RexTaskLink, ElapsedTime } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@
 import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, ItemLevel, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
+import type { NavigateTo } from "../../types.js";
 import { formatTimestamp } from "./compute.js";
 import { findItemById } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
@@ -23,6 +24,8 @@ export interface TaskDetailProps {
   taskUsage?: TaskUsageSummary;
   /** Shared resolved weekly budget used for deterministic utilization display. */
   weeklyBudget?: WeeklyBudgetResolution | null;
+  /** Whether to show token budget UI (budget bar, percentage, limit label). */
+  showTokenBudget?: boolean;
   /** All items in the document, for resolving dependency references. */
   allItems: PRDItemData[];
   /** Called when an item is updated via the API. */
@@ -37,6 +40,8 @@ export interface TaskDetailProps {
   onAddChild?: (data: { title: string; parentId: string; level: ItemLevel; description?: string; priority?: string }) => Promise<void>;
   /** Called to remove/delete the current item and all its descendants. */
   onRemove?: (id: string) => Promise<void>;
+  /** Navigation callback for deep-linking to other views (e.g. hench-runs). */
+  navigateTo?: NavigateTo;
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -260,21 +265,246 @@ function DependencyList({
   );
 }
 
-/** Acceptance criteria checklist (read-only display). */
-function AcceptanceCriteria({ criteria }: { criteria: string[] }) {
-  if (criteria.length === 0) return null;
+/** Editable title — click to edit inline. */
+function EditableTitle({
+  title,
+  onUpdate,
+}: {
+  title: string;
+  onUpdate?: (title: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(title);
+
+  // Sync draft when item changes externally
+  useEffect(() => { setDraft(title); }, [title]);
+
+  const handleSave = useCallback(() => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== title && onUpdate) {
+      onUpdate(trimmed);
+    }
+    setEditing(false);
+  }, [draft, title, onUpdate]);
+
+  if (!onUpdate) {
+    return h("div", { class: "task-title-display" }, title);
+  }
+
+  if (editing) {
+    return h("div", { class: "task-title-edit" },
+      h("input", {
+        class: "task-title-input",
+        type: "text",
+        value: draft,
+        onInput: (e: Event) => setDraft((e.target as HTMLInputElement).value),
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key === "Enter") { e.preventDefault(); handleSave(); }
+          if (e.key === "Escape") { setDraft(title); setEditing(false); }
+        },
+        onBlur: handleSave,
+        ref: (el: HTMLInputElement | null) => el?.focus(),
+      }),
+    );
+  }
+
+  return h("div", {
+    class: "task-title-display editable",
+    onClick: () => { setDraft(title); setEditing(true); },
+    title: "Click to edit title",
+    role: "button",
+    tabIndex: 0,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDraft(title); setEditing(true); }
+    },
+  }, title, h("span", { class: "task-edit-icon" }, "\u270e"));
+}
+
+/** Editable description — click to edit with textarea. */
+function EditableDescription({
+  description,
+  onUpdate,
+}: {
+  description?: string;
+  onUpdate?: (description: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(description ?? "");
+
+  // Sync draft when item changes externally
+  useEffect(() => { setDraft(description ?? ""); }, [description]);
+
+  const handleSave = useCallback(() => {
+    const trimmed = draft.trim();
+    if (trimmed !== (description ?? "") && onUpdate) {
+      onUpdate(trimmed);
+    }
+    setEditing(false);
+  }, [draft, description, onUpdate]);
+
+  if (!onUpdate) {
+    return description
+      ? h("div", { class: "task-description" }, description)
+      : null;
+  }
+
+  if (editing) {
+    return h("div", { class: "task-description-edit" },
+      h("textarea", {
+        class: "task-description-textarea",
+        value: draft,
+        rows: Math.max(3, (draft.match(/\n/g) ?? []).length + 2),
+        onInput: (e: Event) => setDraft((e.target as HTMLTextAreaElement).value),
+        onKeyDown: (e: KeyboardEvent) => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleSave(); }
+          if (e.key === "Escape") { setDraft(description ?? ""); setEditing(false); }
+        },
+        ref: (el: HTMLTextAreaElement | null) => el?.focus(),
+      }),
+      h("div", { class: "task-edit-actions" },
+        h("button", { class: "task-edit-save", onClick: handleSave }, "Save"),
+        h("button", { class: "task-edit-cancel", onClick: () => { setDraft(description ?? ""); setEditing(false); } }, "Cancel"),
+        h("span", { class: "task-edit-hint" }, "Ctrl+Enter to save"),
+      ),
+    );
+  }
+
+  if (!description) {
+    return h("button", {
+      class: "task-add-description-btn",
+      onClick: () => { setDraft(""); setEditing(true); },
+    }, "+ Add description");
+  }
+
+  return h("div", {
+    class: "task-description editable",
+    onClick: () => { setDraft(description ?? ""); setEditing(true); },
+    title: "Click to edit description",
+    role: "button",
+    tabIndex: 0,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDraft(description ?? ""); setEditing(true); }
+    },
+  }, description, h("span", { class: "task-edit-icon" }, "\u270e"));
+}
+
+/** Editable acceptance criteria — add, edit, remove individual items. */
+function EditableAcceptanceCriteria({
+  criteria,
+  onUpdate,
+}: {
+  criteria: string[];
+  onUpdate?: (criteria: string[]) => void;
+}) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addDraft, setAddDraft] = useState("");
+
+  const handleStartEdit = useCallback((i: number) => {
+    setEditingIndex(i);
+    setEditDraft(criteria[i]);
+  }, [criteria]);
+
+  const handleSaveEdit = useCallback(() => {
+    if (editingIndex === null || !onUpdate) return;
+    const trimmed = editDraft.trim();
+    if (!trimmed) {
+      // Empty means remove
+      onUpdate(criteria.filter((_, i) => i !== editingIndex));
+    } else if (trimmed !== criteria[editingIndex]) {
+      const updated = [...criteria];
+      updated[editingIndex] = trimmed;
+      onUpdate(updated);
+    }
+    setEditingIndex(null);
+    setEditDraft("");
+  }, [editingIndex, editDraft, criteria, onUpdate]);
+
+  const handleRemove = useCallback((i: number) => {
+    if (!onUpdate) return;
+    onUpdate(criteria.filter((_, idx) => idx !== i));
+  }, [criteria, onUpdate]);
+
+  const handleAdd = useCallback(() => {
+    const trimmed = addDraft.trim();
+    if (trimmed && onUpdate) {
+      onUpdate([...criteria, trimmed]);
+    }
+    setAddDraft("");
+    setAdding(false);
+  }, [addDraft, criteria, onUpdate]);
+
+  if (criteria.length === 0 && !onUpdate) return null;
 
   return h(
     "div",
     { class: "task-acceptance-criteria" },
     h("div", { class: "task-section-label" }, "Acceptance Criteria"),
-    h(
-      "ul",
-      { class: "task-criteria-list" },
-      criteria.map((criterion, i) =>
-        h("li", { key: i, class: "task-criterion" }, criterion),
-      ),
-    ),
+    criteria.length > 0
+      ? h(
+          "ul",
+          { class: "task-criteria-list" },
+          criteria.map((criterion, i) =>
+            editingIndex === i
+              ? h("li", { key: i, class: "task-criterion editing" },
+                  h("input", {
+                    class: "task-criterion-input",
+                    type: "text",
+                    value: editDraft,
+                    onInput: (e: Event) => setEditDraft((e.target as HTMLInputElement).value),
+                    onKeyDown: (e: KeyboardEvent) => {
+                      if (e.key === "Enter") { e.preventDefault(); handleSaveEdit(); }
+                      if (e.key === "Escape") { setEditingIndex(null); setEditDraft(""); }
+                    },
+                    onBlur: handleSaveEdit,
+                    ref: (el: HTMLInputElement | null) => el?.focus(),
+                  }),
+                )
+              : h("li", {
+                  key: i,
+                  class: `task-criterion${onUpdate ? " editable" : ""}`,
+                  onClick: onUpdate ? () => handleStartEdit(i) : undefined,
+                  role: onUpdate ? "button" : undefined,
+                  tabIndex: onUpdate ? 0 : undefined,
+                  onKeyDown: onUpdate
+                    ? (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleStartEdit(i); } }
+                    : undefined,
+                },
+                  h("span", { class: "task-criterion-text" }, criterion),
+                  onUpdate
+                    ? h("button", {
+                        class: "task-criterion-remove",
+                        onClick: (e: Event) => { e.stopPropagation(); handleRemove(i); },
+                        "aria-label": `Remove criterion ${i + 1}`,
+                        title: "Remove",
+                      }, "\u00d7")
+                    : null,
+                ),
+          ),
+        )
+      : null,
+    // Add new criterion
+    onUpdate
+      ? adding
+        ? h("div", { class: "task-criterion-add-form" },
+            h("input", {
+              class: "task-criterion-add-input",
+              type: "text",
+              value: addDraft,
+              placeholder: "New acceptance criterion...",
+              onInput: (e: Event) => setAddDraft((e.target as HTMLInputElement).value),
+              onKeyDown: (e: KeyboardEvent) => {
+                if (e.key === "Enter" && addDraft.trim()) { e.preventDefault(); handleAdd(); }
+                if (e.key === "Escape") { setAdding(false); setAddDraft(""); }
+              },
+              ref: (el: HTMLInputElement | null) => el?.focus(),
+            }),
+            h("button", { class: "task-criterion-add-confirm", onClick: handleAdd, disabled: !addDraft.trim() }, "\u2713"),
+            h("button", { class: "task-criterion-add-cancel", onClick: () => { setAdding(false); setAddDraft(""); } }, "\u00d7"),
+          )
+        : h("button", { class: "task-criterion-add-btn", onClick: () => setAdding(true) }, "+ criterion")
+      : null,
   );
 }
 
@@ -1035,9 +1265,164 @@ function ExecuteTaskButton({
   );
 }
 
+// ── Hench Runs list ──────────────────────────────────────────────────
+
+/** Summary of a hench run, matching the server's RunSummary shape. */
+interface RunEntry {
+  id: string;
+  status: string;
+  startedAt: string;
+  finishedAt?: string;
+  turns: number;
+  tokenUsage: {
+    input: number;
+    output: number;
+    cacheCreationInput?: number;
+    cacheReadInput?: number;
+  };
+}
+
+function runTotalTokens(r: RunEntry): number {
+  return (r.tokenUsage.input ?? 0)
+    + (r.tokenUsage.output ?? 0)
+    + (r.tokenUsage.cacheCreationInput ?? 0)
+    + (r.tokenUsage.cacheReadInput ?? 0);
+}
+
+function fmtDuration(start: string, end?: string): string {
+  if (!end) return "running\u2026";
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  if (ms < 0) return "\u2014";
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const remainSecs = secs % 60;
+  if (mins < 60) return `${mins}m ${remainSecs}s`;
+  const hours = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  return `${hours}h ${remainMins}m`;
+}
+
+function fmtRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours < 1) {
+    const mins = Math.floor(diffMs / (1000 * 60));
+    return mins <= 0 ? "just now" : `${mins}m ago`;
+  }
+  if (diffHours < 24) return `${Math.floor(diffHours)}h ago`;
+  if (diffHours < 168) {
+    return new Date(iso).toLocaleDateString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+  }
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+const RUN_STATUS_ICONS: Record<string, { icon: string; color: string }> = {
+  completed: { icon: "\u25cf", color: "var(--green)" },
+  failed: { icon: "\u2715", color: "var(--red)" },
+  error: { icon: "\u2715", color: "var(--red)" },
+  running: { icon: "\u25d0", color: "var(--accent)" },
+  in_progress: { icon: "\u25d0", color: "var(--accent)" },
+};
+
+function getRunStatusConfig(status: string) {
+  return RUN_STATUS_ICONS[status] ?? { icon: "\u25cb", color: "var(--text-dim)" };
+}
+
+/** Fetches and displays hench runs associated with a task. */
+function HenchRunsList({
+  taskId,
+  navigateTo,
+}: {
+  taskId: string;
+  navigateTo?: NavigateTo;
+}) {
+  const [runs, setRuns] = useState<RunEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+
+    fetch(`/api/hench/runs?taskId=${encodeURIComponent(taskId)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("fetch failed");
+        return res.json();
+      })
+      .then((json) => {
+        if (!cancelled) {
+          setRuns(json.runs ?? []);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [taskId]);
+
+  // Don't render the section at all while loading on first mount, or if no runs
+  if (loading) return null;
+  if (error) return null;
+  if (runs.length === 0) return null;
+
+  return h(
+    "div",
+    { class: "task-section task-runs-section" },
+    h("div", { class: "task-section-label" }, `Hench Runs (${runs.length})`),
+    h(
+      "div",
+      { class: "task-runs-list" },
+      runs.map((run) => {
+        const st = getRunStatusConfig(run.status);
+        const tokens = runTotalTokens(run);
+
+        return h(
+          "div",
+          {
+            key: run.id,
+            class: `task-run-entry${navigateTo ? " clickable" : ""}`,
+            onClick: navigateTo
+              ? () => navigateTo("hench-runs", { runId: run.id })
+              : undefined,
+            role: navigateTo ? "button" : undefined,
+            tabIndex: navigateTo ? 0 : undefined,
+            onKeyDown: navigateTo
+              ? (e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigateTo("hench-runs", { runId: run.id });
+                  }
+                }
+              : undefined,
+            title: navigateTo ? "View run details" : undefined,
+          },
+          // Status icon + timestamp
+          h("div", { class: "task-run-header" },
+            h("span", { class: "task-run-status", style: `color: ${st.color}` }, st.icon),
+            h("span", { class: "task-run-time" }, fmtRelativeTime(run.startedAt)),
+          ),
+          // Metadata chips: duration, turns, tokens
+          h("div", { class: "task-run-meta" },
+            h("span", { class: "task-run-chip" }, fmtDuration(run.startedAt, run.finishedAt)),
+            h("span", { class: "task-run-chip" }, `${run.turns} turns`),
+            h("span", { class: "task-run-chip task-run-chip-tokens" }, formatTokenCount(tokens) + " tokens"),
+          ),
+        );
+      }),
+    ),
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────
 
-export function TaskDetail({ item, taskUsage, weeklyBudget, allItems, onUpdate, onNavigateToItem, onExecuteTask, onPrdChanged, onAddChild, onRemove }: TaskDetailProps) {
+export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, allItems, onUpdate, onNavigateToItem, onExecuteTask, onPrdChanged, onAddChild, onRemove, navigateTo }: TaskDetailProps) {
   const [saving, setSaving] = useState(false);
   const [pendingFailStatus, setPendingFailStatus] = useState(false);
   const [failureReason, setFailureReason] = useState("");
@@ -1132,6 +1517,18 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, allItems, onUpdate, 
       h(CopyLinkButton, { path: `/prd/${item.id}`, compact: true }),
     ),
 
+    // Editable title
+    h(
+      "div",
+      { class: "task-section" },
+      h(EditableTitle, {
+        title: item.title,
+        onUpdate: onUpdate
+          ? (title: string) => onUpdate(item.id, { title })
+          : undefined,
+      }),
+    ),
+
     // Status selector
     h(
       "div",
@@ -1180,22 +1577,30 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, allItems, onUpdate, 
         : null,
     ),
 
-    // Description
-    item.description
-      ? h(
-          "div",
-          { class: "task-section" },
-          h("div", { class: "task-section-label" }, "Description"),
-          h("div", { class: "task-description" }, item.description),
-        )
-      : null,
+    // Description (editable)
+    h(
+      "div",
+      { class: "task-section" },
+      h("div", { class: "task-section-label" }, "Description"),
+      h(EditableDescription, {
+        description: item.description,
+        onUpdate: onUpdate
+          ? (description: string) => onUpdate(item.id, { description: description || undefined })
+          : undefined,
+      }),
+    ),
 
-    // Acceptance criteria
-    item.acceptanceCriteria && item.acceptanceCriteria.length > 0
+    // Acceptance criteria (editable)
+    (item.acceptanceCriteria && item.acceptanceCriteria.length > 0) || onUpdate
       ? h(
           "div",
           { class: "task-section" },
-          h(AcceptanceCriteria, { criteria: item.acceptanceCriteria }),
+          h(EditableAcceptanceCriteria, {
+            criteria: item.acceptanceCriteria ?? [],
+            onUpdate: onUpdate
+              ? (criteria: string[]) => onUpdate(item.id, { acceptanceCriteria: criteria })
+              : undefined,
+          }),
         )
       : null,
 
@@ -1209,18 +1614,26 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, allItems, onUpdate, 
             h("span", { class: "label" }, "Total Tokens"),
             h("span", { class: "task-usage-value" }, `${formatTokenCount(usageSummary.totalTokens)} tokens`),
           ),
-          h("div", { class: "task-usage-row" },
-            h("span", { class: "label" }, "Weekly Utilization"),
-            h(
-              "span",
-              { class: "task-usage-value", "data-utilization-reason": utilization.reason },
-              utilization.label,
-            ),
-          ),
-          h("div", { class: "task-usage-hint", "data-utilization-reason": utilization.reason },
-            `${usageSummary.runCount} associated run${usageSummary.runCount === 1 ? "" : "s"} | reason: ${utilization.reason}`,
+          // Budget-specific fields: weekly utilization percentage and budget reason
+          showTokenBudget
+            ? h("div", { class: "task-usage-row" },
+                h("span", { class: "label" }, "Weekly Utilization"),
+                h(
+                  "span",
+                  { class: "task-usage-value", "data-utilization-reason": utilization.reason },
+                  utilization.label,
+                ),
+              )
+            : null,
+          h("div", { class: "task-usage-hint", "data-utilization-reason": showTokenBudget ? utilization.reason : undefined },
+            `${usageSummary.runCount} associated run${usageSummary.runCount === 1 ? "" : "s"}${showTokenBudget ? ` | reason: ${utilization.reason}` : ""}`,
           ),
         )
+      : null,
+
+    // Associated hench runs (tasks/subtasks only)
+    isWorkItem(item.level)
+      ? h(HenchRunsList, { taskId: item.id, navigateTo })
       : null,
 
     // Failure reason

@@ -13,22 +13,8 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { NdxLogoPng } from "../components/logos.js";
 
-// ── Types ────────────────────────────────────────────────────────────
-
-interface FeatureToggle {
-  key: string;
-  label: string;
-  description: string;
-  impact: string;
-  package: "sourcevision" | "rex" | "hench";
-  stability: "experimental" | "stable" | "deprecated";
-  enabled: boolean;
-  defaultValue: boolean;
-}
-
-interface FeaturesResponse {
-  toggles: FeatureToggle[];
-}
+// ── Types (canonical definitions in src/schema/features.ts) ──────────
+import type { FeatureToggle, FeaturesResponse } from "../external.js";
 
 // ── Package metadata ─────────────────────────────────────────────────
 
@@ -230,6 +216,9 @@ export function FeatureTogglesView() {
       setToggles((prev) =>
         prev.map((t) => t.key === key ? { ...t, enabled } : t),
       );
+
+      // Notify other components that a toggle changed
+      window.dispatchEvent(new CustomEvent("feature-toggle-changed", { detail: { key, enabled } }));
 
       // Find the toggle label for the toast
       const toggle = toggles.find((t) => t.key === key);

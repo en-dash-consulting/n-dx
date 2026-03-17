@@ -28,6 +28,139 @@
       "text": "Low cohesion and high coupling ratios suggest this zone may need restructuring or merging",
       "acknowledgedAt": "2026-02-25T14:48:48.547Z",
       "acknowledgedBy": "user"
+    },
+    {
+      "hash": "9841b7329bfb",
+      "reason": "acknowledged",
+      "text": "Bidirectional coupling: \"rex-fix-command\" ↔ \"rex-prd-engine\" (7+1 crossings) — consider extracting shared interface",
+      "acknowledgedAt": "2026-03-11T04:36:42.336Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "3a82920140f7",
+      "reason": "acknowledged",
+      "text": "Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects",
+      "acknowledgedAt": "2026-03-11T04:36:45.342Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "1d0e54a08d36",
+      "reason": "acknowledged",
+      "text": "High coupling (0.71) — 11 imports target \"web-application-core\"",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "6bf033e52c66",
+      "reason": "acknowledged",
+      "text": "Low cohesion (0.29) — files are loosely related, consider splitting this zone",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "3444c9927280",
+      "reason": "acknowledged",
+      "text": "Cohesion of 0.29 is below the 0.4 threshold, likely because the community-detection algorithm sees the four files as loosely connected within the broader viewer graph; semantically they are tightly related around hench observability.",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "9f57492b1270",
+      "reason": "acknowledged",
+      "text": "Coupling of 0.71 exceeds the 0.6 warning threshold; the zone has no internal edges compared to its 11 outbound imports into web-viewer, making it a pure leaf consumer cluster — splitting it further would not reduce coupling.",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "067c038e5a15",
+      "reason": "acknowledged",
+      "text": "High coupling (0.75) — 7 imports target \"rex-prd-engine\"",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "a34e0938fdf4",
+      "reason": "acknowledged",
+      "text": "Low cohesion (0.25) — files are loosely related, consider splitting this zone",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "e0ad3e8dc8e0",
+      "reason": "acknowledged",
+      "text": "Coupling 0.75 reflects a thin command layer that delegates heavily to rex-unit — acceptable for a CLI shim, but the reverse edge (rex-unit → fix: 1 import) creates a bidirectional dependency that should be audited for circular risk.",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "47d44775e9bd",
+      "reason": "acknowledged",
+      "text": "Rex dogfoods its own PRD tooling by storing .rex/ state inside the package directory; this is architecturally intentional but the execution-log.jsonl committed to the repo should be gitignored to avoid noisy diffs.",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "444269ac1838",
+      "reason": "acknowledged",
+      "text": "20 entry points — wide API surface, consider consolidating exports",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "dd0dbb951483",
+      "reason": "acknowledged",
+      "text": "web-unit imports web-application-core 7 times; since routes-data.ts is a server route handler, confirm these imports are type-only (stripped at compile time) and do not introduce a runtime dependency from server routing logic into viewer modules.",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "431c220e897b",
+      "reason": "acknowledged",
+      "text": "sourcevision (domain layer) imports this web-server zone once; domain packages should not depend on web-tier modules — verify this reference is a type-only import from shared-types.ts that can be relocated to a foundation-tier package if it grows.",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "40554300e50b",
+      "reason": "acknowledged",
+      "text": "10 entry points — wide API surface, consider consolidating exports",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "2e0eee3deefc",
+      "reason": "acknowledged",
+      "text": "Add a monorepo-wide invariant test asserting that every zone with cohesion below 0.4 is either a data zone (no source files), a test fixture zone, or has an explicit waiver comment in architecture-policy.test.js. Zones currently below threshold without waivers: fix (0.25), panel (0.29). The test would prevent low-cohesion zones from silently accumulating as new files are added.",
+      "acknowledgedAt": "2026-03-11T04:36:45.343Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "7a5126bd25ef",
+      "reason": "acknowledged",
+      "text": "Bidirectional coupling: \"web-application-core\" ↔ \"web-viewer-messaging-pipeline\" (22+16 crossings) — consider extracting shared interface",
+      "acknowledgedAt": "2026-03-11T04:36:58.758Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "361496b6c9e7",
+      "reason": "acknowledged",
+      "text": "web-viewer imports 1 symbol from web-unit (a test zone) — production code acquiring a runtime dependency on a test zone is a structural boundary violation that could accidentally pull test-only utilities into the production bundle; identify the import and relocate the shared symbol to web-shared or a dedicated viewer utility module.",
+      "acknowledgedAt": "2026-03-11T04:37:08.154Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "716f1c4b51df",
+      "reason": "acknowledged",
+      "text": "routes-data.ts (server route handler, 3-file zone) imports 7 symbols from the 338-file web-application-core zone which contains viewer components; the asymmetric edge count (7 in from the small zone, 1 out from the large zone) indicates routes-data.ts is consuming viewer-side abstractions — these must be verified as type-only imports to prevent server code from acquiring a Preact runtime dependency.",
+      "acknowledgedAt": "2026-03-11T04:37:15.380Z",
+      "acknowledgedBy": "user"
+    },
+    {
+      "hash": "dd9f55cf2002",
+      "reason": "acknowledged",
+      "text": "The REQUIRED_CONTRACTS weak-match means the llm-gateway contract (packages/hench/src/prd/llm-gateway.ts, 30 functions + 10 types) is not independently verified at integration level; add a dedicated assertion block in cross-package-contracts.test.js that imports and exercises at least one symbol from the llm-gateway to close the gap the policy test currently fails to detect",
+      "acknowledgedAt": "2026-03-11T04:37:21.714Z",
+      "acknowledgedBy": "user"
     }
   ]
 }

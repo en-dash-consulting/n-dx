@@ -1,10 +1,10 @@
 /**
- * Tests for execution panel polling + WebSocket coordination via request
- * deduplication.
+ * Tests for execution panel polling + WebSocket coordination via the
+ * FetchPipeline (rate limiter → request dedup).
  *
  * Verifies that the execution panel's 3-second polling and WebSocket-triggered
  * reconciliation fetches share a single in-flight request through the
- * `createRequestDedup` wrapper, guaranteeing at most one concurrent
+ * `createFetchPipeline` wrapper, guaranteeing at most one concurrent
  * `/api/rex/execute/status` request at any time.
  *
  * Acceptance criteria:
@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createRequestDedup } from "../../../src/viewer/messaging/request-dedup.js";
+import { createFetchPipeline } from "../../../src/viewer/messaging/fetch-pipeline.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -41,30 +41,30 @@ function createControllable<T = void>() {
 
 /**
  * Simulate the execution panel's two fetch sources (polling + WS handler)
- * sharing one `RequestDedup` instance, matching the component's architecture:
+ * sharing one `FetchPipeline` instance, matching the component's architecture:
  *
- *   statusDedup = createRequestDedup(rawFetch)
- *   fetchStatus = () => statusDedup.execute()   // wrapped with try/catch
+ *   statusPipeline = createFetchPipeline(rawFetch)
+ *   fetchStatus = () => statusPipeline.execute()   // wrapped with try/catch
  *   polling     → fetchStatus() every 3s
  *   WS handler  → fetchStatus() on rex:execution-progress
  */
-function createExecutionPanelDedup<T = void>(fn: () => Promise<T>) {
-  const dedup = createRequestDedup(fn);
+function createExecutionPanelPipeline<T = void>(fn: () => Promise<T>) {
+  const pipeline = createFetchPipeline(fn, { minIntervalMs: 0 });
 
   // Mirrors the component's fetchStatus callback
   async function fetchStatus(): Promise<void> {
     try {
-      await dedup.execute();
+      await pipeline.execute();
     } catch {
       // Silently fail — mirrors component behavior
     }
   }
 
   function dispose() {
-    dedup.dispose();
+    pipeline.dispose();
   }
 
-  return { dedup, fetchStatus, dispose };
+  return { pipeline, fetchStatus, dispose };
 }
 
 // ─── Test setup ──────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ afterEach(() => {
 describe("polling respects in-flight WS requests", () => {
   it("polling call during WS-triggered in-flight request shares the same promise", async () => {
     const { fn, resolve } = createControllable();
-    const { fetchStatus, dispose } = createExecutionPanelDedup(fn.bind(null));
+    const { fetchStatus, dispose } = createExecutionPanelPipeline(fn.bind(null));
 
     // WS handler triggers a fetch
     const wsPromise = fetchStatus();
@@ -100,11 +100,11 @@ describe("polling respects in-flight WS requests", () => {
 
   it("polling waits for WS-initiated request to complete before starting fresh", async () => {
     const { fn, resolve } = createControllable();
-    const { fetchStatus, dedup, dispose } = createExecutionPanelDedup(fn.bind(null));
+    const { fetchStatus, pipeline, dispose } = createExecutionPanelPipeline(fn.bind(null));
 
     // WS handler triggers a fetch
     const wsPromise = fetchStatus();
-    expect(dedup.isInFlight()).toBe(true);
+    expect(pipeline.isInFlight()).toBe(true);
 
     // Polling fires — shares the in-flight promise
     const pollPromise = fetchStatus();
@@ -112,7 +112,7 @@ describe("polling respects in-flight WS requests", () => {
     // Complete the request
     resolve();
     await Promise.all([wsPromise, pollPromise]);
-    expect(dedup.isInFlight()).toBe(false);
+    expect(pipeline.isInFlight()).toBe(false);
 
     // Next poll starts a fresh request
     const nextPoll = fetchStatus();
@@ -128,7 +128,7 @@ describe("polling respects in-flight WS requests", () => {
 describe("WS handlers respect in-flight polling requests", () => {
   it("WS reconciliation during in-flight poll shares the same request", async () => {
     const { fn, resolve } = createControllable();
-    const { fetchStatus, dispose } = createExecutionPanelDedup(fn.bind(null));
+    const { fetchStatus, dispose } = createExecutionPanelPipeline(fn.bind(null));
 
     // Polling fires
     const pollPromise = fetchStatus();
@@ -146,11 +146,11 @@ describe("WS handlers respect in-flight polling requests", () => {
 
   it("WS handler does not block — shares the polling promise transparently", async () => {
     const { fn, resolve } = createControllable();
-    const { fetchStatus, dedup, dispose } = createExecutionPanelDedup(fn.bind(null));
+    const { fetchStatus, pipeline, dispose } = createExecutionPanelPipeline(fn.bind(null));
 
     // Polling starts
     const pollPromise = fetchStatus();
-    expect(dedup.isInFlight()).toBe(true);
+    expect(pipeline.isInFlight()).toBe(true);
 
     // Multiple WS messages arrive — all share the same in-flight request
     const ws1 = fetchStatus();
@@ -162,7 +162,7 @@ describe("WS handlers respect in-flight polling requests", () => {
 
     resolve();
     await Promise.all([pollPromise, ws1, ws2, ws3]);
-    expect(dedup.isInFlight()).toBe(false);
+    expect(pipeline.isInFlight()).toBe(false);
     dispose();
   });
 });
@@ -172,7 +172,7 @@ describe("WS handlers respect in-flight polling requests", () => {
 describe("maximum one concurrent /api/rex/execute/status request", () => {
   it("rapid interleaving of poll + WS triggers produces exactly one API call while in-flight", async () => {
     const { fn, resolve } = createControllable();
-    const { fetchStatus, dispose } = createExecutionPanelDedup(fn.bind(null));
+    const { fetchStatus, dispose } = createExecutionPanelPipeline(fn.bind(null));
 
     // Simulate rapid interleaving: poll, WS, poll, WS, poll
     const promises = [
@@ -194,14 +194,14 @@ describe("maximum one concurrent /api/rex/execute/status request", () => {
   it("after in-flight completes, the next trigger starts a fresh single request", async () => {
     let callCount = 0;
     const fn = vi.fn(async () => ++callCount);
-    const { fetchStatus, dedup, dispose } = createExecutionPanelDedup(fn);
+    const { fetchStatus, pipeline, dispose } = createExecutionPanelPipeline(fn);
 
     // Round 1: poll + WS overlap
     const p1 = fetchStatus();
     const p2 = fetchStatus();
     await Promise.all([p1, p2]);
     expect(fn).toHaveBeenCalledTimes(1);
-    expect(dedup.isInFlight()).toBe(false);
+    expect(pipeline.isInFlight()).toBe(false);
 
     // Round 2: fresh request
     await fetchStatus();
@@ -211,7 +211,7 @@ describe("maximum one concurrent /api/rex/execute/status request", () => {
 
   it("error in the shared request is received by all callers", async () => {
     const { fn, reject } = createControllable();
-    const { fetchStatus, dedup, dispose } = createExecutionPanelDedup(fn.bind(null));
+    const { fetchStatus, pipeline, dispose } = createExecutionPanelPipeline(fn.bind(null));
 
     // Both poll and WS trigger share the same request
     const pollPromise = fetchStatus();
@@ -223,7 +223,7 @@ describe("maximum one concurrent /api/rex/execute/status request", () => {
     // Both callers handle the error (fetchStatus catches silently)
     await pollPromise; // should not throw — caught internally
     await wsPromise;   // should not throw — caught internally
-    expect(dedup.isInFlight()).toBe(false);
+    expect(pipeline.isInFlight()).toBe(false);
     dispose();
   });
 
@@ -234,11 +234,11 @@ describe("maximum one concurrent /api/rex/execute/status request", () => {
       if (callCount === 1) throw new Error("transient failure");
       return callCount;
     });
-    const { fetchStatus, dedup, dispose } = createExecutionPanelDedup(fn);
+    const { fetchStatus, pipeline, dispose } = createExecutionPanelPipeline(fn);
 
     // First call fails (caught by fetchStatus)
     await fetchStatus();
-    expect(dedup.isInFlight()).toBe(false);
+    expect(pipeline.isInFlight()).toBe(false);
 
     // Second call starts fresh
     await fetchStatus();
@@ -249,31 +249,32 @@ describe("maximum one concurrent /api/rex/execute/status request", () => {
 
 // ─── 4. Cleanup ─────────────────────────────────────────────────────────────
 
-describe("dedup cleanup on unmount", () => {
+describe("pipeline cleanup on unmount", () => {
   it("dispose clears in-flight tracking state", () => {
     const { fn } = createControllable();
-    const { fetchStatus, dedup, dispose } = createExecutionPanelDedup(fn.bind(null));
+    const { fetchStatus, pipeline, dispose } = createExecutionPanelPipeline(fn.bind(null));
 
     // Start a request
     fetchStatus();
-    expect(dedup.isInFlight()).toBe(true);
+    expect(pipeline.isInFlight()).toBe(true);
 
     // Dispose (simulates component unmount cleanup)
     dispose();
-    expect(dedup.isInFlight()).toBe(false);
+    expect(pipeline.isInFlight()).toBe(false);
   });
 
-  it("after dispose, new calls to underlying dedup start fresh", () => {
+  it("after dispose, new calls to pipeline reject cleanly", async () => {
     const { fn } = createControllable();
-    const { dedup, dispose } = createExecutionPanelDedup(fn.bind(null));
+    const { pipeline, dispose } = createExecutionPanelPipeline(fn.bind(null));
 
     // Start and dispose
-    dedup.execute();
+    pipeline.execute();
     expect(fn).toHaveBeenCalledTimes(1);
     dispose();
 
-    // New call after dispose starts a fresh request
-    dedup.execute();
-    expect(fn).toHaveBeenCalledTimes(2);
+    // New call after dispose rejects (rate limiter is disposed)
+    await expect(pipeline.execute()).rejects.toThrow("disposed");
+    // Underlying fn was NOT called again
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });

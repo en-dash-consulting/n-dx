@@ -20,7 +20,7 @@ import type {
   Requirement,
   RequirementCategory,
   RequirementValidationType,
-} from "../schema/v1.js";
+} from "../schema/index.js";
 import { findItem, walkTree } from "./tree.js";
 
 // ── Collection ────────────────────────────────────────────────────

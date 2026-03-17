@@ -2,29 +2,22 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import {
+  run as runBase,
+  runResult as runResultBase,
+  createTmpDir,
+  removeTmpDir,
+  setupRexDir,
+  setupSourcevisionDir,
+} from "./e2e-helpers.js";
 
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
-
+/** Wrap helpers to prepend "ci" subcommand. */
 function run(args, opts = {}) {
-  return execFileSync("node", [CLI_PATH, "ci", ...args], {
-    encoding: "utf-8",
-    timeout: 30000,
-    ...opts,
-  });
+  return runBase(["ci", ...args], { timeout: 30000, ...opts });
 }
 
 function runResult(args) {
-  try {
-    const stdout = execFileSync("node", [CLI_PATH, "ci", ...args], {
-      encoding: "utf-8",
-      timeout: 30000,
-      stdio: "pipe",
-    });
-    return { stdout, code: 0 };
-  } catch (err) {
-    return { stdout: err.stdout || "", stderr: err.stderr || "", code: err.status };
-  }
+  return runResultBase(["ci", ...args], { timeout: 30000 });
 }
 
 /**
@@ -32,109 +25,22 @@ function runResult(args) {
  * enough for ci to validate against.
  */
 async function setupProject(dir) {
-  // .sourcevision with valid data files
-  await mkdir(join(dir, ".sourcevision"), { recursive: true });
-  await writeFile(
-    join(dir, ".sourcevision", "manifest.json"),
-    JSON.stringify({
-      schemaVersion: "1.0.0",
-      toolVersion: "0.1.0",
-      analyzedAt: new Date().toISOString(),
-      targetPath: dir,
-      modules: {
-        inventory: { status: "complete", lastRun: new Date().toISOString() },
-        imports: { status: "complete", lastRun: new Date().toISOString() },
-        zones: { status: "complete", lastRun: new Date().toISOString() },
-        components: { status: "complete", lastRun: new Date().toISOString() },
-      },
-    }),
-  );
-  await writeFile(
-    join(dir, ".sourcevision", "inventory.json"),
-    JSON.stringify({ files: [], summary: { totalFiles: 0, totalBytes: 0, languages: {} } }),
-  );
-  await writeFile(
-    join(dir, ".sourcevision", "imports.json"),
-    JSON.stringify({
-      edges: [],
-      external: {},
-      summary: { totalEdges: 0, totalExternal: 0 },
-    }),
-  );
-  await writeFile(
-    join(dir, ".sourcevision", "zones.json"),
-    JSON.stringify({
-      zones: [],
-      crossings: [],
-      unzoned: [],
-      summary: { totalZones: 0, totalFiles: 0 },
-    }),
-  );
-  await writeFile(
-    join(dir, ".sourcevision", "components.json"),
-    JSON.stringify({
-      components: [],
-      routeModules: [],
-      usageEdges: [],
-      summary: { totalComponents: 0, totalRouteModules: 0, totalUsageEdges: 0 },
-    }),
-  );
-
-  // .rex with valid config and minimal PRD
-  await mkdir(join(dir, ".rex"), { recursive: true });
-  await writeFile(
-    join(dir, ".rex", "config.json"),
-    JSON.stringify({
-      schema: "rex/v1",
-      project: "test-ci-project",
-      adapter: "file",
-      sourcevision: "auto",
-    }),
-  );
-  await writeFile(
-    join(dir, ".rex", "prd.json"),
-    JSON.stringify({
-      schema: "rex/v1",
-      title: "Test CI Project",
-      items: [
-        {
-          id: "epic-1",
-          level: "epic",
-          title: "Test Epic",
-          status: "pending",
-          priority: "medium",
-          children: [
-            {
-              id: "task-1",
-              level: "task",
-              title: "Test Task",
-              status: "completed",
-              priority: "medium",
-            },
-            {
-              id: "task-2",
-              level: "task",
-              title: "Another Task",
-              status: "pending",
-              priority: "low",
-            },
-          ],
-        },
-      ],
-    }),
-  );
+  await setupSourcevisionDir(dir);
+  await setupRexDir(dir, { project: "test-ci-project" });
+  // CI step 0 checks community files — provide CODE_OF_CONDUCT.md
+  await writeFile(join(dir, "CODE_OF_CONDUCT.md"), "# Code of Conduct\nBe kind.\n");
 }
 
 describe("n-dx ci", () => {
   let tmpDir;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), "ndx-ci-e2e-"));
+    tmpDir = await createTmpDir("ndx-ci-e2e-");
     await setupProject(tmpDir);
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await removeTmpDir(tmpDir);
   });
 
   // ── Basic execution ───────────────────────────────────────────────────────
@@ -534,11 +440,7 @@ describe("n-dx ci", () => {
 
   describe("help text", () => {
     it("shows ci in the main help", () => {
-      const output = execFileSync("node", [CLI_PATH], {
-        encoding: "utf-8",
-        timeout: 10000,
-        stdio: "pipe",
-      });
+      const output = runBase([]);
       expect(output).toContain("ci");
     });
   });

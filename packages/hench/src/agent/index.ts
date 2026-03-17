@@ -57,16 +57,17 @@ export type { AssembleBriefOptions, ActionableTask } from "./planning/brief.js";
 export { buildSystemPrompt } from "./planning/prompt.js";
 
 // ── Analysis ──
+// Re-exported from analysis barrel (review, summary, stuck, spin, adaptive, workflow)
 
-// Review gate
-export { collectReviewDiff, promptReview, revertChanges } from "./analysis/review.js";
-export type { ReviewResult, ReviewDiff } from "./analysis/review.js";
+export {
+  collectReviewDiff, promptReview, revertChanges,
+  buildRunSummary,
+  countRecentFailures, isStuckTask, getStuckTaskIds,
+} from "./analysis/index.js";
 
-// Run summary
-export { buildRunSummary } from "./analysis/summary.js";
-
-// Stuck task detection
-export { countRecentFailures, isStuckTask, getStuckTaskIds } from "./analysis/stuck.js";
+export type {
+  ReviewResult, ReviewDiff,
+} from "./analysis/index.js";
 
 // ── Validation (canonical source: ../validation/) ──
 

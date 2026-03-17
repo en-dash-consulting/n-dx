@@ -4,6 +4,7 @@ import {
   addDirectoryProximityEdges,
   louvainPhase1,
   mergeSmallCommunities,
+  mergeSatelliteCommunities,
   splitLargeCommunities,
   splitByDirectory,
 } from "../../../src/analyzers/louvain.js";
@@ -14,6 +15,7 @@ import {
   deriveZoneIdFromFilenames,
   analyzeZones,
   assignByProximity,
+  applyZonePins,
   SUBDIVISION_THRESHOLD,
 } from "../../../src/analyzers/zones.js";
 import type { Zone, ImportEdge } from "../../../src/schema/index.js";
@@ -150,21 +152,26 @@ describe("deriveZoneName", () => {
 // ── Integration: analyzeZones ───────────────────────────────────────────────
 
 describe("analyzeZones", () => {
-  it("groups root-level files into a zone via directory proximity", async () => {
+  it("groups root-level importable files into a zone via directory proximity", async () => {
     const inventory = makeInventory([
+      makeFileEntry("index.ts"),
+      makeFileEntry("config.ts"),
+      // Non-importable files (.md, .json) are excluded from zone detection
       makeFileEntry("README.md", { role: "docs" }),
       makeFileEntry("package.json", { role: "config" }),
     ]);
-    const imports = makeImports([]);
+    const imports = makeImports([
+      makeEdge("index.ts", "config.ts"),
+    ]);
 
     const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
-    // Directory proximity edges pull root-level files into the graph,
-    // forming a zone instead of leaving them unzoned
+    // Importable .ts files form a zone; non-importable files are excluded entirely
     expect(result.zones).toHaveLength(1);
     expect(result.zones[0].id).toBe("root");
     expect(result.crossings).toHaveLength(0);
-    expect(result.unzoned).toHaveLength(0);
+    expect(result.zones[0].files).not.toContain("README.md");
+    expect(result.zones[0].files).not.toContain("package.json");
   });
 
   it("detects two disconnected clusters as separate zones", async () => {
@@ -217,6 +224,23 @@ describe("analyzeZones", () => {
     expect(result.zones[0].coupling).toBe(0);
   });
 
+  it("gives cohesion=0 to multi-file zones with no import edges", async () => {
+    // Two files in the same directory but no imports between them
+    const inventory = makeInventory([
+      makeFileEntry("scripts/check-a.mjs"),
+      makeFileEntry("scripts/check-b.mjs"),
+    ]);
+    const imports = makeImports([]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+
+    // All files should land in one zone (proximity-based)
+    expect(result.zones).toHaveLength(1);
+    // No edges → cohesion should be 0, not the old default of 1
+    expect(result.zones[0].cohesion).toBe(0);
+    expect(result.zones[0].coupling).toBe(0);
+  });
+
   it("populates crossings for cross-zone edges", async () => {
     const inventory = makeInventory([
       makeFileEntry("src/a/x.ts"),
@@ -250,13 +274,16 @@ describe("analyzeZones", () => {
     }
   });
 
-  it("assigns non-import files to zones via directory proximity", async () => {
+  it("excludes non-importable files from zone proximity assignment", async () => {
     const inventory = makeInventory([
       makeFileEntry("src/m/a.ts"),
       makeFileEntry("src/m/b.ts"),
       makeFileEntry("src/m/c.ts"),
+      // Non-importable files are excluded from zone scope
       makeFileEntry("README.md", { role: "docs" }),
-      makeFileEntry(".gitignore", { role: "config" }),
+      // .gitignore has no extension — not in NON_IMPORTABLE_EXTENSIONS
+      // but also has no import edges, so it may remain unzoned
+      makeFileEntry("src/m/helper.ts"),
     ]);
     const imports = makeImports([
       makeEdge("src/m/a.ts", "src/m/b.ts"),
@@ -266,14 +293,12 @@ describe("analyzeZones", () => {
 
     const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
-    // Directory proximity edges pull non-import files into the graph,
-    // so they get assigned to zones instead of remaining unzoned
-    expect(result.unzoned).toHaveLength(0);
-    // All files should be accounted for in zones
+    // Importable .ts files should be zoned
     const allZonedFiles = result.zones.flatMap(z => z.files);
     expect(allZonedFiles).toContain("src/m/a.ts");
-    expect(allZonedFiles).toContain("README.md");
-    expect(allZonedFiles).toContain(".gitignore");
+    // Non-importable files should be excluded entirely
+    expect(allZonedFiles).not.toContain("README.md");
+    expect(result.unzoned).not.toContain("README.md");
   });
 
   it("merges communities that derive the same zone ID into one zone", async () => {
@@ -624,14 +649,14 @@ describe("directory proximity integration", () => {
     expect(ids).toEqual(["auth", "billing"]);
   });
 
-  it("reduces unzoned files by pulling import-isolated files into graph", async () => {
+  it("excludes non-importable files from zone scope entirely", async () => {
     const inventory = makeInventory([
       makeFileEntry("src/core/a.ts"),
       makeFileEntry("src/core/b.ts"),
       makeFileEntry("src/core/c.ts"),
-      // Config files with no imports — previously would be unzoned
+      // Non-importable files (.json, .md) are excluded from zone detection
       makeFileEntry("src/core/config.json", { role: "config", language: "JSON" }),
-      makeFileEntry("src/core/types.d.ts", { language: "TypeScript" }),
+      makeFileEntry("src/core/README.md", { role: "docs" }),
     ]);
     const imports = makeImports([
       makeEdge("src/core/a.ts", "src/core/b.ts"),
@@ -641,8 +666,16 @@ describe("directory proximity integration", () => {
 
     const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
-    // All files should end up zoned (either in graph or via proximity assignment)
-    expect(result.unzoned).toHaveLength(0);
+    // Non-importable files should not appear in zones or unzoned
+    const allZonedFiles = result.zones.flatMap(z => z.files);
+    expect(allZonedFiles).not.toContain("src/core/config.json");
+    expect(allZonedFiles).not.toContain("src/core/README.md");
+    expect(result.unzoned).not.toContain("src/core/config.json");
+    expect(result.unzoned).not.toContain("src/core/README.md");
+    // Importable .ts files should be zoned
+    expect(allZonedFiles).toContain("src/core/a.ts");
+    expect(allZonedFiles).toContain("src/core/b.ts");
+    expect(allZonedFiles).toContain("src/core/c.ts");
   });
 
   it("produces disambiguated zone names instead of numeric suffixes", async () => {
@@ -1013,6 +1046,51 @@ describe("assignByProximity", () => {
 
     expect(expanded[0].files).toHaveLength(6); // all assigned
     expect(remaining).toHaveLength(0);
+  });
+});
+
+// ── applyZonePins ────────────────────────────────────────────────────────────
+
+describe("applyZonePins", () => {
+  const baseZones: Zone[] = [
+    { id: "build", name: "Build", description: "", files: ["build.js", "src/a.ts", "src/b.ts"], cohesion: 0, coupling: 0 },
+    { id: "viewer", name: "Viewer", description: "", files: ["src/viewer/main.ts", "src/viewer/app.ts"], cohesion: 0, coupling: 0 },
+  ];
+
+  it("moves pinned files from source zone to target zone", () => {
+    const result = applyZonePins(baseZones, { "src/a.ts": "viewer" });
+    const build = result.find((z) => z.id === "build")!;
+    const viewer = result.find((z) => z.id === "viewer")!;
+
+    expect(build.files).not.toContain("src/a.ts");
+    expect(viewer.files).toContain("src/a.ts");
+  });
+
+  it("skips pins for files not in any zone", () => {
+    const result = applyZonePins(baseZones, { "missing.ts": "viewer" });
+    expect(result).toHaveLength(2);
+    expect(result.find((z) => z.id === "build")!.files).toHaveLength(3);
+  });
+
+  it("skips pins targeting a nonexistent zone", () => {
+    const result = applyZonePins(baseZones, { "src/a.ts": "nonexistent" });
+    expect(result.find((z) => z.id === "build")!.files).toContain("src/a.ts");
+  });
+
+  it("removes zones that become empty after pinning", () => {
+    const zones: Zone[] = [
+      { id: "tiny", name: "Tiny", description: "", files: ["only.ts"], cohesion: 0, coupling: 0 },
+      { id: "big", name: "Big", description: "", files: ["a.ts"], cohesion: 0, coupling: 0 },
+    ];
+    const result = applyZonePins(zones, { "only.ts": "big" });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("big");
+    expect(result[0].files).toContain("only.ts");
+  });
+
+  it("is a no-op when file is already in target zone", () => {
+    const result = applyZonePins(baseZones, { "src/viewer/main.ts": "viewer" });
+    expect(result.find((z) => z.id === "viewer")!.files).toHaveLength(2);
   });
 });
 
@@ -1647,6 +1725,169 @@ describe("filename-based zone IDs replace numeric suffixes", () => {
     // Should NOT have zones with numeric suffixes like src-2, src-3
     for (const zone of result.zones) {
       expect(zone.id).not.toMatch(/^src-\d+$/);
+    }
+  });
+});
+
+// ── mergeSatelliteCommunities ────────────────────────────────────────────────
+
+describe("mergeSatelliteCommunities", () => {
+  it("absorbs a small high-coupling community into its most-connected neighbor", () => {
+    // Setup: 3 communities — large A (10 nodes), large B (10 nodes), satellite S (4 nodes)
+    // S has more external edges than internal edges → high coupling
+    const community = new Map<string, string>();
+    const graph: Map<string, Map<string, number>> = new Map();
+
+    // Large community A: 10 nodes tightly connected
+    for (let i = 0; i < 10; i++) {
+      community.set(`a${i}`, "A");
+      graph.set(`a${i}`, new Map());
+    }
+    for (let i = 0; i < 9; i++) {
+      graph.get(`a${i}`)!.set(`a${i + 1}`, 1);
+      graph.get(`a${i + 1}`)!.set(`a${i}`, 1);
+    }
+
+    // Large community B: 10 nodes tightly connected
+    for (let i = 0; i < 10; i++) {
+      community.set(`b${i}`, "B");
+      graph.set(`b${i}`, new Map());
+    }
+    for (let i = 0; i < 9; i++) {
+      graph.get(`b${i}`)!.set(`b${i + 1}`, 1);
+      graph.get(`b${i + 1}`)!.set(`b${i}`, 1);
+    }
+
+    // Satellite S: 4 nodes with 1 internal edge, 3 external edges to A
+    for (let i = 0; i < 4; i++) {
+      community.set(`s${i}`, "S");
+      if (!graph.has(`s${i}`)) graph.set(`s${i}`, new Map());
+    }
+    // 1 internal edge
+    graph.get("s0")!.set("s1", 1);
+    graph.get("s1")!.set("s0", 1);
+    // 3 cross-edges to A (high coupling)
+    graph.get("s0")!.set("a0", 1);
+    graph.get("a0")!.set("s0", 1);
+    graph.get("s1")!.set("a1", 1);
+    graph.get("a1")!.set("s1", 1);
+    graph.get("s2")!.set("a2", 1);
+    graph.get("a2")!.set("s2", 1);
+
+    const result = mergeSatelliteCommunities(community, graph);
+
+    // S should be absorbed into A (its most-connected neighbor)
+    for (let i = 0; i < 4; i++) {
+      expect(result.get(`s${i}`)).toBe("A");
+    }
+    // A and B should remain unchanged
+    for (let i = 0; i < 10; i++) {
+      expect(result.get(`a${i}`)).toBe("A");
+      expect(result.get(`b${i}`)).toBe("B");
+    }
+  });
+
+  it("preserves small communities with high cohesion", () => {
+    const community = new Map<string, string>();
+    const graph: Map<string, Map<string, number>> = new Map();
+
+    // Large community A
+    for (let i = 0; i < 10; i++) {
+      community.set(`a${i}`, "A");
+      graph.set(`a${i}`, new Map());
+    }
+    for (let i = 0; i < 9; i++) {
+      graph.get(`a${i}`)!.set(`a${i + 1}`, 1);
+      graph.get(`a${i + 1}`)!.set(`a${i}`, 1);
+    }
+
+    // Small community S: 4 nodes with 6 internal edges, 1 external edge
+    // Internal edges >> external → low coupling, should NOT be merged
+    for (let i = 0; i < 4; i++) {
+      community.set(`s${i}`, "S");
+      graph.set(`s${i}`, new Map());
+    }
+    // Fully connected internally (6 edges)
+    for (let i = 0; i < 4; i++) {
+      for (let j = i + 1; j < 4; j++) {
+        graph.get(`s${i}`)!.set(`s${j}`, 1);
+        graph.get(`s${j}`)!.set(`s${i}`, 1);
+      }
+    }
+    // 1 cross-edge to A
+    graph.get("s0")!.set("a0", 1);
+    graph.get("a0")!.set("s0", 1);
+
+    const result = mergeSatelliteCommunities(community, graph);
+
+    // S should remain separate (low coupling)
+    for (let i = 0; i < 4; i++) {
+      expect(result.get(`s${i}`)).toBe("S");
+    }
+  });
+
+  it("does not merge communities exceeding maxSize", () => {
+    const community = new Map<string, string>();
+    const graph: Map<string, Map<string, number>> = new Map();
+
+    // Large community A
+    for (let i = 0; i < 10; i++) {
+      community.set(`a${i}`, "A");
+      graph.set(`a${i}`, new Map());
+    }
+
+    // Community S: exactly at maxSize=5, with high coupling
+    for (let i = 0; i < 5; i++) {
+      community.set(`s${i}`, "S");
+      graph.set(`s${i}`, new Map());
+    }
+    // Only external edges, no internal
+    for (let i = 0; i < 5; i++) {
+      graph.get(`s${i}`)!.set(`a${i}`, 1);
+      graph.get(`a${i}`)!.set(`s${i}`, 1);
+    }
+
+    // maxSize=4 → S has 5 files, should NOT be merged
+    const result = mergeSatelliteCommunities(community, graph, 4);
+
+    for (let i = 0; i < 5; i++) {
+      expect(result.get(`s${i}`)).toBe("S");
+    }
+  });
+
+  it("chooses the most-connected neighbor when multiple neighbors exist", () => {
+    const community = new Map<string, string>();
+    const graph: Map<string, Map<string, number>> = new Map();
+
+    // Community A (10 nodes)
+    for (let i = 0; i < 10; i++) {
+      community.set(`a${i}`, "A");
+      graph.set(`a${i}`, new Map());
+    }
+
+    // Community B (10 nodes)
+    for (let i = 0; i < 10; i++) {
+      community.set(`b${i}`, "B");
+      graph.set(`b${i}`, new Map());
+    }
+
+    // Satellite S: 3 nodes, 2 edges to A, 1 edge to B
+    for (let i = 0; i < 3; i++) {
+      community.set(`s${i}`, "S");
+      graph.set(`s${i}`, new Map());
+    }
+    graph.get("s0")!.set("a0", 1);
+    graph.get("a0")!.set("s0", 1);
+    graph.get("s1")!.set("a1", 1);
+    graph.get("a1")!.set("s1", 1);
+    graph.get("s2")!.set("b0", 1);
+    graph.get("b0")!.set("s2", 1);
+
+    const result = mergeSatelliteCommunities(community, graph);
+
+    // S should merge into A (2 edges) not B (1 edge)
+    for (let i = 0; i < 3; i++) {
+      expect(result.get(`s${i}`)).toBe("A");
     }
   });
 });

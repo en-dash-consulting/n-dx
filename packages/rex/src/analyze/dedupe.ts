@@ -1,5 +1,5 @@
 import type { ScanResult } from "./scanners.js";
-import { PRIORITY_ORDER } from "../schema/v1.js";
+import { PRIORITY_ORDER } from "../schema/index.js";
 
 /** Default similarity threshold for merging near-duplicates */
 const DEFAULT_THRESHOLD = 0.7;

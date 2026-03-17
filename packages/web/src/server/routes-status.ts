@@ -12,9 +12,10 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./types.js";
-import { DATA_FILES } from "../shared/data-files.js";
+import { DATA_FILES } from "../shared/index.js";
 import { computeStats, collectCompletedIds, findNextTask } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
+import { loadPRDSync } from "./prd-io.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -147,8 +148,8 @@ function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
 }
 
 function extractRexStatus(ctx: ServerContext): RexStatus {
-  const prdPath = join(ctx.rexDir, "prd.json");
-  if (!existsSync(prdPath)) {
+  const doc = loadPRDSync(ctx.rexDir);
+  if (!doc) {
     return {
       exists: false,
       percentComplete: 0,
@@ -160,7 +161,6 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
   }
 
   try {
-    const doc: PRDDocument = JSON.parse(readFileSync(prdPath, "utf-8"));
     const stats = computeStats(doc.items);
     const completedIds = collectCompletedIds(doc.items);
     const nextEntry = findNextTask(doc.items, completedIds);

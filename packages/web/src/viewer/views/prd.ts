@@ -17,7 +17,7 @@
 
 import { h, Fragment } from "preact";
 import type { VNode } from "preact";
-import { useEffect } from "preact/hooks";
+import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { PRDTree, StatusFilter } from "../components/prd-tree/index.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
 import { BulkActions } from "../components/prd-tree/bulk-actions.js";
@@ -27,12 +27,18 @@ import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.j
 import { BrandedHeader } from "../components/logos.js";
 import type { PRDDocumentData } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";
-import { useToast } from "../hooks/use-toast.js";
-import { usePRDData } from "../hooks/use-prd-data.js";
-import { usePRDWebSocket } from "../hooks/use-prd-websocket.js";
-import { usePRDActions } from "../hooks/use-prd-actions.js";
-import { usePRDDeepLink } from "../hooks/use-prd-deep-link.js";
-import { usePersistentFilter } from "../hooks/use-persistent-filter.js";
+import {
+  useToast,
+  usePRDData,
+  usePRDWebSocket,
+  usePRDActions,
+  usePRDDeepLink,
+  usePersistentFilter,
+  useFeatureToggle,
+  useFacetState,
+} from "../hooks/index.js";
+import { searchTree, collectAllTags } from "../components/prd-tree/tree-search.js";
+import { FacetFilter } from "../components/prd-tree/facet-filter.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -59,6 +65,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     fetchPRDData, fetchTaskUsage,
   } = usePRDData(prdData);
 
+  // ── Feature toggles ────────────────────────────────────────────
+  const showTokenBudget = useFeatureToggle("rex.showTokenBudget", false);
+
   // ── WebSocket real-time updates ────────────────────────────────
   usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage });
 
@@ -69,10 +78,70 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     showToast,
     onSelectItem, onDetailContent,
     taskUsageById, weeklyBudget,
+    showTokenBudget,
+    navigateTo,
   });
 
   // ── Status filter (persists across view switches) ────────────
   const { activeStatuses, setActiveStatuses } = usePersistentFilter();
+
+  // ── Inline tree search ──────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Facet filters (tags + status, URL-persisted) ──────────────
+  const {
+    activeTags, activeSearchStatuses, searchFacets,
+    setActiveTags, setActiveSearchStatuses,
+    clearFacets, hasFacets,
+  } = useFacetState();
+
+  // Collect all unique tags from the PRD for facet chip rendering
+  const availableTags = useMemo(
+    () => data ? collectAllTags(data.items) : [],
+    [data],
+  );
+
+  // Prune stale active tags that no longer exist in the PRD
+  useEffect(() => {
+    if (activeTags.size === 0) return;
+    const tagSet = new Set(availableTags);
+    const pruned = new Set<string>();
+    for (const tag of activeTags) {
+      if (tagSet.has(tag)) pruned.add(tag);
+    }
+    if (pruned.size !== activeTags.size) {
+      setActiveTags(pruned);
+    }
+  }, [availableTags, activeTags, setActiveTags]);
+
+  const searchResult = useMemo(
+    () => data ? searchTree(data.items, searchQuery, searchFacets) : null,
+    [data, searchQuery, searchFacets],
+  );
+
+  // Keyboard shortcut: Ctrl+F / Cmd+F to focus the search input
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        // Only intercept when the PRD view is rendered (data exists)
+        if (!data) return;
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [data]);
+
+  // Clear search and facets on Escape when input is focused
+  const handleSearchKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setSearchQuery("");
+      clearFacets();
+      (e.target as HTMLInputElement).blur();
+    }
+  }, [clearFacets]);
 
   // ── Deep-link resolution ───────────────────────────────────────
   const { deepLinkError, setDeepLinkError, highlightedTaskId, deepLinkExpandIds } =
@@ -86,6 +155,28 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   useEffect(() => {
     actions.syncDetailContent();
   }, [actions.syncDetailContent]);
+
+  // ── Click-outside to clear bulk selection ─────────────────────
+  // Clicks outside the `.prd-tree` container and the `.rex-bulk-bar`
+  // deselect all items.
+  useEffect(() => {
+    if (actions.bulkSelectedIds.size === 0) return;
+
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.closest(".prd-tree") ||
+        target.closest(".rex-bulk-bar") ||
+        target.closest(".merge-preview")
+      ) {
+        return;
+      }
+      actions.clearBulkSelection();
+    };
+
+    document.addEventListener("click", handler, true);
+    return () => document.removeEventListener("click", handler, true);
+  }, [actions.bulkSelectedIds.size, actions.clearBulkSelection]);
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -173,8 +264,42 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         })
       : null,
 
-    // Sticky filter bar — consolidated above the tree
+    // Sticky filter bar — search input + status filter
     h("div", { class: "prd-filter-bar" },
+      h("div", { class: "prd-search-row" },
+        h("input", {
+          ref: searchInputRef,
+          class: "prd-search-input",
+          type: "search",
+          placeholder: "Search tasks\u2026 (Ctrl+F)",
+          value: searchQuery,
+          "aria-label": "Search PRD tree",
+          onInput: (e: Event) => setSearchQuery((e.target as HTMLInputElement).value),
+          onKeyDown: handleSearchKeyDown,
+        }),
+        (searchQuery || hasFacets) && searchResult
+          ? h("span", { class: "prd-search-count", "aria-live": "polite" },
+              `${searchResult.matchCount} match${searchResult.matchCount !== 1 ? "es" : ""}`,
+            )
+          : null,
+        searchQuery || hasFacets
+          ? h("button", {
+              class: "prd-search-clear",
+              onClick: () => { setSearchQuery(""); clearFacets(); searchInputRef.current?.focus(); },
+              "aria-label": "Clear search and facets",
+              title: "Clear search and facets",
+            }, "\u00d7")
+          : null,
+      ),
+      // Facet filter chips (tags + statuses for search narrowing)
+      h(FacetFilter, {
+        availableTags,
+        activeTags,
+        activeStatuses: activeSearchStatuses,
+        onTagsChange: setActiveTags,
+        onStatusesChange: setActiveSearchStatuses,
+        onClearAll: clearFacets,
+      }),
       h(StatusFilter, { activeStatuses, onChange: setActiveStatuses }),
     ),
 
@@ -183,11 +308,12 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       document: data,
       taskUsageById,
       weeklyBudget,
+      showTokenBudget,
       defaultExpandDepth: 2,
       onSelectItem: actions.handleSelectItem,
       selectedItemId: actions.selectedItemId,
       bulkSelectedIds: actions.bulkSelectedIds,
-      onToggleBulkSelect: actions.handleToggleBulkSelect,
+      onBulkSelect: actions.handleBulkSelect,
       onInlineAddSubmit: actions.handleInlineAddItem,
       highlightedItemId: highlightedTaskId,
       deepLinkExpandIds,
@@ -195,6 +321,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       onUpdateItem: actions.handleItemUpdate,
       deletingItemId: actions.deletingItemId,
       activeStatuses,
+      searchQuery: searchQuery || undefined,
+      searchVisibleIds: searchResult?.visibleIds,
+      searchMatchIds: searchResult?.matchIds,
     }),
 
     // Bulk actions bar (floating at bottom)

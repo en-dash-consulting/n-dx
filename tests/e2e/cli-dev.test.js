@@ -1,33 +1,33 @@
+/**
+ * REQUIRED TEST — do not skip or delete.
+ *
+ * This is the single point of failure for dev-mode startup coverage.
+ * Without it, regressions in the `ndx dev` command path (prerequisite
+ * checks, help text, dev-server boot) would go undetected.
+ *
+ * If refactoring changes the dev-server startup path, update this test
+ * to match — do not remove it.
+ *
+ * CI governance: this file must not be skipped or timed out silently.
+ * The explicit timeout budget below (30 s) ensures CI kills the test
+ * deterministically rather than hanging until the global timeout.
+ *
+ * @see TESTING.md "Required Tests" section
+ * @see tests/integration/scheduler-startup.test.js — analogous required test for server boot
+ */
+
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { run, runResult, createTmpDir, removeTmpDir } from "./e2e-helpers.js";
 
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
-
-function runResult(args) {
-  try {
-    const stdout = execFileSync("node", [CLI_PATH, ...args], {
-      encoding: "utf-8",
-      timeout: 10000,
-      stdio: "pipe",
-    });
-    return { stdout, stderr: "", code: 0 };
-  } catch (err) {
-    return { stdout: err.stdout || "", stderr: err.stderr || "", code: err.status };
-  }
-}
-
-describe("n-dx dev", () => {
+describe("n-dx dev", { timeout: 30_000 }, () => {
   let tmpDir;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), "ndx-dev-e2e-"));
+    tmpDir = await createTmpDir("ndx-dev-e2e-");
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await removeTmpDir(tmpDir);
   });
 
   describe("prerequisite checks", () => {
@@ -40,11 +40,7 @@ describe("n-dx dev", () => {
 
   describe("help text", () => {
     it("shows dev command in the main help output", () => {
-      const output = execFileSync("node", [CLI_PATH], {
-        encoding: "utf-8",
-        timeout: 10000,
-        stdio: "pipe",
-      });
+      const output = run([]);
       expect(output).toContain("dev");
       expect(output).toContain("live reload");
     });

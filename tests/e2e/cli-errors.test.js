@@ -1,33 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
-import { join } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
-
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
-
-function runFail(args, cwd) {
-  try {
-    execFileSync("node", [CLI_PATH, ...args], {
-      encoding: "utf-8",
-      timeout: 10000,
-      stdio: "pipe",
-      cwd,
-    });
-    throw new Error("Expected command to fail");
-  } catch (err) {
-    if (err.message === "Expected command to fail") throw err;
-    return { stderr: err.stderr, stdout: err.stdout, status: err.status };
-  }
-}
-
-function run(args) {
-  return execFileSync("node", [CLI_PATH, ...args], {
-    encoding: "utf-8",
-    timeout: 10000,
-    stdio: "pipe",
-  });
-}
+import { run, runFail } from "./e2e-helpers.js";
 
 describe("n-dx CLI error handling", () => {
   describe("unknown commands", () => {

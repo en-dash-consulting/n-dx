@@ -2,9 +2,8 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { PRDStore } from "rex";
+import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
-import { saveRun } from "../../store/index.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { checkTokenBudget } from "./token-budget.js";
@@ -762,6 +761,284 @@ async function spawnCodex(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Accumulated retry state — bundles mutable counters across retry attempts
+// ---------------------------------------------------------------------------
+
+interface AccumulatedState {
+  turns: number;
+  toolCalls: ToolCallRecord[];
+  turnTokenUsage: TurnTokenUsage[];
+  tokenUsage: CliRunResult["tokenUsage"];
+}
+
+function createAccumulatedState(): AccumulatedState {
+  return {
+    turns: 0,
+    toolCalls: [],
+    turnTokenUsage: [],
+    tokenUsage: { input: 0, output: 0 },
+  };
+}
+
+function accumulateResult(state: AccumulatedState, result: CliRunResult): void {
+  state.turns += result.turns;
+  state.toolCalls = state.toolCalls.concat(result.toolCalls);
+  state.turnTokenUsage = state.turnTokenUsage.concat(result.turnTokenUsage);
+  state.tokenUsage = addTokenUsage(state.tokenUsage, result.tokenUsage);
+}
+
+/** Copy accumulated state into the run record. */
+function syncRunFromAccumulated(
+  run: RunRecord,
+  state: AccumulatedState,
+  attempt: number,
+): void {
+  run.turns = state.turns;
+  run.toolCalls = state.toolCalls;
+  run.tokenUsage = state.tokenUsage;
+  run.turnTokenUsage = state.turnTokenUsage;
+  run.retryAttempts = attempt > 0 ? attempt : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// CLI arg construction (platform-aware)
+// ---------------------------------------------------------------------------
+
+interface ClaudeCliInput {
+  systemPrompt: string;
+  promptText: string;
+  allowedTools: string[];
+  modelOverride?: string;
+}
+
+/**
+ * Build the Claude CLI args and stdin content.
+ * Handles Windows cmd.exe escaping quirks.
+ */
+function buildClaudeCliArgs(input: ClaudeCliInput): { args: string[]; stdinContent: string } {
+  const isWindows = process.platform === "win32";
+
+  // On Windows, cmd.exe can't handle multi-line strings or special chars
+  // like ( ) & | in CLI args. Embed system prompt in stdin instead.
+  const stdinContent = isWindows
+    ? `${input.systemPrompt}\n\n---\n\n${input.promptText}`
+    : input.promptText;
+
+  const args = [
+    "-p",  // print mode; prompt is read from stdin
+    "--output-format", "stream-json",
+    "--verbose",
+    ...(isWindows ? [] : ["--system-prompt", input.systemPrompt]),
+    "--allowed-tools",
+    // On Windows: join as a single comma-separated arg wrapped in cmd.exe quotes.
+    // Bash(cmd:*) patterns contain ( ) which are special to cmd.exe without quoting.
+    ...(isWindows ? [`"${input.allowedTools.join(",")}"`] : input.allowedTools),
+    ...(input.modelOverride ? ["--model", input.modelOverride] : []),
+  ];
+
+  return { args, stdinContent };
+}
+
+// ---------------------------------------------------------------------------
+// Vendor dispatch — choose between Claude and Codex CLI
+// ---------------------------------------------------------------------------
+
+interface VendorDispatchOptions {
+  vendor: LLMVendor;
+  systemPrompt: string;
+  promptText: string;
+  allowedTools: string[];
+  projectDir: string;
+  tokenMetadata: TokenEventMetadata;
+  cliBinary: string;
+  cliEnv?: NodeJS.ProcessEnv;
+  modelOverride?: string;
+}
+
+async function dispatchVendorSpawn(opts: VendorDispatchOptions): Promise<CliRunResult> {
+  if (opts.vendor === "codex") {
+    return spawnCodex(
+      `SYSTEM:\n${opts.systemPrompt}\n\nTASK:\n${opts.promptText}`,
+      opts.projectDir,
+      opts.modelOverride,
+      opts.tokenMetadata,
+      opts.cliBinary,
+      opts.cliEnv,
+    );
+  }
+
+  const { args, stdinContent } = buildClaudeCliArgs({
+    systemPrompt: opts.systemPrompt,
+    promptText: opts.promptText,
+    allowedTools: opts.allowedTools,
+    modelOverride: opts.modelOverride,
+  });
+
+  return spawnClaude(
+    args,
+    stdinContent,
+    opts.projectDir,
+    opts.tokenMetadata,
+    opts.cliBinary,
+    opts.cliEnv,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Successful result processing — spin detection, validation, budget, review
+// ---------------------------------------------------------------------------
+
+/** Return value from processSuccessfulResult indicating whether the loop should break. */
+type SuccessAction = "break" | "continue";
+
+interface SuccessContext {
+  run: RunRecord;
+  result: CliRunResult;
+  accumulated: AccumulatedState;
+  attempt: number;
+  store: PRDStore;
+  taskId: string;
+  projectDir: string;
+  startingHead: string | undefined;
+  testCommand?: string;
+  tokenBudget?: number;
+  review?: boolean;
+  selfHeal?: boolean;
+}
+
+/**
+ * Process a CLI result that completed without a process-level error.
+ * Handles spin detection, completion validation, budget checks, and review gating.
+ */
+async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessAction> {
+  const { run, result, accumulated, attempt, store, taskId, projectDir } = ctx;
+
+  // Post-run spin detection: many turns with zero tool calls
+  if (isSpinningRun(result.turns, result.toolCalls.length)) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "failed";
+    run.error = `Agent spin detected: ${result.turns} turns with 0 tool calls.`;
+    info(`\n${run.error}`);
+    await handleRunFailure(store, taskId, "deferred", "spin_detected", run.error);
+    return "break";
+  }
+
+  // Validate completion: require meaningful changes
+  const validation = await validateCompletion(projectDir, {
+    testCommand: ctx.testCommand,
+    startingHead: ctx.startingHead,
+    selfHeal: ctx.selfHeal,
+  });
+
+  syncRunFromAccumulated(run, accumulated, attempt);
+
+  // Post-run token budget check (CLI provider can only check after run)
+  const budgetCheck = checkTokenBudget(run.tokenUsage, ctx.tokenBudget);
+  if (budgetCheck.exceeded) {
+    run.status = "budget_exceeded";
+    run.summary = result.summary;
+    run.error = `Token budget exceeded: ${budgetCheck.totalUsed} used of ${budgetCheck.budget} budget`;
+    info(`\n${run.error}`);
+    await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
+    return "break";
+  }
+
+  if (validation.valid) {
+    // Review gate
+    if (ctx.review) {
+      const reviewGate = await runReviewGate(projectDir, store, taskId, run);
+      if (reviewGate.rejected) {
+        run.summary = result.summary;
+        return "break";
+      }
+    }
+
+    // Success
+    run.status = "completed";
+    run.summary = result.summary;
+    await toolRexUpdateStatus(store, taskId, { status: "completed" });
+    await toolRexAppendLog(store, taskId, {
+      event: "task_completed",
+      detail: run.summary,
+    });
+  } else {
+    // Completion rejected — no meaningful changes
+    run.status = "failed";
+    run.summary = result.summary;
+    run.error = validation.reason;
+    info(`\nCompletion rejected: ${validation.reason}`);
+    info(formatValidationResult(validation));
+    await handleRunFailure(store, taskId, "pending", "completion_rejected", formatValidationResult(validation));
+  }
+
+  return "break";
+}
+
+// ---------------------------------------------------------------------------
+// Error result processing — transient vs non-transient
+// ---------------------------------------------------------------------------
+
+/** Return value from processErrorResult indicating whether the loop should break. */
+type ErrorAction = "break" | "retry";
+
+interface ErrorContext {
+  run: RunRecord;
+  result: CliRunResult;
+  accumulated: AccumulatedState;
+  attempt: number;
+  store: PRDStore;
+  taskId: string;
+  retryConfig: RetryConfig;
+}
+
+/**
+ * Process a CLI result that completed with a process-level error.
+ * Classifies as transient (retry with backoff) or permanent (fail immediately).
+ */
+async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
+  const { run, result, accumulated, attempt, store, taskId, retryConfig } = ctx;
+
+  if (!isTransientError(result.error!)) {
+    // Non-transient error: fail immediately
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "failed";
+    run.summary = result.summary;
+    run.error = result.error;
+    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error!);
+    return "break";
+  }
+
+  // Transient error — log and decide whether to retry or give up
+  await toolRexAppendLog(store, taskId, {
+    event: "transient_error",
+    detail: `Attempt ${attempt + 1}: ${result.error}`,
+  });
+
+  if (attempt < retryConfig.maxRetries) {
+    const delay = computeDelay(attempt, retryConfig.baseDelayMs, retryConfig.maxDelayMs);
+    info(`Transient error on attempt ${attempt + 1}, retrying in ${delay}ms...`);
+    await sleep(delay);
+    return "retry";
+  }
+
+  // Retries exhausted
+  syncRunFromAccumulated(run, accumulated, attempt);
+  run.status = "error_transient";
+  run.summary = result.summary;
+  run.error = result.error;
+
+  await handleRunFailure(
+    store, taskId, "pending", "task_transient_exhausted",
+    `All ${retryConfig.maxRetries + 1} attempts failed with transient errors. Last: ${result.error}`,
+  );
+  return "break";
+}
+
+// ---------------------------------------------------------------------------
+// Main CLI loop — orchestrates brief → spawn → result processing
+// ---------------------------------------------------------------------------
+
 export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const { config, store, projectDir, henchDir, dryRun } = opts;
   const model = opts.model ?? config.model;
@@ -815,12 +1092,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // CLI-specific: build --allowed-tools from guard config
   const allowedTools = buildAllowedTools(config.guard.allowedCommands);
-
-  let accumulatedTurns = 0;
-  let accumulatedToolCalls: ToolCallRecord[] = [];
-  let accumulatedTurnTokenUsage: TurnTokenUsage[] = [];
-  let accumulatedTokenUsage: CliRunResult["tokenUsage"] = { input: 0, output: 0 };
-  let lastError: string | undefined;
+  const accumulated = createAccumulatedState();
+  const tokenMetadata: TokenEventMetadata = { vendor, model: eventModel };
 
   // Start heartbeat — writes lastActivityAt to disk periodically so the CLI
   // subprocess doesn't appear stale to the web dashboard during long tool calls.
@@ -830,182 +1103,49 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
       const promptText = attempt === 0
         ? briefText
-        : briefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulatedTurns);
-
-      // On Windows, cmd.exe (used by shell:true) can't handle multi-line strings
-      // or special chars like ( ) & | in CLI args. Work around by:
-      //   1. Passing the prompt via stdin instead of as a positional arg
-      //   2. Embedding the system prompt in stdin content (no --system-prompt arg)
-      //   3. Joining allowed-tools as a comma-separated string (avoids Bash(cmd:*) parens issue)
-      const isWindows = process.platform === "win32";
-      const stdinContent = isWindows
-        ? `${systemPrompt}\n\n---\n\n${promptText}`
-        : promptText;
-
-      const args = [
-        "-p",  // print mode; prompt is read from stdin
-        "--output-format", "stream-json",
-        "--verbose",
-        // On Windows: system-prompt is embedded in stdin to avoid cmd.exe multiline/escaping issues.
-        // On other platforms: pass normally.
-        ...(isWindows ? [] : ["--system-prompt", systemPrompt]),
-        "--allowed-tools",
-        // On Windows: join as a single comma-separated arg wrapped in cmd.exe quotes.
-        // Bash(cmd:*) patterns contain ( ) which are special to cmd.exe without quoting.
-        ...(isWindows ? [`"${allowedTools.join(",")}"`] : allowedTools),
-        ...(opts.model ? ["--model", opts.model] : []),
-      ];
+        : briefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns);
 
       section(`Agent Run${opts.model ? ` (${opts.model})` : ""}${attempt > 0 ? ` (retry ${attempt}/${retryConfig.maxRetries})` : ""}`);
       stream("CLI", `Spawning ${vendor}${opts.model ? ` (model: ${opts.model})` : ""}...`);
 
-      const result = vendor === "codex"
-        ? await spawnCodex(
-          `SYSTEM:\n${systemPrompt}\n\nTASK:\n${promptText}`,
-          projectDir,
-          opts.model,
-          { vendor, model: eventModel },
-          cliBinary,
-          cliEnv,
-        )
-        : await spawnClaude(
-          args,
-          stdinContent,
-          projectDir,
-          { vendor, model: eventModel },
-          cliBinary,
-          cliEnv,
-        );
-
-      accumulatedTurns += result.turns;
-      accumulatedToolCalls = accumulatedToolCalls.concat(result.toolCalls);
-      accumulatedTurnTokenUsage = accumulatedTurnTokenUsage.concat(result.turnTokenUsage);
-      accumulatedTokenUsage = addTokenUsage(accumulatedTokenUsage, result.tokenUsage);
-
-      // Post-run spin detection: many turns with zero tool calls
-      if (isSpinningRun(result.turns, result.toolCalls.length) && !result.error) {
-        run.turns = accumulatedTurns;
-        run.toolCalls = accumulatedToolCalls;
-        run.tokenUsage = accumulatedTokenUsage;
-        run.turnTokenUsage = accumulatedTurnTokenUsage;
-        run.status = "failed";
-        run.error = `Agent spin detected: ${result.turns} turns with 0 tool calls.`;
-        run.retryAttempts = attempt > 0 ? attempt : undefined;
-        info(`\n${run.error}`);
-        await handleRunFailure(store, taskId, "deferred", "spin_detected", run.error);
-        break;
-      }
-
-      if (!result.error) {
-        // Validate completion: require meaningful changes
-        const validation = await validateCompletion(projectDir, {
-          testCommand: brief.project.testCommand,
-          startingHead,
-        });
-
-        run.turns = accumulatedTurns;
-        run.toolCalls = accumulatedToolCalls;
-        run.tokenUsage = accumulatedTokenUsage;
-        run.turnTokenUsage = accumulatedTurnTokenUsage;
-        run.retryAttempts = attempt > 0 ? attempt : undefined;
-
-        // Post-run token budget check (CLI provider can only check after run)
-        const budgetCheck = checkTokenBudget(run.tokenUsage, config.tokenBudget);
-        if (budgetCheck.exceeded) {
-          run.status = "budget_exceeded";
-          run.summary = result.summary;
-          run.error = `Token budget exceeded: ${budgetCheck.totalUsed} used of ${budgetCheck.budget} budget`;
-
-          info(`\n${run.error}`);
-
-          await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
-          break;
-        }
-
-        if (validation.valid) {
-          // Shared: review gate
-          if (opts.review) {
-            const reviewGate = await runReviewGate(projectDir, store, taskId, run);
-            if (reviewGate.rejected) {
-              run.summary = result.summary;
-              break;
-            }
-          }
-
-          // Success
-          run.status = "completed";
-          run.summary = result.summary;
-
-          await toolRexUpdateStatus(store, taskId, { status: "completed" });
-          await toolRexAppendLog(store, taskId, {
-            event: "task_completed",
-            detail: run.summary,
-          });
-        } else {
-          // Completion rejected — no meaningful changes
-          run.status = "failed";
-          run.summary = result.summary;
-          run.error = validation.reason;
-
-          info(`\nCompletion rejected: ${validation.reason}`);
-          info(formatValidationResult(validation));
-
-          await handleRunFailure(store, taskId, "pending", "completion_rejected", formatValidationResult(validation));
-        }
-        break;
-      }
-
-      // Error path — check if transient
-      lastError = result.error;
-
-      if (!isTransientError(result.error)) {
-        // Non-transient error: fail immediately
-        run.turns = accumulatedTurns;
-        run.toolCalls = accumulatedToolCalls;
-        run.tokenUsage = accumulatedTokenUsage;
-        run.turnTokenUsage = accumulatedTurnTokenUsage;
-        run.status = "failed";
-        run.summary = result.summary;
-        run.error = result.error;
-        run.retryAttempts = attempt > 0 ? attempt : undefined;
-
-        await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
-        break;
-      }
-
-      // Transient error
-      await toolRexAppendLog(store, taskId, {
-        event: "transient_error",
-        detail: `Attempt ${attempt + 1}: ${result.error}`,
+      const result = await dispatchVendorSpawn({
+        vendor,
+        systemPrompt,
+        promptText,
+        allowedTools,
+        projectDir,
+        tokenMetadata,
+        cliBinary,
+        cliEnv,
+        modelOverride: opts.model,
       });
 
-      if (attempt < retryConfig.maxRetries) {
-        const delay = computeDelay(attempt, retryConfig.baseDelayMs, retryConfig.maxDelayMs);
-        info(`Transient error on attempt ${attempt + 1}, retrying in ${delay}ms...`);
-        await sleep(delay);
-      } else {
-        // Retries exhausted
-        run.turns = accumulatedTurns;
-        run.toolCalls = accumulatedToolCalls;
-        run.tokenUsage = accumulatedTokenUsage;
-        run.turnTokenUsage = accumulatedTurnTokenUsage;
-        run.status = "error_transient";
-        run.summary = result.summary;
-        run.error = result.error;
-        run.retryAttempts = attempt;
+      accumulateResult(accumulated, result);
 
-        // Revert to pending so it gets auto-picked next run
-        await handleRunFailure(
-          store, taskId, "pending", "task_transient_exhausted",
-          `All ${retryConfig.maxRetries + 1} attempts failed with transient errors. Last: ${result.error}`,
-        );
+      if (!result.error) {
+        const action = await processSuccessfulResult({
+          run, result, accumulated, attempt,
+          store, taskId, projectDir, startingHead,
+          testCommand: brief.project.testCommand,
+          tokenBudget: config.tokenBudget,
+          review: opts.review,
+          selfHeal: config.selfHeal,
+        });
+        if (action === "break") break;
+      } else {
+        const action = await processErrorResult({
+          run, result, accumulated, attempt,
+          store, taskId, retryConfig,
+        });
+        if (action === "break") break;
+        // action === "retry" → continue loop
       }
     }
   } catch (err) {
     run.status = "failed";
     run.error = (err as Error).message;
-    run.turns = accumulatedTurns;
-    run.toolCalls = accumulatedToolCalls;
+    run.turns = accumulated.turns;
+    run.toolCalls = accumulated.toolCalls;
     console.error(`[Error] ${run.error}`);
 
     await toolRexAppendLog(store, taskId, {

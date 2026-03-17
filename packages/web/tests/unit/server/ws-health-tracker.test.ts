@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { WsHealthTracker } from "../../../src/server/ws-health-tracker.js";
+import { WsHealthTracker } from "../../../src/server/websocket.js";
 
 describe("WsHealthTracker", () => {
   let tracker: WsHealthTracker;

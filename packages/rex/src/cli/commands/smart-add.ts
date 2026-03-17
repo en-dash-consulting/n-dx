@@ -1,5 +1,6 @@
 import { join, resolve } from "node:path";
-import { access, writeFile, readFile, unlink } from "node:fs/promises";
+import { access, readFile, unlink } from "node:fs/promises";
+import { atomicWriteJSON } from "../../store/atomic-write.js";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
@@ -23,6 +24,7 @@ import type { Proposal, QualityIssue } from "../../analyze/index.js";
 import { CHILD_LEVEL, PRIORITY_ORDER, LOE_DEFAULTS } from "../../schema/index.js";
 import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
+import { hashPRD } from "../../core/pending-cache.js";
 import {
   matchProposalNodesToPRD,
   attachDuplicateReasonsToProposals,
@@ -462,11 +464,13 @@ export async function applyDuplicateProposalMerges(
 ): Promise<{
   mergedCount: number;
   mergeTargetsByNodeKey: Record<string, string>;
+  reopenedItemIds: string[];
 }> {
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
   const proposalNodeIndex = buildMergeableProposalNodeIndex(proposals);
   const mergeTargetsByNodeKey: Record<string, string> = {};
+  const reopenedItemIds: string[] = [];
   const mergedAt = new Date().toISOString();
   let mergedCount = 0;
 
@@ -481,6 +485,14 @@ export async function applyDuplicateProposalMerges(
     if (!existing) continue;
 
     const updates: Partial<ItemWithMergedProposals> = {};
+
+    // Reset completed items that receive new merged content
+    if (existing.status === "completed") {
+      updates.status = "pending";
+      updates.completedAt = undefined;
+      reopenedItemIds.push(existing.id);
+    }
+
     const nextDescription = mergeDescription(existing.description, proposalNode.description);
     if (nextDescription !== existing.description) {
       updates.description = nextDescription;
@@ -529,7 +541,7 @@ export async function applyDuplicateProposalMerges(
     }
   }
 
-  return { mergedCount, mergeTargetsByNodeKey };
+  return { mergedCount, mergeTargetsByNodeKey, reopenedItemIds };
 }
 
 /**
@@ -626,8 +638,12 @@ export function classifySmartAddError(
   const hasInvalidApiKey = /invalid.*api.*key/i.test(err.message);
   llmDebug(`classify error vendor=${vendor} mode=${mode} message="${err.message}"`);
 
-  // Authentication issues
-  if (msg.includes("401") || msg.includes("unauthorized") || hasInvalidApiKey || msg.includes("authentication")) {
+  // Authentication issues — match HTTP status codes and specific API error patterns,
+  // not generic words like "authentication" which may appear in user input descriptions.
+  const isAuthError = /\b401\b/.test(msg) || hasInvalidApiKey
+    || /authentication.*(fail|error|invalid|expired)/i.test(err.message)
+    || /unauthorized.*(request|access|error)/i.test(err.message);
+  if (isAuthError) {
     if (vendor === "codex") {
       return {
         message: "Authentication failed — Codex CLI credentials were rejected.",
@@ -641,7 +657,7 @@ export function classifySmartAddError(
   }
 
   // Rate limiting
-  if (msg.includes("429") || msg.includes("rate limit") || msg.includes("too many requests")) {
+  if (/\b429\b/.test(msg) || msg.includes("rate limit") || msg.includes("too many requests")) {
     return {
       message: "Rate limit exceeded — the API is temporarily throttling requests.",
       suggestion: "Wait a few minutes and try again, or use a different model with --model.",
@@ -683,7 +699,7 @@ export function classifySmartAddError(
   }
 
   // Overloaded / server errors
-  if (msg.includes("529") || msg.includes("503") || msg.includes("overloaded") || msg.includes("server error") || msg.includes("500")) {
+  if (/\b(529|503|500)\b/.test(msg) || msg.includes("overloaded") || msg.includes("server error")) {
     return {
       message: "The API is temporarily overloaded or experiencing errors.",
       suggestion: "Wait a moment and retry. Consider using a different model with --model.",
@@ -705,18 +721,19 @@ async function savePending(
   dir: string,
   proposals: Proposal[],
   parentId?: string,
+  prdHash?: string,
 ): Promise<void> {
   const filePath = join(dir, REX_DIR, PENDING_FILE);
-  await writeFile(filePath, JSON.stringify({ proposals, parentId }, null, 2));
+  await atomicWriteJSON(filePath, { proposals, parentId, prdHash });
 }
 
 async function loadPending(
   dir: string,
-): Promise<{ proposals: Proposal[]; parentId?: string } | null> {
+): Promise<{ proposals: Proposal[]; parentId?: string; prdHash?: string } | null> {
   const filePath = join(dir, REX_DIR, PENDING_FILE);
   try {
     const raw = await readFile(filePath, "utf-8");
-    return JSON.parse(raw) as { proposals: Proposal[]; parentId?: string };
+    return JSON.parse(raw) as { proposals: Proposal[]; parentId?: string; prdHash?: string };
   } catch {
     return null;
   }
@@ -762,6 +779,21 @@ export function formatQualityWarnings(issues: QualityIssue[]): string {
   return lines.join("\n");
 }
 
+/**
+ * Validate that a merge target exists and has the expected level.
+ * Returns the merge target ID if valid, or undefined to fall back to creation.
+ */
+async function validateMergeTarget(
+  store: Awaited<ReturnType<typeof resolveStore>>,
+  mergeTargetId: string | undefined,
+  expectedLevel: ItemLevel,
+): Promise<string | undefined> {
+  if (!mergeTargetId) return undefined;
+  const item = await store.getItem(mergeTargetId);
+  if (!item || item.level !== expectedLevel) return undefined;
+  return mergeTargetId;
+}
+
 async function acceptProposals(
   dir: string,
   proposals: Proposal[],
@@ -770,6 +802,7 @@ async function acceptProposals(
     overrideMarkersByNodeKey?: Record<string, DuplicateOverrideMarker>;
     mergeTargetsByNodeKey?: Record<string, string>;
     mergedCount?: number;
+    reopenedItemIds?: string[];
   } = {},
 ): Promise<number> {
   const {
@@ -777,18 +810,25 @@ async function acceptProposals(
     overrideMarkersByNodeKey,
     mergeTargetsByNodeKey,
     mergedCount = 0,
+    reopenedItemIds = [],
   } = options;
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
   const parentLevel = await resolveParentLevel(dir, parentId);
 
   let addedCount = 0;
+  // Track newly created container IDs so we can clean up empty ones after merges
+  const newContainerIds: string[] = [];
+  // Track existing containers reused via existingId so we cascade-reset them
+  const reusedContainerIds: string[] = [];
 
   for (let pIdx = 0; pIdx < proposals.length; pIdx++) {
     const p = proposals[pIdx];
     if (!parentId) {
       // No parent — create a new top-level epic (or reuse existing via existingId)
-      const epicMergeTarget = mergeTargetsByNodeKey?.[`p${pIdx}:epic`];
+      const epicMergeTarget = await validateMergeTarget(
+        store, mergeTargetsByNodeKey?.[`p${pIdx}:epic`], "epic",
+      );
       let epicId = epicMergeTarget ?? randomUUID();
       const epicMarker = overrideMarkersByNodeKey?.[`p${pIdx}:epic`];
 
@@ -801,6 +841,7 @@ async function acceptProposals(
         if (existing) {
           epicId = epicExistingRef;
           epicReused = true;
+          reusedContainerIds.push(epicExistingRef);
           // Update title if the LLM expanded the scope
           if (p.epic.title && p.epic.title !== existing.item.title) {
             await store.updateItem(epicExistingRef, { title: p.epic.title });
@@ -819,12 +860,15 @@ async function acceptProposals(
           ...(epicMarker ? { overrideMarker: epicMarker } : {}),
         });
         addedCount++;
+        newContainerIds.push(epicId);
       }
 
       for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
         const f = p.features[fIdx];
         const featureKey = `p${pIdx}:feature:${fIdx}`;
-        const featureMergeTarget = mergeTargetsByNodeKey?.[featureKey];
+        const featureMergeTarget = await validateMergeTarget(
+          store, mergeTargetsByNodeKey?.[featureKey], "feature",
+        );
         let featureId = featureMergeTarget ?? randomUUID();
         const featureMarker = overrideMarkersByNodeKey?.[`p${pIdx}:feature:${fIdx}`];
 
@@ -837,6 +881,7 @@ async function acceptProposals(
           if (existing) {
             featureId = featureExistingRef;
             featureReused = true;
+            reusedContainerIds.push(featureExistingRef);
             if (f.title && f.title !== existing.item.title) {
               await store.updateItem(featureExistingRef, { title: f.title });
             }
@@ -857,12 +902,16 @@ async function acceptProposals(
             epicId,
           );
           addedCount++;
+          newContainerIds.push(featureId);
         }
 
         for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
           const t = f.tasks[tIdx];
           const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMergeTarget = await validateMergeTarget(
+            store, mergeTargetsByNodeKey?.[taskKey], "task",
+          );
+          if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
@@ -887,7 +936,9 @@ async function acceptProposals(
       for (let fIdx = 0; fIdx < p.features.length; fIdx++) {
         const f = p.features[fIdx];
         const featureKey = `p${pIdx}:feature:${fIdx}`;
-        const featureMergeTarget = mergeTargetsByNodeKey?.[featureKey];
+        const featureMergeTarget = await validateMergeTarget(
+          store, mergeTargetsByNodeKey?.[featureKey], "feature",
+        );
         const featureId = featureMergeTarget ?? randomUUID();
         const featureMarker = overrideMarkersByNodeKey?.[`p${pIdx}:feature:${fIdx}`];
         if (!featureMergeTarget) {
@@ -904,12 +955,16 @@ async function acceptProposals(
             parentId,
           );
           addedCount++;
+          newContainerIds.push(featureId);
         }
 
         for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
           const t = f.tasks[tIdx];
           const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMergeTarget = await validateMergeTarget(
+            store, mergeTargetsByNodeKey?.[taskKey], "task",
+          );
+          if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
@@ -937,7 +992,10 @@ async function acceptProposals(
         for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
           const t = f.tasks[tIdx];
           const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMergeTarget = await validateMergeTarget(
+            store, mergeTargetsByNodeKey?.[taskKey], "task",
+          );
+          if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
@@ -964,7 +1022,10 @@ async function acceptProposals(
         for (let tIdx = 0; tIdx < f.tasks.length; tIdx++) {
           const t = f.tasks[tIdx];
           const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;
-          if (mergeTargetsByNodeKey?.[taskKey]) continue;
+          const taskMergeTarget = await validateMergeTarget(
+            store, mergeTargetsByNodeKey?.[taskKey], "subtask",
+          );
+          if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
           await store.addItem(
             {
@@ -987,8 +1048,47 @@ async function acceptProposals(
     }
   }
 
+  // Clean up empty containers created during this operation.
+  // When all children of a proposed epic/feature were merged with existing items,
+  // the parent container was still created but has no children — remove it.
+  // Process bottom-up (features before epics) so epic cleanup sees the final state.
+  if (newContainerIds.length > 0) {
+    // Partition into features (remove first) and epics (remove second)
+    const featureIds: string[] = [];
+    const epicIds: string[] = [];
+    {
+      const doc = await store.loadDocument();
+      for (const id of newContainerIds) {
+        const entry = findItem(doc.items, id);
+        if (!entry) continue;
+        if (entry.item.level === "feature") featureIds.push(id);
+        else epicIds.push(id);
+      }
+    }
+    // Remove childless features first, then childless epics
+    for (const containerId of [...featureIds, ...epicIds]) {
+      const doc = await store.loadDocument();
+      const entry = findItem(doc.items, containerId);
+      if (!entry) continue;
+      if ((entry.item.children ?? []).length === 0) {
+        await store.removeItem(containerId);
+        addedCount--;
+      }
+    }
+  }
+
   // Reset completed ancestors when adding under a completed parent
   await cascadeParentReset(store, parentId);
+
+  // Reset completed reused containers (existingId) and their ancestors
+  for (const id of reusedContainerIds) {
+    await cascadeParentReset(store, id);
+  }
+
+  // Cascade-reset reopened merge targets and their ancestors
+  for (const id of reopenedItemIds) {
+    await cascadeParentReset(store, id);
+  }
 
   const overrideCount = overrideMarkersByNodeKey
     ? Object.keys(overrideMarkersByNodeKey).length
@@ -1060,6 +1160,20 @@ async function replayCachedIfRequested(
   }
   const cached = await loadPending(dir);
   if (!cached || cached.proposals.length === 0) return false;
+
+  // Staleness detection: compare current PRD hash with cached hash
+  if (cached.prdHash) {
+    const rexDir = join(dir, REX_DIR);
+    const store = await resolveStore(rexDir);
+    const doc = await store.loadDocument();
+    const currentHash = hashPRD(doc.items);
+    if (currentHash !== cached.prdHash) {
+      warn("PRD has changed since proposals were generated");
+      await clearPending(dir);
+      return false;
+    }
+  }
+
   info(`Accepting ${cached.proposals.length} cached proposal(s)...`);
   const added = await acceptProposals(dir, cached.proposals, { parentId: cached.parentId });
   result(`Added ${added} items to PRD.`);
@@ -1220,9 +1334,10 @@ async function maybeCacheSmartAddProposals(
   dir: string,
   proposals: Proposal[],
   parentId?: string,
+  prdHash?: string,
 ): Promise<void> {
   if (await hasRexDir(dir)) {
-    await savePending(dir, proposals, parentId);
+    await savePending(dir, proposals, parentId, prdHash);
   }
 }
 
@@ -1292,7 +1407,7 @@ async function runInteractiveSmartAddApproval(params: {
             matchProposalNodesToPRD(currentProposals, existing),
             currentProposals,
           );
-          await maybeCacheSmartAddProposals(dir, currentProposals, parentId);
+          await maybeCacheSmartAddProposals(dir, currentProposals, parentId, hashPRD(existing));
         } else {
           adjSpinner.stop("LLM returned no proposals. Original proposals unchanged.");
         }
@@ -1310,6 +1425,7 @@ async function runInteractiveSmartAddApproval(params: {
       let overrideMarkersByNodeKey: Record<string, DuplicateOverrideMarker> | undefined;
       let mergeTargetsByNodeKey: Record<string, string> | undefined;
       let mergedCount = 0;
+      let reopenedItemIds: string[] = [];
       if (hasDuplicateMatches(currentDuplicateMatches)) {
         info("Duplicate matches were detected in the selected proposals.");
         info("Choose action: c=cancel / m=merge with existing / p=proceed anyway");
@@ -1323,6 +1439,7 @@ async function runInteractiveSmartAddApproval(params: {
           );
           mergeTargetsByNodeKey = mergeResult.mergeTargetsByNodeKey;
           mergedCount = mergeResult.mergedCount;
+          reopenedItemIds = mergeResult.reopenedItemIds;
         }
         if (duplicateDecision === "cancel") {
           info("Cancelled. No items were created.");
@@ -1342,6 +1459,7 @@ async function runInteractiveSmartAddApproval(params: {
         overrideMarkersByNodeKey,
         mergeTargetsByNodeKey,
         mergedCount,
+        reopenedItemIds,
       });
       if (mergedCount > 0) {
         result(`Merged ${mergedCount} duplicate node(s) and added ${added} new item(s) to PRD.`);
@@ -1369,6 +1487,7 @@ async function runInteractiveSmartAddApproval(params: {
     let overrideMarkersByNodeKey: Record<string, DuplicateOverrideMarker> | undefined;
     let mergeTargetsByNodeKey: Record<string, string> | undefined;
     let mergedCount = 0;
+    let reopenedItemIds: string[] = [];
     let usedMergeDecision = false;
     if (hasDuplicateMatches(selectedMatches)) {
       info("Duplicate matches were detected in the selected proposals.");
@@ -1383,6 +1502,7 @@ async function runInteractiveSmartAddApproval(params: {
         );
         mergeTargetsByNodeKey = mergeResult.mergeTargetsByNodeKey;
         mergedCount = mergeResult.mergedCount;
+        reopenedItemIds = mergeResult.reopenedItemIds;
         usedMergeDecision = true;
       }
       if (duplicateDecision === "cancel") {
@@ -1403,6 +1523,7 @@ async function runInteractiveSmartAddApproval(params: {
       overrideMarkersByNodeKey,
       mergeTargetsByNodeKey,
       mergedCount,
+      reopenedItemIds,
     });
     if (mergedCount > 0) {
       result(`Merged ${mergedCount} duplicate node(s) and added ${added} new item(s) to PRD.`);
@@ -1412,7 +1533,7 @@ async function runInteractiveSmartAddApproval(params: {
 
     const rejected = currentProposals.filter((_, i) => !decision.approved.includes(i));
     if (rejected.length > 0 && !usedMergeDecision) {
-      await savePending(dir, rejected, parentId);
+      await savePending(dir, rejected, parentId, hashPRD(existing));
       info(`${rejected.length} proposal(s) saved. Run \`rex add --accept\` to accept later.`);
     } else if (rejected.length > 0 && usedMergeDecision) {
       info(`${rejected.length} unselected proposal(s) were cancelled and not written.`);
@@ -1448,7 +1569,7 @@ async function finalizeSmartAdd(params: {
     thresholdWeeks,
   } = params;
 
-  await maybeCacheSmartAddProposals(dir, proposals, parentId);
+  await maybeCacheSmartAddProposals(dir, proposals, parentId, hashPRD(existing));
 
   if (accept) {
     if (hasDuplicateMatches(duplicateMatches)) {

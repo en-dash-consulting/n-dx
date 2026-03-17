@@ -8,7 +8,7 @@ import {
   DEFAULT_CHUNK_SIZE,
   PROGRESSIVE_THRESHOLD,
   LoadMoreIndicator,
-} from "../../../src/viewer/components/prd-tree/progressive-loader.js";
+} from "../../../src/viewer/components/progressive-loader.js";
 import type { PRDItemData, ItemStatus } from "../../../src/viewer/components/prd-tree/types.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

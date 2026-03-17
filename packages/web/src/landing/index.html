@@ -6,6 +6,20 @@
   <meta name="description" content="n-dx: AI-powered development toolkit. Analyze codebases, plan work, execute tasks autonomously." />
   <title>n-dx — AI-powered development toolkit</title>
   <link rel="icon" type="image/png" href="/n-dx.png">
+  <!--
+    External dependency manifest — all resources loaded from this HTML shell.
+    No CDN or external URLs are referenced; all assets are local:
+      - /n-dx.png            (favicon)
+      - /SourceVision-F.png  (pipeline icon)
+      - /Rex-F.png           (pipeline icon)
+      - /Hench-F.png         (pipeline icon)
+      - ./landing.css        (landing page stylesheet)
+      - ./landing.ts         (landing page entry point, bundled by Vite)
+      - https://github.com/endash/n-dx  (outbound link only — not a loaded resource)
+      - https://www.npmjs.com/package/n-dx (outbound link only — not a loaded resource)
+    If an external CDN resource is added here, register it in this block
+    so that supply-chain security tooling can audit it alongside pnpm audit.
+  -->
   <script>
     (function(){
       var s = localStorage.getItem("sv-theme");

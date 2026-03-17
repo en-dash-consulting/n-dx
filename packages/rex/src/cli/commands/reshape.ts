@@ -15,6 +15,9 @@ import type { PRDItem } from "../../schema/index.js";
 
 const ARCHIVE_FILE = "archive.json";
 
+/** Maximum number of archive batches to retain. */
+const MAX_ARCHIVE_BATCHES = 100;
+
 interface ReshapeArchive {
   schema: "rex/archive/v1";
   batches: ReshapeArchiveBatch[];
@@ -36,6 +39,15 @@ async function loadArchive(archivePath: string): Promise<ReshapeArchive> {
     return JSON.parse(raw) as ReshapeArchive;
   } catch {
     return { schema: "rex/archive/v1", batches: [] };
+  }
+}
+
+/**
+ * Trim archive to retain only the most recent batches.
+ */
+function trimArchive(archive: ReshapeArchive, maxBatches: number = MAX_ARCHIVE_BATCHES): void {
+  if (archive.batches.length > maxBatches) {
+    archive.batches = archive.batches.slice(archive.batches.length - maxBatches);
   }
 }
 
@@ -139,6 +151,7 @@ export async function cmdReshape(
       reason: `Reshape: ${accepted.map((p) => p.action.action).join(", ")}`,
       actions: accepted,
     });
+    trimArchive(archive);
     await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
   }
 

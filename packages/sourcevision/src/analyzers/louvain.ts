@@ -13,12 +13,16 @@
  * Louvain detects this automatically, producing zones that match intuitive
  * architectural groupings without any configuration.
  *
- * ## Achieving perfect cohesion
+ * ## Cohesion scoring
  *
  * When the algorithm finds zones with cohesion 1.0 and coupling 0.0, it means
  * all import edges for that zone's files stay within the zone — a sign of
  * excellent encapsulation. This typically happens with well-structured packages
  * that expose clean public interfaces.
+ *
+ * Zones where multiple files have **no** import edges at all receive cohesion
+ * 0.0 — the absence of edges means cohesion is unmeasurable, not perfect.
+ * Single-file zones are the exception: cohesion is trivially 1.0.
  *
  * ## Pipeline
  *
@@ -386,6 +390,108 @@ export function mergeBidirectionalCoupling(
     members.set(target, targetMembers);
     members.delete(source);
     merged.add(source);
+  }
+
+  return result;
+}
+
+// ── Merge satellite communities ──────────────────────────────────────────────
+
+/**
+ * Absorb small communities that are more coupled to their neighbors than
+ * internally cohesive. These "satellites" are too small and too dependent
+ * to justify a separate zone.
+ *
+ * For each community with ≤ `maxSize` files, compute:
+ *   externalEdges / totalEdges (= coupling ratio)
+ *
+ * If this ratio exceeds `couplingThreshold`, the community is absorbed into
+ * its most-connected neighbor. Iterates until no more merges occur.
+ */
+export function mergeSatelliteCommunities(
+  community: Map<string, string>,
+  graph: UndirectedGraph,
+  maxSize = 8,
+  couplingThreshold = 0.3
+): Map<string, string> {
+  const result = new Map(community);
+
+  for (let round = 0; round < 10; round++) {
+    // Gather community → members
+    const members = new Map<string, string[]>();
+    for (const [node, comm] of result) {
+      let list = members.get(comm);
+      if (!list) { list = []; members.set(comm, list); }
+      list.push(node);
+    }
+
+    let merged = false;
+
+    // Process small communities in sorted order for determinism
+    const smallComms = [...members.entries()]
+      .filter(([, m]) => m.length <= maxSize)
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    for (const [comm, commMembers] of smallComms) {
+      // Skip if already merged in this round
+      if (!members.has(comm)) continue;
+
+      // Count internal vs external edges and track neighbor communities
+      let internalEdgeCount = 0;
+      let externalEdgeCount = 0;
+      const neighborCommWeights = new Map<string, number>();
+
+      for (const node of commMembers) {
+        const neighbors = graph.get(node);
+        if (!neighbors) continue;
+        for (const [neighbor, weight] of neighbors) {
+          const neighborComm = result.get(neighbor)!;
+          if (neighborComm === comm) {
+            internalEdgeCount += weight;
+          } else {
+            externalEdgeCount += weight;
+            neighborCommWeights.set(
+              neighborComm,
+              (neighborCommWeights.get(neighborComm) ?? 0) + weight
+            );
+          }
+        }
+      }
+
+      // Undirected: each edge counted twice
+      internalEdgeCount /= 2;
+      const totalEdges = internalEdgeCount + externalEdgeCount;
+      if (totalEdges === 0) continue;
+
+      const couplingRatio = externalEdgeCount / totalEdges;
+      if (couplingRatio < couplingThreshold) continue;
+
+      // Find the most-connected neighbor community
+      let bestNeighbor = "";
+      let bestWeight = 0;
+      for (const [neighborComm, weight] of neighborCommWeights) {
+        if (weight > bestWeight || (weight === bestWeight && neighborComm < bestNeighbor)) {
+          bestNeighbor = neighborComm;
+          bestWeight = weight;
+        }
+      }
+
+      if (!bestNeighbor) continue;
+
+      // Absorb into the best neighbor
+      for (const node of commMembers) {
+        result.set(node, bestNeighbor);
+      }
+
+      // Update members tracking
+      const targetMembers = members.get(bestNeighbor) ?? [];
+      targetMembers.push(...commMembers);
+      members.set(bestNeighbor, targetMembers);
+      members.delete(comm);
+      merged = true;
+    }
+
+    if (!merged) break;
   }
 
   return result;

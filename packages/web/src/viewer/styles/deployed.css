@@ -1,0 +1,92 @@
+/**
+ * Deployed mode — hide all mutation controls.
+ *
+ * When `ndx export` generates a static build, the body gets the
+ * `.ndx-deployed` class.  All interactive mutation UI is hidden so
+ * the exported site is a clean read-only view.
+ */
+
+/* ── Smart-add / batch import / analyze panels ─────────────────────── */
+.ndx-deployed .smart-add-panel,
+.ndx-deployed .smart-add-panel-compact,
+.ndx-deployed .batch-import-panel,
+.ndx-deployed .rex-analyze-panel,
+.ndx-deployed .rex-add-form,
+.ndx-deployed .prd-inline-add-form {
+  display: none !important;
+}
+
+/* ── Prune / reorganize / merge panels ─────────────────────────────── */
+.ndx-deployed .prune-confirmation,
+.ndx-deployed .reorganize-panel,
+.ndx-deployed .merge-preview,
+.ndx-deployed .delete-modal {
+  display: none !important;
+}
+
+/* ── Bulk action bar ───────────────────────────────────────────────── */
+.ndx-deployed .rex-bulk-bar,
+.ndx-deployed .rex-bulk-actions {
+  display: none !important;
+}
+
+/* ── Individual node/task action buttons ────────────────────────────── */
+.ndx-deployed .prd-node-action-edit,
+.ndx-deployed .prd-node-action-delete,
+.ndx-deployed .prd-inline-add-btn,
+.ndx-deployed .task-add-child-btn,
+.ndx-deployed .task-add-description-btn,
+.ndx-deployed .task-remove-btn,
+.ndx-deployed .task-execute-btn,
+.ndx-deployed .task-execute-section,
+.ndx-deployed .task-edit-actions,
+.ndx-deployed .task-title-edit,
+.ndx-deployed .task-description-edit {
+  display: none !important;
+}
+
+/* ── Tag / criteria editing ────────────────────────────────────────── */
+.ndx-deployed .task-tag-add-btn,
+.ndx-deployed .task-tag-add,
+.ndx-deployed .task-tag-remove,
+.ndx-deployed .task-tag-edit,
+.ndx-deployed .task-criterion-add,
+.ndx-deployed .task-criterion-remove {
+  display: none !important;
+}
+
+/* ── Dashboard action buttons ──────────────────────────────────────── */
+.ndx-deployed .rex-dash-smart-add,
+.ndx-deployed .rex-dash-action,
+.ndx-deployed .rex-dash-header-action,
+.ndx-deployed .rex-dash-panel-action {
+  display: none !important;
+}
+
+/* ── Configuration / integration editing ───────────────────────────── */
+.ndx-deployed .notion-config-actions,
+.ndx-deployed .notion-config-save-btn,
+.ndx-deployed .notion-config-remove-btn,
+.ndx-deployed .intg-remove-btn,
+.ndx-deployed .hench-config-tag-add-btn,
+.ndx-deployed .hench-config-tag-remove,
+.ndx-deployed .hench-template-delete-btn,
+.ndx-deployed .hench-template-apply-btn {
+  display: none !important;
+}
+
+/* ── Hench execution controls ──────────────────────────────────────── */
+.ndx-deployed .hench-execute-btn,
+.ndx-deployed .hench-terminate-btn,
+.ndx-deployed .hench-throttle-controls {
+  display: none !important;
+}
+
+/* ── Polling / live indicators (not meaningful in static mode) ──────── */
+.ndx-deployed .refresh-toast,
+.ndx-deployed .polling-suspension-indicator,
+.ndx-deployed .refresh-queue-status,
+.ndx-deployed .memory-warning-banner,
+.ndx-deployed .degradation-banner {
+  display: none !important;
+}

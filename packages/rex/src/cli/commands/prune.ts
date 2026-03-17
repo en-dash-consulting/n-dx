@@ -5,6 +5,12 @@ import { findPrunableItems, pruneItems, countSubtree } from "../../core/prune.js
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
+import {
+  hashPRD,
+  savePendingSmartPrune,
+  loadPendingSmartPrune,
+  clearPendingSmartPrune,
+} from "../../core/pending-cache.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -13,6 +19,13 @@ import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 
 const ARCHIVE_FILE = "archive.json";
+
+/**
+ * Maximum number of archive batches to retain.
+ * Older batches are discarded when this limit is exceeded,
+ * preventing unbounded growth of archive.json over time.
+ */
+const MAX_ARCHIVE_BATCHES = 100;
 
 /**
  * Archive structure written to `.rex/archive.json`.
@@ -34,6 +47,34 @@ interface PruneBatch {
   actions?: ReshapeProposal[];
 }
 
+// ── Parsed flag helpers ──────────────────────────────────────────────
+
+interface PruneFlags {
+  dryRun: boolean;
+  skipConsolidate: boolean;
+  accept: boolean;
+  autoConfirm: boolean;
+  isJson: boolean;
+  model?: string;
+  format?: string;
+  raw: Record<string, string>;
+}
+
+function parseFlags(flags: Record<string, string>): PruneFlags {
+  return {
+    dryRun: flags["dry-run"] === "true",
+    skipConsolidate: flags["no-consolidate"] === "true",
+    accept: flags.accept === "true",
+    autoConfirm: flags.yes === "true" || flags.y === "true",
+    isJson: flags.format === "json",
+    model: flags.model,
+    format: flags.format,
+    raw: flags,
+  };
+}
+
+// ── Archive I/O ──────────────────────────────────────────────────────
+
 async function loadArchive(archivePath: string): Promise<PruneArchive> {
   try {
     const { readFile } = await import("node:fs/promises");
@@ -43,6 +84,33 @@ async function loadArchive(archivePath: string): Promise<PruneArchive> {
     return { schema: "rex/archive/v1", batches: [] };
   }
 }
+
+/**
+ * Trim archive to retain only the most recent batches.
+ * Prevents unbounded growth of archive.json in long-running projects.
+ */
+function trimArchive(archive: PruneArchive, maxBatches: number = MAX_ARCHIVE_BATCHES): number {
+  if (archive.batches.length <= maxBatches) return 0;
+  const excess = archive.batches.length - maxBatches;
+  archive.batches = archive.batches.slice(excess);
+  return excess;
+}
+
+/**
+ * Append a batch to the archive and persist to disk.
+ */
+async function appendArchiveBatch(
+  rexDir: string,
+  batch: PruneBatch,
+): Promise<void> {
+  const archivePath = join(rexDir, ARCHIVE_FILE);
+  const archive = await loadArchive(archivePath);
+  archive.batches.push(batch);
+  trimArchive(archive);
+  await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+}
+
+// ── TTY interaction ──────────────────────────────────────────────────
 
 /**
  * Ask a single yes/no question in a TTY. Returns true for "y"/"yes".
@@ -82,7 +150,7 @@ function formatPrunePreview(prunable: PRDItem[]): {
     byLevel[item.level] = (byLevel[item.level] || 0) + 1;
 
     const childInfo = subtreeCount > 1 ? ` (${subtreeCount} items including children)` : "";
-    lines.push(`  ${icon(item.level)} ${item.title} [${item.id.slice(0, 8)}]${childInfo}`);
+    lines.push(`  ${getLevelEmoji(item.level)} ${item.title} [${item.id.slice(0, 8)}]${childInfo}`);
   }
 
   return { lines, totalItems, byLevel };
@@ -295,7 +363,7 @@ export async function cmdPrune(
   } else {
     result(`Pruned ${pruneResult.prunedCount} completed item${pruneResult.prunedCount === 1 ? "" : "s"}:`);
     for (const item of pruneResult.pruned) {
-      result(`  ${icon(item.level)} ${item.title}`);
+      result(`  ${getLevelEmoji(item.level)} ${item.title}`);
     }
     info(`Archived to ${ARCHIVE_FILE}`);
 
@@ -461,16 +529,36 @@ async function smartPrune(
   const accept = flags.accept === "true";
   const model = flags.model;
 
-  info("Analyzing PRD for pruning opportunities...");
-  const { proposals, tokenUsage } = await reasonForReshape(doc.items, {
-    dir,
-    model,
-    pruneMode: true,
-  });
+  // Check cache before LLM call
+  const currentHash = hashPRD(doc.items);
+  const cached = await loadPendingSmartPrune(rexDir);
 
-  const usageLine = formatTokenUsage(tokenUsage);
-  if (usageLine) {
-    info(`Token usage: ${usageLine}`);
+  let proposals: ReshapeProposal[];
+  let tokenUsage: import("../../schema/index.js").AnalyzeTokenUsage | undefined;
+
+  if (cached && cached.proposals.length > 0 && cached.prdHash === currentHash) {
+    info("Using cached proposals");
+    proposals = cached.proposals;
+    tokenUsage = undefined;
+  } else {
+    info("Analyzing PRD for pruning opportunities...");
+    const reshapeResult = await reasonForReshape(doc.items, {
+      dir,
+      model,
+      pruneMode: true,
+    });
+    proposals = reshapeResult.proposals;
+    tokenUsage = reshapeResult.tokenUsage;
+
+    const usageLine = formatTokenUsage(tokenUsage);
+    if (usageLine) {
+      info(`Token usage: ${usageLine}`);
+    }
+
+    // Save proposals to cache after LLM generation
+    if (proposals.length > 0) {
+      await savePendingSmartPrune(rexDir, proposals, currentHash);
+    }
   }
 
   if (proposals.length === 0) {
@@ -540,6 +628,9 @@ async function smartPrune(
   info("Saving document...");
   await store.saveDocument(doc);
 
+  // Clear cache after successful application
+  await clearPendingSmartPrune(rexDir);
+
   await store.appendLog({
     timestamp: new Date().toISOString(),
     event: "smart_prune",
@@ -562,6 +653,10 @@ async function smartPrune(
       info(`  ${reshapeResult.archivedItems.length} item${reshapeResult.archivedItems.length === 1 ? "" : "s"} archived.`);
     }
   }
+}
+
+function summarize(item: PRDItem): { id: string; title: string; level: string } {
+  return { id: item.id, title: item.title, level: item.level };
 }
 
 async function interactiveAcceptProposals(
@@ -602,12 +697,4 @@ async function interactiveAcceptProposals(
   }
 
   return accepted;
-}
-
-function summarize(item: PRDItem): { id: string; title: string; level: string } {
-  return { id: item.id, title: item.title, level: item.level };
-}
-
-function icon(level: string): string {
-  return getLevelEmoji(level);
 }

@@ -16,7 +16,6 @@
 @import "./a11y.css";
 @import "./prd-tree.css";
 @import "./rex-dashboard.css";
-@import "./analysis.css";
 @import "./token-usage.css";
 @import "./validation.css";
 @import "./hench-runs.css";
@@ -39,4 +38,5 @@
 @import "./polling-suspension.css";
 @import "./search-overlay.css";
 @import "./zone-slideout.css";
+@import "./deployed.css";
 @import "./responsive.css";

@@ -2,7 +2,7 @@ import type { TokenUsage } from "../../schema/index.js";
 import {
   parseApiTokenUsage as parseTokenUsage,
   parseStreamTokenUsage,
-} from "@n-dx/llm-client";
+} from "../../prd/llm-gateway.js";
 
 // Re-export parsing functions from the canonical source (@n-dx/llm-client).
 // `parseTokenUsage` is an alias for `parseApiTokenUsage` — same function,

@@ -80,11 +80,14 @@ export { jiraIntegrationSchema } from "./store/integration-schemas/jira.js";
 // ---- Schema types & constants -----------------------------------------------
 
 export type {
-  PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, RexConfig,
+  PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, ResolutionType, RexConfig,
   RequirementCategory, RequirementValidationType, Requirement,
   FacetDefinition, LoEConfig,
 } from "./schema/v1.js";
 export {
+  SCHEMA_VERSION,
+  isCompatibleSchema,
+  assertSchemaVersion,
   PRIORITY_ORDER,
   LEVEL_HIERARCHY,
   VALID_LEVELS,
@@ -265,7 +268,7 @@ export type {
 
 export {
   computeFindingHash, loadAcknowledged, saveAcknowledged,
-  acknowledgeFinding, isAcknowledged,
+  acknowledgeFinding, isAcknowledged, isAcknowledgedFuzzy,
 } from "./analyze/acknowledge.js";
 export type { AcknowledgedFinding, AcknowledgedStore } from "./analyze/acknowledge.js";
 
@@ -274,7 +277,7 @@ export type { AcknowledgedFinding, AcknowledgedStore } from "./analyze/acknowled
 export { createItemsFromRecommendations } from "./recommend/create-from-recommendations.js";
 export type {
   EnrichedRecommendation, RecommendationMeta, CreationResult,
-  SkippedRecommendation, ReparentedRecommendation,
+  SkippedRecommendation, UpdatedRecommendation, ReparentedRecommendation,
 } from "./recommend/create-from-recommendations.js";
 
 // ---- Core: facets -----------------------------------------------------------
@@ -312,6 +315,10 @@ export type {
 
 export type { DecomposedTask, DecompositionResult } from "./analyze/decompose.js";
 export { applyDecompositionPass, buildDecompositionPrompt } from "./analyze/decompose.js";
+
+// ---- Analyze: proposal types ------------------------------------------------
+
+export type { Proposal, ProposalEpic, ProposalFeature, ProposalTask } from "./analyze/propose.js";
 
 // ---- Analyze: consolidation guard -------------------------------------------
 
@@ -356,3 +363,7 @@ export type {
 // ---- MCP server factory -----------------------------------------------------
 
 export { createRexMcpServer } from "./cli/mcp.js";
+
+// ---- MCP tool handlers (for direct invocation by web/gateway) ---------------
+
+export { handleEditItem } from "./cli/mcp-tools.js";

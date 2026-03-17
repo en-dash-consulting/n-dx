@@ -160,6 +160,13 @@ const FindingTypeSchema = z.enum([
   "relationship",
   "anti-pattern",
   "suggestion",
+  "move-file",
+]);
+
+const MoveFileReasonSchema = z.enum([
+  "zone-pin-override",
+  "import-neighbor-majority",
+  "directory-consolidation",
 ]);
 
 export const FindingSchema = z.object({
@@ -169,6 +176,11 @@ export const FindingSchema = z.object({
   text: z.string(),
   severity: z.enum(["info", "warning", "critical"]).optional(),
   related: z.array(z.string()).optional(),
+  // move-file specific fields (optional, present only when type === "move-file")
+  from: z.string().optional(),
+  to: z.string().optional(),
+  moveReason: MoveFileReasonSchema.optional(),
+  predictedImpact: z.number().int().nonnegative().optional(),
 });
 
 // ── Zones ───────────────────────────────────────────────────────────────────

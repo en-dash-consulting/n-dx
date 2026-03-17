@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import type * as V1 from "../schema/v1.js";
+import type { V1 } from "./external.js";
 
 // ── Manifest ────────────────────────────────────────────────────────────────
 
@@ -124,6 +124,7 @@ const FindingTypeSchema = z.enum([
   "relationship",
   "anti-pattern",
   "suggestion",
+  "move-file",
 ]);
 
 const FindingSchema = z.object({
@@ -133,6 +134,9 @@ const FindingSchema = z.object({
   text: z.string(),
   severity: z.enum(["info", "warning", "critical"]).optional(),
   related: z.array(z.string()).optional(),
+  // move-file specific fields (optional, present only when type === "move-file")
+  from: z.string().optional(),
+  to: z.string().optional(),
 });
 
 // ── Zones ───────────────────────────────────────────────────────────────────

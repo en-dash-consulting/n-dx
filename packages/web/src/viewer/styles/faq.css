@@ -155,4 +155,7 @@
   color: var(--accent);
 }
 
-/* Sidebar controls moved to header control bar — see utils.css */
+/* ── Global FAQ button (sidebar footer toolbar) ── */
+/* Inherits .sidebar-control-btn sizing; no extra styles needed at desktop.
+   On mobile the sidebar footer is hidden, so we promote the button to a
+   viewport-fixed FAB in responsive.css. */

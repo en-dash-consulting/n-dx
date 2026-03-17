@@ -57,6 +57,15 @@ export function buildSystemPrompt(
     lines.push("7. Log a summary of what you did\n");
   }
 
+  if (config.selfHeal) {
+    lines.push("## Self-Heal Mode");
+    lines.push("You are fixing a structural code issue found by static analysis.");
+    lines.push("- Make source code changes that address the root cause. Move files, extract modules, remove cross-zone imports, reduce coupling.");
+    lines.push("- Do NOT write ADR documents, markdown files, or architectural documentation as your primary deliverable.");
+    lines.push("- Configuration-only changes (eslint rules, tsconfig, zone pins) are acceptable only when they directly fix the detected issue.");
+    lines.push("- If the issue requires changes beyond a single task scope, set status to \"deferred\" with a specific reason. Do not fake completion.\n");
+  }
+
   lines.push("## Error Handling");
   lines.push("- If tests fail after your changes, read the failure output carefully, fix the issue, and re-run.");
   lines.push("- If you encounter a test failure you did NOT cause (pre-existing), note it in the log and continue.");

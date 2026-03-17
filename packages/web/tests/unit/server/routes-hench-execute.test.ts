@@ -9,7 +9,7 @@ import { handleHenchRoute } from "../../../src/server/routes-hench.js";
 /** Minimal PRD document for testing. */
 function makePRD(items: Array<Record<string, unknown>> = []): Record<string, unknown> {
   return {
-    schema: "prd/v1",
+    schema: "rex/v1",
     title: "Test PRD",
     items,
   };

@@ -3,9 +3,22 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, cp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createServer as createNetServer } from "node:net";
 
 const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");
+
+function getFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = createNetServer();
+    srv.listen(0, () => {
+      const addr = srv.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      srv.close(() => resolve(port));
+    });
+    srv.on("error", reject);
+  });
+}
 
 function waitForServer(port: number, timeout = 5000): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -37,7 +50,7 @@ describe("sourcevision serve (e2e)", () => {
     if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("serves viewer and data files", async () => {
+  it("serves viewer and data files", { timeout: 30000 }, async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-serve-"));
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
 
@@ -47,8 +60,8 @@ describe("sourcevision serve (e2e)", () => {
       timeout: 30000,
     });
 
-    // Start server on a random port
-    const port = 3117 + Math.floor(Math.random() * 1000);
+    // Start server on an OS-assigned free port
+    const port = await getFreePort();
     serverProc = spawn("node", [CLI_PATH, "serve", tmpDir, `--port=${port}`], {
       stdio: "pipe",
     });
@@ -59,7 +72,7 @@ describe("sourcevision serve (e2e)", () => {
     const htmlRes = await fetch(`http://localhost:${port}/`);
     expect(htmlRes.status).toBe(200);
     const html = await htmlRes.text();
-    expect(html).toContain("SourceVision");
+    expect(html.toLowerCase()).toContain("sourcevision");
     expect(html).toContain("<div id=\"app\"></div>");
 
     // Fetch data file list

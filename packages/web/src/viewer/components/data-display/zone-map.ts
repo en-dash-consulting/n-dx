@@ -1,6 +1,6 @@
 import { h } from "preact";
 import { useState, useMemo } from "preact/hooks";
-import type { Zone, ZoneCrossing } from "../../../schema/v1.js";
+import type { Zone, ZoneCrossing } from "../../external.js";
 import { getZoneColorByIndex, basename } from "../../utils.js";
 
 /**

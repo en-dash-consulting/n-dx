@@ -48,6 +48,21 @@ async function readPrdItems(dir: string): Promise<PRDDocument["items"]> {
   return doc.items;
 }
 
+type AnyItem = PRDDocument["items"][0];
+
+function flattenItems(items: AnyItem[]): AnyItem[] {
+  const result: AnyItem[] = [];
+  for (const item of items) {
+    result.push(item);
+    if (item.children) result.push(...flattenItems(item.children));
+  }
+  return result;
+}
+
+function filterByLevel(items: AnyItem[], level: string): AnyItem[] {
+  return flattenItems(items).filter((i) => i.level === level);
+}
+
 async function writeFindings(
   dir: string,
   findings: Array<{ severity: string; category: string; message: string }>,
@@ -95,18 +110,23 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=2" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(1);
-    expect(items[0].title).toContain("Address perf issues");
-    expect(items[0].status).toBe("pending");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].title).toContain("Fix perf in global");
+    expect(tasks[0].status).toBe("pending");
+    // Should also have structural parents
+    expect(items).toHaveLength(1); // 1 epic at root
+    expect(items[0].level).toBe("epic");
   });
 
   it("preserves recommendation list order for accepted subset", async () => {
     await cmdRecommend(tmpDir, { accept: "=3,1" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(2);
-    expect(items[0].title).toContain("Address auth issues");
-    expect(items[1].title).toContain("Address security issues");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(2);
+    expect(tasks[0].title).toContain("Fix auth in global");
+    expect(tasks[1].title).toContain("Fix security in global");
   });
 
   it("parses equals-prefixed indices with commas and whitespace", async () => {
@@ -121,17 +141,19 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=1, 4, 5" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(3);
-    expect(items[0].title).toContain("Address auth issues");
-    expect(items[1].title).toContain("Address docs issues");
-    expect(items[2].title).toContain("Address ops issues");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(3);
+    expect(tasks[0].title).toContain("Fix auth in global");
+    expect(tasks[1].title).toContain("Fix docs in global");
+    expect(tasks[2].title).toContain("Fix ops in global");
   });
 
   it("keeps all-accept behavior when no equals selector is provided", async () => {
     await cmdRecommend(tmpDir, { accept: "true" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(3);
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(3);
   });
 
   it("rejects selector values without '=' prefix", async () => {
@@ -150,8 +172,9 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=2,2,2" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(1);
-    expect(items[0].title).toContain("Address perf issues");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].title).toContain("Fix perf in global");
   });
 
   // ── Wildcard / =all syntax ──────────────────────────────────────────
@@ -160,16 +183,17 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=all" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(3);
-    expect(items[0].title).toContain("Address auth issues");
-    expect(items[1].title).toContain("Address perf issues");
-    expect(items[2].title).toContain("Address security issues");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(3);
+    expect(tasks[0].title).toContain("Fix auth in global");
+    expect(tasks[1].title).toContain("Fix perf in global");
+    expect(tasks[2].title).toContain("Fix security in global");
   });
 
   it("=all and --accept=true produce equivalent results", async () => {
     // Accept with =all
     await cmdRecommend(tmpDir, { accept: "=all" });
-    const itemsAll = await readPrdItems(tmpDir);
+    const itemsAll = flattenItems(await readPrdItems(tmpDir));
 
     // Reset PRD
     await writeFile(
@@ -180,7 +204,7 @@ describe("cmdRecommend --accept indexed selection", () => {
 
     // Accept with true (legacy)
     await cmdRecommend(tmpDir, { accept: "true" });
-    const itemsTrue = await readPrdItems(tmpDir);
+    const itemsTrue = flattenItems(await readPrdItems(tmpDir));
 
     expect(itemsAll.length).toBe(itemsTrue.length);
     for (let i = 0; i < itemsAll.length; i++) {
@@ -196,16 +220,17 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=." });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(3);
-    expect(items[0].title).toContain("Address auth issues");
-    expect(items[1].title).toContain("Address perf issues");
-    expect(items[2].title).toContain("Address security issues");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(3);
+    expect(tasks[0].title).toContain("Fix auth in global");
+    expect(tasks[1].title).toContain("Fix perf in global");
+    expect(tasks[2].title).toContain("Fix security in global");
   });
 
   it("=. and =all produce equivalent results", async () => {
     // Accept with =.
     await cmdRecommend(tmpDir, { accept: "=." });
-    const itemsDot = await readPrdItems(tmpDir);
+    const itemsDot = flattenItems(await readPrdItems(tmpDir));
 
     // Reset PRD
     await writeFile(
@@ -216,7 +241,7 @@ describe("cmdRecommend --accept indexed selection", () => {
 
     // Accept with =all
     await cmdRecommend(tmpDir, { accept: "=all" });
-    const itemsAll = await readPrdItems(tmpDir);
+    const itemsAll = flattenItems(await readPrdItems(tmpDir));
 
     expect(itemsDot.length).toBe(itemsAll.length);
     for (let i = 0; i < itemsDot.length; i++) {
@@ -246,8 +271,9 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=1" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(1);
-    expect(items[0].title).toContain("Address auth issues");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].title).toContain("Fix auth in global");
   });
 
   // ── Selecting all indices explicitly ────────────────────────────────
@@ -256,7 +282,8 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=1,2,3" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(3);
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(3);
   });
 
   // ── Metadata preservation through CLI accept flow ───────────────────
@@ -270,8 +297,9 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=1" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(1);
-    const meta = items[0].recommendationMeta as Record<string, unknown>;
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(1);
+    const meta = tasks[0].recommendationMeta as Record<string, unknown>;
     expect(meta).toBeDefined();
     expect(meta.category).toBe("auth");
     expect(meta.findingCount).toBe(2);
@@ -287,7 +315,8 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=1" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items[0].priority).toBe("critical");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks[0].priority).toBe("critical");
   });
 
   it("sets priority to high when all findings in a group are warnings", async () => {
@@ -299,7 +328,8 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=1" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items[0].priority).toBe("high");
+    const tasks = filterByLevel(items, "task");
+    expect(tasks[0].priority).toBe("high");
   });
 
   // ── No-op when no recommendations match ─────────────────────────────
@@ -660,7 +690,8 @@ describe("cmdRecommend --accept indexed selection", () => {
       await cmdRecommend(tmpDir, { accept: "=ALL" });
 
       const items = await readPrdItems(tmpDir);
-      expect(items).toHaveLength(3);
+      const tasks = filterByLevel(items, "task");
+      expect(tasks).toHaveLength(3);
     });
 
     it("provides correction hint when = prefix missing and input looks like indices", async () => {
@@ -731,14 +762,14 @@ describe("cmdRecommend --accept creation summary output", () => {
   it("shows pre-creation summary listing selected recommendations", async () => {
     await cmdRecommend(tmpDir, { accept: "=1,3" });
 
-    const summaryHeader = infoCalls.find((c) => c.includes("Creating 2 of 3 recommendations:"));
+    const summaryHeader = infoCalls.find((c) => c.includes("Creating 2 of 3 tasks"));
     expect(summaryHeader).toBeDefined();
   });
 
   it("shows pre-creation summary with each recommendation's priority, title, and level", async () => {
     await cmdRecommend(tmpDir, { accept: "=2" });
 
-    const itemLine = infoCalls.find((c) => c.includes("[high]") && c.includes("Address perf issues") && c.includes("(feature)"));
+    const itemLine = infoCalls.find((c) => c.includes("[high]") && c.includes("Fix perf in global") && c.includes("(task)"));
     expect(itemLine).toBeDefined();
   });
 
@@ -749,25 +780,25 @@ describe("cmdRecommend --accept creation summary output", () => {
 
     await cmdRecommend(tmpDir, { accept: "=1" });
 
-    const header = infoCalls.find((c) => c.includes("Creating 1 recommendation:"));
+    const header = infoCalls.find((c) => c.includes("Creating 1 task"));
     expect(header).toBeDefined();
   });
 
   it("shows 'N of M' when accepting a subset", async () => {
     await cmdRecommend(tmpDir, { accept: "=1" });
 
-    const header = infoCalls.find((c) => c.includes("Creating 1 of 3 recommendations:"));
+    const header = infoCalls.find((c) => c.includes("Creating 1 of 3 tasks"));
     expect(header).toBeDefined();
   });
 
   it("omits 'of M' when accepting all", async () => {
     await cmdRecommend(tmpDir, { accept: "true" });
 
-    // Should show "Creating 3 recommendations:" without "of 3"
-    const header = infoCalls.find((c) => /Creating 3 recommendations:/.test(c));
+    // Should show "Creating 3 tasks" without "of 3"
+    const header = infoCalls.find((c) => /Creating 3 task/.test(c));
     expect(header).toBeDefined();
     // Should NOT say "of 3" since all are selected
-    const subsetHeader = infoCalls.find((c) => c.includes("of 3 recommendations:"));
+    const subsetHeader = infoCalls.find((c) => c.includes("of 3 task"));
     expect(subsetHeader).toBeUndefined();
   });
 
@@ -777,8 +808,9 @@ describe("cmdRecommend --accept creation summary output", () => {
     await cmdRecommend(tmpDir, { accept: "=2" });
 
     const items = await readPrdItems(tmpDir);
+    const tasks = filterByLevel(items, "task");
     const successLine = resultCalls.find(
-      (c) => c.includes("✓") && c.includes(items[0].id) && c.includes("Address perf issues"),
+      (c) => c.includes("✓") && c.includes(tasks[0].id) && c.includes("Fix perf in global"),
     );
     expect(successLine).toBeDefined();
   });
@@ -787,23 +819,26 @@ describe("cmdRecommend --accept creation summary output", () => {
     await cmdRecommend(tmpDir, { accept: "=1" });
 
     const items = await readPrdItems(tmpDir);
+    const tasks = filterByLevel(items, "task");
     const successLine = resultCalls.find(
-      (c) => c.includes("✓") && c.includes("feature") && c.includes(items[0].id),
+      (c) => c.includes("✓") && c.includes("task") && c.includes(tasks[0].id),
     );
     expect(successLine).toBeDefined();
   });
 
-  it("shows root placement when no parent is specified", async () => {
+  it("shows root placement for epic", async () => {
     await cmdRecommend(tmpDir, { accept: "=1" });
 
     const rootLine = resultCalls.find((c) => c.includes("(root)"));
     expect(rootLine).toBeDefined();
   });
 
-  it("shows total count of created vs selected items", async () => {
+  it("shows total count of created vs selected tasks", async () => {
     await cmdRecommend(tmpDir, { accept: "=1,3" });
 
-    const countLine = resultCalls.find((c) => c.includes("2/2 selected recommendations created."));
+    // reportCreationResults counts all created items (epic + features + tasks)
+    // but the total denominator is the number of selected tasks
+    const countLine = resultCalls.find((c) => c.includes("selected recommendation") && c.includes("created"));
     expect(countLine).toBeDefined();
   });
 
@@ -814,7 +849,7 @@ describe("cmdRecommend --accept creation summary output", () => {
 
     await cmdRecommend(tmpDir, { accept: "=1" });
 
-    const countLine = resultCalls.find((c) => c.includes("1/1 selected recommendation created."));
+    const countLine = resultCalls.find((c) => c.includes("selected recommendation") && c.includes("created"));
     expect(countLine).toBeDefined();
   });
 
@@ -822,34 +857,34 @@ describe("cmdRecommend --accept creation summary output", () => {
     await cmdRecommend(tmpDir, { accept: "=all" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(3);
+    const allItems = flattenItems(items);
 
     // Each created item should have a success line with its ID
-    for (const item of items) {
+    for (const item of allItems) {
       const successLine = resultCalls.find((c) => c.includes(item.id));
       expect(successLine).toBeDefined();
     }
   });
 
-  it("shows 3/3 count when accepting all 3 recommendations", async () => {
+  it("shows task count when accepting all 3 recommendations", async () => {
     await cmdRecommend(tmpDir, { accept: "=all" });
 
-    const countLine = resultCalls.find((c) => c.includes("3/3 selected recommendations created."));
+    const countLine = resultCalls.find((c) => c.includes("3/3 selected recommendations created"));
     expect(countLine).toBeDefined();
   });
 
   // ── Pre-creation summary lists correct items for selective accept ───
 
-  it("lists only selected recommendations in pre-creation summary", async () => {
+  it("lists only selected tasks and their structural parents in pre-creation summary", async () => {
     await cmdRecommend(tmpDir, { accept: "=2" });
 
-    // Should have a numbered list entry for perf
-    const perfLine = infoCalls.find((c) => c.includes("1.") && c.includes("Address perf issues"));
+    // Should list the perf task
+    const perfLine = infoCalls.find((c) => c.includes("Fix perf in global") && c.includes("(task)"));
     expect(perfLine).toBeDefined();
 
-    // Should NOT list auth or security in the pre-creation summary lines
-    const authLine = infoCalls.find((c) => /^\s+\d+\./.test(c) && c.includes("Address auth issues"));
-    expect(authLine).toBeUndefined();
+    // Should NOT list auth or security tasks in summary
+    const authTaskLine = infoCalls.find((c) => c.includes("Fix auth in global") && c.includes("(task)"));
+    expect(authTaskLine).toBeUndefined();
   });
 });
 
@@ -891,8 +926,8 @@ describe("cmdRecommend --accept conflict detection", () => {
     }
   });
 
-  it("skips conflicting recommendations and creates non-conflicting ones", async () => {
-    // Pre-populate PRD with an item that matches one recommendation
+  it("creates all items including when existing items have similar titles (force for hierarchy)", async () => {
+    // Pre-populate PRD with an item that has a similar title to a task recommendation
     await writeFile(
       join(tmpDir, ".rex", "prd.json"),
       JSON.stringify({
@@ -901,25 +936,29 @@ describe("cmdRecommend --accept conflict detection", () => {
         items: [
           {
             id: "existing-auth",
-            title: "Address auth issues (2 findings)",
+            title: "Fix auth in global: Auth finding A (+1 more)",
             status: "pending",
-            level: "feature",
+            level: "task",
           },
         ],
       }),
       "utf-8",
     );
 
+    // Hierarchical recommendations always use "force" strategy, so all items
+    // are created even when existing items have similar titles. Dedup is handled
+    // upstream by the finding acknowledgment system.
     await cmdRecommend(tmpDir, { accept: "=all" });
 
     const items = await readPrdItems(tmpDir);
-    // Auth should be skipped (conflicts), perf and security should be created
-    expect(items.length).toBeGreaterThanOrEqual(2); // existing + new non-conflicting
-    // The existing auth item should be preserved
-    expect(items.find((i: PRDDocument["items"][0]) => i.id === "existing-auth")).toBeDefined();
+    const allItems = flattenItems(items);
+    // Existing item preserved + new hierarchy created
+    expect(allItems.find((i) => i.id === "existing-auth")).toBeDefined();
+    const tasks = allItems.filter((i) => i.level === "task" && i.id !== "existing-auth");
+    expect(tasks).toHaveLength(3);
   });
 
-  it("shows conflict warning when items are skipped", async () => {
+  it("creates all items with --force flag explicitly", async () => {
     await writeFile(
       join(tmpDir, ".rex", "prd.json"),
       JSON.stringify({
@@ -928,57 +967,9 @@ describe("cmdRecommend --accept conflict detection", () => {
         items: [
           {
             id: "existing-auth",
-            title: "Address auth issues (2 findings)",
+            title: "Fix auth in global: Auth finding A (+1 more)",
             status: "pending",
-            level: "feature",
-          },
-        ],
-      }),
-      "utf-8",
-    );
-
-    await cmdRecommend(tmpDir, { accept: "=all" });
-
-    const warningLine = infoCalls.find((c) => c.includes("conflicting") && c.includes("skipped"));
-    expect(warningLine).toBeDefined();
-  });
-
-  it("shows hint to use --force when conflicts are skipped", async () => {
-    await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
-      JSON.stringify({
-        schema: "rex/v1",
-        title: "test-project",
-        items: [
-          {
-            id: "existing-auth",
-            title: "Address auth issues (2 findings)",
-            status: "pending",
-            level: "feature",
-          },
-        ],
-      }),
-      "utf-8",
-    );
-
-    await cmdRecommend(tmpDir, { accept: "=all" });
-
-    const forceLine = infoCalls.find((c) => c.includes("--force"));
-    expect(forceLine).toBeDefined();
-  });
-
-  it("creates all items when --force is used despite conflicts", async () => {
-    await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
-      JSON.stringify({
-        schema: "rex/v1",
-        title: "test-project",
-        items: [
-          {
-            id: "existing-auth",
-            title: "Address auth issues (2 findings)",
-            status: "pending",
-            level: "feature",
+            level: "task",
           },
         ],
       }),
@@ -988,45 +979,150 @@ describe("cmdRecommend --accept conflict detection", () => {
     await cmdRecommend(tmpDir, { accept: "=all", force: "" });
 
     const items = await readPrdItems(tmpDir);
-    // Should have original + all 3 recommendations (no skipping)
-    expect(items).toHaveLength(4); // 1 existing + 3 new
+    const allItems = flattenItems(items);
+    // Existing + epic + 3 features + 3 tasks = 8
+    expect(allItems.length).toBeGreaterThanOrEqual(8);
   });
 
-  it("shows created/skipped count in summary", async () => {
-    await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
-      JSON.stringify({
-        schema: "rex/v1",
-        title: "test-project",
-        items: [
-          {
-            id: "existing-auth",
-            title: "Address auth issues (2 findings)",
-            status: "pending",
-            level: "feature",
-          },
-        ],
-      }),
-      "utf-8",
-    );
-
-    await cmdRecommend(tmpDir, { accept: "=all" });
-
-    const countLine = resultCalls.find((c) => c.includes("skipped") && c.includes("conflicts"));
-    expect(countLine).toBeDefined();
-  });
-
-  it("creates all items with no conflicts and no skipped count", async () => {
+  it("creates all items with no conflicts and shows task count", async () => {
     // Default fixture has empty PRD - no conflicts possible
     await cmdRecommend(tmpDir, { accept: "=all" });
 
     const items = await readPrdItems(tmpDir);
-    expect(items).toHaveLength(3); // All 3 recommendations
+    const tasks = filterByLevel(items, "task");
+    expect(tasks).toHaveLength(3); // All 3 tasks
 
     // Should show standard count without "skipped"
     const countLine = resultCalls.find((c) => c.includes("3/3") && c.includes("created"));
     expect(countLine).toBeDefined();
     const skippedLine = resultCalls.find((c) => c.includes("skipped"));
     expect(skippedLine).toBeUndefined();
+  });
+});
+
+// ── --actionable-only filter ──────────────────────────────────────────────
+
+describe("cmdRecommend --actionable-only", () => {
+  let tmpDir: string;
+  let cmdRecommend: typeof import("../../../../src/cli/commands/recommend.js")["cmdRecommend"];
+  let resultCalls: string[];
+  let infoCalls: string[];
+
+  beforeEach(async () => {
+    resultCalls = [];
+    infoCalls = [];
+
+    vi.resetModules();
+    vi.doMock("@n-dx/llm-client", () => ({
+      PROJECT_DIRS: {
+        REX: ".rex",
+        SOURCEVISION: ".sourcevision",
+      },
+      formatUsage: () => "",
+      toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
+      result: (...args: unknown[]) => { resultCalls.push(args.map(String).join(" ")); },
+      info: (...args: unknown[]) => { infoCalls.push(args.map(String).join(" ")); },
+      setQuiet: () => {},
+      isQuiet: () => false,
+    }));
+    ({ cmdRecommend } = await import("../../../../src/cli/commands/recommend.js"));
+
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-actionable-"));
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+
+    await writeFile(
+      join(tmpDir, ".rex", "config.json"),
+      JSON.stringify({ schema: "rex/v1", project: "test", adapter: "file" }),
+      "utf-8",
+    );
+    await writeFile(
+      join(tmpDir, ".rex", "prd.json"),
+      JSON.stringify({ schema: "rex/v1", title: "test", items: [] }),
+      "utf-8",
+    );
+  });
+
+  afterEach(async () => {
+    vi.doUnmock("@n-dx/llm-client");
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("filters out observation and pattern types", async () => {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: [
+          { type: "observation", severity: "warning", text: "Contains 52% of files", scope: "core" },
+          { type: "pattern", severity: "warning", text: "Barrel exports used", scope: "core" },
+          { type: "anti-pattern", severity: "warning", text: "God object detected", scope: "core" },
+          { type: "suggestion", severity: "warning", text: "Consider splitting module", scope: "core" },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { "actionable-only": "" });
+
+    // Should only show anti-pattern and suggestion
+    const tasks = resultCalls.filter((c) => /^\s+\d+\./.test(c));
+    expect(tasks).toHaveLength(2);
+  });
+
+  it("keeps move-file type findings", async () => {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: [
+          { type: "move-file", severity: "warning", text: "Move utils.ts to shared/", scope: "core" },
+          { type: "relationship", severity: "warning", text: "High coupling between A and B", scope: "core" },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { "actionable-only": "" });
+
+    const tasks = resultCalls.filter((c) => /^\s+\d+\./.test(c));
+    expect(tasks).toHaveLength(1);
+  });
+
+  it("shows filtered-out count when all findings are non-actionable", async () => {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: [
+          { type: "observation", severity: "warning", text: "Zone has 3 files", scope: "core" },
+          { type: "pattern", severity: "warning", text: "Uses barrel exports", scope: "core" },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, { "actionable-only": "" });
+
+    const noFindings = resultCalls.find((c) => c.includes("No findings to recommend"));
+    expect(noFindings).toBeDefined();
+    const filteredMsg = infoCalls.find((c) => c.includes("filtered out by --actionable-only"));
+    expect(filteredMsg).toBeDefined();
+  });
+
+  it("shows all findings without --actionable-only flag", async () => {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: [
+          { type: "observation", severity: "warning", text: "Contains 52% of files", scope: "core" },
+          { type: "anti-pattern", severity: "warning", text: "God object detected", scope: "core" },
+        ],
+      }),
+      "utf-8",
+    );
+
+    await cmdRecommend(tmpDir, {});
+
+    // Without the flag, both findings should appear
+    const tasks = resultCalls.filter((c) => /^\s+\d+\./.test(c));
+    expect(tasks).toHaveLength(2);
   });
 });

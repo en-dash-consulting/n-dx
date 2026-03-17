@@ -253,7 +253,8 @@ function parseBaseRef(comparisonRange: string): string | null {
   return ref.length > 0 ? ref : null;
 }
 
-export function resolveWorkedEpicTitlesForRange(projectDir: string, comparisonRange: string): ResolvedBranchScopedRexWork {
+/** @internal Not part of the public API — unused wrapper kept for potential future CLI use. */
+function resolveWorkedEpicTitlesForRange(projectDir: string, comparisonRange: string): ResolvedBranchScopedRexWork {
   const baseRef = parseBaseRef(comparisonRange);
   if (!baseRef) {
     return {

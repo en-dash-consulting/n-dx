@@ -147,6 +147,38 @@
   color: var(--text-dim);
 }
 
+.top-zone-item .health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Link button */
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+/* Zone attention note */
+.zone-attention-note {
+  font-size: 11px;
+  color: var(--orange);
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  border-radius: 6px;
+}
+
 /* Attention list */
 .attention-list {
   display: flex;

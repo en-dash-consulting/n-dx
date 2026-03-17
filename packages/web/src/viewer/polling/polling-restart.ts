@@ -119,25 +119,3 @@ export function stopPollingRestart(): void {
   started = false;
 }
 
-/**
- * Check if the coordinator is currently running.
- */
-export function isPollingRestartStarted(): boolean {
-  return started;
-}
-
-/**
- * Check if the coordinator has triggered a global suspension.
- */
-export function isCoordinatorSuspended(): boolean {
-  return coordinatorSuspended;
-}
-
-/**
- * Reset all module state (for testing).
- */
-export function resetPollingRestart(): void {
-  stopPollingRestart();
-  started = false;
-  coordinatorSuspended = false;
-}

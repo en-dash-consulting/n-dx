@@ -7,8 +7,8 @@
  */
 
 import { h } from "preact";
-import type { MemorySnapshot, MemoryLevel } from "../performance/memory-monitor.js";
-import { formatBytes, formatRatio } from "../performance/memory-monitor.js";
+import type { MemorySnapshot, MemoryLevel } from "../performance/index.js";
+import { formatBytes, formatRatio } from "../performance/index.js";
 
 export interface MemoryWarningProps {
   /** Current memory snapshot (null = no data yet). */

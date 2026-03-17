@@ -17,12 +17,10 @@ import {
   getDetectionResult,
   clearCrashHistory,
   resetCrashDetector,
-  _testHelpers,
   type CrashDetectionResult,
   type SavedNavigationState,
-} from "../../../src/viewer/performance/crash-detector.js";
-
-const {
+} from "../../../src/viewer/crash/crash-detector.js";
+import {
   HEARTBEAT_KEY,
   NAV_STATE_KEY,
   CRASH_HISTORY_KEY,
@@ -30,7 +28,7 @@ const {
   CRASH_LOOP_WINDOW_MS,
   CRASH_LOOP_THRESHOLD,
   MAX_CRASH_HISTORY,
-} = _testHelpers;
+} from "../../helpers/crash-detector-test-support.js";
 
 describe("crash-detector", () => {
   beforeEach(() => {

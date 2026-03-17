@@ -5,11 +5,13 @@ import { Sidebar } from "../../../src/viewer/components/sidebar.js";
 
 /** Flush Preact's microtask queue so state updates and effects are applied to the DOM.
  *  Preact schedules effects via requestAnimationFrame which jsdom polyfills as setTimeout(0).
- *  We need two ticks: one for Preact's internal scheduling, one for the effect callbacks. */
+ *  We need multiple ticks: for Preact's internal scheduling, effect callbacks, and any
+ *  secondary effects triggered by state changes in hooks (e.g. fetch-based hooks). */
 function flush(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0)).then(
-    () => new Promise((r) => setTimeout(r, 0))
-  );
+  return new Promise((r) => setTimeout(r, 0))
+    .then(() => new Promise((r) => setTimeout(r, 0)))
+    .then(() => new Promise((r) => setTimeout(r, 0)))
+    .then(() => new Promise((r) => setTimeout(r, 0)));
 }
 
 describe("Sidebar", () => {
@@ -117,12 +119,14 @@ describe("Sidebar", () => {
       expect(stored).toBe("REX");
     });
 
-    it("restores expanded section from localStorage", () => {
+    it("expands the section owning the active view regardless of localStorage", () => {
       localStorage.setItem("sidebar-expanded-section", "REX");
       renderSidebar({ view: "overview" as const });
       const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      expect(headers[1].getAttribute("aria-expanded")).toBe("true");
-      expect(headers[0].getAttribute("aria-expanded")).toBe("false");
+      // SOURCEVISION (index 0) owns "overview", so it should be expanded even
+      // though localStorage had "REX" — the active view always wins on load.
+      expect(headers[0].getAttribute("aria-expanded")).toBe("true");
+      expect(headers[1].getAttribute("aria-expanded")).toBe("false");
     });
 
     it("saves empty string when collapsing all sections", async () => {
@@ -260,6 +264,23 @@ describe("Sidebar", () => {
       const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
       // HENCH section (index 2) should be expanded
       expect(headers[2].getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("deep-linking to a rex view expands rex section even with stale localStorage", () => {
+      // Simulate a previous session that left SOURCEVISION expanded
+      localStorage.setItem("sidebar-expanded-section", "SOURCEVISION");
+      renderSidebar({ view: "prd" as const });
+      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
+      // REX section (index 1) must be expanded so the active "prd" item is visible
+      expect(headers[1].getAttribute("aria-expanded")).toBe("true");
+      expect(headers[0].getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("active nav item is highlighted on initial render", () => {
+      renderSidebar({ view: "prd" as const });
+      const activeItems = root.querySelectorAll(".nav-item.active");
+      expect(activeItems.length).toBe(1);
+      expect(activeItems[0].textContent).toContain("Tasks");
     });
 
   });
@@ -448,8 +469,10 @@ describe("Sidebar", () => {
       modules: {
         inventory: { status: "complete" },
         imports: { status: "complete" },
+        classifications: { status: "complete" },
         zones: { status: "running" },
         components: { status: "pending" },
+        callgraph: { status: "pending" },
       },
     } as any;
 
@@ -478,7 +501,7 @@ describe("Sidebar", () => {
     it("shows correct progress count", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const label = root.querySelector(".progress-label");
-      expect(label?.textContent).toBe("Analysis: 2/5");
+      expect(label?.textContent).toBe("Analysis: 3/6");
     });
 
     it("navigates to overview when progress indicator is clicked", () => {
@@ -499,20 +522,21 @@ describe("Sidebar", () => {
     it("renders module status icons", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const modules = root.querySelectorAll(".progress-module");
-      expect(modules.length).toBe(5);
-      // First two should be done (✓)
+      expect(modules.length).toBe(6);
+      // First three should be done (✓)
       expect(modules[0].classList.contains("done")).toBe(true);
       expect(modules[1].classList.contains("done")).toBe(true);
+      expect(modules[2].classList.contains("done")).toBe(true);
       // Last three should not be done
-      expect(modules[2].classList.contains("done")).toBe(false);
       expect(modules[3].classList.contains("done")).toBe(false);
       expect(modules[4].classList.contains("done")).toBe(false);
+      expect(modules[5].classList.contains("done")).toBe(false);
     });
 
     it("progress bar reflects completion percentage", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const fill = root.querySelector<HTMLElement>(".progress-fill");
-      expect(fill?.style.width).toBe("40%");
+      expect(fill?.style.width).toBe("50%");
     });
 
     it("progress indicator collapses with the SourceVision section", async () => {
@@ -563,8 +587,8 @@ describe("Sidebar", () => {
     it("shows sourcevision nav items + token usage + settings when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 9 sourcevision items + 1 token usage item + 1 settings item (Feature Flags)
-      expect(navItems.length).toBe(11);
+      // 8 sourcevision items (graph is feature-gated, default off) + 1 token usage item + 1 settings item (Feature Flags)
+      expect(navItems.length).toBe(10);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

@@ -19,7 +19,7 @@
 import { similarity } from "../analyze/dedupe.js";
 import { walkTree } from "../core/tree.js";
 import type { PRDItem, ItemLevel, ItemStatus } from "../schema/index.js";
-import type { EnrichedRecommendation } from "./types.js";
+import type { EnrichedRecommendation, RecommendationMeta } from "./types.js";
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -131,6 +131,17 @@ function scoreRecommendationAgainstItem(
   rec: EnrichedRecommendation,
   item: PRDItem,
 ): ScoredCandidate | null {
+  // Category-aware short-circuit: when both items carry recommendation
+  // metadata with a category (e.g. "observation", "suggestion", "anti-pattern"),
+  // different categories mean different work — skip the match entirely.
+  // Template-style titles like "Address X issues (N findings)" inflate
+  // similarity across categories without representing actual duplicates.
+  const recCategory = rec.meta?.category;
+  const itemCategory = (item.recommendationMeta as RecommendationMeta | undefined)?.category;
+  if (recCategory && itemCategory && recCategory !== itemCategory) {
+    return null;
+  }
+
   const recTitle = normalize(rec.title);
   const itemTitle = normalize(item.title);
 

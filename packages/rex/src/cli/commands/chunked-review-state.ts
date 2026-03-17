@@ -1,25 +1,12 @@
 import type { Proposal } from "../../analyze/index.js";
 import { classifyModificationRequest } from "../../analyze/validate-modification.js";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
+import type { GranularityAdjustmentRecord, BatchAcceptanceRecord } from "../../analyze/batch-types.js";
+
+// Re-export so existing consumers of chunked-review-state keep working.
+export type { GranularityAdjustmentRecord, BatchAcceptanceRecord };
 
 const DEFAULT_CHUNK_SIZE = 5;
-
-// ─── Types ───────────────────────────────────────────────────────────
-
-/**
- * Record of a single granularity adjustment performed during a review session.
- * Captures what was changed and how, providing an audit trail of adjustments.
- */
-export interface GranularityAdjustmentRecord {
-  /** The direction of adjustment. */
-  direction: "break_down" | "consolidate";
-  /** Titles of the original proposals that were adjusted. */
-  originalTitles: string[];
-  /** Titles of the resulting proposals after adjustment. */
-  resultTitles: string[];
-  /** ISO 8601 timestamp of the adjustment. */
-  timestamp: string;
-}
 
 /** Assessment of a single proposal's task granularity. */
 export interface ProposalAssessment {
@@ -82,32 +69,6 @@ export interface GranularityRequest {
   kind: "break_down" | "consolidate";
   /** 0-based indices of proposals to adjust. */
   indices: number[];
-}
-
-/**
- * Record of a batch acceptance decision.
- * Captures what was offered, what was accepted/rejected,
- * and the mode of acceptance (interactive review vs auto-accept).
- */
-export interface BatchAcceptanceRecord {
-  /** ISO 8601 timestamp of the decision. */
-  timestamp: string;
-  /** Total proposals offered in this batch. */
-  totalProposals: number;
-  /** Number of proposals accepted. */
-  acceptedCount: number;
-  /** Number of proposals rejected (not accepted). */
-  rejectedCount: number;
-  /** Total PRD items (epics + features + tasks) added from accepted proposals. */
-  acceptedItemCount: number;
-  /** Titles of accepted proposals (epic titles). */
-  accepted: string[];
-  /** Titles of rejected proposals (epic titles). */
-  rejected: string[];
-  /** How the decision was made. */
-  mode: "interactive" | "auto" | "cached";
-  /** Granularity adjustments made during this batch review session. */
-  granularityAdjustments?: GranularityAdjustmentRecord[];
 }
 
 /**

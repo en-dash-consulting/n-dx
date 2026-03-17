@@ -7,7 +7,6 @@ import {
   extractHenchTokenUsage,
   extractSvTokenUsage,
   aggregateTokenUsage,
-  formatAggregateTokenUsage,
   estimateCost,
   extractRexTokenEvents,
   extractHenchTokenEvents,
@@ -17,8 +16,11 @@ import {
   groupByTimePeriod,
   periodKey,
   checkBudget,
-  formatBudgetWarnings,
 } from "../../../src/core/token-usage.js";
+import {
+  formatAggregateTokenUsage,
+  formatBudgetWarnings,
+} from "../../../src/cli/commands/token-format.js";
 import type { LogEntry } from "../../../src/schema/index.js";
 import type { AggregateTokenUsage, TokenEvent, BudgetConfig } from "../../../src/core/token-usage.js";
 

@@ -8,7 +8,7 @@
  */
 
 import { h } from "preact";
-import type { SavedNavigationState } from "../performance/crash-detector.js";
+import type { SavedNavigationState } from "../crash/index.js";
 
 export interface CrashRecoveryBannerProps {
   /** Whether the banner should be visible. */

@@ -1,7 +1,7 @@
 import { h, Fragment } from "preact";
 import { useMemo } from "preact/hooks";
 import type { LoadedData } from "../types.js";
-import type { Finding } from "../../schema/v1.js";
+import type { Finding } from "../external.js";
 import { FindingsList, BarChart } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader } from "../components/logos.js";

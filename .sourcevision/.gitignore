@@ -1,0 +1,4 @@
+# Ignore all generated analysis output — regenerate with `ndx plan`
+*
+!.gitignore
+!hints.md

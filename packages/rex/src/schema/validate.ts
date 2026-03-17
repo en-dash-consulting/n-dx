@@ -1,38 +1,34 @@
 import { z, ZodError } from "zod";
+import {
+  SCHEMA_VERSION,
+  isCompatibleSchema,
+  VALID_STATUSES,
+  VALID_LEVELS,
+  VALID_PRIORITIES,
+  VALID_REQUIREMENT_CATEGORIES,
+  VALID_VALIDATION_TYPES,
+} from "./v1.js";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
   | { ok: false; errors: ZodError };
 
-const ItemStatusSchema = z.enum([
-  "pending",
-  "in_progress",
-  "completed",
-  "failing",
-  "deferred",
-  "blocked",
-  "deleted",
-]);
+/** Helper: convert a Set<string> to a z.enum()-compatible tuple. */
+function setToEnumValues<T extends string>(s: Set<T>): [T, ...T[]] {
+  const arr = [...s];
+  return arr as [T, ...T[]];
+}
 
-const ItemLevelSchema = z.enum(["epic", "feature", "task", "subtask"]);
+const ItemStatusSchema = z.enum(setToEnumValues(VALID_STATUSES));
 
-const PrioritySchema = z.enum(["critical", "high", "medium", "low"]);
+const ItemLevelSchema = z.enum(setToEnumValues(VALID_LEVELS));
+
+const PrioritySchema = z.enum(setToEnumValues(VALID_PRIORITIES));
 const ProposalNodeKindSchema = z.enum(["epic", "feature", "task"]);
 
-const RequirementCategorySchema = z.enum([
-  "technical",
-  "performance",
-  "security",
-  "accessibility",
-  "compatibility",
-  "quality",
-]);
+const RequirementCategorySchema = z.enum(setToEnumValues(VALID_REQUIREMENT_CATEGORIES));
 
-const RequirementValidationTypeSchema = z.enum([
-  "automated",
-  "manual",
-  "metric",
-]);
+const RequirementValidationTypeSchema = z.enum(setToEnumValues(VALID_VALIDATION_TYPES));
 
 export const RequirementSchema = z
   .object({
@@ -65,6 +61,8 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       failureReason: z.string().optional(),
+      resolutionType: z.enum(["code-change", "config-override", "acknowledgment", "deferred", "unclassified"]).optional(),
+      resolutionDetail: z.string().optional(),
       mergedProposals: z.array(z.object({
         proposalNodeKey: z.string(),
         proposalTitle: z.string(),
@@ -81,7 +79,9 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
 
 export const PRDDocumentSchema = z
   .object({
-    schema: z.string(),
+    schema: z.string().refine(isCompatibleSchema, {
+      message: `Incompatible PRD schema version, expected "${SCHEMA_VERSION}"`,
+    }),
     title: z.string(),
     items: z.array(PRDItemSchema),
   })

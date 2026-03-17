@@ -1,9 +1,10 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
-import type { Manifest, Zones } from "../../schema/v1.js";
+import type { Manifest, Zones } from "../external.js";
 import type { ViewId } from "../types.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { SidebarThemeToggle } from "./theme-toggle.js";
+import { GlobalFAQ } from "./faq.js";
 import {
   useProjectStatus,
   SvFreshnessIndicator,
@@ -11,7 +12,7 @@ import {
   HenchActivityIndicator,
 } from "./status-indicators.js";
 import { ConfigFooter } from "./config-footer.js";
-import { useProjectMetadata } from "../hooks/use-project-metadata.js";
+import { useProjectMetadata, useFeatureToggle } from "../hooks/index.js";
 import { SOURCEVISION_TABS } from "../views/sourcevision-tabs.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
@@ -27,7 +28,7 @@ interface SidebarProps {
   scope?: string | null;
 }
 
-type NavItem = { type: "item"; id: ViewId; icon: string; label: string; minPass: number };
+type NavItem = { type: "item"; id: ViewId; icon: string; label: string; minPass: number; featureGate?: string };
 type NavSection = { type: "section"; label: string; product?: "sourcevision" | "rex" | "hench" };
 type NavEntry = NavItem | NavSection;
 
@@ -43,10 +44,9 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "section", label: "REX", product: "rex" },
   { type: "item", id: "rex-dashboard", icon: "\u25A8", label: "Dashboard", minPass: 0 },
   { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
-  { type: "item", id: "rex-analysis", icon: "\u2699", label: "Analysis", minPass: 0 },
   { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
-  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "Notion", minPass: 0 },
-  { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0 },
+  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "Notion", minPass: 0, featureGate: "rex.notionSync" },
+  { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0, featureGate: "rex.integrations" },
   { type: "section", label: "HENCH", product: "hench" },
   { type: "item", id: "hench-runs", icon: "\u25B6", label: "Runs", minPass: 0 },
   { type: "item", id: "hench-audit", icon: "\u2638", label: "Audit", minPass: 0 },
@@ -86,17 +86,8 @@ function sectionForView(view: ViewId): string {
   return SECTIONS[0].label;
 }
 
-/** Read persisted expanded section, falling back to the section owning the active view */
+/** Expand the section that owns the active view so the highlighted item is always visible on load */
 function getInitialExpanded(view: ViewId): string {
-  // Token Usage now lives at top-level, so initial render must always surface
-  // its own section even when a different section was previously persisted.
-  if (view === "token-usage") return sectionForView(view);
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && SECTIONS.some((s) => s.label === stored)) return stored;
-  } catch {
-    // localStorage may be unavailable
-  }
   return sectionForView(view);
 }
 
@@ -114,11 +105,32 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const projectStatus = useProjectStatus();
   const projectMeta = useProjectMetadata();
 
-  /** Sections filtered by scope — when scoped, show only the matching section + cross-cutting sections. */
+  // Feature-gated nav items: subscribe to toggle state
+  const callGraphEnabled = useFeatureToggle("sourcevision.callGraph", false);
+  const notionSyncEnabled = useFeatureToggle("rex.notionSync", false);
+  const integrationsEnabled = useFeatureToggle("rex.integrations", false);
+  const enabledGates = useMemo(() => {
+    const m = new Map<string, boolean>();
+    m.set("sourcevision.callGraph", callGraphEnabled);
+    m.set("rex.notionSync", notionSyncEnabled);
+    m.set("rex.integrations", integrationsEnabled);
+    return m;
+  }, [callGraphEnabled, notionSyncEnabled, integrationsEnabled]);
+
+  /** Sections filtered by scope and feature gates. */
   const visibleSections = useMemo(() => {
-    if (!scope) return SECTIONS;
-    return SECTIONS.filter((s) => s.product === scope || !s.product);
-  }, [scope]);
+    const scopeFiltered = scope && scope !== "all"
+      ? SECTIONS.filter((s) => s.product === scope || !s.product)
+      : SECTIONS;
+    // Filter out feature-gated items that are disabled
+    return scopeFiltered.map((s) => ({
+      ...s,
+      items: s.items.filter((item) => {
+        if (!item.featureGate) return true;
+        return enabledGates.get(item.featureGate) ?? false;
+      }),
+    }));
+  }, [scope, enabledGates]);
 
   const [expandedSection, setExpandedSection] = useState<string>(() =>
     scope ? (visibleSections[0]?.label ?? getInitialExpanded(view)) : getInitialExpanded(view)
@@ -127,7 +139,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
   const modules = manifest?.modules ?? {};
-  const moduleNames = ["inventory", "imports", "zones", "components", "callgraph"];
+  const moduleNames = ["inventory", "imports", "classifications", "zones", "components", "callgraph"];
   const completedCount = moduleNames.filter(
     (m) => modules[m]?.status === "complete"
   ).length;
@@ -416,6 +428,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
           h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
           h("div", { class: "sidebar-footer-controls" },
             h(SidebarThemeToggle, null),
+            h(GlobalFAQ, null),
             h("button", {
               class: "sidebar-control-btn sidebar-collapse-btn",
               onClick: onToggleSidebar,

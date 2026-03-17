@@ -21,7 +21,6 @@ import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
 import type { Proposal, ProposalTask } from "./propose.js";
 import {
   detectFileFormat,
-  spawnClaude,
   DEFAULT_MODEL,
   extractJson,
   repairTruncatedJson,
@@ -30,8 +29,9 @@ import {
   PRD_SCHEMA,
   TASK_QUALITY_RULES,
   OUTPUT_INSTRUCTION,
-} from "./reason.js";
-import type { FileFormat } from "./reason.js";
+} from "./analyze-shared.js";
+import type { FileFormat } from "./analyze-shared.js";
+import { spawnClaude } from "./llm-bridge.js";
 import {
   validateFileInput,
   validateMarkdownContent,

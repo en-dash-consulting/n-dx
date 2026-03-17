@@ -18,7 +18,7 @@
  * @see {@link generateStructuralInsights} for automated metric interpretation
  */
 
-import { basename, dirname } from "node:path";
+import { basename, dirname, extname } from "node:path";
 import { createHash } from "node:crypto";
 import type {
   Inventory,
@@ -33,6 +33,10 @@ import type {
 } from "../schema/index.js";
 import type { SubAnalysis } from "./workspace.js";
 import {
+  buildPackageMap,
+  computeCrossRepoCrossings,
+} from "./workspace-crossings.js";
+import {
   promoteZones,
   promoteCrossings,
   getSubAnalyzedPrefixes,
@@ -45,12 +49,15 @@ import {
   louvainPhase1,
   mergeBidirectionalCoupling,
   mergeSmallCommunities,
+  mergeSatelliteCommunities,
   capZoneCount,
   splitLargeCommunities,
 } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import type { EnrichResult, PerZoneEnrichResult } from "./enrich.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
+import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
+import type { MoveContext } from "./move-recommendations.js";
 
 /** Result from analyzeZones, including the zones data and optional token usage. */
 export interface AnalyzeZonesResult {
@@ -74,7 +81,7 @@ export interface ZonePipelineOptions {
   maxZones?: number;
   /**
    * Maximum percentage of scope files a single zone may contain (1–100).
-   * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (30%).
+   * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (15%).
    * Set to `100` to disable the zone size cap.
    */
   maxZonePercent?: number;
@@ -84,6 +91,13 @@ export interface ZonePipelineOptions {
   depth?: number;
   /** Test files excluded from cohesion/coupling metric computation. */
   testFiles?: Set<string>;
+  /**
+   * Manual zone overrides: file path → target zone ID.
+   * Files listed here are moved to the specified zone after Louvain detection
+   * and proximity assignment, overriding the algorithmic placement.
+   * Stored in `.n-dx.json` under `sourcevision.zones.pins`.
+   */
+  zonePins?: Record<string, string>;
 }
 
 /** Result of running the zone detection pipeline. */
@@ -450,6 +464,56 @@ export function assignByProximity(
   return { zones: expandedZones, remaining };
 }
 
+// ── Zone pinning ─────────────────────────────────────────────────────────────
+
+/**
+ * Apply manual zone pins by moving files from their detected zone to the
+ * pinned target zone. Files whose target zone doesn't exist are skipped.
+ * This runs after Louvain detection and proximity assignment.
+ */
+export function applyZonePins(
+  zones: Zone[],
+  pins: Record<string, string>,
+): Zone[] {
+  // Build file → source zone index
+  const fileToZoneIdx = new Map<string, number>();
+  for (let i = 0; i < zones.length; i++) {
+    for (const f of zones[i].files) {
+      fileToZoneIdx.set(f, i);
+    }
+  }
+
+  // Build zone ID → index
+  const zoneIdToIdx = new Map<string, number>();
+  for (let i = 0; i < zones.length; i++) {
+    zoneIdToIdx.set(zones[i].id, i);
+  }
+
+  // Collect moves: [file, sourceIdx, targetIdx]
+  const moves: [string, number, number][] = [];
+  for (const [file, targetZoneId] of Object.entries(pins)) {
+    const sourceIdx = fileToZoneIdx.get(file);
+    const targetIdx = zoneIdToIdx.get(targetZoneId);
+    if (sourceIdx === undefined || targetIdx === undefined) continue;
+    if (sourceIdx === targetIdx) continue; // already in target zone
+    moves.push([file, sourceIdx, targetIdx]);
+  }
+
+  if (moves.length === 0) return zones;
+
+  // Apply moves immutably
+  const result = zones.map((z) => ({ ...z, files: [...z.files] }));
+  for (const [file, sourceIdx, targetIdx] of moves) {
+    const srcFiles = result[sourceIdx].files;
+    const idx = srcFiles.indexOf(file);
+    if (idx !== -1) srcFiles.splice(idx, 1);
+    result[targetIdx].files.push(file);
+  }
+
+  // Remove zones that became empty
+  return result.filter((z) => z.files.length > 0);
+}
+
 // ── Recursive subdivision ────────────────────────────────────────────────────
 
 /** Zones with more than this many files are subdivided recursively. */
@@ -545,19 +609,11 @@ export function computeZoneContentHash(
   return createHash("sha256").update(data).digest("hex").slice(0, 16);
 }
 
-/**
- * Hash all zone content hashes into a single global content hash.
- * Changes when any zone's content changes.
- */
-export function computeGlobalContentHash(
-  zoneContentHashes: Record<string, string>
-): string {
-  const data = Object.keys(zoneContentHashes)
-    .sort()
-    .map((id) => `${id}\0${zoneContentHashes[id]}`)
-    .join("\n");
-  return createHash("sha256").update(data).digest("hex").slice(0, 16);
-}
+// Imported from zone-hash.ts to break circular dependency with enrich.ts.
+// Both zones.ts and enrich.ts need this function; placing it in a third
+// module prevents the cycle.
+import { computeGlobalContentHash } from "./zone-hash.js";
+export { computeGlobalContentHash } from "./zone-hash.js";
 
 // ── Structural insights ─────────────────────────────────────────────────────
 
@@ -568,6 +624,9 @@ export function computeGlobalContentHash(
  * These insights translate raw cohesion/coupling numbers into architectural
  * guidance:
  *
+ * - **Isolated files**: multiple files with no import edges — cohesion is
+ *   unmeasurable (reported as 0). Not inherently bad, but the grouping is
+ *   based on proximity rather than structural evidence.
  * - **High cohesion** (≥0.8): files are tightly interconnected — good sign.
  *   Perfect cohesion (1.0) means the zone is fully self-contained.
  * - **Low cohesion** (<0.4): files are loosely related — consider splitting.
@@ -579,9 +638,10 @@ export function computeGlobalContentHash(
  * - **Hub files**: files imported across 3+ zones are cross-cutting dependencies.
  * - **Bidirectional coupling**: zone pairs that import from each other.
  *
- * When all zones achieve perfect cohesion, it validates that the Louvain
- * community detection successfully identified the codebase's natural
- * architectural boundaries.
+ * When all connected zones achieve perfect cohesion, it validates that the
+ * Louvain community detection successfully identified the codebase's natural
+ * architectural boundaries. Isolated-file zones (cohesion 0) are excluded
+ * from this assessment — their grouping is proximity-based, not structural.
  */
 export function generateStructuralInsights(
   zones: Zone[],
@@ -599,15 +659,41 @@ export function generateStructuralInsights(
     zoneInsights.set(zone.id, []);
   }
 
-  // ── Per-zone insights ──
+  collectPerZoneInsights(zones, crossings, totalFiles, zoneInsights);
+  collectHubFileInsights(crossings, globalInsights);
+  collectBidirectionalCouplingInsights(crossings, globalInsights);
+  collectSizeImbalanceInsights(zones, globalInsights);
+  collectCircularDependencyInsights(imports, globalInsights);
 
+  if (callGraphStats) {
+    collectCallGraphInsights(zones, callGraphStats, zoneInsights, globalInsights);
+  }
+
+  collectFileStructureFindings(zones, filenameBasedZoneIds, findings);
+
+  return { zoneInsights, globalInsights, findings };
+}
+
+// ── Per-zone metric insights ────────────────────────────────────────────────
+
+/** Cohesion, coupling, size, entry point, and naming insights per zone. */
+function collectPerZoneInsights(
+  zones: Zone[],
+  crossings: ZoneCrossing[],
+  totalFiles: number,
+  zoneInsights: Map<string, string[]>,
+): void {
   for (const zone of zones) {
     const insights = zoneInsights.get(zone.id)!;
     const pct = totalFiles > 0
       ? Math.round((zone.files.length / totalFiles) * 100)
       : 0;
 
-    if (zone.cohesion >= 0.8) {
+    if (zone.cohesion === 0 && zone.coupling === 0 && zone.files.length > 1) {
+      insights.push(
+        `Isolated files — no import edges between ${zone.files.length} files, cohesion is unmeasurable (reported as 0)`
+      );
+    } else if (zone.cohesion >= 0.8) {
       insights.push(
         `High cohesion (${zone.cohesion}) — files are tightly interconnected`
       );
@@ -658,10 +744,15 @@ export function generateStructuralInsights(
       );
     }
   }
+}
 
-  // ── Global insights ──
+// ── Hub file detection ──────────────────────────────────────────────────────
 
-  // Hub files: files imported across 3+ zones
+/** Find files imported across 3+ zones (cross-cutting dependencies). */
+function collectHubFileInsights(
+  crossings: ZoneCrossing[],
+  globalInsights: string[],
+): void {
   const fileImportingZones = new Map<string, Set<string>>();
   for (const c of crossings) {
     let set = fileImportingZones.get(c.to);
@@ -681,8 +772,15 @@ export function generateStructuralInsights(
       `Hub: ${file} is imported by ${importingZones.size} zones — cross-cutting dependency`
     );
   }
+}
 
-  // Bidirectional coupling between zone pairs
+// ── Bidirectional coupling ──────────────────────────────────────────────────
+
+/** Detect zone pairs that import from each other. */
+function collectBidirectionalCouplingInsights(
+  crossings: ZoneCrossing[],
+  globalInsights: string[],
+): void {
   const pairCounts = new Map<string, { ab: number; ba: number }>();
   for (const c of crossings) {
     const key =
@@ -708,8 +806,15 @@ export function generateStructuralInsights(
       );
     }
   }
+}
 
-  // Zone size imbalance
+// ── Zone size imbalance ─────────────────────────────────────────────────────
+
+/** Flag when largest zone dwarfs smallest (>5× ratio). */
+function collectSizeImbalanceInsights(
+  zones: Zone[],
+  globalInsights: string[],
+): void {
   if (zones.length > 2) {
     const sizes = zones.map((z) => z.files.length).sort((a, b) => a - b);
     if (sizes[sizes.length - 1] > sizes[0] * 5) {
@@ -718,74 +823,96 @@ export function generateStructuralInsights(
       );
     }
   }
+}
 
-  // Circular dependencies
+// ── Circular dependency reporting ───────────────────────────────────────────
+
+/** Surface file-level circular dependency counts from import analysis. */
+function collectCircularDependencyInsights(
+  imports: Imports,
+  globalInsights: string[],
+): void {
   if (imports.summary.circularCount > 0) {
     globalInsights.push(
       `${imports.summary.circularCount} circular dependency chain${imports.summary.circularCount > 1 ? "s" : ""} detected — see imports.json for details`
     );
   }
+}
 
-  // ── Call graph insights (when available) ──
+// ── Call graph insights ─────────────────────────────────────────────────────
 
-  if (callGraphStats) {
-    const { zoneStats, crossZonePatterns } = callGraphStats;
-    const zoneStatsMap = new Map(zoneStats.map((s) => [s.zoneId, s]));
+type CallGraphStats = NonNullable<Parameters<typeof generateStructuralInsights>[4]>;
 
-    // Per-zone call graph insights
-    for (const zone of zones) {
-      const stats = zoneStatsMap.get(zone.id);
-      if (!stats) continue;
-      const insights = zoneInsights.get(zone.id)!;
+/** Per-zone and global insights derived from the function call graph. */
+function collectCallGraphInsights(
+  zones: Zone[],
+  callGraphStats: CallGraphStats,
+  zoneInsights: Map<string, string[]>,
+  globalInsights: string[],
+): void {
+  const { zoneStats, crossZonePatterns } = callGraphStats;
+  const zoneStatsMap = new Map(zoneStats.map((s) => [s.zoneId, s]));
 
-      // Call cohesion divergence from import cohesion
-      const cohesionDiff = Math.abs(stats.callCohesion - zone.cohesion);
-      if (cohesionDiff > 0.3) {
-        if (stats.callCohesion < zone.cohesion) {
-          insights.push(
-            `Call cohesion (${stats.callCohesion}) much lower than import cohesion (${zone.cohesion}) — functions call across zone boundaries more than imports suggest`
-          );
-        } else {
-          insights.push(
-            `Call cohesion (${stats.callCohesion}) much higher than import cohesion (${zone.cohesion}) — tighter runtime coupling within zone than import structure suggests`
-          );
-        }
-      }
+  // Per-zone call graph insights
+  for (const zone of zones) {
+    const stats = zoneStatsMap.get(zone.id);
+    if (!stats) continue;
+    const insights = zoneInsights.get(zone.id)!;
 
-      // High incoming call traffic
-      if (stats.incomingCalls > 20) {
+    // Call cohesion divergence from import cohesion
+    const cohesionDiff = Math.abs(stats.callCohesion - zone.cohesion);
+    if (cohesionDiff > 0.3) {
+      if (stats.callCohesion < zone.cohesion) {
         insights.push(
-          `${stats.incomingCalls} incoming calls from other zones — heavily depended-on runtime API`
+          `Call cohesion (${stats.callCohesion}) much lower than import cohesion (${zone.cohesion}) — functions call across zone boundaries more than imports suggest`
+        );
+      } else {
+        insights.push(
+          `Call cohesion (${stats.callCohesion}) much higher than import cohesion (${zone.cohesion}) — tighter runtime coupling within zone than import structure suggests`
         );
       }
     }
 
-    // Global cross-zone call patterns
-    const topCrossZone = crossZonePatterns.slice(0, 3);
-    for (const pattern of topCrossZone) {
-      if (pattern.callCount >= 10) {
-        globalInsights.push(
-          `Heavy cross-zone calls: "${pattern.fromZone}" → "${pattern.toZone}" (${pattern.callCount} calls) — tight runtime coupling`
-        );
-      }
-    }
-
-    // Total cross-zone call percentage
-    const totalCalls = zoneStats.reduce((s, z) => s + z.internalCalls + z.outgoingCalls, 0);
-    const totalCrossZone = zoneStats.reduce((s, z) => s + z.outgoingCalls, 0);
-    if (totalCalls > 0) {
-      const pct = Math.round((totalCrossZone / totalCalls) * 100);
-      if (pct > 40) {
-        globalInsights.push(
-          `${pct}% of function calls cross zone boundaries — high runtime inter-zone dependency`
-        );
-      }
+    // High incoming call traffic
+    if (stats.incomingCalls > 20) {
+      insights.push(
+        `${stats.incomingCalls} incoming calls from other zones — heavily depended-on runtime API`
+      );
     }
   }
 
-  // ── File-structure recommendations ──
+  // Global cross-zone call patterns
+  const topCrossZone = crossZonePatterns.slice(0, 3);
+  for (const pattern of topCrossZone) {
+    if (pattern.callCount >= 10) {
+      globalInsights.push(
+        `Heavy cross-zone calls: "${pattern.fromZone}" → "${pattern.toZone}" (${pattern.callCount} calls) — tight runtime coupling`
+      );
+    }
+  }
 
-  // 2a. Flat directory spanning 3+ zones
+  // Total cross-zone call percentage
+  const totalCalls = zoneStats.reduce((s, z) => s + z.internalCalls + z.outgoingCalls, 0);
+  const totalCrossZone = zoneStats.reduce((s, z) => s + z.outgoingCalls, 0);
+  if (totalCalls > 0) {
+    const pct = Math.round((totalCrossZone / totalCalls) * 100);
+    if (pct > 40) {
+      globalInsights.push(
+        `${pct}% of function calls cross zone boundaries — high runtime inter-zone dependency`
+      );
+    }
+  }
+}
+
+// ── File-structure recommendations ──────────────────────────────────────────
+
+/** Directory-spanning zones, scattered files, and filename-derived zone IDs. */
+function collectFileStructureFindings(
+  zones: Zone[],
+  filenameBasedZoneIds: Set<string> | undefined,
+  findings: Finding[],
+): void {
+  // Flat directory spanning 3+ zones
   const dirToZones = new Map<string, Set<string>>();
   for (const zone of zones) {
     for (const f of zone.files) {
@@ -808,7 +935,7 @@ export function generateStructuralInsights(
     }
   }
 
-  // 2b. Zone with scattered files (5+ directories)
+  // Zone with scattered files (5+ directories)
   for (const zone of zones) {
     const dirs = new Set(zone.files.map((f) => dirname(f)));
     if (dirs.size >= 5) {
@@ -822,7 +949,23 @@ export function generateStructuralInsights(
     }
   }
 
-  // 2c. Filename-derived zone
+  // Numeric suffix zones — overflow communities requiring pin or merge decision.
+  // Mirrors the cross-package residual zone dissolution policy but applies it
+  // to intra-package overflow communities (e.g. web-2, src-2, unit-3).
+  for (const zone of zones) {
+    const leafId = zone.id.includes("/") ? zone.id.split("/").pop()! : zone.id;
+    if (/-\d+$/.test(leafId)) {
+      findings.push({
+        type: "suggestion",
+        pass: 0,
+        scope: zone.id,
+        text: `Zone "${leafId}" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID`,
+        severity: "warning",
+      });
+    }
+  }
+
+  // Filename-derived zone
   if (filenameBasedZoneIds) {
     for (const zoneId of filenameBasedZoneIds) {
       const zone = zones.find((z) => z.id === zoneId);
@@ -838,8 +981,6 @@ export function generateStructuralInsights(
       });
     }
   }
-
-  return { zoneInsights, globalInsights, findings };
 }
 
 // ── Helper: merge same-ID communities ────────────────────────────────────────
@@ -961,8 +1102,11 @@ function dominantPackageRoot(files: string[]): string | null {
 
 /**
  * Compute cohesion and coupling metrics for a set of files in a zone.
- * Test files are excluded from the calculation because test→source edges
- * represent test dependencies, not architectural coupling.
+ * Test files are excluded from the calculation — both as iteration sources
+ * and as neighbors — because test→source and source→test edges represent
+ * test dependencies, not architectural coupling. Without this exclusion,
+ * zones with many test files (e.g. E2E suites) produce misleading metrics
+ * where test-file neighbors inflate internal/external edge counts.
  */
 function computeZoneMetrics(
   files: string[],
@@ -972,20 +1116,34 @@ function computeZoneMetrics(
   const memberSet = new Set(files);
   let internalEdgeCount = 0;
   let totalEdgesFromZone = 0;
+  let productionNodeCount = 0;
   for (const node of files) {
     if (testFiles.has(node)) continue;
+    productionNodeCount++;
     const neighbors = graph.get(node);
     if (!neighbors) continue;
     for (const [neighbor] of neighbors) {
+      if (testFiles.has(neighbor)) continue;
       totalEdgesFromZone++;
       if (memberSet.has(neighbor)) internalEdgeCount++;
     }
   }
+  // A zone with ≤1 production files cannot form internal production edges,
+  // so cohesion/coupling are structurally meaningless. Return healthy defaults
+  // to avoid false-positive risk alerts on test-dominated or single-file zones.
+  if (productionNodeCount <= 1) {
+    return { cohesion: 1, coupling: 0 };
+  }
+  // Multiple production files but zero edges: files are completely isolated
+  // from each other. Cohesion is 0 (no evidence of relatedness), not 1.
+  // Returning 1 here would be a metric artifact — perfect cohesion should
+  // require actual internal edges, not merely the absence of external ones.
+  if (totalEdgesFromZone === 0) {
+    return { cohesion: 0, coupling: 0 };
+  }
   return {
-    cohesion: totalEdgesFromZone > 0
-      ? Math.round((internalEdgeCount / totalEdgesFromZone) * 100) / 100 : 1,
-    coupling: totalEdgesFromZone > 0
-      ? Math.round(((totalEdgesFromZone - internalEdgeCount) / totalEdgesFromZone) * 100) / 100 : 0,
+    cohesion: Math.round((internalEdgeCount / totalEdgesFromZone) * 100) / 100,
+    coupling: Math.round(((totalEdgesFromZone - internalEdgeCount) / totalEdgesFromZone) * 100) / 100,
   };
 }
 
@@ -1013,6 +1171,11 @@ function computeEntryPoints(
  * Convert Louvain community assignments into Zone objects with metrics.
  * Computes entry points, cohesion/coupling, and recursive subdivision.
  *
+ * Cohesion/coupling are computed from `metricsGraph` (import edges only),
+ * not from the clustering `graph` which includes proximity edges. This
+ * prevents isolated files grouped by directory proximity from receiving
+ * artificially perfect cohesion scores.
+ *
  * When `parentId` is provided (subdivision), zone IDs are derived relative
  * to the parent and prefixed with `parentId/`. The `depth` parameter is
  * threaded to `subdivideZone` for recursion limiting.
@@ -1020,6 +1183,7 @@ function computeEntryPoints(
 function buildZonesFromCommunities(
   community: Map<string, string>,
   graph: Map<string, Map<string, number>>,
+  metricsGraph: Map<string, Map<string, number>>,
   imports: Imports,
   inventory: Inventory,
   testFiles: Set<string>,
@@ -1068,7 +1232,7 @@ function buildZonesFromCommunities(
             existing.description = describeZone(existing.files, inventory);
             const mergedSet = new Set(existing.files);
             existing.entryPoints = computeEntryPoints(mergedSet, imports);
-            const metrics = computeZoneMetrics(existing.files, graph, testFiles);
+            const metrics = computeZoneMetrics(existing.files, metricsGraph, testFiles);
             existing.cohesion = metrics.cohesion;
             existing.coupling = metrics.coupling;
             // Re-subdivide with merged files
@@ -1095,7 +1259,7 @@ function buildZonesFromCommunities(
 
     const memberSet = new Set(members);
     const entryPoints = computeEntryPoints(memberSet, imports);
-    const { cohesion, coupling } = computeZoneMetrics(members, graph, testFiles);
+    const { cohesion, coupling } = computeZoneMetrics(members, metricsGraph, testFiles);
 
     const zone: Zone = {
       id,
@@ -1119,30 +1283,6 @@ function buildZonesFromCommunities(
   return { zones, filenameBasedZoneIds };
 }
 
-// ── Helper: collect unzoned files ────────────────────────────────────────────
-
-/** Gather inventory files not assigned to any zone or sub-analysis. */
-function collectUnzonedFiles(
-  zones: Zone[],
-  inventory: Inventory,
-  subAnalyzedPrefixes: string[]
-): string[] {
-  const zonedFiles = new Set<string>();
-  for (const zone of zones) {
-    for (const f of zone.files) zonedFiles.add(f);
-  }
-  const unzoned: string[] = [];
-  for (const entry of inventory.files) {
-    if (
-      !zonedFiles.has(entry.path) &&
-      !isSubAnalyzedFile(entry.path, subAnalyzedPrefixes)
-    ) {
-      unzoned.push(entry.path);
-    }
-  }
-  return unzoned;
-}
-
 // ── Helper: compute content hashes ───────────────────────────────────────────
 
 /** Compute per-zone and global content hashes for stale-finding detection. */
@@ -1160,6 +1300,44 @@ function computeContentHashes(
   }
   const globalContentHash = computeGlobalContentHash(zoneContentHashes);
   return { zoneContentHashes, globalContentHash };
+}
+
+/**
+ * Remap content hash keys from pre-enrichment zone IDs to post-enrichment IDs.
+ *
+ * Enrichment (AI or fast-mode preservation) may rename zone IDs. This function
+ * builds a mapping by matching zones positionally (same index = same zone) and
+ * returns a new hash record keyed by the final zone IDs.
+ *
+ * If no IDs changed, the original record is returned as-is for efficiency.
+ */
+function remapContentHashKeys(
+  originalHashes: Record<string, string>,
+  preEnrichmentZones: Zone[],
+  postEnrichmentZones: Zone[],
+): Record<string, string> {
+  // Build old→new ID mapping. Zones are matched by array position since
+  // enrichment preserves zone order and count.
+  const idMap = new Map<string, string>();
+  let anyChanged = false;
+  const limit = Math.min(preEnrichmentZones.length, postEnrichmentZones.length);
+  for (let i = 0; i < limit; i++) {
+    const oldId = preEnrichmentZones[i].id;
+    const newId = postEnrichmentZones[i].id;
+    if (oldId !== newId) {
+      anyChanged = true;
+    }
+    idMap.set(oldId, newId);
+  }
+
+  if (!anyChanged) return originalHashes;
+
+  const remapped: Record<string, string> = {};
+  for (const [key, hash] of Object.entries(originalHashes)) {
+    const newKey = idMap.get(key) ?? key;
+    remapped[newKey] = hash;
+  }
+  return remapped;
 }
 
 // ── Helper: AI enrichment ────────────────────────────────────────────────────
@@ -1511,9 +1689,9 @@ function backPopulateInsights(
 /**
  * Maximum percentage of project files a single zone should contain.
  * Zones exceeding this threshold are split via internal Louvain subdivision.
- * Default: 30% — prevents over-aggregation where one zone dominates the codebase.
+ * Default: 15% — prevents over-aggregation where one zone dominates the codebase.
  */
-export const DEFAULT_MAX_ZONE_PERCENT = 30;
+export const DEFAULT_MAX_ZONE_PERCENT = 15;
 
 /**
  * Run the full zone detection pipeline: graph construction, Louvain community
@@ -1529,15 +1707,25 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     inventory,
     imports,
     scopeFiles,
-    maxZones = 15,
+    maxZones = 30,
     maxZonePercent = DEFAULT_MAX_ZONE_PERCENT,
     parentId,
     depth = 0,
     testFiles = new Set<string>(),
+    zonePins,
   } = options;
 
   // ── Build undirected graph ──
   const graph = buildUndirectedGraph(edges);
+
+  // Snapshot the import-only graph for metrics computation. Proximity edges
+  // exist to help Louvain cluster disconnected files but they are NOT
+  // evidence of architectural cohesion — inflating cohesion for zones
+  // whose files share a directory but never import each other.
+  const importOnlyGraph: Map<string, Map<string, number>> = new Map();
+  for (const [node, neighbors] of graph) {
+    importOnlyGraph.set(node, new Map(neighbors));
+  }
 
   // ── Add directory proximity edges ──
   // Only for files not already in the import graph, and only those sharing
@@ -1561,12 +1749,12 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   addDirectoryProximityEdges(graph, clusterableNonImportFiles);
 
   // ── Scale maxZones by file count ──
-  // Small packages shouldn't fragment into many zones. Scale from 3 (≤45 files)
-  // up to the configured cap (default 15 at 225+ files).
+  // Small packages shouldn't fragment into many zones. Scale from 3 (≤36 files)
+  // up to the configured cap (default 30 at 360+ files).
   // Also ensure we allow enough zones for the size policy to work —
   // if maxZonePercent limits zone size, we need at least ceil(n/maxSize) zones.
   const graphNodeCount = graph.size;
-  const scaledByCount = Math.max(3, Math.floor(graphNodeCount / 15));
+  const scaledByCount = Math.max(3, Math.floor(graphNodeCount / 12));
   const maxPct = Math.max(1, Math.min(100, maxZonePercent));
   const maxZoneSize = Math.max(3, Math.ceil(graphNodeCount * maxPct / 100));
   const minForSizePolicy = maxPct < 100 ? Math.ceil(graphNodeCount / maxZoneSize) : 0;
@@ -1576,6 +1764,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   let community = louvainPhase1(graph);
   community = mergeBidirectionalCoupling(community, graph);
   community = mergeSmallCommunities(community, graph);
+  community = mergeSatelliteCommunities(community, graph);
   community = capZoneCount(community, graph, scaledMaxZones);
 
   // ── Split oversized communities ──
@@ -1586,7 +1775,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
 
   // ── Build zones from communities ──
   const { zones, filenameBasedZoneIds } = buildZonesFromCommunities(
-    community, graph, imports, inventory, testFiles, parentId, depth,
+    community, graph, importOnlyGraph, imports, inventory, testFiles, parentId, depth,
     maxPct < 100 ? maxZoneSize : undefined,
   );
 
@@ -1600,10 +1789,175 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     zones, initialUnzoned, maxPct < 100 ? maxZoneSize : undefined,
   );
 
-  // ── Build crossings ──
-  const crossings = buildCrossings(expandedZones, imports, []);
+  // ── Apply zone pins ──
+  const pinnedZones = zonePins && Object.keys(zonePins).length > 0
+    ? applyZonePins(expandedZones, zonePins)
+    : expandedZones;
 
-  return { zones: expandedZones, crossings, unzoned, filenameBasedZoneIds };
+  // ── Build crossings ──
+  const crossings = buildCrossings(pinnedZones, imports, []);
+
+  return { zones: pinnedZones, crossings, unzoned, filenameBasedZoneIds };
+}
+
+// ── Non-importable file extensions ────────────────────────────────────────────
+
+/**
+ * File extensions that cannot form import edges in any JS/TS module system.
+ * Including these in zone detection produces noise zones (e.g. logo, web-landing)
+ * with false-positive 'at-risk' labels and distorted cohesion scores of 0.
+ */
+const NON_IMPORTABLE_EXTENSIONS = new Set([
+  // Binary image assets
+  ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".avif", ".bmp", ".tiff",
+  // Vector and font assets
+  ".svg", ".woff", ".woff2", ".ttf", ".otf", ".eot",
+  // Media assets
+  ".mp3", ".mp4", ".wav", ".ogg", ".webm", ".pdf",
+  // Markup and style (not importable as modules)
+  ".html", ".htm", ".css", ".scss", ".less", ".sass",
+  // Data and documentation
+  ".md", ".mdx", ".json", ".yaml", ".yml", ".toml",
+  // Lock files
+  ".lock",
+]);
+
+// ── Helper: prepare scope and edges ──────────────────────────────────────────
+
+/** Filter sub-analyzed files from edges/inventory and build the test file set. */
+function prepareScopeAndEdges(
+  inventory: Inventory,
+  imports: Imports,
+  subAnalyses: SubAnalysis[],
+): {
+  filteredEdges: ImportEdge[];
+  scopeFiles: string[];
+  testFiles: Set<string>;
+  subAnalyzedPrefixes: string[];
+} {
+  const subAnalyzedPrefixes = getSubAnalyzedPrefixes(subAnalyses);
+  const filteredEdges = subAnalyzedPrefixes.length > 0
+    ? imports.edges.filter(
+        (e) =>
+          !isSubAnalyzedFile(e.from, subAnalyzedPrefixes) &&
+          !isSubAnalyzedFile(e.to, subAnalyzedPrefixes)
+      )
+    : imports.edges;
+
+  const scopeFiles = inventory.files
+    .filter(f => !isSubAnalyzedFile(f.path, subAnalyzedPrefixes))
+    .filter(f => !NON_IMPORTABLE_EXTENSIONS.has(extname(f.path).toLowerCase()))
+    .map(f => f.path);
+
+  const testFiles = new Set<string>();
+  for (const f of inventory.files) {
+    if (f.role === "test") testFiles.add(f.path);
+  }
+
+  return { filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes };
+}
+
+// ── Helper: promote sub-analyses ─────────────────────────────────────────────
+
+/**
+ * Promote zones and crossings from sub-analyses into the root zone list.
+ * Also resolves workspace member npm imports (e.g. `@n-dx/llm-client`) into
+ * zone crossings so foundation-tier coupling is visible in the monorepo graph.
+ */
+function promoteSubAnalyses(
+  subAnalyses: SubAnalysis[],
+  pinnedFinalZones: Zone[],
+): { allZones: Zone[]; promotedCrossings: ZoneCrossing[] } {
+  const promotedZones: Zone[] = [];
+  const promotedCrossings: ZoneCrossing[] = [];
+  for (const sub of subAnalyses) {
+    promotedZones.push(...promoteZones(sub));
+    promotedCrossings.push(...promoteCrossings(sub));
+  }
+  const allZones = [...pinnedFinalZones, ...promotedZones];
+
+  if (subAnalyses.length > 0) {
+    const packageMap = buildPackageMap(subAnalyses);
+    const crossRepoCrossings = computeCrossRepoCrossings(
+      subAnalyses, allZones, packageMap,
+    );
+    promotedCrossings.push(...crossRepoCrossings);
+  }
+
+  return { allZones, promotedCrossings };
+}
+
+// ── Helper: move recommendations ─────────────────────────────────────────────
+
+/** Detect pin divergence and import-neighbor move recommendations. */
+function computeMoveFindings(
+  pinnedFinalZones: Zone[],
+  crossings: ZoneCrossing[],
+  edges: ImportEdge[],
+  zonePins: Record<string, string>,
+): Finding[] {
+  const rootCrossings = crossings.filter(
+    (c) => !c.fromZone.includes(":") && !c.toZone.includes(":"),
+  );
+  const moveCtx: MoveContext = {
+    zones: pinnedFinalZones,
+    crossings: rootCrossings,
+    edges,
+    zonePins,
+  };
+  return [
+    ...detectPinDivergence(moveCtx),
+    ...detectImportNeighborMoves(moveCtx),
+  ];
+}
+
+// ── Helper: build final result ───────────────────────────────────────────────
+
+/** Assemble the final AnalyzeZonesResult with sorted zones data. */
+function buildAnalyzeZonesResult(opts: {
+  allZones: Zone[];
+  crossings: ZoneCrossing[];
+  unzoned: string[];
+  allGlobalInsights: string[];
+  allFindings: Finding[];
+  enrichmentPass: number;
+  structureHash: string;
+  remappedContentHashes: Record<string, string>;
+  previousZones: Zones | undefined;
+  structureChanged: boolean;
+  enrichTokenUsage: AnalyzeTokenUsage | undefined;
+}): AnalyzeZonesResult {
+  const {
+    allZones, crossings, unzoned, allGlobalInsights, allFindings,
+    enrichmentPass, structureHash, remappedContentHashes,
+    previousZones, structureChanged, enrichTokenUsage,
+  } = opts;
+
+  const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
+  const metaEvaluationCount = enrichmentPass >= 5
+    ? prevMetaCount + 1
+    : prevMetaCount > 0 ? prevMetaCount : undefined;
+  const displayPass = enrichmentPass > 4 ? 4 : enrichmentPass;
+  const lastReset = (structureChanged && previousZones?.enrichmentPass)
+    ? { from: previousZones.enrichmentPass, to: 1 }
+    : undefined;
+
+  return {
+    zones: sortZonesData({
+      zones: allZones,
+      crossings,
+      unzoned,
+      insights: allGlobalInsights.length > 0 ? allGlobalInsights : undefined,
+      findings: allFindings.length > 0 ? allFindings : undefined,
+      enrichmentPass: enrichmentPass > 0 ? displayPass : undefined,
+      ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
+      structureHash,
+      zoneContentHashes: remappedContentHashes,
+      ...(lastReset ? { lastReset } : {}),
+    }),
+    tokenUsage: enrichTokenUsage,
+    structureChanged,
+  };
 }
 
 // ── Main entry point ────────────────────────────────────────────────────────
@@ -1625,10 +1979,15 @@ export async function analyzeZones(
     /**
      * Maximum percentage of project files a single zone may contain (1–100).
      * Zones exceeding this are split via internal Louvain subdivision.
-     * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (30%).
+     * Default: {@link DEFAULT_MAX_ZONE_PERCENT} (15%).
      * Set to `100` to disable the zone size cap.
      */
     maxZonePercent?: number;
+    /**
+     * Manual zone overrides: file path → target zone ID.
+     * Passed through to the zone pipeline to override Louvain placement.
+     */
+    zonePins?: Record<string, string>;
   }
 ): Promise<AnalyzeZonesResult> {
   const enrich = options?.enrich ?? true;
@@ -1636,25 +1995,9 @@ export async function analyzeZones(
   const previousZones = options?.previousZones;
   const subAnalyses = options?.subAnalyses ?? [];
 
-  // ── Exclude sub-analyzed files from Louvain ──
-  const subAnalyzedPrefixes = getSubAnalyzedPrefixes(subAnalyses);
-  const filteredEdges = subAnalyzedPrefixes.length > 0
-    ? imports.edges.filter(
-        (e) =>
-          !isSubAnalyzedFile(e.from, subAnalyzedPrefixes) &&
-          !isSubAnalyzedFile(e.to, subAnalyzedPrefixes)
-      )
-    : imports.edges;
-
-  const scopeFiles = inventory.files
-    .filter(f => !isSubAnalyzedFile(f.path, subAnalyzedPrefixes))
-    .map(f => f.path);
-
-  // Build set of test files for metric exclusion
-  const testFiles = new Set<string>();
-  for (const f of inventory.files) {
-    if (f.role === "test") testFiles.add(f.path);
-  }
+  // ── Prepare scope ──
+  const { filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes } =
+    prepareScopeAndEdges(inventory, imports, subAnalyses);
 
   // ── Run zone detection pipeline ──
   const pipeline = runZonePipeline({
@@ -1664,6 +2007,7 @@ export async function analyzeZones(
     scopeFiles,
     maxZonePercent: options?.maxZonePercent,
     testFiles,
+    zonePins: options?.zonePins,
   });
   const { zones: expandedZones, unzoned, filenameBasedZoneIds } = pipeline;
 
@@ -1688,68 +2032,56 @@ export async function analyzeZones(
   const { finalZones, aiZoneInsights, aiGlobalInsights, aiFindings,
     enrichmentPass, metaUpdatedFindings, enrichTokenUsage } = enrichResult;
 
-  // ── Promote zones from sub-analyses ──
-  const promotedZones: Zone[] = [];
-  const promotedCrossings: ZoneCrossing[] = [];
-  for (const sub of subAnalyses) {
-    promotedZones.push(...promoteZones(sub));
-    promotedCrossings.push(...promoteCrossings(sub));
-  }
-  const allZones = [...finalZones, ...promotedZones];
+  // ── Remap content hashes to post-enrichment zone IDs ──
+  const remappedContentHashes = remapContentHashKeys(
+    zoneContentHashes, expandedZones, finalZones,
+  );
 
-  // ── Build final crossings ──
+  // ── Apply zone pins (post-enrichment) ──
+  const pinnedFinalZones = options?.zonePins && Object.keys(options.zonePins).length > 0
+    ? applyZonePins(finalZones, options.zonePins)
+    : finalZones;
+
+  // ── Promote sub-analyses and build crossings ──
+  const { allZones, promotedCrossings } =
+    promoteSubAnalyses(subAnalyses, pinnedFinalZones);
   const crossings = buildCrossings(allZones, imports, promotedCrossings);
 
-  // ── Generate structural insights ──
+  // ── Generate structural insights + move recommendations ──
   const rootFileCount = inventory.files.filter(
     (f) => !isSubAnalyzedFile(f.path, subAnalyzedPrefixes)
   ).length;
   const structural = generateStructuralInsights(
-    finalZones,
+    pinnedFinalZones,
     crossings.filter((c) => !c.fromZone.includes(":") && !c.toZone.includes(":")),
     imports,
     rootFileCount,
     undefined,
     filenameBasedZoneIds,
   );
+  structural.findings.push(
+    ...computeMoveFindings(pinnedFinalZones, crossings, imports.edges, options?.zonePins ?? {}),
+  );
 
   // ── Merge insights ──
-  mergeZoneInsights(finalZones, structural, aiZoneInsights, validPrevious);
+  mergeZoneInsights(pinnedFinalZones, structural, aiZoneInsights, validPrevious);
   const allGlobalInsights = mergeGlobalInsights(
     structural, aiGlobalInsights, validPrevious
   );
 
   // ── Assemble findings ──
   const allFindings = assembleFindings(
-    finalZones, structural, aiFindings, metaUpdatedFindings,
-    validPrevious, previousZones, zoneContentHashes, globalContentHash
+    pinnedFinalZones, structural, aiFindings, metaUpdatedFindings,
+    validPrevious, previousZones, remappedContentHashes, globalContentHash
   );
 
   // ── Back-populate findings into insights for backward compatibility ──
-  backPopulateInsights(finalZones, allFindings, allGlobalInsights);
+  backPopulateInsights(pinnedFinalZones, allFindings, allGlobalInsights);
 
   // ── Build result ──
-  const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
-  const metaEvaluationCount = enrichmentPass >= 5 ? prevMetaCount + 1 : prevMetaCount > 0 ? prevMetaCount : undefined;
-  const displayPass = enrichmentPass > 4 ? 4 : enrichmentPass;
-  const lastReset = (structureChanged && previousZones?.enrichmentPass)
-    ? { from: previousZones.enrichmentPass, to: 1 }
-    : undefined;
-
-  return {
-    zones: sortZonesData({
-      zones: allZones,
-      crossings,
-      unzoned,
-      insights: allGlobalInsights.length > 0 ? allGlobalInsights : undefined,
-      findings: allFindings.length > 0 ? allFindings : undefined,
-      enrichmentPass: allFindings.length > 0 ? displayPass : undefined,
-      ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
-      structureHash,
-      zoneContentHashes,
-      ...(lastReset ? { lastReset } : {}),
-    }),
-    tokenUsage: enrichTokenUsage,
-    structureChanged,
-  };
+  return buildAnalyzeZonesResult({
+    allZones, crossings, unzoned, allGlobalInsights, allFindings,
+    enrichmentPass, structureHash, remappedContentHashes,
+    previousZones, structureChanged, enrichTokenUsage,
+  });
 }

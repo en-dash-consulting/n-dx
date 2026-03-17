@@ -12,9 +12,9 @@ import {
   STATUS_OPTIONS,
   PRIORITY_OPTIONS,
   DATABASE_SCHEMA,
-} from "../../../src/core/notion-map.js";
+} from "../../../src/store/notion-map.js";
 import type { PRDItem, PRDDocument } from "../../../src/schema/index.js";
-import type { NotionStatusGroup } from "../../../src/core/notion-map.js";
+import type { NotionStatusGroup } from "../../../src/store/notion-map.js";
 
 function makeItem(
   overrides: Partial<PRDItem> & { id: string; title: string },

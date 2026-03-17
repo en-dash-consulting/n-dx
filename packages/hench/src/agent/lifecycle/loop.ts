@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { PRDStore } from "rex";
+import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails } from "../../guard/index.js";
 import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/dispatch.js";
@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel } from "@n-dx/llm-client";
+import { resolveModel } from "../../prd/llm-gateway.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
@@ -48,6 +48,10 @@ const BASE_DELAY_MS = 1000;
 const MAX_CONTEXT_PAIRS = 20;
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TOOL_OUTPUT_STORED = 2000;
+
+// ---------------------------------------------------------------------------
+// Extracted helpers — each handles one focused concern within the turn loop
+// ---------------------------------------------------------------------------
 
 async function callWithRetry(
   client: Anthropic,
@@ -88,6 +92,176 @@ function pruneMessages(messages: Anthropic.MessageParam[]): void {
   detail(`Pruned ${removed} messages to stay within token budget`);
 }
 
+/** Resolved API resources needed for the agent turn loop. */
+interface ApiResources {
+  client: Anthropic;
+  vendor: string;
+  toolCtx: ToolContext;
+}
+
+/**
+ * Validate vendor, resolve API key, construct the Anthropic client,
+ * guard rails, memory monitor, and tool context.
+ */
+async function initApiResources(
+  config: HenchConfig,
+  henchDir: string,
+  projectDir: string,
+  store: PRDStore,
+  taskId: string,
+  testCommand: string | undefined,
+  startingHead: string | undefined,
+): Promise<ApiResources> {
+  const llmConfig = await loadLLMConfig(henchDir);
+  const vendor = resolveLLMVendor(llmConfig);
+  if (vendor !== "claude") {
+    throw new Error(
+      `Hench API mode requires llm.vendor=claude. Current vendor: ${vendor}. ` +
+      "Use provider=cli for Codex.",
+    );
+  }
+
+  const claudeConfig = await loadClaudeConfig(henchDir);
+  const apiKey = resolveApiKey(claudeConfig, config.apiKeyEnv);
+  if (!apiKey) {
+    throw new Error(
+      `API key not found. Set it via 'n-dx config claude.api_key <key>' or the ${config.apiKeyEnv} environment variable.`,
+    );
+  }
+
+  const anthropicOpts: Record<string, unknown> = { apiKey };
+  if (claudeConfig.api_endpoint) {
+    anthropicOpts.baseURL = claudeConfig.api_endpoint;
+  }
+  const client = new Anthropic(anthropicOpts as ConstructorParameters<typeof Anthropic>[0]);
+
+  const guard = new GuardRails(projectDir, config.guard);
+  const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
+
+  const toolCtx: ToolContext = {
+    guard,
+    projectDir,
+    store,
+    taskId,
+    testCommand,
+    startingHead,
+    memoryMonitor,
+    selfHeal: config.selfHeal,
+  };
+
+  return { client, vendor, toolCtx };
+}
+
+/**
+ * Parse the API response usage and accumulate into both the run-level
+ * totals and the per-turn breakdown array.
+ */
+function recordTurnTokenUsage(
+  run: RunRecord,
+  rawUsage: Record<string, unknown>,
+  turn: number,
+  vendor: string,
+  model: string,
+): void {
+  const parsed = parseTokenUsage(rawUsage);
+
+  // Accumulate into run totals
+  run.tokenUsage.input += parsed.input;
+  run.tokenUsage.output += parsed.output;
+  if (parsed.cacheCreationInput) {
+    run.tokenUsage.cacheCreationInput = (run.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
+  }
+  if (parsed.cacheReadInput) {
+    run.tokenUsage.cacheReadInput = (run.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
+  }
+
+  // Per-turn breakdown
+  const turnUsage: TurnTokenUsage = {
+    turn,
+    input: parsed.input,
+    output: parsed.output,
+    vendor,
+    model,
+  };
+  if (parsed.cacheCreationInput) turnUsage.cacheCreationInput = parsed.cacheCreationInput;
+  if (parsed.cacheReadInput) turnUsage.cacheReadInput = parsed.cacheReadInput;
+  run.turnTokenUsage!.push(turnUsage);
+}
+
+/**
+ * Dispatch all tool_use blocks in the assistant response, record results
+ * in the run, and return the tool result messages for the next turn.
+ */
+async function executeToolCalls(
+  assistantContent: Anthropic.ContentBlock[],
+  toolCtx: ToolContext,
+  turn: number,
+  run: RunRecord,
+): Promise<Anthropic.ToolResultBlockParam[]> {
+  const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+  for (const block of assistantContent) {
+    if (block.type !== "tool_use") continue;
+
+    const startMs = Date.now();
+    stream("Tool", `${block.name}(${JSON.stringify(block.input).slice(0, 100)})`);
+
+    const output = await dispatchTool(
+      toolCtx,
+      block.name,
+      block.input as Record<string, unknown>,
+      rexToolHandlers,
+    );
+
+    const durationMs = Date.now() - startMs;
+
+    run.toolCalls.push({
+      turn,
+      tool: block.name,
+      input: block.input as Record<string, unknown>,
+      output: output.slice(0, MAX_TOOL_OUTPUT_STORED),
+      durationMs,
+    });
+
+    toolResults.push({
+      type: "tool_result",
+      tool_use_id: block.id,
+      content: output,
+    });
+
+    stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
+    detail(`${durationMs}ms`);
+  }
+
+  return toolResults;
+}
+
+/**
+ * Extract a summary from the last text block of the assistant response
+ * (used when stop_reason is "end_turn").
+ */
+function extractEndTurnSummary(assistantContent: Anthropic.ContentBlock[]): string | undefined {
+  for (const block of [...assistantContent].reverse()) {
+    if (block.type === "text") {
+      return block.text.slice(0, MAX_SUMMARY_LENGTH);
+    }
+  }
+  return undefined;
+}
+
+/** Print text blocks from the assistant response. */
+function streamAssistantText(assistantContent: Anthropic.ContentBlock[]): void {
+  for (const block of assistantContent) {
+    if (block.type === "text" && block.text) {
+      stream("Agent", block.text);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main agent loop
+// ---------------------------------------------------------------------------
+
 export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult> {
   const { config, store, projectDir, henchDir, dryRun } = opts;
   const maxTurns = opts.maxTurns ?? config.maxTurns;
@@ -117,48 +291,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Shared: transition task to in_progress
   await transitionToInProgress(store, taskId, brief.task.status);
 
-  // API-specific: resolve API key
-  const llmConfig = await loadLLMConfig(henchDir);
-  const vendor = resolveLLMVendor(llmConfig);
-  if (vendor !== "claude") {
-    throw new Error(
-      `Hench API mode requires llm.vendor=claude. Current vendor: ${vendor}. ` +
-      "Use provider=cli for Codex.",
-    );
-  }
-
-  const claudeConfig = await loadClaudeConfig(henchDir);
-  const apiKey = resolveApiKey(claudeConfig, config.apiKeyEnv);
-  if (!apiKey) {
-    throw new Error(
-      `API key not found. Set it via 'n-dx config claude.api_key <key>' or the ${config.apiKeyEnv} environment variable.`,
-    );
-  }
-
-  // Shared: capture starting HEAD
+  // API-specific: resolve vendor, API key, build client and tool context
   const startingHead = captureStartingHead(projectDir);
-
-  // API-specific: build Anthropic client
-  const anthropicOpts: Record<string, unknown> = { apiKey };
-  if (claudeConfig.api_endpoint) {
-    anthropicOpts.baseURL = claudeConfig.api_endpoint;
-  }
-  const client = new Anthropic(anthropicOpts as ConstructorParameters<typeof Anthropic>[0]);
-  const guard = new GuardRails(projectDir, config.guard);
-
-  // Memory monitor for pre-spawn checks during tool dispatch.
-  // Uses platform-specific memory detection (Linux /proc/meminfo, macOS/Windows os module).
-  const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
-
-  const toolCtx: ToolContext = {
-    guard,
-    projectDir,
-    store,
-    taskId,
-    testCommand: brief.project.testCommand,
-    startingHead,
-    memoryMonitor,
-  };
+  const { client, vendor, toolCtx } = await initApiResources(
+    config, henchDir, projectDir, store, taskId,
+    brief.project.testCommand, startingHead,
+  );
 
   // Shared: initialize run record + capture start memory snapshot
   const { run, memoryCtx } = await initRunRecord({
@@ -196,28 +334,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         messages,
       });
 
-      // Track token usage
-      const parsed = parseTokenUsage(response.usage as unknown as Record<string, unknown>);
-      run.tokenUsage.input += parsed.input;
-      run.tokenUsage.output += parsed.output;
-      if (parsed.cacheCreationInput) {
-        run.tokenUsage.cacheCreationInput = (run.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
-      }
-      if (parsed.cacheReadInput) {
-        run.tokenUsage.cacheReadInput = (run.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
-      }
-
-      // Per-turn breakdown
-      const turnUsage: TurnTokenUsage = {
-        turn: turn + 1,
-        input: parsed.input,
-        output: parsed.output,
-        vendor,
-        model,
-      };
-      if (parsed.cacheCreationInput) turnUsage.cacheCreationInput = parsed.cacheCreationInput;
-      if (parsed.cacheReadInput) turnUsage.cacheReadInput = parsed.cacheReadInput;
-      run.turnTokenUsage!.push(turnUsage);
+      // Track token usage for this turn
+      recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, vendor, model);
 
       // Shared: check token budget
       const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
@@ -230,22 +348,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       const assistantContent = response.content;
       messages.push({ role: "assistant", content: assistantContent });
 
-      // Print text output
-      for (const block of assistantContent) {
-        if (block.type === "text" && block.text) {
-          stream("Agent", block.text);
-        }
-      }
+      streamAssistantText(assistantContent);
 
       // Handle stop reasons
       if (response.stop_reason === "end_turn") {
         run.status = "completed";
-        for (const block of [...assistantContent].reverse()) {
-          if (block.type === "text") {
-            run.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
-            break;
-          }
-        }
+        run.summary = extractEndTurnSummary(assistantContent);
         break;
       }
 
@@ -276,41 +384,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       }
 
       // Process tool calls
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
-
-      for (const block of assistantContent) {
-        if (block.type !== "tool_use") continue;
-
-        const startMs = Date.now();
-        stream("Tool", `${block.name}(${JSON.stringify(block.input).slice(0, 100)})`);
-
-        const output = await dispatchTool(
-          toolCtx,
-          block.name,
-          block.input as Record<string, unknown>,
-          rexToolHandlers,
-        );
-
-        const durationMs = Date.now() - startMs;
-
-        run.toolCalls.push({
-          turn: turn + 1,
-          tool: block.name,
-          input: block.input as Record<string, unknown>,
-          output: output.slice(0, MAX_TOOL_OUTPUT_STORED),
-          durationMs,
-        });
-
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: output,
-        });
-
-        stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
-        detail(`${durationMs}ms`);
-      }
-
+      const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run);
       messages.push({ role: "user", content: toolResults });
 
       // Save progress periodically

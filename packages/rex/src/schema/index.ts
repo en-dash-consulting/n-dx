@@ -1,6 +1,14 @@
 /**
  * Schema barrel — re-exports types and constants from v1.ts.
  *
+ * ⚠️ HIGH FAN-IN MODULE — imported by 40+ files across rex, hench, and web.
+ * Changes here have wide ripple effects. Treat this module's public surface
+ * as a stability contract:
+ *   - Adding exports is safe.
+ *   - Renaming or removing exports requires updating all consumers.
+ *   - Moving types between v1.ts and levels.ts is invisible to consumers
+ *     as long as this barrel continues to re-export them.
+ *
  * Validation schemas (Zod) are intentionally NOT re-exported here.
  * Import directly from `./validate.js` when validation is needed.
  * This avoids forcing a transitive Zod dependency on every consumer
@@ -12,6 +20,8 @@
 
 export {
   SCHEMA_VERSION,
+  isCompatibleSchema,
+  assertSchemaVersion,
   LEVEL_HIERARCHY,
   PRIORITY_ORDER,
   VALID_LEVELS,
@@ -33,6 +43,7 @@ export type {
   ItemLevel,
   ItemStatus,
   Priority,
+  ResolutionType,
   RequirementCategory,
   RequirementValidationType,
   Requirement,

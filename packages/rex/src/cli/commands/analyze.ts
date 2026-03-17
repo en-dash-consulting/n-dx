@@ -1,5 +1,6 @@
 import { join, resolve } from "node:path";
-import { access, writeFile, readFile, unlink } from "node:fs/promises";
+import { access, readFile, unlink } from "node:fs/promises";
+import { atomicWriteJSON } from "../../store/atomic-write.js";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
@@ -9,7 +10,7 @@ import { info, warn, result } from "../output.js";
 import {
   preflightBudgetCheck,
   formatBudgetWarnings,
-} from "../../core/token-usage.js";
+} from "./token-format.js";
 import {
   scanTests,
   scanDocs,
@@ -34,11 +35,17 @@ import {
 import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type { PRDItem, PRDDocument, AnalyzeTokenUsage, LoEConfig } from "../../schema/index.js";
 import { LOE_DEFAULTS } from "../../schema/index.js";
-import type { BatchAcceptanceRecord } from "./chunked-review.js";
+import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 
 const PENDING_FILE = "pending-proposals.json";
+/**
+ * Sentinel file written before acceptance starts and removed after completion.
+ * If this file exists on load, the previous accept was interrupted mid-write,
+ * indicating the pending-proposals and PRD may be in an inconsistent state.
+ */
+const ACCEPT_SENTINEL = ".accepting";
 const UNKNOWN_PROVIDER_METADATA = "unknown";
 
 function normalizeProviderMetadata(value: string | undefined): string | undefined {
@@ -137,7 +144,7 @@ function formatProposals(proposals: Proposal[], thresholdWeeks?: number): string
 
 async function savePending(dir: string, proposals: Proposal[]): Promise<void> {
   const filePath = join(dir, REX_DIR, PENDING_FILE);
-  await writeFile(filePath, JSON.stringify(proposals, null, 2));
+  await atomicWriteJSON(filePath, proposals);
 }
 
 async function loadPending(dir: string): Promise<Proposal[] | null> {
@@ -158,6 +165,37 @@ async function clearPending(dir: string): Promise<void> {
   }
 }
 
+/** Write sentinel file indicating an accept is in progress. */
+async function writeSentinel(dir: string): Promise<void> {
+  const { writeFile } = await import("node:fs/promises");
+  await writeFile(
+    join(dir, REX_DIR, ACCEPT_SENTINEL),
+    JSON.stringify({ startedAt: new Date().toISOString(), pid: process.pid }),
+  );
+}
+
+/** Remove sentinel file after successful accept. */
+async function clearSentinel(dir: string): Promise<void> {
+  try {
+    await unlink(join(dir, REX_DIR, ACCEPT_SENTINEL));
+  } catch {
+    // Already gone
+  }
+}
+
+/**
+ * Check for stale accept sentinel indicating a crashed accept.
+ * Returns true if a sentinel was found (caller should warn).
+ */
+async function checkSentinel(dir: string): Promise<boolean> {
+  try {
+    await access(join(dir, REX_DIR, ACCEPT_SENTINEL));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function acceptProposals(
   dir: string,
   proposals: Proposal[],
@@ -170,44 +208,68 @@ async function acceptProposals(
     );
   }
 
+  // Check for stale sentinel from a crashed previous accept
+  if (await checkSentinel(dir)) {
+    warn(
+      "Detected incomplete previous accept (stale sentinel file).\n" +
+      "The PRD may contain partially-added proposals. Review with 'rex status'\n" +
+      "before continuing. Clearing stale sentinel and pending proposals.",
+    );
+    await clearSentinel(dir);
+    await clearPending(dir);
+    return;
+  }
+
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
 
+  // Write sentinel before starting — if we crash between here and
+  // clearSentinel(), the next run will detect the inconsistency.
+  await writeSentinel(dir);
+
   let addedCount = 0;
 
+  let completedCount = 0;
   for (const p of proposals) {
     const epicId = randomUUID();
+    const epicStatus = p.epic.status ?? "pending";
     const epicItem: PRDItem = {
       id: epicId,
       title: p.epic.title,
       level: "epic",
-      status: "pending",
+      status: epicStatus,
       source: p.epic.source,
       description: p.epic.description,
+      ...(epicStatus === "completed" && { completedAt: new Date().toISOString() }),
     };
     await store.addItem(epicItem);
     addedCount++;
+    if (epicStatus === "completed") completedCount++;
 
     for (const f of p.features) {
       const featureId = randomUUID();
+      const featureStatus = f.status ?? "pending";
       const featureItem: PRDItem = {
         id: featureId,
         title: f.title,
         level: "feature",
-        status: "pending",
+        status: featureStatus,
         source: f.source,
         description: f.description,
+        ...(featureStatus === "completed" && { completedAt: new Date().toISOString() }),
       };
       await store.addItem(featureItem, epicId);
       addedCount++;
+      if (featureStatus === "completed") completedCount++;
 
       for (const t of f.tasks) {
         const taskId = randomUUID();
+        const taskStatus = t.status ?? "pending";
         const taskItem: PRDItem = {
           id: taskId,
           title: t.title,
           level: "task",
-          status: "pending",
+          status: taskStatus,
           source: t.source,
           description: t.description,
           acceptanceCriteria: t.acceptanceCriteria,
@@ -217,9 +279,11 @@ async function acceptProposals(
           ...(t.loe !== undefined && { loe: t.loe }),
           ...(t.loeRationale !== undefined && { loeRationale: t.loeRationale }),
           ...(t.loeConfidence !== undefined && { loeConfidence: t.loeConfidence }),
+          ...(taskStatus === "completed" && { completedAt: new Date().toISOString() }),
         };
         await store.addItem(taskItem, featureId);
         addedCount++;
+        if (taskStatus === "completed") completedCount++;
       }
     }
   }
@@ -239,6 +303,7 @@ async function acceptProposals(
   });
 
   await clearPending(dir);
+  await clearSentinel(dir);
 
   // Show formatted summary when batch record is available, else simple message
   if (batchRecord) {
@@ -249,6 +314,11 @@ async function acceptProposals(
   } else {
     result(`Added ${addedCount} items to PRD.`);
   }
+
+  if (completedCount > 0) {
+    const pendingCount = addedCount - completedCount;
+    info(`Baseline: ${completedCount} items marked completed (existing code), ${pendingCount} pending (gaps/improvements).`);
+  }
 }
 
 export async function cmdAnalyze(
@@ -256,20 +326,61 @@ export async function cmdAnalyze(
   flags: Record<string, string>,
   multiFlags: Record<string, string[]> = {},
 ): Promise<void> {
-  const lite = flags.lite === "true";
   const accept = flags.accept === "true";
   const noLlm = flags["no-llm"] === "true";
 
-  // Load unified LLM config and initialize the client abstraction layer
+  const llmConfig = await initLLMClients(dir, noLlm, flags.format);
+
+  const filePaths: string[] = multiFlags.file ?? (flags.file ? [flags.file] : []);
+  const chunkSize = flags["chunk-size"] !== undefined
+    ? parseIntSafe(flags["chunk-size"], "chunk-size", { min: 1 })
+    : undefined;
+
+  const model = await resolveModel(dir, flags.model);
+
+  await runBudgetPreflight(dir);
+
+  // --accept with no other flags: replay cached proposals
+  if (accept && filePaths.length === 0 && !flags.format) {
+    if (await replayCachedProposals(dir)) return;
+  }
+
+  const existing = await loadExistingItems(dir);
+
+  let { proposals, tokenUsage } = await generateProposals(
+    dir, existing, filePaths, flags, { lite: flags.lite === "true", noLlm, model, accept },
+  );
+  if (!proposals) return; // early return from JSON output or no proposals
+
+  proposals = await postProcessProposals(proposals, tokenUsage, noLlm, dir, model);
+
+  const loeConfig = await loadLoEConfig(dir, noLlm);
+  const thresholdWeeks = loeConfig?.taskThresholdWeeks ?? LOE_DEFAULTS.taskThresholdWeeks;
+
+  proposals = await displayAndReviewProposals(
+    dir, proposals, existing, accept, thresholdWeeks,
+  );
+
+  await logUsageAndCache(dir, tokenUsage, llmConfig, model, proposals);
+
+  await handleAcceptance(dir, proposals, { accept, chunkSize, model, thresholdWeeks });
+}
+
+// ── Phase functions ───────────────────────────────────────────────────
+
+/** Initialize LLM clients and display auth info. */
+async function initLLMClients(
+  dir: string,
+  noLlm: boolean,
+  format: string | undefined,
+): Promise<Awaited<ReturnType<typeof loadLLMConfig>>> {
   const rexConfigDir = join(dir, REX_DIR);
   const llmConfig = await loadLLMConfig(rexConfigDir);
   setLLMConfig(llmConfig);
-  // Backward compatibility for paths still reading claude.* defaults
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
 
-  // Display which authentication method will be used for LLM calls
-  if (!noLlm && flags.format !== "json") {
+  if (!noLlm && format !== "json") {
     const vendor = getLLMVendor();
     if (vendor) info(`Using ${vendor} for reasoning.`);
     const authMode = getAuthMode();
@@ -278,94 +389,94 @@ export async function cmdAnalyze(
     }
   }
 
-  // Support multiple --file flags; fall back to single flags.file for compat
-  const filePaths: string[] = multiFlags.file ?? (flags.file ? [flags.file] : []);
+  return llmConfig;
+}
 
-  // Parse --chunk-size: must be a positive integer when provided
-  const chunkSize = flags["chunk-size"] !== undefined
-    ? parseIntSafe(flags["chunk-size"], "chunk-size", { min: 1 })
-    : undefined;
-
-  // Resolve model: --model flag → config.model → DEFAULT_MODEL
-  let model: string | undefined = flags.model;
-  if (!model && await hasRexDir(dir)) {
+/** Resolve model from --model flag, rex config, or default. */
+async function resolveModel(dir: string, flagModel?: string): Promise<string | undefined> {
+  if (flagModel) return flagModel;
+  if (await hasRexDir(dir)) {
     try {
       const rexDir = join(dir, REX_DIR);
       const store = await resolveStore(rexDir);
       const config = await store.loadConfig();
-      if (config.model) {
-        model = config.model;
-      }
+      if (config.model) return config.model;
     } catch {
       // Config unreadable — fall through to default
     }
   }
+  return undefined;
+}
 
-  // Pre-flight budget check — warn or abort before expensive LLM calls
-  if (await hasRexDir(dir)) {
+/** Run pre-flight budget check; warn or abort before expensive LLM calls. */
+async function runBudgetPreflight(dir: string): Promise<void> {
+  if (!(await hasRexDir(dir))) return;
+
+  const rexDir = join(dir, REX_DIR);
+  const budgetResult = await preflightBudgetCheck(rexDir, dir);
+  if (!budgetResult) return;
+
+  const budgetLines = formatBudgetWarnings(budgetResult);
+  if (budgetLines.length > 0) {
+    for (const line of budgetLines) warn(line);
+    warn("");
+  }
+  if (budgetResult.severity === "exceeded") {
+    const store = await resolveStore(rexDir);
+    const config = await store.loadConfig();
+    if (config.budget?.abort) {
+      throw new BudgetExceededError(budgetResult.warnings);
+    }
+  }
+}
+
+/** Replay cached proposals if available. Returns true if accepted and done. */
+async function replayCachedProposals(dir: string): Promise<boolean> {
+  const cached = await loadPending(dir);
+  if (!cached || cached.length === 0) return false;
+
+  info(`Accepting ${cached.length} cached proposals...`);
+  const { createReviewState, buildBatchRecord } = await import("./chunked-review.js");
+  const state = createReviewState(cached, cached.length);
+  for (let i = 0; i < cached.length; i++) state.accepted.add(i);
+  const batchRecord = buildBatchRecord(state, "cached");
+  await acceptProposals(dir, cached, batchRecord);
+  return true;
+}
+
+/** Load existing PRD items for deduplication. */
+async function loadExistingItems(dir: string): Promise<PRDItem[]> {
+  if (!(await hasRexDir(dir))) return [];
+  try {
     const rexDir = join(dir, REX_DIR);
-    const budgetResult = await preflightBudgetCheck(rexDir, dir);
-    if (budgetResult) {
-      const budgetLines = formatBudgetWarnings(budgetResult);
-      if (budgetLines.length > 0) {
-        for (const line of budgetLines) {
-          warn(line);
-        }
-        warn("");
-      }
-      if (budgetResult.severity === "exceeded") {
-        // Load config to check abort setting
-        const store = await resolveStore(rexDir);
-        const config = await store.loadConfig();
-        if (config.budget?.abort) {
-          throw new BudgetExceededError(budgetResult.warnings);
-        }
-      }
-    }
+    const store = await resolveStore(rexDir);
+    const doc = await store.loadDocument();
+    return doc.items;
+  } catch {
+    return [];
   }
+}
 
-  // --accept with no other flags: replay cached proposals
-  if (accept && filePaths.length === 0 && !flags.format) {
-    const cached = await loadPending(dir);
-    if (cached && cached.length > 0) {
-      info(`Accepting ${cached.length} cached proposals...`);
-      const { createReviewState, buildBatchRecord } = await import("./chunked-review.js");
-      const state = createReviewState(cached, cached.length);
-      for (let i = 0; i < cached.length; i++) state.accepted.add(i);
-      const batchRecord = buildBatchRecord(state, "cached");
-      await acceptProposals(dir, cached, batchRecord);
-      return;
-    }
-    // No cache — fall through to generate fresh proposals
-  }
-
-  // Load existing PRD items for deduplication
-  let existing: PRDItem[] = [];
-  if (await hasRexDir(dir)) {
-    try {
-      const rexDir = join(dir, REX_DIR);
-      const store = await resolveStore(rexDir);
-      const doc = await store.loadDocument();
-      existing = doc.items;
-    } catch {
-      // No valid PRD yet, treat as empty
-    }
-  }
-
+/** Generate proposals from file import, scanner mode, or guided spec. */
+async function generateProposals(
+  dir: string,
+  existing: PRDItem[],
+  filePaths: string[],
+  flags: Record<string, string>,
+  opts: { lite: boolean; noLlm: boolean; model?: string; accept: boolean },
+): Promise<{ proposals: Proposal[] | null; tokenUsage: AnalyzeTokenUsage }> {
   let proposals: Proposal[];
   let tokenUsage = emptyAnalyzeTokenUsage();
 
   if (filePaths.length > 0) {
-    // --file mode: import from document(s) via structured parsing or LLM
     const resolved = filePaths.map((fp) => resolve(dir, fp));
-
     if (flags.format !== "json") {
       const label = resolved.length === 1 ? "file" : "files";
       info(`Importing from ${label}: ${resolved.join(", ")}`);
     }
 
     try {
-      const reasonResult = await reasonFromFiles(resolved, existing, model);
+      const reasonResult = await reasonFromFiles(resolved, existing, opts.model);
       proposals = reasonResult.proposals;
       tokenUsage = reasonResult.tokenUsage;
     } catch (err) {
@@ -377,31 +488,34 @@ export async function cmdAnalyze(
 
     if (flags.format === "json") {
       result(JSON.stringify({ proposals, tokenUsage }, null, 2));
-      return;
+      return { proposals: null, tokenUsage };
     }
 
     const fileLabel = resolved.length === 1 ? "file" : `${resolved.length} files`;
     info(`Extracted ${proposals.length} epics from ${fileLabel}.`);
   } else {
-    // Scanner mode: run all scanners, reconcile, and optionally refine with LLM
-    const scanResult = await runScannerMode(dir, existing, { lite, noLlm, model, accept, formatJson: flags.format === "json" });
+    const scanResult = await runScannerMode(dir, existing, {
+      lite: opts.lite, noLlm: opts.noLlm, model: opts.model,
+      accept: opts.accept, formatJson: flags.format === "json",
+    });
     proposals = scanResult.proposals;
     tokenUsage = scanResult.tokenUsage;
-    if (scanResult.earlyReturn) return;
+    if (scanResult.earlyReturn) return { proposals: null, tokenUsage };
   }
 
+  // Try guided spec if no proposals found
   if (proposals.length === 0) {
     const guided = flags.guided === "true";
-    if ((existing.length === 0 || guided) && !noLlm) {
+    if ((existing.length === 0 || guided) && !opts.noLlm) {
       if (process.stdin.isTTY) {
         const { runGuidedSpec } = await import("../../analyze/guided.js");
-        const guidedResult = await runGuidedSpec(dir, model);
+        const guidedResult = await runGuidedSpec(dir, opts.model);
         proposals = guidedResult.proposals;
         tokenUsage = guidedResult.tokenUsage;
       } else if (!guided) {
         result("No new proposals found.");
         info("Hint: Run 'n-dx plan --guided' interactively to build your initial spec.");
-        return;
+        return { proposals: null, tokenUsage };
       } else {
         throw new CLIError(
           "Guided spec mode requires an interactive terminal.",
@@ -411,93 +525,92 @@ export async function cmdAnalyze(
     }
     if (proposals.length === 0) {
       result("No new proposals found.");
-      return;
+      return { proposals: null, tokenUsage };
     }
   }
 
-  // Load LoE config for consolidation guard and decomposition
-  let loeConfig: LoEConfig | undefined;
-  if (!noLlm && await hasRexDir(dir)) {
-    try {
-      const rexDir = join(dir, REX_DIR);
-      const store = await resolveStore(rexDir);
-      const config = await store.loadConfig();
-      loeConfig = config.loe;
-    } catch {
-      // Config unreadable — use defaults
-    }
+  return { proposals, tokenUsage };
+}
+
+/** Accumulate token usage from a sub-pass into the running total. */
+function accumulateTokenUsage(
+  total: AnalyzeTokenUsage,
+  addition: AnalyzeTokenUsage,
+): void {
+  total.calls += addition.calls;
+  total.inputTokens += addition.inputTokens;
+  total.outputTokens += addition.outputTokens;
+  if (addition.cacheCreationInputTokens) {
+    total.cacheCreationInputTokens =
+      (total.cacheCreationInputTokens ?? 0) + addition.cacheCreationInputTokens;
   }
-
-  // Post-processing consolidation guard: reduce over-granular LLM output
-  if (!noLlm) {
-    const guardResult = await applyConsolidationGuard(
-      proposals,
-      loeConfig,
-      model,
-    );
-
-    if (guardResult.triggered) {
-      proposals = guardResult.proposals;
-      // Accumulate consolidation token usage
-      tokenUsage.calls += guardResult.tokenUsage.calls;
-      tokenUsage.inputTokens += guardResult.tokenUsage.inputTokens;
-      tokenUsage.outputTokens += guardResult.tokenUsage.outputTokens;
-      if (guardResult.tokenUsage.cacheCreationInputTokens) {
-        tokenUsage.cacheCreationInputTokens =
-          (tokenUsage.cacheCreationInputTokens ?? 0) +
-          guardResult.tokenUsage.cacheCreationInputTokens;
-      }
-      if (guardResult.tokenUsage.cacheReadInputTokens) {
-        tokenUsage.cacheReadInputTokens =
-          (tokenUsage.cacheReadInputTokens ?? 0) +
-          guardResult.tokenUsage.cacheReadInputTokens;
-      }
-
-      if (guardResult.reduced) {
-        info(
-          `Consolidation guard: reduced from ${guardResult.originalTaskCount} to ${guardResult.finalTaskCount} tasks (ceiling: ${guardResult.ceiling}).`,
-        );
-      } else if (guardResult.warning) {
-        warn(guardResult.warning);
-      }
-    }
+  if (addition.cacheReadInputTokens) {
+    total.cacheReadInputTokens =
+      (total.cacheReadInputTokens ?? 0) + addition.cacheReadInputTokens;
   }
+}
 
-  // LoE decomposition pass: break down oversized tasks automatically
-  if (!noLlm) {
-    const decompositionResult = await applyDecompositionPass(
-      proposals,
-      loeConfig,
-      model,
-    );
+/** Load LoE config from rex store. */
+async function loadLoEConfig(dir: string, noLlm: boolean): Promise<LoEConfig | undefined> {
+  if (noLlm || !(await hasRexDir(dir))) return undefined;
+  try {
+    const rexDir = join(dir, REX_DIR);
+    const store = await resolveStore(rexDir);
+    const config = await store.loadConfig();
+    return config.loe;
+  } catch {
+    return undefined;
+  }
+}
 
-    if (decompositionResult.decomposed.length > 0) {
-      proposals = decompositionResult.proposals;
-      // Accumulate decomposition token usage
-      tokenUsage.calls += decompositionResult.tokenUsage.calls;
-      tokenUsage.inputTokens += decompositionResult.tokenUsage.inputTokens;
-      tokenUsage.outputTokens += decompositionResult.tokenUsage.outputTokens;
-      if (decompositionResult.tokenUsage.cacheCreationInputTokens) {
-        tokenUsage.cacheCreationInputTokens =
-          (tokenUsage.cacheCreationInputTokens ?? 0) +
-          decompositionResult.tokenUsage.cacheCreationInputTokens;
-      }
-      if (decompositionResult.tokenUsage.cacheReadInputTokens) {
-        tokenUsage.cacheReadInputTokens =
-          (tokenUsage.cacheReadInputTokens ?? 0) +
-          decompositionResult.tokenUsage.cacheReadInputTokens;
-      }
+/** Apply consolidation guard and LoE decomposition post-processing. */
+async function postProcessProposals(
+  proposals: Proposal[],
+  tokenUsage: AnalyzeTokenUsage,
+  noLlm: boolean,
+  dir: string,
+  model: string | undefined,
+): Promise<Proposal[]> {
+  if (noLlm) return proposals;
 
+  const loeConfig = await loadLoEConfig(dir, noLlm);
+
+  // Consolidation guard: reduce over-granular LLM output
+  const guardResult = await applyConsolidationGuard(proposals, loeConfig, model);
+  if (guardResult.triggered) {
+    proposals = guardResult.proposals;
+    accumulateTokenUsage(tokenUsage, guardResult.tokenUsage);
+
+    if (guardResult.reduced) {
       info(
-        `Decomposed ${decompositionResult.decomposed.length} oversized task${decompositionResult.decomposed.length === 1 ? "" : "s"} (LoE exceeded threshold).`,
+        `Consolidation guard: reduced from ${guardResult.originalTaskCount} to ${guardResult.finalTaskCount} tasks (ceiling: ${guardResult.ceiling}).`,
       );
+    } else if (guardResult.warning) {
+      warn(guardResult.warning);
     }
   }
 
-  // Resolve decomposition threshold for LoE flagging in display
-  const thresholdWeeks = loeConfig?.taskThresholdWeeks ?? LOE_DEFAULTS.taskThresholdWeeks;
+  // LoE decomposition: break down oversized tasks
+  const decompositionResult = await applyDecompositionPass(proposals, loeConfig, model);
+  if (decompositionResult.decomposed.length > 0) {
+    proposals = decompositionResult.proposals;
+    accumulateTokenUsage(tokenUsage, decompositionResult.tokenUsage);
+    info(
+      `Decomposed ${decompositionResult.decomposed.length} oversized task${decompositionResult.decomposed.length === 1 ? "" : "s"} (LoE exceeded threshold).`,
+    );
+  }
 
-  // Show diff view when existing PRD items are present, otherwise plain list
+  return proposals;
+}
+
+/** Display proposals, run decomposition review, and show token usage. */
+async function displayAndReviewProposals(
+  dir: string,
+  proposals: Proposal[],
+  existing: PRDItem[],
+  accept: boolean,
+  thresholdWeeks: number,
+): Promise<Proposal[]> {
   if (existing.length > 0) {
     info(formatDiff(proposals, existing));
   } else {
@@ -514,14 +627,9 @@ export async function cmdAnalyze(
       formatDecompositionSummary,
     } = await import("./decomposition-review.js");
 
-    let decompositionResult;
-    if (accept || !process.stdin.isTTY) {
-      // Non-interactive: default to accepting decomposed versions
-      decompositionResult = await autoResolveDecompositions(proposals);
-    } else {
-      // Interactive: prompt user for each decomposed task
-      decompositionResult = await runDecompositionReview(proposals);
-    }
+    const decompositionResult = (accept || !process.stdin.isTTY)
+      ? await autoResolveDecompositions(proposals)
+      : await runDecompositionReview(proposals);
 
     proposals = decompositionResult.proposals;
     const summaryLine = formatDecompositionSummary(decompositionResult.summary);
@@ -531,13 +639,22 @@ export async function cmdAnalyze(
     }
   }
 
-  // Display token usage summary
+  return proposals;
+}
+
+/** Log token usage and cache proposals for later acceptance. */
+async function logUsageAndCache(
+  dir: string,
+  tokenUsage: AnalyzeTokenUsage,
+  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
+  model: string | undefined,
+  proposals: Proposal[],
+): Promise<void> {
   const usageLine = formatTokenUsage(tokenUsage);
   if (usageLine) {
     info(`Token usage: ${usageLine}`);
   }
 
-  // Log token usage to execution log
   if (await hasRexDir(dir)) {
     const rexDir = join(dir, REX_DIR);
     const store = await resolveStore(rexDir);
@@ -555,11 +672,8 @@ export async function cmdAnalyze(
       });
     }
 
-    // Cache proposals so they can be accepted later without re-running
     await savePending(dir, proposals);
   }
-
-  await handleAcceptance(dir, proposals, { accept, chunkSize, model, thresholdWeeks });
 }
 
 // ── Extracted phases ──────────────────────────────────────────────────

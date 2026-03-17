@@ -11,15 +11,14 @@
  *
  * Follows the same hook-over-infrastructure pattern as use-prd-websocket,
  * use-memory-monitor, etc. — all infrastructure coupling (WebSocket,
- * message-coalescer, message-throttle, graceful-degradation) lives here
- * rather than in a presentation component.
+ * ws-pipeline, graceful-degradation) lives here rather than in a
+ * presentation component.
  */
 
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "./use-polling.js";
-import { createMessageCoalescer } from "../messaging/message-coalescer.js";
-import { createMessageThrottle } from "../messaging/message-throttle.js";
-import { isFeatureDisabled, onDegradationChange } from "../performance/graceful-degradation.js";
+import { createWSPipeline } from "../messaging/index.js";
+import { isFeatureDisabled, onDegradationChange } from "../performance/index.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirror server-side ProjectStatus shape)
@@ -129,14 +128,11 @@ export function useProjectStatus(): ProjectStatus | null {
     refresh();
 
     // Connect to WebSocket for instant status updates when runs/PRD change.
-    // Two-layer pipeline: per-type throttle → coalescer → single refresh.
-    //
-    // The throttle debounces high-frequency message types (rex:prd-changed,
-    // hench:task-execution-progress) independently before they reach the
-    // coalescer. Other types pass through immediately.
+    // Composed throttle → coalescer pipeline debounces high-frequency
+    // message types independently before batching into a single refresh.
     let ws: WebSocket | null = null;
 
-    const coalescer = createMessageCoalescer({
+    const pipeline = createWSPipeline({
       onFlush: (batch) => {
         if (!mountedRef.current) return;
         const needsRefresh =
@@ -147,10 +143,6 @@ export function useProjectStatus(): ProjectStatus | null {
           refresh();
         }
       },
-    });
-
-    const throttle = createMessageThrottle({
-      onMessage: (msg) => coalescer.push(msg),
       defaultDelayMs: 250,
       delays: {
         "rex:prd-changed": 300,
@@ -167,7 +159,7 @@ export function useProjectStatus(): ProjectStatus | null {
         if (!mountedRef.current) return;
         try {
           const msg = JSON.parse(event.data);
-          throttle.push(msg);
+          pipeline.push(msg);
         } catch {
           // ignore malformed messages
         }
@@ -178,8 +170,7 @@ export function useProjectStatus(): ProjectStatus | null {
 
     return () => {
       mountedRef.current = false;
-      throttle.dispose();
-      coalescer.dispose();
+      pipeline.dispose();
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
       }

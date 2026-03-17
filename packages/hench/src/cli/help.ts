@@ -12,8 +12,8 @@
  * @module hench/cli/help
  */
 
-import { formatHelp } from "@n-dx/llm-client";
-import type { HelpDefinition } from "@n-dx/llm-client";
+import { formatHelp } from "../prd/llm-gateway.js";
+import type { HelpDefinition } from "../prd/llm-gateway.js";
 
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {

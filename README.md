@@ -1,6 +1,6 @@
 # n-dx
 
-AI-powered development toolkit. Three packages that chain together: analyze a codebase, build a PRD, execute tasks autonomously.
+AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks autonomously.
 
 | | | |
 |:---:|:---:|:---:|
@@ -11,328 +11,187 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 ## Quick Start
 
 ```sh
-pnpm install
-pnpm build
+pnpm install && pnpm build
+npm link                    # register CLI globally
 
-# Register CLI globally
-npm link
-# or
-pnpm link --global
-
-# Initialize all tools in a project
-ndx init .
-
-# Select LLM vendor for this project
+ndx init .                  # initialize project (.sourcevision/.rex/.hench)
 ndx config llm.vendor claude .
 
-# Analyze codebase and generate PRD proposals
-ndx plan .
-
-# Accept proposals into the PRD
-ndx plan --accept .
-
-# Execute the next task autonomously
-ndx work .
-
-# Check progress
-ndx status .
+ndx analyze .               # run SourceVision codebase analysis
+ndx recommend --accept .    # turn findings into PRD tasks
+ndx add "Add SSO support" . # add custom feature requests
+ndx work --auto .           # execute the next task autonomously
+ndx status .                # check progress
 ```
 
-## Beginner Workflow
+## Workflow
 
-Use this as the default day-to-day loop in a project root.
+The core loop: **analyze** your codebase, **build** a PRD from findings and ideas, **execute** tasks with an autonomous agent.
+
+### 1. Analyze
 
 ```sh
-# 0) One-time setup
-pnpm install
-pnpm build
-npm link
-
-# 1) Initialize project folders (.sourcevision/.rex/.hench)
-ndx init .
+ndx analyze .
 ```
 
-**2) Configure your LLM vendor (choose one):**
+Runs SourceVision static analysis: file inventory, import graph, zone detection (Louvain community detection), and React component catalog. Outputs `.sourcevision/CONTEXT.md`, `llms.txt`, zones, and architectural findings.
 
-**Claude (recommended)**
+### 2. Recommend
 
+```sh
+ndx recommend .                # show findings and recommendations
+ndx recommend --accept .       # add all recommendations to PRD
+ndx recommend --acknowledge=1,2 .  # skip specific findings
+ndx recommend --actionable-only .  # only anti-patterns, suggestions, move-files
+```
+
+Translates SourceVision findings into concrete PRD tasks. The `--actionable-only` flag filters out non-actionable observations (metrics, patterns, relationships) and keeps only findings that describe concrete problems to fix.
+
+### 3. Add Ideas
+
+```sh
+ndx add "Add SSO support with Google and Okta" .    # natural language
+ndx add --file=ideas.txt .                           # import from file
+ndx add "Add retries" --parent=<item-id> .           # under specific parent
+```
+
+Smart add uses an LLM to decompose descriptions into structured epic/feature/task proposals with duplicate detection against existing PRD items.
+
+### 4. Plan (Full Pipeline)
+
+```sh
+ndx plan .                  # analyze + generate PRD proposals (interactive)
+ndx plan --accept .         # analyze + auto-accept proposals
+ndx plan --file=spec.md .   # import PRD from a document (skips analysis)
+```
+
+`plan` combines analysis and proposal generation in one step. For existing codebases scanned for the first time, baseline detection automatically marks implemented functionality as "completed" and only gaps/improvements as "pending."
+
+### 5. Execute
+
+```sh
+ndx work --auto .                          # next highest-priority task
+ndx work --auto --iterations=4 .           # run 4 tasks sequentially
+ndx work --epic="Auth System" --auto .     # scope to an epic
+ndx work --task=abc123 .                   # specific task
+```
+
+Hench picks a task, builds a brief with codebase context, runs an LLM tool-use loop to implement it, then records the run.
+
+### 6. Self-Heal
+
+```sh
+ndx self-heal 3 .           # 3 iterations of analyze → recommend → execute
+```
+
+Iterative improvement loop: re-analyze the codebase, accept new recommendations (filtered to actionable findings), execute tasks, acknowledge completed findings, and repeat. Fuzzy acknowledgment matching prevents fixed findings from regenerating as "new" after code changes alter zone names.
+
+### 7. Monitor
+
+```sh
+ndx status .                # PRD tree with completion stats
+ndx start .                 # dashboard + MCP server (port 3117)
+ndx start --background .    # daemon mode
+ndx usage .                 # token usage analytics
+```
+
+## LLM Configuration
+
+**Claude (recommended):**
 ```sh
 ndx config llm.vendor claude .
-
-# Option A: API mode (recommended — best token accounting and reliability)
-ndx config llm.claude.api_key sk-ant-... .   # or: export ANTHROPIC_API_KEY=sk-ant-...
-# Optionally pin a model (default: claude-sonnet-4-6)
-ndx config llm.claude.model claude-opus-4-20250514 .
-
-# Option B: CLI mode (no API key required)
-ndx config llm.claude.cli_path claude .       # omit if `claude` is already on PATH
-claude login
-```
-
-**Codex**
-
-```sh
-ndx config llm.vendor codex .
-ndx config llm.codex.cli_path codex .
-ndx config rex.model gpt-5.3-codex .
-codex login
-```
-
-### A. Analyze codebase health (SourceVision)
-
-```sh
-ndx sourcevision analyze .
-```
-
-What you get:
-- Updated `.sourcevision/` outputs (`zones.json`, `CONTEXT.md`, findings, etc.)
-- Architecture and coupling warnings that Rex can turn into PRD tasks
-
-### B. Turn findings into PRD work (Rex)
-
-```sh
-# See recommendations from SourceVision findings
-ndx rex recommend .
-
-# Add all shown recommendations to PRD
-ndx rex recommend --accept .
-```
-
-Notes:
-- `recommend --accept` accepts all current recommendations.
-- If you want to skip specific ones, use acknowledgements instead:
-
-```sh
-# Acknowledge finding numbers from the current list
-ndx rex recommend --acknowledge=1,2 .
-```
-
-### C. Add custom feature requests (Rex Smart Add)
-
-```sh
-# Natural language feature request -> structured epic/feature/task proposal
-ndx rex add "Add SSO support with Google and Okta, admin configuration UI, and audit logs." .
-
-# Accept/reject interactively when prompted
-```
-
-Useful variants:
-
-```sh
-# Add multiple requests in one pass
-ndx rex add "Request A" "Request B" .
-
-# Import ideas from a text file
-ndx rex add --file=ideas.txt .
-
-# Add under a specific parent item
-ndx rex add "Add retries to this flow" --parent=<item-id> .
-```
-
-If smart add detects duplicates against existing PRD items in your accepted proposals, you’ll get:
-
-```text
-Choose action: c=cancel / m=merge with existing / p=proceed anyway
-```
-
-- `c` (Cancel): write nothing.
-- `m` (Merge): update matched existing items and add only non-duplicate nodes.
-- `p` (Proceed anyway): create duplicates and stamp `overrideMarker` on those new duplicate-created items.
-
-Audit visibility:
-- `ndx rex status` shows `[override: <reason>]` next to items with override markers.
-- `ndx rex status --format=json` includes per-item `overrideMarker` plus a top-level `overrideMarkers` summary.
-
-### D. Remove PRD items (Rex Remove)
-
-Remove epics or tasks that are cancelled, obsolete, or added by mistake:
-
-```sh
-# Remove an epic and its entire subtree (features, tasks, subtasks)
-rex remove epic <id> .
-
-# Remove a task and its subtasks only (parent feature/epic stays)
-rex remove task <id> .
-
-# Auto-detect level from the item ID
-rex remove <id> .
-```
-
-> **⚠️ WARNING:** Removal is irreversible. Deleted items and all their descendants are permanently erased from `prd.json`. Use `rex status` to review the subtree before removing.
-
-Confirmation behavior:
-
-```sh
-# Interactive confirmation prompt (default)
-rex remove epic abc123 .
-#   Remove epic "My Epic" and 12 descendant(s)? [y/N]
-
-# Skip confirmation for scripting
-rex remove task def456 --yes .
-
-# Machine-readable output
-rex remove epic abc123 --yes --format=json .
-```
-
-Behavior notes:
-- **Epic removal** deletes the epic and its entire subtree (features, tasks, and subtasks). Use when an initiative is cancelled or obsolete.
-- **Task removal** deletes the task and its subtasks only. The parent feature and epic remain intact. If removing the task causes all remaining siblings to be completed, the parent is auto-completed.
-- **Features and subtasks** cannot be removed directly. Remove the parent epic or task instead.
-- All `blockedBy` references pointing to deleted items are automatically cleaned up.
-
-### E. Execute PRD tasks autonomously (Hench via ndx work)
-
-**Claude:**
-
-```sh
-# Safe first run: one task (uses default model; API key auto-detected from env or config)
-ndx work --auto --iterations=1 .
-
-# Specify model explicitly
-ndx work --auto --iterations=1 --model=claude-opus-4-20250514 .
-
-# Scale up
-ndx work --auto --iterations=4 .
-
-# Scope execution to one epic
-ndx work --epic="Your Epic Title" --auto --iterations=2 .
-
-# Force API mode (requires llm.claude.api_key or ANTHROPIC_API_KEY)
-ndx config hench.provider api .
-ndx work --auto --iterations=1 .
+# API mode (recommended):
+ndx config llm.claude.api_key sk-ant-... .
+# CLI mode (no API key):
+ndx config llm.claude.cli_path claude .
 ```
 
 **Codex:**
+```sh
+ndx config llm.vendor codex .
+ndx config llm.codex.cli_path codex .
+```
+
+## Commands
+
+### Primary
+
+| Command | Description |
+|---------|-------------|
+| `ndx init [dir]` | Initialize all tools (sourcevision + rex + hench) |
+| `ndx analyze [dir]` | Run SourceVision codebase analysis (`--deep`, `--full`, `--lite`) |
+| `ndx recommend [dir]` | Show/accept SourceVision recommendations (`--accept`, `--actionable-only`) |
+| `ndx add "<desc>" [dir]` | Add PRD items from descriptions, files, or stdin |
+| `ndx work [dir]` | Run next task (`--task=ID`, `--epic=ID`, `--auto`, `--loop`) |
+| `ndx self-heal [N] [dir]` | Iterative improvement loop (analyze + recommend + execute) |
+| `ndx start [dir]` | Start server: dashboard + MCP (`--port=N`, `--background`, `stop`, `status`) |
+
+### More
+
+| Command | Description |
+|---------|-------------|
+| `ndx plan [dir]` | Analyze codebase and generate PRD proposals (`--guided`, `--accept`) |
+| `ndx status [dir]` | Show PRD status (`--format=json`, `--since`, `--until`) |
+| `ndx refresh [dir]` | Refresh dashboard artifacts (`--ui-only`, `--data-only`, `--no-build`) |
+| `ndx usage [dir]` | Token usage analytics (`--format=json`, `--group=day\|week\|month`) |
+| `ndx sync [dir]` | Sync local PRD with remote adapter (`--push`, `--pull`) |
+| `ndx dev [dir]` | Start dev server with live reload |
+| `ndx ci [dir]` | Run analysis pipeline and validate PRD health |
+| `ndx config [key] [value]` | View and edit settings (`--json`, `--help`) |
+| `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github`) |
+
+### Direct Tool Access
 
 ```sh
-# Safe first run: one task
-ndx work --auto --iterations=1 --model=gpt-5.3-codex .
-
-# Then scale up
-ndx work --auto --iterations=4 --model=gpt-5.3-codex .
-
-# Or scope execution to one epic
-ndx work --epic="Your Epic Title" --auto --iterations=2 --model=gpt-5.3-codex .
+ndx rex <command> [args]          # or standalone: rex <command> [args]
+ndx hench <command> [args]        # or standalone: hench <command> [args]
+ndx sourcevision <command> [args] # or standalone: sv <command> [args]
 ```
 
-### F. Inspect progress and repeat
-
-```sh
-ndx status .
-ndx sourcevision analyze .
-ndx rex recommend .
-```
-
-Repeat the loop:
-1. SourceVision analyze
-2. Rex recommend / add
-3. Hench execute with `ndx work`
-
-## Packages
-
-**[sourcevision](packages/sourcevision)** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption. Includes an interactive browser-based viewer.
-
-**[rex](packages/rex)** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores state in `.rex/prd.json`. MCP server for AI tool integration.
-
-**[hench](packages/hench)** — Autonomous agent: picks next rex task, builds a brief, calls Claude API or CLI in a tool-use loop with security guardrails, records runs in `.hench/runs/`.
-
-**[@n-dx/llm-client](packages/llm-client)** — Vendor-neutral LLM foundation: shared provider interfaces, Claude and Codex adapters, provider registry, and token usage tracking. Used by rex and hench for all LLM calls.
-
-**[@n-dx/web](packages/web)** — Dashboard and unified MCP HTTP server: browser-based project dashboard with sourcevision zone maps and PRD status, plus a single HTTP endpoint serving both rex and sourcevision MCP tools.
-
-## Command Aliases
-
-Both `n-dx` and `ndx` work identically. Examples in this doc use `ndx` for brevity.
-
-| Full Form | Short Form |
-|-----------|------------|
-| `n-dx` | `ndx` |
-| `sourcevision` | `sv` |
-
-## Orchestration Commands
-
-```
-ndx init [dir]             sourcevision init + rex init + hench init
-ndx config llm.vendor ...  set active LLM vendor (claude|codex)
-ndx plan [dir]             sourcevision analyze + rex analyze (show proposals)
-ndx plan --accept [dir]    ...then accept proposals into PRD
-ndx plan --file=<path>     import PRD from a document (skips sourcevision)
-ndx work [dir]             hench run (interactive task selection by default)
-ndx work --auto [dir]      autoselect highest-priority task
-ndx work --iterations=N    run N tasks sequentially (stops on failure)
-ndx status [dir]           rex status (pass --format=json)
-```
-
-## `ndx refresh`
-
-Use `ndx refresh` to update dashboard data and UI artifacts with explicit per-step status output.
-
-```sh
-# Full refresh (SourceVision analyze + dashboard artifact metadata + web build)
-ndx refresh .
-
-# Scope controls
-ndx refresh --data-only .      # Skip UI build
-ndx refresh --ui-only .        # Skip SourceVision data refresh
-ndx refresh --pr-markdown .    # Regenerate PR markdown only
-ndx refresh --no-build .       # Skip web build step
-```
-
-Behavior notes:
-- Each planned step prints transitions with the step name: `started`, `succeeded`, `failed`, or `skipped`.
-- A final refresh step summary is always printed.
-- If a running `ndx start` server supports reload signaling, refreshed assets are applied via live reload.
-- If live reload signaling is unavailable for a running server (unsupported endpoint or request failure), refresh prints:
-  - `Restart required: ndx start stop "<dir>" && ndx start "<dir>"`
-
-## Rex/Hench Vendor Behavior
-
-Use this matrix when choosing `llm.vendor` for `rex analyze` and `hench run`.
-
-| Vendor | Rex behavior | Hench behavior | Token accounting | Known parsing constraints / fallback behavior |
-|--------|--------------|----------------|------------------|----------------------------------------------|
-| `claude` | Uses the shared LLM client. Auto-selects API when a Claude API key is configured; otherwise falls back to Claude CLI. | Supports both `hench.provider=api` and `hench.provider=cli`. | **Rex:** supported when provider returns usage. **Hench:** supported in API and CLI modes (per-turn + run totals). | JSON responses are expected for structured analyze flows. Parser strips fences/prose and attempts truncated-JSON repair before failing. |
-| `codex` | Uses Codex CLI adapter (`codex exec`) only. | CLI-only in Hench (`hench.provider=api` is rejected when `llm.vendor=codex`). | **Rex:** limited (Codex CLI adapter returns text without usage payload). **Hench:** supported when Codex returns usage fields; otherwise zeros with warning. | Rex parse path still expects JSON for structured proposal outputs. Hench applies `normalizeCodexResponse` and tolerates malformed payloads by falling back to plain text; warns on unknown/missing block types and missing usage. |
-
-Vendor selection and related config:
-- `ndx config llm.vendor claude .` or `ndx config llm.vendor codex .`
-- `ndx config hench.provider cli .` or `ndx config hench.provider api .` (API requires `llm.vendor=claude`)
-- `ndx config llm.claude.cli_path /path/to/claude .`
-- `ndx config llm.codex.cli_path /path/to/codex .`
-- `ndx config llm.claude.model <model> .`
-- `ndx config llm.codex.model <model> .`
-
-## Direct Tool Access
-
-Access individual tools through the orchestrator or as standalone commands:
-
-```sh
-# Via orchestrator (ndx delegates to the tool)
-ndx rex <command> [args]
-ndx hench <command> [args]
-ndx sourcevision <command> [args]
-ndx sv <command> [args]           # shorthand for sourcevision
-
-# Standalone binaries (also available after npm link)
-rex <command> [args]
-hench <command> [args]
-sourcevision <command> [args]
-sv <command> [args]               # shorthand for sourcevision
-```
+Both `n-dx` and `ndx` work identically. `sv` is an alias for `sourcevision`.
 
 ## MCP Servers
 
-Rex and sourcevision expose MCP servers for Claude Code tool use:
+Rex and SourceVision expose MCP servers for Claude Code tool use.
+
+### HTTP transport (recommended)
 
 ```sh
-# Using standalone binaries (recommended)
+ndx start .
+claude mcp add --transport http rex http://localhost:3117/mcp/rex
+claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
+```
+
+### stdio transport
+
+```sh
 claude mcp add rex -- rex mcp .
 claude mcp add sourcevision -- sv mcp .
-
-# Or using node directly
-claude mcp add rex -- node packages/rex/dist/cli/index.js mcp .
-claude mcp add sourcevision -- node packages/sourcevision/dist/cli/index.js mcp .
 ```
+
+### Tools
+
+**Rex:** `rex_status`, `rex_next`, `rex_add`, `rex_update`, `rex_validate`, `rex_analyze`, `rex_recommend`
+
+**SourceVision:** `sv_inventory`, `sv_imports`, `sv_zones`, `sv_components`, `sv_context`
+
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| **[sourcevision](packages/sourcevision)** | Static analysis: file inventory, import graph, zone detection (Louvain), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt`. |
+| **[rex](packages/rex)** | PRD management: hierarchical epics/features/tasks/subtasks, LLM-powered analysis and recommendations. Stores state in `.rex/prd.json`. |
+| **[hench](packages/hench)** | Autonomous agent: picks rex tasks, builds briefs, runs LLM tool-use loops with security guardrails. Records runs in `.hench/runs/`. |
+| **[@n-dx/llm-client](packages/llm-client)** | Vendor-neutral LLM foundation: Claude and Codex adapters, provider registry, token usage tracking. |
+| **[@n-dx/web](packages/web)** | Dashboard and unified MCP HTTP server: browser-based project dashboard with zone maps and PRD status. |
+
+## Output Files
+
+| Directory | Owner | Contents |
+|-----------|-------|----------|
+| `.sourcevision/` | sourcevision | `manifest.json`, `inventory.json`, `imports.json`, `zones.json`, `components.json`, `llms.txt`, `CONTEXT.md` |
+| `.rex/` | rex | `prd.json`, `config.json`, `execution-log.jsonl`, `workflow.md`, `acknowledged-findings.json` |
+| `.hench/` | hench | `config.json`, `runs/` |
 
 ## Development
 
@@ -342,14 +201,12 @@ pnpm test           # test all packages
 pnpm typecheck      # typecheck all packages
 ```
 
-## Output Files
+See [PACKAGE_GUIDELINES.md](PACKAGE_GUIDELINES.md) for package conventions, gateway patterns, and dependency hierarchy. See [TESTING.md](TESTING.md) for test tier requirements.
 
-| Directory | Owner | Contents |
-|-----------|-------|----------|
-| `.sourcevision/` | sourcevision | `manifest.json`, `inventory.json`, `imports.json`, `zones.json`, `components.json`, `llms.txt`, `CONTEXT.md` |
-| `.rex/` | rex | `prd.json`, `config.json`, `execution-log.jsonl`, `workflow.md` |
-| `.hench/` | hench | `config.json`, `runs/` |
+## Community
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
 
 ## License
 
-ISC
+[Elastic License 2.0](LICENSE)

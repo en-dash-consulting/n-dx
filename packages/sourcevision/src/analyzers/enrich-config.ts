@@ -41,6 +41,8 @@ export const PASS_CONFIGS: PassConfig[] = [
 2. A one-sentence description of the zone's architectural purpose
 3. 2-3 actionable observations about its role and quality
 
+Zone naming convention: the '-tests' suffix is reserved for zones that contain ONLY test files. If a zone contains any production source files alongside test files, name it after its production purpose (e.g. 'prd-tree-lifecycle', not 'prd-tree-lifecycle-tests'). This prevents tooling from misclassifying production code as test-only.
+
 Severity guide: most observations are "info". Flag zones with low cohesion (<0.4) or high coupling (>0.6) as "warning". Positive observations about good architecture or clean design are always "info" — never "warning" or "critical".`,
     expectedTypes: ["observation"],
   },

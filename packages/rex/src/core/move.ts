@@ -12,7 +12,6 @@
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { LEVEL_HIERARCHY } from "../schema/index.js";
 import { findItem, removeFromTree, insertChild, walkTree } from "./tree.js";
-import { CLIError } from "../cli/errors.js";
 
 export interface MoveResult {
   item: PRDItem;
@@ -161,7 +160,7 @@ export function moveItem(
 ): MoveResult {
   const validation = validateMove(items, itemId, newParentId);
   if (!validation.valid) {
-    throw new CLIError(validation.error!, validation.suggestion);
+    throw new Error(validation.error!);
   }
 
   const entry = findItem(items, itemId)!;
@@ -172,9 +171,8 @@ export function moveItem(
   // Remove from current position (preserves children)
   const removed = removeFromTree(items, itemId);
   if (!removed) {
-    throw new CLIError(
+    throw new Error(
       `Failed to remove item "${itemId}" from tree.`,
-      "The item may have been modified concurrently. Run 'rex status' and try again.",
     );
   }
 
@@ -188,9 +186,8 @@ export function moveItem(
       } else {
         items.push(removed);
       }
-      throw new CLIError(
+      throw new Error(
         `Failed to insert item under "${newParentId}".`,
-        "The target parent may have been removed. Run 'rex status' and try again.",
       );
     }
   } else {

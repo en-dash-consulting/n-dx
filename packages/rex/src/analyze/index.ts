@@ -92,3 +92,5 @@ export { validateFileInput, validateMarkdownContent, validateTextContent, valida
 
 export type { ConsolidationGuardResult } from "./consolidation-guard.js";
 export { countProposalTasks, buildConsolidationGuardPrompt, applyConsolidationGuard } from "./consolidation-guard.js";
+
+export type { BatchAcceptanceRecord, GranularityAdjustmentRecord } from "./batch-types.js";

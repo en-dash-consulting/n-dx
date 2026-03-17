@@ -12,10 +12,10 @@ import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/logos.js";
 import { RexTaskLink } from "../components/rex-task-link.js";
 import { ExecutionPanel } from "../components/prd-tree/execution-panel.js";
-import { SmartAddInput } from "../components/prd-tree/smart-add-input.js";
+import { SmartAddInput } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { ReorganizePanel } from "../components/prd-tree/reorganize-panel.js";
-import { usePolling } from "../hooks/use-polling.js";
+import { usePolling } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -608,10 +608,6 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   class: "rex-dash-action-btn",
                   onClick: () => navigateTo("prd" as ViewId),
                 }, "Browse Tasks"),
-                h("button", {
-                  class: "rex-dash-action-btn",
-                  onClick: () => navigateTo("rex-analysis" as ViewId),
-                }, "Run Analysis"),
                 h("button", {
                   class: "rex-dash-action-btn",
                   onClick: () => navigateTo("validation" as ViewId),

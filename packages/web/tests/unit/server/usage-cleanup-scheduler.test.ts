@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm, readFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -23,8 +24,45 @@ import {
   DEFAULT_CLEANUP_INTERVAL_MS,
   type OrphanedEntry,
   type CleanupResult,
+  type CollectAllIdsFn,
+  type LoadPRDFn,
 } from "../../../src/server/usage-cleanup-scheduler.js";
 import { IncrementalTaskUsageAggregator } from "../../../src/server/incremental-task-usage.js";
+
+/**
+ * Test-local implementation of collectAllIds.
+ *
+ * Extracts IDs from a flat array of PRD items (with optional nested children).
+ * This avoids importing from rex-gateway in a unit test, which would create a
+ * bidirectional coupling between the task-usage-tracking and web-dashboard zones.
+ */
+function collectAllIds(items: unknown[]): Set<string> {
+  const ids = new Set<string>();
+  const queue = [...items];
+  while (queue.length > 0) {
+    const item = queue.pop() as Record<string, unknown> | undefined;
+    if (!item || typeof item !== "object") continue;
+    if (typeof item.id === "string") ids.add(item.id);
+    if (Array.isArray(item.children)) queue.push(...item.children);
+  }
+  return ids;
+}
+
+/**
+ * Test-local PRD loader.
+ *
+ * Reads prd.json from disk without importing from prd-io.ts,
+ * which avoids cross-zone coupling in tests.
+ */
+const testLoadPRD: LoadPRDFn = (rexDir: string) => {
+  const prdPath = join(rexDir, "prd.json");
+  if (!existsSync(prdPath)) return null;
+  try {
+    return JSON.parse(readFileSync(prdPath, "utf-8"));
+  } catch {
+    return null;
+  }
+};
 
 describe("UsageCleanupScheduler", () => {
   let tmpDir: string;
@@ -281,7 +319,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      const result = await runCleanupCycle({ aggregator, rexDir });
+      const result = await runCleanupCycle({ aggregator, rexDir, collectAllIds, loadPRD: testLoadPRD });
 
       expect(result.prdAvailable).toBe(true);
       expect(result.totalOrphaned).toBe(1);
@@ -303,7 +341,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      const result = await runCleanupCycle({ aggregator, rexDir });
+      const result = await runCleanupCycle({ aggregator, rexDir, collectAllIds, loadPRD: testLoadPRD });
 
       expect(result.totalOrphaned).toBe(0);
       expect(result.orphanedEntries).toEqual([]);
@@ -319,6 +357,8 @@ describe("UsageCleanupScheduler", () => {
       const result = await runCleanupCycle({
         aggregator,
         rexDir: missingRexDir,
+        collectAllIds,
+        loadPRD: testLoadPRD,
       });
 
       expect(result.prdAvailable).toBe(false);
@@ -337,7 +377,7 @@ describe("UsageCleanupScheduler", () => {
       const logPath = join(tmpDir, ".hench", "usage-cleanup.jsonl");
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir, logPath });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, logPath, loadPRD: testLoadPRD });
 
       const logContent = await readFile(logPath, "utf-8");
       const entry = JSON.parse(logContent.trim());
@@ -353,10 +393,9 @@ describe("UsageCleanupScheduler", () => {
       const logPath = join(tmpDir, ".hench", "usage-cleanup.jsonl");
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir, logPath });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, logPath, loadPRD: testLoadPRD });
 
       // Log file should not exist since there were no orphans
-      const { existsSync } = await import("node:fs");
       expect(existsSync(logPath)).toBe(false);
     });
 
@@ -369,7 +408,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir, broadcast });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, broadcast, loadPRD: testLoadPRD });
 
       expect(broadcasts).toHaveLength(1);
       const msg = broadcasts[0] as Record<string, unknown>;
@@ -386,7 +425,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir, broadcast });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, broadcast, loadPRD: testLoadPRD });
 
       expect(broadcasts).toHaveLength(0);
     });
@@ -398,10 +437,9 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      await runCleanupCycle({ aggregator, rexDir });
+      await runCleanupCycle({ aggregator, rexDir, collectAllIds, loadPRD: testLoadPRD });
 
       // Verify run files still exist on disk
-      const { existsSync } = await import("node:fs");
       expect(existsSync(join(runsDir, "run-1.json"))).toBe(true);
       expect(existsSync(join(runsDir, "run-2.json"))).toBe(true);
     });
@@ -415,7 +453,7 @@ describe("UsageCleanupScheduler", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
-      const result = await runCleanupCycle({ aggregator, rexDir });
+      const result = await runCleanupCycle({ aggregator, rexDir, collectAllIds, loadPRD: testLoadPRD });
 
       expect(result.totalOrphaned).toBe(2);
       expect(result.totalTokensRemoved).toBe(

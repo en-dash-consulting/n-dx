@@ -535,6 +535,7 @@ async function walkDir(dir: string, rootDir: string, ig: IgnoreFilter): Promise<
 
   for (const entry of entries) {
     if (SKIP_DIRS.has(entry.name)) continue;
+    if (entry.name === ".gitkeep") continue;
 
     const fullPath = join(dir, entry.name);
     const relPath = toPosix(relative(rootDir, fullPath));

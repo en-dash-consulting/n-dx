@@ -308,13 +308,13 @@ describe("n-dx web", () => {
   // ── Help text ──────────────────────────────────────────────────────────
 
   describe("help text", () => {
-    it("shows web in the main help output", () => {
+    it("shows start/dashboard in the main help output", () => {
       const output = execFileSync("node", [CLI_PATH], {
         encoding: "utf-8",
         timeout: 10000,
         stdio: "pipe",
       });
-      expect(output).toContain("web");
+      expect(output).toContain("start");
       expect(output).toContain("dashboard");
     });
   });

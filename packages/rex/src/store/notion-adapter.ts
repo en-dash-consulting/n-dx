@@ -2,7 +2,7 @@
  * Notion database adapter for the PRDStore interface.
  *
  * Reads/writes PRD data through the Notion API, using the mapping utilities
- * from `core/notion-map.ts` for bidirectional conversion and `core/sync.ts`
+ * from `store/notion-map.ts` for bidirectional conversion and `core/sync.ts`
  * for conflict resolution.
  *
  * A local `.rex/` directory is still required for config, logs, and workflow
@@ -22,8 +22,8 @@ import {
   resolveParentPage,
   buildStatusGroupMap,
   validateDatabaseSchema,
-} from "../core/notion-map.js";
-import type { NotionStatusGroup } from "../core/notion-map.js";
+} from "./notion-map.js";
+import type { NotionStatusGroup } from "./notion-map.js";
 import {
   stampModified,
   stampSynced,

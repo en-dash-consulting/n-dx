@@ -6,6 +6,10 @@
  * `import … from "rex"` across route files, all web→rex runtime imports pass
  * through this single module.
  *
+ * **Minimal surface:** This gateway re-exports only the symbols actually
+ * consumed by web package source files. If a new route needs a rex symbol,
+ * add the re-export here — don't import rex directly in the route file.
+ *
  * By concentrating all web→rex runtime imports here, we ensure:
  * - The cross-package surface is **explicit** (re-exports in one file, not scattered).
  * - The DAG stays **acyclic** — rex never imports from web.
@@ -19,16 +23,15 @@
 // ---- Rex MCP server factory -------------------------------------------------
 export { createRexMcpServer } from "rex";
 
+// ---- Rex schema version contract --------------------------------------------
+export { SCHEMA_VERSION, isCompatibleSchema } from "rex";
+
 // ---- Rex domain types & constants -------------------------------------------
-export type { Priority, ItemLevel, ItemStatus } from "rex";
-export type { RequirementCategory, RequirementValidationType } from "rex";
+export type { ItemLevel, ItemStatus } from "rex";
 export type { PRDItem, PRDDocument, Requirement } from "rex";
 export {
-  PRIORITY_ORDER,
   LEVEL_HIERARCHY,
-  VALID_LEVELS,
   VALID_STATUSES,
-  VALID_PRIORITIES,
   VALID_REQUIREMENT_CATEGORIES,
   VALID_VALIDATION_TYPES,
   CHILD_LEVEL,
@@ -38,8 +41,6 @@ export {
   isValidationType,
   isRootLevel,
   isWorkItem,
-  isContainerLevel,
-  getLevelLabel,
 } from "rex";
 
 // ---- Rex tree utilities -----------------------------------------------------
@@ -62,10 +63,9 @@ export { computeTimestampUpdates } from "rex";
 
 // ---- Rex merge/consolidation ------------------------------------------------
 export { validateMerge, previewMerge, mergeItems } from "rex";
-export type { MergeValidation, MergePreview, MergeResult } from "rex";
 
 // ---- Rex prune --------------------------------------------------------------
-export { countSubtree, isFullyCompleted, findPrunableItems, pruneItems } from "rex";
+export { countSubtree } from "rex";
 
 // ---- Rex analytics ----------------------------------------------------------
 export {
@@ -73,17 +73,19 @@ export {
   computePriorityDistribution,
   computeRequirementsSummary,
 } from "rex";
-export type { EpicStats, PriorityDistribution, RequirementsSummary } from "rex";
 
 // ---- Rex health -------------------------------------------------------------
-export { computeHealthScore, formatHealthScore } from "rex";
-export type { StructureHealthScore, HealthDimensions, HealthOptions } from "rex";
+export { computeHealthScore } from "rex";
 
 // ---- Rex reorganize ---------------------------------------------------------
-export { detectReorganizations, applyProposals, formatApplyResult } from "rex";
-export type { ReorganizationProposal, ReorganizationPlan, ApplyResult } from "rex";
+export { detectReorganizations, applyProposals } from "rex";
 
 // ---- Rex reshape (LLM-powered restructuring) --------------------------------
-export { applyReshape, reasonForReshape, formatReshapeProposal } from "rex";
-export type { ReshapeProposal, ReshapeAction, ReshapeResult } from "rex";
-export type { ReshapeReasonOptions, ReshapeReasonResult } from "rex";
+export { applyReshape, reasonForReshape } from "rex";
+export type { ReshapeProposal } from "rex";
+
+// ---- Rex MCP tool handlers (direct invocation) -----------------------------
+export { handleEditItem } from "rex";
+
+// ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
+export type { Proposal, ProposalFeature, ProposalTask } from "rex";

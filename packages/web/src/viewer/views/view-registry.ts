@@ -9,33 +9,49 @@
 import { h } from "preact";
 import type { ComponentChild, VNode } from "preact";
 import type { ViewId, NavigateTo, DetailItem, LoadedData } from "../types.js";
-import type { DegradableFeature } from "../performance/graceful-degradation.js";
+import type { DegradableFeature } from "../performance/index.js";
 import { SOURCEVISION_TAB_IDS } from "./sourcevision-tabs.js";
 
-// ── View component imports ─────────────────────────────────────
+// ── View component imports (via domain barrels) ────────────────
+//
+// Each domain barrel groups related view components behind a single
+// import boundary. This creates natural decomposition points that:
+//   - Make the import surface explicit and auditable
+//   - Enable future lazy-loading per domain
+//   - Reduce the blast radius of view-level changes
 
-import { Overview } from "./overview.js";
-import { Graph } from "./graph.js";
-import { ZonesView } from "./zones.js";
-import { FilesView } from "./files.js";
-import { ArchitectureView } from "./architecture.js";
-import { ProblemsView } from "./problems.js";
-import { SuggestionsView } from "./suggestions.js";
-import { PRMarkdownView } from "./pr-markdown.js";
-import { RoutesView } from "./routes.js";
-import { PRDView } from "./prd.js";
-import { RexDashboard } from "./rex-dashboard.js";
-import { TokenUsageView } from "./token-usage.js";
-import { ValidationView } from "./validation.js";
-import { AnalysisView } from "./analysis.js";
-import { HenchRunsView } from "./hench-runs.js";
-import { HenchConfigView } from "./hench-config.js";
-import { HenchTemplatesView } from "./hench-templates.js";
-import { WorkflowOptimizationView } from "./workflow-optimization.js";
-import { TaskAuditView } from "./task-audit.js";
-import { NotionConfigView } from "./notion-config.js";
-import { IntegrationConfigView } from "./integration-config.js";
-import { FeatureTogglesView } from "./feature-toggles.js";
+import {
+  Overview,
+  Graph,
+  ZonesView,
+  FilesView,
+  ArchitectureView,
+  ProblemsView,
+  SuggestionsView,
+  PRMarkdownView,
+  RoutesView,
+} from "./domain-sourcevision.js";
+
+import {
+  PRDView,
+  RexDashboard,
+  TokenUsageView,
+  ValidationView,
+  TaskAuditView,
+  WorkflowOptimizationView,
+} from "./domain-rex.js";
+
+import {
+  HenchRunsView,
+  HenchConfigView,
+  HenchTemplatesView,
+} from "./domain-hench.js";
+
+import {
+  NotionConfigView,
+  IntegrationConfigView,
+  FeatureTogglesView,
+} from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
 
@@ -99,9 +115,6 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "prd": ({ setDetail, setPrdDetailContent, selectedTaskId, navigateTo }) =>
     h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo }),
 
-  "rex-analysis": () =>
-    h(AnalysisView, null),
-
   "token-usage": () =>
     h(TokenUsageView, null),
 
@@ -144,7 +157,7 @@ export function renderActiveView(view: ViewId, ctx: ViewRenderContext): Componen
 /** All known views grouped by product scope. */
 const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
   sourcevision: SOURCEVISION_TAB_IDS,
-  rex: ["rex-dashboard", "prd", "rex-analysis", "validation", "notion-config", "integrations"],
+  rex: ["rex-dashboard", "prd", "validation", "notion-config", "integrations"],
   hench: ["hench-runs", "hench-audit", "hench-config", "hench-templates", "hench-optimization"],
 };
 
@@ -155,6 +168,6 @@ const ALL_VIEWS = new Set<ViewId>([...Object.values(VIEWS_BY_SCOPE).flat(), ...C
 
 /** Build the valid view set based on an optional scope. */
 export function buildValidViews(scope: string | null): Set<ViewId> {
-  if (!scope) return ALL_VIEWS;
+  if (!scope || scope === "all") return ALL_VIEWS;
   return new Set<ViewId>([...(VIEWS_BY_SCOPE[scope] ?? []), ...CROSS_CUTTING_VIEWS] as ViewId[]);
 }

@@ -7,7 +7,7 @@ import {
   collectRequirements,
   isWorkItem,
 } from "../../prd/rex-gateway.js";
-import type { PRDStore, PRDItem, TreeEntry } from "rex";
+import type { PRDStore, PRDItem, TreeEntry } from "../../prd/rex-gateway.js";
 import type {
   TaskBrief,
   TaskBriefTask,
@@ -17,7 +17,7 @@ import type {
   TaskBriefLogEntry,
   TaskBriefRequirement,
 } from "../../schema/index.js";
-import { CLIError } from "@n-dx/llm-client";
+import { CLIError } from "../../prd/llm-gateway.js";
 
 export interface AssembleBriefOptions {
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */

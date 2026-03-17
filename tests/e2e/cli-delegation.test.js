@@ -1,30 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
-import { join } from "node:path";
-
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
-
-function run(args) {
-  return execFileSync("node", [CLI_PATH, ...args], {
-    encoding: "utf-8",
-    timeout: 10000,
-    stdio: "pipe",
-  });
-}
-
-function runFail(args) {
-  try {
-    execFileSync("node", [CLI_PATH, ...args], {
-      encoding: "utf-8",
-      timeout: 10000,
-      stdio: "pipe",
-    });
-    throw new Error("Expected command to fail");
-  } catch (err) {
-    if (err.message === "Expected command to fail") throw err;
-    return { stderr: err.stderr, stdout: err.stdout };
-  }
-}
+import { run, runFail } from "./e2e-helpers.js";
 
 describe("n-dx delegation commands", () => {
   describe("sourcevision", () => {

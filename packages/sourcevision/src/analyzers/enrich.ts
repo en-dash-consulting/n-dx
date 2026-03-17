@@ -42,7 +42,7 @@ import {
   ZONES_PER_BATCH,
   getPassConfig,
 } from "./enrich-config.js";
-import { computeGlobalContentHash } from "./zones.js";
+import { computeGlobalContentHash } from "./zone-hash.js";
 import { extractFindings, mergeZonesByName, deduplicateZoneIds } from "./enrich-parsing.js";
 import type { EnrichResult } from "./enrich-parsing.js";
 import {

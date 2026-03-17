@@ -8,7 +8,7 @@
  * @module rex/core/facets
  */
 
-import type { PRDItem, RexConfig } from "../schema/v1.js";
+import type { PRDItem, RexConfig } from "../schema/index.js";
 import { walkTree } from "./tree.js";
 
 /** Separator between facet key and value in a tag string. */

@@ -8,9 +8,9 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { usePolling } from "../../hooks/use-polling.js";
-import { createRequestDedup } from "../../messaging/request-dedup.js";
-import { isFeatureDisabled, onDegradationChange } from "../../performance/graceful-degradation.js";
+import { usePolling } from "../../hooks/index.js";
+import { createFetchPipeline } from "../../messaging/index.js";
+import { isFeatureDisabled, onDegradationChange } from "../../performance/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -85,15 +85,16 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
     return unsubscribe;
   }, []);
 
-  // ── Fetch execution status (deduplicated) ──────────────────────────
+  // ── Fetch execution status (rate-limited + deduplicated) ────────────
   //
-  // Wrapped with request deduplication: concurrent callers (e.g. a
-  // WebSocket-triggered reconciliation arriving while a polling fetch is
-  // in-flight) share a single underlying request. This guarantees at
-  // most one /api/rex/execute/status request is active at any time.
+  // Wrapped with FetchPipeline (rate limiter → request dedup): concurrent
+  // callers (e.g. a WebSocket-triggered reconciliation arriving while a
+  // polling fetch is in-flight) share a single underlying request, and
+  // rapid successive calls are rate-limited. This guarantees at most one
+  // /api/rex/execute/status request is active at any time.
 
-  const statusDedup = useRef(
-    createRequestDedup(async () => {
+  const statusPipeline = useRef(
+    createFetchPipeline(async () => {
       const res = await fetch("/api/rex/execute/status");
       if (res.ok) {
         const data = await res.json();
@@ -105,7 +106,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
 
   const fetchStatus = useCallback(async () => {
     try {
-      await statusDedup.current.execute();
+      await statusPipeline.current.execute();
     } catch {
       // Silently fail — will retry on next poll
     }
@@ -160,10 +161,10 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
     };
   }, [fetchStatus, onPrdChanged]);
 
-  // Dispose dedup on unmount to clear in-flight tracking state.
+  // Dispose pipeline on unmount to clear rate-limiter timers and in-flight state.
   useEffect(() => {
-    const dedup = statusDedup.current;
-    return () => dedup.dispose();
+    const pipeline = statusPipeline.current;
+    return () => pipeline.dispose();
   }, []);
 
   // Poll as fallback (every 3s) — visibility-aware via polling manager.

@@ -1,6 +1,7 @@
 {
   "name": "sourcevision",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "description": "Codebase analysis tool with structured, git-friendly output",
   "private": true,
   "type": "module",

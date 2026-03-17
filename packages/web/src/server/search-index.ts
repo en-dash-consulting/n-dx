@@ -12,10 +12,11 @@
  * @module web/server/search-index
  */
 
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDItem, PRDDocument } from "./rex-gateway.js";
 import { walkTree } from "./rex-gateway.js";
+import { loadPRDSync } from "./prd-io.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -157,7 +158,11 @@ export class SearchIndex {
   /** Path to prd.json (set once). */
   private prdPath: string;
 
+  /** Rex directory path for centralized PRD loading. */
+  private rexDir: string;
+
   constructor(rexDir: string) {
+    this.rexDir = rexDir;
     this.prdPath = join(rexDir, "prd.json");
   }
 
@@ -312,12 +317,7 @@ export class SearchIndex {
 
   /** Load the PRD document from disk. */
   private loadPRD(): PRDDocument | null {
-    if (!existsSync(this.prdPath)) return null;
-    try {
-      return JSON.parse(readFileSync(this.prdPath, "utf-8")) as PRDDocument;
-    } catch {
-      return null;
-    }
+    return loadPRDSync(this.rexDir);
   }
 
   /** Index a single PRD item. */

@@ -10,7 +10,7 @@
  * compile-time consistency tests in tests/unit/server/type-consistency.test.ts.
  *
  * @see packages/rex/src/schema/v1.ts — canonical source: ItemLevel, ItemStatus, Priority, PRDItem, PRDDocument
- * @see packages/web/src/server/mcp-deps.ts — server-side gateway (re-exports from rex)
+ * @see packages/web/src/server/rex-gateway.ts — server-side gateway (re-exports from rex)
  */
 
 export type ItemLevel = "epic" | "feature" | "task" | "subtask";

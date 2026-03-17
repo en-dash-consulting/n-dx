@@ -1,7 +1,7 @@
 import { h, Fragment } from "preact";
 import { useState, useMemo } from "preact/hooks";
 import type { LoadedData } from "../types.js";
-import type { RouteTreeNode, RouteExportKind, ComponentUsageEdge } from "../../schema/v1.js";
+import type { RouteTreeNode, RouteExportKind, ComponentUsageEdge } from "../external.js";
 import { TreeView, type TreeNode, CollapsibleSection, BarChart } from "../visualization/index.js";
 import { SearchFilter } from "../components/search-filter.js";
 import { BrandedHeader } from "../components/logos.js";

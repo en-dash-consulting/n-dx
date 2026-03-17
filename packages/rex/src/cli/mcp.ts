@@ -21,6 +21,7 @@ import {
   handleReorganize,
   handleHealth,
   handleFacets,
+  handleEditItem,
 } from "./mcp-tools.js";
 
 /**
@@ -51,27 +52,29 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
 
   // --- Tools ---
 
-  server.tool("get_prd_status", "Get PRD title, overall stats, and per-epic stats", {},
+  server.tool("get_prd_status", "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress.", {},
     async () => handleGetPrdStatus(store));
 
-  server.tool("get_next_task", "Get the next actionable task based on priority and dependencies, with explanation of why it was selected", {},
+  server.tool("get_next_task", "Get the next actionable task based on priority and dependencies, with explanation of why it was selected. Use when the user asks what to work on next.", {},
     async () => handleGetNextTask(store));
 
   server.tool(
     "update_task_status",
-    "Update the status of a PRD item",
+    "Update the status of a PRD item. Use when starting work (in_progress), finishing (completed), or encountering blockers.",
     {
       id: z.string().describe("Item ID"),
       status: z.enum(["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted"]).describe("New status"),
       force: z.boolean().optional().describe("Force the transition even if it violates transition rules (e.g. completed → pending)"),
       reason: z.string().optional().describe("Failure reason (used when status is 'failing')"),
+      resolutionType: z.enum(["code-change", "config-override", "acknowledgment", "deferred", "unclassified"]).optional().describe("How the task was resolved (required when status is 'completed')"),
+      resolutionDetail: z.string().optional().describe("Brief description of how the resolution was achieved"),
     },
     async (args) => handleUpdateTaskStatus(store, args),
   );
 
   server.tool(
     "add_item",
-    "Add a new item to the PRD",
+    "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked.",
     {
       title: z.string().describe("Item title"),
       level: z.enum(getAllLevels() as [string, ...string[]]).describe("Item level"),
@@ -87,8 +90,24 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
   );
 
   server.tool(
+    "edit_item",
+    "Edit content fields of a PRD item (title, description, acceptance criteria, priority, tags). Use for content changes — use update_task_status for status/lifecycle transitions.",
+    {
+      id: z.string().describe("Item ID"),
+      title: z.string().optional().describe("New title"),
+      description: z.string().optional().describe("New description"),
+      acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria"),
+      priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("New priority"),
+      tags: z.array(z.string()).optional().describe("New tags"),
+      source: z.string().optional().describe("New source"),
+      blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
+    },
+    async (args) => handleEditItem(store, args),
+  );
+
+  server.tool(
     "move_item",
-    "Move an item to a different parent in the PRD tree (reparent)",
+    "Move an item to a different parent in the PRD tree (reparent). Use to reorganize items that are under the wrong epic or feature.",
     {
       id: z.string().describe("Item ID to move"),
       parentId: z.string().optional().describe("New parent ID (omit to move to root)"),
@@ -98,7 +117,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
 
   server.tool(
     "merge_items",
-    "Consolidate multiple sibling items into one, combining descriptions, acceptance criteria, and tags",
+    "Consolidate multiple sibling items into one, combining descriptions, acceptance criteria, and tags. Use when duplicate or overlapping items are found.",
     {
       sourceIds: z.array(z.string()).describe("IDs of items to merge (must be siblings at the same level)"),
       targetId: z.string().describe("ID of the item that survives (must be in sourceIds)"),
@@ -111,7 +130,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
 
   server.tool(
     "get_item",
-    "Get full details of a PRD item including parent chain",
+    "Get full details of a PRD item including parent chain. Use to understand task context before starting work.",
     {
       id: z.string().describe("Item ID"),
     },
@@ -139,7 +158,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     async (args) => handleSyncWithRemote(store, rexDir, args, resolveRemoteStore, SyncEngine),
   );
 
-  server.tool("get_recommendations", "Get SourceVision-based recommendations for PRD items (requires SourceVision)", {},
+  server.tool("get_recommendations", "Get SourceVision-based recommendations for PRD items. Use alongside get_findings for data-driven planning.", {},
     async () => handleGetRecommendations());
 
   server.tool(

@@ -9,12 +9,14 @@ import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
-import { handleRexRoute, shutdownRexExecution } from "./routes-rex.js";
+import { handleRexRoute, shutdownRexExecution } from "./routes-rex/index.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
-import { startUsageCleanupScheduler } from "./usage-cleanup-scheduler.js";
+import { registerUsageScheduler, type CollectAllIdsFn } from "./task-usage.js";
+import { loadPRDSync } from "./prd-io.js";
+import { collectAllIds } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute } from "./routes-mcp.js";
@@ -25,9 +27,8 @@ import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
-import { createWebSocketManager } from "./websocket.js";
-import { WsHealthTracker } from "./ws-health-tracker.js";
-import { ALL_DATA_FILES } from "../shared/data-files.js";
+import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
+import { ALL_DATA_FILES } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
 
 /**
@@ -618,11 +619,13 @@ export async function startServer(
 
     // Start periodic usage cleanup — prunes orphaned aggregation entries
     // for tasks that no longer exist in the PRD (configurable, default weekly).
-    const cleanupInterval = startUsageCleanupScheduler(
+    const cleanupInterval = registerUsageScheduler({
       ctx,
-      () => getAggregator(watcherHandles.henchRunsDir),
-      ws.broadcast,
-    );
+      getAggregator: () => getAggregator(watcherHandles.henchRunsDir),
+      broadcast: ws.broadcast,
+      collectAllIds: collectAllIds as CollectAllIdsFn,
+      loadPRD: loadPRDSync,
+    });
     watcherHandles.monitorIntervals.push(cleanupInterval);
   }
 

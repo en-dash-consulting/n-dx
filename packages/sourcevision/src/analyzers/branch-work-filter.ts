@@ -94,7 +94,7 @@ export interface BranchFilterResult {
 }
 
 /** Options for detecting the branch lifecycle. */
-export interface LifecycleDetectionOptions {
+interface LifecycleDetectionOptions {
   /** Project root directory. */
   dir: string;
   /** Base branch to compare against. Auto-detected when omitted. */
@@ -343,8 +343,9 @@ function getCommitDate(dir: string, sha: string): string | null {
  *
  * @param options - Detection configuration
  * @returns Branch lifecycle metadata
+ * @internal Not part of the public API — used only within this module
  */
-export function detectBranchLifecycle(
+function detectBranchLifecycle(
   options: LifecycleDetectionOptions,
 ): BranchLifecycle {
   const { dir } = options;

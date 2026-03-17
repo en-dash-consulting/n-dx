@@ -24,7 +24,7 @@ import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireHenchDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { formatTypoSuggestion } from "@n-dx/llm-client";
+import { formatTypoSuggestion } from "../prd/llm-gateway.js";
 
 function parseArgs(argv: string[]): {
   command: string | undefined;

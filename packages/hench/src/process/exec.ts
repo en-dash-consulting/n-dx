@@ -20,7 +20,7 @@ export {
   spawnManaged,
   ProcessPool,
   ProcessLimitError,
-} from "@n-dx/llm-client";
+} from "../prd/llm-gateway.js";
 
 export type {
   ExecResult,
@@ -28,4 +28,4 @@ export type {
   SpawnToolOptions,
   SpawnToolResult,
   ManagedChild,
-} from "@n-dx/llm-client";
+} from "../prd/llm-gateway.js";

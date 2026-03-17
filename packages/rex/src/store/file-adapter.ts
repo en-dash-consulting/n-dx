@@ -1,10 +1,11 @@
-import { readFile, writeFile, appendFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, appendFile, mkdir, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
+import { atomicWriteJSON } from "./atomic-write.js";
 import type { PRDStore, StoreCapabilities } from "./contracts.js";
 
 export class FileStore implements PRDStore {
@@ -33,7 +34,7 @@ export class FileStore implements PRDStore {
     if (!result.ok) {
       throw new Error(`Invalid document: ${result.errors.message}`);
     }
-    await writeFile(this.path("prd.json"), toCanonicalJSON(doc), "utf-8");
+    await atomicWriteJSON(this.path("prd.json"), doc, toCanonicalJSON);
   }
 
   async getItem(id: string): Promise<PRDItem | null> {
@@ -101,11 +102,27 @@ export class FileStore implements PRDStore {
       entry.detail && entry.detail.length > MAX_DETAIL_LENGTH
         ? { ...entry, detail: entry.detail.slice(0, MAX_DETAIL_LENGTH) + "..." }
         : entry;
-    await appendFile(
-      this.path("execution-log.jsonl"),
-      JSON.stringify(sanitizedEntry) + "\n",
-      "utf-8",
-    );
+
+    const logPath = this.path("execution-log.jsonl");
+
+    // Rotate if the log exceeds the size threshold (1 MB default).
+    // The rotated file is kept as a single backup; older backups are discarded.
+    await this.maybeRotateLog(logPath);
+
+    await appendFile(logPath, JSON.stringify(sanitizedEntry) + "\n", "utf-8");
+  }
+
+  /** Rotate execution-log.jsonl when it exceeds MAX_LOG_BYTES. */
+  private async maybeRotateLog(logPath: string): Promise<void> {
+    const MAX_LOG_BYTES = 1_048_576; // 1 MB
+    try {
+      const info = await stat(logPath);
+      if (info.size < MAX_LOG_BYTES) return;
+      // Rotate: current → .1 (overwrites any previous .1)
+      await rename(logPath, logPath.replace(".jsonl", ".1.jsonl"));
+    } catch {
+      // File doesn't exist yet or stat/rename failed — skip rotation
+    }
   }
 
   async readLog(limit?: number): Promise<LogEntry[]> {

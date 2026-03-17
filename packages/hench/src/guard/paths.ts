@@ -20,7 +20,7 @@
  */
 
 import { resolve, relative } from "node:path";
-import { ClaudeClientError } from "@n-dx/llm-client";
+import { ClaudeClientError } from "../prd/llm-gateway.js";
 
 /**
  * Security guard error — thrown when path validation detects a violation.

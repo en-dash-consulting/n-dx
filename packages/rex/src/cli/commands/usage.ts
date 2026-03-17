@@ -2,14 +2,13 @@ import { join } from "node:path";
 import { resolveStore } from "../../store/index.js";
 import {
   aggregateTokenUsage,
-  formatAggregateTokenUsage,
   estimateCost,
   collectTokenEvents,
   groupByCommand,
   groupByTimePeriod,
   checkBudget,
-  formatBudgetWarnings,
 } from "../../core/token-usage.js";
+import { formatAggregateTokenUsage, formatBudgetWarnings } from "./token-format.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
 import { info, warn, result } from "../output.js";

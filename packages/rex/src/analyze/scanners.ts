@@ -411,12 +411,17 @@ export async function scanDocs(
 
 // Canonical sourcevision schema (v1)
 interface SVFinding {
-  type: "observation" | "pattern" | "relationship" | "anti-pattern" | "suggestion";
+  type: "observation" | "pattern" | "relationship" | "anti-pattern" | "suggestion" | "move-file";
   pass: number;
   scope: string;
   text: string;
   severity?: "info" | "warning" | "critical";
   related?: string[];
+  // move-file specific fields
+  from?: string;
+  to?: string;
+  moveReason?: "zone-pin-override" | "import-neighbor-majority" | "directory-consolidation";
+  predictedImpact?: number;
 }
 
 interface SVZone {
@@ -482,6 +487,8 @@ function findingPrefix(type: SVFinding["type"]): string {
       return "Fix";
     case "suggestion":
       return "Implement";
+    case "move-file":
+      return "Move";
     case "pattern":
       return "Refactor";
     case "observation":
@@ -616,12 +623,14 @@ export async function scanSourceVision(
           // Only include actionable finding types:
           // - anti-pattern: something wrong that needs fixing
           // - suggestion: an improvement to implement
+          // - move-file: concrete file relocation recommendation
           // Skip observations, relationships, patterns — these are informational context
-          const isActionable = finding.type === "anti-pattern" || finding.type === "suggestion";
+          const isActionable = finding.type === "anti-pattern" || finding.type === "suggestion" || finding.type === "move-file";
           if (!isActionable) continue;
 
           // Only include warning/critical severity — info is too noisy for task generation
-          if (finding.severity === "info") continue;
+          // Exception: move-file findings with "info" severity still pass through (import-neighbor moves)
+          if (finding.severity === "info" && finding.type !== "move-file") continue;
 
           // Compute stable hash and skip acknowledged findings
           const hash = computeFindingHash(finding);
@@ -662,6 +671,29 @@ export async function scanSourceVision(
             criteria.push(`Zone: ${zone.name} (${zone.files.length} files, cohesion: ${zone.cohesion.toFixed(2)}, coupling: ${zone.coupling.toFixed(2)})`);
           }
 
+          // Add move-file specific criteria
+          if (finding.type === "move-file" && finding.from && finding.to) {
+            criteria.push(`Move from: ${finding.from}`);
+            criteria.push(`Move to: ${finding.to}`);
+            if (finding.moveReason) {
+              const reasonLabel = finding.moveReason === "zone-pin-override"
+                ? "File is pinned to a zone in a different directory"
+                : finding.moveReason === "import-neighbor-majority"
+                  ? "Majority of import neighbors are in the target directory"
+                  : "Directory consolidation opportunity";
+              criteria.push(`Reason: ${reasonLabel}`);
+            }
+            if (finding.predictedImpact != null && finding.predictedImpact > 0) {
+              criteria.push(`Predicted impact: ${finding.predictedImpact} cross-boundary edge${finding.predictedImpact === 1 ? "" : "s"} eliminated`);
+            }
+            criteria.push(""); // Visual separator
+            criteria.push("Steps:");
+            criteria.push("• Move the file to the target directory");
+            criteria.push("• Update all import paths referencing this file");
+            criteria.push("• Run tests to verify no breakage");
+            criteria.push("• Remove the zone pin from .n-dx.json if this was a pin-override move");
+          }
+
           // Generate concrete fix suggestions based on finding patterns
           const fixSuggestions = generateFixSuggestion(finding, zone);
           if (fixSuggestions.length > 0) {
@@ -675,6 +707,7 @@ export async function scanSourceVision(
           // Build tags: zone name + finding hash for feedback loop
           const tags: string[] = zone ? [zone.name] : finding.scope !== "global" ? [finding.scope] : [];
           tags.push(`finding:${hash}`);
+          if (finding.type === "move-file") tags.push("structural-debt");
 
           results.push({
             name: `${prefix}: ${finding.text}`,

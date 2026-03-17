@@ -9,7 +9,7 @@
  * @module rex/core/code-coverage
  */
 
-import type { PRDItem } from "../schema/v1.js";
+import type { PRDItem } from "../schema/index.js";
 import { walkTree } from "./tree.js";
 
 /** A task that may be related to changed files. */

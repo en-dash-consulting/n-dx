@@ -8,6 +8,8 @@ export interface AcknowledgedFinding {
   hash: string;
   reason: string;
   text: string;
+  type?: string;
+  scope?: string;
   acknowledgedAt: string;
   acknowledgedBy: string;
 }
@@ -68,13 +70,15 @@ export function acknowledgeFinding(
   text: string,
   reason: string,
   by: string,
+  type?: string,
+  scope?: string,
 ): AcknowledgedStore {
   const existing = store.findings.filter((f) => f.hash !== hash);
   return {
     ...store,
     findings: [
       ...existing,
-      { hash, reason, text, acknowledgedAt: new Date().toISOString(), acknowledgedBy: by },
+      { hash, reason, text, type, scope, acknowledgedAt: new Date().toISOString(), acknowledgedBy: by },
     ],
   };
 }
@@ -82,4 +86,54 @@ export function acknowledgeFinding(
 /** Check if a finding hash is acknowledged. */
 export function isAcknowledged(store: AcknowledgedStore, hash: string): boolean {
   return store.findings.some((f) => f.hash === hash);
+}
+
+// ── Fuzzy matching ────────────────────────────────────────────────────
+
+function normalizeText(text: string): string {
+  return text.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function bigramSimilarity(a: string, b: string): number {
+  if (a === b) return 1.0;
+  if (a.length < 2 || b.length < 2) return a === b ? 1.0 : 0;
+
+  const bigramsA = new Set<string>();
+  for (let i = 0; i < a.length - 1; i++) bigramsA.add(a.slice(i, i + 2));
+
+  const bigramsB = new Set<string>();
+  for (let i = 0; i < b.length - 1; i++) bigramsB.add(b.slice(i, i + 2));
+
+  let intersection = 0;
+  for (const gram of bigramsA) {
+    if (bigramsB.has(gram)) intersection++;
+  }
+
+  return (2 * intersection) / (bigramsA.size + bigramsB.size);
+}
+
+/** Similarity threshold for fuzzy cross-run finding matching. */
+const FUZZY_SIMILARITY_THRESHOLD = 0.65;
+
+/**
+ * Check if a finding is acknowledged, using fuzzy text matching as a fallback
+ * when exact hash match fails. Finds matches among acknowledged findings with
+ * the same type+scope, then compares normalized text via bigram Dice similarity.
+ */
+export function isAcknowledgedFuzzy(
+  store: AcknowledgedStore,
+  finding: { hash: string; type: string; scope: string; text: string },
+): boolean {
+  // Fast path: exact hash match
+  if (store.findings.some((f) => f.hash === finding.hash)) return true;
+
+  // Fuzzy path: compare text against acknowledged findings with same type+scope
+  const normalizedText = normalizeText(finding.text);
+  for (const acked of store.findings) {
+    if (acked.type !== finding.type || acked.scope !== finding.scope) continue;
+    const similarity = bigramSimilarity(normalizedText, normalizeText(acked.text));
+    if (similarity >= FUZZY_SIMILARITY_THRESHOLD) return true;
+  }
+
+  return false;
 }

@@ -1,6 +1,7 @@
 {
   "name": "@n-dx/web",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "description": "n-dx web dashboard — serves sourcevision, rex, and hench data",
   "private": true,
   "type": "module",
@@ -20,7 +21,8 @@
   ],
   "scripts": {
     "build": "tsc && node build.js",
-    "build:viewer": "node build.js",
+    "build:viewer": "node build.js --viewer-only",
+    "build:landing": "node build.js --landing-only",
     "dev": "node dev.js",
     "dev:viewer": "node build.js --watch",
     "typecheck": "tsc --noEmit",

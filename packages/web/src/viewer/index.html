@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Loading… | n-dx</title>
   <link rel="icon" type="image/png" href="./n-dx.png">
+  <!--
+    External dependency manifest — all resources loaded from this HTML shell.
+    No CDN or external URLs are referenced; all assets are local:
+      - ./n-dx.png       (favicon)
+      - ./styles.css      (application stylesheet, built from src/viewer/styles/)
+      - ./main.ts         (application entry point, bundled by Vite)
+    If an external CDN resource is added here, register it in this block
+    so that supply-chain security tooling can audit it alongside pnpm audit.
+  -->
   <script>
     (function(){
       var s = localStorage.getItem("sv-theme");

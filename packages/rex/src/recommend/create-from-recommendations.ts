@@ -63,6 +63,18 @@ export interface SkippedRecommendation {
 }
 
 /**
+ * A recommendation that updated an existing pending item in-place.
+ */
+export interface UpdatedRecommendation {
+  /** Index of the recommendation in the original input array. */
+  index: number;
+  /** Title of the recommendation. */
+  title: string;
+  /** ID of the existing item that was updated. */
+  existingItemId: string;
+}
+
+/**
  * A recommendation that was reparented as a child of a completed item.
  */
 export interface ReparentedRecommendation {
@@ -93,6 +105,8 @@ export interface CreationResult {
   }>;
   /** Recommendations that were skipped due to conflicts (only with skip strategy). */
   skipped?: SkippedRecommendation[];
+  /** Recommendations that updated existing pending items in-place. */
+  updated?: UpdatedRecommendation[];
   /** Recommendations reparented as children of completed items. */
   reparented?: ReparentedRecommendation[];
   /** Full conflict report when conflict detection was run. */
@@ -114,6 +128,7 @@ function validatePlacement(
   item: PRDItem,
   parentId: string | undefined,
   docItems: PRDItem[],
+  batchItems?: Map<string, PRDItem>,
 ): string | null {
   const allowedParents = LEVEL_HIERARCHY[item.level];
   if (!allowedParents) {
@@ -125,19 +140,22 @@ function validatePlacement(
   );
 
   if (parentId) {
-    // Validate parent exists and level hierarchy is respected
+    // Check both existing doc items and items being created in the same batch
     const parentEntry = findItem(docItems, parentId);
-    if (!parentEntry) {
+    const batchParent = batchItems?.get(parentId);
+    const parentLevel = parentEntry?.item.level ?? batchParent?.level;
+
+    if (!parentLevel) {
       return `Parent "${parentId}" not found for item "${item.title}".`;
     }
     if (
       allowedParentLevels.length > 0 &&
-      !allowedParentLevels.includes(parentEntry.item.level)
+      !allowedParentLevels.includes(parentLevel)
     ) {
       const parentNames = allowedParentLevels.join(" or ");
       return (
         `A ${item.level} must be a child of a ${parentNames}, ` +
-        `but "${parentId}" is a ${parentEntry.item.level}.`
+        `but "${parentId}" is a ${parentLevel}.`
       );
     }
   } else {
@@ -199,6 +217,7 @@ export async function createItemsFromRecommendations(
   let conflictReport: ConflictReport | undefined;
   let effectiveRecommendations = recommendations;
   const skipped: SkippedRecommendation[] = [];
+  const updated: UpdatedRecommendation[] = [];
   const reparented: ReparentedRecommendation[] = [];
 
   if (strategy !== "force") {
@@ -222,7 +241,7 @@ export async function createItemsFromRecommendations(
         );
       }
 
-      // strategy === "skip": split completed-item conflicts (reparent) from active conflicts (skip)
+      // strategy === "skip": split conflicts into update / reparent / skip
       const reparentedRecs: EnrichedRecommendation[] = [];
 
       for (const idx of conflictReport.conflictingIndices) {
@@ -233,6 +252,28 @@ export async function createItemsFromRecommendations(
         const intraDup = conflictReport.intraBatchDuplicates.find(
           (d) => d.indexB === idx,
         );
+
+        // Pending-item conflicts from same source: update in-place rather than
+        // skipping. Recommendation items are refreshed each run with updated
+        // findings — the existing pending item should reflect the latest data.
+        if (
+          conflict &&
+          conflict.matchedItem.status === "pending" &&
+          rec.source
+        ) {
+          const matched = findItem(doc.items, conflict.matchedItem.id);
+          if (matched && matched.item.source === rec.source) {
+            matched.item.description = rec.description;
+            matched.item.priority = rec.priority;
+            if (rec.meta) matched.item.recommendationMeta = rec.meta;
+            updated.push({
+              index: idx,
+              title: rec.title,
+              existingItemId: conflict.matchedItem.id,
+            });
+            continue;
+          }
+        }
 
         // Completed-item conflicts: reparent as child (if level allows demotion
         // AND the matched item's level is a valid parent for the demoted level)
@@ -275,7 +316,20 @@ export async function createItemsFromRecommendations(
       ];
 
       if (effectiveRecommendations.length === 0) {
+        // Even with no new items to create, we may have updated existing items
+        if (updated.length > 0) {
+          await store.saveDocument(doc);
+          for (const u of updated) {
+            await store.appendLog({
+              timestamp: new Date().toISOString(),
+              event: "item_updated",
+              itemId: u.existingItemId,
+              detail: `Updated ${u.title} from recommendation refresh`,
+            });
+          }
+        }
         const result: CreationResult = { created: [], skipped, conflictReport };
+        if (updated.length > 0) result.updated = updated;
         if (reparented.length > 0) result.reparented = reparented;
         return result;
       }
@@ -286,7 +340,7 @@ export async function createItemsFromRecommendations(
   const pending: Array<{ item: PRDItem; parentId?: string }> = [];
   for (const rec of effectiveRecommendations) {
     const item: PRDItem = {
-      id: randomUUID(),
+      id: rec.id ?? randomUUID(),
       title: rec.title,
       status: "pending",
       level: rec.level,
@@ -308,9 +362,14 @@ export async function createItemsFromRecommendations(
   }
 
   // 4. Validate placement (level hierarchy) for each item
+  //    Build a map of batch items so intra-batch parent references resolve.
+  const batchItemMap = new Map<string, PRDItem>();
+  for (const { item } of pending) {
+    batchItemMap.set(item.id, item);
+  }
   const placementErrors: string[] = [];
   for (const { item, parentId } of pending) {
-    const err = validatePlacement(item, parentId, doc.items);
+    const err = validatePlacement(item, parentId, doc.items, batchItemMap);
     if (err) placementErrors.push(err);
   }
   if (placementErrors.length > 0) {
@@ -344,7 +403,7 @@ export async function createItemsFromRecommendations(
   // 7. Persist atomically — single write for all items
   await store.saveDocument(doc);
 
-  // 8. Log creation events
+  // 8. Log creation and update events
   const created: CreationResult["created"] = [];
   for (const { item, parentId } of pending) {
     await store.appendLog({
@@ -360,9 +419,18 @@ export async function createItemsFromRecommendations(
       parentId,
     });
   }
+  for (const u of updated) {
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "item_updated",
+      itemId: u.existingItemId,
+      detail: `Updated ${u.title} from recommendation refresh`,
+    });
+  }
 
   const result: CreationResult = { created };
   if (skipped.length > 0) result.skipped = skipped;
+  if (updated.length > 0) result.updated = updated;
   if (reparented.length > 0) result.reparented = reparented;
   if (conflictReport) result.conflictReport = conflictReport;
   return result;

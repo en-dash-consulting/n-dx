@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
-import { SCHEMA_VERSION } from "../../schema/index.js";
+import { SCHEMA_VERSION, isCompatibleSchema } from "../../schema/index.js";
 import { validateDocument, validateConfig } from "../../schema/validate.js";
 import { validateDAG } from "../../core/dag.js";
 import { validateStructure, findEpiclessFeatures } from "../../core/structural.js";
@@ -85,15 +85,15 @@ export async function cmdValidate(
     });
   }
 
-  // Check schema version
+  // Check schema version compatibility
   if (doc) {
-    if (doc.schema === SCHEMA_VERSION) {
+    if (isCompatibleSchema(doc.schema)) {
       checks.push({ name: "schema version", pass: true, errors: [] });
     } else {
       checks.push({
         name: "schema version",
         pass: false,
-        errors: [`Unknown schema "${doc.schema}", expected "${SCHEMA_VERSION}"`],
+        errors: [`Incompatible schema "${doc.schema}", expected "${SCHEMA_VERSION}"`],
       });
     }
   }

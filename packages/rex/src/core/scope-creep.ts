@@ -7,9 +7,9 @@
  * @module rex/core/scope-creep
  */
 
-import type { PRDItem } from "../schema/v1.js";
+import type { PRDItem } from "../schema/index.js";
+import { isContainerLevel } from "../schema/index.js";
 import { walkTree } from "./tree.js";
-import { isContainerLevel } from "../schema/levels.js";
 
 /** Result of scope creep detection for a single container. */
 export interface ScopeCreepResult {

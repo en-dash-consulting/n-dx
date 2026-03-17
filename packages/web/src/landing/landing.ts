@@ -2,11 +2,27 @@
  * Landing page interactions — theme toggle, copy-to-clipboard,
  * scroll animations, and animated terminal demo.
  * Vanilla JS (no framework dependency).
+ *
+ * Each concern is isolated in its own init function, called from
+ * the `initLanding()` entry point at the bottom.
  */
 
+// ── Types ──
+
+interface TerminalLine {
+  type: "command" | "output";
+  text: string;
+  cls?: string; // extra CSS class for output coloring
+  delay?: number; // delay before showing this line (ms)
+  phase?: "sourcevision" | "rex" | "hench"; // pipeline phase for synced highlight
+}
+
 // ── Theme toggle ──
-const themeBtn = document.getElementById("theme-toggle");
-if (themeBtn) {
+
+function initThemeToggle(): void {
+  const themeBtn = document.getElementById("theme-toggle");
+  if (!themeBtn) return;
+
   themeBtn.addEventListener("click", () => {
     const current = document.documentElement.getAttribute("data-theme") || "dark";
     const next = current === "dark" ? "light" : "dark";
@@ -20,56 +36,67 @@ if (themeBtn) {
 }
 
 // ── Copy install commands ──
-// Supports multiple copy buttons — each copies the sibling <code> text.
-document.querySelectorAll<HTMLButtonElement>(".copy-btn").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    const codeEl = btn.parentElement?.querySelector("code");
-    if (!codeEl) return;
-    const text = codeEl.textContent || "";
-    const originalLabel = btn.getAttribute("aria-label") || "Copy command";
 
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Fallback for older browsers
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
-    }
+function initCopyButtons(): void {
+  document.querySelectorAll<HTMLButtonElement>(".copy-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const codeEl = btn.parentElement?.querySelector("code");
+      if (!codeEl) return;
+      const text = codeEl.textContent || "";
+      const originalLabel = btn.getAttribute("aria-label") || "Copy command";
 
-    btn.setAttribute("data-copied", "true");
-    btn.setAttribute("aria-label", "Copied!");
-    setTimeout(() => {
-      btn.removeAttribute("data-copied");
-      btn.setAttribute("aria-label", originalLabel);
-    }, 2000);
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Fallback for older browsers
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+
+      btn.setAttribute("data-copied", "true");
+      btn.setAttribute("aria-label", "Copied!");
+      setTimeout(() => {
+        btn.removeAttribute("data-copied");
+        btn.setAttribute("aria-label", originalLabel);
+      }, 2000);
+    });
   });
-});
+}
 
-// ── Smooth scroll for anchor links (polyfill for Safari) ──
-document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-  anchor.addEventListener("click", (e) => {
-    const href = (anchor as HTMLAnchorElement).getAttribute("href");
-    if (!href || href === "#") return;
-    const target = document.querySelector(href);
-    if (target) {
-      e.preventDefault();
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      // Update URL without scroll jump
-      history.pushState(null, "", href);
-    }
+// ── Smooth scroll for anchor links ──
+
+function initSmoothScroll(): void {
+  document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+    anchor.addEventListener("click", (e) => {
+      const href = (anchor as HTMLAnchorElement).getAttribute("href");
+      if (!href || href === "#") return;
+      const target = document.querySelector(href);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        history.pushState(null, "", href);
+      }
+    });
   });
-});
+}
 
 // ── Scroll-triggered fade-in animations ──
-const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-if (!prefersReducedMotion) {
+function initFadeAnimations(prefersReducedMotion: boolean): void {
+  if (prefersReducedMotion) {
+    // Reduced motion: make everything visible immediately
+    document.querySelectorAll<HTMLElement>(".fade-in").forEach((el) => {
+      el.classList.add("visible");
+    });
+    return;
+  }
+
   const fadeEls = document.querySelectorAll<HTMLElement>(".fade-in");
 
   // Hero elements appear immediately (above fold) — reveal on load
@@ -97,21 +124,9 @@ if (!prefersReducedMotion) {
       observer.observe(el);
     }
   });
-} else {
-  // Reduced motion: make everything visible immediately
-  document.querySelectorAll<HTMLElement>(".fade-in").forEach((el) => {
-    el.classList.add("visible");
-  });
 }
 
 // ── Animated Terminal Demo ──
-interface TerminalLine {
-  type: "command" | "output";
-  text: string;
-  cls?: string; // extra CSS class for output coloring
-  delay?: number; // delay before showing this line (ms)
-  phase?: "sourcevision" | "rex" | "hench"; // pipeline phase for synced highlight
-}
 
 const terminalScript: TerminalLine[] = [
   { type: "command", text: "npx n-dx init .", delay: 400, phase: "sourcevision" },
@@ -129,9 +144,9 @@ const terminalScript: TerminalLine[] = [
 
   { type: "command", text: "ndx work .", delay: 600, phase: "hench" },
   { type: "output", text: "  Picking next task...", cls: "muted", delay: 400, phase: "hench" },
-  { type: "output", text: '  ▶ "Add user authentication"', cls: "info", delay: 500, phase: "hench" },
-  { type: "output", text: "  Writing code · Running tests · Committing", cls: "muted", delay: 600, phase: "hench" },
-  { type: "output", text: "  Task completed ✓", cls: "success", delay: 500, phase: "hench" },
+  { type: "output", text: '  \u25B6 "Add user authentication"', cls: "info", delay: 500, phase: "hench" },
+  { type: "output", text: "  Writing code \u00B7 Running tests \u00B7 Committing", cls: "muted", delay: 600, phase: "hench" },
+  { type: "output", text: "  Task completed \u2713", cls: "success", delay: 500, phase: "hench" },
 ];
 
 /**
@@ -258,9 +273,25 @@ async function runTerminalDemo(): Promise<void> {
   clearPipelinePhase();
 }
 
-// Start terminal when it scrolls into view
-const terminalDemo = document.querySelector<HTMLElement>(".terminal-demo");
-if (terminalDemo && !prefersReducedMotion) {
+function initTerminalDemo(prefersReducedMotion: boolean): void {
+  const terminalDemo = document.querySelector<HTMLElement>(".terminal-demo");
+  if (!terminalDemo) return;
+
+  if (prefersReducedMotion) {
+    // Show all lines immediately for reduced motion
+    const container = document.getElementById("terminal-lines");
+    if (container) {
+      terminalScript.forEach((line) => {
+        const el = createTerminalLine(line);
+        el.style.opacity = "1";
+        el.style.transform = "none";
+        el.style.animation = "none";
+        container.appendChild(el);
+      });
+    }
+    return;
+  }
+
   let hasPlayed = false;
   const terminalObserver = new IntersectionObserver(
     (entries) => {
@@ -283,23 +314,13 @@ if (terminalDemo && !prefersReducedMotion) {
       runTerminalDemo();
     });
   }
-} else if (terminalDemo && prefersReducedMotion) {
-  // Show all lines immediately for reduced motion
-  const container = document.getElementById("terminal-lines");
-  if (container) {
-    terminalScript.forEach((line) => {
-      const el = createTerminalLine(line);
-      el.style.opacity = "1";
-      el.style.transform = "none";
-      el.style.animation = "none";
-      container.appendChild(el);
-    });
-  }
 }
 
 // ── Scroll-synced section entrance tracking ──
-// Adds `in-view` class to sections for continuous scroll-synced effects
-if (!prefersReducedMotion) {
+
+function initSectionTracking(prefersReducedMotion: boolean): void {
+  if (prefersReducedMotion) return;
+
   const sections = document.querySelectorAll<HTMLElement>("section");
   const sectionObserver = new IntersectionObserver(
     (entries) => {
@@ -313,3 +334,18 @@ if (!prefersReducedMotion) {
   );
   sections.forEach((s) => sectionObserver.observe(s));
 }
+
+// ── Entry point ──
+
+function initLanding(): void {
+  const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  initThemeToggle();
+  initCopyButtons();
+  initSmoothScroll();
+  initFadeAnimations(prefersReducedMotion);
+  initTerminalDemo(prefersReducedMotion);
+  initSectionTracking(prefersReducedMotion);
+}
+
+initLanding();

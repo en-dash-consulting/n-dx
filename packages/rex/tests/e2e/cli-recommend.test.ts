@@ -67,19 +67,33 @@ describe("rex recommend", () => {
     const output = run(["recommend", "--accept==1,4,5", tmpDir]);
     // Check the creation result section (after "Creating N of M")
     const creationSection = output.slice(output.indexOf("Creating 3 of 5"));
-    expect(creationSection).toContain("Address auth issues");
-    expect(creationSection).toContain("Address docs issues");
-    expect(creationSection).toContain("Address ops issues");
-    expect(creationSection).not.toContain("Address perf issues");
-    expect(creationSection).not.toContain("Address security issues");
+    expect(creationSection).toContain("Fix auth in global");
+    expect(creationSection).toContain("Fix docs in global");
+    expect(creationSection).toContain("Fix ops in global");
+    expect(creationSection).not.toContain("Fix perf in global");
+    expect(creationSection).not.toContain("Fix security in global");
     expect(output).toContain("3/3 selected recommendation");
 
+    // Hierarchical structure: epic at root → features → tasks
     const prd = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
-    const titles = prd.items.map((item: { title: string }) => item.title);
-    expect(titles).toEqual([
-      "Address auth issues (1 findings)",
-      "Address docs issues (1 findings)",
-      "Address ops issues (1 findings)",
+    expect(prd.items).toHaveLength(1); // 1 epic at root
+    expect(prd.items[0].level).toBe("epic");
+
+    // Collect all task titles from the hierarchy
+    type Item = { title: string; level: string; children?: Item[] };
+    const collectTasks = (items: Item[]): string[] => {
+      const result: string[] = [];
+      for (const item of items) {
+        if (item.level === "task") result.push(item.title);
+        if (item.children) result.push(...collectTasks(item.children));
+      }
+      return result;
+    };
+    const taskTitles = collectTasks(prd.items);
+    expect(taskTitles).toEqual([
+      "Fix auth in global: Auth finding",
+      "Fix docs in global: Docs finding",
+      "Fix ops in global: Ops finding",
     ]);
   });
 

@@ -83,7 +83,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
 }
 
 function makePRD(items: Array<Record<string, unknown>> = []): Record<string, unknown> {
-  return { schema: "prd/v1", title: "Test PRD", items };
+  return { schema: "rex/v1", title: "Test PRD", items };
 }
 
 // ── Tests: empty map ──────────────────────────────────────────────────────

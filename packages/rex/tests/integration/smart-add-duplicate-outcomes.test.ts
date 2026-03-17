@@ -148,6 +148,59 @@ describe("cmdSmartAdd duplicate outcomes integration", () => {
     expect(after.every((i) => i.overrideMarker === undefined)).toBe(true);
   });
 
+  it("merge path removes orphaned epic/feature when all tasks are merged", async () => {
+    // Proposal where the ONLY task is a duplicate of the existing task.
+    // After merge, the newly-created epic and feature would be childless — they
+    // should be cleaned up automatically.
+    const allDuplicateProposal: Proposal = {
+      epic: { title: "Security Hardening", source: "smart-add" },
+      features: [
+        {
+          title: "OAuth Security",
+          source: "smart-add",
+          tasks: [
+            {
+              title: "Implement OAuth callback handler",
+              source: "smart-add",
+              sourceFile: "",
+              description: "Implement callback handler with strict state validation.",
+              acceptanceCriteria: ["Callback route exists", "State parameter is validated"],
+              priority: "critical",
+              tags: ["security"],
+            },
+          ],
+        },
+      ],
+    };
+    mockReasonFromDescriptions.mockResolvedValueOnce({ proposals: [allDuplicateProposal] });
+
+    const store = await resolveStore(join(tmpDir, REX_DIR));
+    const beforeItems = flatten((await store.loadDocument()).items);
+    const beforeCount = beforeItems.length;
+
+    promptAnswers.push("y", "m");
+    await cmdSmartAdd(tmpDir, "Improve OAuth security", {}, {});
+
+    const afterItems = flatten((await store.loadDocument()).items);
+    // The existing task should be updated (merged)
+    const existing = afterItems.find((i) => i.id === "task-existing");
+    expect(existing?.description).toBe("Implement callback handler with strict state validation.");
+
+    // No new orphaned epic or feature should be created
+    const orphanedEpic = afterItems.find(
+      (i) => i.level === "epic" && i.title === "Security Hardening",
+    );
+    expect(orphanedEpic).toBeUndefined();
+
+    const orphanedFeature = afterItems.find(
+      (i) => i.level === "feature" && i.title === "OAuth Security",
+    );
+    expect(orphanedFeature).toBeUndefined();
+
+    // Item count should remain the same (no net additions)
+    expect(afterItems).toHaveLength(beforeCount);
+  });
+
   it("merge path updates existing duplicate and only creates non-duplicate items", async () => {
     const store = await resolveStore(join(tmpDir, REX_DIR));
 

@@ -23,6 +23,8 @@ export interface CompletionValidationOptions {
   timeout?: number;
   /** Commit hash captured before the agent started. Diff against this instead of HEAD. */
   startingHead?: string;
+  /** When true, reject completions that only modify documentation files. */
+  selfHeal?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 30_000;
@@ -57,6 +59,25 @@ export async function validateCompletion(
       hasChanges: false,
       reason: "No changes detected in git diff. Task must produce meaningful changes to be marked complete.",
     };
+  }
+
+  // In self-heal mode, reject completions that only modify documentation files
+  if (options?.selfHeal && diffOutput) {
+    const changedFiles = diffOutput
+      .split("\n")
+      .map((line) => line.trim().split("|")[0]?.trim())
+      .filter((f) => f && !f.includes("changed") && !f.includes("insertion") && !f.includes("deletion"));
+    const allDocs = changedFiles.length > 0 && changedFiles.every(
+      (f) => /\.(md|adr\.\w+|txt)$/i.test(f) || f.startsWith("docs/"),
+    );
+    if (allDocs) {
+      return {
+        valid: false,
+        hasChanges: true,
+        diffSummary,
+        reason: "Self-heal mode requires source code changes. Only documentation files were modified.",
+      };
+    }
   }
 
   // Run tests if configured

@@ -25,7 +25,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import { registerTickUpdater } from "../polling/batched-tick-dispatcher.js";
+import { registerTickUpdater } from "../polling/index.js";
 
 /**
  * Subscribe to batched 1-second tick updates and return a formatted

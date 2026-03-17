@@ -7,7 +7,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CLIError as BaseCLIError, PROJECT_DIRS, isExecutableOnPath } from "@n-dx/llm-client";
+import { CLIError as BaseCLIError, PROJECT_DIRS, isExecutableOnPath } from "../prd/llm-gateway.js";
 
 const HENCH_DIR = PROJECT_DIRS.HENCH;
 

@@ -33,15 +33,17 @@
  * | Analysis data     | `readFileSync`     | routes-sourcevision.ts |
  * | Agent run history | `readFileSync`     | routes-hench.ts      |
  * | Rex CLI commands  | `execFile`         | routes-rex.ts        |
- * | Rex domain types  | Gateway re-export  | mcp-deps.ts (gateway) |
- * | MCP servers       | Gateway re-export  | mcp-deps.ts (gateway) |
+ * | Rex domain types  | Gateway re-export  | rex-gateway.ts       |
+ * | MCP servers       | Gateway re-export  | rex-gateway.ts / domain-gateway.ts |
  *
  * Runtime imports — MCP server factories and rex domain types/constants —
- * are funnelled through a single gateway module (`server/mcp-deps.ts`)
- * to keep the coupling surface explicit and auditable.
+ * are funnelled through dedicated gateway modules (`server/rex-gateway.ts`
+ * for Rex, `server/domain-gateway.ts` for Sourcevision) to keep the
+ * coupling surface explicit and auditable.
  *
  * @module @n-dx/web
- * @see packages/web/src/server/mcp-deps.ts — runtime import gateway
+ * @see packages/web/src/server/rex-gateway.ts — Rex runtime import gateway
+ * @see packages/web/src/server/domain-gateway.ts — Sourcevision runtime import gateway
  * @see packages/hench/src/prd/ops.ts — hench's equivalent gateway pattern
  */
 
@@ -51,3 +53,16 @@ export type { ServerContext, RouteHandler, ViewerScope } from "./server/types.js
 export type { WebSocketBroadcaster } from "./server/websocket.js";
 export { checkPort, checkPortWithRetry, findAvailablePort } from "./server/port.js";
 export type { PortCheckResult, PortAllocationResult, PortRetryOptions } from "./server/port.js";
+
+// Cross-zone shared types — stable contract for types used by multiple
+// server zones (task-usage-analytics, web-dashboard, cleanup scheduling).
+// This explicit re-export makes the contract visible in the public API
+// rather than requiring consumers to reach into zone-internal files.
+export type {
+  TaskUsageAccumulator,
+  CollectAllIdsFn,
+  OrphanedEntry,
+  CleanupResult,
+  CleanupLogEntry,
+  CleanupConfig,
+} from "./server/shared-types.js";

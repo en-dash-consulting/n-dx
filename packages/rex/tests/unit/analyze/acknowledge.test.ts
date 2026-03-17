@@ -8,6 +8,7 @@ import {
   saveAcknowledged,
   acknowledgeFinding,
   isAcknowledged,
+  isAcknowledgedFuzzy,
 } from "../../../src/analyze/acknowledge.js";
 
 describe("computeFindingHash", () => {
@@ -66,6 +67,87 @@ describe("acknowledgeFinding / isAcknowledged", () => {
   it("returns false for unknown hashes", () => {
     const store = { version: 1 as const, findings: [] };
     expect(isAcknowledged(store, "unknown")).toBe(false);
+  });
+
+  it("stores type and scope when provided", () => {
+    const store = { version: 1 as const, findings: [] };
+    const updated = acknowledgeFinding(store, "h1", "text", "ack", "user", "anti-pattern", "core");
+    expect(updated.findings[0].type).toBe("anti-pattern");
+    expect(updated.findings[0].scope).toBe("core");
+  });
+});
+
+describe("isAcknowledgedFuzzy", () => {
+  it("matches by exact hash (fast path)", () => {
+    let store = { version: 1 as const, findings: [] };
+    store = acknowledgeFinding(store, "abc123", "some text", "ack", "user", "anti-pattern", "core");
+    expect(isAcknowledgedFuzzy(store, {
+      hash: "abc123", type: "anti-pattern", scope: "core", text: "some text",
+    })).toBe(true);
+  });
+
+  it("matches similar text with same type+scope after zone rename", () => {
+    let store = { version: 1 as const, findings: [] };
+    store = acknowledgeFinding(
+      store, "old-hash",
+      "bidirectional coupling between game-engine and world-ui",
+      "completed", "self-heal", "anti-pattern", "game-engine",
+    );
+    expect(isAcknowledgedFuzzy(store, {
+      hash: "new-hash",
+      type: "anti-pattern",
+      scope: "game-engine",
+      text: "bidirectional coupling between game-engine and world-inventory-ui",
+    })).toBe(true);
+  });
+
+  it("does not match when type differs", () => {
+    let store = { version: 1 as const, findings: [] };
+    store = acknowledgeFinding(
+      store, "old-hash", "bidirectional coupling between A and B",
+      "completed", "self-heal", "anti-pattern", "core",
+    );
+    expect(isAcknowledgedFuzzy(store, {
+      hash: "new-hash",
+      type: "suggestion",
+      scope: "core",
+      text: "bidirectional coupling between A and B",
+    })).toBe(false);
+  });
+
+  it("does not match when scope differs", () => {
+    let store = { version: 1 as const, findings: [] };
+    store = acknowledgeFinding(
+      store, "old-hash", "bidirectional coupling between A and B",
+      "completed", "self-heal", "anti-pattern", "core",
+    );
+    expect(isAcknowledgedFuzzy(store, {
+      hash: "new-hash",
+      type: "anti-pattern",
+      scope: "utils",
+      text: "bidirectional coupling between A and B",
+    })).toBe(false);
+  });
+
+  it("does not match completely different text", () => {
+    let store = { version: 1 as const, findings: [] };
+    store = acknowledgeFinding(
+      store, "old-hash", "god object with too many methods",
+      "completed", "self-heal", "anti-pattern", "core",
+    );
+    expect(isAcknowledgedFuzzy(store, {
+      hash: "new-hash",
+      type: "anti-pattern",
+      scope: "core",
+      text: "circular dependency detected in module graph",
+    })).toBe(false);
+  });
+
+  it("returns false for empty store", () => {
+    const store = { version: 1 as const, findings: [] };
+    expect(isAcknowledgedFuzzy(store, {
+      hash: "h1", type: "anti-pattern", scope: "core", text: "some finding",
+    })).toBe(false);
   });
 });
 

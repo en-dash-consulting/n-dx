@@ -1,15 +1,11 @@
 import { h } from "preact";
-import { useMemo, useState } from "preact/hooks";
+import { useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
-import type { Zone, Finding } from "../../schema/v1.js";
 import {
   BarChart,
-  CollapsibleSection,
   HealthGauge,
   PatternBadge,
   MetricCard,
-  ZoneMap,
-  ZoneDetail,
   getZoneColorByIndex,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
@@ -36,7 +32,6 @@ const LANG_COLORS: Record<string, string> = {
 
 export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
   const { manifest, inventory, imports, zones, components } = data;
-  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
   if (!manifest && !inventory && !imports && !zones) {
     return h("div", { class: "loading" }, "No data loaded. Use 'sourcevision serve' or drop files.");
@@ -106,12 +101,6 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
       .slice(0, 5);
   }, [zones]);
 
-  // Zone with issues (low cohesion or high coupling)
-  const zonesWithIssues = useMemo(() => {
-    if (!zones) return [];
-    return zones.zones.filter(z => z.cohesion < 0.4 || z.coupling > 0.5);
-  }, [zones]);
-
   // Language breakdown
   const langChartData = useMemo(() => {
     if (!inventory) return [];
@@ -125,14 +114,11 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
       }));
   }, [inventory]);
 
-  // Handle zone click from map
-  const handleZoneClick = (zoneId: string) => {
-    setSelectedZoneId(zoneId);
-  };
-
-  const selectedZone = selectedZoneId
-    ? zones?.zones.find(z => z.id === selectedZoneId)
-    : null;
+  // Zones needing attention count
+  const attentionCount = useMemo(() => {
+    if (!zones) return 0;
+    return zones.zones.filter(z => z.cohesion < 0.4 || z.coupling > 0.5).length;
+  }, [zones]);
 
   return h("div", { class: "overview-container" },
     // Header with project info
@@ -239,17 +225,7 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
         )
       : null,
 
-    // Zone Map visualization
-    zones && zones.zones.length > 0
-      ? h(ZoneMap, {
-          zones: zones.zones,
-          crossings: zones.crossings,
-          selectedZone: selectedZoneId,
-          onZoneClick: handleZoneClick,
-        })
-      : null,
-
-    // Two-column layout for details
+    // Two-column layout: Languages + Zone summary
     h("div", { class: "overview-columns" },
       // Left column - Languages
       langChartData.length > 0
@@ -259,104 +235,68 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
           )
         : null,
 
-      // Right column - Top Zones
+      // Right column - Compact zone summary
       topZones.length > 0
         ? h("div", { class: "overview-col" },
-            h("h3", null, "Largest Zones"),
+            h("div", { class: "section-header-row" },
+              h("h3", null, "Top Zones"),
+              navigateTo
+                ? h("button", {
+                    class: "link-btn",
+                    onClick: () => navigateTo("zones"),
+                  }, "View all \u2192")
+                : null
+            ),
             h("div", { class: "top-zones-list" },
               topZones.map((zone, i) => {
                 const globalIdx = zones!.zones.indexOf(zone);
                 const color = getZoneColorByIndex(globalIdx);
+                const healthColor = zone.cohesion >= 0.7 ? "var(--green)"
+                  : zone.cohesion >= 0.4 ? "var(--orange)"
+                  : "var(--red)";
 
                 return h("div", {
                   key: zone.id,
                   class: "top-zone-item",
-                  onClick: () => handleZoneClick(zone.id),
+                  onClick: navigateTo ? () => navigateTo("zones", { zone: zone.id }) : undefined,
                 },
                   h("span", { class: "zone-dot", style: `background: ${color}` }),
                   h("span", { class: "zone-name" }, zone.name),
-                  h("span", { class: "zone-files" }, `${zone.files.length} files`)
+                  h("span", { class: "zone-files" }, `${zone.files.length} files`),
+                  h("span", {
+                    class: "health-dot",
+                    style: `background: ${healthColor}`,
+                    title: `Cohesion: ${zone.cohesion.toFixed(2)} / Coupling: ${zone.coupling.toFixed(2)}`,
+                  })
                 );
               })
-            )
+            ),
+            attentionCount > 0
+              ? h("div", { class: "zone-attention-note" },
+                  `${attentionCount} zone${attentionCount > 1 ? "s" : ""} need${attentionCount === 1 ? "s" : ""} attention`
+                )
+              : null
           )
         : null
     ),
 
-    // Zones needing attention
-    zonesWithIssues.length > 0
+    // Circular dependencies (compact)
+    imports?.summary.circulars.length
       ? h("div", { class: "overview-section" },
-          h("h3", null, "Zones Needing Attention"),
-          h("div", { class: "attention-list" },
-            zonesWithIssues.slice(0, 5).map(zone => {
-              const issues: string[] = [];
-              if (zone.cohesion < 0.4) issues.push(`Low cohesion (${zone.cohesion.toFixed(2)})`);
-              if (zone.coupling > 0.5) issues.push(`High coupling (${zone.coupling.toFixed(2)})`);
-
-              return h("div", { key: zone.id, class: "attention-item" },
-                h("span", { class: "attention-name" }, zone.name),
-                h("span", { class: "attention-issues" },
-                  issues.map(issue =>
-                    h("span", { key: issue, class: "issue-tag" }, issue)
-                  )
-                )
-              );
-            }),
-            zonesWithIssues.length > 5
+          h("h3", null, `${imports.summary.circularCount} Circular Dep${imports.summary.circularCount > 1 ? "s" : ""}`),
+          h("div", { class: "circular-list" },
+            imports.summary.circulars.slice(0, 3).map((c, i) =>
+              h("div", { key: i, class: "circular-dep-block" },
+                c.cycle.join(" \u2192 ") + " \u2192 " + c.cycle[0]
+              )
+            ),
+            imports.summary.circulars.length > 3
               ? h("div", { class: "attention-more" },
-                  `+${zonesWithIssues.length - 5} more zones`
+                  `+${imports.summary.circulars.length - 3} more`
                 )
               : null
           )
         )
-      : null,
-
-    // Key insights from zones
-    zones?.insights && zones.insights.length > 0
-      ? h(CollapsibleSection, {
-          title: "Key Insights",
-          count: zones.insights.length,
-          defaultOpen: true,
-          threshold: 10,
-        },
-          ...zones.insights.slice(0, 10).map((insight, i) =>
-            h("div", { key: i, class: "insight-item" }, insight)
-          ),
-          zones.insights.length > 10
-            ? h("div", { class: "insight-more" },
-                `+${zones.insights.length - 10} more insights in zones.json`
-              )
-            : null
-        )
-      : null,
-
-    // Circular dependencies (if any)
-    imports?.summary.circulars.length
-      ? h(CollapsibleSection, {
-          title: "Circular Dependencies",
-          count: imports.summary.circularCount,
-          defaultOpen: true,
-          threshold: 5,
-        },
-          ...imports.summary.circulars.map((c, i) =>
-            h("div", { key: i, class: "circular-dep-block" },
-              c.cycle.join(" \u2192 ") + " \u2192 " + c.cycle[0]
-            )
-          )
-        )
-      : null,
-
-    // Zone detail popup
-    selectedZone && zones
-      ? h(ZoneDetail, {
-          zone: selectedZone,
-          crossings: zones.crossings,
-          allZones: zones.zones,
-          onClose: () => setSelectedZoneId(null),
-          onFileClick: navigateTo
-            ? (path) => navigateTo("files", { file: path })
-            : undefined,
-        })
       : null
   );
 }

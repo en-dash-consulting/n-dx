@@ -13,7 +13,7 @@ function makeZone(overrides: Partial<Zone> = {}): Zone {
     id: "test-zone",
     name: "Test Zone",
     description: "A test zone",
-    files: ["src/a.ts", "src/b.ts"],
+    files: ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts", "src/e.ts"],
     entryPoints: ["src/a.ts"],
     cohesion: 0.8,
     coupling: 0.2,
@@ -223,5 +223,128 @@ describe("assessAllZoneRisks", () => {
     expect(finding!.text).toContain("0.80");
     expect(finding!.text).toContain("cohesion: 0.20");
     expect(finding!.text).toContain("coupling: 0.80");
+  });
+
+  // ── Small zone threshold ────────────────────────────────────────────
+
+  it("downgrades findings for zones below minZoneSize to info", () => {
+    const zones = [
+      makeZone({
+        id: "tiny-zone",
+        name: "Tiny Zone",
+        cohesion: 0.2,
+        coupling: 0.8,
+        files: ["src/a.ts", "src/b.ts"],  // 2 files < minZoneSize (5)
+      }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones));
+
+    const finding = result.findings.find((f) => f.scope === "tiny-zone");
+    expect(finding).toBeDefined();
+    expect(finding!.severity).toBe("info");
+    expect(finding!.text).toContain("unreliable");
+    expect(finding!.text).toContain("2 files");
+  });
+
+  it("excludes small zones from global failing-zones summary", () => {
+    const zones = [
+      makeZone({ id: "big-bad", name: "Big Bad", cohesion: 0.2, coupling: 0.8 }),
+      makeZone({
+        id: "small-bad",
+        name: "Small Bad",
+        cohesion: 0.2,
+        coupling: 0.8,
+        files: ["src/x.ts"],  // 1 file < minZoneSize
+      }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones));
+
+    // Only 1 non-small failing zone, so no global summary (needs >= 2)
+    const global = result.findings.find((f) => f.scope === "global");
+    expect(global).toBeUndefined();
+  });
+
+  // ── Risk justifications ─────────────────────────────────────────────
+
+  it("downgrades justified zone findings to info severity", () => {
+    const zones = [
+      makeZone({ id: "bad-zone", name: "Bad Zone", cohesion: 0.2, coupling: 0.8 }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones), {
+      justifications: [
+        { zone: "bad-zone", reason: "Test-heavy zone with inherent external coupling" },
+      ],
+    });
+
+    const finding = result.findings.find((f) => f.scope === "bad-zone");
+    expect(finding).toBeDefined();
+    expect(finding!.severity).toBe("info");
+    expect(finding!.text).toContain("justified:");
+    expect(finding!.text).toContain("Test-heavy zone");
+  });
+
+  it("attaches justification text to risk metrics", () => {
+    const zones = [
+      makeZone({ id: "justified", name: "Justified", cohesion: 0.2, coupling: 0.8 }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones), {
+      justifications: [
+        { zone: "justified", reason: "Accepted risk" },
+      ],
+    });
+
+    expect(result.metrics["justified"].riskJustification).toBe("Accepted risk");
+  });
+
+  it("does not attach justification to unjustified zones", () => {
+    const zones = [
+      makeZone({ id: "no-justification", name: "No J", cohesion: 0.2, coupling: 0.8 }),
+    ];
+    const result = assessAllZoneRisks(makeZones(zones), {
+      justifications: [
+        { zone: "other-zone", reason: "Not this one" },
+      ],
+    });
+
+    expect(result.metrics["no-justification"].riskJustification).toBeUndefined();
+  });
+
+  it("excludes justified zones from global failing-zones count", () => {
+    const zones = [
+      makeZone({ id: "bad-1", name: "Bad 1", cohesion: 0.2, coupling: 0.8 }),
+      makeZone({ id: "bad-2", name: "Bad 2", cohesion: 0.25, coupling: 0.75 }),
+      makeZone({ id: "bad-3", name: "Bad 3", cohesion: 0.3, coupling: 0.7 }),
+    ];
+
+    // Without justifications: global finding mentions 3 zones
+    const noJustify = assessAllZoneRisks(makeZones(zones));
+    const globalNoJ = noJustify.findings.find((f) => f.scope === "global");
+    expect(globalNoJ).toBeDefined();
+    expect(globalNoJ!.text).toContain("3");
+
+    // With 2 justified: only 1 unjustified, so no global finding
+    const withJustify = assessAllZoneRisks(makeZones(zones), {
+      justifications: [
+        { zone: "bad-1", reason: "Accepted" },
+        { zone: "bad-2", reason: "Accepted" },
+      ],
+    });
+    const globalWithJ = withJustify.findings.find((f) => f.scope === "global");
+    expect(globalWithJ).toBeUndefined();
+  });
+
+  it("works with no justifications option", () => {
+    const zones = [
+      makeZone({ id: "risky", name: "Risky", cohesion: 0.2, coupling: 0.8 }),
+    ];
+    // No opts at all
+    const result1 = assessAllZoneRisks(makeZones(zones));
+    expect(result1.findings.length).toBeGreaterThan(0);
+    expect(result1.findings[0].severity).toBe("critical");
+
+    // Empty justifications array
+    const result2 = assessAllZoneRisks(makeZones(zones), { justifications: [] });
+    expect(result2.findings.length).toBeGreaterThan(0);
+    expect(result2.findings[0].severity).toBe("critical");
   });
 });

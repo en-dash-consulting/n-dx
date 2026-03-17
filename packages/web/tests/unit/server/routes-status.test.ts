@@ -142,6 +142,7 @@ describe("Status API routes", () => {
 
     it("reports PRD completion when prd.json exists", async () => {
       const prd = {
+        schema: "rex/v1",
         title: "Test PRD",
         version: "1.0",
         items: [
@@ -177,6 +178,7 @@ describe("Status API routes", () => {
 
     it("reports 100% when all tasks are completed", async () => {
       const prd = {
+        schema: "rex/v1",
         title: "Done PRD",
         version: "1.0",
         items: [

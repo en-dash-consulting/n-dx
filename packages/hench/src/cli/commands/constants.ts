@@ -1,4 +1,4 @@
-import { PROJECT_DIRS, formatUsage } from "@n-dx/llm-client";
+import { PROJECT_DIRS, formatUsage } from "../../prd/llm-gateway.js";
 import { CLIError } from "../errors.js";
 
 export const HENCH_DIR = PROJECT_DIRS.HENCH;
