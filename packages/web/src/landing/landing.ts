@@ -129,7 +129,7 @@ function initFadeAnimations(prefersReducedMotion: boolean): void {
 // ── Animated Terminal Demo ──
 
 const terminalScript: TerminalLine[] = [
-  { type: "command", text: "npx n-dx init .", delay: 400, phase: "sourcevision" },
+  { type: "command", text: "npx @n-dx/core init .", delay: 400, phase: "sourcevision" },
   { type: "output", text: "  sourcevision initialized", cls: "success", delay: 300, phase: "sourcevision" },
   { type: "output", text: "  rex initialized", cls: "success", delay: 200, phase: "rex" },
   { type: "output", text: "  hench initialized", cls: "success", delay: 200, phase: "hench" },

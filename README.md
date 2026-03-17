@@ -11,7 +11,9 @@ AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks a
 ## Quick Start
 
 ```sh
-pnpm install && pnpm build
+npm i -g @n-dx/core         # install from npm
+# — or —
+pnpm install && pnpm build  # build from source
 npm link                    # register CLI globally
 
 ndx init .                  # initialize project (.sourcevision/.rex/.hench)

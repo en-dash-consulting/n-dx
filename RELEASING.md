@@ -54,7 +54,7 @@ Verify with `npm pack --dry-run` before publishing.
 
 ## CLI commands registered on install
 
-When users run `npm i -g n-dx`, these commands become available:
+When users run `npm i -g @n-dx/core`, these commands become available:
 
 | Command | Binary |
 |---------|--------|

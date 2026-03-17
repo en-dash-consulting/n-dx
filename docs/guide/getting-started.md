@@ -3,13 +3,15 @@
 ## Installation
 
 ```sh
-# Clone and build
+npm i -g @n-dx/core
+```
+
+Or build from source:
+
+```sh
 git clone https://github.com/en-dash-consulting/n-dx.git
 cd n-dx
-pnpm install
-pnpm build
-
-# Register CLI globally
+pnpm install && pnpm build
 npm link
 ```
 

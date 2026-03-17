@@ -18,7 +18,7 @@ function setupLandingDOM(): void {
       <button id="theme-toggle" aria-label="Switch to light mode"></button>
 
       <div class="copy-btn" aria-label="Copy command">
-        <code>npx n-dx init .</code>
+        <code>npx @n-dx/core init .</code>
       </div>
 
       <a href="#features">Features</a>
