@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI-powered development toolkit — analyze a codebase, build a PRD, and execute tasks autonomously",
   "type": "module",
   "keywords": [
@@ -48,6 +48,7 @@
     "ci.js",
     "web.js",
     "help.js",
+    "gateway-rules.json",
     "refresh-plan.js",
     "refresh-artifacts.js",
     "export.js",
