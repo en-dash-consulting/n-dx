@@ -22,6 +22,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    environment: npm
     timeout-minutes: 20
     permissions:
       contents: write
