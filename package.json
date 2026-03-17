@@ -47,6 +47,8 @@
     "help.js",
     "refresh-plan.js",
     "refresh-artifacts.js",
+    "export.js",
+    "claude-integration.js",
     "refresh-validate.js",
     "packages/rex/dist",
     "packages/rex/package.json",
@@ -55,7 +57,10 @@
     "packages/hench/dist",
     "packages/hench/package.json",
     "packages/llm-client/dist",
-    "packages/web/dist"
+    "packages/llm-client/package.json",
+    "packages/web/dist",
+    "packages/web/package.json",
+    "packages/web/build.js"
   ],
   "scripts": {
     "build": "pnpm -r run build",
@@ -65,12 +70,18 @@
     "validate": "pnpm -r run validate",
     "verify": "vitest run tests/e2e && node ci.js .",
     "pr-check": "node pr-check.js",
+    "prepublishOnly": "pnpm run build && pnpm run typecheck && pnpm run test",
     "prepare": "pnpm run build",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/cli": "^2.30.0",
     "vitepress": "^1.6.4",
     "vitest": "^4.0.18"
   },
