@@ -1,6 +1,7 @@
 {
   "name": "hench",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "bin": {
     "hench": "./dist/cli/index.js"
@@ -22,12 +23,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate": "tsc --noEmit && vitest run",
-    "prepare": "npm run build"
+    "prepare": "pnpm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@n-dx/llm-client": "workspace:*",
-    "rex": "*",
+    "rex": "workspace:*",
     "zod": "^3.22.0"
   },
   "devDependencies": {

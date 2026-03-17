@@ -1,6 +1,7 @@
 {
   "name": "rex",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "bin": {
     "rex": "./dist/cli/index.js"
@@ -22,7 +23,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate": "tsc --noEmit && vitest run",
-    "prepare": "npm run build"
+    "prepare": "pnpm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",

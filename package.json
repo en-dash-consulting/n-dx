@@ -1,8 +1,33 @@
 {
   "name": "n-dx",
   "version": "0.1.0",
-  "private": true,
+  "description": "AI-powered development toolkit — analyze a codebase, build a PRD, and execute tasks autonomously",
   "type": "module",
+  "keywords": [
+    "ai",
+    "cli",
+    "prd",
+    "agent",
+    "sourcevision",
+    "rex",
+    "hench",
+    "codebase-analysis",
+    "autonomous",
+    "developer-tools"
+  ],
+  "author": "Nick Daniel <nick@endash.us>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/en-dash-consulting/n-dx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/en-dash-consulting/n-dx/issues"
+  },
+  "homepage": "https://github.com/en-dash-consulting/n-dx#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "workspaces": [
     "packages/*"
   ],
@@ -14,13 +39,32 @@
     "sourcevision": "./packages/sourcevision/dist/cli/index.js",
     "sv": "./packages/sourcevision/dist/cli/index.js"
   },
+  "files": [
+    "cli.js",
+    "config.js",
+    "ci.js",
+    "web.js",
+    "help.js",
+    "refresh-plan.js",
+    "refresh-artifacts.js",
+    "refresh-validate.js",
+    "packages/rex/dist",
+    "packages/rex/package.json",
+    "packages/sourcevision/dist",
+    "packages/sourcevision/package.json",
+    "packages/hench/dist",
+    "packages/hench/package.json",
+    "packages/llm-client/dist",
+    "packages/web/dist"
+  ],
   "scripts": {
     "build": "pnpm -r run build",
     "dev": "pnpm -r run dev",
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run && pnpm -r run test",
     "validate": "pnpm -r run validate",
-    "pr-check": "node pr-check.js"
+    "pr-check": "node pr-check.js",
+    "prepare": "pnpm run build"
   },
   "devDependencies": {
     "vitest": "^4.0.18"
