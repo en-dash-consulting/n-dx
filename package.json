@@ -16,7 +16,7 @@
     "developer-tools"
   ],
   "author": "Nick Daniel <nick@endash.us>",
-  "license": "Apache-2.0",
+  "license": "Elastic-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/en-dash-consulting/n-dx.git"
