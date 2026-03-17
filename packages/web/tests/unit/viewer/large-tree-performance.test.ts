@@ -283,6 +283,21 @@ function timed<T>(fn: () => T): [T, number] {
   return [result, elapsed];
 }
 
+/** Run fn N times and return the median elapsed time in ms. */
+function timedMedian(fn: () => void, iterations = 20): number {
+  // Warmup
+  fn();
+  fn();
+  const times: number[] = [];
+  for (let i = 0; i < iterations; i++) {
+    const start = performance.now();
+    fn();
+    times.push(performance.now() - start);
+  }
+  times.sort((a, b) => a - b);
+  return times[Math.floor(times.length / 2)];
+}
+
 // ── Memory tracking mock ──────────────────────────────────────────────────────
 
 interface MemorySnapshot {
@@ -840,14 +855,14 @@ describe("performance regression detection", () => {
     const small = generateRealisticTree(500);
     const large = generateRealisticTree(2000);
 
-    // Measure computeBranchStats at both sizes
-    const [, smallTime] = timed(() => computeBranchStats(small));
-    const [, largeTime] = timed(() => computeBranchStats(large));
+    // Measure computeBranchStats at both sizes using median of multiple runs
+    // to avoid flaky results from sub-millisecond single-run timing.
+    const smallTime = timedMedian(() => computeBranchStats(small));
+    const largeTime = timedMedian(() => computeBranchStats(large));
 
     // If O(n), large should be ~4× small. If O(n²), it would be ~16×.
     // We accept up to 8× to account for cache effects and timing variance.
-    // Add a small constant (1ms) to avoid division by zero with very fast times.
-    const ratio = (largeTime + 1) / (smallTime + 1);
+    const ratio = (largeTime + 0.01) / (smallTime + 0.01);
     expect(ratio).toBeLessThan(8);
   });
 
@@ -857,10 +872,10 @@ describe("performance regression detection", () => {
     const smallNext = cloneWithOneChange(small, findMiddleLeafId(small), "completed");
     const largeNext = cloneWithOneChange(large, findMiddleLeafId(large), "completed");
 
-    const [, smallTime] = timed(() => diffItems(small, smallNext));
-    const [, largeTime] = timed(() => diffItems(large, largeNext));
+    const smallTime = timedMedian(() => diffItems(small, smallNext));
+    const largeTime = timedMedian(() => diffItems(large, largeNext));
 
-    const ratio = (largeTime + 1) / (smallTime + 1);
+    const ratio = (largeTime + 0.01) / (smallTime + 0.01);
     expect(ratio).toBeLessThan(8);
   });
 
@@ -868,10 +883,10 @@ describe("performance regression detection", () => {
     const small = generateRealisticTree(500);
     const large = generateRealisticTree(2000);
 
-    const [, smallTime] = timed(() => filterTree(small, ACTIVE_WORK));
-    const [, largeTime] = timed(() => filterTree(large, ACTIVE_WORK));
+    const smallTime = timedMedian(() => filterTree(small, ACTIVE_WORK));
+    const largeTime = timedMedian(() => filterTree(large, ACTIVE_WORK));
 
-    const ratio = (largeTime + 1) / (smallTime + 1);
+    const ratio = (largeTime + 0.01) / (smallTime + 0.01);
     expect(ratio).toBeLessThan(8);
   });
 
@@ -879,10 +894,10 @@ describe("performance regression detection", () => {
     const small = generateRealisticTree(500);
     const large = generateRealisticTree(2000);
 
-    const [, smallTime] = timed(() => countVisibleNodes(small, ALL_STATUSES));
-    const [, largeTime] = timed(() => countVisibleNodes(large, ALL_STATUSES));
+    const smallTime = timedMedian(() => countVisibleNodes(small, ALL_STATUSES));
+    const largeTime = timedMedian(() => countVisibleNodes(large, ALL_STATUSES));
 
-    const ratio = (largeTime + 1) / (smallTime + 1);
+    const ratio = (largeTime + 0.01) / (smallTime + 0.01);
     expect(ratio).toBeLessThan(8);
   });
 
@@ -890,14 +905,14 @@ describe("performance regression detection", () => {
     const small = generateRealisticTree(500);
     const large = generateRealisticTree(2000);
 
-    const [, smallTime] = timed(() =>
+    const smallTime = timedMedian(() =>
       sliceVisibleTree(small, ALL_STATUSES, PROGRESSIVE_THRESHOLD),
     );
-    const [, largeTime] = timed(() =>
+    const largeTime = timedMedian(() =>
       sliceVisibleTree(large, ALL_STATUSES, PROGRESSIVE_THRESHOLD),
     );
 
-    const ratio = (largeTime + 1) / (smallTime + 1);
+    const ratio = (largeTime + 0.01) / (smallTime + 0.01);
     expect(ratio).toBeLessThan(8);
   });
 
