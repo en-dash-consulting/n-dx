@@ -50,10 +50,16 @@ The `@n-dx/web` package sits alongside these as a coordination layer, importing 
 
 ## Naming Convention
 
-| Pattern | When | Examples |
-|---------|------|---------|
-| Unscoped short name | CLI tools (for `npx`/`pnpm exec`) | `rex`, `sourcevision`, `hench` |
-| `@n-dx/` scoped | Internal-only packages | `@n-dx/web`, `@n-dx/llm-client` |
+All packages are published under the `@n-dx/` scope. The root package `@n-dx/core` depends on all sub-packages and registers CLI commands on install.
+
+| npm Package | CLI Commands | Description |
+|-------------|-------------|-------------|
+| `@n-dx/core` | `ndx`, `n-dx` | Orchestration entry point |
+| `@n-dx/rex` | `rex` | PRD management |
+| `@n-dx/hench` | `hench` | Autonomous agent |
+| `@n-dx/sourcevision` | `sourcevision`, `sv` | Static analysis |
+| `@n-dx/llm-client` | — | LLM foundation (library only) |
+| `@n-dx/web` | — | Dashboard + MCP server |
 
 ## Public API
 
@@ -67,7 +73,7 @@ pnpm test           # test all packages
 pnpm typecheck      # typecheck all packages
 
 # Per-package
-pnpm --filter rex build
-pnpm --filter sourcevision test
-pnpm --filter hench typecheck
+pnpm --filter @n-dx/rex build
+pnpm --filter @n-dx/sourcevision test
+pnpm --filter @n-dx/hench typecheck
 ```
