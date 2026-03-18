@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "AI-powered development toolkit — analyze a codebase, build a PRD, and execute tasks autonomously",
   "type": "module",
   "keywords": [
