@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "AI-powered development toolkit — analyze a codebase, build a PRD, and execute tasks autonomously",
   "type": "module",
   "keywords": [
@@ -36,9 +36,14 @@
   ],
   "bin": {
     "n-dx": "./cli.js",
-    "ndx": "./cli.js"
+    "ndx": "./cli.js",
+    "rex": "./bin/rex.js",
+    "hench": "./bin/hench.js",
+    "sourcevision": "./bin/sourcevision.js",
+    "sv": "./bin/sourcevision.js"
   },
   "files": [
+    "bin/",
     "cli.js",
     "config.js",
     "ci.js",

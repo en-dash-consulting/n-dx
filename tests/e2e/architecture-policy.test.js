@@ -37,6 +37,9 @@ const ALLOWED = new Set([
   "packages/llm-client/src/codex-cli-provider.ts",
   "packages/hench/src/agent/lifecycle/cli-loop.ts",
   // Orchestration layer — spawns CLIs directly (no library imports)
+  "bin/rex.js",
+  "bin/hench.js",
+  "bin/sourcevision.js",
   "cli.js",
   "ci.js",
   "web.js",
