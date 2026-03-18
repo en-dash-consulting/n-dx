@@ -12,12 +12,27 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { createRequire } from "module";
 import { join, resolve } from "path";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const _require = createRequire(import.meta.url);
+
+/**
+ * Resolve a sub-package CLI path — monorepo first, then node_modules.
+ */
+function resolveSubPackageCli(pkgDir, npmName) {
+  const monoPath = resolve(__dir, pkgDir, "dist/cli/index.js");
+  if (existsSync(monoPath)) return monoPath;
+  try {
+    return _require.resolve(npmName + "/dist/cli/index.js");
+  } catch {
+    return monoPath; // fallback — will fail with a clear error
+  }
+}
 
 // ── Permission tiers ──────────────────────────────────────────────────────────
 
@@ -130,14 +145,17 @@ argument-hint: "[task-id]"
 
 Pick up a task from the PRD and begin working on it.
 
-1. If task-id provided, call \`get_item\` (rex MCP). Otherwise call \`get_next_task\` (rex MCP)
-2. Read task details: title, description, acceptance criteria, parent chain
-3. For files mentioned in the task, use \`get_file_info\` and \`get_imports\` (sourcevision MCP) to understand current state
-4. Use \`get_zone\` (sourcevision MCP) for the relevant architectural zone
-5. Present a work plan: what needs to change, which files, what tests
-6. After user approves the plan, call \`update_task_status\` (rex MCP) to mark as \`in_progress\`
-7. Implement the changes
-8. When done, use \`update_task_status\` (rex MCP) to mark as \`completed\`
+1. Read \`.rex/workflow.md\` for the project's execution workflow. Follow its instructions — they define the expected discipline for task execution (TDD, validation, commit conventions, etc.)
+2. If task-id provided, call \`get_item\` (rex MCP). Otherwise call \`get_next_task\` (rex MCP)
+3. Read task details: title, description, acceptance criteria, parent chain
+4. For files mentioned in the task, use \`get_file_info\` and \`get_imports\` (sourcevision MCP) to understand current state
+5. Use \`get_zone\` (sourcevision MCP) for the relevant architectural zone
+6. Present a work plan: what needs to change, which files, what tests
+7. After user approves the plan, call \`update_task_status\` (rex MCP) to mark as \`in_progress\`
+8. Implement the changes following the workflow discipline
+9. Run validation and tests as specified in the workflow
+10. Call \`append_log\` (rex MCP) with what was done, decisions made, and issues encountered
+11. When done, use \`update_task_status\` (rex MCP) to mark as \`completed\`
 `,
 
   configure: `---
@@ -243,8 +261,8 @@ function registerMcpServers(dir) {
   const results = [];
 
   // Always use stdio — it doesn't require a running server
-  const rexBin = resolve(__dir, "packages/rex/dist/cli/index.js");
-  const svBin = resolve(__dir, "packages/sourcevision/dist/cli/index.js");
+  const rexBin = resolveSubPackageCli("packages/rex", "@n-dx/rex");
+  const svBin = resolveSubPackageCli("packages/sourcevision", "@n-dx/sourcevision");
   const absDir = resolve(dir);
 
   try {
