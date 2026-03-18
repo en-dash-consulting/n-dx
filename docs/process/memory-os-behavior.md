@@ -205,7 +205,7 @@ performance.memory = {
 
 ### Linux
 - **Production environments:** The current `/proc/meminfo` parsing is the correct approach. Ensure the fallback to `os.freemem()` is flagged in diagnostics since it will cause premature throttling.
-- **Containers:** Be aware that memory limits are invisible. See [Areas of Improvement](./memory-improvements.md) for container-aware monitoring suggestions.
+- **Containers:** Be aware that memory limits are invisible. See [Areas of Improvement](/contributing/memory-system-improvements) for container-aware monitoring suggestions.
 
 ### macOS
 - **Development machines:** Expect the throttle to be more conservative than necessary. Developers may want to raise `delayThreshold` from 80% to 85-90% to account for macOS's aggressive caching.

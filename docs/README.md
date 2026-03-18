@@ -20,7 +20,6 @@ Welcome to the n-dx documentation. Use the sidebar or links below to navigate.
 
 - [Overview](/architecture/overview) — Four-tier dependency hierarchy
 - [Gateway Modules](/architecture/gateways) — Cross-package import pattern
-- [Web Package Zones](/architecture/web-zone-architecture) — Dashboard internal architecture
 - [Memory Management](/architecture/memory-architecture) — Three-tier memory system
 
 ## Packages

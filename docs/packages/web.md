@@ -39,7 +39,7 @@ The web package has four internal zones forming a hub topology:
 - **viewer-message-pipeline** — coalescer, throttle, rate-limiter, request-dedup
 - **web-shared** — data-file constants, view identifiers; zero framework dependencies
 
-See [Web Zone Architecture](/architecture/web-zone-architecture) for governance details.
+See [Web Zone Governance](/contributing/web-zone-governance) for internal governance details.
 
 ## MCP Endpoints
 

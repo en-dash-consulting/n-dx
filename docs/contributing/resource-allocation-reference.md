@@ -6,8 +6,8 @@
 
 This document is a focused reference for all network ports, file handles, and system
 resources allocated during dashboard operation. For process-lifecycle and signal-handling
-details see [`process-lifecycle-audit.md`](./process-lifecycle-audit.md) and
-[`signal-handling-audit.md`](./signal-handling-audit.md).
+details see [`process-lifecycle-audit.md`](/analysis/process-lifecycle-audit) and
+[`signal-handling-audit.md`](/analysis/signal-handling-audit).
 
 ---
 
