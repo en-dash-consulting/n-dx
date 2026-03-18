@@ -68,10 +68,8 @@ The viewer provides 8 views: Overview, Imports, Zones, Files, Routes, Architectu
 
 ## Zone Detection
 
-Zones are detected using Louvain community detection on the import graph. Post-processing:
+Zones are detected using Louvain community detection on the import graph, then refined through multiple post-processing passes (small zone absorption, satellite merging, large zone splitting). AI enrichment optionally names zones, writes descriptions, and generates per-zone context files.
 
-- Small zones (<=8 files, coupling > 0.3) are absorbed into their most-connected neighbor
-- AI enrichment names zones, writes descriptions, and generates context files
-- Zone IDs use kebab-case; zone names use Title Case
+For a thorough explanation of the Louvain algorithm, findings system, risk assessment, and all configuration options, see [SourceVision Analysis Deep Dive](./sourcevision-analysis).
 
 See [Zone Naming Conventions](/architecture/zone-naming-conventions) for naming standards.

@@ -524,7 +524,7 @@ async function loadRegistry(): Promise<{
   isRedactedField: (v: unknown) => v is { __redacted: true; envVar: string; hint: string };
 }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod = await import("rex/dist/store/adapter-registry.js") as any;
+  const mod = await import("@n-dx/rex/dist/store/adapter-registry.js") as any;
   return mod;
 }
 

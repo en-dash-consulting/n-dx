@@ -8,10 +8,10 @@ const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
 export default defineConfig({
   resolve: {
     alias: [
-      // Map bare "rex" import to source public.ts barrel for vitest
-      { find: /^rex$/, replacement: `${rexRoot}/src/public.ts` },
+      // Map bare "@n-dx/rex" import to source public.ts barrel for vitest
+      { find: /^@n-dx\/rex$/, replacement: `${rexRoot}/src/public.ts` },
       // Map rex subpath imports to source .ts files for vitest
-      { find: /^rex\/dist\/(.+)\.js$/, replacement: `${rexRoot}/src/$1.ts` },
+      { find: /^@n-dx\/rex\/dist\/(.+)\.js$/, replacement: `${rexRoot}/src/$1.ts` },
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/public.ts` },
       // Map @n-dx/llm-client to source public.ts for vitest

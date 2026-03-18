@@ -7,7 +7,7 @@ import {
   collectEpicTaskIds,
 } from "../../../src/agent/planning/brief.js";
 import type { TaskBrief } from "../../../src/schema/v1.js";
-import type { PRDStore, PRDItem } from "rex";
+import type { PRDStore, PRDItem } from "@n-dx/rex";
 
 describe("formatTaskBrief", () => {
   const minimalBrief: TaskBrief = {

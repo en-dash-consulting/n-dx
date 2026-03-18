@@ -8,17 +8,17 @@
     },
     {
       "consumer": "packages/hench/src",
-      "externalPackage": "rex",
+      "externalPackage": "@n-dx/rex",
       "gatewayFiles": ["packages/hench/src/prd/rex-gateway.ts"]
     },
     {
       "consumer": "packages/web/src",
-      "externalPackage": "rex",
+      "externalPackage": "@n-dx/rex",
       "gatewayFiles": ["packages/web/src/server/rex-gateway.ts"]
     },
     {
       "consumer": "packages/web/src",
-      "externalPackage": "sourcevision",
+      "externalPackage": "@n-dx/sourcevision",
       "gatewayFiles": ["packages/web/src/server/domain-gateway.ts"]
     }
   ],

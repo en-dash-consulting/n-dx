@@ -95,23 +95,23 @@ function hasRuntimeImportFrom(content, pkg) {
 
 describe("hasRuntimeImportFrom self-tests", () => {
   it("detects runtime import from a package", () => {
-    expect(hasRuntimeImportFrom('import { foo } from "rex"', "rex")).toBe(true);
-    expect(hasRuntimeImportFrom('export { bar } from "rex"', "rex")).toBe(true);
-    expect(hasRuntimeImportFrom('import foo from "sourcevision"', "sourcevision")).toBe(true);
+    expect(hasRuntimeImportFrom('import { foo } from "@n-dx/rex"', "@n-dx/rex")).toBe(true);
+    expect(hasRuntimeImportFrom('export { bar } from "@n-dx/rex"', "@n-dx/rex")).toBe(true);
+    expect(hasRuntimeImportFrom('import foo from "@n-dx/sourcevision"', "@n-dx/sourcevision")).toBe(true);
   });
 
   it("excludes type-only imports", () => {
-    expect(hasRuntimeImportFrom('import type { Foo } from "rex"', "rex")).toBe(false);
-    expect(hasRuntimeImportFrom('export type { Bar } from "rex"', "rex")).toBe(false);
+    expect(hasRuntimeImportFrom('import type { Foo } from "@n-dx/rex"', "@n-dx/rex")).toBe(false);
+    expect(hasRuntimeImportFrom('export type { Bar } from "@n-dx/rex"', "@n-dx/rex")).toBe(false);
   });
 
   it("excludes comments", () => {
-    expect(hasRuntimeImportFrom('// import { foo } from "rex"', "rex")).toBe(false);
-    expect(hasRuntimeImportFrom('* import { foo } from "rex"', "rex")).toBe(false);
+    expect(hasRuntimeImportFrom('// import { foo } from "@n-dx/rex"', "@n-dx/rex")).toBe(false);
+    expect(hasRuntimeImportFrom('* import { foo } from "@n-dx/rex"', "@n-dx/rex")).toBe(false);
   });
 
   it("does not match unrelated packages", () => {
-    expect(hasRuntimeImportFrom('import { foo } from "rex"', "sourcevision")).toBe(false);
+    expect(hasRuntimeImportFrom('import { foo } from "@n-dx/rex"', "@n-dx/sourcevision")).toBe(false);
   });
 });
 
@@ -135,15 +135,15 @@ function hasTypeImportFrom(content, pkg) {
 
 describe("hasTypeImportFrom self-tests", () => {
   it("detects type-only imports", () => {
-    expect(hasTypeImportFrom('import type { Foo } from "rex"', "rex")).toBe(true);
+    expect(hasTypeImportFrom('import type { Foo } from "@n-dx/rex"', "@n-dx/rex")).toBe(true);
   });
 
   it("excludes runtime imports", () => {
-    expect(hasTypeImportFrom('import { foo } from "rex"', "rex")).toBe(false);
+    expect(hasTypeImportFrom('import { foo } from "@n-dx/rex"', "@n-dx/rex")).toBe(false);
   });
 
   it("excludes export type re-exports", () => {
-    expect(hasTypeImportFrom('export type { Foo } from "rex"', "rex")).toBe(false);
+    expect(hasTypeImportFrom('export type { Foo } from "@n-dx/rex"', "@n-dx/rex")).toBe(false);
   });
 });
 
@@ -202,7 +202,7 @@ describe("gateway-rules.json validation", () => {
  */
 describe("architecture policy: domain layer isolation", () => {
   it("rex must not import from sourcevision, hench, or @n-dx/web", () => {
-    const forbidden = ["sourcevision", "hench", "@n-dx/web"];
+    const forbidden = ["@n-dx/sourcevision", "@n-dx/hench", "@n-dx/web"];
     const rexSrc = walk(join(ROOT, "packages/rex/src"));
     const violations = [];
 
@@ -239,7 +239,7 @@ describe("architecture policy: domain layer isolation", () => {
   });
 
   it("sourcevision must not import from rex, hench, or @n-dx/web", () => {
-    const forbidden = ["rex", "hench", "@n-dx/web"];
+    const forbidden = ["@n-dx/rex", "@n-dx/hench", "@n-dx/web"];
     const svSrc = walk(join(ROOT, "packages/sourcevision/src"));
     const violations = [];
 
@@ -282,12 +282,15 @@ describe("architecture policy: domain layer isolation", () => {
    * which create a build-time coupling between domain and upper-tier packages.
    */
   it("domain packages must not contain hardcoded cross-package file paths", () => {
-    const DOMAIN_PKGS = ["rex", "sourcevision"];
-    const SIBLING_PKGS = ["web", "hench", "rex", "sourcevision", "llm-client"];
+    const DOMAIN_PKGS = [
+      { name: "@n-dx/rex", dir: "rex" },
+      { name: "@n-dx/sourcevision", dir: "sourcevision" },
+    ];
+    const SIBLING_DIRS = ["web", "hench", "rex", "sourcevision", "llm-client"];
     const violations = [];
 
     for (const pkg of DOMAIN_PKGS) {
-      const srcDir = join(ROOT, `packages/${pkg}/src`);
+      const srcDir = join(ROOT, `packages/${pkg.dir}/src`);
       if (!existsSync(srcDir)) continue;
 
       const files = walk(srcDir);
@@ -295,8 +298,8 @@ describe("architecture policy: domain layer isolation", () => {
         const rel = relative(ROOT, file).replace(/\\/g, "/");
         const content = readFileSync(file, "utf-8");
 
-        for (const sibling of SIBLING_PKGS) {
-          if (sibling === pkg) continue; // intra-package paths are fine
+        for (const sibling of SIBLING_DIRS) {
+          if (sibling === pkg.dir) continue; // intra-package paths are fine
           // Match hardcoded relative paths that traverse into sibling packages
           // e.g. "../../../web/dist/..." or "../../rex/src/..."
           const pattern = new RegExp(`["']\\.\\./[^"']*/${sibling}/[^"']*["']`);
@@ -342,7 +345,7 @@ describe("architecture policy: orchestration tier boundary", () => {
     "claude-integration.js",
   ];
 
-  const DOMAIN_PACKAGES = ["rex", "sourcevision", "hench", "@n-dx/web"];
+  const DOMAIN_PACKAGES = ["@n-dx/rex", "@n-dx/sourcevision", "@n-dx/hench", "@n-dx/web"];
 
   for (const file of ORCHESTRATION_FILES) {
     it(`${file} must not have runtime imports from domain/execution packages`, () => {
@@ -477,7 +480,7 @@ describe("architecture policy: gateway enforcement", () => {
   /**
    * Type-import gateway enforcement — closes the promotion erosion path.
    *
-   * Even `import type { Foo } from "rex"` outside a gateway is an erosion
+   * Even `import type { Foo } from "@n-dx/rex"` outside a gateway is an erosion
    * risk: a developer may later promote it to a runtime import during
    * refactoring, silently bypassing the gateway pattern. Routing all
    * imports (runtime AND type) through gateways eliminates this pathway.
@@ -749,7 +752,7 @@ describe("architecture policy: gateway enforcement", () => {
    *
    * The deny-list test above only checks imports from packages already listed
    * in GATEWAY_RULES. But a new leaf file could import from any cross-package
-   * name (e.g. "hench" or "@n-dx/llm-client") without being caught.
+   * name (e.g. "@n-dx/hench" or "@n-dx/llm-client") without being caught.
    *
    * This test scans ALL non-gateway files in packages/web/src and checks for
    * runtime imports from ANY known cross-package name, not just the ones with
@@ -760,7 +763,7 @@ describe("architecture policy: gateway enforcement", () => {
     // Foundation-tier (@n-dx/llm-client) is intentionally ungated — it is the
     // shared bottom of the hierarchy, designed for direct use by all tiers.
     // Only domain and execution packages require gateway routing.
-    const ALL_CROSS_PACKAGES = ["rex", "sourcevision", "hench"];
+    const ALL_CROSS_PACKAGES = ["@n-dx/rex", "@n-dx/sourcevision", "@n-dx/hench"];
 
     // Collect all gateway files for web
     const webGateways = new Set();
@@ -815,7 +818,7 @@ describe("architecture policy: gateway enforcement", () => {
       const rel = relative(ROOT, file).replace(/\\/g, "/");
       const content = readFileSync(file, "utf-8");
 
-      if (hasRuntimeImportFrom(content, "sourcevision")) {
+      if (hasRuntimeImportFrom(content, "@n-dx/sourcevision")) {
         violations.push(rel);
       }
     }
@@ -1104,7 +1107,7 @@ describe("architecture policy: foundation tier boundary (@n-dx/llm-client)", () 
 
   it("@n-dx/llm-client must not import from domain or execution packages", () => {
     const llmSrc = walk(join(ROOT, "packages/llm-client/src"));
-    const forbidden = ["rex", "sourcevision", "hench", "@n-dx/web"];
+    const forbidden = ["@n-dx/rex", "@n-dx/sourcevision", "@n-dx/hench", "@n-dx/web"];
     const violations = [];
 
     for (const file of llmSrc) {

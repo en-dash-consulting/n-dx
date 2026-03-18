@@ -1,12 +1,15 @@
 {
-  "name": "sourcevision",
+  "name": "@n-dx/sourcevision",
   "version": "0.1.0",
   "license": "Elastic-2.0",
   "description": "Codebase analysis tool with structured, git-friendly output",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
-    "sourcevision": "./dist/cli/index.js"
+    "sourcevision": "./dist/cli/index.js",
+    "sv": "./dist/cli/index.js"
   },
   "exports": {
     ".": {

@@ -21,16 +21,11 @@ HTTP transport uses Streamable HTTP with session management. Sessions are create
 
 ## stdio Transport
 
-stdio spawns a separate process per MCP server. No `ndx start` required:
+stdio spawns a separate process per MCP server. No `ndx start` required. The `rex` and `sv` commands are available after installing `@n-dx/core`:
 
 ```sh
-# Using standalone binaries
 claude mcp add rex -- rex mcp .
 claude mcp add sourcevision -- sv mcp .
-
-# Or using node directly
-claude mcp add rex -- node packages/rex/dist/cli/index.js mcp .
-claude mcp add sourcevision -- node packages/sourcevision/dist/cli/index.js mcp .
 ```
 
 ## Migrating from stdio to HTTP

@@ -5,16 +5,11 @@
     { "repo": "en-dash-consulting/n-dx" }
   ],
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    ["@n-dx/core", "@n-dx/rex", "@n-dx/hench", "@n-dx/sourcevision", "@n-dx/llm-client", "@n-dx/web"]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
-  "updateInternalDependencies": "patch",
-  "ignore": [
-    "rex",
-    "hench",
-    "sourcevision",
-    "@n-dx/llm-client",
-    "@n-dx/web"
-  ]
+  "updateInternalDependencies": "patch"
 }

@@ -200,13 +200,13 @@ const ORCHESTRATION_PEERS = new Set([
 /**
  * Pattern that matches import statements pulling from package directories.
  * Captures: import/export … from "packages/…" or "./packages/…"
- * Also catches: from "rex", from "sourcevision", from "hench",
+ * Also catches: from "@n-dx/rex", from "@n-dx/sourcevision", from "@n-dx/hench",
  * from "@n-dx/llm-client", from "@n-dx/web"
  */
 const PACKAGE_IMPORT_PATTERN =
   /(?:import|export)\s+.*\s+from\s+["'](?:\.\/)?packages\//;
 const DIRECT_PKG_IMPORT_PATTERN =
-  /(?:import|export)\s+.*\s+from\s+["'](?:rex|sourcevision|hench|@n-dx\/)/;
+  /(?:import|export)\s+.*\s+from\s+["']@n-dx\//;
 
 describe("architecture policy: orchestration spawn-only rule", () => {
   for (const file of ORCHESTRATION_FILES) {

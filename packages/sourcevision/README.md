@@ -1,4 +1,6 @@
-# Sourcevision
+# @n-dx/sourcevision
+
+> **This is an internal package of [`@n-dx/core`](https://www.npmjs.com/package/@n-dx/core).** Install `@n-dx/core` instead — it includes this package and registers all CLI commands.
 
 <img src="SourceVision.png" alt="SourceVision" width="128">
 

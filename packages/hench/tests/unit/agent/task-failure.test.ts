@@ -95,7 +95,7 @@ describe("API loop task failure handling", () => {
 
   it("marks task as deferred on uncaught exception and logs error", async () => {
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
@@ -154,7 +154,7 @@ describe("API loop task failure handling", () => {
     vi.spyOn(toolsModule, "dispatchTool").mockResolvedValue("ok");
 
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
@@ -206,7 +206,7 @@ describe("API loop task failure handling", () => {
     });
 
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);

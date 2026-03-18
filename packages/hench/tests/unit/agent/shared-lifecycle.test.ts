@@ -67,7 +67,7 @@ describe("shared lifecycle", () => {
   describe("prepareBrief", () => {
     it("assembles brief, formats text, builds system prompt, and displays task info", async () => {
       const { prepareBrief } = await import("../../../src/agent/lifecycle/shared.js");
-      const { createStore } = await import("rex/dist/store/index.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
       const { loadConfig } = await import("../../../src/store/config.js");
 
       const config = await loadConfig(henchDir);
@@ -94,7 +94,7 @@ describe("shared lifecycle", () => {
 
     it("auto-selects a task when no taskId is provided", async () => {
       const { prepareBrief } = await import("../../../src/agent/lifecycle/shared.js");
-      const { createStore } = await import("rex/dist/store/index.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
       const { loadConfig } = await import("../../../src/store/config.js");
 
       const config = await loadConfig(henchDir);
@@ -170,7 +170,7 @@ describe("shared lifecycle", () => {
   describe("transitionToInProgress", () => {
     it("transitions pending task to in_progress", async () => {
       const { transitionToInProgress } = await import("../../../src/agent/lifecycle/shared.js");
-      const { createStore } = await import("rex/dist/store/index.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
 
       const rexDir = join(projectDir, ".rex");
       const store = createStore("file", rexDir);
@@ -189,7 +189,7 @@ describe("shared lifecycle", () => {
 
     it("skips transition for already in_progress tasks", async () => {
       const { transitionToInProgress } = await import("../../../src/agent/lifecycle/shared.js");
-      const { createStore } = await import("rex/dist/store/index.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
 
       const rexDir = join(projectDir, ".rex");
       const store = createStore("file", rexDir);
@@ -243,7 +243,7 @@ describe("shared lifecycle", () => {
   describe("handleRunFailure", () => {
     it("updates task status and logs the failure", async () => {
       const { handleRunFailure } = await import("../../../src/agent/lifecycle/shared.js");
-      const { createStore } = await import("rex/dist/store/index.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
 
       const rexDir = join(projectDir, ".rex");
       const store = createStore("file", rexDir);
@@ -264,7 +264,7 @@ describe("shared lifecycle", () => {
   describe("handleBudgetExceeded", () => {
     it("sets run status and error, then updates task", async () => {
       const { handleBudgetExceeded } = await import("../../../src/agent/lifecycle/shared.js");
-      const { createStore } = await import("rex/dist/store/index.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
       const { randomUUID } = await import("node:crypto");
 
       const rexDir = join(projectDir, ".rex");
@@ -302,7 +302,7 @@ describe("shared lifecycle", () => {
     it("both loops produce consistent dry run results through shared module", async () => {
       const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
       const { cliLoop } = await import("../../../src/agent/lifecycle/cli-loop.js");
-      const { createStore } = await import("rex/dist/store/index.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
       const { loadConfig } = await import("../../../src/store/config.js");
 
       const config = await loadConfig(henchDir);

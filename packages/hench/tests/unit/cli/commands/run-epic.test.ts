@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { PRDItem, PRDStore } from "rex";
+import type { PRDItem, PRDStore } from "@n-dx/rex";
 import {
   listEpics,
   findEpicByIdOrTitle,

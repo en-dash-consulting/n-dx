@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "license": "Elastic-2.0",
   "description": "n-dx web dashboard — serves sourcevision, rex, and hench data",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "n-dx-web": "./dist/cli/index.js"
@@ -37,8 +39,8 @@
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
     "preact": "^10.19.0",
-    "rex": "workspace:*",
-    "sourcevision": "workspace:*",
+    "@n-dx/rex": "workspace:*",
+    "@n-dx/sourcevision": "workspace:*",
     "zod": "^3.22.0"
   },
   "devDependencies": {

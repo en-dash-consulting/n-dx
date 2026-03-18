@@ -3,7 +3,7 @@
  *
  * Hench needs several rex functions at runtime (tree traversal, task
  * selection, timestamp computation, auto-completion).  Rather than
- * scattering `import … from "rex"` across 9+ files, every runtime
+ * scattering `import … from "@n-dx/rex"` across 9+ files, every runtime
  * import is funnelled through this single module.  This makes the
  * cross-package dependency surface explicit and easy to audit.
  *
@@ -85,38 +85,38 @@
  */
 
 // ---- Schema version contract ------------------------------------------------
-export { SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion } from "rex";
+export { SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion } from "@n-dx/rex";
 
 // ---- Store factory ----------------------------------------------------------
-export { resolveStore } from "rex";
+export { resolveStore } from "@n-dx/rex";
 
 // ---- Tree utilities ---------------------------------------------------------
-export { findItem, walkTree } from "rex";
+export { findItem, walkTree } from "@n-dx/rex";
 
 // ---- Task selection ---------------------------------------------------------
-export { findNextTask, findActionableTasks, collectCompletedIds } from "rex";
+export { findNextTask, findActionableTasks, collectCompletedIds } from "@n-dx/rex";
 
 // ---- Timestamps -------------------------------------------------------------
-export { computeTimestampUpdates } from "rex";
+export { computeTimestampUpdates } from "@n-dx/rex";
 
 // ---- Parent auto-completion -------------------------------------------------
-export { findAutoCompletions } from "rex";
+export { findAutoCompletions } from "@n-dx/rex";
 
 // ---- Requirements validation ------------------------------------------------
 export {
   collectRequirements,
   validateAutomatedRequirements,
   formatRequirementsValidation,
-} from "rex";
+} from "@n-dx/rex";
 
 // ---- Level helpers ----------------------------------------------------------
-export { isRootLevel, isWorkItem } from "rex";
+export { isRootLevel, isWorkItem } from "@n-dx/rex";
 
 // ---- Finding acknowledgment -------------------------------------------------
-export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "rex";
+export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/rex";
 
 // ---- Type re-exports --------------------------------------------------------
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry } from "rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry } from "@n-dx/rex";

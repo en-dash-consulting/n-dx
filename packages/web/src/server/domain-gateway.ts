@@ -2,7 +2,7 @@
  * Centralized gateway for sourcevision runtime imports.
  *
  * Web route handlers need the sourcevision MCP server factory to serve
- * the `/mcp/sourcevision` endpoint. Rather than importing from "sourcevision"
+ * the `/mcp/sourcevision` endpoint. Rather than importing from "@n-dx/sourcevision"
  * directly in route files, all web→sourcevision runtime imports pass through
  * this single module.
  *
@@ -16,4 +16,4 @@
  * @see packages/hench/src/prd/rex-gateway.ts — hench's equivalent gateway
  */
 
-export { createSourcevisionMcpServer } from "sourcevision";
+export { createSourcevisionMcpServer } from "@n-dx/sourcevision";

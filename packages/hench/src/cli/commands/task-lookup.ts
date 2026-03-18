@@ -11,8 +11,8 @@ export async function lookupTaskInRex(
   taskId: string,
 ): Promise<{ exists: true; title: string; status: string } | { exists: false }> {
   try {
-    const { resolveStore } = await import("rex");
-    const { findItem } = await import("rex");
+    const { resolveStore } = await import("@n-dx/rex");
+    const { findItem } = await import("@n-dx/rex");
     const { loadConfig } = await import("../../store/config.js");
 
     const henchDir = join(dir, HENCH_DIR);
@@ -42,8 +42,8 @@ export async function batchLookupTasksInRex(
   taskIds: string[],
 ): Promise<Set<string> | null> {
   try {
-    const { resolveStore } = await import("rex");
-    const { findItem } = await import("rex");
+    const { resolveStore } = await import("@n-dx/rex");
+    const { findItem } = await import("@n-dx/rex");
     const { loadConfig } = await import("../../store/config.js");
 
     const henchDir = join(dir, HENCH_DIR);

@@ -15,7 +15,7 @@ pnpm install && pnpm build
 npm link
 ```
 
-After linking, both `ndx` and `n-dx` are available as commands. `sv` is a shorthand for `sourcevision`.
+After installing, `ndx`, `n-dx`, `rex`, `hench`, `sourcevision`, and `sv` are all available as commands.
 
 ## Initialize a Project
 
@@ -52,7 +52,6 @@ claude login
 ```sh
 ndx config llm.vendor codex .
 ndx config llm.codex.cli_path codex .
-ndx config rex.model gpt-5.3-codex .
 codex login
 ```
 

@@ -7,6 +7,22 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@n-dx/hench':
+        specifier: workspace:*
+        version: link:packages/hench
+      '@n-dx/llm-client':
+        specifier: workspace:*
+        version: link:packages/llm-client
+      '@n-dx/rex':
+        specifier: workspace:*
+        version: link:packages/rex
+      '@n-dx/sourcevision':
+        specifier: workspace:*
+        version: link:packages/sourcevision
+      '@n-dx/web':
+        specifier: workspace:*
+        version: link:packages/web
     devDependencies:
       '@changesets/changelog-github':
         specifier: ^0.6.0
@@ -29,7 +45,7 @@ importers:
       '@n-dx/llm-client':
         specifier: workspace:*
         version: link:../llm-client
-      rex:
+      '@n-dx/rex':
         specifier: workspace:*
         version: link:../rex
       zod:
@@ -126,6 +142,12 @@ importers:
       '@n-dx/llm-client':
         specifier: workspace:*
         version: link:../llm-client
+      '@n-dx/rex':
+        specifier: workspace:*
+        version: link:../rex
+      '@n-dx/sourcevision':
+        specifier: workspace:*
+        version: link:../sourcevision
       d3-force:
         specifier: ^3.0.0
         version: 3.0.0
@@ -135,12 +157,6 @@ importers:
       preact:
         specifier: ^10.19.0
         version: 10.28.3
-      rex:
-        specifier: workspace:*
-        version: link:../rex
-      sourcevision:
-        specifier: workspace:*
-        version: link:../sourcevision
       zod:
         specifier: ^3.22.0
         version: 3.25.76

@@ -9,7 +9,7 @@ import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
-import type { Proposal, ProposalFeature, ProposalTask } from "rex";
+import type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";
 
 // ── Types ────────────────────────────────────────────────────────────
 

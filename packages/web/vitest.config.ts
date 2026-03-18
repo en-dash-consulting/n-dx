@@ -9,14 +9,14 @@ const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
 export default defineConfig({
   resolve: {
     alias: [
-      // Map bare "rex" import to source public.ts barrel for vitest
-      { find: /^rex$/, replacement: `${rexRoot}/src/public.ts` },
+      // Map bare "@n-dx/rex" import to source public.ts barrel for vitest
+      { find: /^@n-dx\/rex$/, replacement: `${rexRoot}/src/public.ts` },
       // Map rex subpath imports to source .ts files for vitest
-      { find: /^rex\/dist\/(.+)\.js$/, replacement: `${rexRoot}/src/$1.ts` },
-      // Map bare "sourcevision" import to source public.ts barrel for vitest
-      { find: /^sourcevision$/, replacement: `${svRoot}/src/public.ts` },
+      { find: /^@n-dx\/rex\/dist\/(.+)\.js$/, replacement: `${rexRoot}/src/$1.ts` },
+      // Map bare "@n-dx/sourcevision" import to source public.ts barrel for vitest
+      { find: /^@n-dx\/sourcevision$/, replacement: `${svRoot}/src/public.ts` },
       // Map sourcevision subpath imports to source .ts files for vitest
-      { find: /^sourcevision\/dist\/(.+)\.js$/, replacement: `${svRoot}/src/$1.ts` },
+      { find: /^@n-dx\/sourcevision\/dist\/(.+)\.js$/, replacement: `${svRoot}/src/$1.ts` },
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/llm-client$/, replacement: `${llmClientRoot}/src/public.ts` },
       // Map @n-dx/claude-client to source public.ts for vitest (transitive dep of rex)

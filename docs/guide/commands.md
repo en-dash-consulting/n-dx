@@ -118,7 +118,7 @@ ndx config --json .                   # JSON output
 
 ## Direct Tool Access
 
-Each tool can be accessed through the orchestrator or as a standalone command:
+Each tool can be accessed through the orchestrator or as a standalone command (available after `npm i -g @n-dx/core`):
 
 ```sh
 # Via orchestrator
@@ -127,7 +127,7 @@ ndx hench <command> [args]
 ndx sourcevision <command> [args]
 ndx sv <command> [args]           # alias for sourcevision
 
-# Standalone
+# Standalone (registered as CLI commands by @n-dx/core)
 rex <command> [args]
 hench <command> [args]
 sourcevision <command> [args]

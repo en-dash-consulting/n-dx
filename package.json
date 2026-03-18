@@ -36,11 +36,7 @@
   ],
   "bin": {
     "n-dx": "./cli.js",
-    "ndx": "./cli.js",
-    "rex": "./packages/rex/dist/cli/index.js",
-    "hench": "./packages/hench/dist/cli/index.js",
-    "sourcevision": "./packages/sourcevision/dist/cli/index.js",
-    "sv": "./packages/sourcevision/dist/cli/index.js"
+    "ndx": "./cli.js"
   },
   "files": [
     "cli.js",
@@ -53,19 +49,15 @@
     "refresh-artifacts.js",
     "export.js",
     "claude-integration.js",
-    "refresh-validate.js",
-    "packages/rex/dist",
-    "packages/rex/package.json",
-    "packages/sourcevision/dist",
-    "packages/sourcevision/package.json",
-    "packages/hench/dist",
-    "packages/hench/package.json",
-    "packages/llm-client/dist",
-    "packages/llm-client/package.json",
-    "packages/web/dist",
-    "packages/web/package.json",
-    "packages/web/build.js"
+    "refresh-validate.js"
   ],
+  "dependencies": {
+    "@n-dx/rex": "workspace:*",
+    "@n-dx/hench": "workspace:*",
+    "@n-dx/sourcevision": "workspace:*",
+    "@n-dx/llm-client": "workspace:*",
+    "@n-dx/web": "workspace:*"
+  },
   "scripts": {
     "build": "pnpm -r run build",
     "dev": "pnpm -r run dev",

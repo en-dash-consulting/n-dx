@@ -1,7 +1,9 @@
 {
-  "name": "hench",
+  "name": "@n-dx/hench",
   "version": "0.1.0",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "Elastic-2.0",
   "type": "module",
   "bin": {
@@ -29,7 +31,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@n-dx/llm-client": "workspace:*",
-    "rex": "workspace:*",
+    "@n-dx/rex": "workspace:*",
     "zod": "^3.22.0"
   },
   "devDependencies": {

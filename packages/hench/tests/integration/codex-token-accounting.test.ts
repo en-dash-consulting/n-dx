@@ -146,7 +146,7 @@ describe("codex token accounting integration", () => {
         }),
       );
 
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../src/store/config.js");
     const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
 

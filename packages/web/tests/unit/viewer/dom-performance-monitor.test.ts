@@ -834,17 +834,25 @@ describe("counting performance", () => {
     const small = createFlat(200);
     const large = createFlat(800);
 
-    const start1 = performance.now();
-    countDOMNodes(small);
-    const time1 = performance.now() - start1;
+    // Use median of multiple runs to avoid flaky sub-millisecond timing
+    function median(fn: () => void, n = 20): number {
+      fn(); fn(); // warmup
+      const times: number[] = [];
+      for (let i = 0; i < n; i++) {
+        const s = performance.now();
+        fn();
+        times.push(performance.now() - s);
+      }
+      times.sort((a, b) => a - b);
+      return times[Math.floor(times.length / 2)];
+    }
 
-    const start2 = performance.now();
-    countDOMNodes(large);
-    const time2 = performance.now() - start2;
+    const time1 = median(() => countDOMNodes(small));
+    const time2 = median(() => countDOMNodes(large));
 
     // If O(n), large ~4× small. If O(n²), large ~16× small.
     // Accept up to 8× with constant factor.
-    const ratio = (time2 + 0.1) / (time1 + 0.1);
+    const ratio = (time2 + 0.01) / (time1 + 0.01);
     expect(ratio).toBeLessThan(8);
   });
 });

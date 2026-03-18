@@ -114,7 +114,7 @@ describe("API loop authentication and endpoint config", () => {
     });
 
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
@@ -247,7 +247,7 @@ describe("API loop authentication and endpoint config", () => {
     );
 
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
@@ -298,7 +298,7 @@ describe("API loop authentication and endpoint config", () => {
     );
 
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
@@ -370,7 +370,7 @@ describe("CLI loop claude-client integration", () => {
     );
 
     const { cliLoop } = await import("../../../src/agent/lifecycle/cli-loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);

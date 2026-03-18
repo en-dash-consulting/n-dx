@@ -52,7 +52,7 @@ describe("agentLoop", () => {
   it("dry run prints brief without API calls", async () => {
     // Dynamic import to avoid loading Anthropic SDK at module level
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
@@ -87,7 +87,7 @@ describe("agentLoop", () => {
 
   it("fails without API key in non-dry-run mode", async () => {
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
-    const { createStore } = await import("rex/dist/store/index.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);

@@ -1,7 +1,9 @@
 {
-  "name": "rex",
+  "name": "@n-dx/rex",
   "version": "0.1.0",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "Elastic-2.0",
   "type": "module",
   "bin": {

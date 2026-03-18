@@ -81,9 +81,9 @@ async function loadIntegrationSchemas(): Promise<{
   validateConfig: (config: Record<string, unknown>, schema: { fields: Record<string, unknown>; [key: string]: unknown }) => Record<string, { valid: boolean; error?: string }>;
 }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod = await import("rex/dist/store/integration-schema.js") as any;
+  const mod = await import("@n-dx/rex/dist/store/integration-schema.js") as any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const schemas = await import("rex/dist/store/integration-schemas/index.js") as any;
+  const schemas = await import("@n-dx/rex/dist/store/integration-schemas/index.js") as any;
   return {
     ensureSchemas: schemas.ensureSchemas,
     getIntegrationSchema: mod.getIntegrationSchema,
@@ -104,7 +104,7 @@ async function loadRegistry(): Promise<{
   isRedactedField: (v: unknown) => v is { __redacted: true; envVar: string; hint: string };
 }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod = await import("rex/dist/store/adapter-registry.js") as any;
+  const mod = await import("@n-dx/rex/dist/store/adapter-registry.js") as any;
   return mod;
 }
 
