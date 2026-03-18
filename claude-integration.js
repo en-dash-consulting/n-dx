@@ -11,7 +11,7 @@
  * @module n-dx/claude-integration
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync } from "fs";
 import { createRequire } from "module";
 import { join, resolve } from "path";
 import { execSync } from "child_process";
@@ -69,8 +69,8 @@ const AUTO_APPROVED_TOOLS = [
  * Keys are directory names; values are SKILL.md content.
  */
 const SKILLS = {
-  plan: `---
-name: plan
+  "ndx-plan": `---
+name: ndx-plan
 description: Analyze the codebase and propose PRD updates
 ---
 
@@ -86,8 +86,8 @@ Analyze the codebase and propose PRD updates.
 8. Show the updated PRD tree via \`get_prd_status\`
 `,
 
-  status: `---
-name: status
+  "ndx-status": `---
+name: ndx-status
 description: Show comprehensive project status combining PRD progress and codebase health
 ---
 
@@ -101,8 +101,8 @@ Show comprehensive project status combining PRD progress and codebase health.
 6. Present a unified report: progress, health, critical findings, and next steps
 `,
 
-  capture: `---
-name: capture
+  "ndx-capture": `---
+name: ndx-capture
 description: Capture a requirement, feature idea, or task from conversation context
 argument-hint: "[description]"
 ---
@@ -121,8 +121,8 @@ Capture a requirement, feature idea, or task from conversation context.
 7. Use \`add_item\` (rex MCP) to create, then confirm placement in hierarchy
 `,
 
-  zone: `---
-name: zone
+  "ndx-zone": `---
+name: ndx-zone
 description: Deep-dive into an architectural zone's structure and health
 argument-hint: "[zone-id]"
 ---
@@ -137,8 +137,8 @@ Deep-dive into an architectural zone's structure and health.
 6. Present: zone purpose, key files, cohesion/coupling metrics, findings, and cross-zone dependencies
 `,
 
-  work: `---
-name: work
+  "ndx-work": `---
+name: ndx-work
 description: Pick up a task from the PRD and begin working on it
 argument-hint: "[task-id]"
 ---
@@ -158,8 +158,8 @@ Pick up a task from the PRD and begin working on it.
 11. When done, use \`update_task_status\` (rex MCP) to mark as \`completed\`
 `,
 
-  configure: `---
-name: configure
+  "ndx-config": `---
+name: ndx-config
 description: View or change n-dx configuration with guided assistance
 argument-hint: "[key] [value]"
 ---
@@ -225,9 +225,26 @@ function mergeSettings(dir) {
  * Overwrites existing skill files (they're n-dx-managed).
  * Also cleans up old flat-file format (`.claude/skills/<name>.md`).
  */
+/** Old unprefixed skill names — removed on init to avoid duplicates. */
+const LEGACY_SKILL_NAMES = ["plan", "status", "capture", "zone", "work", "configure"];
+
 function writeSkills(dir) {
   const skillsDir = join(dir, ".claude", "skills");
   mkdirSync(skillsDir, { recursive: true });
+
+  // Clean up legacy unprefixed skill directories
+  for (const old of LEGACY_SKILL_NAMES) {
+    const oldDir = join(skillsDir, old);
+    if (existsSync(join(oldDir, "SKILL.md"))) {
+      try { unlinkSync(join(oldDir, "SKILL.md")); } catch { /* ignore */ }
+      try { rmdirSync(oldDir); } catch { /* ignore — may have user files */ }
+    }
+    // Also clean up old flat-file format
+    const oldFlat = join(skillsDir, `${old}.md`);
+    if (existsSync(oldFlat)) {
+      try { unlinkSync(oldFlat); } catch { /* ignore */ }
+    }
+  }
 
   let written = 0;
   for (const [name, content] of Object.entries(SKILLS)) {
@@ -330,7 +347,7 @@ export function printClaudeSetupSummary(result) {
   }
 
   // Skills
-  console.log(`  Skills: wrote ${result.skills.written} workflow skills (/plan, /status, /capture, /zone, /work, /configure)`);
+  console.log(`  Skills: wrote ${result.skills.written} workflow skills (/ndx-plan, /ndx-status, /ndx-capture, /ndx-zone, /ndx-work, /ndx-config)`);
 
   // MCP
   if (!result.mcp.registered) {
