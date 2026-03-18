@@ -36,7 +36,8 @@
 
 import { spawn } from "child_process";
 import { existsSync, readFileSync } from "fs";
-import { dirname, join, resolve } from "path";
+import { createRequire } from "module";
+import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
 import { runConfig } from "./config.js";
@@ -70,11 +71,27 @@ import { runExport } from "./export.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
+/** Map monorepo directory names to npm package names. */
+const PKG_NAMES = {
+  "packages/rex": "@n-dx/rex",
+  "packages/hench": "@n-dx/hench",
+  "packages/sourcevision": "@n-dx/sourcevision",
+  "packages/web": "@n-dx/web",
+};
+
+const _require = createRequire(import.meta.url);
+
 /**
- * Resolve a package's CLI entry point from its package.json bin field.
- * Falls back to the conventional dist/cli/index.js path if bin is missing.
+ * Resolve a package's CLI entry point.
+ *
+ * Strategy:
+ * 1. Try the monorepo path (packages/<name>/package.json → bin field).
+ *    This is the development / source-checkout path.
+ * 2. Fall back to node_modules resolution (npm install path).
+ *    Uses require.resolve to find the installed package's CLI entry.
  */
 function resolveToolPath(pkgDir) {
+  // 1. Monorepo path — works when running from source checkout
   const pkgPath = join(__dir, pkgDir, "package.json");
   try {
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
@@ -82,14 +99,44 @@ function resolveToolPath(pkgDir) {
       return join(pkgDir, pkg.bin);
     }
     if (pkg.bin && typeof pkg.bin === "object") {
-      // Use the first bin entry
       const first = Object.values(pkg.bin)[0];
       if (first) return join(pkgDir, first);
     }
   } catch {
-    // package.json unreadable — fall through
+    // Not in monorepo — fall through to node_modules resolution
   }
+
+  // 2. node_modules resolution — works when installed from npm
+  const npmName = PKG_NAMES[pkgDir];
+  if (npmName) {
+    try {
+      return _require.resolve(npmName + "/dist/cli/index.js");
+    } catch {
+      // Not installed either — fall through
+    }
+  }
+
   return join(pkgDir, "dist/cli/index.js");
+}
+
+/**
+ * Resolve an arbitrary file within a package — monorepo path first,
+ * then node_modules. Used for non-CLI entry points (build.js, dev.js).
+ */
+function resolvePackageFile(pkgDir, file) {
+  const monoPath = join(__dir, pkgDir, file);
+  if (existsSync(monoPath)) return join(pkgDir, file);
+
+  const npmName = PKG_NAMES[pkgDir];
+  if (npmName) {
+    try {
+      return _require.resolve(npmName + "/" + file);
+    } catch {
+      // Not resolvable — fall through
+    }
+  }
+
+  return join(pkgDir, file);
 }
 
 /**
@@ -124,8 +171,9 @@ function formatError(err) {
 }
 
 function run(script, args) {
+  const scriptPath = isAbsolute(script) ? script : resolve(__dir, script);
   return new Promise((res) => {
-    const child = spawn(process.execPath, [resolve(__dir, script), ...args], {
+    const child = spawn(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
     });
     child.on("close", (code) => res(code ?? 1));
@@ -543,7 +591,7 @@ async function runRefreshStep(step, plan, dir, stepStatuses) {
     return true;
   }
   if (step.kind === "web-build") {
-    const code = await run("packages/web/build.js", []);
+    const code = await run(resolvePackageFile("packages/web", "build.js"), []);
     if (code !== 0) {
       const detail = `exit code ${code}`;
       printRefreshStepTransition(step.kind, "failed", detail);
@@ -743,7 +791,7 @@ async function handleDev(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".sourcevision"]);
   const flags = extractFlags(rest);
-  const code = await run("packages/web/dev.js", [...flags, dir]);
+  const code = await run(resolvePackageFile("packages/web", "dev.js"), [...flags, dir]);
   process.exit(code);
 }
 

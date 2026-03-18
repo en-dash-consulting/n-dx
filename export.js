@@ -15,11 +15,26 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, statSync } from "fs";
+import { createRequire } from "module";
 import { join, resolve, dirname, basename } from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const _require = createRequire(import.meta.url);
+
+/**
+ * Resolve a file within a package — monorepo first, then node_modules.
+ */
+function resolvePackagePath(pkgDir, npmName, filePath) {
+  const monoPath = join(__dir, pkgDir, filePath);
+  if (existsSync(monoPath)) return monoPath;
+  try {
+    return dirname(_require.resolve(npmName + "/package.json")) + "/" + filePath;
+  } catch {
+    return monoPath; // fallback — will fail with a clear ENOENT
+  }
+}
 
 // ── Flag parsing ─────────────────────────────────────────────────────────────
 
@@ -144,7 +159,7 @@ export async function runExport(args) {
   console.log(`[export] base path: ${basePath}`);
 
   // ── Dynamic import of rex functions ────────────────────────────────────
-  const rexPublic = await import(join(__dir, "packages/rex/dist/public.js"));
+  const rexPublic = await import(resolvePackagePath("packages/rex", "@n-dx/rex", "dist/public.js"));
   const {
     computeStats,
     computeEpicStats,
@@ -338,7 +353,7 @@ export async function runExport(args) {
 
   // ── Step 5: Copy viewer assets ─────────────────────────────────────────
   console.log("[export] copying viewer assets...");
-  const viewerDir = join(__dir, "packages/web/dist/viewer");
+  const viewerDir = resolvePackagePath("packages/web", "@n-dx/web", "dist/viewer");
 
   if (!existsSync(join(viewerDir, "index.html"))) {
     console.error("Error: Viewer not built. Run 'pnpm build' first.");

@@ -13,10 +13,12 @@
 
 import { spawn } from "child_process";
 import { existsSync } from "fs";
+import { createRequire } from "module";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const _require = createRequire(import.meta.url);
 
 /**
  * Run a subprocess and capture its stdout/stderr.
@@ -191,8 +193,13 @@ if (isMain) {
   const positional = args.filter((a) => !a.startsWith("-"));
   const dir = positional[0] || process.cwd();
 
-  // Resolve rex CLI path
-  const rexCli = join("packages/rex/dist/cli/index.js");
+  // Resolve rex CLI path — monorepo first, then node_modules
+  let rexCli = join("packages/rex/dist/cli/index.js");
+  if (!existsSync(resolve(__dir, rexCli))) {
+    try {
+      rexCli = _require.resolve("@n-dx/rex/dist/cli/index.js");
+    } catch { /* fall through */ }
+  }
 
   try {
     const ok = await runPRCheck(dir, flags, { rexCli });
