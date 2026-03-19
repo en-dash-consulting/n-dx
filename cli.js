@@ -537,8 +537,10 @@ async function handleRecommend(rest) {
 }
 
 async function handleAdd(rest) {
-  const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  // Unlike other commands, add's positional args are descriptions, not dirs.
+  // Rex's dispatchAdd handles dir resolution internally (resolveSmartAddArgs
+  // checks whether the last positional is an existing directory).
+  requireInit(process.cwd(), [".rex"]);
   await runOrDie(tools.rex, ["add", ...rest]);
   process.exit(0);
 }
