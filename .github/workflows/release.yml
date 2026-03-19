@@ -5,8 +5,8 @@
 # 2. The "Version Packages" PR is auto-created/updated with bumped versions + changelog
 # 3. Merging the "Version Packages" PR triggers npm publish + git tags
 #
-# Uses npm trusted publishing (OIDC) — no NPM_TOKEN secret needed.
-# Configure trusted publishing at npmjs.com → package settings → Publishing access.
+# Requires NPM_TOKEN secret (granular access token scoped to @n-dx/*).
+# Create at npmjs.com → Access Tokens → Granular Access Token.
 
 name: Release
 
@@ -58,4 +58,5 @@ jobs:
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
