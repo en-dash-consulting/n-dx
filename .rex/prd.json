@@ -22087,7 +22087,7 @@
     {
       "id": "31fa50b1-31fc-48f3-a311-341ddbd510de",
       "title": "ndx add CLI Delegation Fix",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Fix the ndx add orchestration command which currently throws a missing-.rex error instead of properly delegating to rex add.",
       "children": [
@@ -22118,7 +22118,7 @@
         {
           "id": "caf6319e-35fa-4b12-90b9-74440b2a753f",
           "title": "Add regression test for ndx add CLI delegation",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "Add a test to `tests/e2e/` (or the appropriate orchestration test file) that invokes `ndx add` against a fixture project with a valid `.rex/` directory and asserts it exits cleanly and produces the expected PRD output. This prevents the delegation bug from regressing silently.",
           "acceptanceCriteria": [
@@ -22133,9 +22133,15 @@
             "regression",
             "orchestration"
           ],
-          "source": "smart-add"
+          "source": "smart-add",
+          "startedAt": "2026-03-19T18:47:08.893Z",
+          "completedAt": "2026-03-19T18:48:18.205Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Added tests/e2e/cli-add.test.js with 3 tests: successful manual-mode delegation, missing-.rex user-friendly error, and exit code propagation on failure."
         }
-      ]
+      ],
+      "startedAt": "2026-03-19T18:48:18.396Z",
+      "completedAt": "2026-03-19T18:48:18.396Z"
     }
   ]
 }
