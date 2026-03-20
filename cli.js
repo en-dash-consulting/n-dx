@@ -667,6 +667,10 @@ async function handleInit(rest) {
   // Set up .gitignore for local/generated files
   setupGitignore(dir);
 
+  console.log("");
+  console.log("Configuration stored at .n-dx/");
+  console.log("Files meant to be ignored have been added to your .gitignore");
+
   // Claude Code integration (settings, skills, MCP servers)
   if (!noClaude) {
     try {
