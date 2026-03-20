@@ -5,6 +5,11 @@
     "access": "public"
   },
   "license": "Elastic-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/en-dash-consulting/n-dx.git",
+    "directory": "packages/hench"
+  },
   "type": "module",
   "bin": {
     "hench": "./dist/cli/index.js"
