@@ -45,7 +45,7 @@ export class BudgetExceededError extends CLIError {
  */
 const ERROR_HINTS: Array<[RegExp, string, string]> = [
   [
-    /ENOENT.*\.rex/,
+    /ENOENT.*(?:\.rex|\.n-dx\/rex)/,
     "Rex directory not found.",
     "Run 'n-dx init' to set up the project.",
   ],
@@ -62,17 +62,17 @@ const ERROR_HINTS: Array<[RegExp, string, string]> = [
   [
     /Invalid prd\.json/,
     "PRD file is corrupted or has an invalid format.",
-    "Check .rex/prd.json for syntax errors, or re-initialize with 'n-dx init'.",
+    "Check .n-dx/rex/prd.json for syntax errors, or re-initialize with 'n-dx init'.",
   ],
   [
     /Invalid config\.json/,
     "Configuration file is corrupted.",
-    "Check .rex/config.json for syntax errors, or re-initialize with 'n-dx init'.",
+    "Check .n-dx/rex/config.json for syntax errors, or re-initialize with 'n-dx init'.",
   ],
   [
     /EACCES/,
     "Permission denied.",
-    "Check file permissions for the .rex/ directory.",
+    "Check file permissions for the .n-dx/rex/ directory.",
   ],
   [
     /Unexpected token/,

@@ -13,9 +13,9 @@ function git(cwd: string, args: string[]): string {
 }
 
 function writePRD(dir: string, items: unknown[]): void {
-  mkdirSync(join(dir, ".rex"), { recursive: true });
+  mkdirSync(join(dir, ".n-dx/rex"), { recursive: true });
   writeFileSync(
-    join(dir, ".rex", "prd.json"),
+    join(dir, ".n-dx/rex", "prd.json"),
     JSON.stringify({ schema: "1.0.0", title: "Test Project", items }, null, 2),
     "utf-8",
   );
@@ -234,7 +234,7 @@ describe("cmdPrMarkdown", () => {
   });
 
   it("generates markdown from rex PRD data on a feature branch", async () => {
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     git(tmpDir, ["init", "-b", "main"]);
     git(tmpDir, ["config", "user.email", "test@example.com"]);
@@ -284,7 +284,7 @@ describe("cmdPrMarkdown", () => {
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
 
     // Rex-based content sections
     expect(markdown).toContain("## Summary");
@@ -306,7 +306,7 @@ describe("cmdPrMarkdown", () => {
   });
 
   it("generates meaningful output when rex data is missing", async () => {
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     git(tmpDir, ["init", "-b", "main"]);
     git(tmpDir, ["config", "user.email", "test@example.com"]);
@@ -319,7 +319,7 @@ describe("cmdPrMarkdown", () => {
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
     expect(markdown).toContain("## Summary");
     expect(markdown).toContain("## Completed Work");
     expect(markdown).toContain("No completed work items on this branch.");
@@ -327,7 +327,7 @@ describe("cmdPrMarkdown", () => {
   });
 
   it("works without git history (non-git directory)", async () => {
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     writePRD(tmpDir, [
       {
@@ -357,7 +357,7 @@ describe("cmdPrMarkdown", () => {
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
     expect(markdown).toContain("## Summary");
     expect(markdown).toContain("## Completed Work");
     expect(markdown).toContain("Bootstrap project");
@@ -367,7 +367,7 @@ describe("cmdPrMarkdown", () => {
   });
 
   it("renders epic grouping with stable ordering from PRD hierarchy", async () => {
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     git(tmpDir, ["init", "-b", "main"]);
     git(tmpDir, ["config", "user.email", "test@example.com"]);
@@ -416,7 +416,7 @@ describe("cmdPrMarkdown", () => {
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
 
     expect(markdown).toContain("### Epic Alpha");
     expect(markdown).toContain("### Epic Zebra");
@@ -433,12 +433,12 @@ describe("cmdPrMarkdown", () => {
 
     // Stable: running again produces identical output
     await cmdPrMarkdown(tmpDir);
-    const rerendered = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const rerendered = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
     expect(rerendered).toBe(markdown);
   });
 
   it("includes epic summary table with completion counts", async () => {
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     git(tmpDir, ["init", "-b", "main"]);
     git(tmpDir, ["config", "user.email", "test@example.com"]);
@@ -473,7 +473,7 @@ describe("cmdPrMarkdown", () => {
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
 
     // Summary section contains epic table
     expect(markdown).toContain("| Epic | Completed |");
@@ -482,33 +482,33 @@ describe("cmdPrMarkdown", () => {
   });
 
   it("produces valid output when .rex/prd.json exists but is empty", async () => {
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
-    mkdirSync(join(tmpDir, ".rex"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/rex"), { recursive: true });
 
-    writeFileSync(join(tmpDir, ".rex", "prd.json"), "", "utf-8");
+    writeFileSync(join(tmpDir, ".n-dx/rex", "prd.json"), "", "utf-8");
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
     expect(markdown).toContain("## Summary");
     expect(markdown).toContain("No completed work items on this branch.");
   });
 
   it("produces valid output when .rex/prd.json contains invalid JSON", async () => {
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
-    mkdirSync(join(tmpDir, ".rex"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/rex"), { recursive: true });
 
-    writeFileSync(join(tmpDir, ".rex", "prd.json"), "{ invalid json", "utf-8");
+    writeFileSync(join(tmpDir, ".n-dx/rex", "prd.json"), "{ invalid json", "utf-8");
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
     expect(markdown).toContain("## Summary");
     expect(markdown).toContain("No completed work items on this branch.");
   });
 
   it("only includes branch-specific completions when diffing against base", async () => {
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     git(tmpDir, ["init", "-b", "main"]);
     git(tmpDir, ["config", "user.email", "test@example.com"]);
@@ -564,7 +564,7 @@ describe("cmdPrMarkdown", () => {
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
 
     // Only the branch-specific task should appear
     expect(markdown).toContain("Branch task");
@@ -589,7 +589,7 @@ describe("generatePrMarkdownFile", () => {
   });
 
   it("writes pr-markdown.md to the specified svDir", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     mkdirSync(svDir, { recursive: true });
 
     writePRD(tmpDir, [
@@ -623,7 +623,7 @@ describe("generatePrMarkdownFile", () => {
   });
 
   it("returns zero itemCount when no PRD exists", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     mkdirSync(svDir, { recursive: true });
 
     const result = await generatePrMarkdownFile(tmpDir, svDir);
@@ -636,10 +636,10 @@ describe("generatePrMarkdownFile", () => {
   });
 
   it("returns warnings from corrupted PRD", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     mkdirSync(svDir, { recursive: true });
-    mkdirSync(join(tmpDir, ".rex"), { recursive: true });
-    writeFileSync(join(tmpDir, ".rex", "prd.json"), "{ broken", "utf-8");
+    mkdirSync(join(tmpDir, ".n-dx/rex"), { recursive: true });
+    writeFileSync(join(tmpDir, ".n-dx/rex", "prd.json"), "{ broken", "utf-8");
 
     const result = await generatePrMarkdownFile(tmpDir, svDir);
 
@@ -649,7 +649,7 @@ describe("generatePrMarkdownFile", () => {
   });
 
   it("overwrites existing pr-markdown.md", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     mkdirSync(svDir, { recursive: true });
     const outputPath = join(svDir, PR_MARKDOWN_FILENAME);
     writeFileSync(outputPath, "old stale content", "utf-8");

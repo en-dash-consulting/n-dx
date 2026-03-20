@@ -51,8 +51,8 @@ describe("scanSourceVision with acknowledgment", () => {
   };
 
   it("skips acknowledged findings", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
-    await writeFile(join(tempDir, ".sourcevision", "zones.json"), JSON.stringify(ZONES_DATA));
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
+    await writeFile(join(tempDir, ".n-dx/sourcevision", "zones.json"), JSON.stringify(ZONES_DATA));
 
     // Acknowledge the first finding
     const hash = computeFindingHash({
@@ -60,7 +60,7 @@ describe("scanSourceVision with acknowledgment", () => {
       scope: "core",
       text: "Hardcoded secret in config",
     });
-    const rexDir = join(tempDir, ".rex");
+    const rexDir = join(tempDir, ".n-dx/rex");
     await mkdir(rexDir, { recursive: true });
     let store = { version: 1 as const, findings: [] };
     store = acknowledgeFinding(store, hash, "Hardcoded secret in config", "architectural", "user");
@@ -75,8 +75,8 @@ describe("scanSourceVision with acknowledgment", () => {
   });
 
   it("embeds finding:{hash} tags on unacknowledged findings", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
-    await writeFile(join(tempDir, ".sourcevision", "zones.json"), JSON.stringify(ZONES_DATA));
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
+    await writeFile(join(tempDir, ".n-dx/sourcevision", "zones.json"), JSON.stringify(ZONES_DATA));
 
     const results = await scanSourceVision(tempDir);
     const tasks = results.filter((r) => r.kind === "task");
@@ -90,8 +90,8 @@ describe("scanSourceVision with acknowledgment", () => {
   });
 
   it("works without .rex directory (graceful degradation)", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
-    await writeFile(join(tempDir, ".sourcevision", "zones.json"), JSON.stringify(ZONES_DATA));
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
+    await writeFile(join(tempDir, ".n-dx/sourcevision", "zones.json"), JSON.stringify(ZONES_DATA));
 
     // No .rex directory — should still produce all findings
     const results = await scanSourceVision(tempDir);

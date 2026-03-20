@@ -35,8 +35,8 @@ describe("Status API routes", () => {
   beforeEach(async () => {
     clearStatusCache();
     tmpDir = await mkdtemp(join(tmpdir(), "status-api-"));
-    const svDir = join(tmpDir, ".sourcevision");
-    const rexDir = join(tmpDir, ".rex");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
 
@@ -215,7 +215,7 @@ describe("Status API routes", () => {
     });
 
     it("reports configured when config.json exists", async () => {
-      const henchDir = join(tmpDir, ".hench");
+      const henchDir = join(tmpDir, ".n-dx/hench");
       await mkdir(henchDir, { recursive: true });
       await writeFile(join(henchDir, "config.json"), JSON.stringify({ model: "test" }));
 
@@ -226,7 +226,7 @@ describe("Status API routes", () => {
     });
 
     it("counts run JSON files", async () => {
-      const runsDir = join(tmpDir, ".hench", "runs");
+      const runsDir = join(tmpDir, ".n-dx/hench", "runs");
       await mkdir(runsDir, { recursive: true });
       const run1 = {
         id: "run-1", taskId: "t1", taskTitle: "Task 1",
@@ -242,7 +242,7 @@ describe("Status API routes", () => {
       };
       await writeFile(join(runsDir, "run-1.json"), JSON.stringify(run1));
       await writeFile(join(runsDir, "run-2.json"), JSON.stringify(run2));
-      await writeFile(join(join(tmpDir, ".hench"), "config.json"), "{}");
+      await writeFile(join(join(tmpDir, ".n-dx/hench"), "config.json"), "{}");
 
       clearStatusCache();
       const res = await fetch(`http://localhost:${port}/api/status`);
@@ -251,9 +251,9 @@ describe("Status API routes", () => {
     });
 
     it("excludes malformed and incomplete run files from totalRuns count", async () => {
-      const runsDir = join(tmpDir, ".hench", "runs");
+      const runsDir = join(tmpDir, ".n-dx/hench", "runs");
       await mkdir(runsDir, { recursive: true });
-      await writeFile(join(join(tmpDir, ".hench"), "config.json"), "{}");
+      await writeFile(join(join(tmpDir, ".n-dx/hench"), "config.json"), "{}");
 
       // Valid run
       const validRun = {
@@ -287,7 +287,7 @@ describe("Status API routes", () => {
     });
 
     it("detects stale running runs", async () => {
-      const henchDir = join(tmpDir, ".hench");
+      const henchDir = join(tmpDir, ".n-dx/hench");
       const runsDir = join(henchDir, "runs");
       await mkdir(runsDir, { recursive: true });
       await writeFile(join(henchDir, "config.json"), "{}");
@@ -320,7 +320,7 @@ describe("Status API routes", () => {
     });
 
     it("reports zero stale runs when running run is fresh", async () => {
-      const henchDir = join(tmpDir, ".hench");
+      const henchDir = join(tmpDir, ".n-dx/hench");
       const runsDir = join(henchDir, "runs");
       await mkdir(runsDir, { recursive: true });
       await writeFile(join(henchDir, "config.json"), "{}");
@@ -343,7 +343,7 @@ describe("Status API routes", () => {
     });
 
     it("treats running run without lastActivityAt as stale (legacy compat)", async () => {
-      const henchDir = join(tmpDir, ".hench");
+      const henchDir = join(tmpDir, ".n-dx/hench");
       const runsDir = join(henchDir, "runs");
       await mkdir(runsDir, { recursive: true });
       await writeFile(join(henchDir, "config.json"), "{}");

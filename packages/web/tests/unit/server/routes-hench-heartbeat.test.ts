@@ -36,12 +36,12 @@ describe("Heartbeat data in audit endpoint", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-heartbeat-"));
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
-      rexDir: join(tmpDir, ".rex"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
+      rexDir: join(tmpDir, ".n-dx/rex"),
       dev: false,
     };
     ({ server, port } = await startTestServer(ctx));
@@ -53,7 +53,7 @@ describe("Heartbeat data in audit endpoint", () => {
   });
 
   it("returns healthy heartbeat status for fresh running task", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-hb-1",
       taskId: "task-hb-1",
@@ -78,7 +78,7 @@ describe("Heartbeat data in audit endpoint", () => {
   });
 
   it("returns warning heartbeat status for task with 60s+ inactivity", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     // 70 seconds ago — past the warning threshold (2 * 30s = 60s)
     const run = {
       id: "run-hb-2",
@@ -104,7 +104,7 @@ describe("Heartbeat data in audit endpoint", () => {
   });
 
   it("returns unresponsive heartbeat status for task with 120s+ inactivity", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     // 130 seconds ago — past the unresponsive threshold (4 * 30s = 120s)
     const run = {
       id: "run-hb-3",
@@ -130,7 +130,7 @@ describe("Heartbeat data in audit endpoint", () => {
   });
 
   it("returns unknown heartbeat status for task without lastActivityAt", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-hb-4",
       taskId: "task-hb-4",
@@ -154,7 +154,7 @@ describe("Heartbeat data in audit endpoint", () => {
   });
 
   it("correctly computes missedHeartbeats count", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     // 95 seconds ago — should be 3 missed heartbeats (95 / 30 = 3.16, floor = 3)
     const run = {
       id: "run-hb-5",
@@ -179,7 +179,7 @@ describe("Heartbeat data in audit endpoint", () => {
   });
 
   it("audit entries still include all existing fields alongside heartbeat data", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-hb-6",
       taskId: "task-hb-6",

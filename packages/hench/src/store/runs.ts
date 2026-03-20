@@ -4,6 +4,7 @@ import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
 import { validateRunRecord } from "../schema/index.js";
 import { toCanonicalJSON } from "./json.js";
+import { HENCH_FILES } from "../constants.js";
 import type { RunRecord } from "../schema/index.js";
 
 const gunzipAsync = promisify(gunzip);
@@ -27,7 +28,7 @@ export async function saveRun(
   henchDir: string,
   run: RunRecord,
 ): Promise<void> {
-  const runPath = join(henchDir, "runs", `${run.id}.json`);
+  const runPath = join(henchDir, HENCH_FILES.RUNS, `${run.id}.json`);
   await writeFile(runPath, toCanonicalJSON(run), "utf-8");
 }
 
@@ -35,7 +36,7 @@ export async function loadRun(
   henchDir: string,
   id: string,
 ): Promise<RunRecord> {
-  const runsDir = join(henchDir, "runs");
+  const runsDir = join(henchDir, HENCH_FILES.RUNS);
   const jsonPath = join(runsDir, `${id}.json`);
   const gzPath = join(runsDir, `${id}.json.gz`);
 
@@ -59,7 +60,7 @@ export async function listRuns(
   henchDir: string,
   limit?: number,
 ): Promise<RunRecord[]> {
-  const runsDir = join(henchDir, "runs");
+  const runsDir = join(henchDir, HENCH_FILES.RUNS);
   let files: string[];
   try {
     files = await readdir(runsDir);

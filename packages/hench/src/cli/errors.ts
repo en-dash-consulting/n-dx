@@ -67,12 +67,12 @@ const ERROR_HINTS: Array<[RegExp, string, string]> = [
     "       To change the limit: hench config guard.maxConcurrentProcesses <number>",
   ],
   [
-    /ENOENT.*\.hench/,
+    /ENOENT.*(?:\.hench|\.n-dx\/hench)/,
     "Hench directory not found.",
     "Run 'n-dx init' to set up the project.",
   ],
   [
-    /ENOENT.*\.rex/,
+    /ENOENT.*(?:\.rex|\.n-dx\/rex)/,
     "Rex directory not found.",
     "Run 'n-dx init' to set up the project.",
   ],
@@ -84,17 +84,17 @@ const ERROR_HINTS: Array<[RegExp, string, string]> = [
   [
     /Invalid hench config|Invalid config\.json/,
     "Configuration file is corrupted or has an invalid format.",
-    "Check .hench/config.json for syntax errors, or re-initialize with 'n-dx init'.",
+    "Check .n-dx/hench/config.json for syntax errors, or re-initialize with 'n-dx init'.",
   ],
   [
     /Invalid run record/,
     "Run record is corrupted or has an invalid format.",
-    "The run data in .hench/runs/ may be damaged. Check the file for syntax errors.",
+    "The run data in .n-dx/hench/runs/ may be damaged. Check the file for syntax errors.",
   ],
   [
     /EACCES/,
     "Permission denied.",
-    "Check file permissions for the .hench/ directory.",
+    "Check file permissions for the .n-dx/hench/ directory.",
   ],
   [
     /Unexpected token/,

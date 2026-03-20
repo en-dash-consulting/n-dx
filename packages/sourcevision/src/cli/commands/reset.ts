@@ -4,7 +4,7 @@ import { SV_DIR } from "./constants.js";
 import { info } from "../output.js";
 import { detectSubAnalyses } from "../../analyzers/workspace.js";
 
-/** Reset a single .sourcevision/ directory: backup files then clear. */
+/** Reset a single sourcevision directory: backup files then clear. */
 function resetSvDir(svDir: string, label: string): void {
   const backupDir = join(svDir, ".backup");
   if (existsSync(backupDir)) {
@@ -38,7 +38,7 @@ export function cmdReset(dir: string): void {
   const svDir = join(absDir, SV_DIR);
 
   if (!existsSync(svDir)) {
-    info(`No .sourcevision/ directory found in ${absDir} — nothing to reset.`);
+    info(`No sourcevision directory found in ${absDir} — nothing to reset.`);
     return;
   }
 
@@ -57,6 +57,6 @@ export function cmdReset(dir: string): void {
   }
 
   const total = 1 + subs.length;
-  info(`Reset ${total} .sourcevision/ director${total === 1 ? "y" : "ies"}.`);
+  info(`Reset ${total} sourcevision director${total === 1 ? "y" : "ies"}.`);
   info("Run 'sourcevision analyze' to start fresh.");
 }

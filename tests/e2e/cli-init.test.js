@@ -106,7 +106,7 @@ describe("n-dx init provider selection", () => {
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }
-    const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+    const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx/config.json"), "utf-8"));
     expect(ndxConfig.llm.vendor).toBe("claude");
   });
 

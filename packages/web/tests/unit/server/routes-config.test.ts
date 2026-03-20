@@ -35,8 +35,8 @@ describe("Config API routes", () => {
   beforeEach(async () => {
     clearConfigCaches();
     tmpDir = await mkdtemp(join(tmpdir(), "config-api-"));
-    const svDir = join(tmpDir, ".sourcevision");
-    const rexDir = join(tmpDir, ".rex");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
 
@@ -67,7 +67,7 @@ describe("Config API routes", () => {
     });
 
     it("reads model from hench config", async () => {
-      const henchDir = join(tmpDir, ".hench");
+      const henchDir = join(tmpDir, ".n-dx/hench");
       await mkdir(henchDir, { recursive: true });
       await writeFile(
         join(henchDir, "config.json"),
@@ -86,7 +86,7 @@ describe("Config API routes", () => {
     });
 
     it("prefers .n-dx.json claude.model over hench model", async () => {
-      const henchDir = join(tmpDir, ".hench");
+      const henchDir = join(tmpDir, ".n-dx/hench");
       await mkdir(henchDir, { recursive: true });
       await writeFile(
         join(henchDir, "config.json"),
@@ -118,7 +118,7 @@ describe("Config API routes", () => {
     });
 
     it("detects cli auth method from provider", async () => {
-      const henchDir = join(tmpDir, ".hench");
+      const henchDir = join(tmpDir, ".n-dx/hench");
       await mkdir(henchDir, { recursive: true });
       await writeFile(
         join(henchDir, "config.json"),
@@ -190,7 +190,7 @@ describe("Config API routes", () => {
       // Create a sibling project directory
       const parentDir = join(tmpDir, "..");
       const siblingDir = join(parentDir, "sibling-project-test-ndx");
-      await mkdir(join(siblingDir, ".rex"), { recursive: true });
+      await mkdir(join(siblingDir, ".n-dx/rex"), { recursive: true });
       await writeFile(
         join(siblingDir, "package.json"),
         JSON.stringify({ name: "sibling-project" }),

@@ -12,7 +12,7 @@ describe("Claude config inheritance (rex)", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-claude-cfg-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(rexDir, { recursive: true });
   });
 
@@ -23,56 +23,56 @@ describe("Claude config inheritance (rex)", () => {
   });
 
   describe("loadClaudeConfig", () => {
-    it("returns empty config when .n-dx.json does not exist", async () => {
+    it("returns empty config when .n-dx/config.json does not exist", async () => {
       const config = await loadClaudeConfig(rexDir);
       expect(config).toEqual({});
     });
 
-    it("returns empty config when .n-dx.json has no claude section", async () => {
+    it("returns empty config when .n-dx/config.json has no claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ rex: { project: "test" } }),
       );
       const config = await loadClaudeConfig(rexDir);
       expect(config).toEqual({});
     });
 
-    it("returns empty config when .n-dx.json is invalid JSON", async () => {
-      await writeFile(join(tmpDir, ".n-dx.json"), "not valid json");
+    it("returns empty config when .n-dx/config.json is invalid JSON", async () => {
+      await writeFile(join(tmpDir, ".n-dx", "config.json"), "not valid json");
       const config = await loadClaudeConfig(rexDir);
       expect(config).toEqual({});
     });
 
-    it("loads cli_path from .n-dx.json claude section", async () => {
+    it("loads cli_path from .n-dx/config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { cli_path: "/usr/local/bin/claude" } }),
       );
       const config = await loadClaudeConfig(rexDir);
       expect(config.cli_path).toBe("/usr/local/bin/claude");
     });
 
-    it("loads api_key from .n-dx.json claude section", async () => {
+    it("loads api_key from .n-dx/config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { api_key: "sk-ant-test-key" } }),
       );
       const config = await loadClaudeConfig(rexDir);
       expect(config.api_key).toBe("sk-ant-test-key");
     });
 
-    it("loads api_endpoint from .n-dx.json claude section", async () => {
+    it("loads api_endpoint from .n-dx/config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com" } }),
       );
       const config = await loadClaudeConfig(rexDir);
       expect(config.api_endpoint).toBe("https://proxy.example.com");
     });
 
-    it("loads model from .n-dx.json claude section", async () => {
+    it("loads model from .n-dx/config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { model: "claude-opus-4-20250514" } }),
       );
       const config = await loadClaudeConfig(rexDir);
@@ -81,7 +81,7 @@ describe("Claude config inheritance (rex)", () => {
 
     it("ignores empty string values", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { cli_path: "", api_key: "", api_endpoint: "", model: "" } }),
       );
       const config = await loadClaudeConfig(rexDir);

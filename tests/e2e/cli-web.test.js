@@ -24,9 +24,9 @@ function runResult(args) {
  * Set up a minimal project with .sourcevision dir (minimum for web command).
  */
 async function setupProject(dir) {
-  await mkdir(join(dir, ".sourcevision"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/sourcevision"), { recursive: true });
   await writeFile(
-    join(dir, ".sourcevision", "manifest.json"),
+    join(dir, ".n-dx/sourcevision", "manifest.json"),
     JSON.stringify({
       schemaVersion: "1.0.0",
       toolVersion: "0.1.0",
@@ -41,11 +41,11 @@ async function setupProject(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "inventory.json"),
+    join(dir, ".n-dx/sourcevision", "inventory.json"),
     JSON.stringify({ files: [], summary: { totalFiles: 0, totalBytes: 0, languages: {} } }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "imports.json"),
+    join(dir, ".n-dx/sourcevision", "imports.json"),
     JSON.stringify({
       edges: [],
       external: {},
@@ -53,7 +53,7 @@ async function setupProject(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "zones.json"),
+    join(dir, ".n-dx/sourcevision", "zones.json"),
     JSON.stringify({
       zones: [],
       crossings: [],
@@ -62,7 +62,7 @@ async function setupProject(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "components.json"),
+    join(dir, ".n-dx/sourcevision", "components.json"),
     JSON.stringify({
       components: [],
       routeModules: [],
@@ -115,7 +115,7 @@ describe("n-dx web", () => {
   afterEach(async () => {
     // Clean up any stale PID files / background processes
     try {
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
+      const pidPath = join(tmpDir, ".n-dx/web.pid");
       const raw = await readFile(pidPath, "utf-8");
       const data = JSON.parse(raw);
       try { process.kill(data.pid, "SIGTERM"); } catch {}
@@ -197,12 +197,12 @@ describe("n-dx web", () => {
   // ── Config port integration ────────────────────────────────────────────
 
   describe("config integration", () => {
-    it("reads port from .n-dx.json config", async () => {
+    it("reads port from .n-dx/config.json config", async () => {
       // Write a config with a port. Use background mode to verify the
       // config port is passed to the server (it appears in the output).
       const port = await findAvailablePort();
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx/config.json"),
         JSON.stringify({ web: { port } }),
       );
 
@@ -218,7 +218,7 @@ describe("n-dx web", () => {
       const configPort = await findAvailablePort();
       const flagPort = await findAvailablePort();
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx/config.json"),
         JSON.stringify({ web: { port: configPort } }),
       );
 
@@ -242,7 +242,7 @@ describe("n-dx web", () => {
       expect(stdout).toContain(`${port}`);
 
       // PID file should exist
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
+      const pidPath = join(tmpDir, ".n-dx/web.pid");
       const raw = await readFile(pidPath, "utf-8");
       const pidData = JSON.parse(raw);
       expect(pidData).toHaveProperty("pid");
@@ -268,7 +268,7 @@ describe("n-dx web", () => {
       expect(stderr).toContain("already running");
 
       // Clean up
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
+      const pidPath = join(tmpDir, ".n-dx/web.pid");
       try {
         const raw = await readFile(pidPath, "utf-8");
         const pidData = JSON.parse(raw);

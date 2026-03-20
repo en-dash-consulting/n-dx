@@ -15,7 +15,7 @@ describe("RunChangeDetector", () => {
 
   beforeEach(async () => {
     tmpBase = await mkdtemp(join(tmpdir(), "hench-change-detect-"));
-    runsDir = join(tmpBase, ".hench", "runs");
+    runsDir = join(tmpBase, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
   });
 

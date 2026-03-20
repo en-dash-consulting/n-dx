@@ -10,9 +10,9 @@ function git(cwd: string, args: string[]): string {
 }
 
 function writePRD(dir: string, items: unknown[]): void {
-  mkdirSync(join(dir, ".rex"), { recursive: true });
+  mkdirSync(join(dir, ".n-dx/rex"), { recursive: true });
   writeFileSync(
-    join(dir, ".rex", "prd.json"),
+    join(dir, ".n-dx/rex", "prd.json"),
     JSON.stringify({ schema: "1.0.0", title: "Test Project", items }, null, 2),
     "utf-8",
   );
@@ -30,7 +30,7 @@ describe("pr-markdown rex-based output", () => {
     tmpDir = mkdtempSync(join(tmpdir(), "sv-pr-markdown-integration-"));
     vi.spyOn(console, "log").mockImplementation(() => {});
 
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     git(tmpDir, ["init", "-b", "main"]);
     git(tmpDir, ["config", "user.email", "test@example.com"]);
@@ -87,7 +87,7 @@ describe("pr-markdown rex-based output", () => {
 
     await cmdPrMarkdown(tmpDir);
 
-    const markdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const markdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
 
     // Rex-based output contains structured work items
     expect(markdown).toContain("## Summary");
@@ -110,7 +110,7 @@ describe("pr-markdown rex-based output", () => {
     tmpDir = mkdtempSync(join(tmpdir(), "sv-pr-markdown-integration-"));
     vi.spyOn(console, "log").mockImplementation(() => {});
 
-    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     git(tmpDir, ["init", "-b", "main"]);
     git(tmpDir, ["config", "user.email", "test@example.com"]);
@@ -143,14 +143,14 @@ describe("pr-markdown rex-based output", () => {
     git(tmpDir, ["commit", "-m", "feature update"]);
 
     await cmdPrMarkdown(tmpDir);
-    const baselineMarkdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const baselineMarkdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
 
     // Configure external diff tools that would break git-diff-based generation
     git(tmpDir, ["config", "diff.external", "/usr/bin/false"]);
 
     // Regenerate — should produce identical output since we use rex data, not git diff
     await cmdPrMarkdown(tmpDir);
-    const deterministicMarkdown = readFileSync(join(tmpDir, ".sourcevision", "pr-markdown.md"), "utf-8");
+    const deterministicMarkdown = readFileSync(join(tmpDir, ".n-dx/sourcevision", "pr-markdown.md"), "utf-8");
 
     expect(deterministicMarkdown).toBe(baselineMarkdown);
   });

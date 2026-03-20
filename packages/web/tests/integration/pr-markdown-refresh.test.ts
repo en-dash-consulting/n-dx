@@ -47,8 +47,8 @@ describe("PR markdown integration", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-pr-refresh-"));
-    svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
 

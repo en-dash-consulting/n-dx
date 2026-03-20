@@ -8,8 +8,12 @@
 
 import { dirname, join } from "node:path";
 import { readFile, access } from "node:fs/promises";
-
-const PROJECT_CONFIG_FILE = ".n-dx.json";
+/**
+ * Config filename within the .n-dx/ directory.
+ * loadProjectOverrides navigates up from a package dir (e.g. .n-dx/rex)
+ * to .n-dx/ and joins this filename, so it's just the basename.
+ */
+const PROJECT_CONFIG_FILE = "config.json";
 
 /**
  * Deep merge source into target. Source values take precedence.

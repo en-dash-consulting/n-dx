@@ -36,12 +36,12 @@ describe("Hench runs health endpoint", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-health-"));
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
-      rexDir: join(tmpDir, ".rex"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
+      rexDir: join(tmpDir, ".n-dx/rex"),
       dev: false,
     };
     ({ server, port } = await startTestServer(ctx));
@@ -62,7 +62,7 @@ describe("Hench runs health endpoint", () => {
   });
 
   it("detects stale running run", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-1",
       taskId: "t1",
@@ -85,7 +85,7 @@ describe("Hench runs health endpoint", () => {
   });
 
   it("does not flag fresh running run as stale", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-2",
       taskId: "t2",
@@ -108,7 +108,7 @@ describe("Hench runs health endpoint", () => {
   });
 
   it("ignores completed runs in health check", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-3",
       taskId: "t3",
@@ -130,7 +130,7 @@ describe("Hench runs health endpoint", () => {
   });
 
   it("treats legacy running run without lastActivityAt as stale", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-4",
       taskId: "t4",
@@ -160,12 +160,12 @@ describe("Hench mark-stuck endpoint", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-stuck-"));
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
-      rexDir: join(tmpDir, ".rex"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
+      rexDir: join(tmpDir, ".n-dx/rex"),
       dev: false,
     };
     ({ server, port } = await startTestServer(ctx));
@@ -177,7 +177,7 @@ describe("Hench mark-stuck endpoint", () => {
   });
 
   it("marks a running run as failed", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "stuck-1",
       taskId: "t1",
@@ -204,7 +204,7 @@ describe("Hench mark-stuck endpoint", () => {
   });
 
   it("rejects marking a completed run as stuck", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "done-1",
       taskId: "t1",

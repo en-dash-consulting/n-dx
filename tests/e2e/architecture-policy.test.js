@@ -67,9 +67,7 @@ const SKIP_DIRS = new Set([
   "node_modules",
   "dist",
   ".git",
-  ".hench",
-  ".rex",
-  ".sourcevision",
+  ".n-dx",
 ]);
 
 function walk(dir, files = []) {

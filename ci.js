@@ -58,7 +58,7 @@ export async function runCI(dir, flags, { run, tools }) {
   const isJSON = flags.some((f) => f === "--format=json");
 
   // ── Pre-flight: check required directories ──────────────────────────────
-  const requiredDirs = [".rex", ".sourcevision"];
+  const requiredDirs = [".n-dx/rex", ".n-dx/sourcevision"];
   const missingDirs = requiredDirs.filter((d) => !existsSync(join(dir, d)));
   if (missingDirs.length > 0) {
     const error = `Missing ${missingDirs.join(", ")} in ${dir}`;
@@ -597,7 +597,7 @@ function isPhantomZone(zone) {
  * are excluded from health checks to prevent false-positive violations.
  */
 function checkZoneHealth(dir) {
-  const zonesPath = join(dir, ".sourcevision", "zones.json");
+  const zonesPath = join(dir, ".n-dx/sourcevision", "zones.json");
   if (!existsSync(zonesPath)) {
     return { ok: true, checked: 0, violations: [], phantomSkipped: 0 };
   }
@@ -690,8 +690,8 @@ function zoneIdToDirName(id) {
  * Only checks top-level zones (sub-zones live inside their parent's directory).
  */
 function checkZoneIdConsistency(dir) {
-  const zonesJsonPath = join(dir, ".sourcevision", "zones.json");
-  const zonesDir = join(dir, ".sourcevision", "zones");
+  const zonesJsonPath = join(dir, ".n-dx/sourcevision", "zones.json");
+  const zonesDir = join(dir, ".n-dx/sourcevision", "zones");
 
   if (!existsSync(zonesJsonPath) || !existsSync(zonesDir)) {
     return { ok: true, checked: 0, mismatches: [] };
@@ -739,7 +739,7 @@ function checkZoneIdConsistency(dir) {
   for (const dirName of actualDirs) {
     if (!expectedDirs.has(dirName)) {
       mismatches.push(
-        `directory "${dirName}" exists in .sourcevision/zones/ but has no matching zone in zones.json`,
+        `directory "${dirName}" exists in .n-dx/sourcevision/zones/ but has no matching zone in zones.json`,
       );
     }
   }
@@ -975,7 +975,7 @@ function checkArchitecturePolicy(dir) {
   const violations = [];
   let checked = 0;
 
-  const skipDirs = new Set(["node_modules", "dist", ".git", ".hench", ".rex", ".sourcevision"]);
+  const skipDirs = new Set(["node_modules", "dist", ".git", ".n-dx"]);
   const childProcessPattern = /(?:from\s+["'](?:node:)?child_process["']|require\(["'](?:node:)?child_process["']\))/;
 
   function walkSrc(d) {
@@ -1036,7 +1036,7 @@ function checkArchitecturePolicy(dir) {
  * Direct module imports (import/require) would create fragile coupling between
  * source code and on-disk state layout.
  */
-const DATA_DIRECTORIES = [".rex", ".sourcevision", ".hench"];
+const DATA_DIRECTORIES = [".n-dx/rex", ".n-dx/sourcevision", ".n-dx/hench"];
 
 /**
  * Check that no source files contain import/require paths resolving into
@@ -1056,14 +1056,14 @@ function checkDataLayerContract(dir) {
   const violations = [];
   let checked = 0;
 
-  const skipDirs = new Set(["node_modules", "dist", ".git", ".hench", ".rex", ".sourcevision"]);
+  const skipDirs = new Set(["node_modules", "dist", ".git", ".n-dx"]);
 
   // Match import/require paths that resolve into data directories.
   // Catches patterns like:
-  //   import x from ".rex/prd.json"
-  //   import x from "../.rex/config.json"
-  //   require("./.rex/prd.json")
-  //   from "../../.hench/config.json"
+  //   import x from ".n-dx/rex/prd.json"
+  //   import x from "../.n-dx/rex/config.json"
+  //   require("./.n-dx/rex/prd.json")
+  //   from "../../.n-dx/hench/config.json"
   // Does NOT match filesystem reads (readFileSync, fs.readFile, etc.)
   const dataImportPatterns = DATA_DIRECTORIES.map((d) => {
     const escaped = d.replace(".", "\\.");

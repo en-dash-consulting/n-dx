@@ -106,7 +106,7 @@ describe("requireSvDir", () => {
 
   it("does not throw when .sourcevision/ exists", () => {
     const tmp = mkdtempSync(join(tmpdir(), "sv-test-"));
-    mkdirSync(join(tmp, ".sourcevision"));
+    mkdirSync(join(tmp, ".n-dx/sourcevision"), { recursive: true });
     try {
       expect(() => requireSvDir(tmp)).not.toThrow();
     } finally {

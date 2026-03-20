@@ -15,7 +15,7 @@ function makeConfig(overrides: Record<string, unknown> = {}): Record<string, unk
     maxTurns: 50,
     maxTokens: 8192,
     tokenBudget: 0,
-    rexDir: ".rex",
+    rexDir: ".n-dx/rex",
     apiKeyEnv: "ANTHROPIC_API_KEY",
     loopPauseMs: 2000,
     maxFailedAttempts: 3,
@@ -65,14 +65,14 @@ describe("Hench Config API routes", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-config-api-"));
-    henchDir = join(tmpDir, ".hench");
+    henchDir = join(tmpDir, ".n-dx/hench");
     await mkdir(henchDir, { recursive: true });
     await mkdir(join(henchDir, "runs"), { recursive: true });
 
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
-      rexDir: join(tmpDir, ".rex"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
+      rexDir: join(tmpDir, ".n-dx/rex"),
       dev: false,
     };
 

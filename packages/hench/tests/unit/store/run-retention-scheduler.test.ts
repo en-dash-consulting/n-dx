@@ -25,7 +25,7 @@ describe("RunRetentionScheduler", () => {
   beforeEach(async () => {
     tmpBase = await mkdtemp(join(tmpdir(), "hench-retention-sched-"));
     projectDir = tmpBase;
-    runsDir = join(tmpBase, ".hench", "runs");
+    runsDir = join(tmpBase, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
   });
 
@@ -73,14 +73,14 @@ describe("RunRetentionScheduler", () => {
   // ---------------------------------------------------------------------------
 
   describe("loadRetentionIntervalMs", () => {
-    it("returns default when .n-dx.json does not exist", async () => {
+    it("returns default when config.json does not exist", async () => {
       const interval = await loadRetentionIntervalMs(projectDir);
       expect(interval).toBe(DEFAULT_RETENTION_INTERVAL_MS);
     });
 
     it("returns default when no retention section exists", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({ web: { port: 3117 } }),
         "utf-8",
       );
@@ -88,9 +88,9 @@ describe("RunRetentionScheduler", () => {
       expect(interval).toBe(DEFAULT_RETENTION_INTERVAL_MS);
     });
 
-    it("reads intervalMs from .n-dx.json", async () => {
+    it("reads intervalMs from config.json", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({ retention: { intervalMs: 3600000 } }),
         "utf-8",
       );
@@ -100,7 +100,7 @@ describe("RunRetentionScheduler", () => {
 
     it("returns default for invalid intervalMs", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({ retention: { intervalMs: -1 } }),
         "utf-8",
       );
@@ -218,7 +218,7 @@ describe("RunRetentionScheduler", () => {
     it("uses overrideIntervalMs when provided", async () => {
       // If override is provided, it should not read from config
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({ retention: { intervalMs: 1000 } }),
         "utf-8",
       );

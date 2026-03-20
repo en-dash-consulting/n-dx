@@ -12,7 +12,7 @@ describe("runs store — compressed file support", () => {
 
   beforeEach(async () => {
     tmpBase = await mkdtemp(join(tmpdir(), "hench-compressed-runs-"));
-    henchDir = join(tmpBase, ".hench");
+    henchDir = join(tmpBase, ".n-dx/hench");
     await mkdir(join(henchDir, "runs"), { recursive: true });
   });
 

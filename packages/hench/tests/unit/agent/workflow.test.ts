@@ -37,7 +37,7 @@ function makeConfig(overrides: Partial<HenchConfig> = {}): HenchConfig {
     maxTurns: 50,
     maxTokens: 8192,
     tokenBudget: 0,
-    rexDir: ".rex",
+    rexDir: ".n-dx/rex",
     apiKeyEnv: "ANTHROPIC_API_KEY",
     guard: {
       blockedPaths: [],

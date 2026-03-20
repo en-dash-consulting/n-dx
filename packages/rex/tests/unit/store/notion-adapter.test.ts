@@ -130,7 +130,7 @@ describe("NotionStore", () => {
 
   beforeEach(async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "rex-notion-test-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await ensureNotionRexDir(rexDir);
     mockClient = new MockNotionClient();
     store = new NotionStore(rexDir, mockClient, adapterConfig);

@@ -1,5 +1,5 @@
 import { formatUsage } from "@n-dx/llm-client";
-export { TOOL_VERSION, SV_DIR } from "../../constants.js";
+export { TOOL_VERSION, SV_DIR, SV_FILES } from "../../constants.js";
 
 export function usage(): void {
   console.log(formatUsage({

@@ -246,12 +246,12 @@ describe("buildSubAnalysisRefs", () => {
     expect(refs[0]).toEqual({
       id: "packages-rex",
       prefix: "packages/rex",
-      manifestPath: "packages/rex/.sourcevision/manifest.json",
+      manifestPath: "packages/rex/.n-dx/sourcevision/manifest.json",
     });
     expect(refs[1]).toEqual({
       id: "packages-hench",
       prefix: "packages/hench",
-      manifestPath: "packages/hench/.sourcevision/manifest.json",
+      manifestPath: "packages/hench/.n-dx/sourcevision/manifest.json",
     });
   });
 });
@@ -273,14 +273,14 @@ describe("detectSubAnalyses", () => {
     expect(result).toEqual([]);
   });
 
-  it("detects a subdirectory with .sourcevision", () => {
+  it("detects a subdirectory with .n-dx/sourcevision", () => {
     const n = (s: string) => s.replace(/\\/g, "/");
     // Root directory
     mockedReaddirSync.mockImplementation((dir: any) => {
       const d = n(String(dir));
       if (d === "/root") return ["packages"] as any;
       if (d === "/root/packages") return ["rex"] as any;
-      if (d === "/root/packages/rex") return [".sourcevision"] as any;
+      if (d === "/root/packages/rex") return [".n-dx"] as any;
       return [] as any;
     });
 
@@ -290,8 +290,8 @@ describe("detectSubAnalyses", () => {
 
     mockedExistsSync.mockImplementation((p: any) => {
       const s = n(String(p));
-      if (s === "/root/packages/rex/.sourcevision") return true;
-      if (s === "/root/packages/rex/.sourcevision/manifest.json") return true;
+      if (s === "/root/packages/rex/.n-dx/sourcevision") return true;
+      if (s === "/root/packages/rex/.n-dx/sourcevision/manifest.json") return true;
       return false;
     });
 
@@ -333,11 +333,11 @@ describe("detectSubAnalyses", () => {
     expect(result).toEqual([]);
   });
 
-  it("skips root .sourcevision directory", () => {
+  it("skips root .n-dx directory", () => {
     const n = (s: string) => s.replace(/\\/g, "/");
     mockedReaddirSync.mockImplementation((dir: any) => {
       const d = n(String(dir));
-      if (d === "/root") return [".sourcevision", "packages"] as any;
+      if (d === "/root") return [".n-dx", "packages"] as any;
       if (d === "/root/packages") return [] as any;
       return [] as any;
     });
@@ -360,7 +360,7 @@ describe("detectSubAnalyses", () => {
       const d = n(String(dir));
       if (d === "/root") return ["packages"] as any;
       if (d === "/root/packages") return ["rex"] as any;
-      if (d === "/root/packages/rex") return [".sourcevision"] as any;
+      if (d === "/root/packages/rex") return [".n-dx"] as any;
       return [] as any;
     });
 
@@ -369,7 +369,7 @@ describe("detectSubAnalyses", () => {
     mockedExistsSync.mockImplementation((p: any) => {
       const pathStr = n(String(p));
       return (
-        pathStr.includes(".sourcevision") ||
+        pathStr.includes(".n-dx/sourcevision") ||
         pathStr.includes("manifest.json") ||
         pathStr.includes("zones.json") ||
         pathStr.includes("inventory.json")
@@ -397,12 +397,12 @@ describe("detectSubAnalyses", () => {
 
   it("sorts results by prefix", () => {
     const n = (s: string) => s.replace(/\\/g, "/");
-    // Setup: /root/packages/{zulu,alpha}/.sourcevision/
+    // Setup: /root/packages/{zulu,alpha}/.n-dx/sourcevision/
     mockedReaddirSync.mockImplementation((dir: any) => {
       const d = n(String(dir));
       if (d === "/root") return ["packages"] as any;
       if (d === "/root/packages") return ["zulu", "alpha"] as any;
-      // Return empty for subdirs so it checks for .sourcevision inside them
+      // Return empty for subdirs so it checks for .n-dx/sourcevision inside them
       return [] as any;
     });
 
@@ -410,11 +410,11 @@ describe("detectSubAnalyses", () => {
 
     mockedExistsSync.mockImplementation((p: any) => {
       const pathStr = n(String(p));
-      // .sourcevision dirs exist inside alpha and zulu
-      if (pathStr === "/root/packages/alpha/.sourcevision") return true;
-      if (pathStr === "/root/packages/zulu/.sourcevision") return true;
-      if (pathStr === "/root/packages/alpha/.sourcevision/manifest.json") return true;
-      if (pathStr === "/root/packages/zulu/.sourcevision/manifest.json") return true;
+      // .n-dx/sourcevision dirs exist inside alpha and zulu
+      if (pathStr === "/root/packages/alpha/.n-dx/sourcevision") return true;
+      if (pathStr === "/root/packages/zulu/.n-dx/sourcevision") return true;
+      if (pathStr === "/root/packages/alpha/.n-dx/sourcevision/manifest.json") return true;
+      if (pathStr === "/root/packages/zulu/.n-dx/sourcevision/manifest.json") return true;
       return false;
     });
 

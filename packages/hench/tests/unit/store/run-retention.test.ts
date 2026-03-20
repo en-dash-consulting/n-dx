@@ -31,7 +31,7 @@ describe("RunRetention", () => {
   beforeEach(async () => {
     tmpBase = await mkdtemp(join(tmpdir(), "hench-retention-"));
     projectDir = tmpBase;
-    runsDir = join(tmpBase, ".hench", "runs");
+    runsDir = join(tmpBase, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
   });
 
@@ -97,14 +97,14 @@ describe("RunRetention", () => {
   // ---------------------------------------------------------------------------
 
   describe("loadRetentionConfig", () => {
-    it("returns defaults when .n-dx.json does not exist", async () => {
+    it("returns defaults when config.json does not exist", async () => {
       const config = await loadRetentionConfig(projectDir);
       expect(config).toEqual(DEFAULT_RETENTION_CONFIG);
     });
 
-    it("returns defaults when .n-dx.json has no retention section", async () => {
+    it("returns defaults when config.json has no retention section", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({ web: { port: 3117 } }),
         "utf-8",
       );
@@ -112,9 +112,9 @@ describe("RunRetention", () => {
       expect(config).toEqual(DEFAULT_RETENTION_CONFIG);
     });
 
-    it("reads retention config from .n-dx.json", async () => {
+    it("reads retention config from config.json", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({
           retention: {
             maxAgeDays: 90,
@@ -134,7 +134,7 @@ describe("RunRetention", () => {
 
     it("falls back to defaults for invalid fields", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({
           retention: { maxAgeDays: -1, enabled: "yes", warningDays: 0 },
         }),
@@ -147,14 +147,14 @@ describe("RunRetention", () => {
     });
 
     it("handles invalid JSON gracefully", async () => {
-      await writeFile(join(projectDir, ".n-dx.json"), "not json{{{", "utf-8");
+      await writeFile(join(projectDir, "config.json"), "not json{{{", "utf-8");
       const config = await loadRetentionConfig(projectDir);
       expect(config).toEqual(DEFAULT_RETENTION_CONFIG);
     });
 
     it("clamps warningDays to not exceed maxAgeDays", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({
           retention: { maxAgeDays: 30, warningDays: 60 },
         }),
@@ -472,7 +472,7 @@ describe("RunRetention", () => {
       await writeRunFile("old.json", { tokenUsage: { input: 100, output: 50 } });
       await setFileAge("old.json", 200);
 
-      const logPath = join(tmpBase, ".hench", "retention-stats.jsonl");
+      const logPath = join(tmpBase, ".n-dx/hench", "retention-stats.jsonl");
 
       const result = await enforceRetentionPolicy(
         runsDir,

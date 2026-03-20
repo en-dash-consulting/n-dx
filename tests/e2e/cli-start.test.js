@@ -24,9 +24,9 @@ function runResult(args) {
  * Set up a minimal project with .sourcevision dir (minimum for start command).
  */
 async function setupProject(dir) {
-  await mkdir(join(dir, ".sourcevision"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/sourcevision"), { recursive: true });
   await writeFile(
-    join(dir, ".sourcevision", "manifest.json"),
+    join(dir, ".n-dx/sourcevision", "manifest.json"),
     JSON.stringify({
       schemaVersion: "1.0.0",
       toolVersion: "0.1.0",
@@ -41,11 +41,11 @@ async function setupProject(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "inventory.json"),
+    join(dir, ".n-dx/sourcevision", "inventory.json"),
     JSON.stringify({ files: [], summary: { totalFiles: 0, totalBytes: 0, languages: {} } }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "imports.json"),
+    join(dir, ".n-dx/sourcevision", "imports.json"),
     JSON.stringify({
       edges: [],
       external: {},
@@ -53,7 +53,7 @@ async function setupProject(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "zones.json"),
+    join(dir, ".n-dx/sourcevision", "zones.json"),
     JSON.stringify({
       zones: [],
       crossings: [],
@@ -62,7 +62,7 @@ async function setupProject(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "components.json"),
+    join(dir, ".n-dx/sourcevision", "components.json"),
     JSON.stringify({
       components: [],
       routeModules: [],
@@ -115,7 +115,7 @@ describe("n-dx start", () => {
   afterEach(async () => {
     // Clean up any stale PID files / background processes
     try {
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
+      const pidPath = join(tmpDir, ".n-dx/web.pid");
       const raw = await readFile(pidPath, "utf-8");
       const data = JSON.parse(raw);
       try { process.kill(data.pid, "SIGTERM"); } catch {}
@@ -193,7 +193,7 @@ describe("n-dx start", () => {
       expect(stdout).toContain(`${port}`);
 
       // PID file should exist
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
+      const pidPath = join(tmpDir, ".n-dx/web.pid");
       const raw = await readFile(pidPath, "utf-8");
       const pidData = JSON.parse(raw);
       expect(pidData).toHaveProperty("pid");
@@ -219,7 +219,7 @@ describe("n-dx start", () => {
       expect(stderr).toContain("already running");
 
       // Clean up
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
+      const pidPath = join(tmpDir, ".n-dx/web.pid");
       try {
         const raw = await readFile(pidPath, "utf-8");
         const pidData = JSON.parse(raw);
@@ -267,7 +267,7 @@ describe("n-dx start", () => {
       expect(stdout).toContain("ndx start stop");
 
       // Clean up
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
+      const pidPath = join(tmpDir, ".n-dx/web.pid");
       try {
         const raw = await readFile(pidPath, "utf-8");
         const pidData = JSON.parse(raw);
@@ -287,7 +287,7 @@ describe("n-dx start", () => {
       expect(stderr).toContain("ndx start stop");
 
       // Clean up
-      const pidPath = join(tmpDir, ".n-dx-web.pid");
+      const pidPath = join(tmpDir, ".n-dx/web.pid");
       try {
         const raw = await readFile(pidPath, "utf-8");
         const pidData = JSON.parse(raw);

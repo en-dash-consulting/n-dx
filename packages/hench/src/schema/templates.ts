@@ -121,8 +121,8 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
       maxFailedAttempts: 2,
       guard: {
         blockedPaths: [
-          ".hench/**",
-          ".rex/**",
+          ".n-dx/hench/**",
+          ".n-dx/rex/**",
           ".git/**",
           "node_modules/**",
           ".env*",

@@ -47,7 +47,7 @@ describe("loadProjectOverrides", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "claude-client-pc-"));
-    configDir = join(tmpDir, ".rex");
+    configDir = join(tmpDir, ".n-dx/rex");
     await mkdir(configDir, { recursive: true });
   });
 
@@ -55,14 +55,14 @@ describe("loadProjectOverrides", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns empty object when .n-dx.json does not exist", async () => {
+  it("returns empty object when config.json does not exist", async () => {
     const result = await loadProjectOverrides(configDir, "rex");
     expect(result).toEqual({});
   });
 
   it("returns package-scoped section", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx", "config.json"),
       JSON.stringify({ rex: { model: "opus" } }),
     );
     const result = await loadProjectOverrides(configDir, "rex");
@@ -71,7 +71,7 @@ describe("loadProjectOverrides", () => {
 
   it("returns empty object when package key is missing", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx", "config.json"),
       JSON.stringify({ hench: { maxTurns: 5 } }),
     );
     const result = await loadProjectOverrides(configDir, "rex");
@@ -79,7 +79,7 @@ describe("loadProjectOverrides", () => {
   });
 
   it("returns empty object for invalid JSON", async () => {
-    await writeFile(join(tmpDir, ".n-dx.json"), "not json");
+    await writeFile(join(tmpDir, ".n-dx", "config.json"), "not json");
     const result = await loadProjectOverrides(configDir, "rex");
     expect(result).toEqual({});
   });

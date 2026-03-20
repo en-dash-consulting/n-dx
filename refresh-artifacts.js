@@ -18,7 +18,7 @@ const SOURCEVISION_DASHBOARD_INPUT_FILES = [
  */
 export function refreshSourcevisionDashboardArtifacts(projectDir) {
   const absDir = resolve(projectDir);
-  const svDir = join(absDir, ".sourcevision");
+  const svDir = join(absDir, ".n-dx/sourcevision");
   mkdirSync(svDir, { recursive: true });
 
   const refreshedAt = new Date().toISOString();

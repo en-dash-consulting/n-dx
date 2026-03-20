@@ -62,9 +62,9 @@ function runFail(args) {
 
 async function setupProject(dir) {
   // Create .rex/config.json
-  await mkdir(join(dir, ".rex"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/rex"), { recursive: true });
   await writeFile(
-    join(dir, ".rex", "config.json"),
+    join(dir, ".n-dx/rex", "config.json"),
     JSON.stringify(
       {
         schema: "rex/v1",
@@ -78,9 +78,9 @@ async function setupProject(dir) {
   );
 
   // Create .hench/config.json
-  await mkdir(join(dir, ".hench", "runs"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/hench", "runs"), { recursive: true });
   await writeFile(
-    join(dir, ".hench", "config.json"),
+    join(dir, ".n-dx/hench", "config.json"),
     JSON.stringify(
       {
         schema: "hench/v1",
@@ -88,7 +88,7 @@ async function setupProject(dir) {
         model: "sonnet",
         maxTurns: 50,
         maxTokens: 8192,
-        rexDir: ".rex",
+        rexDir: ".n-dx/rex",
         apiKeyEnv: "ANTHROPIC_API_KEY",
         guard: {
           blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"],
@@ -103,9 +103,9 @@ async function setupProject(dir) {
   );
 
   // Create .sourcevision/manifest.json
-  await mkdir(join(dir, ".sourcevision"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/sourcevision"), { recursive: true });
   await writeFile(
-    join(dir, ".sourcevision", "manifest.json"),
+    join(dir, ".n-dx/sourcevision", "manifest.json"),
     JSON.stringify(
       {
         schemaVersion: "1.0.0",
@@ -164,7 +164,7 @@ describe("n-dx config", () => {
     });
 
     it("skips missing packages gracefully", async () => {
-      await rm(join(tmpDir, ".sourcevision"), { recursive: true });
+      await rm(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
       const output = run(["--json", tmpDir]);
       const parsed = JSON.parse(output);
       expect(parsed.sourcevision).toBeUndefined();
@@ -237,7 +237,7 @@ describe("n-dx config", () => {
       expect(output).toContain("hench.model = opus");
 
       const config = JSON.parse(
-        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx/hench", "config.json"), "utf-8"),
       );
       expect(config.model).toBe("opus");
     });
@@ -246,7 +246,7 @@ describe("n-dx config", () => {
       run(["hench.maxTurns", "100", tmpDir]);
 
       const config = JSON.parse(
-        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx/hench", "config.json"), "utf-8"),
       );
       expect(config.maxTurns).toBe(100);
     });
@@ -255,7 +255,7 @@ describe("n-dx config", () => {
       run(["hench.guard.commandTimeout", "60000", tmpDir]);
 
       const config = JSON.parse(
-        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx/hench", "config.json"), "utf-8"),
       );
       expect(config.guard.commandTimeout).toBe(60000);
     });
@@ -264,7 +264,7 @@ describe("n-dx config", () => {
       run(["hench.guard.allowedCommands", "npm,git,pnpm", tmpDir]);
 
       const config = JSON.parse(
-        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx/hench", "config.json"), "utf-8"),
       );
       expect(config.guard.allowedCommands).toEqual(["npm", "git", "pnpm"]);
     });
@@ -273,7 +273,7 @@ describe("n-dx config", () => {
       run(["rex.project", "new-name", tmpDir]);
 
       const config = JSON.parse(
-        await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
       );
       expect(config.project).toBe("new-name");
     });
@@ -282,7 +282,7 @@ describe("n-dx config", () => {
       run(["rex.validate", "pnpm typecheck", tmpDir]);
 
       const config = JSON.parse(
-        await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
       );
       expect(config.validate).toBe("pnpm typecheck");
     });
@@ -404,20 +404,20 @@ describe("n-dx config", () => {
       expect(output).toContain("n-dx config --json");
     });
 
-    it("documents .n-dx.json project config", () => {
+    it("documents .n-dx/config.json project config", () => {
       const output = run(["--help"]);
-      expect(output).toContain(".n-dx.json");
+      expect(output).toContain(".n-dx/config.json");
       expect(output).toContain("project root");
       expect(output).toContain("precedence");
     });
   });
 
-  // ── Project-level .n-dx.json ─────────────────────────────────────────────
+  // ── Project-level .n-dx/config.json ─────────────────────────────────────
 
-  describe(".n-dx.json project config", () => {
-    it("reads .n-dx.json and merges with package configs", async () => {
+  describe(".n-dx/config.json project config", () => {
+    it("reads .n-dx/config.json and merges with package configs", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ rex: { project: "overridden-name" } }, null, 2) + "\n",
       );
 
@@ -428,7 +428,7 @@ describe("n-dx config", () => {
 
     it("project config takes precedence over package config", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({
           hench: { model: "opus", maxTurns: 200 },
         }, null, 2) + "\n",
@@ -444,7 +444,7 @@ describe("n-dx config", () => {
 
     it("deep merges nested objects", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({
           hench: { guard: { commandTimeout: 60000 } },
         }, null, 2) + "\n",
@@ -457,9 +457,9 @@ describe("n-dx config", () => {
       expect(parsed.hench.guard.maxFileSize).toBe(1048576);
     });
 
-    it("get returns merged value from .n-dx.json", async () => {
+    it("get returns merged value from .n-dx/config.json", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ hench: { model: "haiku" } }, null, 2) + "\n",
       );
 
@@ -467,13 +467,13 @@ describe("n-dx config", () => {
       expect(output.trim()).toBe("haiku");
     });
 
-    it("works when no package configs exist but .n-dx.json does", async () => {
+    it("works when no package configs exist but .n-dx/config.json does", async () => {
       const freshDir = await mkdtemp(join(tmpdir(), "ndx-config-ndxonly-"));
       try {
-        // Only create .n-dx.json — no .rex, .hench, .sourcevision dirs
-        await mkdir(join(freshDir, ".rex"), { recursive: true });
+        // Only create .n-dx/config.json — no .rex, .hench, .sourcevision dirs
+        await mkdir(join(freshDir, ".n-dx/rex"), { recursive: true });
         await writeFile(
-          join(freshDir, ".rex", "config.json"),
+          join(freshDir, ".n-dx/rex", "config.json"),
           JSON.stringify({
             schema: "rex/v1",
             project: "base",
@@ -481,7 +481,7 @@ describe("n-dx config", () => {
           }, null, 2) + "\n",
         );
         await writeFile(
-          join(freshDir, ".n-dx.json"),
+          join(freshDir, ".n-dx", "config.json"),
           JSON.stringify({ rex: { project: "from-ndx" } }, null, 2) + "\n",
         );
 
@@ -493,8 +493,8 @@ describe("n-dx config", () => {
       }
     });
 
-    it("ignores .n-dx.json gracefully when it has invalid JSON", async () => {
-      await writeFile(join(tmpDir, ".n-dx.json"), "not valid json\n");
+    it("ignores .n-dx/config.json gracefully when it has invalid JSON", async () => {
+      await writeFile(join(tmpDir, ".n-dx", "config.json"), "not valid json\n");
 
       // Should still work — just skip the broken project config
       const output = run(["--json", tmpDir]);
@@ -502,31 +502,31 @@ describe("n-dx config", () => {
       expect(parsed.rex.project).toBe("test-project");
     });
 
-    it("ignores .n-dx.json when it does not exist", () => {
-      // Default behavior — no .n-dx.json
+    it("ignores .n-dx/config.json when it does not exist", () => {
+      // Default behavior — no .n-dx/config.json
       const output = run(["--json", tmpDir]);
       const parsed = JSON.parse(output);
       expect(parsed.rex.project).toBe("test-project");
     });
 
-    it("set writes to package config, not .n-dx.json", async () => {
+    it("set writes to package config, not .n-dx/config.json", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ hench: { model: "opus" } }, null, 2) + "\n",
       );
 
       // Set a value — should write to .hench/config.json
       run(["hench.maxTurns", "75", tmpDir]);
 
-      // .n-dx.json should be untouched
+      // .n-dx/config.json should be untouched
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig).toEqual({ hench: { model: "opus" } });
 
       // Package config should have the new value
       const henchConfig = JSON.parse(
-        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx/hench", "config.json"), "utf-8"),
       );
       expect(henchConfig.maxTurns).toBe(75);
 
@@ -536,7 +536,7 @@ describe("n-dx config", () => {
 
     it("array override replaces entire array", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({
           hench: { guard: { allowedCommands: ["pnpm", "git"] } },
         }, null, 2) + "\n",
@@ -551,22 +551,22 @@ describe("n-dx config", () => {
   // ── Claude configuration ─────────────────────────────────────────────────
 
   describe("claude config", () => {
-    it("sets claude.cli_path in .n-dx.json", async () => {
+    it("sets claude.cli_path in .n-dx/config.json", async () => {
       const output = run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
       expect(output).toContain("claude.cli_path = /usr/local/bin/claude");
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.claude.cli_path).toBe("/usr/local/bin/claude");
     });
 
-    it("sets claude.api_key in .n-dx.json", async () => {
+    it("sets claude.api_key in .n-dx/config.json", async () => {
       const output = run(["claude.api_key", "sk-ant-test-key", tmpDir]);
       expect(output).toContain("claude.api_key = sk-ant-test-key");
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.claude.api_key).toBe("sk-ant-test-key");
     });
@@ -610,26 +610,26 @@ describe("n-dx config", () => {
       expect(output).toContain("/usr/local/bin/claude");
     });
 
-    it("creates .n-dx.json if it does not exist", async () => {
-      // No .n-dx.json exists yet
+    it("creates .n-dx/config.json if it does not exist", async () => {
+      // No .n-dx/config.json exists yet
       run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.claude.cli_path).toBe("/usr/local/bin/claude");
     });
 
-    it("preserves existing .n-dx.json content when setting claude values", async () => {
+    it("preserves existing .n-dx/config.json content when setting claude values", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ hench: { model: "opus" } }, null, 2) + "\n",
       );
 
       run(["claude.api_key", "sk-ant-test", tmpDir]);
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.hench.model).toBe("opus");
       expect(ndxConfig.claude.api_key).toBe("sk-ant-test");
@@ -640,7 +640,7 @@ describe("n-dx config", () => {
 
       // .hench/config.json should not have claude settings
       const henchConfig = JSON.parse(
-        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx/hench", "config.json"), "utf-8"),
       );
       expect(henchConfig.claude).toBeUndefined();
       expect(henchConfig.cli_path).toBeUndefined();
@@ -664,7 +664,7 @@ describe("n-dx config", () => {
       expect(output.trim()).toBe("/new/path");
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.claude.cli_path).toBe("/new/path");
     });
@@ -823,12 +823,12 @@ describe("n-dx config", () => {
   // ── API endpoint and model configuration ────────────────────────────────
 
   describe("claude.api_endpoint", () => {
-    it("sets claude.api_endpoint in .n-dx.json", async () => {
+    it("sets claude.api_endpoint in .n-dx/config.json", async () => {
       const output = run(["claude.api_endpoint", "https://proxy.example.com", tmpDir]);
       expect(output).toContain("claude.api_endpoint = https://proxy.example.com");
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.claude.api_endpoint).toBe("https://proxy.example.com");
     });
@@ -871,12 +871,12 @@ describe("n-dx config", () => {
   });
 
   describe("claude.model", () => {
-    it("sets claude.model in .n-dx.json", async () => {
+    it("sets claude.model in .n-dx/config.json", async () => {
       const output = run(["claude.model", "claude-opus-4-20250514", tmpDir]);
       expect(output).toContain("claude.model = claude-opus-4-20250514");
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.claude.model).toBe("claude-opus-4-20250514");
     });
@@ -934,10 +934,10 @@ describe("n-dx config", () => {
   // ── Secure file permissions ──────────────────────────────────────────────
 
   describe("secure file permissions", () => {
-    it.skipIf(process.platform === "win32")("sets .n-dx.json to 0600 when api_key is present", async () => {
+    it.skipIf(process.platform === "win32")("sets .n-dx/config.json to 0600 when api_key is present", async () => {
       run(["claude.api_key", "sk-ant-test-key-123", tmpDir]);
 
-      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
+      const fileStat = await stat(join(tmpDir, ".n-dx", "config.json"));
       // 0o600 = owner read/write only (decimal 384)
       const mode = fileStat.mode & 0o777;
       expect(mode).toBe(0o600);
@@ -946,7 +946,7 @@ describe("n-dx config", () => {
     it("does not restrict permissions when no api_key present", async () => {
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
 
-      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
+      const fileStat = await stat(join(tmpDir, ".n-dx", "config.json"));
       const mode = fileStat.mode & 0o777;
       // Should not be 0o600 — default file permissions apply
       expect(mode).not.toBe(0o600);
@@ -955,13 +955,13 @@ describe("n-dx config", () => {
     it.skipIf(process.platform === "win32")("restricts permissions when api_key is added to existing config", async () => {
       // First set a non-sensitive value
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
-      const beforeStat = await stat(join(tmpDir, ".n-dx.json"));
+      const beforeStat = await stat(join(tmpDir, ".n-dx", "config.json"));
       const beforeMode = beforeStat.mode & 0o777;
       expect(beforeMode).not.toBe(0o600);
 
       // Now add an API key
       run(["claude.api_key", "sk-ant-secure-key", tmpDir]);
-      const afterStat = await stat(join(tmpDir, ".n-dx.json"));
+      const afterStat = await stat(join(tmpDir, ".n-dx", "config.json"));
       const afterMode = afterStat.mode & 0o777;
       expect(afterMode).toBe(0o600);
     });
@@ -1025,7 +1025,7 @@ describe("n-dx config", () => {
       expect(stderr).toContain(`Next step: run '${fakeCodex} login'`);
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.llm.vendor).toBeUndefined();
     });
@@ -1044,7 +1044,7 @@ describe("n-dx config", () => {
       expect(stderr).toContain(`Next step: run '${fakeClaude} login'`);
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(join(tmpDir, ".n-dx", "config.json"), "utf-8"),
       );
       expect(ndxConfig.llm.vendor).toBeUndefined();
     });

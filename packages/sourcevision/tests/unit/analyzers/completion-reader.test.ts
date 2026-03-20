@@ -523,7 +523,7 @@ describe("completion-reader", () => {
         }),
       ]);
 
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
 
@@ -546,7 +546,7 @@ describe("completion-reader", () => {
     });
 
     it("handles corrupted PRD gracefully", async () => {
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), "{{{malformed json");
 
@@ -567,7 +567,7 @@ describe("completion-reader", () => {
         }),
       ]);
 
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
 
@@ -598,7 +598,7 @@ describe("completion-reader", () => {
         }),
       ]);
 
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
 
@@ -621,7 +621,7 @@ describe("completion-reader", () => {
         items: [makeItem({ id: "t1", level: "task", status: "pending" })],
       };
 
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
 
@@ -633,7 +633,7 @@ describe("completion-reader", () => {
     it("handles empty PRD items array", async () => {
       const prd = makePRD([]);
 
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
 
@@ -650,7 +650,7 @@ describe("completion-reader", () => {
         makeItem({ id: "f1", level: "feature", status: "pending" }),
       ]);
 
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
 

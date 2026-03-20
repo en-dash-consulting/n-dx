@@ -8,11 +8,11 @@ import type { PRDDocument } from "../../../../src/schema/index.js";
 import type { RexConfig } from "../../../../src/schema/v1.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
+  writeFileSync(join(dir, ".n-dx/rex", "prd.json"), JSON.stringify(doc));
 }
 
 function writeConfig(dir: string, config: RexConfig): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
+  writeFileSync(join(dir, ".n-dx/rex", "config.json"), JSON.stringify(config));
 }
 
 const BASE_CONFIG: RexConfig = {
@@ -74,7 +74,7 @@ describe("cmdVerify", () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), "rex-verify-cmd-"));
-    mkdirSync(join(tmp, ".rex"));
+    mkdirSync(join(tmp, ".n-dx/rex"), { recursive: true });
     writeConfig(tmp, BASE_CONFIG);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
   });

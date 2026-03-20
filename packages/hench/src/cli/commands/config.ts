@@ -489,7 +489,7 @@ export async function cmdConfig(
   positional: string[],
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, ".hench");
+  const henchDir = join(dir, ".n-dx/hench");
 
   // Interactive mode
   if (flags.interactive === "true") {

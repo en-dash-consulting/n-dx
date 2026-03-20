@@ -16,11 +16,11 @@ import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
 import type { CoverageMap } from "../../../../src/cli/commands/status.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
+  writeFileSync(join(dir, ".n-dx/rex", "prd.json"), JSON.stringify(doc));
 }
 
 function writeConfig(dir: string, config: Record<string, unknown>): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
+  writeFileSync(join(dir, ".n-dx/rex", "config.json"), JSON.stringify(config));
 }
 
 const EMPTY_PRD: PRDDocument = {
@@ -138,7 +138,7 @@ describe("cmdStatus", () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), "rex-status-test-"));
-    mkdirSync(join(tmp, ".rex"));
+    mkdirSync(join(tmp, ".n-dx/rex"), { recursive: true });
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
@@ -892,7 +892,7 @@ describe("cmdStatus", () => {
   describe("token usage (shown by default)", () => {
     function writeLog(dir: string, entries: Array<Record<string, unknown>>): void {
       const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
-      writeFileSync(join(dir, ".rex", "execution-log.jsonl"), lines);
+      writeFileSync(join(dir, ".n-dx/rex", "execution-log.jsonl"), lines);
     }
 
     it("shows token usage summary by default in tree output", async () => {

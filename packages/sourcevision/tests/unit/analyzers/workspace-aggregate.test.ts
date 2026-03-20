@@ -143,7 +143,7 @@ function setupMemberDir(
   inventory?: Inventory,
 ): void {
   const memberDir = join(rootDir, memberPath);
-  const svDir = join(memberDir, ".sourcevision");
+  const svDir = join(memberDir, ".n-dx/sourcevision");
   mkdirSync(svDir, { recursive: true });
 
   writeFileSync(
@@ -165,24 +165,24 @@ describe("loadWorkspaceConfig", () => {
   beforeEach(() => { tmpDir = createTmpDir(); });
   afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
 
-  it("returns null when .n-dx.json does not exist", () => {
+  it("returns null when config.json does not exist", () => {
     expect(loadWorkspaceConfig(tmpDir)).toBeNull();
   });
 
-  it("returns null when .n-dx.json has no sourcevision key", () => {
-    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: {} }));
+  it("returns null when config.json has no sourcevision key", () => {
+    writeFileSync(join(tmpDir, "config.json"), JSON.stringify({ rex: {} }));
     expect(loadWorkspaceConfig(tmpDir)).toBeNull();
   });
 
   it("returns null when sourcevision has no workspace key", () => {
-    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({
+    writeFileSync(join(tmpDir, "config.json"), JSON.stringify({
       sourcevision: { archetypes: {} },
     }));
     expect(loadWorkspaceConfig(tmpDir)).toBeNull();
   });
 
   it("returns null when workspace has no members array", () => {
-    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({
+    writeFileSync(join(tmpDir, "config.json"), JSON.stringify({
       sourcevision: { workspace: {} },
     }));
     expect(loadWorkspaceConfig(tmpDir)).toBeNull();
@@ -195,7 +195,7 @@ describe("loadWorkspaceConfig", () => {
         { path: "packages/web" },
       ],
     };
-    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({
+    writeFileSync(join(tmpDir, "config.json"), JSON.stringify({
       sourcevision: { workspace: config },
     }));
 
@@ -204,7 +204,7 @@ describe("loadWorkspaceConfig", () => {
   });
 
   it("returns config with empty members array", () => {
-    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({
+    writeFileSync(join(tmpDir, "config.json"), JSON.stringify({
       sourcevision: { workspace: { members: [] } },
     }));
 
@@ -219,7 +219,7 @@ describe("saveWorkspaceConfig", () => {
   beforeEach(() => { tmpDir = createTmpDir(); });
   afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
 
-  it("creates .n-dx.json when it does not exist", () => {
+  it("creates config.json when it does not exist", () => {
     saveWorkspaceConfig(tmpDir, { members: [{ path: "packages/api" }] });
 
     const result = loadWorkspaceConfig(tmpDir);
@@ -227,7 +227,7 @@ describe("saveWorkspaceConfig", () => {
   });
 
   it("preserves existing config keys", () => {
-    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({
+    writeFileSync(join(tmpDir, "config.json"), JSON.stringify({
       rex: { someKey: "value" },
       sourcevision: { archetypes: { custom: [] } },
     }));
@@ -235,7 +235,7 @@ describe("saveWorkspaceConfig", () => {
     saveWorkspaceConfig(tmpDir, { members: [{ path: "packages/web" }] });
 
     const raw = JSON.parse(
-      require("node:fs").readFileSync(join(tmpDir, ".n-dx.json"), "utf-8"),
+      require("node:fs").readFileSync(join(tmpDir, "config.json"), "utf-8"),
     );
     expect(raw.rex).toEqual({ someKey: "value" });
     expect(raw.sourcevision.archetypes).toEqual({ custom: [] });
@@ -265,7 +265,7 @@ describe("resolveWorkspaceMembers", () => {
     expect(members[0].inventory).toBeDefined();
   });
 
-  it("throws when member has no .sourcevision/manifest.json", () => {
+  it("throws when member has no .n-dx/sourcevision/manifest.json", () => {
     mkdirSync(join(tmpDir, "packages/api"), { recursive: true });
 
     expect(() =>
@@ -531,7 +531,7 @@ describe("writeWorkspaceOutput", () => {
     const result = writeWorkspaceOutput(tmpDir, [api]);
 
     const fs = require("node:fs");
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     expect(fs.existsSync(join(svDir, "manifest.json"))).toBe(true);
     expect(fs.existsSync(join(svDir, "inventory.json"))).toBe(true);
     expect(fs.existsSync(join(svDir, "imports.json"))).toBe(true);
@@ -550,7 +550,7 @@ describe("writeWorkspaceOutput", () => {
 
     const fs = require("node:fs");
     const manifest = JSON.parse(
-      fs.readFileSync(join(tmpDir, ".sourcevision/manifest.json"), "utf-8"),
+      fs.readFileSync(join(tmpDir, ".n-dx/sourcevision/manifest.json"), "utf-8"),
     );
     expect(manifest.workspace).toBe(true);
   });
@@ -567,7 +567,7 @@ describe("writeWorkspaceOutput", () => {
 
     const fs = require("node:fs");
     const manifest = JSON.parse(
-      fs.readFileSync(join(tmpDir, ".sourcevision/manifest.json"), "utf-8"),
+      fs.readFileSync(join(tmpDir, ".n-dx/sourcevision/manifest.json"), "utf-8"),
     );
     expect(manifest.children).toHaveLength(2);
     expect(manifest.children[0].id).toBe("api");
@@ -582,7 +582,7 @@ describe("writeWorkspaceOutput", () => {
     writeWorkspaceOutput(tmpDir, [api]);
 
     const fs = require("node:fs");
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     expect(fs.existsSync(join(svDir, "llms.txt"))).toBe(true);
     expect(fs.existsSync(join(svDir, "CONTEXT.md"))).toBe(true);
   });
@@ -658,7 +658,7 @@ describe("resolveMembers", () => {
 
   it("uses config when available", () => {
     setupMemberDir(tmpDir, "packages/api");
-    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({
+    writeFileSync(join(tmpDir, "config.json"), JSON.stringify({
       sourcevision: {
         workspace: {
           members: [{ path: "packages/api", name: "api" }],
@@ -685,7 +685,7 @@ describe("resolveMembers", () => {
     // Both exist: config and auto-detected sub-analysis
     setupMemberDir(tmpDir, "packages/api");
     setupMemberDir(tmpDir, "packages/web");
-    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({
+    writeFileSync(join(tmpDir, "config.json"), JSON.stringify({
       sourcevision: {
         workspace: {
           members: [{ path: "packages/api", name: "api" }],

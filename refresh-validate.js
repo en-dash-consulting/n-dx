@@ -32,7 +32,7 @@ const STEP_OUTPUT_FILES = {
  * Capture the current contents of sourcevision output files so they can be
  * restored if a subsequent refresh step fails.
  *
- * Only files in the `.sourcevision/` directory are snapshotted; `web-build`
+ * Only files in the `.n-dx/sourcevision/` directory are snapshotted; `web-build`
  * output is not included because build artifact restoration is unreliable and
  * a failed build does not leave the previous build in a worse state.
  *
@@ -42,7 +42,7 @@ const STEP_OUTPUT_FILES = {
  */
 export async function snapshotRefreshState(dir, plan) {
   const absDir = resolve(dir);
-  const svDir = join(absDir, ".sourcevision");
+  const svDir = join(absDir, ".n-dx/sourcevision");
 
   const stepsToRun = new Set((plan.steps ?? []).map((s) => s.kind));
   const shouldSnapshot =
@@ -86,14 +86,14 @@ export async function snapshotRefreshState(dir, plan) {
  */
 export function validateRefreshStep(stepKind, dir) {
   const absDir = resolve(dir);
-  const svDir = join(absDir, ".sourcevision");
+  const svDir = join(absDir, ".n-dx/sourcevision");
   const outputFiles = STEP_OUTPUT_FILES[stepKind] ?? [];
   const issues = [];
 
   for (const name of outputFiles) {
     const filePath = join(svDir, name);
     if (!existsSync(filePath)) {
-      issues.push(`missing expected output: .sourcevision/${name}`);
+      issues.push(`missing expected output: .n-dx/sourcevision/${name}`);
       continue;
     }
     // Validate JSON files can be parsed — a corrupt JSON file means the step
@@ -102,7 +102,7 @@ export function validateRefreshStep(stepKind, dir) {
       try {
         JSON.parse(readFileSync(filePath, "utf-8"));
       } catch {
-        issues.push(`.sourcevision/${name} exists but contains invalid JSON`);
+        issues.push(`.n-dx/sourcevision/${name} exists but contains invalid JSON`);
       }
     }
   }
@@ -156,7 +156,7 @@ export async function rollbackRefreshState(snapshot) {
     return {
       restored: 0,
       failed: count,
-      errors: [`Cannot recreate .sourcevision directory: ${err.message}`],
+      errors: [`Cannot recreate .n-dx/sourcevision directory: ${err.message}`],
     };
   }
 

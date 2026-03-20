@@ -40,9 +40,9 @@ const SKIP_DIRS = new Set([
   "node_modules",
   "dist",
   ".git",
-  ".hench",
-  ".rex",
-  ".sourcevision",
+  ".n-dx/hench",
+  ".n-dx/rex",
+  ".n-dx/sourcevision",
 ]);
 
 /**
@@ -700,7 +700,7 @@ describe("architecture policy: gateway enforcement", () => {
    * provide redundant enforcement.
    */
   describe("data-layer contract", () => {
-    const DATA_DIRS = [".rex", ".sourcevision", ".hench"];
+    const DATA_DIRS = [".n-dx/rex", ".n-dx/sourcevision", ".n-dx/hench"];
     const allPackageSrc = [
       ...walk(join(ROOT, "packages/rex/src")),
       ...walk(join(ROOT, "packages/sourcevision/src")),

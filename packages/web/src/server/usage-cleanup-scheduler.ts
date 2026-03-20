@@ -254,7 +254,7 @@ export function startUsageCleanupScheduler(
   collectAllIds?: CollectAllIdsFn,
   loadPRD?: LoadPRDFn,
 ): ReturnType<typeof setInterval> {
-  const logPath = join(ctx.projectDir, ".hench", "usage-cleanup.jsonl");
+  const logPath = join(ctx.projectDir, ".n-dx/hench", "usage-cleanup.jsonl");
 
   // Determine interval: explicit override > .n-dx.json config > default
   const intervalMs = overrideIntervalMs ?? loadCleanupConfig(ctx.projectDir).intervalMs;

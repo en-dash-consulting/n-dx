@@ -24,9 +24,9 @@ function runResult(args) {
  * enough for pr-check validate step to work.
  */
 async function setupRex(dir) {
-  await mkdir(join(dir, ".rex"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/rex"), { recursive: true });
   await writeFile(
-    join(dir, ".rex", "config.json"),
+    join(dir, ".n-dx/rex", "config.json"),
     JSON.stringify({
       schema: "rex/v1",
       project: "test-pr-check",
@@ -35,7 +35,7 @@ async function setupRex(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".rex", "prd.json"),
+    join(dir, ".n-dx/rex", "prd.json"),
     JSON.stringify({
       schema: "rex/v1",
       title: "Test PR Check",
@@ -177,7 +177,7 @@ describe("pr-check", () => {
   describe("rex validation failure", () => {
     it("exits 1 when rex validate fails (broken schema)", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({ invalid: true }),
       );
 
@@ -187,7 +187,7 @@ describe("pr-check", () => {
 
     it("exits 1 on orphaned items", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({
           schema: "rex/v1",
           title: "Test",
@@ -208,7 +208,7 @@ describe("pr-check", () => {
 
     it("shows failure mark for rex validate", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({ invalid: true }),
       );
 
@@ -221,14 +221,14 @@ describe("pr-check", () => {
 
   describe("no .rex directory", () => {
     it("still passes when .rex is absent (build-only)", async () => {
-      await rm(join(tmpDir, ".rex"), { recursive: true, force: true });
+      await rm(join(tmpDir, ".n-dx/rex"), { recursive: true, force: true });
 
       const { code } = runResult([tmpDir]);
       expect(code).toBe(0);
     });
 
     it("shows skipped for rex validate when no .rex", async () => {
-      await rm(join(tmpDir, ".rex"), { recursive: true, force: true });
+      await rm(join(tmpDir, ".n-dx/rex"), { recursive: true, force: true });
 
       const { stdout } = runResult([tmpDir]);
       expect(stdout).toContain("skipped");
@@ -287,7 +287,7 @@ describe("pr-check", () => {
 
     it("overall ok is false on rex validate failure", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({ invalid: true }),
       );
 

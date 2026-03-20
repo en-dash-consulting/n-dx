@@ -83,9 +83,9 @@ export async function runPRCheck(dir, flags, { rexCli }) {
   }
 
   // ── Step 2: rex validate ────────────────────────────────────────────────
-  // Only run rex validate if .rex directory exists — a project may not have
+  // Only run rex validate if .n-dx/rex directory exists — a project may not have
   // a PRD yet, and build-only validation is still valuable.
-  const hasRex = existsSync(join(dir, ".rex"));
+  const hasRex = existsSync(join(dir, ".n-dx/rex"));
 
   if (hasRex) {
     info("── rex validate ──");
@@ -137,10 +137,10 @@ export async function runPRCheck(dir, flags, { rexCli }) {
     steps.push({
       name: "rex-validate",
       ok: true,
-      detail: "Skipped (no .rex directory)",
+      detail: "Skipped (no .n-dx/rex directory)",
     });
     info("── rex validate ──");
-    info("  - skipped (no .rex directory)");
+    info("  - skipped (no .n-dx/rex directory)");
   }
 
   // ── Report ──────────────────────────────────────────────────────────────

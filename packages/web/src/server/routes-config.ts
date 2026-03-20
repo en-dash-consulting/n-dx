@@ -99,7 +99,7 @@ function readJSON(path: string): Record<string, unknown> | null {
 
 /** Extract configuration summary from project files. */
 function extractConfig(ctx: ServerContext): NdxConfigSummary {
-  const henchConfigPath = join(ctx.projectDir, ".hench", "config.json");
+  const henchConfigPath = join(ctx.projectDir, ".n-dx/hench", "config.json");
   const ndxConfigPath = join(ctx.projectDir, ".n-dx.json");
   const pkgPath = join(ctx.projectDir, "package.json");
 
@@ -175,9 +175,9 @@ function detectNdxProject(dirPath: string, activeDir: string): DetectedProject |
     return null;
   }
 
-  const hasSv = existsSync(join(dirPath, ".sourcevision"));
-  const hasRex = existsSync(join(dirPath, ".rex"));
-  const hasHench = existsSync(join(dirPath, ".hench"));
+  const hasSv = existsSync(join(dirPath, ".n-dx/sourcevision"));
+  const hasRex = existsSync(join(dirPath, ".n-dx/rex"));
+  const hasHench = existsSync(join(dirPath, ".n-dx/hench"));
   const hasNdxJson = existsSync(join(dirPath, ".n-dx.json"));
 
   // Must have at least one n-dx marker

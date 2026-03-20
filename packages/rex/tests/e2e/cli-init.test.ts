@@ -40,9 +40,9 @@ describe("rex init", () => {
 
   it("creates .rex/ with all files", async () => {
     const output = run(["init", tmpDir]);
-    expect(output).toContain("Initialized .rex/");
+    expect(output).toContain("Initialized .n-dx/rex/");
 
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await access(join(rexDir, "config.json"));
     await access(join(rexDir, "prd.json"));
     await access(join(rexDir, "execution-log.jsonl"));
@@ -52,7 +52,7 @@ describe("rex init", () => {
   it("creates valid config.json", async () => {
     run(["init", tmpDir]);
     const config = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
     );
     expect(config.schema).toBe("rex/v1");
     expect(config.adapter).toBe("file");
@@ -62,7 +62,7 @@ describe("rex init", () => {
   it("creates config.json that passes schema validation", async () => {
     run(["init", tmpDir]);
     const config = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
     );
     const result = RexConfigSchema.safeParse(config);
 
@@ -75,7 +75,7 @@ describe("rex init", () => {
   it("creates config.json matching DEFAULT_CONFIG", async () => {
     run(["init", tmpDir]);
     const config = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
     );
     const defaults = DEFAULT_CONFIG(basename(tmpDir));
 
@@ -85,7 +85,7 @@ describe("rex init", () => {
   it("creates config.json with correct schema version", async () => {
     run(["init", tmpDir]);
     const config = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
     );
 
     expect(config.schema).toBe(SCHEMA_VERSION);
@@ -94,13 +94,13 @@ describe("rex init", () => {
   it("uses --project flag for project name", async () => {
     run(["init", tmpDir, "--project=my-custom-project"]);
     const config = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
     );
 
     expect(config.project).toBe("my-custom-project");
 
     const doc = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(doc.title).toBe("my-custom-project");
   });
@@ -108,7 +108,7 @@ describe("rex init", () => {
   it("defaults project name to directory basename", async () => {
     run(["init", tmpDir]);
     const config = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
     );
 
     expect(config.project).toBe(basename(tmpDir));
@@ -117,7 +117,7 @@ describe("rex init", () => {
   it("creates valid prd.json", async () => {
     run(["init", tmpDir]);
     const doc = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(doc.schema).toBe("rex/v1");
     expect(doc.items).toEqual([]);
@@ -126,7 +126,7 @@ describe("rex init", () => {
   it("creates prd.json that passes schema validation", async () => {
     run(["init", tmpDir]);
     const doc = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     const result = PRDDocumentSchema.safeParse(doc);
 
@@ -139,7 +139,7 @@ describe("rex init", () => {
   it("creates prd.json with correct schema version", async () => {
     run(["init", tmpDir]);
     const doc = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
 
     expect(doc.schema).toBe(SCHEMA_VERSION);
@@ -148,10 +148,10 @@ describe("rex init", () => {
   it("creates prd.json with title matching project name", async () => {
     run(["init", tmpDir]);
     const config = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "config.json"), "utf-8"),
     );
     const doc = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
 
     expect(doc.title).toBe(config.project);
@@ -160,7 +160,7 @@ describe("rex init", () => {
   it("creates empty execution-log.jsonl", async () => {
     run(["init", tmpDir]);
     const log = await readFile(
-      join(tmpDir, ".rex", "execution-log.jsonl"),
+      join(tmpDir, ".n-dx/rex", "execution-log.jsonl"),
       "utf-8",
     );
     expect(log).toBe("");
@@ -169,7 +169,7 @@ describe("rex init", () => {
   it("creates workflow.md with content", async () => {
     run(["init", tmpDir]);
     const workflow = await readFile(
-      join(tmpDir, ".rex", "workflow.md"),
+      join(tmpDir, ".n-dx/rex", "workflow.md"),
       "utf-8",
     );
     expect(workflow).toContain("get_next_task");
@@ -182,7 +182,7 @@ describe("rex init", () => {
 
     // Files should still be valid
     const doc = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(doc.schema).toBe("rex/v1");
   });
@@ -190,7 +190,7 @@ describe("rex init", () => {
   it("preserves valid files on re-run", async () => {
     run(["init", tmpDir]);
 
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     const configRaw1 = await readFile(join(rexDir, "config.json"), "utf-8");
     const prdRaw1 = await readFile(join(rexDir, "prd.json"), "utf-8");
 

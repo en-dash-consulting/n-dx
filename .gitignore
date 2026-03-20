@@ -2,11 +2,25 @@ node_modules/
 dist/
 package-lock.json
 *.tsbuildinfo
-.hench/runs/
+
+# n-dx local/generated files (do not commit)
+.n-dx/config.json
+.n-dx/web.pid
+.n-dx/web.port
+.n-dx/rex/execution-log*.jsonl
+.n-dx/rex/pending-proposals.json
+.n-dx/rex/acknowledged-findings.json
+.n-dx/rex/adapters.json
+.n-dx/rex/archive.json
+.n-dx/hench/runs/
+.n-dx/sourcevision/.backup/
+
+# Legacy n-dx paths (remove after full migration)
 .n-dx.json
 .n-dx2.json
 .n-dx-web.pid
 .n-dx-web.port
+.hench/runs/
 .rex/adapters.json
 .rex/pending-proposals.json
 .rex/acknowledged-findings.json
@@ -14,6 +28,7 @@ package-lock.json
 packages/rex/.rex/execution-log*.jsonl
 .sv2/
 .sv3/
+
 ndx-export/
 .ndx-deploy-tmp/
 .claude/settings.local.json

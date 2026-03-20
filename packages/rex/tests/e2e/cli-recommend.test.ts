@@ -49,9 +49,9 @@ describe("rex recommend", () => {
 
   it("accepts only selected recommendation indices", async () => {
     run(["init", tmpDir]);
-    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tmpDir, ".sourcevision", "zones.json"),
+      join(tmpDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         findings: [
           { severity: "warning", category: "auth", message: "Auth finding" },
@@ -75,7 +75,7 @@ describe("rex recommend", () => {
     expect(output).toContain("3/3 selected recommendation");
 
     // Hierarchical structure: epic at root → features → tasks
-    const prd = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
+    const prd = JSON.parse(await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"));
     expect(prd.items).toHaveLength(1); // 1 epic at root
     expect(prd.items[0].level).toBe("epic");
 
@@ -99,9 +99,9 @@ describe("rex recommend", () => {
 
   it("returns a format error when selector value is missing '='", async () => {
     run(["init", tmpDir]);
-    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tmpDir, ".sourcevision", "zones.json"),
+      join(tmpDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         findings: [
           { severity: "warning", category: "auth", message: "Auth finding" },
@@ -117,9 +117,9 @@ describe("rex recommend", () => {
 
   it("returns a validation error when selector index is out of range", async () => {
     run(["init", tmpDir]);
-    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tmpDir, ".sourcevision", "zones.json"),
+      join(tmpDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         findings: [
           { severity: "warning", category: "auth", message: "Auth finding" },

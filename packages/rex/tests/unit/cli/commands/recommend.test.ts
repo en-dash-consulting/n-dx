@@ -5,11 +5,11 @@ import { tmpdir } from "node:os";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 async function writeFixtureProject(dir: string): Promise<void> {
-  await mkdir(join(dir, ".rex"), { recursive: true });
-  await mkdir(join(dir, ".sourcevision"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/rex"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/sourcevision"), { recursive: true });
 
   await writeFile(
-    join(dir, ".rex", "config.json"),
+    join(dir, ".n-dx/rex", "config.json"),
     JSON.stringify({
       schema: "rex/v1",
       project: "test-project",
@@ -19,7 +19,7 @@ async function writeFixtureProject(dir: string): Promise<void> {
   );
 
   await writeFile(
-    join(dir, ".rex", "prd.json"),
+    join(dir, ".n-dx/rex", "prd.json"),
     JSON.stringify({
       schema: "rex/v1",
       title: "test-project",
@@ -29,7 +29,7 @@ async function writeFixtureProject(dir: string): Promise<void> {
   );
 
   await writeFile(
-    join(dir, ".sourcevision", "zones.json"),
+    join(dir, ".n-dx/sourcevision", "zones.json"),
     JSON.stringify({
       findings: [
         { severity: "warning", category: "auth", message: "Auth finding A" },
@@ -43,7 +43,7 @@ async function writeFixtureProject(dir: string): Promise<void> {
 }
 
 async function readPrdItems(dir: string): Promise<PRDDocument["items"]> {
-  const raw = await readFile(join(dir, ".rex", "prd.json"), "utf-8");
+  const raw = await readFile(join(dir, ".n-dx/rex", "prd.json"), "utf-8");
   const doc = JSON.parse(raw) as PRDDocument;
   return doc.items;
 }
@@ -68,7 +68,7 @@ async function writeFindings(
   findings: Array<{ severity: string; category: string; message: string }>,
 ): Promise<void> {
   await writeFile(
-    join(dir, ".sourcevision", "zones.json"),
+    join(dir, ".n-dx/sourcevision", "zones.json"),
     JSON.stringify({ findings }),
     "utf-8",
   );
@@ -83,8 +83,8 @@ describe("cmdRecommend --accept indexed selection", () => {
     vi.resetModules();
     vi.doMock("@n-dx/llm-client", () => ({
       PROJECT_DIRS: {
-        REX: ".rex",
-        SOURCEVISION: ".sourcevision",
+        REX: ".n-dx/rex",
+        SOURCEVISION: ".n-dx/sourcevision",
       },
       formatUsage: () => "",
       toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
@@ -197,7 +197,7 @@ describe("cmdRecommend --accept indexed selection", () => {
 
     // Reset PRD
     await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
+      join(tmpDir, ".n-dx/rex", "prd.json"),
       JSON.stringify({ schema: "rex/v1", title: "test-project", items: [] }),
       "utf-8",
     );
@@ -234,7 +234,7 @@ describe("cmdRecommend --accept indexed selection", () => {
 
     // Reset PRD
     await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
+      join(tmpDir, ".n-dx/rex", "prd.json"),
       JSON.stringify({ schema: "rex/v1", title: "test-project", items: [] }),
       "utf-8",
     );
@@ -734,8 +734,8 @@ describe("cmdRecommend --accept creation summary output", () => {
     vi.resetModules();
     vi.doMock("@n-dx/llm-client", () => ({
       PROJECT_DIRS: {
-        REX: ".rex",
-        SOURCEVISION: ".sourcevision",
+        REX: ".n-dx/rex",
+        SOURCEVISION: ".n-dx/sourcevision",
       },
       formatUsage: () => "",
       toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
@@ -903,8 +903,8 @@ describe("cmdRecommend --accept conflict detection", () => {
     vi.resetModules();
     vi.doMock("@n-dx/llm-client", () => ({
       PROJECT_DIRS: {
-        REX: ".rex",
-        SOURCEVISION: ".sourcevision",
+        REX: ".n-dx/rex",
+        SOURCEVISION: ".n-dx/sourcevision",
       },
       formatUsage: () => "",
       toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
@@ -929,7 +929,7 @@ describe("cmdRecommend --accept conflict detection", () => {
   it("creates all items including when existing items have similar titles (force for hierarchy)", async () => {
     // Pre-populate PRD with an item that has a similar title to a task recommendation
     await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
+      join(tmpDir, ".n-dx/rex", "prd.json"),
       JSON.stringify({
         schema: "rex/v1",
         title: "test-project",
@@ -960,7 +960,7 @@ describe("cmdRecommend --accept conflict detection", () => {
 
   it("creates all items with --force flag explicitly", async () => {
     await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
+      join(tmpDir, ".n-dx/rex", "prd.json"),
       JSON.stringify({
         schema: "rex/v1",
         title: "test-project",
@@ -1015,8 +1015,8 @@ describe("cmdRecommend --actionable-only", () => {
     vi.resetModules();
     vi.doMock("@n-dx/llm-client", () => ({
       PROJECT_DIRS: {
-        REX: ".rex",
-        SOURCEVISION: ".sourcevision",
+        REX: ".n-dx/rex",
+        SOURCEVISION: ".n-dx/sourcevision",
       },
       formatUsage: () => "",
       toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
@@ -1028,16 +1028,16 @@ describe("cmdRecommend --actionable-only", () => {
     ({ cmdRecommend } = await import("../../../../src/cli/commands/recommend.js"));
 
     tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-actionable-"));
-    await mkdir(join(tmpDir, ".rex"), { recursive: true });
-    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/rex"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
 
     await writeFile(
-      join(tmpDir, ".rex", "config.json"),
+      join(tmpDir, ".n-dx/rex", "config.json"),
       JSON.stringify({ schema: "rex/v1", project: "test", adapter: "file" }),
       "utf-8",
     );
     await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
+      join(tmpDir, ".n-dx/rex", "prd.json"),
       JSON.stringify({ schema: "rex/v1", title: "test", items: [] }),
       "utf-8",
     );
@@ -1050,7 +1050,7 @@ describe("cmdRecommend --actionable-only", () => {
 
   it("filters out observation and pattern types", async () => {
     await writeFile(
-      join(tmpDir, ".sourcevision", "zones.json"),
+      join(tmpDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         findings: [
           { type: "observation", severity: "warning", text: "Contains 52% of files", scope: "core" },
@@ -1071,7 +1071,7 @@ describe("cmdRecommend --actionable-only", () => {
 
   it("keeps move-file type findings", async () => {
     await writeFile(
-      join(tmpDir, ".sourcevision", "zones.json"),
+      join(tmpDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         findings: [
           { type: "move-file", severity: "warning", text: "Move utils.ts to shared/", scope: "core" },
@@ -1089,7 +1089,7 @@ describe("cmdRecommend --actionable-only", () => {
 
   it("shows filtered-out count when all findings are non-actionable", async () => {
     await writeFile(
-      join(tmpDir, ".sourcevision", "zones.json"),
+      join(tmpDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         findings: [
           { type: "observation", severity: "warning", text: "Zone has 3 files", scope: "core" },
@@ -1109,7 +1109,7 @@ describe("cmdRecommend --actionable-only", () => {
 
   it("shows all findings without --actionable-only flag", async () => {
     await writeFile(
-      join(tmpDir, ".sourcevision", "zones.json"),
+      join(tmpDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         findings: [
           { type: "observation", severity: "warning", text: "Contains 52% of files", scope: "core" },

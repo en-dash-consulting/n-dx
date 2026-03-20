@@ -64,7 +64,7 @@ describe("rex prune", () => {
 
     run(["prune", tmpDir]);
 
-    const archivePath = join(tmpDir, ".rex", "archive.json");
+    const archivePath = join(tmpDir, ".n-dx/rex", "archive.json");
     const archive = JSON.parse(await readFile(archivePath, "utf-8"));
     expect(archive.schema).toBe("rex/archive/v1");
     expect(archive.batches).toHaveLength(1);
@@ -211,7 +211,7 @@ describe("rex prune", () => {
 
     run(["prune", tmpDir]);
 
-    const logPath = join(tmpDir, ".rex", "execution-log.jsonl");
+    const logPath = join(tmpDir, ".n-dx/rex", "execution-log.jsonl");
     const logContent = await readFile(logPath, "utf-8");
     const lines = logContent.trim().split("\n").map((l) => JSON.parse(l));
     const pruneEvent = lines.find((l: { event: string }) => l.event === "items_pruned");

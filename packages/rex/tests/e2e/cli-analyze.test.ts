@@ -127,7 +127,7 @@ describe("Billing", () => {
 
     // Verify items in prd.json
     const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(prd.items.length).toBeGreaterThan(0);
   });
@@ -149,7 +149,7 @@ describe("Auth", () => {
 
     // Read execution log and find the batch record
     const logContent = await readFile(
-      join(tmpDir, ".rex", "execution-log.jsonl"),
+      join(tmpDir, ".n-dx/rex", "execution-log.jsonl"),
       "utf-8",
     );
     const logLines = logContent.trim().split("\n").map((l) => JSON.parse(l));
@@ -195,7 +195,7 @@ describe("Billing", () => {
     run(["analyze", "--no-llm", "--accept", tmpDir]);
 
     const logContent = await readFile(
-      join(tmpDir, ".rex", "execution-log.jsonl"),
+      join(tmpDir, ".n-dx/rex", "execution-log.jsonl"),
       "utf-8",
     );
     const logLines = logContent.trim().split("\n").map((l) => JSON.parse(l));
@@ -300,7 +300,7 @@ describe("Cache", () => {
 
     // Verify pending file exists
     const pending = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "pending-proposals.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "pending-proposals.json"), "utf-8"),
     );
     expect(pending.length).toBeGreaterThan(0);
 
@@ -312,7 +312,7 @@ describe("Cache", () => {
 
     // Pending file should be cleared
     try {
-      await readFile(join(tmpDir, ".rex", "pending-proposals.json"), "utf-8");
+      await readFile(join(tmpDir, ".n-dx/rex", "pending-proposals.json"), "utf-8");
       expect(true).toBe(false); // should not reach
     } catch {
       // Expected: file deleted
@@ -471,7 +471,7 @@ describe("Cache", () => {
 
     // Verify items in prd.json (items are nested: epics → features → tasks)
     const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     function collectTitles(items: { title: string; children?: unknown[] }[]): string[] {
       const result: string[] = [];
@@ -660,7 +660,7 @@ describe("Chunk", () => {
     run(["init", tmpDir]);
 
     // Write a model into config
-    const configPath = join(tmpDir, ".rex", "config.json");
+    const configPath = join(tmpDir, ".n-dx/rex", "config.json");
     const config = JSON.parse(await readFile(configPath, "utf-8"));
     config.model = "claude-haiku-4-20250414";
     await writeFile(configPath, JSON.stringify(config, null, 2));

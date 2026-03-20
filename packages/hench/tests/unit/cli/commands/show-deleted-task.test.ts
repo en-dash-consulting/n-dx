@@ -27,7 +27,7 @@ describe("show command with deleted tasks", () => {
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-show-"));
-    henchDir = join(projectDir, ".hench");
+    henchDir = join(projectDir, ".n-dx/hench");
     await initConfig(henchDir);
     await mkdir(join(henchDir, "runs"), { recursive: true });
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -81,7 +81,7 @@ describe("status command with deleted tasks", () => {
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-status-"));
-    henchDir = join(projectDir, ".hench");
+    henchDir = join(projectDir, ".n-dx/hench");
     await initConfig(henchDir);
     await mkdir(join(henchDir, "runs"), { recursive: true });
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});

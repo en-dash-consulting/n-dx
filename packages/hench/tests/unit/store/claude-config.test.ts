@@ -11,7 +11,7 @@ describe("Claude config inheritance (hench)", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-claude-cfg-"));
-    henchDir = join(tmpDir, ".hench");
+    henchDir = join(tmpDir, ".n-dx/hench");
     await mkdir(henchDir, { recursive: true });
   });
 
@@ -20,29 +20,29 @@ describe("Claude config inheritance (hench)", () => {
   });
 
   describe("loadClaudeConfig", () => {
-    it("returns empty config when .n-dx.json does not exist", async () => {
+    it("returns empty config when config.json does not exist", async () => {
       const config = await loadClaudeConfig(henchDir);
       expect(config).toEqual({});
     });
 
-    it("returns empty config when .n-dx.json has no claude section", async () => {
+    it("returns empty config when config.json has no claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ hench: { model: "opus" } }),
       );
       const config = await loadClaudeConfig(henchDir);
       expect(config).toEqual({});
     });
 
-    it("returns empty config when .n-dx.json is invalid JSON", async () => {
-      await writeFile(join(tmpDir, ".n-dx.json"), "not valid json");
+    it("returns empty config when config.json is invalid JSON", async () => {
+      await writeFile(join(tmpDir, ".n-dx", "config.json"), "not valid json");
       const config = await loadClaudeConfig(henchDir);
       expect(config).toEqual({});
     });
 
-    it("loads cli_path from .n-dx.json claude section", async () => {
+    it("loads cli_path from config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { cli_path: "/usr/local/bin/claude" } }),
       );
       const config = await loadClaudeConfig(henchDir);
@@ -50,9 +50,9 @@ describe("Claude config inheritance (hench)", () => {
       expect(config.api_key).toBeUndefined();
     });
 
-    it("loads api_key from .n-dx.json claude section", async () => {
+    it("loads api_key from config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { api_key: "sk-ant-test-key" } }),
       );
       const config = await loadClaudeConfig(henchDir);
@@ -62,7 +62,7 @@ describe("Claude config inheritance (hench)", () => {
 
     it("loads both cli_path and api_key", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({
           claude: { cli_path: "/opt/claude", api_key: "sk-ant-123" },
         }),
@@ -72,18 +72,18 @@ describe("Claude config inheritance (hench)", () => {
       expect(config.api_key).toBe("sk-ant-123");
     });
 
-    it("loads api_endpoint from .n-dx.json claude section", async () => {
+    it("loads api_endpoint from config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com" } }),
       );
       const config = await loadClaudeConfig(henchDir);
       expect(config.api_endpoint).toBe("https://proxy.example.com");
     });
 
-    it("loads model from .n-dx.json claude section", async () => {
+    it("loads model from config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { model: "claude-opus-4-20250514" } }),
       );
       const config = await loadClaudeConfig(henchDir);
@@ -92,7 +92,7 @@ describe("Claude config inheritance (hench)", () => {
 
     it("loads all claude config fields together", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({
           claude: {
             cli_path: "/opt/claude",
@@ -111,7 +111,7 @@ describe("Claude config inheritance (hench)", () => {
 
     it("ignores empty string values", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { cli_path: "", api_key: "", api_endpoint: "", model: "" } }),
       );
       const config = await loadClaudeConfig(henchDir);
@@ -123,7 +123,7 @@ describe("Claude config inheritance (hench)", () => {
 
     it("ignores non-string values", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx", "config.json"),
         JSON.stringify({ claude: { cli_path: 123, api_key: true, api_endpoint: 456, model: false } }),
       );
       const config = await loadClaudeConfig(henchDir);

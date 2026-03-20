@@ -156,7 +156,7 @@ describe("rex CLI workflow", () => {
   it("execution log records actions", async () => {
     run(["add", "epic", tmpDir, '--title=Logged Epic']);
     const log = await readFile(
-      join(tmpDir, ".rex", "execution-log.jsonl"),
+      join(tmpDir, ".n-dx/rex", "execution-log.jsonl"),
       "utf-8",
     );
     const lines = log.trim().split("\n").filter(Boolean);

@@ -141,14 +141,14 @@ function getGitInfo(dir) {
 
 export async function runExport(args) {
   const { outDir, basePath, cname, deploy, dir } = parseExportArgs(args);
-  const svDir = join(dir, ".sourcevision");
-  const rexDir = join(dir, ".rex");
-  const henchDir = join(dir, ".hench");
+  const svDir = join(dir, ".n-dx/sourcevision");
+  const rexDir = join(dir, ".n-dx/rex");
+  const henchDir = join(dir, ".n-dx/hench");
 
   // ── Validate prerequisites ─────────────────────────────────────────────
   const missing = [];
-  if (!existsSync(svDir)) missing.push(".sourcevision");
-  if (!existsSync(join(rexDir, "prd.json"))) missing.push(".rex/prd.json");
+  if (!existsSync(svDir)) missing.push(".n-dx/sourcevision");
+  if (!existsSync(join(rexDir, "prd.json"))) missing.push(".n-dx/rex/prd.json");
   if (missing.length > 0) {
     console.error(`Error: Missing ${missing.join(", ")} in ${dir}`);
     console.error("Hint: Run 'ndx init' and 'ndx plan' first.");

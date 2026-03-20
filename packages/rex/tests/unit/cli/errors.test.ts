@@ -196,7 +196,7 @@ describe("requireRexDir", () => {
 
   it("does not throw when .rex/ exists", () => {
     const tmp = mkdtempSync(join(tmpdir(), "rex-test-"));
-    mkdirSync(join(tmp, ".rex"));
+    mkdirSync(join(tmp, ".n-dx", "rex"), { recursive: true });
     try {
       expect(() => requireRexDir(tmp)).not.toThrow();
     } finally {

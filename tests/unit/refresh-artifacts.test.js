@@ -16,7 +16,7 @@ describe("refreshSourcevisionDashboardArtifacts", () => {
   });
 
   it("writes inspectable metadata with refresh timestamp", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(join(svDir, "manifest.json"), JSON.stringify({ analyzedAt: new Date().toISOString() }), "utf-8");
 

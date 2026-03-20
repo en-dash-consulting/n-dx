@@ -36,12 +36,12 @@ describe("GET /api/hench/audit", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-audit-"));
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
-      rexDir: join(tmpDir, ".rex"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
+      rexDir: join(tmpDir, ".n-dx/rex"),
       dev: false,
     };
     ({ server, port } = await startTestServer(ctx));
@@ -76,7 +76,7 @@ describe("GET /api/hench/audit", () => {
   });
 
   it("includes disk-based running runs in audit entries", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-audit-1",
       taskId: "task-1",
@@ -110,7 +110,7 @@ describe("GET /api/hench/audit", () => {
   });
 
   it("flags stale disk-based running runs", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-stale",
       taskId: "task-stale",
@@ -132,7 +132,7 @@ describe("GET /api/hench/audit", () => {
   });
 
   it("ignores completed runs", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-done",
       taskId: "task-done",
@@ -161,12 +161,12 @@ describe("POST /api/hench/execute/:taskId/terminate", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-terminate-"));
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
-      rexDir: join(tmpDir, ".rex"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
+      rexDir: join(tmpDir, ".n-dx/rex"),
       dev: false,
     };
     ({ server, port } = await startTestServer(ctx));
@@ -188,7 +188,7 @@ describe("POST /api/hench/execute/:taskId/terminate", () => {
   });
 
   it("marks disk-based running run as terminated", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     const run = {
       id: "run-term",
       taskId: "task-term",
@@ -224,7 +224,7 @@ describe("POST /api/hench/execute/:taskId/terminate", () => {
   });
 
   it("returns 404 if no running run matches the taskId on disk", async () => {
-    const runsDir = join(tmpDir, ".hench", "runs");
+    const runsDir = join(tmpDir, ".n-dx/hench", "runs");
     // Create a completed run — should not be terminable
     const run = {
       id: "run-completed",

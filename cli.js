@@ -34,8 +34,8 @@
  * @module n-dx/cli
  */
 
-import { spawn } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { spawn, execFileSync } from "child_process";
+import { existsSync, readFileSync, mkdirSync, renameSync, unlinkSync, writeFileSync, appendFileSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -255,11 +255,11 @@ async function promptInitProvider() {
 }
 
 /**
- * Read active LLM vendor from .n-dx.json.
+ * Read active LLM vendor from .n-dx/config.json.
  * Returns undefined when unset or config file is missing/invalid.
  */
 function readLLMVendor(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = join(dir, ".n-dx/config.json");
   if (!existsSync(configPath)) return undefined;
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
@@ -301,11 +301,11 @@ function showCommandHelp(command) {
 /**
  * Detect and cleanly terminate any running dashboard process before refresh.
  *
- * Reads the `.n-dx-web.pid` file, checks if the recorded process is alive, and
+ * Reads the `.n-dx/web.pid` file, checks if the recorded process is alive, and
  * terminates it gracefully (SIGTERM → SIGKILL fallback) so the refresh does not
  * race against a live server that is serving the files being rebuilt.
  *
- * @param {string} absDir  Absolute project directory (contains `.n-dx-web.pid`)
+ * @param {string} absDir  Absolute project directory (contains `.n-dx/web.pid`)
  * @returns {Promise<{status:"none"|"stale"|"stopped"|"stop-failed", pid?: number, port?: number}>}
  */
 async function detectAndCleanConflictingDashboard(absDir) {
@@ -363,7 +363,7 @@ const REFRESH_STEP_ORDER = {
   "sourcevision-pr-markdown": 3,
   "web-build": 4,
 };
-const WEB_PORT_FILE = ".n-dx-web.port";
+const WEB_PORT_FILE = ".n-dx/web.port";
 
 function printRefreshStepTransition(kind, status, detail) {
   if (status === "skipped") {
@@ -476,6 +476,151 @@ async function signalLiveReload(dir) {
   }
 }
 
+// ── .n-dx directory setup (migration + gitignore) ────────────────────────────
+
+/**
+ * Gitignore entries for n-dx local/generated files that should not be committed.
+ * Each entry is a path relative to the project root.
+ */
+const NDX_GITIGNORE_ENTRIES = [
+  ".n-dx/config.json",
+  ".n-dx/web.pid",
+  ".n-dx/web.port",
+  ".n-dx/rex/execution-log*.jsonl",
+  ".n-dx/rex/pending-proposals.json",
+  ".n-dx/rex/acknowledged-findings.json",
+  ".n-dx/rex/adapters.json",
+  ".n-dx/rex/archive.json",
+  ".n-dx/hench/runs/",
+  ".n-dx/sourcevision/.backup/",
+];
+
+/**
+ * Legacy gitignore entries from the old layout that should be removed
+ * when migrating to the consolidated .n-dx/ structure.
+ */
+const LEGACY_GITIGNORE_ENTRIES = [
+  ".n-dx.json",
+  ".n-dx-web.pid",
+  ".n-dx-web.port",
+  ".hench/runs/",
+  ".rex/adapters.json",
+  ".rex/pending-proposals.json",
+  ".rex/acknowledged-findings.json",
+  ".rex/execution-log*.jsonl",
+];
+
+/**
+ * Detect old-style n-dx directories/files and migrate them into .n-dx/.
+ * Returns a summary of what was migrated.
+ */
+function migrateFromLegacyLayout(dir) {
+  const migrated = [];
+
+  const ndxDir = join(dir, ".n-dx");
+  mkdirSync(ndxDir, { recursive: true });
+
+  // Migrate directories: .rex → .n-dx/rex, etc.
+  const legacyDirs = [
+    { from: ".rex", to: ".n-dx/rex" },
+    { from: ".sourcevision", to: ".n-dx/sourcevision" },
+    { from: ".hench", to: ".n-dx/hench" },
+  ];
+
+  for (const { from, to } of legacyDirs) {
+    const fromPath = join(dir, from);
+    const toPath = join(dir, to);
+    if (existsSync(fromPath) && !existsSync(toPath)) {
+      renameSync(fromPath, toPath);
+      migrated.push(`${from}/ → ${to}/`);
+    }
+  }
+
+  // Migrate config: .n-dx.json → .n-dx/config.json
+  const legacyConfig = join(dir, ".n-dx.json");
+  const newConfig = join(dir, ".n-dx/config.json");
+  if (existsSync(legacyConfig) && !existsSync(newConfig)) {
+    renameSync(legacyConfig, newConfig);
+    migrated.push(".n-dx.json → .n-dx/config.json");
+  }
+
+  // Remove ephemeral files (PID/port — no need to migrate)
+  for (const file of [".n-dx-web.pid", ".n-dx-web.port"]) {
+    const filePath = join(dir, file);
+    if (existsSync(filePath)) {
+      try { unlinkSync(filePath); } catch { /* ignore */ }
+      migrated.push(`${file} (removed — ephemeral)`);
+    }
+  }
+
+  // Clean up legacy entries from .gitignore
+  if (migrated.length > 0) {
+    cleanLegacyGitignoreEntries(dir);
+  }
+
+  return migrated;
+}
+
+/**
+ * Remove legacy n-dx gitignore entries that reference old paths.
+ */
+function cleanLegacyGitignoreEntries(dir) {
+  const gitignorePath = join(dir, ".gitignore");
+  if (!existsSync(gitignorePath)) return;
+
+  const content = readFileSync(gitignorePath, "utf-8");
+  const lines = content.split("\n");
+  const legacySet = new Set(LEGACY_GITIGNORE_ENTRIES);
+
+  const filtered = lines.filter((line) => !legacySet.has(line.trim()));
+
+  // Only write if we actually removed something
+  if (filtered.length !== lines.length) {
+    writeFileSync(gitignorePath, filtered.join("\n"), "utf-8");
+  }
+}
+
+/**
+ * Check if the project is inside a git repository.
+ */
+function isGitRepo(dir) {
+  try {
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: dir,
+      stdio: "pipe",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Append n-dx gitignore entries to the project's .gitignore.
+ * Only adds entries that are not already present.
+ */
+function setupGitignore(dir) {
+  if (!isGitRepo(dir)) return;
+
+  const gitignorePath = join(dir, ".gitignore");
+  const existing = existsSync(gitignorePath)
+    ? readFileSync(gitignorePath, "utf-8")
+    : "";
+
+  const existingLines = new Set(existing.split("\n").map((l) => l.trim()));
+  const toAdd = NDX_GITIGNORE_ENTRIES.filter((entry) => !existingLines.has(entry));
+
+  if (toAdd.length === 0) return;
+
+  const block = [
+    "",
+    "# n-dx local/generated files (do not commit)",
+    ...toAdd,
+  ].join("\n") + "\n";
+
+  appendFileSync(gitignorePath, block, "utf-8");
+}
+
 // ── Command handlers ─────────────────────────────────────────────────────────
 
 async function handleInit(rest) {
@@ -500,10 +645,27 @@ async function handleInit(rest) {
     process.exit(1);
   }
 
+  // Migrate legacy layout (.rex/, .sourcevision/, .hench/ → .n-dx/*)
+  const migrated = migrateFromLegacyLayout(dir);
+  if (migrated.length > 0) {
+    console.log("");
+    console.log("Migrated legacy n-dx files to .n-dx/ directory:");
+    for (const m of migrated) {
+      console.log(`  ${m}`);
+    }
+    console.log("");
+  }
+
+  // Ensure .n-dx/ root exists before package inits
+  mkdirSync(join(dir, ".n-dx"), { recursive: true });
+
   await runOrDie(tools.sourcevision, ["init", ...flags, dir]);
   await runOrDie(tools.rex, ["init", ...flags, dir]);
   await runOrDie(tools.hench, ["init", ...flags, dir]);
   await runConfig(["llm.vendor", selectedProvider, dir]);
+
+  // Set up .gitignore for local/generated files
+  setupGitignore(dir);
 
   // Claude Code integration (settings, skills, MCP servers)
   if (!noClaude) {
@@ -522,7 +684,7 @@ async function handleInit(rest) {
 
 async function handleAnalyze(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".sourcevision"]);
+  requireInit(dir, [".n-dx/sourcevision"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.sourcevision, ["analyze", ...flags, dir]);
   process.exit(0);
@@ -530,7 +692,7 @@ async function handleAnalyze(rest) {
 
 async function handleRecommend(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex", ".sourcevision"]);
+  requireInit(dir, [".n-dx/rex", ".n-dx/sourcevision"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["recommend", ...flags, dir]);
   process.exit(0);
@@ -540,14 +702,14 @@ async function handleAdd(rest) {
   // Unlike other commands, add's positional args are descriptions, not dirs.
   // Rex's dispatchAdd handles dir resolution internally (resolveSmartAddArgs
   // checks whether the last positional is an existing directory).
-  requireInit(process.cwd(), [".rex"]);
+  requireInit(process.cwd(), [".n-dx/rex"]);
   await runOrDie(tools.rex, ["add", ...rest]);
   process.exit(0);
 }
 
 async function handlePlan(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, [".n-dx/rex"]);
   const flags = extractFlags(rest);
   const hasFile = flags.some((f) => f.startsWith("--file=") || f === "--file");
 
@@ -640,7 +802,7 @@ async function handleRefresh(rest) {
   }
 
   if (plan.needsSourcevisionDir) {
-    requireInit(dir, [".sourcevision"]);
+    requireInit(dir, [".n-dx/sourcevision"]);
   }
 
   const stepCount = plan.steps.length;
@@ -726,7 +888,7 @@ async function handleRefresh(rest) {
 
 async function handleWork(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex", ".hench"]);
+  requireInit(dir, [".n-dx/rex", ".n-dx/hench"]);
   const flags = extractFlags(rest);
 
   // Require explicit vendor selection for n-dx orchestration.
@@ -747,7 +909,7 @@ async function handleWork(rest) {
 
 async function handleStatus(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, [".n-dx/rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["status", ...flags, dir]);
   process.exit(0);
@@ -755,7 +917,7 @@ async function handleStatus(rest) {
 
 async function handleUsage(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, [".n-dx/rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["usage", ...flags, dir]);
   process.exit(0);
@@ -763,7 +925,7 @@ async function handleUsage(rest) {
 
 async function handleSync(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex"]);
+  requireInit(dir, [".n-dx/rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["sync", ...flags, dir]);
   process.exit(0);
@@ -777,7 +939,7 @@ async function handleCI(rest) {
   // For JSON mode, let runCI handle missing dirs so it can produce structured output.
   // For text mode, use the standard requireInit guard.
   if (!isJSON) {
-    requireInit(dir, [".rex", ".sourcevision"]);
+    requireInit(dir, [".n-dx/rex", ".n-dx/sourcevision"]);
   }
 
   try {
@@ -791,7 +953,7 @@ async function handleCI(rest) {
 
 async function handleDev(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".sourcevision"]);
+  requireInit(dir, [".n-dx/sourcevision"]);
   const flags = extractFlags(rest);
   const code = await run(resolvePackageFile("packages/web", "dev.js"), [...flags, dir]);
   process.exit(code);
@@ -825,7 +987,7 @@ function runCapture(script, args) {
 
 async function handleSelfHeal(rest) {
   const dir = resolveDir(rest);
-  requireInit(dir, [".rex", ".hench", ".sourcevision"]);
+  requireInit(dir, [".n-dx/rex", ".n-dx/hench", ".n-dx/sourcevision"]);
 
   const vendor = readLLMVendor(dir);
   if (!vendor) {

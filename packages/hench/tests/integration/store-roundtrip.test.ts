@@ -18,7 +18,7 @@ describe("config store roundtrip", () => {
 
   beforeEach(async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "hench-test-store-"));
-    henchDir = join(tmpDir, ".hench");
+    henchDir = join(tmpDir, ".n-dx/hench");
   });
 
   afterEach(async () => {
@@ -57,7 +57,7 @@ describe("runs store roundtrip", () => {
 
   beforeEach(async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "hench-test-runs-"));
-    henchDir = join(tmpDir, ".hench");
+    henchDir = join(tmpDir, ".n-dx/hench");
     await ensureHenchDir(henchDir);
   });
 

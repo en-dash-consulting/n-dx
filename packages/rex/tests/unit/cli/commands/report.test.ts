@@ -6,11 +6,11 @@ import { cmdReport } from "../../../../src/cli/commands/report.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
+  writeFileSync(join(dir, ".n-dx/rex", "prd.json"), JSON.stringify(doc));
 }
 
 function writeConfig(dir: string, config: Record<string, unknown>): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
+  writeFileSync(join(dir, ".n-dx/rex", "config.json"), JSON.stringify(config));
 }
 
 const VALID_CONFIG = {
@@ -85,7 +85,7 @@ describe("cmdReport", () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "rex-report-test-"));
-    mkdirSync(join(tmpDir, ".rex"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/rex"), { recursive: true });
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called");
     }) as never);

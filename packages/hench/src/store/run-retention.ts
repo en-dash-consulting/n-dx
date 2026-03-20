@@ -33,6 +33,7 @@ import {
 import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
 import { dirname } from "node:path";
+import { HENCH_FILES } from "../constants.js";
 
 const gunzipAsync = promisify(gunzip);
 
@@ -124,7 +125,7 @@ export async function loadRetentionConfig(
   projectDir: string,
 ): Promise<RetentionConfig> {
   try {
-    const raw = await readFile(join(projectDir, ".n-dx.json"), "utf-8");
+    const raw = await readFile(join(projectDir, HENCH_FILES.CONFIG), "utf-8");
     const data = JSON.parse(raw) as Record<string, unknown>;
     const section = data.retention as Record<string, unknown> | undefined;
     if (!section || typeof section !== "object") {

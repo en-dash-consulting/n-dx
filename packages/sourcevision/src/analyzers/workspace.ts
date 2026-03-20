@@ -17,7 +17,7 @@ import type {
   ZoneCrossing,
   SubAnalysisRef,
 } from "../schema/index.js";
-import { SV_DIR } from "../constants.js";
+import { SV_DIR, NDX_ROOT } from "../constants.js";
 import { DATA_FILES } from "../schema/data-files.js";
 import { toPosix } from "../util/paths.js";
 
@@ -83,17 +83,19 @@ function findSubSvDirs(rootDir: string, currentDir: string, results: string[]): 
 
     if (!stat.isDirectory()) continue;
 
-    // Check if this directory has a .sourcevision subdirectory
-    if (entry === SV_DIR) {
-      // Skip the root's own .sourcevision
-      const relPath = relative(rootDir, currentDir);
-      if (relPath !== "") {
-        results.push(currentDir);
+    // Skip n-dx data directories — check if they contain sourcevision data
+    if (entry === NDX_ROOT) {
+      const svInside = join(fullPath, "sourcevision");
+      if (existsSync(svInside) && statSync(svInside).isDirectory()) {
+        const relPath = relative(rootDir, currentDir);
+        if (relPath !== "") {
+          results.push(currentDir);
+        }
       }
       continue;
     }
 
-    // Check for .sourcevision inside this directory
+    // Check for sourcevision data inside this directory
     const svPath = join(fullPath, SV_DIR);
     if (existsSync(svPath) && statSync(svPath).isDirectory()) {
       results.push(fullPath);

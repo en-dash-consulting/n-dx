@@ -205,7 +205,13 @@ export type {
 } from "./exec.js";
 
 // Project directory constants
-export { PROJECT_DIRS } from "./project-dirs.js";
+export {
+  PROJECT_ROOT_DIR,
+  PROJECT_DIRS,
+  PROJECT_FILES,
+  LEGACY_DIRS,
+  LEGACY_FILES,
+} from "./project-dirs.js";
 export type { ProjectDir } from "./project-dirs.js";
 
 // Canonical JSON serialization

@@ -67,8 +67,8 @@ describe("Sourcevision API routes", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-api-"));
-    svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
 
@@ -339,7 +339,7 @@ describe("Sourcevision API routes", () => {
   it("returns 404 for missing data files", async () => {
     // Use a fresh dir with no data
     const emptyDir = await mkdtemp(join(tmpdir(), "sv-api-empty-"));
-    const emptySvDir = join(emptyDir, ".sourcevision");
+    const emptySvDir = join(emptyDir, ".n-dx/sourcevision");
     await mkdir(emptySvDir, { recursive: true });
     const emptyCtx: ServerContext = { projectDir: emptyDir, svDir: emptySvDir, rexDir, dev: false };
 

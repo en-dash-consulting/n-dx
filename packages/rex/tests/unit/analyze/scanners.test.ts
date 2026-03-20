@@ -273,10 +273,10 @@ description: Route requests
   it("skips generated output directories like build/ and out/", async () => {
     await mkdir(join(tempDir, "build"), { recursive: true });
     await mkdir(join(tempDir, "out"), { recursive: true });
-    await mkdir(join(tempDir, ".hench"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/hench"), { recursive: true });
     await writeFile(join(tempDir, "build", "output.md"), "# Generated\n- item");
     await writeFile(join(tempDir, "out", "bundle.json"), '{"name":"x"}');
-    await writeFile(join(tempDir, ".hench", "run.json"), '{"name":"run"}');
+    await writeFile(join(tempDir, ".n-dx/hench", "run.json"), '{"name":"run"}');
     // Real doc should still come through
     await writeFile(join(tempDir, "roadmap.md"), "# Roadmap\n- Milestone 1\n");
 
@@ -419,9 +419,9 @@ describe("scanSourceVision", () => {
   });
 
   it("reads zone data and maps to features with file counts", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -486,9 +486,9 @@ describe("scanSourceVision", () => {
   });
 
   it("maps finding types to actionable prefixes", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -519,9 +519,9 @@ describe("scanSourceVision", () => {
   });
 
   it("includes acceptance criteria with file paths on tasks", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -557,9 +557,9 @@ describe("scanSourceVision", () => {
   });
 
   it("handles legacy zone format (flat array)", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify([
         {
           name: "Authentication",
@@ -583,9 +583,9 @@ describe("scanSourceVision", () => {
   });
 
   it("reads inventory.json with canonical schema for epic groupings", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "inventory.json"),
+      join(tempDir, ".n-dx/sourcevision", "inventory.json"),
       JSON.stringify({
         files: [
           { path: "src/components/Button.tsx", category: "components", role: "source" },
@@ -608,9 +608,9 @@ describe("scanSourceVision", () => {
   });
 
   it("reads inventory.json with legacy byCategory format", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "inventory.json"),
+      join(tempDir, ".n-dx/sourcevision", "inventory.json"),
       JSON.stringify({
         byCategory: {
           components: { count: 10 },
@@ -626,9 +626,9 @@ describe("scanSourceVision", () => {
   });
 
   it("reads imports.json with canonical schema for circular dependencies", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "imports.json"),
+      join(tempDir, ".n-dx/sourcevision", "imports.json"),
       JSON.stringify({
         edges: [],
         external: [],
@@ -657,9 +657,9 @@ describe("scanSourceVision", () => {
   });
 
   it("reads imports.json with legacy circularDependencies format", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "imports.json"),
+      join(tempDir, ".n-dx/sourcevision", "imports.json"),
       JSON.stringify({
         circularDependencies: [
           { from: "moduleA", to: "moduleB" },
@@ -676,9 +676,9 @@ describe("scanSourceVision", () => {
   });
 
   it("reads imports.json with legacy circular array format", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "imports.json"),
+      join(tempDir, ".n-dx/sourcevision", "imports.json"),
       JSON.stringify({
         circular: [["A", "B", "A"]],
       }),
@@ -696,10 +696,10 @@ describe("scanSourceVision", () => {
   });
 
   it("returns partial results when some files are missing", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     // Only zones.json, no inventory or imports
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -721,9 +721,9 @@ describe("scanSourceVision", () => {
   });
 
   it("only includes actionable warning/critical findings as tasks", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -769,9 +769,9 @@ describe("scanSourceVision", () => {
   });
 
   it("includes concrete fix suggestions based on finding patterns", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -807,9 +807,9 @@ describe("scanSourceVision", () => {
   });
 
   it("includes zone entry points in acceptance criteria", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -843,9 +843,9 @@ describe("scanSourceVision", () => {
   });
 
   it("includes zone metrics in acceptance criteria", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -879,9 +879,9 @@ describe("scanSourceVision", () => {
   });
 
   it("provides fix suggestions for duplication findings", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -915,9 +915,9 @@ describe("scanSourceVision", () => {
   });
 
   it("provides fix suggestions for god object findings", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -952,9 +952,9 @@ describe("scanSourceVision", () => {
   });
 
   it("includes zone files when no related files specified", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "zones.json"),
+      join(tempDir, ".n-dx/sourcevision", "zones.json"),
       JSON.stringify({
         zones: [
           {
@@ -989,9 +989,9 @@ describe("scanSourceVision", () => {
   });
 
   it("provides fix suggestions for circular dependency imports", async () => {
-    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    await mkdir(join(tempDir, ".n-dx/sourcevision"), { recursive: true });
     await writeFile(
-      join(tempDir, ".sourcevision", "imports.json"),
+      join(tempDir, ".n-dx/sourcevision", "imports.json"),
       JSON.stringify({
         edges: [],
         external: [],

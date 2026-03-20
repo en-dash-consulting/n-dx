@@ -66,7 +66,7 @@ describe("n-dx refresh", () => {
   });
 
   it("updates dashboard artifact metadata after data refresh", async () => {
-    const artifactPath = join(tmpDir, ".sourcevision", "dashboard-artifacts.json");
+    const artifactPath = join(tmpDir, ".n-dx/sourcevision", "dashboard-artifacts.json");
 
     const first = runRefreshResult(["--data-only", tmpDir]);
     expect(first.code).toBe(0);
@@ -130,7 +130,8 @@ describe("n-dx refresh", () => {
     );
 
     const port = 3117;
-    await writeFile(join(tmpDir, ".n-dx-web.port"), String(port));
+    await mkdir(join(tmpDir, ".n-dx"), { recursive: true });
+    await writeFile(join(tmpDir, ".n-dx/web.port"), String(port));
     const stdout = execFileSync(
       "node",
       ["--import", pathToFileURL(mockPath).href, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
@@ -148,7 +149,8 @@ describe("n-dx refresh", () => {
     );
 
     const port = 3117;
-    await writeFile(join(tmpDir, ".n-dx-web.port"), String(port));
+    await mkdir(join(tmpDir, ".n-dx"), { recursive: true });
+    await writeFile(join(tmpDir, ".n-dx/web.port"), String(port));
     const stdout = execFileSync(
       "node",
       ["--import", pathToFileURL(mockPath).href, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
@@ -217,7 +219,7 @@ describe("n-dx refresh", () => {
 
   it("emits rollback messages when a step fails and snapshot contains files", async () => {
     // Populate .sourcevision so there is something to snapshot
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(
       join(svDir, "manifest.json"),
@@ -250,8 +252,9 @@ describe("n-dx refresh", () => {
 
   it("silently cleans up a stale PID file before refresh when the process is not running", async () => {
     const nonExistentPid = 99999999; // highly unlikely to be a real PID
+    await mkdir(join(tmpDir, ".n-dx"), { recursive: true });
     await writeFile(
-      join(tmpDir, ".n-dx-web.pid"),
+      join(tmpDir, ".n-dx/web.pid"),
       JSON.stringify({ pid: nonExistentPid, port: 3117, startedAt: new Date().toISOString() }),
       "utf-8",
     );
@@ -262,7 +265,7 @@ describe("n-dx refresh", () => {
     // Stale PID clean-up is silent — no "Conflict:" message for already-dead processes.
     expect(stdout).not.toContain("Conflict:");
     // Stale PID file must be removed after the refresh.
-    expect(existsSync(join(tmpDir, ".n-dx-web.pid"))).toBe(false);
+    expect(existsSync(join(tmpDir, ".n-dx/web.pid"))).toBe(false);
   });
 
   it("detects and terminates a live dashboard process before proceeding with refresh", async () => {
@@ -274,8 +277,9 @@ describe("n-dx refresh", () => {
     child.unref();
     const pid = child.pid;
 
+    await mkdir(join(tmpDir, ".n-dx"), { recursive: true });
     await writeFile(
-      join(tmpDir, ".n-dx-web.pid"),
+      join(tmpDir, ".n-dx/web.pid"),
       JSON.stringify({ pid, port: 3117, startedAt: new Date().toISOString() }),
       "utf-8",
     );
@@ -303,6 +307,6 @@ describe("n-dx refresh", () => {
     expect(stillRunning).toBe(false);
 
     // PID file must be cleaned up after stopping.
-    expect(existsSync(join(tmpDir, ".n-dx-web.pid"))).toBe(false);
+    expect(existsSync(join(tmpDir, ".n-dx/web.pid"))).toBe(false);
   });
 });

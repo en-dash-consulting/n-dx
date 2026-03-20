@@ -20,56 +20,56 @@ describe("Claude config integration (sourcevision)", () => {
   });
 
   describe("loadClaudeConfig", () => {
-    it("returns empty config when .n-dx.json does not exist", async () => {
+    it("returns empty config when config.json does not exist", async () => {
       const config = await loadClaudeConfig(tmpDir);
       expect(config).toEqual({});
     });
 
-    it("returns empty config when .n-dx.json has no claude section", async () => {
+    it("returns empty config when config.json has no claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, "config.json"),
         JSON.stringify({ sourcevision: { project: "test" } }),
       );
       const config = await loadClaudeConfig(tmpDir);
       expect(config).toEqual({});
     });
 
-    it("returns empty config when .n-dx.json is invalid JSON", async () => {
-      await writeFile(join(tmpDir, ".n-dx.json"), "not valid json");
+    it("returns empty config when config.json is invalid JSON", async () => {
+      await writeFile(join(tmpDir, "config.json"), "not valid json");
       const config = await loadClaudeConfig(tmpDir);
       expect(config).toEqual({});
     });
 
-    it("loads cli_path from .n-dx.json claude section", async () => {
+    it("loads cli_path from config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, "config.json"),
         JSON.stringify({ claude: { cli_path: "/usr/local/bin/claude" } }),
       );
       const config = await loadClaudeConfig(tmpDir);
       expect(config.cli_path).toBe("/usr/local/bin/claude");
     });
 
-    it("loads api_key from .n-dx.json claude section", async () => {
+    it("loads api_key from config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, "config.json"),
         JSON.stringify({ claude: { api_key: "sk-ant-test-key" } }),
       );
       const config = await loadClaudeConfig(tmpDir);
       expect(config.api_key).toBe("sk-ant-test-key");
     });
 
-    it("loads api_endpoint from .n-dx.json claude section", async () => {
+    it("loads api_endpoint from config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, "config.json"),
         JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com" } }),
       );
       const config = await loadClaudeConfig(tmpDir);
       expect(config.api_endpoint).toBe("https://proxy.example.com");
     });
 
-    it("loads model from .n-dx.json claude section", async () => {
+    it("loads model from config.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, "config.json"),
         JSON.stringify({ claude: { model: "claude-opus-4-20250514" } }),
       );
       const config = await loadClaudeConfig(tmpDir);
@@ -78,7 +78,7 @@ describe("Claude config integration (sourcevision)", () => {
 
     it("ignores empty string values", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, "config.json"),
         JSON.stringify({ claude: { cli_path: "", api_key: "", api_endpoint: "", model: "" } }),
       );
       const config = await loadClaudeConfig(tmpDir);

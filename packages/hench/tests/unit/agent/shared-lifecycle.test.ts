@@ -18,11 +18,11 @@ describe("shared lifecycle", () => {
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-shared-"));
-    henchDir = join(projectDir, ".hench");
+    henchDir = join(projectDir, ".n-dx/hench");
     await initConfig(henchDir);
 
     // Create minimal .rex/ for store
-    const rexDir = join(projectDir, ".rex");
+    const rexDir = join(projectDir, ".n-dx/rex");
     await mkdir(rexDir, { recursive: true });
     await writeFile(
       join(rexDir, "config.json"),
@@ -71,7 +71,7 @@ describe("shared lifecycle", () => {
       const { loadConfig } = await import("../../../src/store/config.js");
 
       const config = await loadConfig(henchDir);
-      const rexDir = join(projectDir, ".rex");
+      const rexDir = join(projectDir, ".n-dx/rex");
       const store = createStore("file", rexDir);
 
       const consoleSpy = vi.spyOn(console, "log");
@@ -98,7 +98,7 @@ describe("shared lifecycle", () => {
       const { loadConfig } = await import("../../../src/store/config.js");
 
       const config = await loadConfig(henchDir);
-      const rexDir = join(projectDir, ".rex");
+      const rexDir = join(projectDir, ".n-dx/rex");
       const store = createStore("file", rexDir);
 
       vi.spyOn(console, "log");
@@ -172,7 +172,7 @@ describe("shared lifecycle", () => {
       const { transitionToInProgress } = await import("../../../src/agent/lifecycle/shared.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
 
-      const rexDir = join(projectDir, ".rex");
+      const rexDir = join(projectDir, ".n-dx/rex");
       const store = createStore("file", rexDir);
 
       vi.spyOn(console, "log");
@@ -191,7 +191,7 @@ describe("shared lifecycle", () => {
       const { transitionToInProgress } = await import("../../../src/agent/lifecycle/shared.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
 
-      const rexDir = join(projectDir, ".rex");
+      const rexDir = join(projectDir, ".n-dx/rex");
       const store = createStore("file", rexDir);
 
       // task-2 is already in_progress — should not throw
@@ -245,7 +245,7 @@ describe("shared lifecycle", () => {
       const { handleRunFailure } = await import("../../../src/agent/lifecycle/shared.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
 
-      const rexDir = join(projectDir, ".rex");
+      const rexDir = join(projectDir, ".n-dx/rex");
       const store = createStore("file", rexDir);
 
       // First transition to in_progress so we can defer it
@@ -267,7 +267,7 @@ describe("shared lifecycle", () => {
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
       const { randomUUID } = await import("node:crypto");
 
-      const rexDir = join(projectDir, ".rex");
+      const rexDir = join(projectDir, ".n-dx/rex");
       const store = createStore("file", rexDir);
 
       vi.spyOn(console, "log");
@@ -306,7 +306,7 @@ describe("shared lifecycle", () => {
       const { loadConfig } = await import("../../../src/store/config.js");
 
       const config = await loadConfig(henchDir);
-      const rexDir = join(projectDir, ".rex");
+      const rexDir = join(projectDir, ".n-dx/rex");
       const store = createStore("file", rexDir);
 
       vi.spyOn(console, "log");

@@ -13,7 +13,7 @@ describe("FileStore", () => {
 
   beforeEach(async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "rex-test-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await ensureRexDir(rexDir);
     store = new FileStore(rexDir);
 

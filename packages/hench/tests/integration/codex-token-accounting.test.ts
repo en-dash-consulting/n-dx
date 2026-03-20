@@ -30,14 +30,14 @@ async function setupProjectDir(): Promise<{
   rexDir: string;
 }> {
   const projectDir = await mkdtemp(join(tmpdir(), "hench-test-codex-tokens-"));
-  const henchDir = join(projectDir, ".hench");
-  const rexDir = join(projectDir, ".rex");
+  const henchDir = join(projectDir, ".n-dx/hench");
+  const rexDir = join(projectDir, ".n-dx/rex");
 
   await initConfig(henchDir);
   await mkdir(rexDir, { recursive: true });
 
   await writeFile(
-    join(projectDir, ".n-dx.json"),
+    join(projectDir, ".n-dx", "config.json"),
     JSON.stringify({
       llm: {
         vendor: "codex",

@@ -24,14 +24,14 @@ describe("hench init", () => {
       encoding: "utf-8",
     });
 
-    expect(output).toContain("Initialized .hench/");
+    expect(output).toContain("Initialized .n-dx/hench/");
     expect(output).toContain("config.json");
   });
 
   it("creates valid config.json", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
 
-    const configPath = join(testDir, ".hench", "config.json");
+    const configPath = join(testDir, ".n-dx/hench", "config.json");
     const raw = await readFile(configPath, "utf-8");
     const config = JSON.parse(raw);
 
@@ -39,13 +39,13 @@ describe("hench init", () => {
     expect(config.model).toBe("sonnet");
     expect(config.provider).toBe("cli");
     expect(config.maxTurns).toBe(50);
-    expect(config.guard.blockedPaths).toContain(".hench/**");
+    expect(config.guard.blockedPaths).toContain(".n-dx/hench/**");
   });
 
   it("creates config.json that passes schema validation", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
 
-    const configPath = join(testDir, ".hench", "config.json");
+    const configPath = join(testDir, ".n-dx/hench", "config.json");
     const raw = await readFile(configPath, "utf-8");
     const config = JSON.parse(raw);
     const result = HenchConfigSchema.safeParse(config);
@@ -59,7 +59,7 @@ describe("hench init", () => {
   it("creates config.json matching DEFAULT_HENCH_CONFIG", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
 
-    const configPath = join(testDir, ".hench", "config.json");
+    const configPath = join(testDir, ".n-dx/hench", "config.json");
     const raw = await readFile(configPath, "utf-8");
     const config = JSON.parse(raw);
     const defaults = DEFAULT_HENCH_CONFIG();
@@ -70,7 +70,7 @@ describe("hench init", () => {
   it("creates config.json with correct schema version", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
 
-    const configPath = join(testDir, ".hench", "config.json");
+    const configPath = join(testDir, ".n-dx/hench", "config.json");
     const raw = await readFile(configPath, "utf-8");
     const config = JSON.parse(raw);
 
@@ -80,7 +80,7 @@ describe("hench init", () => {
   it("creates config.json with all required guard fields", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
 
-    const configPath = join(testDir, ".hench", "config.json");
+    const configPath = join(testDir, ".n-dx/hench", "config.json");
     const raw = await readFile(configPath, "utf-8");
     const config = JSON.parse(raw);
 
@@ -94,7 +94,7 @@ describe("hench init", () => {
   it("creates config.json with all required retry fields", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
 
-    const configPath = join(testDir, ".hench", "config.json");
+    const configPath = join(testDir, ".n-dx/hench", "config.json");
     const raw = await readFile(configPath, "utf-8");
     const config = JSON.parse(raw);
 
@@ -106,7 +106,7 @@ describe("hench init", () => {
 
   it("creates runs/ directory", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
-    await access(join(testDir, ".hench", "runs"));
+    await access(join(testDir, ".n-dx/hench", "runs"));
   });
 
   it("is idempotent", () => {
@@ -120,7 +120,7 @@ describe("hench init", () => {
   it("preserves valid config on re-run", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
 
-    const configPath = join(testDir, ".hench", "config.json");
+    const configPath = join(testDir, ".n-dx/hench", "config.json");
     const firstRaw = await readFile(configPath, "utf-8");
 
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });

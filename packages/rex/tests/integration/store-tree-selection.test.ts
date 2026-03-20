@@ -41,7 +41,7 @@ describe("store → tree → task-selection pipeline", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-pipeline-test-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await ensureRexDir(rexDir);
   });
 
