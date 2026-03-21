@@ -6,7 +6,7 @@
   ],
   "commit": false,
   "fixed": [
-    ["@n-dx/rex", "@n-dx/hench", "@n-dx/sourcevision", "@n-dx/llm-client", "@n-dx/web"]
+    ["@n-dx/core", "@n-dx/rex", "@n-dx/hench", "@n-dx/sourcevision", "@n-dx/llm-client", "@n-dx/web"]
   ],
   "linked": [],
   "access": "public",
