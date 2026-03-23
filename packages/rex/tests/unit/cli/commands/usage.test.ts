@@ -6,12 +6,12 @@ import { cmdUsage } from "../../../../src/cli/commands/usage.js";
 import type { PRDDocument, RexConfig } from "../../../../src/schema/index.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
+  writeFileSync(join(dir, ".n-dx/rex", "prd.json"), JSON.stringify(doc));
 }
 
 function writeLog(dir: string, entries: Array<Record<string, unknown>>): void {
   const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
-  writeFileSync(join(dir, ".rex", "execution-log.jsonl"), lines);
+  writeFileSync(join(dir, ".n-dx/rex", "execution-log.jsonl"), lines);
 }
 
 function writeHenchRun(
@@ -19,7 +19,7 @@ function writeHenchRun(
   id: string,
   run: Record<string, unknown>,
 ): void {
-  const runsDir = join(dir, ".hench", "runs");
+  const runsDir = join(dir, ".n-dx/hench", "runs");
   mkdirSync(runsDir, { recursive: true });
   writeFileSync(join(runsDir, `${id}.json`), JSON.stringify(run));
 }
@@ -28,13 +28,13 @@ function writeSvManifest(
   dir: string,
   manifest: Record<string, unknown>,
 ): void {
-  const svDir = join(dir, ".sourcevision");
+  const svDir = join(dir, ".n-dx/sourcevision");
   mkdirSync(svDir, { recursive: true });
   writeFileSync(join(svDir, "manifest.json"), JSON.stringify(manifest));
 }
 
 function writeConfig(dir: string, config: RexConfig): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
+  writeFileSync(join(dir, ".n-dx/rex", "config.json"), JSON.stringify(config));
 }
 
 const MINIMAL_PRD: PRDDocument = {
@@ -63,7 +63,7 @@ function errOutput(): string {
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "rex-usage-test-"));
-  mkdirSync(join(tmp, ".rex"));
+  mkdirSync(join(tmp, ".n-dx/rex"), { recursive: true });
   writePRD(tmp, MINIMAL_PRD);
   writeConfig(tmp, MINIMAL_CONFIG);
   logSpy = vi.spyOn(console, "log").mockImplementation(() => {});

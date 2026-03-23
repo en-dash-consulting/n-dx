@@ -68,9 +68,9 @@ describe("Token Usage API routes", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "token-api-"));
-    svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
-    henchRunsDir = join(tmpDir, ".hench", "runs");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
+    henchRunsDir = join(tmpDir, ".n-dx/hench", "runs");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
     await mkdir(henchRunsDir, { recursive: true });
@@ -317,9 +317,9 @@ describe("Token Usage API routes", () => {
       vendor: "claude",
       model: "claude-sonnet-4-6",
     });
-    expect(data.source.rex).toBe(".rex/execution-log.jsonl");
-    expect(data.source.hench).toBe(".hench/runs/*.json");
-    expect(data.source.sourcevision).toBe(".sourcevision/manifest.json");
+    expect(data.source.rex).toBe(".n-dx/rex/execution-log.jsonl");
+    expect(data.source.hench).toBe(".n-dx/hench/runs/*.json");
+    expect(data.source.sourcevision).toBe(".n-dx/sourcevision/manifest.json");
     expect(data.window).toEqual({
       since: "2026-02-03T00:00:00.000Z",
       until: null,
@@ -552,8 +552,8 @@ describe("Token Usage API routes", () => {
   it("handles missing data gracefully", async () => {
     // Create a fresh tmpDir with no data
     const emptyDir = await mkdtemp(join(tmpdir(), "token-empty-"));
-    const emptySvDir = join(emptyDir, ".sourcevision");
-    const emptyRexDir = join(emptyDir, ".rex");
+    const emptySvDir = join(emptyDir, ".n-dx/sourcevision");
+    const emptyRexDir = join(emptyDir, ".n-dx/rex");
     await mkdir(emptySvDir, { recursive: true });
     await mkdir(emptyRexDir, { recursive: true });
 

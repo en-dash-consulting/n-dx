@@ -1,6 +1,6 @@
-import { PROJECT_DIRS, formatUsage } from "@n-dx/llm-client";
+import { formatUsage } from "@n-dx/llm-client";
 
-export const REX_DIR = PROJECT_DIRS.REX;
+export { REX_DIR, REX_FILES } from "../../constants.js";
 export const TOOL_VERSION = "0.1.0";
 
 export function usage(): void {

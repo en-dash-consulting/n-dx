@@ -191,7 +191,7 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
 const HENCH_STALE_THRESHOLD_MS = 5 * 60 * 1000;
 
 function extractHenchStatus(ctx: ServerContext): HenchStatus {
-  const henchDir = join(ctx.projectDir, ".hench");
+  const henchDir = join(ctx.projectDir, ".n-dx/hench");
   const configPath = join(henchDir, "config.json");
   const runsDir = join(henchDir, "runs");
 

@@ -53,7 +53,7 @@ describe("resolveStore", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-resolve-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     resetDefaultRegistry();
   });
 

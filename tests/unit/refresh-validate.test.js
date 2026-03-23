@@ -31,7 +31,7 @@ describe("snapshotRefreshState", () => {
   });
 
   it("captures existing sourcevision files when the directory exists", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(
       join(svDir, "manifest.json"),
@@ -50,7 +50,7 @@ describe("snapshotRefreshState", () => {
   });
 
   it("does not snapshot when only web-build is planned", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(join(svDir, "manifest.json"), "{}", "utf-8");
 
@@ -62,7 +62,7 @@ describe("snapshotRefreshState", () => {
   });
 
   it("snapshots when sourcevision-dashboard-artifacts step is planned", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(join(svDir, "dashboard-artifacts.json"), JSON.stringify({ ok: true }), "utf-8");
 
@@ -77,7 +77,7 @@ describe("snapshotRefreshState", () => {
     const plan = { steps: [{ kind: "sourcevision-analyze" }] };
     const snapshot = await snapshotRefreshState(tmpDir, plan);
     expect(snapshot.absDir).toBeTruthy();
-    expect(snapshot.svDir).toContain(".sourcevision");
+    expect(snapshot.svDir).toContain(".n-dx/sourcevision");
   });
 });
 
@@ -102,7 +102,7 @@ describe("validateRefreshStep", () => {
   });
 
   it("succeeds when manifest.json exists and contains valid JSON", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(
       join(svDir, "manifest.json"),
@@ -116,7 +116,7 @@ describe("validateRefreshStep", () => {
   });
 
   it("reports invalid JSON in manifest.json", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(join(svDir, "manifest.json"), "{ not valid json {{", "utf-8");
 
@@ -132,7 +132,7 @@ describe("validateRefreshStep", () => {
   });
 
   it("succeeds when dashboard-artifacts.json exists with valid JSON", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(join(svDir, "dashboard-artifacts.json"), JSON.stringify({ ok: true }), "utf-8");
 
@@ -174,7 +174,7 @@ describe("validateRefreshCompletion", () => {
   });
 
   it("succeeds when all step outputs are present and valid", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(join(svDir, "manifest.json"), JSON.stringify({ ok: true }), "utf-8");
     await writeFile(join(svDir, "dashboard-artifacts.json"), JSON.stringify({ ok: true }), "utf-8");
@@ -239,7 +239,7 @@ describe("rollbackRefreshState", () => {
   });
 
   it("restores a snapshotted file to its pre-refresh content", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     const original = JSON.stringify({ version: "before-refresh" });
     await writeFile(join(svDir, "manifest.json"), original, "utf-8");
@@ -264,7 +264,7 @@ describe("rollbackRefreshState", () => {
   });
 
   it("restores multiple files from the snapshot", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     const files = {
       "manifest.json": JSON.stringify({ v: 1 }),
@@ -298,7 +298,7 @@ describe("rollbackRefreshState", () => {
   it("returns zero counts and no errors for an empty snapshot", async () => {
     const snapshot = {
       absDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
       files: {},
       capturedAt: Date.now(),
       fileCount: 0,
@@ -317,7 +317,7 @@ describe("rollbackRefreshState", () => {
   });
 
   it("recreates .sourcevision directory if it was deleted before rollback", async () => {
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeFile(join(svDir, "manifest.json"), JSON.stringify({ v: 1 }), "utf-8");
 

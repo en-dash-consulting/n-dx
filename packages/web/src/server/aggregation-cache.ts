@@ -65,9 +65,9 @@ export async function takeFingerprint(
   projectDir: string,
   rexDir: string,
 ): Promise<SourceFingerprint> {
-  const henchRunsDir = join(projectDir, ".hench", "runs");
+  const henchRunsDir = join(projectDir, ".n-dx/hench", "runs");
   const rexLogPath = join(rexDir, "execution-log.jsonl");
-  const svManifestPath = join(projectDir, ".sourcevision", "manifest.json");
+  const svManifestPath = join(projectDir, ".n-dx/sourcevision", "manifest.json");
 
   // Run all stat operations in parallel for performance
   const [henchDirResult, henchFilesResult, rexLogResult, svManifestResult] =

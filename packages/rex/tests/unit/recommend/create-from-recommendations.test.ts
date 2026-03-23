@@ -11,10 +11,10 @@ async function writeFixtureProject(
   dir: string,
   items: PRDItem[] = [],
 ): Promise<void> {
-  await mkdir(join(dir, ".rex"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/rex"), { recursive: true });
 
   await writeFile(
-    join(dir, ".rex", "config.json"),
+    join(dir, ".n-dx/rex", "config.json"),
     JSON.stringify({
       schema: "rex/v1",
       project: "test-project",
@@ -24,7 +24,7 @@ async function writeFixtureProject(
   );
 
   await writeFile(
-    join(dir, ".rex", "prd.json"),
+    join(dir, ".n-dx/rex", "prd.json"),
     JSON.stringify({
       schema: "rex/v1",
       title: "test-project",
@@ -35,13 +35,13 @@ async function writeFixtureProject(
 }
 
 async function readPrd(dir: string): Promise<PRDDocument> {
-  const raw = await readFile(join(dir, ".rex", "prd.json"), "utf-8");
+  const raw = await readFile(join(dir, ".n-dx/rex", "prd.json"), "utf-8");
   return JSON.parse(raw) as PRDDocument;
 }
 
 async function readLog(dir: string): Promise<string[]> {
   try {
-    const raw = await readFile(join(dir, ".rex", "execution-log.jsonl"), "utf-8");
+    const raw = await readFile(join(dir, ".n-dx/rex", "execution-log.jsonl"), "utf-8");
     return raw.trim().split("\n").filter(Boolean);
   } catch {
     return [];
@@ -57,8 +57,8 @@ describe("createItemsFromRecommendations", () => {
     vi.resetModules();
     vi.doMock("@n-dx/llm-client", () => ({
       PROJECT_DIRS: {
-        REX: ".rex",
-        SOURCEVISION: ".sourcevision",
+        REX: ".n-dx/rex",
+        SOURCEVISION: ".n-dx/sourcevision",
       },
       formatUsage: () => "",
       toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
@@ -87,7 +87,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("returns empty result for zero recommendations", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, []);
 
@@ -100,7 +100,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("creates a single epic from a recommendation", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -126,7 +126,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("creates multiple items atomically", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -165,7 +165,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("preserves recommendation metadata and quality scores on created items", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -207,7 +207,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("omits recommendationMeta when no meta is provided", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -235,7 +235,7 @@ describe("createItemsFromRecommendations", () => {
         level: "epic",
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -274,7 +274,7 @@ describe("createItemsFromRecommendations", () => {
         ],
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -318,7 +318,7 @@ describe("createItemsFromRecommendations", () => {
         ],
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -348,7 +348,7 @@ describe("createItemsFromRecommendations", () => {
         level: "epic",
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -380,7 +380,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("throws when parent ID does not exist", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await expect(
       createItemsFromRecommendations(store, [
@@ -428,7 +428,7 @@ describe("createItemsFromRecommendations", () => {
         ],
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     // Try to add a feature under a task (invalid per hierarchy)
     await expect(
@@ -447,7 +447,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("throws when a subtask is added without a parent", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await expect(
       createItemsFromRecommendations(store, [
@@ -464,7 +464,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("allows features at root level (recommendation workflow)", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     // Features from sourcevision recommendations are typically added at root
     const result = await createItemsFromRecommendations(store, [
@@ -485,7 +485,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("allows tasks at root level (recommendation workflow)", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -520,7 +520,7 @@ describe("createItemsFromRecommendations", () => {
         ],
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     // Epic's LEVEL_HIERARCHY only allows null (root), so placing under
     // a feature should fail. The error comes from the insertion step
@@ -556,7 +556,7 @@ describe("createItemsFromRecommendations", () => {
         ],
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await expect(
       createItemsFromRecommendations(store, [
@@ -576,7 +576,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("creates zero items when validation fails for any item in the batch", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     // Mix of valid and invalid items
     await expect(
@@ -605,7 +605,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("rolls back all items when the last item in a batch fails validation", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await expect(
       createItemsFromRecommendations(store, [
@@ -639,7 +639,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("does not write log entries when batch fails validation", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await expect(
       createItemsFromRecommendations(store, [
@@ -668,7 +668,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("logs item_added events for each created item", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -700,7 +700,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("logs include the item ID", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -719,7 +719,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("log entries have valid ISO timestamps", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -750,7 +750,7 @@ describe("createItemsFromRecommendations", () => {
         level: "epic",
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -784,7 +784,7 @@ describe("createItemsFromRecommendations", () => {
         level: "epic",
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -807,7 +807,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("returns created item IDs that match persisted items", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -833,7 +833,7 @@ describe("createItemsFromRecommendations", () => {
         level: "epic",
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -851,7 +851,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("returns undefined parentId for root-level items", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -868,7 +868,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("generates unique IDs for each created item", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -903,7 +903,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("applies tags when provided", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -922,7 +922,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("omits tags field when no tags are provided", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -940,7 +940,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("omits tags field when tags array is empty", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -961,7 +961,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("creates items of different levels in a single batch", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -1013,7 +1013,7 @@ describe("createItemsFromRecommendations", () => {
         blockedBy: ["task-a"],
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     // Adding a new item should succeed — existing DAG is valid
     const result = await createItemsFromRecommendations(store, [
@@ -1035,7 +1035,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("handles multiline descriptions", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const description = "- Finding A\n- Finding B\n- Finding C\n\nSummary: Multiple issues detected.";
     await createItemsFromRecommendations(store, [
@@ -1054,7 +1054,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("handles empty description", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -1074,7 +1074,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("creates items with all valid priority levels", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -1119,7 +1119,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("preserves custom source identifiers", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -1147,7 +1147,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("always sets status to pending for all created items", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -1183,7 +1183,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("preserves partial metadata (only some fields)", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await createItemsFromRecommendations(store, [
       {
@@ -1212,7 +1212,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("handles a large batch of recommendations (10 items)", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const recommendations = Array.from({ length: 10 }, (_, i) => ({
       title: `Recommendation ${i + 1}`,
@@ -1249,7 +1249,7 @@ describe("createItemsFromRecommendations", () => {
         level: "epic",
       },
     ]);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     // First item is valid (under epic), second references nonexistent parent
     await expect(
@@ -1283,7 +1283,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("includes item title in placement error messages", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await expect(
       createItemsFromRecommendations(store, [
@@ -1300,7 +1300,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("reports multiple placement errors when several items fail", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     await expect(
       createItemsFromRecommendations(store, [
@@ -1326,7 +1326,7 @@ describe("createItemsFromRecommendations", () => {
 
   it("returns level in creation result for each item", async () => {
     await writeFixtureProject(tmpDir);
-    const store = await resolveStore(join(tmpDir, ".rex"));
+    const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
     const result = await createItemsFromRecommendations(store, [
       {
@@ -1361,7 +1361,7 @@ describe("createItemsFromRecommendations", () => {
           level: "feature",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1400,7 +1400,7 @@ describe("createItemsFromRecommendations", () => {
 
     it("creates all items when no conflicts exist", async () => {
       await writeFixtureProject(tmpDir);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1442,7 +1442,7 @@ describe("createItemsFromRecommendations", () => {
           level: "feature",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1481,7 +1481,7 @@ describe("createItemsFromRecommendations", () => {
           level: "feature",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       await createItemsFromRecommendations(
         store,
@@ -1510,7 +1510,7 @@ describe("createItemsFromRecommendations", () => {
           level: "task",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1544,7 +1544,7 @@ describe("createItemsFromRecommendations", () => {
           level: "feature",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1580,7 +1580,7 @@ describe("createItemsFromRecommendations", () => {
           level: "task",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1610,7 +1610,7 @@ describe("createItemsFromRecommendations", () => {
           level: "epic",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1648,7 +1648,7 @@ describe("createItemsFromRecommendations", () => {
           ],
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1685,7 +1685,7 @@ describe("createItemsFromRecommendations", () => {
           level: "feature",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1739,7 +1739,7 @@ describe("createItemsFromRecommendations", () => {
           ],
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1785,7 +1785,7 @@ describe("createItemsFromRecommendations", () => {
           level: "feature",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       await expect(
         createItemsFromRecommendations(
@@ -1816,7 +1816,7 @@ describe("createItemsFromRecommendations", () => {
           level: "task",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       await expect(
         createItemsFromRecommendations(
@@ -1837,7 +1837,7 @@ describe("createItemsFromRecommendations", () => {
 
     it("does not throw when no conflicts exist", async () => {
       await writeFixtureProject(tmpDir);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1869,7 +1869,7 @@ describe("createItemsFromRecommendations", () => {
           level: "feature",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1902,7 +1902,7 @@ describe("createItemsFromRecommendations", () => {
           level: "feature",
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       // No options = force strategy (backwards compat)
       const result = await createItemsFromRecommendations(store, [
@@ -1943,7 +1943,7 @@ describe("createItemsFromRecommendations", () => {
           ],
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,
@@ -1995,7 +1995,7 @@ describe("createItemsFromRecommendations", () => {
           ],
         },
       ]);
-      const store = await resolveStore(join(tmpDir, ".rex"));
+      const store = await resolveStore(join(tmpDir, ".n-dx/rex"));
 
       const result = await createItemsFromRecommendations(
         store,

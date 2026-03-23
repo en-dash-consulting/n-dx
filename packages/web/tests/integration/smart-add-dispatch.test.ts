@@ -113,8 +113,8 @@ describe("smart-add endpoint → rex CLI dispatch", () => {
     };
 
     tmpDir = await mkdtemp(join(tmpdir(), "smart-add-test-"));
-    svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(makePRD(), null, 2));

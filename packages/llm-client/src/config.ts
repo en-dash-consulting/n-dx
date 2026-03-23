@@ -9,7 +9,12 @@ import { join } from "node:path";
 import { readFile, access } from "node:fs/promises";
 import type { ClaudeConfig } from "./types.js";
 
-const PROJECT_CONFIG_FILE = ".n-dx.json";
+/**
+ * Config filename (basename only). Callers pass the directory containing it.
+ * In the old layout this was the project root containing .n-dx.json.
+ * In the new layout callers pass .n-dx/ which contains config.json.
+ */
+const PROJECT_CONFIG_FILE = "config.json";
 
 /**
  * Map of shorthand model aliases to full Anthropic API model IDs.

@@ -6,15 +6,15 @@ import { cmdValidate } from "../../../../src/cli/commands/validate.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
+  writeFileSync(join(dir, ".n-dx/rex", "prd.json"), JSON.stringify(doc));
 }
 
 function writeConfig(dir: string, config: Record<string, unknown>): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
+  writeFileSync(join(dir, ".n-dx/rex", "config.json"), JSON.stringify(config));
 }
 
 function readPRD(dir: string): PRDDocument {
-  return JSON.parse(readFileSync(join(dir, ".rex", "prd.json"), "utf-8"));
+  return JSON.parse(readFileSync(join(dir, ".n-dx/rex", "prd.json"), "utf-8"));
 }
 
 const VALID_CONFIG = {
@@ -71,7 +71,7 @@ describe("cmdValidate — epicless feature interactive resolution", () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "rex-validate-epicless-"));
-    mkdirSync(join(tmpDir, ".rex"), { recursive: true });
+    mkdirSync(join(tmpDir, ".n-dx/rex"), { recursive: true });
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called");
     }) as never);
@@ -260,7 +260,7 @@ describe("cmdValidate — epicless feature interactive resolution", () => {
     ).rejects.toThrow("process.exit");
 
     // Check execution log
-    const logPath = join(tmpDir, ".rex", "execution-log.jsonl");
+    const logPath = join(tmpDir, ".n-dx/rex", "execution-log.jsonl");
     const logContent = readFileSync(logPath, "utf-8");
     expect(logContent).toContain("validate_interactive_fix");
     expect(logContent).toContain("epicless feature");

@@ -129,7 +129,7 @@ describe("rex adapter", () => {
       tmpDir,
     ]);
 
-    const raw = await readFile(join(tmpDir, ".rex", "adapters.json"), "utf-8");
+    const raw = await readFile(join(tmpDir, ".n-dx/rex", "adapters.json"), "utf-8");
     const data = JSON.parse(raw);
     expect(data.adapters).toHaveLength(1);
     expect(data.adapters[0].name).toBe("notion");
@@ -225,7 +225,7 @@ describe("rex adapter", () => {
       tmpDir,
     ]);
 
-    const raw = await readFile(join(tmpDir, ".rex", "adapters.json"), "utf-8");
+    const raw = await readFile(join(tmpDir, ".n-dx/rex", "adapters.json"), "utf-8");
     const data = JSON.parse(raw);
     expect(data.adapters).toHaveLength(2);
 
@@ -255,7 +255,7 @@ describe("rex adapter", () => {
       tmpDir,
     ]);
 
-    const raw = await readFile(join(tmpDir, ".rex", "adapters.json"), "utf-8");
+    const raw = await readFile(join(tmpDir, ".n-dx/rex", "adapters.json"), "utf-8");
     const data = JSON.parse(raw);
     expect(data.adapters).toHaveLength(1);
     // Token is redacted — only the hint reflects the latest value

@@ -51,7 +51,7 @@ describe("branch-work-store", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-bws-"));
-    svDir = join(tmpDir, ".sourcevision");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
   });
 

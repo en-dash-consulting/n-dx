@@ -28,9 +28,9 @@ describe("AggregationResultCache", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "agg-cache-"));
-    rexDir = join(tmpDir, ".rex");
-    henchRunsDir = join(tmpDir, ".hench", "runs");
-    svDir = join(tmpDir, ".sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
+    henchRunsDir = join(tmpDir, ".n-dx/hench", "runs");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(rexDir, { recursive: true });
     await mkdir(henchRunsDir, { recursive: true });
     await mkdir(svDir, { recursive: true });
@@ -64,7 +64,7 @@ describe("AggregationResultCache", () => {
     it("returns zero values when no source files exist", async () => {
       const emptyDir = await mkdtemp(join(tmpdir(), "agg-cache-empty-"));
       try {
-        const fp = await takeFingerprint(emptyDir, join(emptyDir, ".rex"));
+        const fp = await takeFingerprint(emptyDir, join(emptyDir, ".n-dx/rex"));
         expect(fp.henchDirMtimeMs).toBe(0);
         expect(fp.henchFileCount).toBe(0);
         expect(fp.rexLogMtimeMs).toBe(0);
@@ -441,9 +441,9 @@ describe("AggregationResultCache", () => {
   describe("edge cases", () => {
     it("works when hench runs directory does not exist", async () => {
       const noHenchDir = await mkdtemp(join(tmpdir(), "agg-cache-no-hench-"));
-      await mkdir(join(noHenchDir, ".rex"), { recursive: true });
+      await mkdir(join(noHenchDir, ".n-dx/rex"), { recursive: true });
       try {
-        const cache = new AggregationResultCache(noHenchDir, join(noHenchDir, ".rex"));
+        const cache = new AggregationResultCache(noHenchDir, join(noHenchDir, ".n-dx/rex"));
         const result = await cache.getOrCompute("key", () => "value");
         expect(result).toBe("value");
       } finally {
@@ -453,7 +453,7 @@ describe("AggregationResultCache", () => {
 
     it("works when rex directory does not exist", async () => {
       const noRexDir = await mkdtemp(join(tmpdir(), "agg-cache-no-rex-"));
-      await mkdir(join(noRexDir, ".hench", "runs"), { recursive: true });
+      await mkdir(join(noRexDir, ".n-dx/hench", "runs"), { recursive: true });
       try {
         const cache = new AggregationResultCache(noRexDir, join(noRexDir, "missing-rex"));
         const result = await cache.getOrCompute("key", () => "value");

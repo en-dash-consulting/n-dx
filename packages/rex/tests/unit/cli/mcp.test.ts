@@ -37,7 +37,7 @@ describe("Rex MCP server factory", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-mcp-test-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx", "rex");
     await ensureRexDir(rexDir);
 
     const doc: PRDDocument = {

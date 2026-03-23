@@ -27,9 +27,8 @@ export interface ScanOptions {
 const SKIP_DIRS = new Set([
   "node_modules",
   "dist",
-  PROJECT_DIRS.REX,
+  PROJECT_DIRS.ROOT,
   ".git",
-  PROJECT_DIRS.SOURCEVISION,
   "coverage",
   ".next",
   ".turbo",
@@ -39,7 +38,7 @@ const SKIP_DIRS = new Set([
 const SKIP_DOC_DIRS = new Set([
   "build",
   "out",
-  PROJECT_DIRS.HENCH,
+  PROJECT_DIRS.ROOT,
   ".cache",
   ".parcel-cache",
   ".vite",
@@ -604,7 +603,7 @@ export async function scanSourceVision(
         results.push({
           name: zone.name,
           source: "sourcevision",
-          sourceFile: ".sourcevision/zones.json",
+          sourceFile: ".n-dx/sourcevision/zones.json",
           kind: "feature",
           description: fileCount > 0
             ? `${zone.description} (${fileCount} files)`
@@ -648,7 +647,7 @@ export async function scanSourceVision(
 
           // Use first related file as sourceFile, fall back to zones.json
           const primaryFile = finding.related?.[0];
-          const sourceFile = primaryFile ?? ".sourcevision/zones.json";
+          const sourceFile = primaryFile ?? ".n-dx/sourcevision/zones.json";
 
           // Build acceptance criteria from related file paths and fix suggestions
           const criteria: string[] = [];
@@ -744,7 +743,7 @@ export async function scanSourceVision(
         results.push({
           name: toTitleCase(category),
           source: "sourcevision",
-          sourceFile: ".sourcevision/inventory.json",
+          sourceFile: ".n-dx/sourcevision/inventory.json",
           kind: "epic",
           description: `${toTitleCase(category)} (${fileLabel})`,
         });
@@ -755,7 +754,7 @@ export async function scanSourceVision(
         results.push({
           name: toTitleCase(category),
           source: "sourcevision",
-          sourceFile: ".sourcevision/inventory.json",
+          sourceFile: ".n-dx/sourcevision/inventory.json",
           kind: "epic",
         });
       }
@@ -777,7 +776,7 @@ export async function scanSourceVision(
         results.push({
           name: `Resolve circular: ${label}`,
           source: "sourcevision",
-          sourceFile: uniqueFiles[0] ?? ".sourcevision/imports.json",
+          sourceFile: uniqueFiles[0] ?? ".n-dx/sourcevision/imports.json",
           kind: "task",
           priority: "high",
           tags: ["tech-debt"],
@@ -801,7 +800,7 @@ export async function scanSourceVision(
         results.push({
           name: `Resolve circular: ${dep.from} → ${dep.to}`,
           source: "sourcevision",
-          sourceFile: ".sourcevision/imports.json",
+          sourceFile: ".n-dx/sourcevision/imports.json",
           kind: "task",
           priority: "high",
           tags: ["tech-debt"],
@@ -816,7 +815,7 @@ export async function scanSourceVision(
         results.push({
           name: `Resolve circular: ${label}`,
           source: "sourcevision",
-          sourceFile: ".sourcevision/imports.json",
+          sourceFile: ".n-dx/sourcevision/imports.json",
           kind: "task",
           priority: "high",
           tags: ["tech-debt"],
@@ -963,7 +962,7 @@ function processLegacyZones(
     results.push({
       name: zone.name,
       source: "sourcevision",
-      sourceFile: ".sourcevision/zones.json",
+      sourceFile: ".n-dx/sourcevision/zones.json",
       kind: "feature",
       description: zone.description,
       acceptanceCriteria: zone.insights,
@@ -980,7 +979,7 @@ function processLegacyZones(
         results.push({
           name: finding.message,
           source: "sourcevision",
-          sourceFile: finding.file ?? ".sourcevision/zones.json",
+          sourceFile: finding.file ?? ".n-dx/sourcevision/zones.json",
           kind: "task",
           priority,
           tags: [zone.name],

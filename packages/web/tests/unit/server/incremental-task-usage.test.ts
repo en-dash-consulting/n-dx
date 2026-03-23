@@ -20,7 +20,7 @@ describe("IncrementalTaskUsageAggregator", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "incr-task-usage-"));
-    runsDir = join(tmpDir, ".hench", "runs");
+    runsDir = join(tmpDir, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
   });
 

@@ -15,14 +15,14 @@ describe("loadLLMConfig", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns empty config when .n-dx.json is missing", async () => {
+  it("returns empty config when config.json is missing", async () => {
     const cfg = await loadLLMConfig(tmpDir);
     expect(cfg).toEqual({});
   });
 
   it("reads llm.vendor and llm provider sections", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, "config.json"),
       JSON.stringify({
         llm: {
           vendor: "codex",
@@ -41,7 +41,7 @@ describe("loadLLMConfig", () => {
 
   it("falls back to legacy top-level claude config", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, "config.json"),
       JSON.stringify({
         claude: { api_key: "sk-ant-test" },
       }, null, 2),

@@ -7,9 +7,9 @@ import { initConfig } from "../../../src/store/config.js";
 
 /**
  * Tests that the API agentLoop correctly handles authentication configuration:
- * - Uses API key from .n-dx.json (via @n-dx/llm-client)
+ * - Uses API key from config.json (via @n-dx/llm-client)
  * - Passes custom api_endpoint as baseURL to Anthropic client
- * - Uses model override from .n-dx.json
+ * - Uses model override from config.json
  */
 
 async function setupProjectDir(): Promise<{
@@ -18,8 +18,8 @@ async function setupProjectDir(): Promise<{
   rexDir: string;
 }> {
   const projectDir = await mkdtemp(join(tmpdir(), "hench-test-api-auth-"));
-  const henchDir = join(projectDir, ".hench");
-  const rexDir = join(projectDir, ".rex");
+  const henchDir = join(projectDir, ".n-dx/hench");
+  const rexDir = join(projectDir, ".n-dx/rex");
 
   await initConfig(henchDir);
   await mkdir(rexDir, { recursive: true });
@@ -83,10 +83,10 @@ describe("API loop authentication and endpoint config", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("uses api_key from .n-dx.json when env var is unset", async () => {
-    // Write .n-dx.json with API key
+  it("uses api_key from config.json when env var is unset", async () => {
+    // Write config.json with API key
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: { api_key: "sk-ant-from-config" },
       }),
@@ -120,7 +120,7 @@ describe("API loop authentication and endpoint config", () => {
     const config = await loadConfig(henchDir);
     const store = createStore("file", rexDir);
 
-    // Should NOT throw "API key not found" — the .n-dx.json key is used
+    // Should NOT throw "API key not found" — the config.json key is used
     const result = await agentLoop({ config, store, projectDir, henchDir });
 
     // The agent loop ran (even though the mock response won't validate completion,
@@ -129,10 +129,10 @@ describe("API loop authentication and endpoint config", () => {
     expect(result.run.turns).toBeGreaterThanOrEqual(1);
   });
 
-  it("prefers .n-dx.json api_key over env var", async () => {
-    // Write .n-dx.json with API key
+  it("prefers config.json api_key over env var", async () => {
+    // Write config.json with API key
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: { api_key: "sk-ant-config-key" },
       }),
@@ -154,10 +154,10 @@ describe("API loop authentication and endpoint config", () => {
     expect(resolved).toBe("sk-ant-config-key");
   });
 
-  it("falls back to env var when .n-dx.json has no api_key", async () => {
+  it("falls back to env var when config.json has no api_key", async () => {
     process.env.ANTHROPIC_API_KEY = "sk-ant-env-key";
 
-    // No .n-dx.json file
+    // No config.json file
     const { loadClaudeConfig, resolveApiKey } = await import(
       "../../../src/store/project-config.js"
     );
@@ -169,9 +169,9 @@ describe("API loop authentication and endpoint config", () => {
     expect(resolved).toBe("sk-ant-env-key");
   });
 
-  it("reads api_endpoint from .n-dx.json", async () => {
+  it("reads api_endpoint from config.json", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-test",
@@ -189,9 +189,9 @@ describe("API loop authentication and endpoint config", () => {
     expect(claudeConfig.api_endpoint).toBe("https://proxy.example.com/v1");
   });
 
-  it("reads model from .n-dx.json", async () => {
+  it("reads model from config.json", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-test",
@@ -211,7 +211,7 @@ describe("API loop authentication and endpoint config", () => {
 
   it("loads all claude config fields together", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: {
           cli_path: "/opt/claude",
@@ -236,7 +236,7 @@ describe("API loop authentication and endpoint config", () => {
 
   it("dry run succeeds with api_endpoint configured", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-test",
@@ -269,7 +269,7 @@ describe("API loop authentication and endpoint config", () => {
   it("api_endpoint is passed to Anthropic client as baseURL", async () => {
     // Write config with custom endpoint
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-proxy-test",
@@ -328,9 +328,9 @@ describe("CLI loop claude-client integration", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("resolves cli_path from .n-dx.json via @n-dx/llm-client", async () => {
+  it("resolves cli_path from config.json via @n-dx/llm-client", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: { cli_path: "/custom/path/to/claude" },
       }),
@@ -362,7 +362,7 @@ describe("CLI loop claude-client integration", () => {
 
   it("dry run succeeds with cli_path configured", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx", "config.json"),
       JSON.stringify({
         claude: { cli_path: "/opt/special-claude" },
       }),

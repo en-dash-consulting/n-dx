@@ -28,7 +28,7 @@ const gw = await import("../../packages/hench/dist/prd/rex-gateway.js");
 
 function makeTmpProject(items) {
   const tmpDir = mkdtempSync(join(tmpdir(), "hench-rex-gw-test-"));
-  const rexDir = join(tmpDir, ".rex");
+  const rexDir = join(tmpDir, ".n-dx/rex");
   mkdirSync(rexDir, { recursive: true });
 
   const doc = {

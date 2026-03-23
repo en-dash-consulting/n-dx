@@ -20,13 +20,14 @@
 
 import { readdir, writeFile, unlink, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { HENCH_FILES } from "../constants.js";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const LOCKS_DIR = "locks";
-const RUNS_DIR = "runs";
+const RUNS_DIR = HENCH_FILES.RUNS;
 const LIFECYCLE_DIR = "lifecycle";
 
 /** Default stale run threshold: 2 minutes without activity. */

@@ -1115,7 +1115,7 @@ describe("rex runtime state: PRD write-zone enforcement", () => {
    */
   function collectSourceFiles(dir) {
     const results = [];
-    const SKIP = new Set(["node_modules", "dist", "tests", ".git", ".hench", ".rex", ".sourcevision"]);
+    const SKIP = new Set(["node_modules", "dist", "tests", ".git", ".n-dx"]);
 
     function walk(d) {
       let entries;

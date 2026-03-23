@@ -30,14 +30,14 @@ describe("cmdExportPdf", () => {
   });
 
   it("throws CLIError when manifest.json is missing", () => {
-    mkdirSync(join(tmpDir, ".sourcevision"));
+    mkdirSync(join(tmpDir, ".n-dx/sourcevision"), { recursive: true });
     expect(() => cmdExportPdf(tmpDir)).toThrow(CLIError);
     expect(() => cmdExportPdf(tmpDir)).toThrow(/No analysis data found/);
   });
 
   it("throws CLIError when required analysis files are missing", () => {
-    const svDir = join(tmpDir, ".sourcevision");
-    mkdirSync(svDir);
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
+    mkdirSync(svDir, { recursive: true });
     writeFileSync(
       join(svDir, "manifest.json"),
       JSON.stringify({
@@ -67,7 +67,7 @@ describe("cmdExportPdf", () => {
 
     await cmdExportPdf(tmpDir);
 
-    expect(existsSync(join(tmpDir, ".sourcevision", "report.pdf"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".n-dx/sourcevision", "report.pdf"))).toBe(true);
   });
 
   it("throws CLIError when output directory does not exist", () => {
@@ -83,7 +83,7 @@ describe("cmdExportPdf", () => {
 
 /** Helper: write minimal valid analysis data to .sourcevision/ */
 function setupAnalysisData(dir: string): void {
-  const svDir = join(dir, ".sourcevision");
+  const svDir = join(dir, ".n-dx/sourcevision");
   mkdirSync(svDir, { recursive: true });
 
   writeFileSync(

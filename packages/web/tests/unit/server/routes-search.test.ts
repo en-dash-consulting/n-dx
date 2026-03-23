@@ -51,8 +51,8 @@ describe("Search API routes", () => {
   beforeEach(async () => {
     clearSearchIndexCache();
     tmpDir = await mkdtemp(join(tmpdir(), "search-api-"));
-    const svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
 

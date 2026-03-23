@@ -40,6 +40,7 @@ import {
   type RetentionConfig,
   type RetentionResult,
 } from "./run-retention.js";
+import { HENCH_FILES } from "../constants.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -85,7 +86,7 @@ export async function loadRetentionIntervalMs(
   projectDir: string,
 ): Promise<number> {
   try {
-    const raw = await readFile(join(projectDir, ".n-dx.json"), "utf-8");
+    const raw = await readFile(join(projectDir, HENCH_FILES.CONFIG), "utf-8");
     const data = JSON.parse(raw) as Record<string, unknown>;
     const section = data.retention as Record<string, unknown> | undefined;
     if (
@@ -121,7 +122,7 @@ export async function runRetentionCycle(
 
   try {
     const config = await loadRetentionConfig(projectDir);
-    const logPath = join(projectDir, ".hench", "retention-stats.jsonl");
+    const logPath = join(projectDir, ".n-dx/hench", "retention-stats.jsonl");
 
     const result = await enforceRetentionPolicy(
       runsDir,

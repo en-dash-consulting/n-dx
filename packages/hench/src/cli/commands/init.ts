@@ -10,15 +10,15 @@ export async function cmdInit(
   const henchDir = join(dir, HENCH_DIR);
 
   if (await configExists(henchDir)) {
-    info(".hench/ already initialized, skipping");
+    info(".n-dx/hench/ already initialized, skipping");
     return;
   }
 
   const config = await initConfig(henchDir);
 
-  info("Created .hench/config.json");
-  info("Created .hench/runs/");
-  info(`\nInitialized .hench/ in ${dir}`);
+  info("Created .n-dx/hench/config.json");
+  info("Created .n-dx/hench/runs/");
+  info(`\nInitialized .n-dx/hench/ in ${dir}`);
   info(`Model: ${config.model}`);
   info(`Max turns: ${config.maxTurns}`);
   info(`Rex dir: ${config.rexDir}`);

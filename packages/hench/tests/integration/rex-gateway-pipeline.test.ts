@@ -38,7 +38,7 @@ describe("hench → rex-gateway integration pipeline", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-gw-test-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(rexDir, { recursive: true });
   });
 

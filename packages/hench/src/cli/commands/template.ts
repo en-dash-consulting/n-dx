@@ -247,7 +247,7 @@ export async function cmdTemplate(
   positional: string[],
   flags: Record<string, string>,
 ): Promise<void> {
-  const henchDir = join(dir, ".hench");
+  const henchDir = join(dir, ".n-dx/hench");
   const subcommand = positional[0];
   const format = flags.format ?? "text";
 

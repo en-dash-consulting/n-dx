@@ -4,7 +4,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, watch, type FSWatcher } from "node:fs";
-import { writeFile, unlink } from "node:fs/promises";
+import { writeFile, unlink, mkdir } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
@@ -36,7 +36,7 @@ import { findAvailablePort } from "./port.js";
  * Used by the orchestrator (web.js) to discover the port in background mode,
  * where the server's stdout is not available.
  */
-export const PORT_FILE = ".n-dx-web.port";
+export const PORT_FILE = ".n-dx/web.port";
 
 // ── Shutdown handler ──────────────────────────────────────────────────────
 
@@ -347,7 +347,7 @@ function registerWatchers(
   ws: ReturnType<typeof createWebSocketManager>,
   viewerPath: string,
 ): WatcherHandles {
-  const henchRunsDir = join(ctx.projectDir, ".hench", "runs");
+  const henchRunsDir = join(ctx.projectDir, ".n-dx/hench", "runs");
   const watchers: FSWatcher[] = [];
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) watchers.push(sv);
@@ -568,8 +568,8 @@ export async function startServer(
   opts: ServerOptions = {},
 ): Promise<StartResult> {
   const absDir = resolve(targetDir);
-  const svDir = join(absDir, ".sourcevision");
-  const rexDir = join(absDir, ".rex");
+  const svDir = join(absDir, ".n-dx/sourcevision");
+  const rexDir = join(absDir, ".n-dx/rex");
   const dev = opts.dev ?? false;
   const scope = opts.scope;
 
@@ -591,7 +591,7 @@ export async function startServer(
   }
 
   if (isInScope(scope, "sourcevision") && !existsSync(svDir)) {
-    console.log("No .sourcevision/ directory found — landing page will be shown at /");
+    console.log("No .n-dx/sourcevision/ directory found — landing page will be shown at /");
     console.log("Run 'ndx init .' to initialize, then 'ndx plan .' to analyze.");
   }
 
@@ -659,6 +659,7 @@ export async function startServer(
       // (especially important in background mode where stdout is unavailable).
       const portFilePath = join(absDir, PORT_FILE);
       try {
+        await mkdir(join(absDir, ".n-dx"), { recursive: true });
         await writeFile(portFilePath, String(actualPort) + "\n", "utf-8");
       } catch {
         // Non-fatal: port file is a convenience, not a requirement

@@ -122,13 +122,13 @@ describe("shutdownActiveExecutions — with active executions", () => {
     vi.clearAllMocks();
 
     tmpDir = await mkdtemp(join(tmpdir(), "hench-shutdown-"));
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(rexDir, { recursive: true });
-    await mkdir(join(tmpDir, ".hench", "runs"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/hench", "runs"), { recursive: true });
 
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
       rexDir,
       dev: false,
     };
@@ -206,7 +206,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
   });
 
   it("handles concurrent active executions", async () => {
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     // Add a second task
     await writeFile(
       join(rexDir, "prd.json"),
@@ -268,13 +268,13 @@ describe("shutdownActiveExecutions — logging", () => {
     vi.clearAllMocks();
 
     tmpDir = await mkdtemp(join(tmpdir(), "hench-shutdown-log-"));
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(rexDir, { recursive: true });
-    await mkdir(join(tmpDir, ".hench", "runs"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/hench", "runs"), { recursive: true });
 
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
       rexDir,
       dev: false,
     };
@@ -326,7 +326,7 @@ describe("shutdownActiveExecutions — logging", () => {
   });
 
   it("logs per-execution termination message for each task", async () => {
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await writeFile(
       join(rexDir, "prd.json"),
       JSON.stringify(makePRD([

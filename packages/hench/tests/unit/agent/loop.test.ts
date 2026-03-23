@@ -10,11 +10,11 @@ describe("agentLoop", () => {
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-loop-"));
-    henchDir = join(projectDir, ".hench");
+    henchDir = join(projectDir, ".n-dx/hench");
     await initConfig(henchDir);
 
     // Create minimal .rex/ for store
-    const rexDir = join(projectDir, ".rex");
+    const rexDir = join(projectDir, ".n-dx/rex");
     await mkdir(rexDir, { recursive: true });
     await writeFile(
       join(rexDir, "config.json"),
@@ -56,7 +56,7 @@ describe("agentLoop", () => {
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
-    const rexDir = join(projectDir, ".rex");
+    const rexDir = join(projectDir, ".n-dx/rex");
     const store = createStore("file", rexDir);
 
     const consoleSpy = vi.spyOn(console, "log");
@@ -91,7 +91,7 @@ describe("agentLoop", () => {
     const { loadConfig } = await import("../../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
-    const rexDir = join(projectDir, ".rex");
+    const rexDir = join(projectDir, ".n-dx/rex");
     const store = createStore("file", rexDir);
 
     // Ensure the env var is not set

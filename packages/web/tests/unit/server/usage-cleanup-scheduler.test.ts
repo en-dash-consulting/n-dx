@@ -71,8 +71,8 @@ describe("UsageCleanupScheduler", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "usage-cleanup-"));
-    runsDir = join(tmpDir, ".hench", "runs");
-    rexDir = join(tmpDir, ".rex");
+    runsDir = join(tmpDir, ".n-dx/hench", "runs");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(runsDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
   });
@@ -172,7 +172,7 @@ describe("UsageCleanupScheduler", () => {
 
   describe("writeCleanupLog", () => {
     it("appends a JSONL entry to the log file", async () => {
-      const logPath = join(tmpDir, ".hench", "usage-cleanup.jsonl");
+      const logPath = join(tmpDir, ".n-dx/hench", "usage-cleanup.jsonl");
 
       const entry = {
         event: "usage_cleanup" as const,
@@ -194,7 +194,7 @@ describe("UsageCleanupScheduler", () => {
     });
 
     it("appends multiple entries on separate lines", async () => {
-      const logPath = join(tmpDir, ".hench", "usage-cleanup.jsonl");
+      const logPath = join(tmpDir, ".n-dx/hench", "usage-cleanup.jsonl");
 
       const entry1 = {
         event: "usage_cleanup" as const,
@@ -374,7 +374,7 @@ describe("UsageCleanupScheduler", () => {
       await writeRun("run-2.json", "task-deleted", { input: 200, output: 100 });
       await writePRD(["task-a"]);
 
-      const logPath = join(tmpDir, ".hench", "usage-cleanup.jsonl");
+      const logPath = join(tmpDir, ".n-dx/hench", "usage-cleanup.jsonl");
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
       await runCleanupCycle({ aggregator, rexDir, collectAllIds, logPath, loadPRD: testLoadPRD });
@@ -390,7 +390,7 @@ describe("UsageCleanupScheduler", () => {
       await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
       await writePRD(["task-a"]);
 
-      const logPath = join(tmpDir, ".hench", "usage-cleanup.jsonl");
+      const logPath = join(tmpDir, ".n-dx/hench", "usage-cleanup.jsonl");
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
 
       await runCleanupCycle({ aggregator, rexDir, collectAllIds, logPath, loadPRD: testLoadPRD });

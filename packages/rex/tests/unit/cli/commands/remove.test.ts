@@ -47,7 +47,7 @@ describe("cmdRemove", () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), "rex-remove-test-"));
-    mkdirSync(join(tmp, ".rex"));
+    mkdirSync(join(tmp, ".n-dx/rex"), { recursive: true });
   });
 
   afterEach(() => {
@@ -58,21 +58,21 @@ describe("cmdRemove", () => {
 
   describe("epic removal", () => {
     it("removes epic and all descendants with --yes", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await cmdRemove(tmp, "e1", "epic", { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       expect(prd.items.length).toBe(1);
       expect(prd.items[0].id).toBe("e2");
     });
 
     it("cleans up blockedBy references to deleted items", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await cmdRemove(tmp, "e1", "epic", { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       const t3 = prd.items[0].children[0].children[0];
       expect(t3.id).toBe("t3");
       // blockedBy should be cleaned (t1 was deleted)
@@ -80,11 +80,11 @@ describe("cmdRemove", () => {
     });
 
     it("logs epic_removed event", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await cmdRemove(tmp, "e1", "epic", { yes: "true" });
 
-      const logContent = readFileSync(join(tmp, ".rex", "execution-log.jsonl"), "utf-8");
+      const logContent = readFileSync(join(tmp, ".n-dx/rex", "execution-log.jsonl"), "utf-8");
       const entries = logContent.trim().split("\n").map((l: string) => JSON.parse(l));
       const removeEntry = entries.find((e: { event: string }) => e.event === "epic_removed");
       expect(removeEntry).toBeDefined();
@@ -93,7 +93,7 @@ describe("cmdRemove", () => {
     });
 
     it("outputs JSON when --format=json", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       const logs: string[] = [];
       const origLog = console.log;
@@ -115,7 +115,7 @@ describe("cmdRemove", () => {
     });
 
     it("throws CLIError when item is not an epic", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await expect(
         cmdRemove(tmp, "t1", "epic", { yes: "true" }),
@@ -130,11 +130,11 @@ describe("cmdRemove", () => {
 
   describe("task removal", () => {
     it("removes task and subtasks with --yes", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await cmdRemove(tmp, "t1", "task", { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       const f1 = prd.items[0].children[0];
       // t1 and s1 removed, only t2 remains
       expect(f1.children.length).toBe(1);
@@ -142,22 +142,22 @@ describe("cmdRemove", () => {
     });
 
     it("cleans up blockedBy references to deleted task", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await cmdRemove(tmp, "t1", "task", { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       const t3 = prd.items[1].children[0].children[0];
       expect(t3.id).toBe("t3");
       expect(t3.blockedBy ?? []).toEqual([]);
     });
 
     it("logs task_removed event", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await cmdRemove(tmp, "t1", "task", { yes: "true" });
 
-      const logContent = readFileSync(join(tmp, ".rex", "execution-log.jsonl"), "utf-8");
+      const logContent = readFileSync(join(tmp, ".n-dx/rex", "execution-log.jsonl"), "utf-8");
       const entries = logContent.trim().split("\n").map((l: string) => JSON.parse(l));
       const removeEntry = entries.find((e: { event: string }) => e.event === "task_removed");
       expect(removeEntry).toBeDefined();
@@ -166,7 +166,7 @@ describe("cmdRemove", () => {
     });
 
     it("outputs JSON when --format=json", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       const logs: string[] = [];
       const origLog = console.log;
@@ -187,7 +187,7 @@ describe("cmdRemove", () => {
     });
 
     it("throws CLIError when item is not a task", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await expect(
         cmdRemove(tmp, "e1", "task", { yes: "true" }),
@@ -225,11 +225,11 @@ describe("cmdRemove", () => {
     }
 
     it("removes feature and all descendants with --yes", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
 
       await cmdRemove(tmp, "f-orphan", "feature", { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       expect(prd.items.length).toBe(1);
       expect(prd.items[0].id).toBe("e1");
     });
@@ -252,22 +252,22 @@ describe("cmdRemove", () => {
           ],
         },
       ];
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(items));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(items));
 
       await cmdRemove(tmp, "f-orphan", "feature", { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       const tDep = prd.items[0].children[0];
       expect(tDep.id).toBe("t-dep");
       expect(tDep.blockedBy ?? []).toEqual([]);
     });
 
     it("logs feature_removed event", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
 
       await cmdRemove(tmp, "f-orphan", "feature", { yes: "true" });
 
-      const logContent = readFileSync(join(tmp, ".rex", "execution-log.jsonl"), "utf-8");
+      const logContent = readFileSync(join(tmp, ".n-dx/rex", "execution-log.jsonl"), "utf-8");
       const entries = logContent.trim().split("\n").map((l: string) => JSON.parse(l));
       const removeEntry = entries.find((e: { event: string }) => e.event === "feature_removed");
       expect(removeEntry).toBeDefined();
@@ -276,7 +276,7 @@ describe("cmdRemove", () => {
     });
 
     it("outputs JSON with pre-check data when --format=json", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
 
       const logs: string[] = [];
       const origLog = console.log;
@@ -314,7 +314,7 @@ describe("cmdRemove", () => {
           blockedBy: ["t-orphan"],
         },
       ];
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(items));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(items));
 
       const logs: string[] = [];
       const origLog = console.log;
@@ -334,7 +334,7 @@ describe("cmdRemove", () => {
     });
 
     it("throws CLIError when item is not a feature", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await expect(
         cmdRemove(tmp, "e1", "feature", { yes: "true" }),
@@ -345,11 +345,11 @@ describe("cmdRemove", () => {
     });
 
     it("auto-detects feature level when level is omitted", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(treeWithEpiclessFeature()));
 
       await cmdRemove(tmp, "f-orphan", undefined, { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       expect(prd.items.length).toBe(1);
       expect(prd.items[0].id).toBe("e1");
     });
@@ -359,28 +359,28 @@ describe("cmdRemove", () => {
 
   describe("auto-detection", () => {
     it("auto-detects epic level when level is omitted", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await cmdRemove(tmp, "e1", undefined, { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       expect(prd.items.length).toBe(1);
       expect(prd.items[0].id).toBe("e2");
     });
 
     it("auto-detects task level when level is omitted", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await cmdRemove(tmp, "t1", undefined, { yes: "true" });
 
-      const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+      const prd = JSON.parse(readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8"));
       const f1 = prd.items[0].children[0];
       expect(f1.children.length).toBe(1);
       expect(f1.children[0].id).toBe("t2");
     });
 
     it("throws CLIError for non-removable level (subtask)", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await expect(
         cmdRemove(tmp, "s1", undefined, { yes: "true" }),
@@ -395,7 +395,7 @@ describe("cmdRemove", () => {
 
   describe("validation", () => {
     it("throws CLIError when item not found", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       await expect(
         cmdRemove(tmp, "nonexistent", "epic", { yes: "true" }),
@@ -406,7 +406,7 @@ describe("cmdRemove", () => {
     });
 
     it("throws CLIError when specified level doesn't match item", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(fullTree()));
 
       // e1 is an epic, but we said task
       await expect(
@@ -439,7 +439,7 @@ describe("cmdRemove", () => {
         },
       ];
 
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(items));
+      writeFileSync(join(tmp, ".n-dx/rex", "prd.json"), makePrd(items));
 
       const logs: string[] = [];
       const origLog = console.log;
@@ -455,7 +455,7 @@ describe("cmdRemove", () => {
       expect(output.autoCompleted.length).toBeGreaterThan(0);
 
       // Verify that the parent auto-completion was logged
-      const logContent = readFileSync(join(tmp, ".rex", "execution-log.jsonl"), "utf-8");
+      const logContent = readFileSync(join(tmp, ".n-dx/rex", "execution-log.jsonl"), "utf-8");
       const entries = logContent.trim().split("\n").map((l: string) => JSON.parse(l));
       const autoEntry = entries.find((e: { event: string }) => e.event === "auto_completed");
       expect(autoEntry).toBeDefined();

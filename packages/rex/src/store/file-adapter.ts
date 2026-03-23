@@ -7,6 +7,7 @@ import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tre
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWriteJSON } from "./atomic-write.js";
 import type { PRDStore, StoreCapabilities } from "./contracts.js";
+import { REX_FILES } from "../constants.js";
 
 export class FileStore implements PRDStore {
   private rexDir: string;
@@ -20,11 +21,11 @@ export class FileStore implements PRDStore {
   }
 
   async loadDocument(): Promise<PRDDocument> {
-    const raw = await readFile(this.path("prd.json"), "utf-8");
+    const raw = await readFile(this.path(REX_FILES.PRD), "utf-8");
     const parsed = JSON.parse(raw);
     const result = validateDocument(parsed);
     if (!result.ok) {
-      throw new Error(`Invalid prd.json: ${result.errors.message}`);
+      throw new Error(`Invalid ${REX_FILES.PRD}: ${result.errors.message}`);
     }
     return result.data as PRDDocument;
   }
@@ -34,7 +35,7 @@ export class FileStore implements PRDStore {
     if (!result.ok) {
       throw new Error(`Invalid document: ${result.errors.message}`);
     }
-    await atomicWriteJSON(this.path("prd.json"), doc, toCanonicalJSON);
+    await atomicWriteJSON(this.path(REX_FILES.PRD), doc, toCanonicalJSON);
   }
 
   async getItem(id: string): Promise<PRDItem | null> {
@@ -75,11 +76,11 @@ export class FileStore implements PRDStore {
   }
 
   async loadConfig(): Promise<RexConfig> {
-    const raw = await readFile(this.path("config.json"), "utf-8");
+    const raw = await readFile(this.path(REX_FILES.CONFIG), "utf-8");
     const parsed = JSON.parse(raw);
     const result = validateConfig(parsed);
     if (!result.ok) {
-      throw new Error(`Invalid config.json: ${result.errors.message}`);
+      throw new Error(`Invalid ${REX_FILES.CONFIG}: ${result.errors.message}`);
     }
 
     // Merge project-level .n-dx.json overrides (project config takes precedence)
@@ -88,7 +89,7 @@ export class FileStore implements PRDStore {
   }
 
   async saveConfig(config: RexConfig): Promise<void> {
-    await writeFile(this.path("config.json"), toCanonicalJSON(config), "utf-8");
+    await writeFile(this.path(REX_FILES.CONFIG), toCanonicalJSON(config), "utf-8");
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
@@ -103,7 +104,7 @@ export class FileStore implements PRDStore {
         ? { ...entry, detail: entry.detail.slice(0, MAX_DETAIL_LENGTH) + "..." }
         : entry;
 
-    const logPath = this.path("execution-log.jsonl");
+    const logPath = this.path(REX_FILES.EXECUTION_LOG);
 
     // Rotate if the log exceeds the size threshold (1 MB default).
     // The rotated file is kept as a single backup; older backups are discarded.
@@ -128,7 +129,7 @@ export class FileStore implements PRDStore {
   async readLog(limit?: number): Promise<LogEntry[]> {
     let raw: string;
     try {
-      raw = await readFile(this.path("execution-log.jsonl"), "utf-8");
+      raw = await readFile(this.path(REX_FILES.EXECUTION_LOG), "utf-8");
     } catch {
       return [];
     }
@@ -148,11 +149,11 @@ export class FileStore implements PRDStore {
   }
 
   async loadWorkflow(): Promise<string> {
-    return readFile(this.path("workflow.md"), "utf-8");
+    return readFile(this.path(REX_FILES.WORKFLOW), "utf-8");
   }
 
   async saveWorkflow(content: string): Promise<void> {
-    await writeFile(this.path("workflow.md"), content, "utf-8");
+    await writeFile(this.path(REX_FILES.WORKFLOW), content, "utf-8");
   }
 
   capabilities(): StoreCapabilities {

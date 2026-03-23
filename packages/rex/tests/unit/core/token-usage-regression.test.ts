@@ -69,7 +69,7 @@ const fixtures = JSON.parse(
 ) as RegressionFixtureFile;
 
 function writeFixtureRuns(projectDir: string, runs: Array<Record<string, unknown>>): void {
-  const runsDir = join(projectDir, ".hench", "runs");
+  const runsDir = join(projectDir, ".n-dx", "hench", "runs");
   mkdirSync(runsDir, { recursive: true });
   for (const run of runs) {
     const id = String(run.id ?? "run");
@@ -78,7 +78,7 @@ function writeFixtureRuns(projectDir: string, runs: Array<Record<string, unknown
 }
 
 function writeFixtureManifest(projectDir: string, manifest: Record<string, unknown>): void {
-  const svDir = join(projectDir, ".sourcevision");
+  const svDir = join(projectDir, ".n-dx", "sourcevision");
   mkdirSync(svDir, { recursive: true });
   writeFileSync(join(svDir, "manifest.json"), JSON.stringify(manifest));
 }

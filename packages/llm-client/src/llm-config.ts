@@ -10,7 +10,8 @@ import { access, readFile } from "node:fs/promises";
 import type { LLMConfig, LLMVendor, CodexConfig } from "./llm-types.js";
 import type { ClaudeConfig } from "./types.js";
 
-const PROJECT_CONFIG_FILE = ".n-dx.json";
+/** Config filename (basename only) — callers pass the containing directory. */
+const PROJECT_CONFIG_FILE = "config.json";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;

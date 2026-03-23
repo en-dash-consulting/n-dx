@@ -88,7 +88,7 @@ describe("Billing", () => {
     expect(output).toContain("items added to PRD");
 
     const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(prd.items.length).toBeGreaterThan(0);
   });

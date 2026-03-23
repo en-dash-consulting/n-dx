@@ -84,8 +84,8 @@ describe("Dev live-reload", () => {
 
       const ctx: ServerContext = {
         projectDir: tmpDir,
-        svDir: join(tmpDir, ".sourcevision"),
-        rexDir: join(tmpDir, ".rex"),
+        svDir: join(tmpDir, ".n-dx/sourcevision"),
+        rexDir: join(tmpDir, ".n-dx/rex"),
         dev: true,
       };
 

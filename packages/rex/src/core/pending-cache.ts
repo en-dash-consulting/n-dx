@@ -11,11 +11,12 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { PROJECT_DIRS } from "@n-dx/llm-client";
 import { toCanonicalJSON } from "./canonical.js";
 import type { ReshapeProposal } from "./reshape.js";
 import type { PRDItem } from "../schema/index.js";
 
-const REX_DIR = ".rex";
+const REX_DIR = PROJECT_DIRS.REX;
 
 export const PENDING_SMART_PRUNE_FILE = "pending-smart-prune.json";
 

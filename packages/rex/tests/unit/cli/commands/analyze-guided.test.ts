@@ -75,15 +75,15 @@ describe("analyze --guided integration", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     tmpDir = await mkdtemp(join(tmpdir(), "rex-analyze-guided-"));
-    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/rex"), { recursive: true });
     // Create a minimal valid PRD document (empty items)
     await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
+      join(tmpDir, ".n-dx/rex", "prd.json"),
       JSON.stringify({ schema: "rex/v1", title: "Test", items: [] }),
     );
     // Create config so store operations work
     await writeFile(
-      join(tmpDir, ".rex", "config.json"),
+      join(tmpDir, ".n-dx/rex", "config.json"),
       JSON.stringify({ schema: "rex/v1", project: "test", adapter: "file" }),
     );
     origIsTTY = process.stdin.isTTY;
@@ -181,7 +181,7 @@ describe("analyze --guided integration", () => {
     const output = consoleOutput.join("\n");
     expect(output).toContain("Auth System");
 
-    const logPath = join(tmpDir, ".rex", "execution-log.jsonl");
+    const logPath = join(tmpDir, ".n-dx/rex", "execution-log.jsonl");
     const lines = (await readFile(logPath, "utf-8"))
       .split("\n")
       .map((line) => line.trim())

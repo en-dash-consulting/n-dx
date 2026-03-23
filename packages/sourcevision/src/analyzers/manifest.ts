@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { getCurrentHead, getCurrentBranch } from "@n-dx/llm-client";
 import type { Manifest, ModuleStatus } from "../schema/index.js";
-import { SV_DIR, TOOL_VERSION } from "../constants.js";
+import { SV_DIR, SV_FILES, TOOL_VERSION } from "../constants.js";
 
 function getGitInfo(dir: string): { sha?: string; branch?: string } {
   return {
@@ -17,7 +17,7 @@ function getGitInfo(dir: string): { sha?: string; branch?: string } {
 
 export function readManifest(dir: string): Manifest {
   const absDir = resolve(dir);
-  const manifestPath = join(absDir, SV_DIR, "manifest.json");
+  const manifestPath = join(absDir, SV_DIR, SV_FILES.MANIFEST);
 
   if (existsSync(manifestPath)) {
     const raw = readFileSync(manifestPath, "utf-8");
@@ -41,7 +41,7 @@ export function writeManifest(dir: string, manifest: Manifest): void {
   const absDir = resolve(dir);
   const svDir = join(absDir, SV_DIR);
   mkdirSync(svDir, { recursive: true });
-  writeFileSync(join(svDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+  writeFileSync(join(svDir, SV_FILES.MANIFEST), JSON.stringify(manifest, null, 2) + "\n");
 }
 
 export function updateManifestModule(

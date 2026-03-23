@@ -27,9 +27,9 @@ function runResult(args) {
  * Minimal .rex directory with a valid PRD containing known items.
  */
 async function setupRexDir(dir) {
-  await mkdir(join(dir, ".rex"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/rex"), { recursive: true });
   await writeFile(
-    join(dir, ".rex", "config.json"),
+    join(dir, ".n-dx/rex", "config.json"),
     JSON.stringify({
       schema: "rex/v1",
       project: "orch-test",
@@ -38,7 +38,7 @@ async function setupRexDir(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".rex", "prd.json"),
+    join(dir, ".n-dx/rex", "prd.json"),
     JSON.stringify({
       schema: "rex/v1",
       title: "Orchestration Test",
@@ -63,16 +63,16 @@ async function setupRexDir(dir) {
  * Minimal .hench directory with valid config.
  */
 async function setupHenchDir(dir) {
-  await mkdir(join(dir, ".hench"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/hench"), { recursive: true });
   await writeFile(
-    join(dir, ".hench", "config.json"),
+    join(dir, ".n-dx/hench", "config.json"),
     JSON.stringify({
       schema: "hench/v1",
       provider: "cli",
       model: "sonnet",
       maxTurns: 50,
       maxTokens: 8192,
-      rexDir: ".rex",
+      rexDir: ".n-dx/rex",
       apiKeyEnv: "ANTHROPIC_API_KEY",
       guard: {
         blockedPaths: [".hench/**", ".rex/**", ".git/**"],
@@ -88,9 +88,9 @@ async function setupHenchDir(dir) {
  * Minimal .sourcevision directory with valid analysis output.
  */
 async function setupSourcevisionDir(dir) {
-  await mkdir(join(dir, ".sourcevision"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/sourcevision"), { recursive: true });
   await writeFile(
-    join(dir, ".sourcevision", "manifest.json"),
+    join(dir, ".n-dx/sourcevision", "manifest.json"),
     JSON.stringify({
       schemaVersion: "1.0.0",
       toolVersion: "0.1.0",
@@ -105,19 +105,19 @@ async function setupSourcevisionDir(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "inventory.json"),
+    join(dir, ".n-dx/sourcevision", "inventory.json"),
     JSON.stringify({ files: [], summary: { totalFiles: 0, totalBytes: 0, languages: {} } }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "imports.json"),
+    join(dir, ".n-dx/sourcevision", "imports.json"),
     JSON.stringify({ edges: [], external: {}, summary: { totalEdges: 0, totalExternal: 0 } }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "zones.json"),
+    join(dir, ".n-dx/sourcevision", "zones.json"),
     JSON.stringify({ zones: [], crossings: [], unzoned: [], summary: { totalZones: 0, totalFiles: 0 } }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "components.json"),
+    join(dir, ".n-dx/sourcevision", "components.json"),
     JSON.stringify({
       components: [],
       routeModules: [],
@@ -147,7 +147,7 @@ describe("orchestration script integration", () => {
       const { stderr, code } = runResult(["status", tmpDir]);
       expect(code).toBe(1);
       expect(stderr).toContain("Missing");
-      expect(stderr).toContain(".rex");
+      expect(stderr).toContain(".n-dx/rex");
       expect(stderr).toContain("ndx init");
     });
 
@@ -195,7 +195,7 @@ describe("orchestration script integration", () => {
     it("requires .rex directory", () => {
       const { stderr, code } = runResult(["usage", tmpDir]);
       expect(code).toBe(1);
-      expect(stderr).toContain(".rex");
+      expect(stderr).toContain(".n-dx/rex");
     });
 
     it("delegates to rex usage and succeeds with empty usage", async () => {
@@ -222,7 +222,7 @@ describe("orchestration script integration", () => {
     it("requires .rex directory", () => {
       const { stderr, code } = runResult(["sync", tmpDir]);
       expect(code).toBe(1);
-      expect(stderr).toContain(".rex");
+      expect(stderr).toContain(".n-dx/rex");
     });
 
     it("delegates to rex sync (fails gracefully without adapter)", async () => {
@@ -240,7 +240,7 @@ describe("orchestration script integration", () => {
     it("requires .rex directory", () => {
       const { stderr, code } = runResult(["plan", tmpDir]);
       expect(code).toBe(1);
-      expect(stderr).toContain(".rex");
+      expect(stderr).toContain(".n-dx/rex");
     });
 
     it("shows help with --help flag", () => {
@@ -256,14 +256,14 @@ describe("orchestration script integration", () => {
     it("requires .rex directory", () => {
       const { stderr, code } = runResult(["work", tmpDir]);
       expect(code).toBe(1);
-      expect(stderr).toContain(".rex");
+      expect(stderr).toContain(".n-dx/rex");
     });
 
     it("requires .hench directory", async () => {
       await setupRexDir(tmpDir);
       const { stderr, code } = runResult(["work", tmpDir]);
       expect(code).toBe(1);
-      expect(stderr).toContain(".hench");
+      expect(stderr).toContain(".n-dx/hench");
     });
 
     it("requires LLM vendor configuration for non-dry-run", async () => {

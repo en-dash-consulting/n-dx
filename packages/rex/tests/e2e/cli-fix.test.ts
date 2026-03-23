@@ -41,7 +41,7 @@ function run(args: string[], expectFail = false): string {
 /** Write a PRD with specific items for testing fix scenarios. */
 async function writePrd(dir: string, items: unknown[]): Promise<void> {
   await writeFile(
-    join(dir, ".rex", "prd.json"),
+    join(dir, ".n-dx/rex", "prd.json"),
     JSON.stringify({ schema: "rex/v1", title: "Fix Test", items }, null, 2) +
       "\n",
   );
@@ -80,7 +80,7 @@ describe("rex fix", () => {
     expect(output).toContain("Fixed");
 
     // Verify the fix was persisted
-    const prd = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
+    const prd = JSON.parse(await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"));
     expect(prd.items[0].completedAt).toBeTruthy();
   });
 
@@ -99,7 +99,7 @@ describe("rex fix", () => {
     const output = run(["fix", tmpDir]);
     expect(output).toContain("Fixed");
 
-    const prd = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
+    const prd = JSON.parse(await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"));
     // Orphan reference should be removed
     expect(prd.items[0].blockedBy ?? []).not.toContain("nonexistent-id");
   });
@@ -115,9 +115,9 @@ describe("rex fix", () => {
       },
     ]);
 
-    const before = await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8");
+    const before = await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8");
     const output = run(["fix", "--dry-run", tmpDir]);
-    const after = await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8");
+    const after = await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8");
 
     expect(output).toContain("Would fix");
     expect(before).toEqual(after);

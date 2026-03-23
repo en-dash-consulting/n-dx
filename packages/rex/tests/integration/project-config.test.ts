@@ -14,7 +14,7 @@ describe("project-config merge (rex)", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-projcfg-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await ensureRexDir(rexDir);
     store = createStore("file", rexDir);
 
@@ -34,15 +34,15 @@ describe("project-config merge (rex)", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("loads config without .n-dx.json", async () => {
+  it("loads config without .n-dx/config.json", async () => {
     const config = await store.loadConfig();
     expect(config.project).toBe("base-project");
     expect(config.adapter).toBe("file");
   });
 
-  it("merges .n-dx.json overrides into config", async () => {
+  it("merges .n-dx/config.json overrides into config", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx", "config.json"),
       JSON.stringify({ rex: { project: "overridden" } }, null, 2) + "\n",
     );
 
@@ -53,9 +53,9 @@ describe("project-config merge (rex)", () => {
     expect(config.sourcevision).toBe("auto");
   });
 
-  it("adds optional fields from .n-dx.json", async () => {
+  it("adds optional fields from .n-dx/config.json", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx", "config.json"),
       JSON.stringify({
         rex: { validate: "pnpm typecheck", test: "pnpm test" },
       }, null, 2) + "\n",
@@ -67,16 +67,16 @@ describe("project-config merge (rex)", () => {
     expect(config.project).toBe("base-project");
   });
 
-  it("ignores invalid .n-dx.json gracefully", async () => {
-    await writeFile(join(tmpDir, ".n-dx.json"), "not valid json\n");
+  it("ignores invalid .n-dx/config.json gracefully", async () => {
+    await writeFile(join(tmpDir, ".n-dx", "config.json"), "not valid json\n");
 
     const config = await store.loadConfig();
     expect(config.project).toBe("base-project");
   });
 
-  it("ignores .n-dx.json with no rex section", async () => {
+  it("ignores .n-dx/config.json with no rex section", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx", "config.json"),
       JSON.stringify({ hench: { model: "opus" } }, null, 2) + "\n",
     );
 

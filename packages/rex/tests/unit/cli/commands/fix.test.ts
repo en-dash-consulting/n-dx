@@ -6,15 +6,15 @@ import { cmdFix } from "../../../../src/cli/commands/fix.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
+  writeFileSync(join(dir, ".n-dx/rex", "prd.json"), JSON.stringify(doc));
 }
 
 function readPRD(dir: string): PRDDocument {
-  return JSON.parse(readFileSync(join(dir, ".rex", "prd.json"), "utf-8"));
+  return JSON.parse(readFileSync(join(dir, ".n-dx/rex", "prd.json"), "utf-8"));
 }
 
 function writeConfig(dir: string, config: Record<string, unknown>): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
+  writeFileSync(join(dir, ".n-dx/rex", "config.json"), JSON.stringify(config));
 }
 
 const VALID_CONFIG = {
@@ -29,8 +29,8 @@ describe("cmdFix", () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "rex-fix-test-"));
-    mkdirSync(join(tmpDir, ".rex"), { recursive: true });
-    writeFileSync(join(tmpDir, ".rex", "execution-log.jsonl"), "");
+    mkdirSync(join(tmpDir, ".n-dx/rex"), { recursive: true });
+    writeFileSync(join(tmpDir, ".n-dx/rex", "execution-log.jsonl"), "");
     stdoutSpy = vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
@@ -392,7 +392,7 @@ describe("cmdFix", () => {
 
       await cmdFix(tmpDir, {});
 
-      const logContent = readFileSync(join(tmpDir, ".rex", "execution-log.jsonl"), "utf-8");
+      const logContent = readFileSync(join(tmpDir, ".n-dx/rex", "execution-log.jsonl"), "utf-8");
       expect(logContent).toContain("auto_fix");
     });
 
@@ -413,7 +413,7 @@ describe("cmdFix", () => {
 
       await cmdFix(tmpDir, {});
 
-      const logContent = readFileSync(join(tmpDir, ".rex", "execution-log.jsonl"), "utf-8");
+      const logContent = readFileSync(join(tmpDir, ".n-dx/rex", "execution-log.jsonl"), "utf-8");
       expect(logContent).not.toContain("auto_fix");
     });
   });

@@ -2,7 +2,7 @@ import { writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { getCurrentHead, getCurrentBranch } from "@n-dx/llm-client";
 import { SCHEMA_VERSION } from "../../schema/v1.js";
-import { TOOL_VERSION, SV_DIR } from "./constants.js";
+import { TOOL_VERSION, SV_DIR, SV_FILES } from "./constants.js";
 import { info } from "../output.js";
 
 export const HINTS_TEMPLATE = `<!-- Sourcevision Hints -->
@@ -20,8 +20,8 @@ export function cmdInit(dir: string): void {
   const absDir = resolve(dir);
   const svDir = join(absDir, SV_DIR);
 
-  if (existsSync(join(svDir, "manifest.json"))) {
-    info(`.sourcevision/ already initialized in ${absDir}`);
+  if (existsSync(join(svDir, SV_FILES.MANIFEST))) {
+    info(`.n-dx/sourcevision/ already initialized in ${absDir}`);
     info("Run 'sourcevision analyze' to update.");
     return;
   }
@@ -42,20 +42,19 @@ export function cmdInit(dir: string): void {
     modules: {},
   };
 
-  writeFileSync(join(svDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+  writeFileSync(join(svDir, SV_FILES.MANIFEST), JSON.stringify(manifest, null, 2) + "\n");
 
   // Create hints.md template (only if not already present)
-  const hintsPath = join(svDir, "hints.md");
+  const hintsPath = join(svDir, SV_FILES.HINTS);
   if (!existsSync(hintsPath)) {
     writeFileSync(hintsPath, HINTS_TEMPLATE);
   }
 
-  info(`Initialized .sourcevision/ in ${absDir}`);
-  info(`  ${join(svDir, "manifest.json")} created`);
-  info(`  ${join(svDir, "hints.md")} created`);
+  info(`Initialized .n-dx/sourcevision/ in ${absDir}`);
+  info(`  ${join(svDir, SV_FILES.MANIFEST)} created`);
+  info(`  ${join(svDir, SV_FILES.HINTS)} created`);
   info("");
-  info("Analysis output saved to .sourcevision/ — this is designed to be committed to your repo.");
-  info("The viewer UI is served from the sourcevision package and is not stored in your project.");
+  info("Analysis output saved to .n-dx/sourcevision/ — this is designed to be committed to your repo.");
   info("");
 
   info("Next steps:");

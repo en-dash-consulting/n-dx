@@ -53,7 +53,7 @@ import type {
 
 // ── Config loading ──────────────────────────────────────────────────────────
 
-const PROJECT_CONFIG_FILE = ".n-dx.json";
+const PROJECT_CONFIG_FILE = "config.json";
 
 /**
  * Load workspace configuration from .n-dx.json.

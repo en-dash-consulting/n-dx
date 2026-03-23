@@ -499,7 +499,7 @@ describeStoreContract("FileStore", () => ({
   supportsPassthrough: true,
   setup: async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "rex-contract-"));
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await ensureRexDir(rexDir);
 
     // Seed the minimal files FileStore expects
@@ -605,7 +605,7 @@ describeStoreContract("NotionStore", () => ({
   supportsArchival: true,
   setup: async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "rex-contract-notion-"));
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await ensureNotionRexDir(rexDir);
 
     // Seed local files (config, log, workflow — NotionStore needs these)

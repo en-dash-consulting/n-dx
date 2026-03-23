@@ -15,7 +15,7 @@ describe("Store roundtrip integration", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-integ-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await ensureRexDir(rexDir);
     store = createStore("file", rexDir);
 
@@ -251,9 +251,9 @@ describe("Store roundtrip integration", () => {
   });
 
   it("loads config with local file overrides", async () => {
-    // Write .n-dx.json with rex overrides
+    // Write .n-dx/config.json with rex overrides
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx", "config.json"),
       JSON.stringify({
         rex: {
           project: "overridden-project",
@@ -274,7 +274,7 @@ describe("Store roundtrip integration", () => {
   it("reads empty log when no log file exists", async () => {
     // Create a fresh store without the log file
     const tmpDir2 = await mkdtemp(join(tmpdir(), "rex-integ-nolog-"));
-    const rexDir2 = join(tmpDir2, ".rex");
+    const rexDir2 = join(tmpDir2, ".n-dx/rex");
     await ensureRexDir(rexDir2);
     const store2 = createStore("file", rexDir2);
 

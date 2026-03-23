@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { PROJECT_DIRS } from "@n-dx/llm-client";
 
-const REX_DIR = ".rex";
+const REX_DIR = PROJECT_DIRS.REX;
 
 interface PRDItemLike {
   id: string;

@@ -34,19 +34,19 @@ const POPULATED_PRD: PRDDocument = {
 };
 
 function writeConfig(dir: string, config: Record<string, unknown>): void {
-  writeFileSync(join(dir, ".rex", "config.json"), toCanonicalJSON(config));
+  writeFileSync(join(dir, ".n-dx/rex", "config.json"), toCanonicalJSON(config));
 }
 
 function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), toCanonicalJSON(doc));
+  writeFileSync(join(dir, ".n-dx/rex", "prd.json"), toCanonicalJSON(doc));
 }
 
 function seedDir(dir: string, prd: PRDDocument = EMPTY_PRD): void {
-  mkdirSync(join(dir, ".rex"), { recursive: true });
+  mkdirSync(join(dir, ".n-dx/rex"), { recursive: true });
   writeConfig(dir, VALID_CONFIG);
   writePRD(dir, prd);
-  writeFileSync(join(dir, ".rex", "execution-log.jsonl"), "", "utf-8");
-  writeFileSync(join(dir, ".rex", "workflow.md"), "# Workflow", "utf-8");
+  writeFileSync(join(dir, ".n-dx/rex", "execution-log.jsonl"), "", "utf-8");
+  writeFileSync(join(dir, ".n-dx/rex", "workflow.md"), "# Workflow", "utf-8");
 }
 
 describe("cmdSync", () => {
@@ -98,9 +98,9 @@ describe("cmdSync", () => {
       name: "test-remote",
       description: "Test remote",
       configSchema: { dir: { required: true, description: "Remote dir" } },
-      factory: (_, config) => new FileStore(join(config.dir as string, ".rex")),
+      factory: (_, config) => new FileStore(join(config.dir as string, ".n-dx/rex")),
     });
-    await registry.saveAdapterConfig(join(tmpDir, ".rex"), {
+    await registry.saveAdapterConfig(join(tmpDir, ".n-dx/rex"), {
       name: "test-remote",
       config: { dir: remoteDir },
     });
@@ -109,7 +109,7 @@ describe("cmdSync", () => {
 
     // Verify push happened — remote should now have the item
     const remoteDoc = JSON.parse(
-      readFileSync(join(remoteDir, ".rex", "prd.json"), "utf-8"),
+      readFileSync(join(remoteDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(remoteDoc.items.length).toBeGreaterThan(0);
     expect(remoteDoc.items[0].id).toBe("e1");
@@ -129,9 +129,9 @@ describe("cmdSync", () => {
       name: "test-remote",
       description: "Test remote",
       configSchema: { dir: { required: true, description: "Remote dir" } },
-      factory: (_, config) => new FileStore(join(config.dir as string, ".rex")),
+      factory: (_, config) => new FileStore(join(config.dir as string, ".n-dx/rex")),
     });
-    await registry.saveAdapterConfig(join(tmpDir, ".rex"), {
+    await registry.saveAdapterConfig(join(tmpDir, ".n-dx/rex"), {
       name: "test-remote",
       config: { dir: remoteDir },
     });
@@ -140,7 +140,7 @@ describe("cmdSync", () => {
 
     // Verify pull happened — local should now have the item
     const localDoc = JSON.parse(
-      readFileSync(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      readFileSync(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(localDoc.items.length).toBeGreaterThan(0);
     expect(localDoc.items[0].id).toBe("e1");
@@ -167,9 +167,9 @@ describe("cmdSync", () => {
       name: "test-remote",
       description: "Test remote",
       configSchema: { dir: { required: true, description: "Remote dir" } },
-      factory: (_, config) => new FileStore(join(config.dir as string, ".rex")),
+      factory: (_, config) => new FileStore(join(config.dir as string, ".n-dx/rex")),
     });
-    await registry.saveAdapterConfig(join(tmpDir, ".rex"), {
+    await registry.saveAdapterConfig(join(tmpDir, ".n-dx/rex"), {
       name: "test-remote",
       config: { dir: remoteDir },
     });
@@ -178,10 +178,10 @@ describe("cmdSync", () => {
 
     // Both should now have both items
     const localDoc = JSON.parse(
-      readFileSync(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      readFileSync(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     const remoteDoc = JSON.parse(
-      readFileSync(join(remoteDir, ".rex", "prd.json"), "utf-8"),
+      readFileSync(join(remoteDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
 
     const localIds = localDoc.items.map((i: { id: string }) => i.id).sort();
@@ -203,16 +203,16 @@ describe("cmdSync", () => {
       name: "test-remote",
       description: "Test remote",
       configSchema: { dir: { required: true, description: "Remote dir" } },
-      factory: (_, config) => new FileStore(join(config.dir as string, ".rex")),
+      factory: (_, config) => new FileStore(join(config.dir as string, ".n-dx/rex")),
     });
-    await registry.saveAdapterConfig(join(tmpDir, ".rex"), {
+    await registry.saveAdapterConfig(join(tmpDir, ".n-dx/rex"), {
       name: "test-remote",
       config: { dir: remoteDir },
     });
 
     await cmdSync(tmpDir, { push: "true", adapter: "test-remote" });
 
-    const logContent = readFileSync(join(tmpDir, ".rex", "execution-log.jsonl"), "utf-8");
+    const logContent = readFileSync(join(tmpDir, ".n-dx/rex", "execution-log.jsonl"), "utf-8");
     const lines = logContent.trim().split("\n").filter(Boolean);
     const lastEntry = JSON.parse(lines[lines.length - 1]);
     expect(lastEntry.event).toBe("sync_completed");
@@ -232,9 +232,9 @@ describe("cmdSync", () => {
       name: "test-remote",
       description: "Test remote",
       configSchema: { dir: { required: true, description: "Remote dir" } },
-      factory: (_, config) => new FileStore(join(config.dir as string, ".rex")),
+      factory: (_, config) => new FileStore(join(config.dir as string, ".n-dx/rex")),
     });
-    await registry.saveAdapterConfig(join(tmpDir, ".rex"), {
+    await registry.saveAdapterConfig(join(tmpDir, ".n-dx/rex"), {
       name: "test-remote",
       config: { dir: remoteDir },
     });
@@ -274,9 +274,9 @@ describe("cmdSync", () => {
       name: "test-remote",
       description: "Test remote",
       configSchema: { dir: { required: true, description: "Remote dir" } },
-      factory: (_, config) => new FileStore(join(config.dir as string, ".rex")),
+      factory: (_, config) => new FileStore(join(config.dir as string, ".n-dx/rex")),
     });
-    await registry.saveAdapterConfig(join(tmpDir, ".rex"), {
+    await registry.saveAdapterConfig(join(tmpDir, ".n-dx/rex"), {
       name: "test-remote",
       config: { dir: remoteDir },
     });
@@ -285,7 +285,7 @@ describe("cmdSync", () => {
 
     // Remote should still be empty
     const remoteDoc = JSON.parse(
-      readFileSync(join(remoteDir, ".rex", "prd.json"), "utf-8"),
+      readFileSync(join(remoteDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(remoteDoc.items).toEqual([]);
 

@@ -150,7 +150,7 @@ const DEFAULT_CONFIG: Record<string, unknown> = {
   tokenBudget: 0,
   loopPauseMs: 2000,
   maxFailedAttempts: 3,
-  rexDir: ".rex",
+  rexDir: ".n-dx/rex",
   "retry.maxRetries": 3,
   "retry.baseDelayMs": 2000,
   "retry.maxDelayMs": 30000,
@@ -204,7 +204,7 @@ function getImpact(path: string, value: unknown): string {
 /** Read the hench config.json directly from disk. */
 function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
   try {
-    const raw = readFileSync(join(projectDir, ".hench", "config.json"), "utf-8");
+    const raw = readFileSync(join(projectDir, ".n-dx/hench", "config.json"), "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return null;
@@ -576,7 +576,7 @@ export function handleHenchRoute(
     req,
     res,
     ctx,
-    runsDir: join(ctx.projectDir, ".hench", "runs"),
+    runsDir: join(ctx.projectDir, ".n-dx/hench", "runs"),
     broadcast,
   };
 
@@ -607,7 +607,7 @@ async function handleConfigUpdate(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = join(ctx.projectDir, ".n-dx/hench", "config.json");
 
   // Load current config
   const current = loadHenchConfig(ctx.projectDir);
@@ -724,7 +724,7 @@ const BUILT_IN_TEMPLATES: WorkflowTemplateData[] = [
     description: "Maximum guard rails for sensitive codebases and production-adjacent work",
     useCases: ["Production infrastructure changes", "Security-sensitive code modifications", "Regulated environments requiring audit trails"],
     tags: ["safety", "security", "production"],
-    config: { maxTurns: 30, maxFailedAttempts: 2, guard: { blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**", ".env*", "*.pem", "*.key", "**/secrets/**", "**/credentials/**"], allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"], commandTimeout: 15000, maxFileSize: 524288 } },
+    config: { maxTurns: 30, maxFailedAttempts: 2, guard: { blockedPaths: [".n-dx/hench/**", ".n-dx/rex/**", ".git/**", "node_modules/**", ".env*", "*.pem", "*.key", "**/secrets/**", "**/credentials/**"], allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"], commandTimeout: 15000, maxFileSize: 524288 } },
     builtIn: true,
   },
   {
@@ -742,7 +742,7 @@ const TEMPLATES_FILE = "templates.json";
 
 /** Load user-defined templates from .hench/templates.json. */
 function loadUserTemplates(projectDir: string): WorkflowTemplateData[] {
-  const filePath = join(projectDir, ".hench", TEMPLATES_FILE);
+  const filePath = join(projectDir, ".n-dx/hench", TEMPLATES_FILE);
   try {
     if (!existsSync(filePath)) return [];
     const raw = readFileSync(filePath, "utf-8");
@@ -853,7 +853,7 @@ async function handleTemplateCreate(
   };
 
   // Load, update, and write back
-  const filePath = join(ctx.projectDir, ".hench", TEMPLATES_FILE);
+  const filePath = join(ctx.projectDir, ".n-dx/hench", TEMPLATES_FILE);
   const existing = loadUserTemplates(ctx.projectDir);
   const idx = existing.findIndex((t) => t.id === id);
   if (idx >= 0) {
@@ -892,7 +892,7 @@ function handleTemplateApply(
   }
 
   const updated = mergeTemplateConfig(config, template.config);
-  const configPath = join(ctx.projectDir, ".hench", "config.json");
+  const configPath = join(ctx.projectDir, ".n-dx/hench", "config.json");
 
   try {
     writeFileSync(configPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
@@ -920,7 +920,7 @@ async function handleTemplateDelete(
     return true;
   }
 
-  const filePath = join(ctx.projectDir, ".hench", TEMPLATES_FILE);
+  const filePath = join(ctx.projectDir, ".n-dx/hench", TEMPLATES_FILE);
   const existing = loadUserTemplates(ctx.projectDir);
   const filtered = existing.filter((t) => t.id !== id);
 
@@ -1430,7 +1430,7 @@ export function startConcurrencyMonitor(
   const CONCURRENCY_BROADCAST_MS = 10_000; // 10 seconds
 
   const timer = setInterval(() => {
-    const henchDir = join(ctx.projectDir, ".hench");
+    const henchDir = join(ctx.projectDir, ".n-dx/hench");
     const locksDir = join(henchDir, "locks");
     const runsDir = join(henchDir, "runs");
 
@@ -1844,7 +1844,7 @@ function getEffectiveMaxConcurrent(projectDir: string): number {
  * a utilization level for visual indicators.
  */
 function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
-  const henchDir = join(ctx.projectDir, ".hench");
+  const henchDir = join(ctx.projectDir, ".n-dx/hench");
   const locksDir = join(henchDir, "locks");
   const runsDir = join(henchDir, "runs");
 

@@ -203,9 +203,9 @@ describe("extractHenchTokenUsage", () => {
   });
 
   function writeRun(id: string, run: Record<string, unknown>): void {
-    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
+    mkdirSync(join(tmp, ".n-dx/hench", "runs"), { recursive: true });
     writeFileSync(
-      join(tmp, ".hench", "runs", `${id}.json`),
+      join(tmp, ".n-dx/hench", "runs", `${id}.json`),
       JSON.stringify(run),
     );
   }
@@ -252,9 +252,9 @@ describe("extractHenchTokenUsage", () => {
   });
 
   it("skips invalid run files", async () => {
-    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
+    mkdirSync(join(tmp, ".n-dx/hench", "runs"), { recursive: true });
     writeFileSync(
-      join(tmp, ".hench", "runs", "bad.json"),
+      join(tmp, ".n-dx/hench", "runs", "bad.json"),
       "not valid json",
     );
     writeRun("run-001", {
@@ -281,8 +281,8 @@ describe("extractHenchTokenUsage", () => {
   });
 
   it("skips non-json files", async () => {
-    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
-    writeFileSync(join(tmp, ".hench", "runs", "notes.txt"), "not a run");
+    mkdirSync(join(tmp, ".n-dx/hench", "runs"), { recursive: true });
+    writeFileSync(join(tmp, ".n-dx/hench", "runs", "notes.txt"), "not a run");
     writeRun("run-001", {
       id: "run-001",
       startedAt: "2026-01-15T10:00:00.000Z",
@@ -353,9 +353,9 @@ describe("extractSvTokenUsage", () => {
   });
 
   function writeManifest(manifest: Record<string, unknown>): void {
-    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmp, ".n-dx/sourcevision"), { recursive: true });
     writeFileSync(
-      join(tmp, ".sourcevision", "manifest.json"),
+      join(tmp, ".n-dx/sourcevision", "manifest.json"),
       JSON.stringify(manifest),
     );
   }
@@ -394,9 +394,9 @@ describe("extractSvTokenUsage", () => {
   });
 
   it("returns zero for invalid manifest JSON", async () => {
-    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmp, ".n-dx/sourcevision"), { recursive: true });
     writeFileSync(
-      join(tmp, ".sourcevision", "manifest.json"),
+      join(tmp, ".n-dx/sourcevision", "manifest.json"),
       "not valid json",
     );
 
@@ -482,17 +482,17 @@ describe("aggregateTokenUsage", () => {
   });
 
   function writeRun(id: string, run: Record<string, unknown>): void {
-    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
+    mkdirSync(join(tmp, ".n-dx/hench", "runs"), { recursive: true });
     writeFileSync(
-      join(tmp, ".hench", "runs", `${id}.json`),
+      join(tmp, ".n-dx/hench", "runs", `${id}.json`),
       JSON.stringify(run),
     );
   }
 
   function writeSvManifest(manifest: Record<string, unknown>): void {
-    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    mkdirSync(join(tmp, ".n-dx/sourcevision"), { recursive: true });
     writeFileSync(
-      join(tmp, ".sourcevision", "manifest.json"),
+      join(tmp, ".n-dx/sourcevision", "manifest.json"),
       JSON.stringify(manifest),
     );
   }
@@ -946,8 +946,8 @@ describe("extractHenchTokenEvents", () => {
   });
 
   function writeRun(id: string, run: Record<string, unknown>): void {
-    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
-    writeFileSync(join(tmp, ".hench", "runs", `${id}.json`), JSON.stringify(run));
+    mkdirSync(join(tmp, ".n-dx/hench", "runs"), { recursive: true });
+    writeFileSync(join(tmp, ".n-dx/hench", "runs", `${id}.json`), JSON.stringify(run));
   }
 
   it("returns token events from hench run files", async () => {
@@ -1042,8 +1042,8 @@ describe("extractSvTokenEvents", () => {
   });
 
   function writeManifest(manifest: Record<string, unknown>): void {
-    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
-    writeFileSync(join(tmp, ".sourcevision", "manifest.json"), JSON.stringify(manifest));
+    mkdirSync(join(tmp, ".n-dx/sourcevision"), { recursive: true });
+    writeFileSync(join(tmp, ".n-dx/sourcevision", "manifest.json"), JSON.stringify(manifest));
   }
 
   it("returns token event from sourcevision manifest", async () => {
@@ -1093,13 +1093,13 @@ describe("collectTokenEvents", () => {
   });
 
   function writeRun(id: string, run: Record<string, unknown>): void {
-    mkdirSync(join(tmp, ".hench", "runs"), { recursive: true });
-    writeFileSync(join(tmp, ".hench", "runs", `${id}.json`), JSON.stringify(run));
+    mkdirSync(join(tmp, ".n-dx/hench", "runs"), { recursive: true });
+    writeFileSync(join(tmp, ".n-dx/hench", "runs", `${id}.json`), JSON.stringify(run));
   }
 
   function writeSvManifest(manifest: Record<string, unknown>): void {
-    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
-    writeFileSync(join(tmp, ".sourcevision", "manifest.json"), JSON.stringify(manifest));
+    mkdirSync(join(tmp, ".n-dx/sourcevision"), { recursive: true });
+    writeFileSync(join(tmp, ".n-dx/sourcevision", "manifest.json"), JSON.stringify(manifest));
   }
 
   it("collects events from all packages sorted by timestamp", async () => {

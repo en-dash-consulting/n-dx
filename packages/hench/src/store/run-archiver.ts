@@ -23,6 +23,7 @@ import { join } from "node:path";
 import { readFile, writeFile, readdir, stat, unlink } from "node:fs/promises";
 import { gzip, gunzip } from "node:zlib";
 import { promisify } from "node:util";
+import { HENCH_FILES } from "../constants.js";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -88,7 +89,7 @@ export async function loadArchivalConfig(
   projectDir: string,
 ): Promise<ArchivalConfig> {
   try {
-    const raw = await readFile(join(projectDir, ".n-dx.json"), "utf-8");
+    const raw = await readFile(join(projectDir, HENCH_FILES.CONFIG), "utf-8");
     const data = JSON.parse(raw) as Record<string, unknown>;
     const section = data.archival as Record<string, unknown> | undefined;
     if (!section || typeof section !== "object") {

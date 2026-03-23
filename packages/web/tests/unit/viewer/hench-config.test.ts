@@ -17,7 +17,7 @@ function makeConfigResponse() {
       tokenBudget: 0,
       loopPauseMs: 2000,
       maxFailedAttempts: 3,
-      rexDir: ".rex",
+      rexDir: ".n-dx/rex",
       apiKeyEnv: "ANTHROPIC_API_KEY",
       guard: {
         blockedPaths: [".hench/**", ".rex/**"],

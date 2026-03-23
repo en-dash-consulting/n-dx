@@ -68,7 +68,7 @@ describe("formatCLIError", () => {
     const result = formatCLIError(err);
     expect(result).toContain("corrupted or has an invalid format");
     expect(result).toContain("Hint:");
-    expect(result).toContain(".hench/config.json");
+    expect(result).toContain(".n-dx/hench/config.json");
   });
 
   it("matches Invalid run record pattern", () => {
@@ -76,7 +76,7 @@ describe("formatCLIError", () => {
     const result = formatCLIError(err);
     expect(result).toContain("Run record is corrupted");
     expect(result).toContain("Hint:");
-    expect(result).toContain(".hench/runs/");
+    expect(result).toContain(".n-dx/hench/runs/");
   });
 
   it("falls back to generic message for unknown errors", () => {
@@ -224,7 +224,7 @@ describe("requireHenchDir", () => {
 
   it("does not throw when .hench/ exists", () => {
     const tmp = mkdtempSync(join(tmpdir(), "hench-test-"));
-    mkdirSync(join(tmp, ".hench"));
+    mkdirSync(join(tmp, ".n-dx/hench"), { recursive: true });
     try {
       expect(() => requireHenchDir(tmp)).not.toThrow();
     } finally {

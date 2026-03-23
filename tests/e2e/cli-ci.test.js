@@ -21,7 +21,7 @@ function runResult(args) {
 }
 
 /**
- * Set up a minimal project with .sourcevision and .rex dirs,
+ * Set up a minimal project with .n-dx/sourcevision and .n-dx/rex dirs,
  * enough for ci to validate against.
  */
 async function setupProject(dir) {
@@ -151,7 +151,7 @@ describe("n-dx ci", () => {
   // ── Missing directories ────────────────────────────────────────────────────
 
   describe("missing project setup", () => {
-    it("exits 1 when .rex is missing", async () => {
+    it("exits 1 when .n-dx/rex is missing", async () => {
       const emptyDir = await mkdtemp(join(tmpdir(), "ndx-ci-empty-"));
       try {
         const { stderr, code } = runResult([emptyDir]);
@@ -162,16 +162,16 @@ describe("n-dx ci", () => {
       }
     });
 
-    it("returns structured JSON error when .rex is missing with --format=json", async () => {
+    it("returns structured JSON error when .n-dx/rex is missing with --format=json", async () => {
       const emptyDir = await mkdtemp(join(tmpdir(), "ndx-ci-empty-"));
       try {
-        // Create .sourcevision so only .rex is missing
-        await mkdir(join(emptyDir, ".sourcevision"), { recursive: true });
+        // Create .n-dx/sourcevision so only .n-dx/rex is missing
+        await mkdir(join(emptyDir, ".n-dx/sourcevision"), { recursive: true });
         const { stdout, code } = runResult(["--format=json", emptyDir]);
         expect(code).toBe(1);
         const report = JSON.parse(stdout);
         expect(report.ok).toBe(false);
-        expect(report.error).toMatch(/\.rex/);
+        expect(report.error).toMatch(/\.n-dx\/rex/);
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
@@ -184,8 +184,8 @@ describe("n-dx ci", () => {
         expect(code).toBe(1);
         const report = JSON.parse(stdout);
         expect(report.ok).toBe(false);
-        expect(report.error).toMatch(/\.rex/);
-        expect(report.error).toMatch(/\.sourcevision/);
+        expect(report.error).toMatch(/\.n-dx\/rex/);
+        expect(report.error).toMatch(/\.n-dx\/sourcevision/);
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
@@ -194,7 +194,7 @@ describe("n-dx ci", () => {
     it("JSON error includes hint for missing setup", async () => {
       const emptyDir = await mkdtemp(join(tmpdir(), "ndx-ci-empty-"));
       try {
-        await mkdir(join(emptyDir, ".sourcevision"), { recursive: true });
+        await mkdir(join(emptyDir, ".n-dx/sourcevision"), { recursive: true });
         const { stdout, code } = runResult(["--format=json", emptyDir]);
         expect(code).toBe(1);
         const report = JSON.parse(stdout);
@@ -207,7 +207,7 @@ describe("n-dx ci", () => {
     it("includes timestamp in JSON error report", async () => {
       const emptyDir = await mkdtemp(join(tmpdir(), "ndx-ci-empty-"));
       try {
-        await mkdir(join(emptyDir, ".sourcevision"), { recursive: true });
+        await mkdir(join(emptyDir, ".n-dx/sourcevision"), { recursive: true });
         const { stdout } = runResult(["--format=json", emptyDir]);
         const report = JSON.parse(stdout);
         expect(report.timestamp).toBeDefined();
@@ -217,7 +217,7 @@ describe("n-dx ci", () => {
       }
     });
 
-    it("text mode still shows clear error when .rex is missing", async () => {
+    it("text mode still shows clear error when .n-dx/rex is missing", async () => {
       const emptyDir = await mkdtemp(join(tmpdir(), "ndx-ci-empty-"));
       try {
         const { stderr, code } = runResult([emptyDir]);
@@ -236,7 +236,7 @@ describe("n-dx ci", () => {
     it("exits non-zero when rex validate fails", async () => {
       // Break the PRD schema
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({ invalid: true }),
       );
 
@@ -246,7 +246,7 @@ describe("n-dx ci", () => {
 
     it("JSON report shows failed step", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({ invalid: true }),
       );
 
@@ -262,7 +262,7 @@ describe("n-dx ci", () => {
     it("exits 1 on orphaned items", async () => {
       // Subtask at root is an orphan — subtasks must be under task
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({
           schema: "rex/v1",
           title: "Test",
@@ -283,7 +283,7 @@ describe("n-dx ci", () => {
 
     it("JSON report shows orphaned items as failed check", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({
           schema: "rex/v1",
           title: "Test",
@@ -309,7 +309,7 @@ describe("n-dx ci", () => {
 
     it("includes check details for failed validations", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({
           schema: "rex/v1",
           title: "Test",
@@ -340,7 +340,7 @@ describe("n-dx ci", () => {
     it("exits 1 when sourcevision data is invalid", async () => {
       // Break the inventory schema
       await writeFile(
-        join(tmpDir, ".sourcevision", "inventory.json"),
+        join(tmpDir, ".n-dx/sourcevision", "inventory.json"),
         JSON.stringify({ invalid: true }),
       );
 
@@ -350,7 +350,7 @@ describe("n-dx ci", () => {
 
     it("JSON report shows sourcevision-validate failure", async () => {
       await writeFile(
-        join(tmpDir, ".sourcevision", "inventory.json"),
+        join(tmpDir, ".n-dx/sourcevision", "inventory.json"),
         JSON.stringify({ invalid: true }),
       );
 
@@ -417,7 +417,7 @@ describe("n-dx ci", () => {
 
     it("shows pipeline failed message on failure", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({ invalid: true }),
       );
 
@@ -427,7 +427,7 @@ describe("n-dx ci", () => {
 
     it("shows failure marks for failing steps", async () => {
       await writeFile(
-        join(tmpDir, ".rex", "prd.json"),
+        join(tmpDir, ".n-dx/rex", "prd.json"),
         JSON.stringify({ invalid: true }),
       );
 

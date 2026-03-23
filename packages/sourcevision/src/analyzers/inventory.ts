@@ -17,7 +17,7 @@ import { toPosix } from "../util/paths.js";
 const SKIP_DIRS = new Set([
   ".git",
   "node_modules",
-  PROJECT_DIRS.SOURCEVISION,
+  PROJECT_DIRS.ROOT,
   "dist",
   "build",
   "__pycache__",

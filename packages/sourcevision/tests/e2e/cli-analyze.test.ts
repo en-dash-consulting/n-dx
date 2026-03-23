@@ -26,7 +26,7 @@ describe("sourcevision analyze (e2e)", () => {
       timeout: 30000,
     });
 
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
 
     // Check all expected files exist
     expect(existsSync(join(svDir, "manifest.json"))).toBe(true);
@@ -66,7 +66,7 @@ describe("sourcevision analyze (e2e)", () => {
       timeout: 30000,
     });
 
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     const inv1 = readFileSync(join(svDir, "inventory.json"), "utf-8");
     const imp1 = readFileSync(join(svDir, "imports.json"), "utf-8");
 
@@ -96,7 +96,7 @@ describe("sourcevision analyze (e2e)", () => {
       timeout: 30000,
     });
 
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     expect(existsSync(join(svDir, "inventory.json"))).toBe(true);
     expect(existsSync(join(svDir, "imports.json"))).toBe(false);
     expect(existsSync(join(svDir, "zones.json"))).toBe(false);
@@ -112,7 +112,7 @@ describe("sourcevision analyze (e2e)", () => {
       timeout: 30000,
     });
 
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     expect(existsSync(join(svDir, "inventory.json"))).toBe(true);
     expect(existsSync(join(svDir, "imports.json"))).toBe(false);
   });
@@ -136,7 +136,7 @@ describe("sourcevision analyze (e2e)", () => {
     expect(output).toContain("cached");
 
     // Validate output is still correct
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     const inventory = JSON.parse(readFileSync(join(svDir, "inventory.json"), "utf-8"));
     expect(validateInventory(inventory).ok).toBe(true);
   });
@@ -150,7 +150,7 @@ describe("sourcevision analyze (e2e)", () => {
       timeout: 30000,
     });
 
-    const svDir = join(tmpDir, ".sourcevision");
+    const svDir = join(tmpDir, ".n-dx/sourcevision");
     const components = JSON.parse(readFileSync(join(svDir, "components.json"), "utf-8"));
 
     expect(components.routeModules.length).toBeGreaterThan(0);

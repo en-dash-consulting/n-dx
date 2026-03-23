@@ -68,8 +68,8 @@ function loadPRDSync(rexDir) {
 /** Create a temporary project directory with .rex/ and optional prd.json. */
 function makeTmpProject(prdItems = undefined) {
   const tmpDir = mkdtempSync(join(tmpdir(), "scheduler-test-"));
-  const rexDir = join(tmpDir, ".rex");
-  const henchDir = join(tmpDir, ".hench");
+  const rexDir = join(tmpDir, ".n-dx/rex");
+  const henchDir = join(tmpDir, ".n-dx/hench");
   const runsDir = join(henchDir, "runs");
   mkdirSync(rexDir, { recursive: true });
   mkdirSync(runsDir, { recursive: true });

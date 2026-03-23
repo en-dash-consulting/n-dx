@@ -100,8 +100,8 @@ describe("Data routes — streaming file responses", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "data-stream-"));
-    svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
 
@@ -175,8 +175,8 @@ describe("Sourcevision inventory — pagination", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-pagination-"));
-    svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
 
@@ -278,17 +278,17 @@ describe("Hench runs — pagination with offset", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-pagination-"));
-    svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
-    runsDir = join(tmpDir, ".hench", "runs");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
+    runsDir = join(tmpDir, ".n-dx/hench", "runs");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
     await mkdir(runsDir, { recursive: true });
 
     // Write hench config
-    await mkdir(join(tmpDir, ".hench"), { recursive: true });
+    await mkdir(join(tmpDir, ".n-dx/hench"), { recursive: true });
     await writeFile(
-      join(tmpDir, ".hench", "config.json"),
+      join(tmpDir, ".n-dx/hench", "config.json"),
       JSON.stringify({ provider: "cli", model: "sonnet" }),
     );
 

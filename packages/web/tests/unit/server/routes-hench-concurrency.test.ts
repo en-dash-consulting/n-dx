@@ -36,16 +36,16 @@ describe("GET /api/hench/concurrency", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "hench-concurrency-"));
-    const henchDir = join(tmpDir, ".hench");
+    const henchDir = join(tmpDir, ".n-dx/hench");
     const runsDir = join(henchDir, "runs");
     const locksDir = join(henchDir, "locks");
-    const rexDir = join(tmpDir, ".rex");
+    const rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(runsDir, { recursive: true });
     await mkdir(locksDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
     ctx = {
       projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
+      svDir: join(tmpDir, ".n-dx/sourcevision"),
       rexDir,
       dev: false,
     };
@@ -81,7 +81,7 @@ describe("GET /api/hench/concurrency", () => {
       guard: { maxConcurrentProcesses: 5 },
     };
     await writeFile(
-      join(tmpDir, ".hench", "config.json"),
+      join(tmpDir, ".n-dx/hench", "config.json"),
       JSON.stringify(config),
     );
 
@@ -99,7 +99,7 @@ describe("GET /api/hench/concurrency", () => {
       taskId: "task-1",
     };
     await writeFile(
-      join(tmpDir, ".hench", "locks", `${process.pid}.lock`),
+      join(tmpDir, ".n-dx/hench", "locks", `${process.pid}.lock`),
       JSON.stringify(lock),
     );
 
@@ -122,7 +122,7 @@ describe("GET /api/hench/concurrency", () => {
       taskId: "task-dead",
     };
     await writeFile(
-      join(tmpDir, ".hench", "locks", "99999999.lock"),
+      join(tmpDir, ".n-dx/hench", "locks", "99999999.lock"),
       JSON.stringify(lock),
     );
 
@@ -146,7 +146,7 @@ describe("GET /api/hench/concurrency", () => {
       model: "sonnet",
     };
     await writeFile(
-      join(tmpDir, ".hench", "runs", "run-1.json"),
+      join(tmpDir, ".n-dx/hench", "runs", "run-1.json"),
       JSON.stringify(run),
     );
 
@@ -170,7 +170,7 @@ describe("GET /api/hench/concurrency", () => {
       model: "sonnet",
     };
     await writeFile(
-      join(tmpDir, ".hench", "runs", "run-done.json"),
+      join(tmpDir, ".n-dx/hench", "runs", "run-done.json"),
       JSON.stringify(run),
     );
 
@@ -198,7 +198,7 @@ describe("GET /api/hench/concurrency", () => {
       ],
     };
     await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
+      join(tmpDir, ".n-dx/rex", "prd.json"),
       JSON.stringify(prd),
     );
 
@@ -211,7 +211,7 @@ describe("GET /api/hench/concurrency", () => {
     // Set max concurrent to 3 and create 2 live lock files → "high" level (2/3 = 67%)
     const config = { schema: "hench/v1", guard: { maxConcurrentProcesses: 3 } };
     await writeFile(
-      join(tmpDir, ".hench", "config.json"),
+      join(tmpDir, ".n-dx/hench", "config.json"),
       JSON.stringify(config),
     );
 
@@ -222,7 +222,7 @@ describe("GET /api/hench/concurrency", () => {
       startedAt: new Date().toISOString(),
     };
     await writeFile(
-      join(tmpDir, ".hench", "locks", `${process.pid}.lock`),
+      join(tmpDir, ".n-dx/hench", "locks", `${process.pid}.lock`),
       JSON.stringify(lock),
     );
 
@@ -235,7 +235,7 @@ describe("GET /api/hench/concurrency", () => {
 
   it("handles missing locks directory gracefully", async () => {
     // Remove the locks directory
-    await rm(join(tmpDir, ".hench", "locks"), { recursive: true });
+    await rm(join(tmpDir, ".n-dx/hench", "locks"), { recursive: true });
 
     const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
     expect(res.status).toBe(200);

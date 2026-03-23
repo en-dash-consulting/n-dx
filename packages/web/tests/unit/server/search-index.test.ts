@@ -83,7 +83,7 @@ describe("SearchIndex", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "search-index-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(rexDir, { recursive: true });
     index = new SearchIndex(rexDir);
   });

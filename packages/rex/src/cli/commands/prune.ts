@@ -11,14 +11,12 @@ import {
   loadPendingSmartPrune,
   clearPendingSmartPrune,
 } from "../../core/pending-cache.js";
-import { REX_DIR } from "./constants.js";
+import { REX_DIR, REX_FILES } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
-
-const ARCHIVE_FILE = "archive.json";
 
 /**
  * Maximum number of archive batches to retain.
@@ -103,7 +101,7 @@ async function appendArchiveBatch(
   rexDir: string,
   batch: PruneBatch,
 ): Promise<void> {
-  const archivePath = join(rexDir, ARCHIVE_FILE);
+  const archivePath = join(rexDir, REX_FILES.ARCHIVE);
   const archive = await loadArchive(archivePath);
   archive.batches.push(batch);
   trimArchive(archive);
@@ -321,7 +319,7 @@ export async function cmdPrune(
 
   // Archive pruned items
   progress("Archiving pruned items...");
-  const archivePath = join(rexDir, ARCHIVE_FILE);
+  const archivePath = join(rexDir, REX_FILES.ARCHIVE);
   const archive = await loadArchive(archivePath);
   archive.batches.push({
     timestamp: new Date().toISOString(),
@@ -365,7 +363,7 @@ export async function cmdPrune(
     for (const item of pruneResult.pruned) {
       result(`  ${getLevelEmoji(item.level)} ${item.title}`);
     }
-    info(`Archived to ${ARCHIVE_FILE}`);
+    info(`Archived to ${REX_FILES.ARCHIVE}`);
 
     // Chain consolidation after prune
     if (!skipConsolidate && doc.items.length > 0) {
@@ -449,7 +447,7 @@ async function consolidateAfterPrune(
     // Archive any items removed during consolidation
     if (reshapeResult.archivedItems.length > 0) {
       info("Archiving consolidated items...");
-      const archivePath = join(rexDir, ARCHIVE_FILE);
+      const archivePath = join(rexDir, REX_FILES.ARCHIVE);
       const archive = await loadArchive(archivePath);
       archive.batches.push({
         timestamp: new Date().toISOString(),
@@ -612,7 +610,7 @@ async function smartPrune(
   // Archive
   if (reshapeResult.archivedItems.length > 0) {
     info("Archiving pruned items...");
-    const archivePath = join(rexDir, ARCHIVE_FILE);
+    const archivePath = join(rexDir, REX_FILES.ARCHIVE);
     const archive = await loadArchive(archivePath);
     archive.batches.push({
       timestamp: new Date().toISOString(),

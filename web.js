@@ -4,7 +4,7 @@
  * Starts the unified server (@n-dx/web serve) with support for:
  *   - Configurable port (--port, config, default 3117)
  *   - Background/daemon mode (--background)
- *   - PID file management (.n-dx-web.pid)
+ *   - PID file management (.n-dx/web.pid)
  *   - Graceful stop (ndx start stop / ndx web stop)
  *
  * Used by both `ndx start` (unified: dashboard + MCP) and `ndx web` (alias).
@@ -19,12 +19,12 @@
 
 import { spawn } from "child_process";
 import { createConnection } from "net";
-import { readFile, writeFile, unlink, access } from "fs/promises";
+import { readFile, writeFile, unlink, access, mkdir } from "fs/promises";
 import { join, resolve } from "path";
 
 const DEFAULT_PORT = 3117;
-const PID_FILE = ".n-dx-web.pid";
-const PORT_FILE = ".n-dx-web.port";
+const PID_FILE = ".n-dx/web.pid";
+const PORT_FILE = ".n-dx/web.port";
 
 // ── Output helpers ───────────────────────────────────────────────────────────
 // Orchestration files avoid importing from packages (they spawn CLIs instead).
@@ -49,10 +49,10 @@ async function fileExists(path) {
 }
 
 /**
- * Load the project .n-dx.json and return the web.port if configured.
+ * Load the project .n-dx/config.json and return the web.port if configured.
  */
 async function loadConfigPort(dir) {
-  const configPath = join(dir, ".n-dx.json");
+  const configPath = join(dir, ".n-dx/config.json");
   if (!(await fileExists(configPath))) return undefined;
   try {
     const raw = await readFile(configPath, "utf-8");
@@ -144,6 +144,7 @@ export async function readPidFile(dir) {
  */
 async function writePidFile(dir, pid, port) {
   const pidPath = join(dir, PID_FILE);
+  await mkdir(join(dir, ".n-dx"), { recursive: true });
   await writeFile(
     pidPath,
     JSON.stringify({ pid, port, startedAt: new Date().toISOString() }, null, 2) + "\n",
@@ -324,7 +325,7 @@ export async function runWeb(dir, rest, { run, tools, __dir, commandName = "web"
 
   _quiet = !!(flags.quiet);
 
-  // Resolve port: --port flag > .n-dx.json config > default
+  // Resolve port: --port flag > .n-dx/config.json > default
   let port = DEFAULT_PORT;
   if (flags.port) {
     const parsed = parseInt(flags.port, 10);

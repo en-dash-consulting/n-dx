@@ -35,7 +35,7 @@ describe("rex --quiet", () => {
 
   it("suppresses init output with --quiet", () => {
     const normal = run(["init", tmpDir]);
-    expect(normal).toContain("Initialized .rex/");
+    expect(normal).toContain("Initialized .n-dx/rex/");
 
     // Clean up and re-init with --quiet
     const tmpDir2 = tmpDir + "-q";

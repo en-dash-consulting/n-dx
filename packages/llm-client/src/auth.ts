@@ -185,7 +185,7 @@ export async function diagnoseAuth(
 
   if (configKey) {
     apiKeySource = "config";
-    messages.push(`API key: found in .n-dx.json (claude.api_key)`);
+    messages.push(`API key: found in .n-dx/config.json (claude.api_key)`);
   } else if (envKey) {
     apiKeySource = "env";
     messages.push(`API key: found in environment (${apiKeyEnv})`);

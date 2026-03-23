@@ -21,7 +21,7 @@ describe("RunArchiver", () => {
   beforeEach(async () => {
     tmpBase = await mkdtemp(join(tmpdir(), "hench-archiver-"));
     projectDir = tmpBase;
-    runsDir = join(tmpBase, ".hench", "runs");
+    runsDir = join(tmpBase, ".n-dx/hench", "runs");
     await mkdir(runsDir, { recursive: true });
   });
 
@@ -71,14 +71,14 @@ describe("RunArchiver", () => {
   // ---------------------------------------------------------------------------
 
   describe("loadArchivalConfig", () => {
-    it("returns defaults when .n-dx.json does not exist", async () => {
+    it("returns defaults when config.json does not exist", async () => {
       const config = await loadArchivalConfig(projectDir);
       expect(config).toEqual(DEFAULT_ARCHIVAL_CONFIG);
     });
 
-    it("returns defaults when .n-dx.json has no archival section", async () => {
+    it("returns defaults when config.json has no archival section", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({ web: { port: 3117 } }),
         "utf-8",
       );
@@ -86,9 +86,9 @@ describe("RunArchiver", () => {
       expect(config).toEqual(DEFAULT_ARCHIVAL_CONFIG);
     });
 
-    it("reads archival config from .n-dx.json", async () => {
+    it("reads archival config from config.json", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({ archival: { maxAgeDays: 7, enabled: false } }),
         "utf-8",
       );
@@ -99,7 +99,7 @@ describe("RunArchiver", () => {
 
     it("falls back to defaults for invalid fields", async () => {
       await writeFile(
-        join(projectDir, ".n-dx.json"),
+        join(projectDir, "config.json"),
         JSON.stringify({ archival: { maxAgeDays: -1, enabled: "yes" } }),
         "utf-8",
       );
@@ -109,7 +109,7 @@ describe("RunArchiver", () => {
     });
 
     it("handles invalid JSON gracefully", async () => {
-      await writeFile(join(projectDir, ".n-dx.json"), "not json{{{", "utf-8");
+      await writeFile(join(projectDir, "config.json"), "not json{{{", "utf-8");
       const config = await loadArchivalConfig(projectDir);
       expect(config).toEqual(DEFAULT_ARCHIVAL_CONFIG);
     });

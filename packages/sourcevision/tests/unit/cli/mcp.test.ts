@@ -60,7 +60,7 @@ describe("Sourcevision MCP server factory", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-mcp-test-"));
-    svDir = join(tmpDir, ".sourcevision");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
     await mkdir(svDir, { recursive: true });
 
     // Write minimal analysis data

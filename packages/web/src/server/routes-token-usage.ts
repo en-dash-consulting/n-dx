@@ -350,7 +350,7 @@ interface HenchRunSummary {
 
 function extractHenchEvents(projectDir: string, since?: string, until?: string): TokenEvent[] {
   const events: TokenEvent[] = [];
-  const runsDir = join(projectDir, ".hench", "runs");
+  const runsDir = join(projectDir, ".n-dx/hench", "runs");
   let files: string[];
   try {
     files = readdirSync(runsDir);
@@ -407,7 +407,7 @@ interface SvManifest {
 
 function extractSvEvents(projectDir: string, since?: string, until?: string): TokenEvent[] {
   const events: TokenEvent[] = [];
-  const manifestPath = join(projectDir, ".sourcevision", "manifest.json");
+  const manifestPath = join(projectDir, ".n-dx/sourcevision", "manifest.json");
   try {
     const raw = readFileSync(manifestPath, "utf-8");
     const manifest = JSON.parse(raw) as SvManifest;
@@ -439,12 +439,12 @@ function collectAllEvents(ctx: ServerContext, since?: string, until?: string): T
 
 function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
   const rexPath = join(ctx.rexDir, "execution-log.jsonl");
-  const henchPath = join(ctx.projectDir, ".hench", "runs");
-  const svPath = join(ctx.projectDir, ".sourcevision", "manifest.json");
+  const henchPath = join(ctx.projectDir, ".n-dx/hench", "runs");
+  const svPath = join(ctx.projectDir, ".n-dx/sourcevision", "manifest.json");
   return {
-    rex: existsSync(rexPath) ? ".rex/execution-log.jsonl" : "missing (.rex/execution-log.jsonl)",
-    hench: existsSync(henchPath) ? ".hench/runs/*.json" : "missing (.hench/runs/*.json)",
-    sourcevision: existsSync(svPath) ? ".sourcevision/manifest.json" : "missing (.sourcevision/manifest.json)",
+    rex: existsSync(rexPath) ? ".n-dx/rex/execution-log.jsonl" : "missing (.n-dx/rex/execution-log.jsonl)",
+    hench: existsSync(henchPath) ? ".n-dx/hench/runs/*.json" : "missing (.n-dx/hench/runs/*.json)",
+    sourcevision: existsSync(svPath) ? ".n-dx/sourcevision/manifest.json" : "missing (.n-dx/sourcevision/manifest.json)",
   };
 }
 

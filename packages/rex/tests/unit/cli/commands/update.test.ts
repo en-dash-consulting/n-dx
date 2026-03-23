@@ -12,9 +12,9 @@ describe("cmdUpdate", () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), "rex-update-test-"));
-    mkdirSync(join(tmp, ".rex"));
+    mkdirSync(join(tmp, ".n-dx/rex"), { recursive: true });
     writeFileSync(
-      join(tmp, ".rex", "prd.json"),
+      join(tmp, ".n-dx/rex", "prd.json"),
       JSON.stringify({
         schema: "rex/v1",
         title: "test",
@@ -242,7 +242,7 @@ describe("cmdUpdate", () => {
   describe("blockedBy updates", () => {
     it("sets blockedBy from comma-separated string", async () => {
       writeFileSync(
-        join(tmp, ".rex", "prd.json"),
+        join(tmp, ".n-dx/rex", "prd.json"),
         JSON.stringify({
           schema: "rex/v1",
           title: "test",
@@ -256,14 +256,14 @@ describe("cmdUpdate", () => {
 
       await cmdUpdate(tmp, itemId, { blockedBy: "dep-1,dep-2" });
 
-      const raw = readFileSync(join(tmp, ".rex", "prd.json"), "utf-8");
+      const raw = readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8");
       const doc = JSON.parse(raw) as PRDDocument;
       expect(doc.items[0].blockedBy).toEqual(["dep-1", "dep-2"]);
     });
 
     it("clears blockedBy with empty string", async () => {
       writeFileSync(
-        join(tmp, ".rex", "prd.json"),
+        join(tmp, ".n-dx/rex", "prd.json"),
         JSON.stringify({
           schema: "rex/v1",
           title: "test",
@@ -276,7 +276,7 @@ describe("cmdUpdate", () => {
 
       await cmdUpdate(tmp, itemId, { blockedBy: "" });
 
-      const raw = readFileSync(join(tmp, ".rex", "prd.json"), "utf-8");
+      const raw = readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8");
       const doc = JSON.parse(raw) as PRDDocument;
       expect(doc.items[0].blockedBy).toBeUndefined();
     });
@@ -301,7 +301,7 @@ describe("cmdUpdate", () => {
 
     it("rejects blockedBy that creates a cycle", async () => {
       writeFileSync(
-        join(tmp, ".rex", "prd.json"),
+        join(tmp, ".n-dx/rex", "prd.json"),
         JSON.stringify({
           schema: "rex/v1",
           title: "test",
@@ -326,7 +326,7 @@ describe("cmdUpdate", () => {
 
   describe("automatic timestamps", () => {
     function readItem(): PRDDocument["items"][number] {
-      const raw = readFileSync(join(tmp, ".rex", "prd.json"), "utf-8");
+      const raw = readFileSync(join(tmp, ".n-dx/rex", "prd.json"), "utf-8");
       const doc = JSON.parse(raw) as PRDDocument;
       return doc.items[0];
     }

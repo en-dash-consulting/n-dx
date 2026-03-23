@@ -15,26 +15,26 @@ describe("loadClaudeConfig", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns empty config when .n-dx.json does not exist", async () => {
+  it("returns empty config when config.json does not exist", async () => {
     const config = await loadClaudeConfig(tmpDir);
     expect(config).toEqual({});
   });
 
-  it("returns empty config when .n-dx.json is invalid JSON", async () => {
-    await writeFile(join(tmpDir, ".n-dx.json"), "not json");
+  it("returns empty config when config.json is invalid JSON", async () => {
+    await writeFile(join(tmpDir, "config.json"), "not json");
     const config = await loadClaudeConfig(tmpDir);
     expect(config).toEqual({});
   });
 
-  it("returns empty config when .n-dx.json has no claude section", async () => {
-    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ hench: {} }));
+  it("returns empty config when config.json has no claude section", async () => {
+    await writeFile(join(tmpDir, "config.json"), JSON.stringify({ hench: {} }));
     const config = await loadClaudeConfig(tmpDir);
     expect(config).toEqual({});
   });
 
   it("extracts all claude fields", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, "config.json"),
       JSON.stringify({
         claude: {
           cli_path: "/usr/local/bin/claude",
@@ -56,7 +56,7 @@ describe("loadClaudeConfig", () => {
 
   it("ignores non-string fields", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, "config.json"),
       JSON.stringify({
         claude: {
           cli_path: 42,
@@ -74,7 +74,7 @@ describe("loadClaudeConfig", () => {
 
   it("ignores empty string fields", async () => {
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, "config.json"),
       JSON.stringify({
         claude: {
           cli_path: "",

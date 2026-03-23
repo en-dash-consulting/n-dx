@@ -1,7 +1,7 @@
-import { PROJECT_DIRS, formatUsage } from "../../prd/llm-gateway.js";
+import { formatUsage } from "../../prd/llm-gateway.js";
 import { CLIError } from "../errors.js";
 
-export const HENCH_DIR = PROJECT_DIRS.HENCH;
+export { HENCH_DIR, HENCH_FILES } from "../../constants.js";
 export const TOOL_VERSION = "0.1.0";
 
 export function safeParseInt(value: string, name: string): number {

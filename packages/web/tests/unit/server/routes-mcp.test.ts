@@ -83,8 +83,8 @@ describe("MCP routes", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "mcp-routes-"));
-    svDir = join(tmpDir, ".sourcevision");
-    rexDir = join(tmpDir, ".rex");
+    svDir = join(tmpDir, ".n-dx/sourcevision");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(makePRD(), null, 2));

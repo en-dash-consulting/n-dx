@@ -62,7 +62,7 @@ describe("AdapterRegistry", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-registry-"));
-    rexDir = join(tmpDir, ".rex");
+    rexDir = join(tmpDir, ".n-dx/rex");
     await seedRexDir(rexDir);
     registry = new AdapterRegistry();
   });

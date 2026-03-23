@@ -41,7 +41,7 @@ describe("port utilities", () => {
     });
 
     it("exports PORT_FILE constant for server-to-orchestrator communication", () => {
-      expect(PORT_FILE).toBe(".n-dx-web.port");
+      expect(PORT_FILE).toBe(".n-dx/web.port");
     });
   });
 

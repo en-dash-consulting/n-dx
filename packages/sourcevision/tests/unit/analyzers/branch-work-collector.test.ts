@@ -46,7 +46,7 @@ async function setupGitRepo(
   branchPRD?: Record<string, unknown>,
   branchName = "feature/test-branch",
 ) {
-  const rexDir = join(dir, ".rex");
+  const rexDir = join(dir, ".n-dx/rex");
   await mkdir(rexDir, { recursive: true });
 
   // Initialise git repo on main
@@ -386,7 +386,7 @@ describe("branch-work-collector", () => {
 
       // Feature branch with PRD
       execFileSync("git", ["checkout", "-b", "feature/new"], { cwd: tmpDir });
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       const prd = makePRD([
         makeItem({ id: "a", status: "completed" }),
@@ -424,7 +424,7 @@ describe("branch-work-collector", () => {
       execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
       execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
 
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       const basePRD = makePRD([makeItem({ id: "a", status: "pending" })]);
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(basePRD, null, 2));
@@ -457,7 +457,7 @@ describe("branch-work-collector", () => {
       execFileSync("git", ["checkout", "-b", "feature/broken"], { cwd: tmpDir });
 
       // Write corrupted PRD
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), "{{{not valid");
       execFileSync("git", ["add", "."], { cwd: tmpDir });
@@ -472,7 +472,7 @@ describe("branch-work-collector", () => {
 
     it("handles non-git directory gracefully", async () => {
       // No git init — just a bare directory
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       const prd = makePRD([makeItem({ id: "a", status: "completed" })]);
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
@@ -490,7 +490,7 @@ describe("branch-work-collector", () => {
       execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
       execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
 
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       const basePRD = makePRD([makeItem({ id: "x", status: "pending" })]);
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(basePRD, null, 2));
@@ -575,7 +575,7 @@ describe("branch-work-collector", () => {
       execFileSync("git", ["init", "-b", "main"], { cwd: tmpDir });
       execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir });
       execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
-      const rexDir = join(tmpDir, ".rex");
+      const rexDir = join(tmpDir, ".n-dx/rex");
       await mkdir(rexDir, { recursive: true });
       await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
       execFileSync("git", ["add", "."], { cwd: tmpDir });

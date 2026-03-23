@@ -125,10 +125,10 @@ export async function removeTmpDir(dir) {
  * @param {object[]} [overrides.items] - PRD items (default: one epic with 2 tasks)
  */
 export async function setupRexDir(dir, overrides = {}) {
-  await mkdir(join(dir, ".rex"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/rex"), { recursive: true });
 
   await writeFile(
-    join(dir, ".rex", "config.json"),
+    join(dir, ".n-dx/rex", "config.json"),
     JSON.stringify(
       {
         schema: "rex/v1",
@@ -168,7 +168,7 @@ export async function setupRexDir(dir, overrides = {}) {
   ];
 
   await writeFile(
-    join(dir, ".rex", "prd.json"),
+    join(dir, ".n-dx/rex", "prd.json"),
     JSON.stringify(
       {
         schema: "rex/v1",
@@ -187,10 +187,10 @@ export async function setupRexDir(dir, overrides = {}) {
  * @param {string} dir - Project root directory
  */
 export async function setupHenchDir(dir) {
-  await mkdir(join(dir, ".hench", "runs"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/hench", "runs"), { recursive: true });
 
   await writeFile(
-    join(dir, ".hench", "config.json"),
+    join(dir, ".n-dx/hench", "config.json"),
     JSON.stringify(
       {
         schema: "hench/v1",
@@ -198,7 +198,7 @@ export async function setupHenchDir(dir) {
         model: "sonnet",
         maxTurns: 50,
         maxTokens: 8192,
-        rexDir: ".rex",
+        rexDir: ".n-dx/rex",
         apiKeyEnv: "ANTHROPIC_API_KEY",
         guard: {
           blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"],
@@ -219,10 +219,10 @@ export async function setupHenchDir(dir) {
  * @param {string} dir - Project root directory
  */
 export async function setupSourcevisionDir(dir) {
-  await mkdir(join(dir, ".sourcevision"), { recursive: true });
+  await mkdir(join(dir, ".n-dx/sourcevision"), { recursive: true });
 
   await writeFile(
-    join(dir, ".sourcevision", "manifest.json"),
+    join(dir, ".n-dx/sourcevision", "manifest.json"),
     JSON.stringify({
       schemaVersion: "1.0.0",
       toolVersion: "0.1.0",
@@ -238,11 +238,11 @@ export async function setupSourcevisionDir(dir) {
   );
 
   await writeFile(
-    join(dir, ".sourcevision", "inventory.json"),
+    join(dir, ".n-dx/sourcevision", "inventory.json"),
     JSON.stringify({ files: [], summary: { totalFiles: 0, totalBytes: 0, languages: {} } }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "imports.json"),
+    join(dir, ".n-dx/sourcevision", "imports.json"),
     JSON.stringify({
       edges: [],
       external: {},
@@ -250,7 +250,7 @@ export async function setupSourcevisionDir(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "zones.json"),
+    join(dir, ".n-dx/sourcevision", "zones.json"),
     JSON.stringify({
       zones: [],
       crossings: [],
@@ -259,7 +259,7 @@ export async function setupSourcevisionDir(dir) {
     }),
   );
   await writeFile(
-    join(dir, ".sourcevision", "components.json"),
+    join(dir, ".n-dx/sourcevision", "components.json"),
     JSON.stringify({
       components: [],
       routeModules: [],

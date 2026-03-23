@@ -74,7 +74,7 @@ describe("rex add (smart mode routing)", () => {
 
     // Verify in prd.json
     const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(prd.items.some((i: { title: string }) => i.title === "Test Epic")).toBe(true);
   });
@@ -98,7 +98,7 @@ describe("rex add (smart mode routing)", () => {
     expect(output).toContain("ID:");
 
     const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     expect(prd.items.some((i: { title: string }) => i.title === "Flag Epic")).toBe(true);
   });
@@ -191,7 +191,7 @@ describe("rex add (smart mode routing)", () => {
 
     // Read back to find the subtask id
     const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+      await readFile(join(tmpDir, ".n-dx/rex", "prd.json"), "utf-8"),
     );
     const subtaskId = prd.items[0].children[0].children[0].children[0].id;
 
