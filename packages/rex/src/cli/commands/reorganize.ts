@@ -13,6 +13,7 @@ import {
 } from "../../core/reorganize-executor.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
+import { appendArchiveBatch } from "../../core/archive.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result, startSpinner } from "../output.js";
@@ -113,6 +114,7 @@ function selectStructuralProposals(
 
 async function applyStructural(
   store: PRDStore,
+  rexDir: string,
   doc: PRDDocument,
   toApply: ReorganizationProposal[],
   isJson: boolean,
@@ -128,6 +130,23 @@ async function applyStructural(
       event: "reorganize_applied",
       detail: `Applied ${applyResult.applied} structural reorganization proposals`,
     });
+
+    // Archive removed items
+    if (applyResult.archivedItems.length > 0) {
+      const descriptions = toApply
+        .filter((_, i) => applyResult.results[i]?.success)
+        .map((p) => p.description);
+      await appendArchiveBatch(rexDir, {
+        timestamp: new Date().toISOString(),
+        source: "reorganize",
+        items: applyResult.archivedItems,
+        count: applyResult.archivedItems.length,
+        reason: `Reorganize: ${descriptions.join("; ")}`,
+      });
+      if (!isJson) {
+        info(`Archived ${applyResult.archivedItems.length} removed item${applyResult.archivedItems.length === 1 ? "" : "s"}`);
+      }
+    }
   }
   if (!isJson) {
     result(formatApplyResult(applyResult));
@@ -283,7 +302,7 @@ export async function cmdReorganize(
   let structuralApplied = 0;
   if (acceptFlag !== undefined && hasStructural) {
     const toApply = selectStructuralProposals(plan, acceptFlag, isAcceptAll);
-    structuralApplied = await applyStructural(store, doc, toApply, isJson);
+    structuralApplied = await applyStructural(store, rexDir, doc, toApply, isJson);
   }
 
   // Apply LLM proposals

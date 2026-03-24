@@ -194,6 +194,8 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **General rule:** Commands that write to `.rex/prd.json`, `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
+**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) also write to `.rex/prd.json`. Never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
+
 #### HTTP-request concurrency (web server)
 
 When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:

@@ -39,6 +39,8 @@ export interface ApplyResult {
   failed: number;
   /** Detail per proposal. */
   results: ProposalResult[];
+  /** Items removed from the tree (for archival). */
+  archivedItems: PRDItem[];
 }
 
 export interface ProposalResult {
@@ -61,12 +63,14 @@ export function applyProposals(
   proposals: ReorganizationProposal[],
 ): ApplyResult {
   const results: ProposalResult[] = [];
+  const archivedItems: PRDItem[] = [];
   let applied = 0;
   let failed = 0;
 
   for (const proposal of proposals) {
     try {
-      applyOne(items, proposal);
+      const removed = applyOne(items, proposal);
+      archivedItems.push(...removed);
       results.push({ proposalId: proposal.id, success: true });
       applied++;
     } catch (err) {
@@ -76,43 +80,51 @@ export function applyProposals(
     }
   }
 
-  return { applied, failed, results };
+  return { applied, failed, results, archivedItems };
 }
 
 /**
  * Apply a single proposal to the tree. Throws on failure.
+ * Returns items that were removed (for archival).
  */
-function applyOne(items: PRDItem[], proposal: ReorganizationProposal): void {
+function applyOne(items: PRDItem[], proposal: ReorganizationProposal): PRDItem[] {
   switch (proposal.detail.kind) {
     case "merge":
-      applyMerge(items, proposal.detail);
-      break;
+      return applyMerge(items, proposal.detail);
     case "move":
       applyMove(items, proposal.detail);
-      break;
+      return [];
     case "delete":
-      applyDelete(items, proposal.detail);
-      break;
+      return applyDelete(items, proposal.detail);
     case "prune":
-      applyPrune(items);
-      break;
+      return applyPrune(items);
     case "collapse":
       applyCollapse(items, proposal.detail);
-      break;
+      return [];
     case "split":
       applySplit(items, proposal.detail);
-      break;
+      return [];
   }
 }
 
 // ── Executors ────────────────────────────────────────────────────────────────
 
-function applyMerge(items: PRDItem[], detail: MergeDetail): void {
+function applyMerge(items: PRDItem[], detail: MergeDetail): PRDItem[] {
+  // Snapshot absorbed items before merge removes them
+  const absorbedIds = detail.sourceIds.filter((id) => id !== detail.targetId);
+  const snapshots: PRDItem[] = [];
+  for (const id of absorbedIds) {
+    const entry = findItem(items, id);
+    if (entry) {
+      snapshots.push(structuredClone(entry.item));
+    }
+  }
+
   const result = mergeItems(items, detail.sourceIds, detail.targetId);
-  // mergeItems mutates in place; throws internally on validation failure
   if (!result) {
     throw new Error(`Merge failed for target=${detail.targetId}`);
   }
+  return snapshots;
 }
 
 function applyMove(items: PRDItem[], detail: MoveDetail): void {
@@ -129,18 +141,24 @@ function applyMove(items: PRDItem[], detail: MoveDetail): void {
   moveItem(items, detail.itemId, detail.toParentId ?? undefined);
 }
 
-function applyDelete(items: PRDItem[], detail: DeleteDetail): void {
+function applyDelete(items: PRDItem[], detail: DeleteDetail): PRDItem[] {
+  // Snapshot before removal
+  const entry = findItem(items, detail.itemId);
+  const snapshot = entry ? structuredClone(entry.item) : null;
+
   const removed = removeFromTree(items, detail.itemId);
   if (!removed) {
     throw new Error(`Item "${detail.itemId}" not found for deletion`);
   }
+  return snapshot ? [snapshot] : [];
 }
 
-function applyPrune(items: PRDItem[]): void {
+function applyPrune(items: PRDItem[]): PRDItem[] {
   const result = pruneItems(items);
   if (result.prunedCount === 0) {
     throw new Error("No prunable items found");
   }
+  return result.pruned;
 }
 
 function applyCollapse(items: PRDItem[], detail: CollapseDetail): void {
