@@ -1,7 +1,9 @@
 ---
-"@n-dx/rex": minor
-"@n-dx/hench": minor
-"@n-dx/web": minor
+"@n-dx/rex": patch
+"@n-dx/hench": patch
+"@n-dx/web": patch
+"@n-dx/llm-client": patch
+"@n-dx/sourcevision": patch
 ---
 
 ### Rex
