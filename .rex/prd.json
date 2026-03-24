@@ -11983,7 +11983,7 @@
         {
           "id": "0f8711c6-1dc3-4e54-b156-54579f60771f",
           "title": "Fix --mode=fast being ignored when --accept is passed to reorganize",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "Running `rex reorganize --mode=fast --accept=3,4 .` still triggers the LLM analysis pass, wasting time and tokens. The --mode flag should be respected regardless of whether --accept is also passed. The LLM analysis should only run when mode is \"full\" (the default).",
           "acceptanceCriteria": [
@@ -11995,7 +11995,9 @@
           "tags": [
             "rex",
             "bugfix"
-          ]
+          ],
+          "startedAt": "2026-03-24T05:24:18.425Z",
+          "completedAt": "2026-03-24T05:25:16.585Z"
         },
         {
           "id": "9fa85475-a6ff-474a-bf4f-e1f531df7916",

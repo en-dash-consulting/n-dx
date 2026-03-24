@@ -244,7 +244,7 @@ export async function cmdReorganize(
   }
 
   const includeCompleted = flags["include-completed"] === "true";
-  const fast = flags.fast === "true";
+  const fast = flags.mode === "fast" || flags.fast === "true";
   const isJson = flags.format === "json";
 
   // Stage 1: Programmatic detectors
