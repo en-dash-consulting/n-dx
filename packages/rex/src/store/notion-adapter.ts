@@ -270,6 +270,13 @@ export class NotionStore implements PRDStore {
     await writeFile(this.path("workflow.md"), content, "utf-8");
   }
 
+  async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
+    const doc = await this.loadDocument();
+    const result = await fn(doc);
+    await this.saveDocument(doc);
+    return result;
+  }
+
   capabilities(): StoreCapabilities {
     return {
       adapter: "notion",

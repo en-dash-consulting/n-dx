@@ -293,7 +293,7 @@ describe("Store roundtrip integration", () => {
   it("reports file adapter capabilities", () => {
     const caps = store.capabilities();
     expect(caps.adapter).toBe("file");
-    expect(caps.supportsTransactions).toBe(false);
+    expect(caps.supportsTransactions).toBe(true);
     expect(caps.supportsWatch).toBe(false);
   });
 });

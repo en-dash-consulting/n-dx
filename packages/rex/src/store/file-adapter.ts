@@ -11,6 +11,8 @@ import type { PRDStore, StoreCapabilities } from "./contracts.js";
 
 export class FileStore implements PRDStore {
   private rexDir: string;
+  /** True while inside withTransaction — prevents double-locking in saveDocument. */
+  private inTransaction = false;
 
   constructor(rexDir: string) {
     this.rexDir = rexDir;
@@ -39,7 +41,29 @@ export class FileStore implements PRDStore {
     if (!result.ok) {
       throw new Error(`Invalid document: ${result.errors.message}`);
     }
-    await atomicWriteJSON(this.path("prd.json"), doc, toCanonicalJSON);
+    // When called outside a transaction, acquire the lock for the write.
+    // Inside a transaction, the lock is already held.
+    if (this.inTransaction) {
+      await atomicWriteJSON(this.path("prd.json"), doc, toCanonicalJSON);
+    } else {
+      await withLock(this.lockPath(), async () => {
+        await atomicWriteJSON(this.path("prd.json"), doc, toCanonicalJSON);
+      });
+    }
+  }
+
+  async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
+    return withLock(this.lockPath(), async () => {
+      this.inTransaction = true;
+      try {
+        const doc = await this.loadDocument();
+        const result = await fn(doc);
+        await this.saveDocument(doc);
+        return result;
+      } finally {
+        this.inTransaction = false;
+      }
+    });
   }
 
   async getItem(id: string): Promise<PRDItem | null> {
@@ -49,8 +73,7 @@ export class FileStore implements PRDStore {
   }
 
   async addItem(item: PRDItem, parentId?: string): Promise<void> {
-    await withLock(this.lockPath(), async () => {
-      const doc = await this.loadDocument();
+    await this.withTransaction(async (doc) => {
       if (parentId) {
         const inserted = insertChild(doc.items, parentId, item);
         if (!inserted) {
@@ -59,29 +82,24 @@ export class FileStore implements PRDStore {
       } else {
         doc.items.push(item);
       }
-      await this.saveDocument(doc);
     });
   }
 
   async updateItem(id: string, updates: Partial<PRDItem>): Promise<void> {
-    await withLock(this.lockPath(), async () => {
-      const doc = await this.loadDocument();
+    await this.withTransaction(async (doc) => {
       const updated = updateInTree(doc.items, id, updates);
       if (!updated) {
         throw new Error(`Item "${id}" not found`);
       }
-      await this.saveDocument(doc);
     });
   }
 
   async removeItem(id: string): Promise<void> {
-    await withLock(this.lockPath(), async () => {
-      const doc = await this.loadDocument();
+    await this.withTransaction(async (doc) => {
       const removed = removeFromTree(doc.items, id);
       if (!removed) {
         throw new Error(`Item "${id}" not found`);
       }
-      await this.saveDocument(doc);
     });
   }
 
@@ -169,7 +187,7 @@ export class FileStore implements PRDStore {
   capabilities(): StoreCapabilities {
     return {
       adapter: "file",
-      supportsTransactions: false,
+      supportsTransactions: true,
       supportsWatch: false,
     };
   }
