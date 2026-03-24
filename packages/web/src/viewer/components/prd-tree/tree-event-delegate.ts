@@ -110,9 +110,11 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
       return;
     }
 
-    // Edit action button — select item for detail panel
-    if (target.closest(".prd-node-action-edit")) {
-      if (c.onSelectItem) c.onSelectItem(item);
+    // Checkbox — toggle bulk selection without opening detail panel
+    if (target.closest("[data-bulk-check]")) {
+      if (c.onBulkSelect) {
+        c.onBulkSelect(item, { ctrlKey: true, shiftKey: false });
+      }
       return;
     }
 
@@ -138,9 +140,8 @@ export function useTreeEventDelegation(cb: TreeDelegationCallbacks): TreeDelegat
       return;
     }
 
-    // Default: multi-select with modifier support, falling back to
-    // detail-panel selection or expand/collapse toggle.
-    if (c.onBulkSelect) {
+    // Default row click: ctrl/shift+click → bulk select, plain click → detail panel
+    if ((e.ctrlKey || e.metaKey || e.shiftKey) && c.onBulkSelect) {
       const modifiers: SelectionModifiers = {
         ctrlKey: e.ctrlKey || e.metaKey,
         shiftKey: e.shiftKey,

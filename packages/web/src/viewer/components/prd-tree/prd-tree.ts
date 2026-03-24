@@ -279,6 +279,15 @@ class NodeRow extends Component<NodeRowProps> {
         tabIndex: 0,
         ref: nodeRef,
       },
+      // Checkbox (visible on hover or when bulk-selected)
+      h("input", {
+        type: "checkbox",
+        class: `prd-node-checkbox${isBulkSelected ? " prd-node-checkbox-visible" : ""}`,
+        checked: isBulkSelected,
+        "aria-label": `Select ${item.title}`,
+        tabIndex: -1,
+        "data-bulk-check": "",
+      }),
       // Chevron
       h(
         "span",
@@ -346,13 +355,6 @@ class NodeRow extends Component<NodeRowProps> {
               tabIndex: 0,
             }, "+")
           : null,
-        // Edit (opens detail panel)
-        h("button", {
-          class: "prd-node-action prd-node-action-edit",
-          title: `Edit ${item.title}`,
-          "aria-label": `Edit ${item.title}`,
-          tabIndex: 0,
-        }, "\u270E"),
         // Change status (opens inline status picker)
         h("button", {
           class: "prd-node-action prd-node-action-status",

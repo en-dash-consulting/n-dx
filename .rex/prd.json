@@ -9193,6 +9193,8 @@
       "status": "completed",
       "level": "epic",
       "description": "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json.",
+      "startedAt": "2026-03-24T20:09:27.774Z",
+      "completedAt": "2026-03-24T20:09:27.774Z",
       "children": [
         {
           "id": "95bfdba2-2cba-4921-b614-3a34779e0892",
@@ -12023,9 +12025,7 @@
           "startedAt": "2026-03-24T05:12:16.787Z",
           "completedAt": "2026-03-24T05:20:58.936Z"
         }
-      ],
-      "startedAt": "2026-03-24T20:09:27.774Z",
-      "completedAt": "2026-03-24T20:09:27.774Z"
+      ]
     },
     {
       "id": "4fc05c48-48b0-4da3-8126-4fa237b924d9",
@@ -13037,7 +13037,7 @@
     {
       "id": "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7",
       "title": "Web Dashboard",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page.",
       "startedAt": "2026-03-24T05:27:03.754Z",
@@ -18783,15 +18783,17 @@
         {
           "id": "797fa0aa-caa0-433f-aa50-de87f0c05e90",
           "title": "Checkbox multi-select and detail panel UX for PRD tree",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Rework the PRD tree row interaction model. Hovering a row reveals a checkbox. Clicking the checkbox enters multi-select mode and shows the bulk action popover. Clicking the row itself (not the checkbox) opens the detail side panel. While the detail panel is open for an item, show its checkbox but don't auto-select it into multi-select. Remove the Edit icon on the right side of rows.",
           "priority": "medium",
+          "startedAt": "2026-03-24T20:12:05.010Z",
+          "completedAt": "2026-03-24T20:12:05.010Z",
           "children": [
             {
               "id": "81019293-1603-40e3-a410-e532d832b87b",
               "title": "Hover reveals checkbox, click checkbox enters multi-select",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "On hover, show a checkbox input on the left side of the row. Clicking the checkbox toggles multi-select for that item and shows the bulk action bar. The checkbox should be hidden by default and only appear on hover (or when the item is already in multi-select).",
               "acceptanceCriteria": [
@@ -18804,12 +18806,14 @@
               "tags": [
                 "web",
                 "ux"
-              ]
+              ],
+              "startedAt": "2026-03-24T20:09:49.469Z",
+              "completedAt": "2026-03-24T20:12:02.134Z"
             },
             {
               "id": "914d5466-e655-4cd3-b88e-4f9499b7a3b4",
               "title": "Click row opens detail panel, show checkbox without auto-selecting",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Clicking the row (not the checkbox) opens the detail side panel. While the detail panel is showing for an item, display its checkbox visibly but don't auto-add it to the multi-select set. This lets users see the detail and optionally select it for bulk actions.",
               "acceptanceCriteria": [
@@ -18824,12 +18828,14 @@
               ],
               "blockedBy": [
                 "81019293-1603-40e3-a410-e532d832b87b"
-              ]
+              ],
+              "startedAt": "2026-03-24T20:12:03.561Z",
+              "completedAt": "2026-03-24T20:12:03.561Z"
             },
             {
               "id": "c243c06f-07a2-4c26-b8d6-a333266e0ea4",
               "title": "Remove Edit icon from PRD tree rows",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Remove the Edit pencil icon that appears on the right side of PRD tree rows. Editing is handled through the detail panel.",
               "acceptanceCriteria": [
@@ -18840,14 +18846,16 @@
               "tags": [
                 "web",
                 "ux"
-              ]
+              ],
+              "startedAt": "2026-03-24T20:12:04.863Z",
+              "completedAt": "2026-03-24T20:12:04.863Z"
             }
           ]
         },
         {
           "id": "577c74cb-da15-4cb2-aca7-3012fe840896",
           "title": "Item completion timeline view",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Add a timeline view to the Rex dashboard showing item completions over time. Users should see which items completed most recently, sorted by completedAt timestamp. This gives visibility into velocity and recent progress without digging through the tree.",
           "acceptanceCriteria": [
@@ -18861,11 +18869,13 @@
             "web",
             "ux"
           ],
+          "startedAt": "2026-03-24T20:36:03.902Z",
+          "completedAt": "2026-03-24T20:36:03.902Z",
           "children": [
             {
               "id": "8fd96b07-8037-4722-a80d-88269f148e90",
               "title": "Build completion timeline data source from PRD items",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a utility that walks the PRD tree, collects all items with a completedAt timestamp, and returns them sorted by completion date (most recent first). Include item title, level, parent chain breadcrumb, and completion timestamp. This feeds the timeline view.",
               "acceptanceCriteria": [
@@ -18878,12 +18888,14 @@
               "tags": [
                 "web",
                 "rex"
-              ]
+              ],
+              "startedAt": "2026-03-24T20:12:13.057Z",
+              "completedAt": "2026-03-24T20:36:01.337Z"
             },
             {
               "id": "380ea760-5f73-4474-8057-81e62e5266a6",
               "title": "Render completion timeline view in Rex dashboard",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add a timeline view component showing recently completed items as a chronological list grouped by day. Each entry shows the item title, level badge, parent breadcrumb, and relative time. Accessible as a tab on the Tasks page or a section on the Rex dashboard.",
               "acceptanceCriteria": [
@@ -18899,12 +18911,14 @@
               ],
               "blockedBy": [
                 "8fd96b07-8037-4722-a80d-88269f148e90"
-              ]
+              ],
+              "startedAt": "2026-03-24T20:36:02.779Z",
+              "completedAt": "2026-03-24T20:36:02.779Z"
             },
             {
               "id": "99456edd-c26e-4f03-a362-741c28b79aca",
               "title": "Add date range filter to completion timeline",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add filter controls to the timeline: preset ranges (today, this week, this month, all time) and optional custom date picker. Default to showing the last 7 days.",
               "acceptanceCriteria": [
@@ -18919,11 +18933,14 @@
               ],
               "blockedBy": [
                 "380ea760-5f73-4474-8057-81e62e5266a6"
-              ]
+              ],
+              "startedAt": "2026-03-24T20:36:03.754Z",
+              "completedAt": "2026-03-24T20:36:03.754Z"
             }
           ]
         }
-      ]
+      ],
+      "completedAt": "2026-03-24T20:36:04.012Z"
     },
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
