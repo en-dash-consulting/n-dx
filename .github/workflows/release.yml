@@ -53,8 +53,8 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version && node scripts/sync-root-version.js
-          publish: pnpm changeset publish --access public
+          version: npx changeset version && node scripts/sync-root-version.js
+          publish: npx changeset publish --access public
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
