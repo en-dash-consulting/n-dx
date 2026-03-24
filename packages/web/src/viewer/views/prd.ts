@@ -85,6 +85,19 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   // ── Status filter (persists across view switches) ────────────
   const { activeStatuses, setActiveStatuses } = usePersistentFilter();
 
+  // ── Smart expand depth: collapsed when no active work ────────
+  const hasActiveWork = useMemo(() => {
+    if (!data) return false;
+    function check(items: any[]): boolean {
+      for (const item of items) {
+        if (item.status === "pending" || item.status === "in_progress" || item.status === "blocked") return true;
+        if (item.children && check(item.children)) return true;
+      }
+      return false;
+    }
+    return check(data.items);
+  }, [data]);
+
   // ── Inline tree search ──────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -302,7 +315,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       taskUsageById,
       weeklyBudget,
       showTokenBudget,
-      defaultExpandDepth: 2,
+      defaultExpandDepth: hasActiveWork ? 2 : 1,
       onSelectItem: actions.handleSelectItem,
       selectedItemId: actions.selectedItemId,
       bulkSelectedIds: actions.bulkSelectedIds,
