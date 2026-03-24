@@ -13032,7 +13032,7 @@
     {
       "id": "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7",
       "title": "Web Dashboard",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page.",
       "children": [
@@ -18890,7 +18890,7 @@
         {
           "id": "5dd63e4e-1bbb-47a8-a0fa-754bc142a377",
           "title": "Hot-reload MCP tool schemas on HTTP transport without server restart",
-          "status": "pending",
+          "status": "deferred",
           "level": "task",
           "description": "The HTTP MCP server holds tool schemas in memory from startup. When rex or sourcevision are rebuilt with new/changed tool parameters, the running server still serves the old schemas. Users must restart the server to pick up changes. This is a friction point during development — stdio MCP doesn't have this problem since each invocation spawns fresh.\n\nOptions: file-watch the dist/ directories and re-initialize MCP servers on change, or add an admin endpoint to trigger reload.",
           "acceptanceCriteria": [
@@ -18907,7 +18907,9 @@
             "8fc4844a-d6f9-480e-94c6-c8536f89c207"
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-03-24T05:27:03.754Z",
+      "completedAt": "2026-03-24T05:27:03.754Z"
     },
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
