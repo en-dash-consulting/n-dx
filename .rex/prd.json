@@ -11964,7 +11964,7 @@
         {
           "id": "8fc4844a-d6f9-480e-94c6-c8536f89c207",
           "title": "Audit MCP tool schemas against PRDItem fields",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "The edit_item MCP tool was missing the `level` field — it only exposed title, description, priority, tags, acceptanceCriteria, source, and blockedBy. Level was added ad-hoc during a restructuring session. There may be other mutable PRDItem fields not exposed through MCP tools. The MCP tool schemas should be systematically audited against the PRDItem type to ensure full coverage.",
           "acceptanceCriteria": [
@@ -11976,7 +11976,9 @@
           "tags": [
             "rex",
             "mcp"
-          ]
+          ],
+          "startedAt": "2026-03-24T05:21:24.525Z",
+          "completedAt": "2026-03-24T05:23:53.235Z"
         },
         {
           "id": "0f8711c6-1dc3-4e54-b156-54579f60771f",
