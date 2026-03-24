@@ -7,7 +7,7 @@
  */
 export { PRDTree } from "./prd-tree.js";
 export type { PRDTreeProps } from "./prd-tree.js";
-export { StatusFilter, defaultStatusFilter } from "./status-filter.js";
+export { StatusFilter, defaultStatusFilter, ALL_STATUSES } from "./status-filter.js";
 export type { StatusFilterProps } from "./status-filter.js";
 export { FacetFilter } from "./facet-filter.js";
 export type { FacetFilterProps } from "./facet-filter.js";

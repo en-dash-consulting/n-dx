@@ -18,7 +18,7 @@
 import { h, Fragment } from "preact";
 import type { VNode } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
-import { PRDTree } from "../components/prd-tree/index.js";
+import { PRDTree, ALL_STATUSES } from "../components/prd-tree/index.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
 import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
@@ -298,14 +298,14 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
           "aria-label": "Remove completed subtrees",
         }, "\u2702"),
       ),
-      // Facet filter chips (tags + statuses for search narrowing)
+      // Facet filter chips (tags for search, statuses for tree visibility)
       h(FacetFilter, {
         availableTags,
         activeTags,
-        activeStatuses: activeSearchStatuses,
+        activeStatuses,
         onTagsChange: setActiveTags,
-        onStatusesChange: setActiveSearchStatuses,
-        onClearAll: clearFacets,
+        onStatusesChange: setActiveStatuses,
+        onClearAll: () => { clearFacets(); setActiveStatuses(new Set(ALL_STATUSES)); },
       }),
     ),
 
