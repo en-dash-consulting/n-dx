@@ -428,6 +428,24 @@ async function dispatchCommand(
       break;
     }
     default: {
+      // Check if the user tried an ndx-only orchestration command
+      const NDX_ONLY_COMMANDS: Record<string, string> = {
+        plan: "ndx plan",
+        work: "ndx work",
+        "self-heal": "ndx self-heal",
+        start: "ndx start",
+        ci: "ndx ci",
+        dev: "ndx dev",
+        refresh: "ndx refresh",
+        export: "ndx export",
+        config: "ndx config",
+      };
+      if (command in NDX_ONLY_COMMANDS) {
+        throw new CLIError(
+          `"${command}" is an orchestrator command. Run: ${NDX_ONLY_COMMANDS[command]} .`,
+        );
+      }
+
       const REX_COMMANDS = [
         "init", "status", "next", "add", "update", "move", "remove", "reshape",
         "prune", "validate", "fix", "sync", "usage", "report", "verify",

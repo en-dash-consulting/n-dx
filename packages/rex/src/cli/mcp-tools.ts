@@ -612,6 +612,7 @@ export async function handleEditItem(
     description?: string;
     acceptanceCriteria?: string[];
     priority?: string;
+    level?: string;
     tags?: string[];
     source?: string;
     blockedBy?: string[];
@@ -626,11 +627,18 @@ export async function handleEditItem(
       );
     }
 
+    const VALID_LEVELS = ["epic", "feature", "task", "subtask"];
     const updates: Partial<PRDItem> = {};
     if (args.title !== undefined) updates.title = args.title;
     if (args.description !== undefined) updates.description = args.description;
     if (args.acceptanceCriteria !== undefined) updates.acceptanceCriteria = args.acceptanceCriteria;
     if (args.priority !== undefined) updates.priority = args.priority as Priority;
+    if (args.level !== undefined) {
+      if (!VALID_LEVELS.includes(args.level)) {
+        return textResult(`Invalid level "${args.level}". Must be one of: ${VALID_LEVELS.join(", ")}`, true);
+      }
+      updates.level = args.level as PRDItem["level"];
+    }
     if (args.tags !== undefined) updates.tags = args.tags;
     if (args.source !== undefined) updates.source = args.source;
     if (args.blockedBy !== undefined) {

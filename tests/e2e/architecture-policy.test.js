@@ -190,6 +190,7 @@ const ORCHESTRATION_FILES = ["cli.js", "web.js", "ci.js"];
  * other orchestration files (peer imports within the same tier).
  */
 const ORCHESTRATION_PEERS = new Set([
+  "cli-brand.js",
   "config.js",
   "web.js",
   "ci.js",
@@ -796,11 +797,12 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["chunked-review-pipeline", "Small CLI pipeline zone (4 files); linear review pipeline with low internal edge count"],
-  ["prd-verification-utilities", "Small utility zone (2 files); unrelated verification helpers grouped by Louvain; low edge count"],
-  ["project-status-polling", "Small viewer zone (3 files); polling infrastructure with linear dependency chain"],
-  ["rex", "Package config and metadata zone; no internal import structure"],
+  ["cli-binary-shims", "Shim scripts with no internal imports; zero cohesion by design"],
+  ["project-status-hooks", "Small viewer zone (4 files); polling hooks with linear dependency chain"],
+  ["rex-chunked-review", "Small CLI pipeline zone; linear review pipeline with low internal edge count"],
   ["rex-cli-e2e-coverage", "Test configuration zone (9 files); test fixtures have no internal import structure"],
+  ["rex-package-infrastructure", "Package config and metadata zone; no internal import structure"],
+  ["rex-task-verification", "Small utility zone; unrelated verification helpers grouped by Louvain"],
   ["web-shared", "Small foundation zone (5 files) with high outbound utility; cohesion 0.36 — governed by two-consumer addition policy (CLAUDE.md)"],
 ]);
 

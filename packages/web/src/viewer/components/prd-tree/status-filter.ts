@@ -188,7 +188,7 @@ export function StatusFilter({ activeStatuses, onChange }: StatusFilterProps) {
   );
 }
 
-/** Default set of visible statuses (active work: pending, in progress, failing, blocked). */
+/** Default set of visible statuses — show everything. */
 export function defaultStatusFilter(): Set<ItemStatus> {
-  return new Set<ItemStatus>(["pending", "in_progress", "failing", "blocked"]);
+  return new Set<ItemStatus>(ALL_STATUSES);
 }

@@ -163,6 +163,7 @@ describe("hench → rex gateway contract", () => {
     "findNextTask",
     "findActionableTasks",
     "collectCompletedIds",
+    "explainSelection",
     "computeTimestampUpdates",
     "findAutoCompletions",
     "collectRequirements",
@@ -547,8 +548,8 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["resolveStore", "isCompatibleSchema", "assertSchemaVersion",
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
-        "collectCompletedIds", "computeTimestampUpdates", "findAutoCompletions",
-        "collectRequirements", "validateAutomatedRequirements",
+        "collectCompletedIds", "explainSelection", "computeTimestampUpdates",
+        "findAutoCompletions", "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
       ...["SCHEMA_VERSION"],

@@ -94,7 +94,7 @@ export { resolveStore } from "@n-dx/rex";
 export { findItem, walkTree } from "@n-dx/rex";
 
 // ---- Task selection ---------------------------------------------------------
-export { findNextTask, findActionableTasks, collectCompletedIds } from "@n-dx/rex";
+export { findNextTask, findActionableTasks, collectCompletedIds, explainSelection } from "@n-dx/rex";
 
 // ---- Timestamps -------------------------------------------------------------
 export { computeTimestampUpdates } from "@n-dx/rex";
@@ -119,4 +119,4 @@ export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/re
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation } from "@n-dx/rex";

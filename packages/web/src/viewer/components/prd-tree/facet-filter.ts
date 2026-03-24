@@ -166,14 +166,14 @@ export function FacetFilter({
     "div",
     { class: "prd-facet-filter", role: "group", "aria-label": "Search facets" },
 
-    // ── Status facets ─────────────────────────────────────────────────
+    // ── Status facets (controls tree visibility) ───────────────────────
     h(
       "div",
       { class: "prd-facet-row" },
       h("span", { class: "prd-facet-label" }, "Status:"),
       h(
         "div",
-        { class: "prd-facet-chips", role: "toolbar", "aria-label": "Status facets" },
+        { class: "prd-facet-chips", role: "toolbar", "aria-label": "Status filters" },
         STATUS_FACETS.map((sf) => {
           const isActive = activeStatuses.has(sf.status);
           return h(
@@ -182,7 +182,7 @@ export function FacetFilter({
               key: sf.status,
               class: `prd-facet-chip prd-facet-status${isActive ? " active" : ""} ${sf.cssClass}`,
               onClick: () => toggleStatus(sf.status),
-              title: `${isActive ? "Remove" : "Add"} ${sf.label.toLowerCase()} filter`,
+              title: `${isActive ? "Hide" : "Show"} ${sf.label.toLowerCase()} items`,
               "aria-pressed": String(isActive),
               type: "button",
             },

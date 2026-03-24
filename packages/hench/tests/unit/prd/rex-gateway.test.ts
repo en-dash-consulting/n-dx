@@ -33,6 +33,7 @@ const EXPECTED_EXPORTS = [
   "findNextTask",
   "findActionableTasks",
   "collectCompletedIds",
+  "explainSelection",
   // Timestamps
   "computeTimestampUpdates",
   // Parent auto-completion

@@ -126,6 +126,37 @@
   opacity: 1;
 }
 
+/* Individual page icons within active section (collapsed rail) */
+.sidebar-rail-page {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: var(--font-lg);
+  transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+.sidebar-rail-page:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.sidebar-rail-page-active {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.sidebar-rail-page-icon {
+  line-height: 1;
+}
+
 /* Expand button at bottom of rail */
 .sidebar-rail-expand {
   margin-top: auto;

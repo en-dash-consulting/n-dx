@@ -272,6 +272,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const { brief, taskId, briefText, systemPrompt } = await prepareBrief(
     store, config, opts.taskId,
     { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId },
+    { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
   );
 
   // Shared: dry run path

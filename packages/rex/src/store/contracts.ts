@@ -168,6 +168,26 @@ export interface PRDStore {
 
   // ---- Introspection -----------------------------------------------------
 
+  // ---- Transactions --------------------------------------------------------
+
+  /**
+   * Execute a read-modify-write transaction under a file lock.
+   *
+   * The callback receives the loaded document. Any mutations to it are
+   * saved atomically when the callback returns. The lock is held for the
+   * entire duration, preventing concurrent writers from interleaving.
+   *
+   * CLI commands that do their own load→mutate→save (reorganize, prune,
+   * reshape) should use this instead of calling loadDocument/saveDocument
+   * directly.
+   *
+   * @param fn - Receives the loaded document; return value is passed through.
+   * @throws If the lock cannot be acquired (another writer is active).
+   */
+  withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T>;
+
+  // ---- Introspection -------------------------------------------------------
+
   /**
    * Return the adapter's capability flags.
    *

@@ -104,4 +104,22 @@ describe("displayTaskInfo", () => {
     const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
     expect(allOutput).toContain("──");
   });
+
+  it("shows auto-selection reason when reason is 'auto'", () => {
+    const brief = makeBrief();
+    displayTaskInfo(brief, "auto");
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(allOutput).toContain("auto");
+    expect(allOutput).toContain("highest priority");
+  });
+
+  it("does not show selection reason for explicit tasks", () => {
+    const brief = makeBrief();
+    displayTaskInfo(brief, "explicit");
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(allOutput).not.toContain("auto");
+    expect(allOutput).not.toContain("Selected:");
+  });
 });

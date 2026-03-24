@@ -15,7 +15,8 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { PRDStore } from "../../prd/rex-gateway.js";
+import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, findItem } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief } from "../../schema/index.js";
 import { getCurrentHead } from "../../process/index.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
@@ -29,6 +30,7 @@ import { runPostTaskTests } from "../../tools/index.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info } from "../../types/output.js";
 import { displayTaskInfo } from "./task-display.js";
+import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +52,10 @@ export interface SharedLoopOptions {
   excludeTaskIds?: Set<string>;
   /** Restrict task selection to this epic (ID). */
   epicId?: string;
+  /** Prior attempt history for the selected task (shown in task card). */
+  priorAttempts?: PriorAttemptInfo;
+  /** Run records for computing prior attempts when task is auto-selected. */
+  runHistory?: RunRecord[];
 }
 
 // ---------------------------------------------------------------------------
@@ -63,23 +69,97 @@ export interface PreparedBrief {
   systemPrompt: string;
 }
 
+/** Additional display options for brief preparation. */
+export interface PrepareBriefDisplayOptions {
+  /** Prior attempt history for the selected task. */
+  priorAttempts?: PriorAttemptInfo;
+  /** Run records for computing prior attempts when task is auto-selected. */
+  runHistory?: RunRecord[];
+}
+
 /**
  * Assemble the task brief, format it, build the system prompt, and display
  * task info. This sequence is identical in both API and CLI loops.
+ *
+ * When the task is auto-selected (no explicit taskId), computes a
+ * SelectionExplanation from rex to show rich reasoning in the task card.
  */
 export async function prepareBrief(
   store: PRDStore,
   config: HenchConfig,
   taskId?: string,
   options?: AssembleBriefOptions,
+  displayOptions?: PrepareBriefDisplayOptions,
 ): Promise<PreparedBrief> {
   const { brief, taskId: resolvedTaskId } = await assembleTaskBrief(store, taskId, options);
   const briefText = formatTaskBrief(brief);
   const systemPrompt = buildSystemPrompt(brief.project, config);
 
-  displayTaskInfo(brief);
+  const reason: SelectionReason = taskId ? "explicit" : "auto";
+
+  // Compute selection explanation for auto-selected tasks
+  let explanation: SelectionExplanation | undefined;
+  if (!taskId) {
+    try {
+      const doc = await store.loadDocument();
+      const completedIds = collectCompletedIds(doc.items);
+      // Get the full tree entry (not the brief version) for explainSelection
+      const treeEntry = findItem(doc.items, resolvedTaskId);
+      if (treeEntry) {
+        explanation = explainSelection(doc.items, treeEntry, completedIds);
+      }
+    } catch {
+      // Best-effort — fall back to simple display
+    }
+  }
+
+  // Resolve prior attempts: use explicit value if provided, otherwise compute from run history
+  let priorAttempts = displayOptions?.priorAttempts;
+  if (!priorAttempts && displayOptions?.runHistory) {
+    priorAttempts = computePriorAttempts(resolvedTaskId, displayOptions.runHistory);
+  }
+
+  displayTaskInfo(brief, reason, explanation, priorAttempts);
 
   return { brief, taskId: resolvedTaskId, briefText, systemPrompt };
+}
+
+// ---------------------------------------------------------------------------
+// Prior attempt computation
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a duration in milliseconds as a human-readable "X ago" string.
+ */
+function formatTimeAgo(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * Compute prior attempt info for a task from run history.
+ * Returns undefined if there are no prior attempts.
+ */
+function computePriorAttempts(taskId: string, runs: RunRecord[]): PriorAttemptInfo | undefined {
+  const taskRuns = runs.filter((r) => r.taskId === taskId && r.status !== "running");
+  if (taskRuns.length === 0) return undefined;
+
+  // runs are sorted by startedAt descending
+  const mostRecent = taskRuns[0];
+  const finishedAt = mostRecent.finishedAt ?? mostRecent.startedAt;
+  const agoMs = Date.now() - new Date(finishedAt).getTime();
+
+  return {
+    count: taskRuns.length,
+    lastAttemptAgo: formatTimeAgo(agoMs),
+    lastStatus: mostRecent.status,
+  };
 }
 
 // ---------------------------------------------------------------------------

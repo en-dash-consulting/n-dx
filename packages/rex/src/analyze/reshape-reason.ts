@@ -244,6 +244,32 @@ export async function reasonForReshape(
 }
 
 /**
+ * Normalize common LLM typos/variations in the action discriminator field.
+ * Returns the canonical action type or the original string if unrecognized.
+ */
+const ACTION_ALIASES: Record<string, string> = {
+  merge: "merge", update: "update", reparent: "reparent", obsolete: "obsolete", split: "split",
+  // Common LLM variations
+  merge_items: "merge", merge_into: "merge",
+  move: "reparent", relocate: "reparent",
+  delete: "obsolete", remove: "obsolete", deprecate: "obsolete",
+  edit: "update", modify: "update", rename: "update",
+};
+
+function normalizeAction(item: unknown): unknown {
+  if (item && typeof item === "object" && "action" in item) {
+    const action = (item as Record<string, unknown>).action;
+    if (typeof action === "string") {
+      const normalized = ACTION_ALIASES[action.toLowerCase().trim()];
+      if (normalized && normalized !== action) {
+        return { ...item as Record<string, unknown>, action: normalized };
+      }
+    }
+  }
+  return item;
+}
+
+/**
  * Parse an LLM response into validated ReshapeProposals.
  */
 export function parseReshapeResponse(raw: string): ReshapeProposal[] {
@@ -266,13 +292,28 @@ export function parseReshapeResponse(raw: string): ReshapeProposal[] {
     return [];
   }
 
+  // Normalize action types before validation
+  if (Array.isArray(parsed)) {
+    parsed = parsed.map(normalizeAction);
+  } else if (parsed && typeof parsed === "object") {
+    parsed = normalizeAction(parsed);
+  }
+
   // Try strict validation first
   const strict = ReshapeResponseSchema.safeParse(parsed);
   if (strict.success) {
     return strict.data.map(wrapAction);
   }
 
-  // Lenient fallback: validate items individually
+  // Single-object fallback: LLM returned one action instead of an array
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const single = ReshapeActionSchema.safeParse(parsed);
+    if (single.success) {
+      return [wrapAction(single.data)];
+    }
+  }
+
+  // Lenient fallback: validate items individually, skip invalid ones
   if (Array.isArray(parsed) && parsed.length > 0) {
     const valid: ReshapeAction[] = [];
     for (const item of parsed) {
@@ -287,7 +328,10 @@ export function parseReshapeResponse(raw: string): ReshapeProposal[] {
   }
 
   throw new Error(
-    `Reshape LLM response failed validation: ${strict.error.issues.map((i) => i.message).join("; ")}`,
+    `Reshape LLM response failed validation: ${strict.error.issues
+      .slice(0, 5)
+      .map((i) => `${i.path.join(".") || "root"}: ${i.message}`)
+      .join("; ")}`,
   );
 }
 

@@ -234,13 +234,13 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
 
           h("div", { class: "sidebar-rail-divider", "aria-hidden": "true" }),
 
-          // Section icons
+          // Section icons with sibling page items for active section
           h("nav", { class: "sidebar-rail-nav", "aria-label": "Section navigation" },
-            visibleSections.filter((s) => s.product).map((section) => {
+            visibleSections.filter((s) => s.product).flatMap((section) => {
               const product = section.product!;
               const isActive = activeProduct === product;
               const defaultView = SECTION_DEFAULT_VIEW[product];
-              return h("button", {
+              const sectionBtn = h("button", {
                 key: product,
                 class: `sidebar-rail-section${isActive ? " sidebar-rail-section-active" : ""} sidebar-rail-section-${product}`,
                 onClick: () => handleNav(defaultView),
@@ -253,6 +253,19 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
                   : null,
                 h(ProductLogoPng, { product, size: 48, class: "sidebar-rail-icon" }),
               );
+              if (!isActive) return [sectionBtn];
+              // Show sibling page icons for the active section
+              const pageItems = section.items.map((entry) =>
+                h("button", {
+                  key: entry.id,
+                  class: `sidebar-rail-page${view === entry.id ? " sidebar-rail-page-active" : ""}`,
+                  onClick: () => handleNav(entry.id),
+                  title: entry.label,
+                  "aria-label": entry.label,
+                  "aria-current": view === entry.id ? "page" : undefined,
+                }, h("span", { class: "sidebar-rail-page-icon" }, entry.icon)),
+              );
+              return [sectionBtn, ...pageItems];
             })
           ),
 

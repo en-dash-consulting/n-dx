@@ -4,6 +4,7 @@ import { resolveStore } from "../../store/index.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
+import { ARCHIVE_FILE, loadArchive, trimArchive } from "../../core/archive.js";
 import { reasonForReshape, formatReshapeProposal } from "../../analyze/reshape-reason.js";
 import { setLLMConfig, setClaudeConfig } from "../../analyze/reason.js";
 import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
@@ -12,44 +13,6 @@ import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import type { PRDItem } from "../../schema/index.js";
-
-const ARCHIVE_FILE = "archive.json";
-
-/** Maximum number of archive batches to retain. */
-const MAX_ARCHIVE_BATCHES = 100;
-
-interface ReshapeArchive {
-  schema: "rex/archive/v1";
-  batches: ReshapeArchiveBatch[];
-}
-
-interface ReshapeArchiveBatch {
-  timestamp: string;
-  source: "prune" | "reshape";
-  items: PRDItem[];
-  count: number;
-  reason?: string;
-  actions?: ReshapeProposal[];
-}
-
-async function loadArchive(archivePath: string): Promise<ReshapeArchive> {
-  try {
-    const { readFile } = await import("node:fs/promises");
-    const raw = await readFile(archivePath, "utf-8");
-    return JSON.parse(raw) as ReshapeArchive;
-  } catch {
-    return { schema: "rex/archive/v1", batches: [] };
-  }
-}
-
-/**
- * Trim archive to retain only the most recent batches.
- */
-function trimArchive(archive: ReshapeArchive, maxBatches: number = MAX_ARCHIVE_BATCHES): void {
-  if (archive.batches.length > maxBatches) {
-    archive.batches = archive.batches.slice(archive.batches.length - maxBatches);
-  }
-}
 
 export async function cmdReshape(
   dir: string,

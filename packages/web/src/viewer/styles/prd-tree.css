@@ -729,6 +729,23 @@
   color: var(--accent);
 }
 
+/* ── Filtered-empty state ─────────────────────────────────────────── */
+
+.prd-filtered-empty {
+  text-align: center;
+  padding: var(--space-10) var(--space-5);
+  color: var(--text-dim);
+}
+
+.prd-filtered-empty p {
+  margin-bottom: var(--space-2);
+}
+
+.prd-filtered-empty-hint {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
 /* ── Task Detail Panel ───────────────────────────────────────────── */
 
 .task-meta-header {
@@ -5521,6 +5538,37 @@
 .prd-search-clear:hover {
   color: var(--text);
   background: var(--bg-surface);
+}
+
+/* Inline action buttons in search row */
+.prd-search-action {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: var(--font-base);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  line-height: 1;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.prd-search-action:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.prd-search-action.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-hover);
 }
 
 /* Search match highlight in tree node titles */

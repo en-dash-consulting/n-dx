@@ -5,6 +5,7 @@ import { findPrunableItems, pruneItems, countSubtree } from "../../core/prune.js
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
+import { ARCHIVE_FILE, loadArchive, trimArchive, appendArchiveBatch } from "../../core/archive.js";
 import {
   hashPRD,
   savePendingSmartPrune,
@@ -17,35 +18,6 @@ import { info, result } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
-
-const ARCHIVE_FILE = "archive.json";
-
-/**
- * Maximum number of archive batches to retain.
- * Older batches are discarded when this limit is exceeded,
- * preventing unbounded growth of archive.json over time.
- */
-const MAX_ARCHIVE_BATCHES = 100;
-
-/**
- * Archive structure written to `.rex/archive.json`.
- *
- * Each prune run appends a batch to the archive's `batches` array,
- * preserving a timestamped history of all pruned subtrees.
- */
-interface PruneArchive {
-  schema: "rex/archive/v1";
-  batches: PruneBatch[];
-}
-
-interface PruneBatch {
-  timestamp: string;
-  source?: "prune" | "reshape";
-  items: PRDItem[];
-  count: number;
-  reason?: string;
-  actions?: ReshapeProposal[];
-}
 
 // ── Parsed flag helpers ──────────────────────────────────────────────
 
@@ -71,43 +43,6 @@ function parseFlags(flags: Record<string, string>): PruneFlags {
     format: flags.format,
     raw: flags,
   };
-}
-
-// ── Archive I/O ──────────────────────────────────────────────────────
-
-async function loadArchive(archivePath: string): Promise<PruneArchive> {
-  try {
-    const { readFile } = await import("node:fs/promises");
-    const raw = await readFile(archivePath, "utf-8");
-    return JSON.parse(raw) as PruneArchive;
-  } catch {
-    return { schema: "rex/archive/v1", batches: [] };
-  }
-}
-
-/**
- * Trim archive to retain only the most recent batches.
- * Prevents unbounded growth of archive.json in long-running projects.
- */
-function trimArchive(archive: PruneArchive, maxBatches: number = MAX_ARCHIVE_BATCHES): number {
-  if (archive.batches.length <= maxBatches) return 0;
-  const excess = archive.batches.length - maxBatches;
-  archive.batches = archive.batches.slice(excess);
-  return excess;
-}
-
-/**
- * Append a batch to the archive and persist to disk.
- */
-async function appendArchiveBatch(
-  rexDir: string,
-  batch: PruneBatch,
-): Promise<void> {
-  const archivePath = join(rexDir, ARCHIVE_FILE);
-  const archive = await loadArchive(archivePath);
-  archive.batches.push(batch);
-  trimArchive(archive);
-  await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
 }
 
 // ── TTY interaction ──────────────────────────────────────────────────

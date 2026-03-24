@@ -97,10 +97,11 @@
   color: var(--brand-orange);
 }
 
-/* Current page segment — not a link */
+/* Current page segment — prominent, acts as page title */
 .breadcrumb-current {
   color: var(--text);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-bold);
+  font-size: var(--font-xl);
 }
 
 /* ── Zone drill-down breadcrumb ── */

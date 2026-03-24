@@ -909,6 +909,119 @@ async function handleConfig(rest) {
   }
 }
 
+// ── Delegated rex commands ────────────────────────────────────────────────────
+
+async function handleValidate(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["validate", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleFix(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["fix", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleHealth(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["health", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleReport(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["report", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleVerify(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["verify", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleUpdate(rest) {
+  // First positional arg is the item ID, not a dir
+  requireInit(process.cwd(), [".rex"]);
+  await runOrDie(tools.rex, ["update", ...rest]);
+  process.exit(0);
+}
+
+async function handleRemove(rest) {
+  // First positional arg is the item ID (or level), not a dir
+  requireInit(process.cwd(), [".rex"]);
+  await runOrDie(tools.rex, ["remove", ...rest]);
+  process.exit(0);
+}
+
+async function handleMove(rest) {
+  // First positional arg is the item ID, not a dir
+  requireInit(process.cwd(), [".rex"]);
+  await runOrDie(tools.rex, ["move", ...rest]);
+  process.exit(0);
+}
+
+async function handleReshape(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["reshape", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleReorganize(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["reorganize", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handlePrune(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["prune", ...flags, dir]);
+  process.exit(0);
+}
+
+async function handleNext(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.rex, ["next", ...flags, dir]);
+  process.exit(0);
+}
+
+// ── Delegated sourcevision commands ───────────────────────────────────────────
+
+async function handleReset(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, [".sourcevision"]);
+  await runOrDie(tools.sourcevision, ["reset", dir]);
+  process.exit(0);
+}
+
+// ── Delegated hench commands ─────────────────────────────────────────────────
+
+async function handleShow(rest) {
+  // First positional arg is the run ID, not a dir
+  requireInit(process.cwd(), [".hench"]);
+  await runOrDie(tools.hench, ["show", ...rest]);
+  process.exit(0);
+}
+
 function handleHelp(rest) {
   const query = rest.filter((a) => !a.startsWith("-")).join(" ");
   if (!query) {
@@ -1007,6 +1120,26 @@ async function main() {
     case "export":    return handleExport(rest);
     case "config":    return handleConfig(rest);
     case "self-heal": return handleSelfHeal(rest);
+
+    // ── Delegated rex commands ──
+    case "validate":    return handleValidate(rest);
+    case "fix":         return handleFix(rest);
+    case "health":      return handleHealth(rest);
+    case "report":      return handleReport(rest);
+    case "verify":      return handleVerify(rest);
+    case "update":      return handleUpdate(rest);
+    case "remove":      return handleRemove(rest);
+    case "move":        return handleMove(rest);
+    case "reshape":     return handleReshape(rest);
+    case "reorganize":  return handleReorganize(rest);
+    case "prune":       return handlePrune(rest);
+    case "next":        return handleNext(rest);
+
+    // ── Delegated sourcevision commands ──
+    case "reset":       return handleReset(rest);
+
+    // ── Delegated hench commands ──
+    case "show":        return handleShow(rest);
   }
 
   // ── Tool delegation ───────────────────────────────────────────────────────

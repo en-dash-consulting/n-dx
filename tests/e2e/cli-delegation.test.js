@@ -56,10 +56,12 @@ describe("n-dx delegation commands", () => {
   });
 
   describe("help output", () => {
-    it("lists sv as an alias for sourcevision", () => {
+    it("mentions tool access in footer", () => {
       const output = run([]);
-      expect(output).toContain("sv ...");
-      expect(output).toContain("Alias for sourcevision");
+      expect(output).toContain("direct tool access");
+      expect(output).toContain("rex");
+      expect(output).toContain("sourcevision");
+      expect(output).toContain("hench");
     });
   });
 });

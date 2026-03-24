@@ -63,7 +63,6 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
 
       - name: Publish @n-dx/core (root package)
-        if: steps.changesets.outputs.published == 'true'
         run: |
           CURRENT=$(node -p "require('./package.json').version")
           NPM_VERSION=$(npm view @n-dx/core version 2>/dev/null || echo "0.0.0")

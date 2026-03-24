@@ -756,6 +756,13 @@ export function PRDTree({ document: doc, taskUsageById, weeklyBudget, showTokenB
     ),
     // Summary
     h(SummaryBar, { items: doc.items }),
+    // Filtered-empty state — items exist but all filtered out
+    flatNodes.length === 0
+      ? h("div", { class: "prd-filtered-empty" },
+          h("p", null, "No items match the current filters."),
+          h("p", { class: "prd-filtered-empty-hint" }, "Clear the search or adjust the status filters above."),
+        )
+      : null,
     // Tree — virtual scroll container with delegated event handlers
     h(
       "div",

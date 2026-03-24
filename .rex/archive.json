@@ -835,6 +835,1578 @@
           }
         }
       ]
+    },
+    {
+      "timestamp": "2026-03-24T01:54:35.134Z",
+      "source": "reorganize",
+      "items": [
+        {
+          "id": "f6531625-6e2f-47bc-9173-9304ba9b659e",
+          "title": "File Format Enhancement for Requirements Import",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-02T08:01:56.604Z",
+          "completedAt": "2026-03-02T08:01:56.604Z",
+          "children": [
+            {
+              "id": "a372d24d-aa4e-49e1-b49e-82531a78b92b",
+              "title": "Markdown and Text File Processing",
+              "status": "completed",
+              "level": "feature",
+              "description": "Enable rex add command to accept and process markdown and text files containing product requirements and descriptions",
+              "source": "smart-add",
+              "startedAt": "2026-03-02T08:01:56.527Z",
+              "completedAt": "2026-03-02T08:01:56.527Z",
+              "children": [
+                {
+                  "id": "935284b6-5cd8-4409-bcf3-0e1aff807c75",
+                  "title": "Implement markdown file parsing for rex add command",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Add support for parsing markdown files in the rex add command, extracting structured requirements from markdown format including headers, lists, and sections",
+                  "acceptanceCriteria": [
+                    "Rex add command accepts .md file paths as input",
+                    "Parses markdown headers as potential epic/feature titles",
+                    "Extracts bullet points and numbered lists as tasks or acceptance criteria",
+                    "Maintains markdown formatting context in parsed output"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "rex",
+                    "file-import",
+                    "markdown"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-02T07:25:11.824Z",
+                  "completedAt": "2026-03-03T05:45:40.095Z"
+                },
+                {
+                  "id": "710072f7-b895-40f3-be57-75e918094f9b",
+                  "title": "Implement text file parsing for rex add command",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Add support for parsing plain text files in the rex add command, using natural language processing to extract requirements and structure from unstructured text",
+                  "acceptanceCriteria": [
+                    "Rex add command accepts .txt file paths as input",
+                    "Parses plain text using NLP to identify requirements structure",
+                    "Handles various text formatting styles and conventions",
+                    "Provides fallback parsing for unstructured requirement documents"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "rex",
+                    "file-import",
+                    "text",
+                    "nlp"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-02T07:31:47.994Z",
+                  "completedAt": "2026-03-03T05:59:25.301Z"
+                },
+                {
+                  "id": "66b6e1b8-2e15-4acf-ac7f-05fa55b4183a",
+                  "title": "Add structured requirements extraction engine",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Implement intelligent parsing logic to extract epics, features, and tasks from markdown and text documents using pattern recognition and LLM assistance",
+                  "acceptanceCriteria": [
+                    "Identifies epic-level requirements from document structure",
+                    "Extracts feature-level requirements from subsections",
+                    "Parses task-level items from bullet points and paragraphs",
+                    "Uses LLM to disambiguate unclear requirement structures"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "rex",
+                    "parsing",
+                    "llm",
+                    "requirements"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-02T07:16:47.451Z",
+                  "completedAt": "2026-03-03T05:23:01.531Z"
+                },
+                {
+                  "id": "21f89819-e032-44c2-8d94-05edcb82610d",
+                  "title": "Integrate file upload support in rex add UI interface",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Add file upload capability to the rex add web interface, allowing users to drag and drop or select markdown/text files for requirements import",
+                  "acceptanceCriteria": [
+                    "File upload component supports .md and .txt files",
+                    "Drag and drop functionality for file selection",
+                    "File preview before processing with rex add",
+                    "Progress indicator during file processing and import"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "rex",
+                    "ui",
+                    "file-upload",
+                    "web"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-02T07:50:35.863Z",
+                  "completedAt": "2026-03-03T06:20:37.555Z",
+                  "overrideMarker": {
+                    "type": "duplicate_guard_override",
+                    "reason": "semantic_title",
+                    "reasonRef": "semantic_title:63a696d6-7814-4cb6-8c68-71ff2cbfbc23",
+                    "matchedItemId": "63a696d6-7814-4cb6-8c68-71ff2cbfbc23",
+                    "matchedItemTitle": "Create smart add interface in Rex dashboard",
+                    "matchedItemLevel": "task",
+                    "matchedItemStatus": "completed",
+                    "createdAt": "2026-03-02T05:41:33.798Z"
+                  }
+                },
+                {
+                  "id": "f0200d1b-edbe-42c7-9051-48f4ab0a8307",
+                  "title": "Add file format validation and error handling",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Implement comprehensive validation for markdown and text file inputs, with clear error messages for unsupported formats or malformed content",
+                  "acceptanceCriteria": [
+                    "Validates file extensions and MIME types before processing",
+                    "Detects and reports malformed markdown syntax",
+                    "Handles large files with appropriate memory management",
+                    "Provides clear error messages for parsing failures"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "rex",
+                    "validation",
+                    "error-handling",
+                    "file-processing"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-02T07:43:10.841Z",
+                  "completedAt": "2026-03-03T06:14:44.996Z",
+                  "overrideMarker": {
+                    "type": "duplicate_guard_override",
+                    "reason": "semantic_title",
+                    "reasonRef": "semantic_title:bd9043b5-1958-4bc7-85e3-f6e3265a9384",
+                    "matchedItemId": "bd9043b5-1958-4bc7-85e3-f6e3265a9384",
+                    "matchedItemTitle": "Enhanced Validation and Error Handling",
+                    "matchedItemLevel": "feature",
+                    "matchedItemStatus": "completed",
+                    "createdAt": "2026-03-02T05:41:33.798Z"
+                  }
+                }
+              ]
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:dc8fd7bb-c902-4a61-931b-0a91a1d7fe0a",
+            "matchedItemId": "dc8fd7bb-c902-4a61-931b-0a91a1d7fe0a",
+            "matchedItemTitle": "File import enhancements",
+            "matchedItemLevel": "feature",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-03-02T05:41:33.798Z"
+          }
+        },
+        {
+          "id": "4c081a10-9a55-48e7-a9de-68ca2f1de243",
+          "title": "Duplicate-aware Proposal Override for rex add",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T07:38:57.537Z",
+          "completedAt": "2026-03-06T07:38:57.537Z",
+          "children": [
+            {
+              "id": "8e04e63b-854c-4e25-9689-3a261ed2d20d",
+              "title": "Orphaned Parent Cleanup After Smart-Add Merge",
+              "status": "completed",
+              "level": "feature",
+              "description": "When the smart-add merge path is applied, the proposed parent epic container can be written to the PRD before the merge target is resolved, leaving it as an empty or childless node. This feature covers the fix and regression coverage.",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T07:38:57.447Z",
+              "completedAt": "2026-03-06T07:38:57.447Z",
+              "children": [
+                {
+                  "id": "556276b8-b57e-434e-a98a-b3033e2c7bc2",
+                  "title": "Fix orphaned epic creation in smart-add merge path",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Trace the merge execution path in the smart-add pipeline to identify where the proposed parent epic is instantiated before merge resolution completes. The bug produces an empty or single-child epic that is structurally disconnected after the merge target absorbs the child item. The fix should defer or suppress parent creation when a merge is confirmed, or clean up any empty containers after the merge operation settles. Verify the fix against both cross-level and same-level merge scenarios.",
+                  "acceptanceCriteria": [
+                    "Performing a smart-add merge does not create a new top-level epic that has no children after the operation completes",
+                    "If a parent epic was legitimately created as part of the merge (e.g. to group merged children), it is retained with its children intact",
+                    "Running `rex validate` after a merge produces no orphaned-node errors",
+                    "Existing merge behavior for same-level and cross-level matches is unchanged"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "bug",
+                    "smart-add",
+                    "merge"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T07:21:18.308Z",
+                  "completedAt": "2026-03-06T07:28:38.629Z"
+                },
+                {
+                  "id": "3adce9c5-d919-465c-affb-1c09b1ee5c16",
+                  "title": "Add regression tests for orphaned parent scenarios in smart-add merge",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Add unit and integration tests that reproduce the orphaned-epic condition before the fix and confirm it stays resolved. Tests should cover: (1) merge into an existing item where the proposed parent is new, (2) cross-level merge where the parent already exists, and (3) merge followed by `rex validate` asserting a clean PRD.",
+                  "acceptanceCriteria": [
+                    "A test reproducing the orphaned-epic bug exists and fails on the pre-fix code path",
+                    "The same test passes after the fix is applied",
+                    "A cross-level merge regression test confirms no empty containers are left",
+                    "`rex validate` is called as part of at least one integration test and returns no structural errors"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "testing",
+                    "smart-add",
+                    "merge",
+                    "regression"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T07:34:24.672Z",
+                  "completedAt": "2026-03-06T07:38:57.251Z",
+                  "overrideMarker": {
+                    "type": "duplicate_guard_override",
+                    "reason": "content_overlap",
+                    "reasonRef": "content_overlap:c7fd1ec7-b523-44e1-b6ba-81d5925af64e",
+                    "matchedItemId": "c7fd1ec7-b523-44e1-b6ba-81d5925af64e",
+                    "matchedItemTitle": "Add regression tests for malformed and partial Codex outputs",
+                    "matchedItemLevel": "task",
+                    "matchedItemStatus": "completed",
+                    "createdAt": "2026-03-06T07:00:37.480Z"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "0f870e1b-65e4-4879-b157-95ca4afd36c1",
+          "title": "Rex UI Task Management Enhancement",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T17:05:15.210Z",
+          "completedAt": "2026-03-06T17:05:15.210Z",
+          "children": [
+            {
+              "id": "7834908d-fabe-4ecd-8784-058f7d0140f0",
+              "title": "Rex Task Search",
+              "status": "completed",
+              "level": "feature",
+              "description": "Add search functionality to the Rex tasks web UI so users can quickly locate tasks, epics, and features by title, description, tags, or status without manually scanning the full PRD tree.",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T17:05:15.123Z",
+              "completedAt": "2026-03-06T17:05:15.123Z",
+              "children": [
+                {
+                  "id": "b9306df2-f2dd-4ec1-bf7a-3125f20436f7",
+                  "title": "Implement task search input and filtering engine in Rex UI",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Add a search input to the Rex dashboard that filters the visible PRD tree in real time. The filtering engine should match against task/feature/epic titles and descriptions using case-insensitive substring matching, keeping matching ancestors visible to preserve tree context. Results should highlight matched text and auto-expand collapsed sections that contain matches.",
+                  "acceptanceCriteria": [
+                    "Search input is visible and focused on keyboard shortcut (e.g. Ctrl+F / Cmd+F or a dedicated keybinding)",
+                    "Typing in the search input filters the PRD tree to show only items whose title or description contains the query (case-insensitive)",
+                    "Ancestor nodes (epics, features) of matching tasks remain visible to provide tree context",
+                    "Matched text is visually highlighted within each result",
+                    "Sections containing matches are automatically expanded",
+                    "Clearing the search input restores the full unfiltered tree",
+                    "Search state is not persisted across page reloads"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "rex",
+                    "web",
+                    "search",
+                    "ux"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T16:47:28.992Z",
+                  "completedAt": "2026-03-06T16:52:33.562Z"
+                },
+                {
+                  "id": "7084652c-0887-47fc-94b8-ab5e1536ea0b",
+                  "title": "Extend Rex task search with tag and status facets",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Augment the basic title/description search with filter chips for tags and status values. Users should be able to combine a text query with one or more tag or status facets to narrow results further. Facets should be populated dynamically from the current PRD data.",
+                  "acceptanceCriteria": [
+                    "Tag facet chips are rendered below the search input, populated from all unique tags present in the PRD",
+                    "Status facet chips (todo, in-progress, completed, blocked, deferred) are available as toggleable filters",
+                    "Selecting a tag or status facet further narrows the already-filtered tree",
+                    "Multiple facets can be active simultaneously (AND logic within each facet group)",
+                    "Active facets are visually distinguished from inactive ones",
+                    "Clearing all facets and the search input returns the full tree",
+                    "Facet state updates the URL hash or query string so the filtered view is shareable"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "rex",
+                    "web",
+                    "search",
+                    "filters",
+                    "ux"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T16:59:06.762Z",
+                  "completedAt": "2026-03-06T17:05:14.927Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "37383cf7-8f86-47dd-a508-ddff174d5c3b",
+          "title": "SourceVision UI Import Graph Enhancement",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T17:07:35.696Z",
+          "completedAt": "2026-03-06T17:07:35.696Z",
+          "children": [
+            {
+              "id": "09c29ff9-de59-49d7-a1a7-66120c7cb933",
+              "title": "Zone Slideout Interaction Regression Fix",
+              "status": "completed",
+              "level": "feature",
+              "description": "The SourceVision Zones graph no longer opens the detail slideout panel when clicking zone nodes or the info button — instead, clicks collapse the node. The info button also lacks visual affordance indicating it reveals more information. This feature restores correct click behavior and improves the info button's discoverability.",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T17:07:35.610Z",
+              "completedAt": "2026-03-06T17:07:35.610Z",
+              "children": [
+                {
+                  "id": "a76a7559-0dc6-4bb8-bcf5-866f39ab4f50",
+                  "title": "Restore zone node click and info button routing to slideout panel",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Clicking a zone node or its info button currently collapses the node instead of opening the detail slideout panel. Audit the click event handlers on zone graph nodes and the info button, identify where the event is being consumed or incorrectly routed, and restore the behavior so node clicks open the slideout. The 'Load more' action should similarly not collapse the node.",
+                  "acceptanceCriteria": [
+                    "Clicking a zone node opens the detail slideout panel instead of collapsing the node",
+                    "Clicking the info button on a zone node opens the detail slideout panel",
+                    "The 'Load more' action expands data inline without collapsing the node",
+                    "Collapsing a node only occurs when explicitly triggered via a dedicated collapse affordance",
+                    "Slideout opens with correct zone data matching the clicked node"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "web",
+                    "sourcevision",
+                    "bug",
+                    "zones"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T16:53:24.233Z",
+                  "completedAt": "2026-03-06T16:58:26.189Z"
+                },
+                {
+                  "id": "aee318ff-ac6b-476c-8414-075f04c4e988",
+                  "title": "Improve info button visual affordance on zone nodes",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "The info button on zone nodes is not visually clear enough for users to understand it reveals additional details. Update the button's icon, tooltip, and styling to make its purpose obvious — it should look like an interactive 'more info' control, not a passive label or toggle.",
+                  "acceptanceCriteria": [
+                    "Info button uses a recognizable information icon (e.g. 'ℹ' or outlined info circle) distinct from collapse controls",
+                    "Hovering the info button displays a tooltip with text such as 'View zone details'",
+                    "Info button has a visible hover/focus state indicating interactivity",
+                    "Info button is visually distinct from node collapse/expand controls to prevent confusion"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "web",
+                    "sourcevision",
+                    "ux",
+                    "zones"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T17:06:09.948Z",
+                  "completedAt": "2026-03-06T17:07:35.408Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "8eb17701-e2db-46c7-bdf2-1f6104a71bc5",
+          "title": "PR Build Pipeline and Code Quality Automation",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T16:47:15.819Z",
+          "completedAt": "2026-03-06T16:47:15.819Z",
+          "children": [
+            {
+              "id": "454d5c08-2d8f-45e1-a173-9acf8617a560",
+              "title": "GitHub Actions CI Pipeline",
+              "status": "completed",
+              "level": "feature",
+              "description": "Replace the existing Bitbucket Pipelines configuration with an equivalent GitHub Actions workflow that runs build, typecheck, and PRD validation on pull requests and pushes to main.",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T16:47:15.731Z",
+              "completedAt": "2026-03-06T16:47:15.731Z",
+              "children": [
+                {
+                  "id": "b327e7df-acd3-4657-bcb3-d91c5166fa9e",
+                  "title": "Create GitHub Actions workflow replacing bitbucket-pipelines.yml",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Write a .github/workflows/ci.yml that replicates the PR validation pipeline currently defined in bitbucket-pipelines.yml. The workflow should trigger on pull_request and push-to-main events, install pnpm and Node dependencies, run the build, typecheck, and PRD validation steps (pnpm build, pnpm typecheck, node ci.js), and report failures clearly. The existing bitbucket-pipelines.yml should be removed once the GitHub Actions workflow is confirmed working.",
+                  "acceptanceCriteria": [
+                    ".github/workflows/ci.yml exists and triggers on pull_request (all branches) and push to main",
+                    "Workflow installs correct Node version and pnpm, restores node_modules via cache",
+                    "pnpm build runs across all packages with no skipped packages",
+                    "pnpm typecheck runs across all packages and fails the job on type errors",
+                    "node ci.js (or ndx ci .) runs and fails the job when PRD validation fails",
+                    "bitbucket-pipelines.yml is removed from the repository",
+                    "A passing workflow run is confirmed in GitHub Actions UI"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "ci",
+                    "github-actions",
+                    "infra"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T16:45:55.427Z",
+                  "completedAt": "2026-03-06T16:47:15.571Z",
+                  "overrideMarker": {
+                    "type": "duplicate_guard_override",
+                    "reason": "content_overlap",
+                    "reasonRef": "content_overlap:f08cf5a3-2a8e-49c1-874f-5dec139c98ce",
+                    "matchedItemId": "f08cf5a3-2a8e-49c1-874f-5dec139c98ce",
+                    "matchedItemTitle": "Create bitbucket-pipelines.yml with PR validation workflow",
+                    "matchedItemLevel": "task",
+                    "matchedItemStatus": "completed",
+                    "createdAt": "2026-03-06T16:21:50.494Z"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "508b354a-f727-4117-a8bd-edda9072da41",
+          "title": "Rex UI Task Management Enhancement",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T16:45:34.834Z",
+          "completedAt": "2026-03-06T16:45:34.834Z",
+          "children": [
+            {
+              "id": "598d6fd3-86d0-42d2-8a41-1030963777ef",
+              "title": "Smart Add Command Regression Fix",
+              "status": "completed",
+              "level": "feature",
+              "description": "The `ndx add` orchestration command currently throws a 'missing .rex' error instead of delegating to `rex add` as expected. The fix should ensure `ndx add` spawns the rex CLI with the correct arguments and working directory, matching the behavior documented in CLAUDE.md.",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T16:45:34.740Z",
+              "completedAt": "2026-03-19T15:03:54.710Z",
+              "resolutionType": "acknowledgment",
+              "resolutionDetail": "All children completed; pending tasks moved to new CLI epic",
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:feature:0",
+                  "proposalTitle": "Fix ndx add command delegation to rex add",
+                  "proposalKind": "feature",
+                  "reason": "semantic_title",
+                  "score": 0.6229508196721312,
+                  "mergedAt": "2026-03-19T14:57:36.835Z",
+                  "source": "smart-add"
+                }
+              ],
+              "children": [
+                {
+                  "id": "aed32a03-80d2-41de-b9e5-cafdd0d1f400",
+                  "title": "Identify and fix smart-add command name mismatch between web UI and rex CLI",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "The Rex Dashboard Smart Add box triggers an API call to the rex CLI using the subcommand 'smart-add', but the CLI no longer registers that name — likely renamed or restructured during a prior refactor. Trace the full call path from the web UI input handler through the web server API route to the rex CLI invocation, identify the correct current command name (e.g. 'add --smart' or similar), and update the web server route or API client to use the correct invocation. Verify the fix does not break the CLI's own smart-add entry point if it is invoked directly.",
+                  "acceptanceCriteria": [
+                    "Typing in the Smart Add box in the Rex Dashboard no longer produces an 'Unknown command' error at any character count",
+                    "Proposal generation triggers successfully and returns results in the Smart Add panel",
+                    "The rex CLI 'rex --help' output confirms the invoked subcommand or flag exists",
+                    "No regression in the CLI smart-add workflow when invoked directly from the terminal",
+                    "Web server API route for smart-add returns a 200-range response with proposal data"
+                  ],
+                  "priority": "critical",
+                  "tags": [
+                    "rex",
+                    "smart-add",
+                    "bug",
+                    "web-ui",
+                    "cli"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T16:38:59.191Z",
+                  "completedAt": "2026-03-06T16:40:58.745Z"
+                },
+                {
+                  "id": "133f2af9-e07d-4470-8bb8-c28cd51ac8e1",
+                  "title": "Add integration test covering Smart Add web-to-CLI command dispatch",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "There is currently no test that exercises the full web UI → web server → rex CLI invocation path for the smart-add feature, which allowed a command name regression to ship undetected. Add an integration test that confirms the web server's smart-add endpoint constructs and dispatches the correct CLI command, and that a well-formed response is returned when the rex package handles the request.",
+                  "acceptanceCriteria": [
+                    "Integration test exists that mounts the web server smart-add route and asserts the correct rex command is invoked",
+                    "Test fails when the command name is set to 'smart-add' (reproducing the bug) and passes with the correct command",
+                    "Test is added to the standard CI test suite and runs without additional setup",
+                    "Test covers at least one happy-path proposal response and one error case (invalid input)"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "rex",
+                    "smart-add",
+                    "testing",
+                    "integration"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T16:41:37.907Z",
+                  "completedAt": "2026-03-06T16:45:34.536Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "e9641f3c-2913-4e47-a9e4-bb95ebe92291",
+          "title": "Rex UI Task Management Enhancement",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T18:14:07.851Z",
+          "completedAt": "2026-03-06T18:14:07.851Z",
+          "children": [
+            {
+              "id": "7de88f8c-5bee-4b9e-9532-7f134c7244ed",
+              "title": "Smart Add Command Construction and Submission UX Fix",
+              "status": "completed",
+              "level": "feature",
+              "description": "Two related regressions in the Rex Dashboard Smart Add form: (1) the CLI command is being built incorrectly, appending stale or unrelated text from the UI (e.g. a previous task title) to the `add` subcommand arguments, causing a command-not-found failure; (2) the form auto-submits on every keystroke or Enter press rather than waiting for the user to finish composing their input.",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T18:14:07.762Z",
+              "completedAt": "2026-03-06T18:14:07.762Z",
+              "children": [
+                {
+                  "id": "7185db68-f9b1-473a-982d-1d169dd5d880",
+                  "title": "Fix Smart Add CLI command argument construction in Rex Dashboard",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "The Rex Dashboard Smart Add feature builds a shell command like `rex add --format=json <description>` before dispatching it to the CLI. A regression is causing the description argument to be concatenated with unrelated UI state (e.g. the current search query or last-focused task title), producing a malformed command such as `rex add --format=json limit Tag selection options in the rex task UI search area`. Trace the command-builder code path, identify the source of the stale string injection, and fix the argument assembly so only the user-entered description is forwarded.",
+                  "acceptanceCriteria": [
+                    "Submitting a Smart Add description dispatches exactly `rex add --format=json <user-description>` with no extra text appended",
+                    "The error 'Command failed: … add --format=json <unrelated-text>' no longer appears in the dashboard for any input",
+                    "Verified by submitting a short description while a different task or search term is visible on screen — the dispatched command contains only the typed description",
+                    "Existing Smart Add integration test suite passes without modification"
+                  ],
+                  "priority": "critical",
+                  "tags": [
+                    "bug",
+                    "smart-add",
+                    "rex-ui",
+                    "cli"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T17:55:45.464Z",
+                  "completedAt": "2026-03-06T18:09:27.902Z"
+                },
+                {
+                  "id": "ebb0e5f8-32e7-4494-a680-8b16ac5603e5",
+                  "title": "Prevent Smart Add form auto-submission and require explicit user action",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "The Smart Add input form in the Rex Dashboard currently submits automatically — either on each keystroke (reactive binding) or on Enter key press — before the user has finished composing their description. This makes it impossible to type multi-word or multi-clause ideas without triggering a premature submission. The form should only submit when the user explicitly clicks the Submit button (or equivalent deliberate action). Debouncing alone is insufficient; the trigger must be user-initiated.",
+                  "acceptanceCriteria": [
+                    "Typing any text into the Smart Add input does not trigger proposal generation or CLI dispatch",
+                    "Pressing Enter while focused in the Smart Add input does not submit the form",
+                    "The form submits only when the user activates the designated Submit/Generate button",
+                    "A user can type, pause, edit, and resume typing before submitting without any interim API calls or errors",
+                    "Submission button is visually distinct and reachable via keyboard (Tab + Enter/Space)"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "ux",
+                    "smart-add",
+                    "rex-ui",
+                    "form"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T18:10:04.254Z",
+                  "completedAt": "2026-03-06T18:14:07.584Z"
+                }
+              ],
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "semantic_title",
+                "reasonRef": "semantic_title:598d6fd3-86d0-42d2-8a41-1030963777ef",
+                "matchedItemId": "598d6fd3-86d0-42d2-8a41-1030963777ef",
+                "matchedItemTitle": "Smart Add Command Regression Fix",
+                "matchedItemLevel": "feature",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-03-06T17:26:10.279Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "d357994f-13c1-488f-b839-0c7b2c710903",
+          "title": "Rex UI Task Management Enhancement",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T18:30:26.347Z",
+          "completedAt": "2026-03-06T18:30:26.347Z",
+          "children": [
+            {
+              "id": "4068a2f4-c73e-4e7a-b038-0c9d2ad52303",
+              "title": "Rex Task Search",
+              "status": "completed",
+              "level": "feature",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T18:30:26.261Z",
+              "completedAt": "2026-03-06T18:30:26.261Z",
+              "children": [
+                {
+                  "id": "6b7536e1-7c34-4906-be43-74e715c267dc",
+                  "title": "Limit tag filter options in Rex task search to tags present in the current PRD",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "The tag facet selector in the Rex task search area currently shows an unbounded or static list of tag options. It should instead derive its options dynamically from the set of tags actually used across all tasks in the current PRD tree, so users only see relevant, actionable choices. Tags with zero matching tasks in the current view should be omitted or visually disabled.",
+                  "acceptanceCriteria": [
+                    "Tag options in the search facet are derived at runtime from tags present on tasks in the loaded PRD",
+                    "Tags not present on any task in the current PRD do not appear as selectable options",
+                    "Tag list updates if the PRD is refreshed or tasks are added/removed during the session",
+                    "Selecting a tag filter correctly narrows the displayed task list to tasks carrying that tag",
+                    "Empty-state messaging is shown when no tags exist in the current PRD"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "web",
+                    "rex",
+                    "search",
+                    "ux"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T18:27:52.549Z",
+                  "completedAt": "2026-03-06T21:39:10.140Z",
+                  "failureReason": "I still see all the hundred plus tags in the list beneath the search bar"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d7e35684-e88e-4f57-a231-661a93b290b2",
+          "title": "Analyze pipeline improvements",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T18:39:02.535Z",
+          "completedAt": "2026-03-06T18:39:02.535Z",
+          "children": [
+            {
+              "id": "35e5b979-bfe3-4025-8445-72711d8686be",
+              "title": "Hide completed items by default in status views",
+              "status": "completed",
+              "level": "feature",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T18:39:02.444Z",
+              "completedAt": "2026-03-06T18:39:02.444Z",
+              "children": [
+                {
+                  "id": "1cf7f490-d6e1-4232-bb90-c9fcbe06a6af",
+                  "title": "Suppress deleted items from rex status CLI output by default",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Deleted items clutter the rex status tree and provide no actionable signal to the user. The status command should omit items with a 'deleted' status from its default output, matching the existing behavior for completed items. A flag (e.g. --show-deleted or --all) should allow users to opt back in if needed.",
+                  "acceptanceCriteria": [
+                    "Running `rex status` omits all items whose status is 'deleted' from the printed tree",
+                    "Omitted deleted items are not counted in completion totals shown in status output",
+                    "A CLI flag (--show-deleted or --all) causes deleted items to appear in the output when passed",
+                    "JSON output via --format=json respects the same filter by default and includes deleted items when the flag is present",
+                    "Behavior is consistent with how completed items are hidden by default"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "cli",
+                    "rex",
+                    "status"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T18:31:09.396Z",
+                  "completedAt": "2026-03-06T18:39:02.245Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "eece7e94-0268-4fe4-b046-59d4db803173",
+          "title": "Repository Governance and Community Standards",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-07T02:42:10.134Z",
+          "completedAt": "2026-03-07T02:42:10.134Z",
+          "children": [
+            {
+              "id": "0a31d148-55c3-4c5b-9754-8cbe88fd0226",
+              "title": "Code of Conduct",
+              "status": "completed",
+              "level": "feature",
+              "description": "Establish a code of conduct document for the repository to set community and contributor expectations.",
+              "source": "smart-add",
+              "startedAt": "2026-03-07T02:42:10.041Z",
+              "completedAt": "2026-03-07T02:42:10.041Z",
+              "children": [
+                {
+                  "id": "8cf40be7-6f18-4e6e-8c9c-10f2c9330342",
+                  "title": "Add CODE_OF_CONDUCT.md placeholder to repository root",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Create a CODE_OF_CONDUCT.md file at the repository root with placeholder content that the user will replace with their own. Include a minimal stub structure (title, sections) so the file is valid and discoverable by GitHub and contributors, and reference it from the README.",
+                  "acceptanceCriteria": [
+                    "CODE_OF_CONDUCT.md exists at the repository root",
+                    "File contains clearly marked placeholder content indicating it will be replaced",
+                    "README.md links to CODE_OF_CONDUCT.md in a Contributing or Community section",
+                    "File is tracked in git and included in the next commit"
+                  ],
+                  "priority": "low",
+                  "tags": [
+                    "docs",
+                    "community"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-07T02:40:24.054Z",
+                  "completedAt": "2026-03-07T02:41:06.601Z"
+                },
+                {
+                  "id": "7bdd57f8-88b4-44b9-b9a5-026b0180fd80",
+                  "title": "Wire CODE_OF_CONDUCT.md into package metadata and CI validation",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Ensure the code of conduct is referenced in package.json or repository metadata where applicable, and add a CI check that verifies the file exists and is non-empty so it cannot be accidentally deleted.",
+                  "acceptanceCriteria": [
+                    "At least one package.json or root metadata field references the code of conduct (e.g. 'funding', 'bugs', or a custom field in the monorepo root)",
+                    "CI pipeline (ci.js or GitHub Actions) includes a step that fails if CODE_OF_CONDUCT.md is missing or empty",
+                    "CI step is documented in the pipeline comments"
+                  ],
+                  "priority": "low",
+                  "tags": [
+                    "docs",
+                    "ci",
+                    "community"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-07T02:41:13.185Z",
+                  "completedAt": "2026-03-07T02:42:09.839Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d677010f-a2b8-4b74-8372-d6036078cd69",
+          "title": "MCP over HTTP transport",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-09T01:23:07.906Z",
+          "completedAt": "2026-03-09T01:23:07.906Z",
+          "children": [
+            {
+              "id": "653cb773-dd9d-467c-880a-bc8c8de9cbe2",
+              "title": "rex_edit_item MCP tool",
+              "status": "completed",
+              "level": "feature",
+              "description": "Expose a dedicated edit_item action on the rex MCP server so AI agents and Claude Code can modify PRD item content (title, description, acceptance criteria, priority, tags, LoE fields) in a single structured call — distinct from rex_update which handles status/lifecycle transitions.",
+              "source": "smart-add",
+              "startedAt": "2026-03-09T01:23:07.809Z",
+              "completedAt": "2026-03-09T01:23:07.809Z",
+              "children": [
+                {
+                  "id": "322588c0-9776-4853-a0e4-13cffc4dd37e",
+                  "title": "Implement rex_edit_item tool handler and schema",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Add an edit_item tool to the rex MCP server that accepts a target item ID and a partial patch of editable fields (title, description, acceptanceCriteria, priority, tags, loe, loeRationale, loeConfidence). The handler should validate the patch against the PRD schema, apply it via the existing PRDStore mutation API, and return the updated item. Wire the new tool into the MCP tool registry alongside the existing rex tools.",
+                  "acceptanceCriteria": [
+                    "edit_item tool is listed in the rex MCP tool manifest returned by list-tools",
+                    "Calling edit_item with a valid item ID and partial patch updates exactly the specified fields and leaves all other fields unchanged",
+                    "Calling edit_item with an unknown item ID returns a structured MCP error response (not a server crash)",
+                    "Calling edit_item with an invalid field value (e.g. unrecognized priority string) returns a descriptive validation error",
+                    "The updated item is persisted to prd.json and visible in a subsequent rex_status call",
+                    "Unit tests cover field merging, unknown ID, and invalid value cases"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "rex",
+                    "mcp",
+                    "backend"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-09T01:16:42.183Z",
+                  "completedAt": "2026-03-09T01:23:07.606Z"
+                },
+                {
+                  "id": "45937170-e43c-47ca-93d5-a86fa3bdc1a0",
+                  "title": "Expose edit_item through rex-gateway and add MCP integration test",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Re-export the new edit_item capability through the web rex-gateway.ts so the HTTP MCP server can reach it without bypassing the gateway pattern. Add an integration test that calls the edit_item endpoint over HTTP transport, verifies the 200 response shape, and confirms the change is reflected in a follow-up rex_status call.",
+                  "acceptanceCriteria": [
+                    "rex-gateway.ts re-exports the edit_item function; no direct imports of rex internals exist outside the gateway",
+                    "domain-isolation.test.js passes without modification (gateway re-export-only rule still holds)",
+                    "Integration test POSTs an edit_item call to the HTTP MCP endpoint and asserts the response contains the updated item fields",
+                    "Integration test asserts a follow-up rex_status call reflects the edited values",
+                    "CI pipeline passes with the new test included"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "rex",
+                    "mcp",
+                    "gateway",
+                    "test"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-09T01:12:11.466Z",
+                  "completedAt": "2026-03-09T01:16:11.451Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2b20bb70-66cb-48ca-b249-b54729b03427",
+          "title": "Polling Restart and Recovery Logic",
+          "status": "completed",
+          "level": "feature",
+          "description": "Implement automatic polling restart when memory pressure subsides to restore normal UI functionality",
+          "source": "smart-add",
+          "startedAt": "2026-02-26T22:21:31.779Z",
+          "completedAt": "2026-02-26T22:21:31.779Z",
+          "children": [
+            {
+              "id": "5198ec1d-e5a0-4e82-a4e4-e6efbcd8271b",
+              "title": "Implement polling restart when memory pressure subsides",
+              "status": "deleted",
+              "level": "task",
+              "description": "Automatically restart all suspended polling loops when memory usage drops below pressure threshold and autoRefresh is re-enabled",
+              "acceptanceCriteria": [
+                "All polling loops restart when memory pressure flag clears",
+                "Polling intervals resume at original frequencies (5s, 3s, 10s)",
+                "No duplicate polling loops created during restart"
+              ],
+              "priority": "medium",
+              "tags": [
+                "memory",
+                "polling",
+                "recovery"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-26T22:16:42.797Z"
+            },
+            {
+              "id": "2497cbfc-79ac-402d-a799-85b33978b38c",
+              "title": "Add polling state management and cleanup",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement centralized polling state management to prevent orphaned intervals and ensure clean suspension/restart cycles",
+              "acceptanceCriteria": [
+                "All polling intervals are tracked and can be cleanly stopped",
+                "No memory leaks from orphaned polling intervals",
+                "Polling state persists across component remounts during memory pressure"
+              ],
+              "priority": "medium",
+              "tags": [
+                "memory",
+                "polling",
+                "cleanup"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-26T21:51:32.268Z",
+              "completedAt": "2026-02-26T22:15:59.666Z"
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:6d3d8a74-c84d-4615-a418-11ac553c4f8c",
+            "matchedItemId": "6d3d8a74-c84d-4615-a418-11ac553c4f8c",
+            "matchedItemTitle": "Log",
+            "matchedItemLevel": "subtask",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-02-25T19:43:48.688Z"
+          }
+        },
+        {
+          "id": "0258aa8d-c25e-4351-91f1-2f2e41ff39ef",
+          "title": "UI Update Optimization",
+          "status": "completed",
+          "level": "feature",
+          "description": "Optimize rendering pipeline to minimize unnecessary DOM updates and improve responsiveness during high-frequency data changes",
+          "source": "smart-add",
+          "startedAt": "2026-02-26T18:23:51.259Z",
+          "completedAt": "2026-02-26T18:23:51.259Z",
+          "children": [
+            {
+              "id": "4d0f2bb9-b44c-4f8c-bfac-b3392a1fe077",
+              "title": "Implement intelligent tree re-render optimization",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace full tree re-renders with targeted updates that only modify changed nodes, reducing CPU load and improving UI responsiveness",
+              "acceptanceCriteria": [
+                "Tree updates use virtual DOM diffing to minimize DOM manipulation",
+                "Only changed nodes and their ancestors are re-rendered",
+                "Re-render performance scales sub-linearly with tree size",
+                "UI remains responsive during rapid update sequences"
+              ],
+              "priority": "high",
+              "tags": [
+                "ui",
+                "rendering",
+                "performance"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-26T05:35:41.732Z",
+              "completedAt": "2026-02-26T05:52:26.741Z"
+            },
+            {
+              "id": "561a77de-29fe-49e9-b64e-460de3baf57f",
+              "title": "Add update batching for rapid WebSocket message sequences",
+              "status": "deleted",
+              "level": "task",
+              "description": "Batch UI updates within animation frames to ensure smooth rendering and prevent UI blocking during message bursts",
+              "acceptanceCriteria": [
+                "UI updates are batched using requestAnimationFrame",
+                "Maximum one UI update per animation frame",
+                "Update batching preserves final state consistency",
+                "Batching can be disabled via debug configuration"
+              ],
+              "priority": "medium",
+              "tags": [
+                "ui",
+                "batching",
+                "rendering"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-26T18:15:03.720Z"
+            }
+          ]
+        },
+        {
+          "id": "2d8059e8-d266-4b1d-ae28-51a519e2ba98",
+          "title": "Virtual Scrolling and Windowing Implementation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Implement viewport-based rendering to only create DOM nodes for visible tree items",
+          "source": "smart-add",
+          "startedAt": "2026-02-25T23:06:34.516Z",
+          "completedAt": "2026-02-25T23:06:34.516Z",
+          "children": [
+            {
+              "id": "10dc3d4a-0c7c-4a82-8564-c7406c6b091b",
+              "title": "Implement virtual scrolling container for TreeNodes component",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace full tree rendering with a virtual scrolling container that only renders items within the viewport plus a configurable buffer zone",
+              "acceptanceCriteria": [
+                "TreeNodes only renders visible items plus buffer zone",
+                "Scroll position accurately reflects virtual tree height",
+                "Tree expansion/collapse works correctly with virtual scrolling",
+                "Performance improvement measurable on 500+ item trees"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ui",
+                "performance",
+                "virtualization"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T23:04:34.884Z",
+              "completedAt": "2026-03-03T05:08:49.650Z"
+            },
+            {
+              "id": "7a4147b5-4841-48b1-8b52-8b9d18f85e6b",
+              "title": "Add viewport intersection detection for tree nodes",
+              "status": "deleted",
+              "level": "task",
+              "description": "Implement efficient intersection observer-based detection to determine which tree nodes should be rendered based on viewport visibility",
+              "acceptanceCriteria": [
+                "Uses IntersectionObserver API for efficient visibility detection",
+                "Handles nested tree item visibility correctly",
+                "Includes configurable margins for pre-rendering buffer",
+                "Works correctly with dynamic tree height changes"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ui",
+                "performance",
+                "viewport"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T23:03:38.306Z"
+            },
+            {
+              "id": "4482fa07-daf2-427b-b7db-43dfd54596a1",
+              "title": "Implement dynamic tree height calculation",
+              "status": "deleted",
+              "level": "task",
+              "description": "Calculate and maintain accurate virtual tree height for scrolling while only rendering visible nodes",
+              "acceptanceCriteria": [
+                "Accurately calculates total virtual height for collapsed and expanded states",
+                "Updates height dynamically when nodes are expanded/collapsed",
+                "Maintains scroll position accuracy during height changes",
+                "Handles variable node heights correctly"
+              ],
+              "priority": "high",
+              "tags": [
+                "ui",
+                "performance",
+                "calculation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-02-25T23:06:31.700Z"
+            }
+          ]
+        },
+        {
+          "id": "0e4d20ed-72d6-49a0-9717-7a2e27c53766",
+          "title": "Ctrl/Shift Multi-Select for Task Items",
+          "status": "completed",
+          "level": "feature",
+          "description": "Replace checkbox-based selection in the Rex tasks UI with keyboard-modifier multi-select (ctrl+click for toggle, shift+click for range selection), matching the interaction model familiar from file explorers and list UIs.",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T07:52:05.383Z",
+          "completedAt": "2026-03-06T07:52:05.383Z",
+          "children": [
+            {
+              "id": "710ef0e2-8b4e-4bf0-bd3f-6261808131a2",
+              "title": "Implement ctrl/shift multi-select interaction on Rex task list items",
+              "status": "completed",
+              "level": "task",
+              "description": "Remove checkbox inputs from task list items and replace with pointer+keyboard modifier selection logic. Ctrl+click should toggle individual item selection; shift+click should extend the selection range from the last-clicked anchor item. The selected set should be tracked in component state and visually indicated via highlight styling rather than a checkbox. Deselect-all should occur on a plain click with no modifier.",
+              "acceptanceCriteria": [
+                "Clicking a task item with no modifier selects only that item and deselects all others",
+                "Ctrl+click (Cmd+click on macOS) toggles the clicked item's selection without affecting other selected items",
+                "Shift+click selects the contiguous range between the anchor item and the clicked item",
+                "Selected items are visually distinguished (e.g. highlighted row background) with no checkbox element rendered",
+                "All existing bulk actions that previously relied on checkbox selection continue to work with the new selection set",
+                "Keyboard accessibility: Space or Enter on a focused item toggles its selection; Shift+Arrow extends range selection",
+                "Plain click anywhere outside the task list clears the selection"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "rex",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T07:45:16.322Z",
+              "completedAt": "2026-03-06T07:52:05.187Z"
+            }
+          ]
+        },
+        {
+          "id": "5e436133-6154-4bcd-868c-aba338560e3d",
+          "title": "Smart-add duplicate detection fixes",
+          "status": "completed",
+          "level": "feature",
+          "description": "Fixes for cross-level matching bugs in smart-add duplicate merge logic.",
+          "priority": "high",
+          "source": "manual",
+          "startedAt": "2026-03-06T23:18:27.911Z",
+          "completedAt": "2026-03-06T23:18:27.911Z",
+          "children": [
+            {
+              "id": "8b518f76-029b-42af-b9bd-7eadb183c008",
+              "title": "Fix cross-level matching in smart-add duplicate merge",
+              "status": "completed",
+              "level": "task",
+              "description": "The smart-add duplicate detection (`matchProposalNodeToPRD` in `smart-add-duplicates.ts`) walks the entire PRD tree and scores every item against each proposal node with no level filtering. A proposed epic can match an existing task, a proposed feature can match an existing epic, etc. This causes two failure modes:\n\n1. **Crash + partial state** — A proposed epic matches an existing task/feature. The merge target ID is used as `epicId` in `acceptProposals`. When it tries to add a new feature under this \"epic\" (actually a task), `insertChild` rejects the hierarchy mismatch (`tree.ts:65`), `addItem` throws (`file-adapter.ts:50`), and the loop aborts mid-way. Items added before the crash are already persisted → partial, broken PRD.\n\n2. **Silent structural corruption** — A proposed feature matches an existing epic. The merge target ID becomes `featureId`. New tasks are added with `featureId` = an epic ID. Since `LEVEL_HIERARCHY.task` allows parent `[\"feature\", \"epic\"]`, `insertChild` succeeds — but tasks become direct children of the epic, orphaned from any feature grouping.\n\n**Fix required (3 parts):**\n\n1. **Primary: Add level filtering to `matchProposalNodeToPRD`** (`smart-add-duplicates.ts:288-323`) — only match epic↔epic, feature↔feature, task↔task. Add a guard in `scoreNodeAgainstItem` or in the caller's loop: skip items whose `level` doesn't match `node.kind`.\n\n2. **Secondary: Validate merge targets in `acceptProposals`** (`smart-add.ts:~791-880`) — before using a merge target ID as a parent, verify the existing item has the expected level. If not, fall back to creating a new item instead of silently using the wrong parent.\n\n3. **Optional: Batch mutations for atomicity** — currently each `store.addItem()` individually loads/saves the document. If any add fails mid-loop, previously persisted items stay → inconsistent partial state. Consider collecting all mutations and saving once at the end.\n\n**Key files:**\n- `packages/rex/src/cli/commands/smart-add-duplicates.ts` — `matchProposalNodeToPRD` (lines 288-323), `scoreNodeAgainstItem` (lines 213-250)\n- `packages/rex/src/cli/commands/smart-add.ts` — `acceptProposals` (lines ~787-883), `applyDuplicateProposalMerges` (lines 458-533)\n- `packages/rex/src/store/file-adapter.ts` — `addItem` (lines 45-56)\n- `packages/rex/src/core/tree.ts` — `insertChild` (lines 50-78)",
+              "acceptanceCriteria": [
+                "matchProposalNodeToPRD only matches nodes against PRD items of the same level (epic↔epic, feature↔feature, task↔task)",
+                "acceptProposals validates merge target level before using it as a parent, falls back to creation on mismatch",
+                "Existing integration test (smart-add-duplicate-outcomes.test.ts) continues to pass",
+                "New test: cross-level match is rejected (e.g. proposed epic with same title as existing task does NOT produce a duplicate match)",
+                "New test: merge with level-matched duplicates correctly merges fields and adds non-duplicate children under the right parent"
+              ],
+              "priority": "high",
+              "tags": [
+                "bug",
+                "rex",
+                "smart-add",
+                "merge"
+              ],
+              "source": "manual",
+              "startedAt": "2026-03-06T06:04:33.772Z",
+              "completedAt": "2026-03-06T06:09:55.004Z"
+            }
+          ]
+        }
+      ],
+      "count": 16,
+      "reason": "Reorganize: Merge undersized epic \"File Format Enhancement for Requirements Import\" (1 child) into \"SourceVision UI Import Graph Enhancement\"; Merge undersized epic \"Duplicate-aware Proposal Override for rex add\" (1 child) into \"Duplicate-aware Proposal Override for rex add\"; Merge undersized epic \"Rex UI Task Management Enhancement\" (1 child) into \"Rex UI Task Management Enhancement\"; Merge undersized epic \"SourceVision UI Import Graph Enhancement\" (1 child) into \"SourceVision UI Import Graph Enhancement\"; Merge undersized epic \"PR Build Pipeline and Code Quality Automation\" (1 child) into \"PR Build Pipeline and Code Quality Automation\"; Merge undersized epic \"Rex UI Task Management Enhancement\" (1 child) into \"Rex UI Task Management Enhancement\"; Merge undersized epic \"Rex UI Task Management Enhancement\" (1 child) into \"Rex UI Task Management Enhancement\"; Merge undersized epic \"Rex UI Task Management Enhancement\" (1 child) into \"Rex UI Task Management Enhancement\"; Merge undersized epic \"Analyze pipeline improvements\" (1 child) into \"Analyze pipeline improvements\"; Merge undersized epic \"Repository Governance and Community Standards\" (1 child) into \"Selective Recommendation Acceptance Syntax\"; Merge undersized epic \"MCP over HTTP transport\" (1 child) into \"Unified Server Architecture: HTTP MCP and ndx start\"; Merge undersized feature \"Polling Restart and Recovery Logic\" (1 child) into \"Memory Pressure Polling Suspension\"; Merge undersized feature \"UI Update Optimization\" (1 child) into \"Message Throttling and Coalescing\"; Merge undersized feature \"Virtual Scrolling and Windowing Implementation\" (1 child) into \"Lazy Rendering and Node Culling\"; Merge undersized feature \"Ctrl/Shift Multi-Select for Task Items\" (1 child) into \"Ability to edit epic/feature/task details in the side panel\"; Merge undersized feature \"Smart-add duplicate detection fixes\" (1 child) into \"Address observation issues (3 findings)\""
+    },
+    {
+      "timestamp": "2026-03-24T02:14:53.705Z",
+      "source": "reorganize",
+      "items": [
+        {
+          "id": "000ab316-d0d4-497f-9485-e9ee706acb24",
+          "title": "WebSocket Message Performance Optimization",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-02-26T18:23:51.336Z",
+          "completedAt": "2026-02-26T18:23:51.336Z",
+          "children": [
+            {
+              "id": "4a39248e-94d2-4bca-a1eb-0bb06ac724fb",
+              "title": "Message Throttling and Coalescing",
+              "status": "completed",
+              "level": "feature",
+              "description": "Implement intelligent throttling and batching mechanisms to handle high-frequency WebSocket messages without overwhelming the UI\n\n---\n\nOptimize rendering pipeline to minimize unnecessary DOM updates and improve responsiveness during high-frequency data changes",
+              "source": "smart-add",
+              "startedAt": "2026-02-26T16:13:44.287Z",
+              "completedAt": "2026-02-26T16:13:44.287Z",
+              "children": [
+                {
+                  "id": "e8facee3-b5a7-4553-9b65-3ec91b969001",
+                  "title": "Implement throttled WebSocket message handler with configurable debounce",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Replace direct message handlers with throttled versions that can handle rapid message sequences without triggering excessive API calls",
+                  "acceptanceCriteria": [
+                    "WebSocket messages are debounced with configurable delay (default 250ms)",
+                    "Throttling applies to rex:prd-changed, rex:item-updated, and rex:item-deleted messages",
+                    "Configuration allows per-message-type throttle intervals",
+                    "Memory footprint remains stable during message bursts"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "websocket",
+                    "performance",
+                    "ui"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-02-26T06:18:15.920Z",
+                  "completedAt": "2026-02-26T06:25:47.339Z"
+                },
+                {
+                  "id": "a357c727-5187-43f0-b279-e9ae82394fb1",
+                  "title": "Implement message coalescing for rapid sequential updates",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Batch multiple WebSocket messages that arrive in quick succession to reduce redundant fetchPRDData and fetchTaskUsage calls",
+                  "acceptanceCriteria": [
+                    "Sequential messages of same type are coalesced within throttle window",
+                    "Mixed message types are batched appropriately without data loss",
+                    "Coalescing preserves message ordering semantics",
+                    "Batch size limits prevent unbounded memory growth"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "websocket",
+                    "performance",
+                    "batching"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-02-26T06:10:42.239Z",
+                  "completedAt": "2026-02-26T06:18:15.692Z"
+                },
+                {
+                  "id": "997995fe-43df-431b-8a31-b255feb84b24",
+                  "title": "Add rate limiting for fetchPRDData and fetchTaskUsage calls",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Implement call-level rate limiting to prevent these expensive operations from being invoked more frequently than necessary",
+                  "acceptanceCriteria": [
+                    "fetchPRDData calls are rate-limited to maximum 2 per second",
+                    "fetchTaskUsage calls are rate-limited to maximum 2 per second",
+                    "Rate limits are configurable via application settings",
+                    "Queued calls are deduplicated to prevent redundant requests"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "api",
+                    "rate-limiting",
+                    "performance"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-02-26T16:06:27.701Z",
+                  "completedAt": "2026-02-26T16:13:44.180Z"
+                },
+                {
+                  "id": "4d0f2bb9-b44c-4f8c-bfac-b3392a1fe077",
+                  "title": "Implement intelligent tree re-render optimization",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Replace full tree re-renders with targeted updates that only modify changed nodes, reducing CPU load and improving UI responsiveness",
+                  "acceptanceCriteria": [
+                    "Tree updates use virtual DOM diffing to minimize DOM manipulation",
+                    "Only changed nodes and their ancestors are re-rendered",
+                    "Re-render performance scales sub-linearly with tree size",
+                    "UI remains responsive during rapid update sequences"
+                  ],
+                  "priority": "high",
+                  "tags": [
+                    "ui",
+                    "rendering",
+                    "performance"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-02-26T05:35:41.732Z",
+                  "completedAt": "2026-02-26T05:52:26.741Z"
+                },
+                {
+                  "id": "561a77de-29fe-49e9-b64e-460de3baf57f",
+                  "title": "Add update batching for rapid WebSocket message sequences",
+                  "status": "deleted",
+                  "level": "task",
+                  "description": "Batch UI updates within animation frames to ensure smooth rendering and prevent UI blocking during message bursts",
+                  "acceptanceCriteria": [
+                    "UI updates are batched using requestAnimationFrame",
+                    "Maximum one UI update per animation frame",
+                    "Update batching preserves final state consistency",
+                    "Batching can be disabled via debug configuration"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "ui",
+                    "batching",
+                    "rendering"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-02-26T18:15:03.720Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c8fbd011-06cb-48a1-9c6d-03a50c00b5a0",
+          "title": "Rex UI Task Management Enhancement",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T07:52:05.467Z",
+          "completedAt": "2026-03-06T07:52:05.467Z",
+          "children": [
+            {
+              "id": "8de98d96-3ee3-47bd-be66-46d1bb7e25b8",
+              "title": "Ability to edit epic/feature/task details in the side panel",
+              "status": "completed",
+              "level": "feature",
+              "description": "Replace checkbox-based selection in the Rex tasks UI with keyboard-modifier multi-select (ctrl+click for toggle, shift+click for range selection), matching the interaction model familiar from file explorers and list UIs.",
+              "startedAt": "2026-03-06T07:39:31.119Z",
+              "completedAt": "2026-03-06T07:44:35.624Z",
+              "children": [
+                {
+                  "id": "710ef0e2-8b4e-4bf0-bd3f-6261808131a2",
+                  "title": "Implement ctrl/shift multi-select interaction on Rex task list items",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Remove checkbox inputs from task list items and replace with pointer+keyboard modifier selection logic. Ctrl+click should toggle individual item selection; shift+click should extend the selection range from the last-clicked anchor item. The selected set should be tracked in component state and visually indicated via highlight styling rather than a checkbox. Deselect-all should occur on a plain click with no modifier.",
+                  "acceptanceCriteria": [
+                    "Clicking a task item with no modifier selects only that item and deselects all others",
+                    "Ctrl+click (Cmd+click on macOS) toggles the clicked item's selection without affecting other selected items",
+                    "Shift+click selects the contiguous range between the anchor item and the clicked item",
+                    "Selected items are visually distinguished (e.g. highlighted row background) with no checkbox element rendered",
+                    "All existing bulk actions that previously relied on checkbox selection continue to work with the new selection set",
+                    "Keyboard accessibility: Space or Enter on a focused item toggles its selection; Shift+Arrow extends range selection",
+                    "Plain click anywhere outside the task list clears the selection"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "web",
+                    "rex",
+                    "ux"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T07:45:16.322Z",
+                  "completedAt": "2026-03-06T07:52:05.187Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "35e5b979-bfe3-4025-8445-72711d8686be",
+          "title": "Hide completed items by default in status views",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T18:39:02.444Z",
+          "completedAt": "2026-03-06T18:39:02.444Z",
+          "children": [
+            {
+              "id": "1cf7f490-d6e1-4232-bb90-c9fcbe06a6af",
+              "title": "Suppress deleted items from rex status CLI output by default",
+              "status": "completed",
+              "level": "task",
+              "description": "Deleted items clutter the rex status tree and provide no actionable signal to the user. The status command should omit items with a 'deleted' status from its default output, matching the existing behavior for completed items. A flag (e.g. --show-deleted or --all) should allow users to opt back in if needed.",
+              "acceptanceCriteria": [
+                "Running `rex status` omits all items whose status is 'deleted' from the printed tree",
+                "Omitted deleted items are not counted in completion totals shown in status output",
+                "A CLI flag (--show-deleted or --all) causes deleted items to appear in the output when passed",
+                "JSON output via --format=json respects the same filter by default and includes deleted items when the flag is present",
+                "Behavior is consistent with how completed items are hidden by default"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "rex",
+                "status"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T18:31:09.396Z",
+              "completedAt": "2026-03-06T18:39:02.245Z"
+            }
+          ]
+        },
+        {
+          "id": "4068a2f4-c73e-4e7a-b038-0c9d2ad52303",
+          "title": "Rex Task Search",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T18:30:26.261Z",
+          "completedAt": "2026-03-06T18:30:26.261Z",
+          "children": [
+            {
+              "id": "6b7536e1-7c34-4906-be43-74e715c267dc",
+              "title": "Limit tag filter options in Rex task search to tags present in the current PRD",
+              "status": "completed",
+              "level": "task",
+              "description": "The tag facet selector in the Rex task search area currently shows an unbounded or static list of tag options. It should instead derive its options dynamically from the set of tags actually used across all tasks in the current PRD tree, so users only see relevant, actionable choices. Tags with zero matching tasks in the current view should be omitted or visually disabled.",
+              "acceptanceCriteria": [
+                "Tag options in the search facet are derived at runtime from tags present on tasks in the loaded PRD",
+                "Tags not present on any task in the current PRD do not appear as selectable options",
+                "Tag list updates if the PRD is refreshed or tasks are added/removed during the session",
+                "Selecting a tag filter correctly narrows the displayed task list to tasks carrying that tag",
+                "Empty-state messaging is shown when no tags exist in the current PRD"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "rex",
+                "search",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T18:27:52.549Z",
+              "completedAt": "2026-03-06T21:39:10.140Z",
+              "failureReason": "I still see all the hundred plus tags in the list beneath the search bar"
+            }
+          ]
+        },
+        {
+          "id": "454d5c08-2d8f-45e1-a173-9acf8617a560",
+          "title": "GitHub Actions CI Pipeline",
+          "status": "completed",
+          "level": "feature",
+          "description": "Replace the existing Bitbucket Pipelines configuration with an equivalent GitHub Actions workflow that runs build, typecheck, and PRD validation on pull requests and pushes to main.",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T16:47:15.731Z",
+          "completedAt": "2026-03-06T16:47:15.731Z",
+          "children": [
+            {
+              "id": "b327e7df-acd3-4657-bcb3-d91c5166fa9e",
+              "title": "Create GitHub Actions workflow replacing bitbucket-pipelines.yml",
+              "status": "completed",
+              "level": "task",
+              "description": "Write a .github/workflows/ci.yml that replicates the PR validation pipeline currently defined in bitbucket-pipelines.yml. The workflow should trigger on pull_request and push-to-main events, install pnpm and Node dependencies, run the build, typecheck, and PRD validation steps (pnpm build, pnpm typecheck, node ci.js), and report failures clearly. The existing bitbucket-pipelines.yml should be removed once the GitHub Actions workflow is confirmed working.",
+              "acceptanceCriteria": [
+                ".github/workflows/ci.yml exists and triggers on pull_request (all branches) and push to main",
+                "Workflow installs correct Node version and pnpm, restores node_modules via cache",
+                "pnpm build runs across all packages with no skipped packages",
+                "pnpm typecheck runs across all packages and fails the job on type errors",
+                "node ci.js (or ndx ci .) runs and fails the job when PRD validation fails",
+                "bitbucket-pipelines.yml is removed from the repository",
+                "A passing workflow run is confirmed in GitHub Actions UI"
+              ],
+              "priority": "high",
+              "tags": [
+                "ci",
+                "github-actions",
+                "infra"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T16:45:55.427Z",
+              "completedAt": "2026-03-06T16:47:15.571Z",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:f08cf5a3-2a8e-49c1-874f-5dec139c98ce",
+                "matchedItemId": "f08cf5a3-2a8e-49c1-874f-5dec139c98ce",
+                "matchedItemTitle": "Create bitbucket-pipelines.yml with PR validation workflow",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-03-06T16:21:50.494Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "814e1bad-c2cc-4646-b49f-e09f10fc9bcb",
+          "title": "FAQ FAB Placement and Role Separation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Clarify the dual-FAB FAQ pattern by anchoring the global FAQ FAB in the bottom-left toolbar alongside the theme switcher, while leaving the page-specific FAQ FAB in its existing top-right position. This gives each button a distinct visual location that communicates its scope to the user.",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T07:57:25.089Z",
+          "completedAt": "2026-03-06T07:57:25.089Z",
+          "children": [
+            {
+              "id": "3560e79d-0a36-4ce6-949d-5834403e5f2c",
+              "title": "Relocate global FAQ FAB to bottom-left toolbar beside theme switcher",
+              "status": "completed",
+              "level": "task",
+              "description": "Move the global FAQ floating action button out of its current position and into the bottom-left corner of the UI, directly adjacent to the existing theme switcher control. The page-specific FAQ FAB must remain in the top-right and must not be affected by this change. Update any positioning styles, z-index stacking, and layout containers that govern the bottom-left toolbar so the two controls sit flush without overlap.",
+              "acceptanceCriteria": [
+                "Global FAQ FAB renders in the bottom-left corner of the viewport at all supported viewport widths",
+                "Global FAQ FAB is visually adjacent to the theme switcher with consistent spacing matching the design system",
+                "Page-specific FAQ FAB remains in the top-right corner and is visually and functionally unchanged",
+                "No overlap or collision between the global FAQ FAB and theme switcher at narrow viewport widths",
+                "Both FABs remain accessible (keyboard-focusable, correct aria-label) after the move",
+                "Existing FAQ FAB click handlers and modal/panel behavior are preserved"
+              ],
+              "priority": "low",
+              "tags": [
+                "ui",
+                "layout",
+                "faq",
+                "accessibility"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T07:55:16.344Z",
+              "completedAt": "2026-03-06T07:57:24.894Z"
+            }
+          ]
+        }
+      ],
+      "count": 6,
+      "reason": "Reorganize: Merge undersized epic \"WebSocket Message Performance Optimization\" (1 child) into \"Token Usage Aggregation Performance Optimization\"; Merge undersized epic \"Rex UI Task Management Enhancement\" (1 child) into \"Rex UI Task Management Enhancement\"; Merge undersized feature \"Hide completed items by default in status views\" (1 child) into \"Hide completed items by default in status views\"; Merge undersized feature \"Rex Task Search\" (1 child) into \"Rex Task Search\"; Merge undersized feature \"GitHub Actions CI Pipeline\" (1 child) into \"Bitbucket Pipeline Integration\"; Merge undersized feature \"FAQ FAB Placement and Role Separation\" (1 child) into \"Sidebar Active State on Initial Load\""
+    },
+    {
+      "timestamp": "2026-03-24T02:22:08.978Z",
+      "source": "reorganize",
+      "items": [
+        {
+          "id": "4909cee2-05f2-47b8-a9dd-a9e7006532e0",
+          "title": "Web UI Design and User Experience Enhancement",
+          "status": "completed",
+          "level": "epic",
+          "source": "smart-add",
+          "startedAt": "2026-03-06T07:57:25.175Z",
+          "completedAt": "2026-03-06T07:57:25.175Z",
+          "children": [
+            {
+              "id": "1b9353a7-41d8-4f55-947c-1aedaadc5932",
+              "title": "Sidebar Active State on Initial Load",
+              "status": "completed",
+              "level": "feature",
+              "description": "Ensure the sidebar navigation correctly reflects the active page when the app first loads, including direct URL access and page refresh scenarios.\n\n---\n\nClarify the dual-FAB FAQ pattern by anchoring the global FAQ FAB in the bottom-left toolbar alongside the theme switcher, while leaving the page-specific FAQ FAB in its existing top-right position. This gives each button a distinct visual location that communicates its scope to the user.",
+              "source": "smart-add",
+              "startedAt": "2026-03-06T07:54:44.479Z",
+              "completedAt": "2026-03-06T07:54:44.479Z",
+              "children": [
+                {
+                  "id": "5a83f70a-b30d-4251-8168-5e8d939f9b1d",
+                  "title": "Sync sidebar active state with current route on initial page load",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "When the web UI loads or is refreshed, the sidebar should immediately highlight the nav item corresponding to the current URL hash or route, rather than defaulting to no selection or the wrong item. This involves reading the initial route from the URL at mount time and applying the active state before the first render.",
+                  "acceptanceCriteria": [
+                    "Loading the app at any valid route URL shows the correct sidebar item highlighted on first render",
+                    "Refreshing the page on any view retains the correct active sidebar item",
+                    "Direct URL navigation (e.g. pasting a deep link) highlights the matching sidebar item",
+                    "No visible flash of incorrect or missing active state on load"
+                  ],
+                  "priority": "medium",
+                  "tags": [
+                    "web",
+                    "navigation",
+                    "ux"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T07:52:49.267Z",
+                  "completedAt": "2026-03-06T07:54:44.278Z"
+                },
+                {
+                  "id": "3560e79d-0a36-4ce6-949d-5834403e5f2c",
+                  "title": "Relocate global FAQ FAB to bottom-left toolbar beside theme switcher",
+                  "status": "completed",
+                  "level": "task",
+                  "description": "Move the global FAQ floating action button out of its current position and into the bottom-left corner of the UI, directly adjacent to the existing theme switcher control. The page-specific FAQ FAB must remain in the top-right and must not be affected by this change. Update any positioning styles, z-index stacking, and layout containers that govern the bottom-left toolbar so the two controls sit flush without overlap.",
+                  "acceptanceCriteria": [
+                    "Global FAQ FAB renders in the bottom-left corner of the viewport at all supported viewport widths",
+                    "Global FAQ FAB is visually adjacent to the theme switcher with consistent spacing matching the design system",
+                    "Page-specific FAQ FAB remains in the top-right corner and is visually and functionally unchanged",
+                    "No overlap or collision between the global FAQ FAB and theme switcher at narrow viewport widths",
+                    "Both FABs remain accessible (keyboard-focusable, correct aria-label) after the move",
+                    "Existing FAQ FAB click handlers and modal/panel behavior are preserved"
+                  ],
+                  "priority": "low",
+                  "tags": [
+                    "ui",
+                    "layout",
+                    "faq",
+                    "accessibility"
+                  ],
+                  "source": "smart-add",
+                  "startedAt": "2026-03-06T07:55:16.344Z",
+                  "completedAt": "2026-03-06T07:57:24.894Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "8de98d96-3ee3-47bd-be66-46d1bb7e25b8",
+          "title": "Ability to edit epic/feature/task details in the side panel",
+          "status": "completed",
+          "level": "feature",
+          "description": "Replace checkbox-based selection in the Rex tasks UI with keyboard-modifier multi-select (ctrl+click for toggle, shift+click for range selection), matching the interaction model familiar from file explorers and list UIs.",
+          "startedAt": "2026-03-06T07:39:31.119Z",
+          "completedAt": "2026-03-06T07:44:35.624Z",
+          "children": [
+            {
+              "id": "710ef0e2-8b4e-4bf0-bd3f-6261808131a2",
+              "title": "Implement ctrl/shift multi-select interaction on Rex task list items",
+              "status": "completed",
+              "level": "task",
+              "description": "Remove checkbox inputs from task list items and replace with pointer+keyboard modifier selection logic. Ctrl+click should toggle individual item selection; shift+click should extend the selection range from the last-clicked anchor item. The selected set should be tracked in component state and visually indicated via highlight styling rather than a checkbox. Deselect-all should occur on a plain click with no modifier.",
+              "acceptanceCriteria": [
+                "Clicking a task item with no modifier selects only that item and deselects all others",
+                "Ctrl+click (Cmd+click on macOS) toggles the clicked item's selection without affecting other selected items",
+                "Shift+click selects the contiguous range between the anchor item and the clicked item",
+                "Selected items are visually distinguished (e.g. highlighted row background) with no checkbox element rendered",
+                "All existing bulk actions that previously relied on checkbox selection continue to work with the new selection set",
+                "Keyboard accessibility: Space or Enter on a focused item toggles its selection; Shift+Arrow extends range selection",
+                "Plain click anywhere outside the task list clears the selection"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web",
+                "rex",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-06T07:45:16.322Z",
+              "completedAt": "2026-03-06T07:52:05.187Z"
+            }
+          ]
+        }
+      ],
+      "count": 2,
+      "reason": "Reorganize: Merge undersized epic \"Web UI Design and User Experience Enhancement\" (1 child) into \"Web UI Design and User Experience Enhancement\"; Merge undersized feature \"Ability to edit epic/feature/task details in the side panel\" (1 child) into \"Detail Panel Task Creation\""
     }
   ]
 }

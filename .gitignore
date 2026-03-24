@@ -7,6 +7,7 @@ package-lock.json
 .n-dx2.json
 .n-dx-web.pid
 .n-dx-web.port
+.rex/prd.json.lock
 .rex/adapters.json
 .rex/pending-proposals.json
 .rex/acknowledged-findings.json

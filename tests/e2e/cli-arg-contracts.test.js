@@ -151,13 +151,26 @@ const NDX_ORCHESTRATION_COMMANDS = [
   "ci",
   "config",
   "export",
+  "validate",
+  "fix",
+  "health",
+  "report",
+  "verify",
+  "update",
+  "remove",
+  "move",
+  "reshape",
+  "reorganize",
+  "prune",
+  "next",
+  "reset",
+  "show",
 ];
 
 const NDX_TOOL_COMMANDS = [
   "rex",
   "hench",
   "sourcevision",
-  "sv",
 ];
 
 // ---------------------------------------------------------------------------
@@ -288,11 +301,12 @@ describe("CLI argument contracts", () => {
     });
 
     it("lists all tool delegation commands", () => {
-      for (const cmd of NDX_TOOL_COMMANDS) {
+      // Tools are mentioned in the footer rather than as individual entries
+      for (const tool of NDX_TOOL_COMMANDS) {
         expect(
           helpText,
-          `missing ndx tool command: ${cmd}`,
-        ).toMatch(new RegExp(`^\\s+${cmd}\\b`, "m"));
+          `missing tool name in footer: ${tool}`,
+        ).toContain(tool);
       }
     });
   });

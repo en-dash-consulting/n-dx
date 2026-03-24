@@ -202,6 +202,107 @@ const COMMAND_REGISTRY = [
     keywords: ["heal", "iterate", "loop", "improve", "analyze", "recommend", "accept", "agent", "autonomous"],
     related: ["plan", "work", "refresh"],
   },
+  // ── Manage commands (delegated from rex) ──
+  {
+    name: "validate",
+    category: "Manage",
+    summary: "Check PRD integrity (DAG, schema, references)",
+    keywords: ["check", "integrity", "schema", "DAG", "health", "PRD"],
+    related: ["fix", "health", "report"],
+  },
+  {
+    name: "fix",
+    category: "Manage",
+    summary: "Auto-fix common PRD issues",
+    keywords: ["repair", "timestamps", "references", "auto-fix", "PRD"],
+    related: ["validate", "health"],
+  },
+  {
+    name: "health",
+    category: "Manage",
+    summary: "Show PRD health summary",
+    keywords: ["health", "check", "PRD", "summary", "diagnostics"],
+    related: ["validate", "report"],
+  },
+  {
+    name: "report",
+    category: "Manage",
+    summary: "Generate JSON health report",
+    keywords: ["health", "CI", "JSON", "dashboard", "report"],
+    related: ["validate", "health"],
+  },
+  {
+    name: "verify",
+    category: "Manage",
+    summary: "Run tests for acceptance criteria",
+    keywords: ["test", "acceptance", "criteria", "coverage", "verify"],
+    related: ["status", "validate"],
+  },
+  {
+    name: "update",
+    category: "Manage",
+    summary: "Update item status, priority, or title",
+    keywords: ["modify", "change", "complete", "status", "priority"],
+    related: ["add", "remove", "move"],
+  },
+  {
+    name: "remove",
+    category: "Manage",
+    summary: "Remove an item from the PRD",
+    keywords: ["delete", "remove", "item", "epic", "feature", "task"],
+    related: ["add", "update", "prune"],
+  },
+  {
+    name: "move",
+    category: "Manage",
+    summary: "Reparent an item in the PRD tree",
+    keywords: ["reparent", "hierarchy", "reorganize", "move"],
+    related: ["reshape", "reorganize"],
+  },
+  {
+    name: "reshape",
+    category: "Manage",
+    summary: "LLM-powered PRD restructuring",
+    keywords: ["restructure", "merge", "split", "reorganize", "LLM"],
+    related: ["prune", "move", "reorganize"],
+  },
+  {
+    name: "reorganize",
+    category: "Manage",
+    summary: "Reorganize PRD structure",
+    keywords: ["reorganize", "restructure", "hierarchy"],
+    related: ["reshape", "move"],
+  },
+  {
+    name: "prune",
+    category: "Manage",
+    summary: "Remove completed subtrees from PRD",
+    keywords: ["clean", "archive", "completed", "consolidate"],
+    related: ["reshape", "status", "remove"],
+  },
+  {
+    name: "next",
+    category: "Manage",
+    summary: "Print next actionable task",
+    keywords: ["task", "priority", "actionable", "next"],
+    related: ["status", "work", "update"],
+  },
+  // ── Delegated sourcevision commands ──
+  {
+    name: "reset",
+    category: "Manage",
+    summary: "Remove .sourcevision/ and start fresh",
+    keywords: ["clean", "delete", "fresh", "reset", "sourcevision"],
+    related: ["init", "analyze"],
+  },
+  // ── Delegated hench commands ──
+  {
+    name: "show",
+    category: "Manage",
+    summary: "Show full details of a hench run",
+    keywords: ["details", "run", "tokens", "timing", "hench"],
+    related: ["work", "status"],
+  },
   // ── Tool delegation commands ──
   {
     name: "rex",
@@ -861,6 +962,170 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["start", "status"],
   },
+  validate: {
+    summary: "check PRD integrity",
+    description: "Validates the PRD structure: checks DAG integrity, schema conformance,\nparent-child references, and ID uniqueness. Delegates to 'rex validate'.",
+    usage: "ndx validate [options] [dir]",
+    options: [
+      { flag: "--format=json", description: "Machine-readable JSON output" },
+    ],
+    examples: [
+      { command: "ndx validate", description: "Check PRD integrity" },
+      { command: "ndx validate --format=json .", description: "JSON output for CI" },
+    ],
+    related: ["fix", "health", "report"],
+  },
+  fix: {
+    summary: "auto-fix common PRD issues",
+    description: "Automatically repairs common PRD problems: missing timestamps,\nbroken parent references, orphaned items. Delegates to 'rex fix'.",
+    usage: "ndx fix [options] [dir]",
+    options: [
+      { flag: "--dry-run", description: "Preview fixes without applying" },
+    ],
+    examples: [
+      { command: "ndx fix", description: "Fix PRD issues" },
+      { command: "ndx fix --dry-run .", description: "Preview fixes" },
+    ],
+    related: ["validate", "health"],
+  },
+  health: {
+    summary: "show PRD health summary",
+    description: "Displays a summary of PRD health including validation results,\ncompletion stats, and potential issues. Delegates to 'rex health'.",
+    usage: "ndx health [options] [dir]",
+    options: [
+      { flag: "--format=json", description: "Machine-readable JSON output" },
+    ],
+    examples: [
+      { command: "ndx health", description: "Show health summary" },
+      { command: "ndx health --format=json .", description: "JSON output" },
+    ],
+    related: ["validate", "report"],
+  },
+  report: {
+    summary: "generate JSON health report",
+    description: "Generates a comprehensive JSON health report for CI/CD integration\nor dashboard consumption. Delegates to 'rex report'.",
+    usage: "ndx report [options] [dir]",
+    options: [
+      { flag: "--format=json", description: "Machine-readable JSON output" },
+    ],
+    examples: [
+      { command: "ndx report", description: "Generate health report" },
+      { command: "ndx report --format=json .", description: "JSON report for CI" },
+    ],
+    related: ["validate", "health"],
+  },
+  verify: {
+    summary: "run tests for acceptance criteria",
+    description: "Runs test suites associated with PRD task acceptance criteria.\nVerifies that completed tasks actually pass their defined tests.\nDelegates to 'rex verify'.",
+    usage: "ndx verify [options] [dir]",
+    examples: [
+      { command: "ndx verify", description: "Run acceptance criteria tests" },
+      { command: "ndx verify .", description: "Verify in target directory" },
+    ],
+    related: ["status", "validate"],
+  },
+  update: {
+    summary: "update a PRD item",
+    description: "Updates the status, priority, or title of a PRD item by ID.\nDelegates to 'rex update'.",
+    usage: "ndx update <id> [options] [dir]",
+    options: [
+      { flag: "--status=<status>", description: "New status (pending, in-progress, done, blocked)" },
+      { flag: "--priority=<priority>", description: "New priority (low, medium, high, critical)" },
+      { flag: "--title=<title>", description: "New title" },
+    ],
+    examples: [
+      { command: "ndx update abc123 --status=done", description: "Mark item as done" },
+      { command: "ndx update abc123 --priority=high", description: "Change priority" },
+    ],
+    related: ["add", "remove", "move"],
+  },
+  remove: {
+    summary: "remove a PRD item",
+    description: "Removes an item (and its children) from the PRD.\nDelegates to 'rex remove'.",
+    usage: ["ndx remove <id> [dir]", "ndx remove <level> <id> [dir]"],
+    examples: [
+      { command: "ndx remove abc123", description: "Remove item by ID" },
+      { command: "ndx remove epic abc123", description: "Remove epic by ID" },
+    ],
+    related: ["add", "update", "prune"],
+  },
+  move: {
+    summary: "reparent a PRD item",
+    description: "Moves an item to a new parent in the PRD tree.\nDelegates to 'rex move'.",
+    usage: "ndx move <id> --parent=<new-parent-id> [dir]",
+    options: [
+      { flag: "--parent=<id>", description: "New parent ID" },
+    ],
+    examples: [
+      { command: "ndx move abc123 --parent=def456", description: "Move item under new parent" },
+    ],
+    related: ["reshape", "reorganize"],
+  },
+  reshape: {
+    summary: "LLM-powered PRD restructuring",
+    description: "Uses an LLM to analyze and restructure the PRD tree for better\norganization. Can merge duplicates, split oversized items, and\nrebalance the hierarchy. Delegates to 'rex reshape'.",
+    usage: "ndx reshape [options] [dir]",
+    examples: [
+      { command: "ndx reshape", description: "Restructure PRD" },
+      { command: "ndx reshape .", description: "Restructure PRD in target directory" },
+    ],
+    related: ["prune", "move", "reorganize"],
+  },
+  reorganize: {
+    summary: "reorganize PRD structure",
+    description: "Reorganizes the PRD structure for better grouping and hierarchy.\nDelegates to 'rex reorganize'.",
+    usage: "ndx reorganize [options] [dir]",
+    examples: [
+      { command: "ndx reorganize", description: "Reorganize PRD" },
+      { command: "ndx reorganize .", description: "Reorganize PRD in target directory" },
+    ],
+    related: ["reshape", "move"],
+  },
+  prune: {
+    summary: "remove completed subtrees",
+    description: "Removes completed epics, features, and tasks from the PRD tree.\nArchives pruned items to .rex/archive.json for recovery.\nDelegates to 'rex prune'.",
+    usage: "ndx prune [options] [dir]",
+    options: [
+      { flag: "--dry-run", description: "Preview what would be pruned without applying" },
+    ],
+    examples: [
+      { command: "ndx prune", description: "Prune completed items" },
+      { command: "ndx prune --dry-run .", description: "Preview pruning" },
+    ],
+    related: ["reshape", "status", "remove"],
+  },
+  next: {
+    summary: "print next actionable task",
+    description: "Shows the next task that should be worked on, based on priority\nand dependency ordering. Delegates to 'rex next'.",
+    usage: "ndx next [options] [dir]",
+    options: [
+      { flag: "--format=json", description: "Machine-readable JSON output" },
+    ],
+    examples: [
+      { command: "ndx next", description: "Show next task" },
+      { command: "ndx next --format=json .", description: "JSON output" },
+    ],
+    related: ["status", "work", "update"],
+  },
+  reset: {
+    summary: "remove .sourcevision/ and start fresh",
+    description: "Deletes the .sourcevision/ directory so analysis can start from\nscratch. Delegates to 'sourcevision reset'.",
+    usage: "ndx reset [dir]",
+    examples: [
+      { command: "ndx reset", description: "Reset sourcevision data" },
+      { command: "ndx reset .", description: "Reset in target directory" },
+    ],
+    related: ["init", "analyze"],
+  },
+  show: {
+    summary: "show details of a hench run",
+    description: "Displays full details of a specific hench agent run, including\ntiming, token usage, and conversation. Delegates to 'hench show'.",
+    usage: "ndx show <run-id> [dir]",
+    examples: [
+      { command: "ndx show abc123", description: "Show run details" },
+    ],
+    related: ["work", "status"],
+  },
   "self-heal": {
     summary: "iterative codebase improvement loop",
     description:
@@ -968,7 +1233,7 @@ export function formatOrchestratorCommandHelp(command) {
 }
 
 /**
- * Format the main ndx help page with consistent visual styling.
+ * Format the main ndx help page with workflow-based grouping.
  * @returns {string}
  */
 export function formatMainHelp() {
@@ -977,63 +1242,77 @@ export function formatMainHelp() {
   lines.push(`${bold("n-dx")} ${dim("—")} AI-powered development toolkit`);
   lines.push("");
 
-  // ── Primary workflow ──
-  lines.push(bold("COMMANDS"));
-  const primaryItems = [
-    ["init [dir]", "Initialize all tools (sourcevision + rex + hench)"],
-    ["analyze [dir]", "Run SourceVision codebase analysis (--deep, --full, --lite)"],
-    ["recommend [dir]", "Show or accept SourceVision recommendations (--accept, --actionable-only)"],
-    ['add "<desc>" [dir]', "Add PRD items from descriptions, files, or stdin"],
-    ["work [dir]", "Run next task (--task=ID, --epic=ID, --auto, --loop)"],
-    ["self-heal [N] [dir]", "Iterative improvement loop (analyze → recommend → execute)"],
-    ["start [dir]", "Start server: dashboard + MCP (--port=N, --background, stop, status)"],
-  ];
-  const maxPrimaryLen = Math.max(...primaryItems.map(([n]) => n.length));
-  const primaryPad = Math.max(maxPrimaryLen + 4, 24);
-  for (const [name, desc] of primaryItems) {
-    const spacing = " ".repeat(Math.max(primaryPad - name.length - 2, 2));
-    lines.push(`  ${cmd(name)}${spacing}${desc}`);
+  /**
+   * Render a section with a bold header and aligned command/description rows.
+   * @param {string} title
+   * @param {[string, string][]} items
+   * @param {number} pad
+   */
+  function section(title, items, pad) {
+    lines.push(bold(title));
+    for (const [name, desc] of items) {
+      const spacing = " ".repeat(Math.max(pad - name.length - 2, 2));
+      lines.push(`  ${cmd(name)}${spacing}${desc}`);
+    }
+    lines.push("");
   }
-  lines.push("");
 
-  // ── Secondary commands ──
-  lines.push(bold("MORE COMMANDS"));
-  const orchestrationItems = [
-    ["plan [dir]", "Analyze codebase and generate PRD proposals (--guided, --accept)"],
-    ["status [dir]", "Show PRD status (--format=json, --since, --until)"],
-    ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only, --no-build)"],
-    ["usage [dir]", "Token usage analytics (--format=json, --group=day|week|month)"],
+  const pad = 28;
+
+  section("SETUP", [
+    ["init [dir]", "Initialize project"],
+    ["config [key] [value]", "View or edit settings"],
+  ], pad);
+
+  section("ANALYZE", [
+    ["analyze [dir]", "Run codebase analysis (--deep, --full, --lite)"],
+    ["recommend [dir]", "Show or accept recommendations (--accept, --actionable-only)"],
+  ], pad);
+
+  section("PLAN", [
+    ["plan [dir]", "Analyze and generate PRD proposals (--guided, --accept)"],
+    ['add "<desc>" [dir]', "Add items from descriptions, files, or stdin"],
+  ], pad);
+
+  section("EXECUTE", [
+    ["work [dir]", "Run next task autonomously (--task=ID, --auto, --loop)"],
+    ["self-heal [N] [dir]", "Iterative improvement loop (analyze, recommend, execute)"],
+  ], pad);
+
+  section("MANAGE", [
+    ["status [dir]", "Show PRD status tree (--format=json, --all)"],
+    ["next [dir]", "Print next actionable task"],
+    ["update <id>", "Update item status, priority, or title"],
+    ["remove <id>", "Remove an item from the PRD"],
+    ["move <id>", "Reparent an item (--parent=<id>)"],
+    ["validate [dir]", "Check PRD integrity"],
+    ["fix [dir]", "Auto-fix common PRD issues"],
+    ["health [dir]", "Show PRD health summary"],
+    ["report [dir]", "Generate JSON health report"],
+    ["verify [dir]", "Run tests for acceptance criteria"],
+    ["reshape [dir]", "LLM-powered PRD restructuring"],
+    ["reorganize [dir]", "Reorganize PRD structure"],
+    ["prune [dir]", "Remove completed subtrees"],
+    ["show <run-id>", "Show details of a hench run"],
+    ["reset [dir]", "Remove .sourcevision/ and start fresh"],
+  ], pad);
+
+  section("SERVE", [
+    ["start [dir]", "Start dashboard + MCP server (--port=N, --background)"],
+    ["dev [dir]", "Start dev server with live reload"],
+    ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only)"],
+    ["export [dir]", "Export static deployable dashboard (--deploy=github)"],
+  ], pad);
+
+  section("TRACK", [
+    ["usage [dir]", "Token usage analytics (--group=day|week|month)"],
     ["sync [dir]", "Sync local PRD with remote adapter (--push, --pull)"],
-    ["dev [dir]", "Start dev server with live reload (--port=N, --scope=<pkg>)"],
     ["ci [dir]", "Run analysis pipeline and validate PRD health"],
-    ["config [key] [value]", "View and edit settings (--json, --help)"],
-    ["export [dir]", "Export static deployable dashboard (--out-dir, --deploy=github)"],
-  ];
-  const maxOrchLen = Math.max(...orchestrationItems.map(([n]) => n.length));
-  const orchPad = Math.max(maxOrchLen + 4, 24);
-  for (const [name, desc] of orchestrationItems) {
-    const spacing = " ".repeat(Math.max(orchPad - name.length - 2, 2));
-    lines.push(`  ${cmd(name)}${spacing}${desc}`);
-  }
-  lines.push("");
-
-  // ── Tools ──
-  lines.push(bold("TOOLS") + dim(" (via orchestrator or standalone)"));
-  const toolItems = [
-    ["rex ...", "PRD management and task tracking"],
-    ["hench ...", "Autonomous agent for task execution"],
-    ["sourcevision ...", "Codebase analysis and visualization"],
-    ["sv ...", "Alias for sourcevision"],
-  ];
-  for (const [name, desc] of toolItems) {
-    const spacing = " ".repeat(Math.max(orchPad - name.length - 2, 2));
-    lines.push(`  ${cmd(name)}${spacing}${desc}`);
-  }
-  lines.push("");
+  ], pad);
 
   // ── Options ──
   lines.push(bold("OPTIONS"));
-  lines.push(`  ${formatFlag("--quiet, -q")}           Suppress informational output (for scripting)`);
+  lines.push(`  ${formatFlag("--quiet, -q")}           Suppress informational output`);
   lines.push("");
 
   // ── Usage ──
@@ -1042,10 +1321,10 @@ export function formatMainHelp() {
   lines.push(`  ${cmd("n-dx")} ${dim("<command>")} ${dim("[args...]")}`);
   lines.push("");
 
-  // ── Footer hints ──
+  // ── Footer ──
   lines.push(dim("Run 'ndx <command> --help' for detailed help on any command."));
   lines.push(dim("Run 'ndx help <keyword>' to search all commands by keyword."));
-  lines.push(dim("Standalone binaries (rex, hench, sourcevision, sv) are also available after install."));
+  lines.push(dim("Run 'ndx <tool> <command>' for direct tool access (rex, sourcevision, hench)."));
 
   return lines.join("\n");
 }

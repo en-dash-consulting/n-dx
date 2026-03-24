@@ -125,6 +125,25 @@ try {
       usage();
       break;
     default: {
+      // Check if the user tried an ndx-only orchestration command
+      const NDX_ONLY_COMMANDS: Record<string, string> = {
+        plan: "ndx plan",
+        work: "ndx work",
+        "self-heal": "ndx self-heal",
+        start: "ndx start",
+        init: "ndx init",
+        ci: "ndx ci",
+        dev: "ndx dev",
+        refresh: "ndx refresh",
+        export: "ndx export",
+        config: "ndx config",
+      };
+      if (command && command in NDX_ONLY_COMMANDS) {
+        throw new CLIError(
+          `"${command}" is an orchestrator command. Run: ${NDX_ONLY_COMMANDS[command]} .`,
+        );
+      }
+
       const SV_COMMANDS = ["init", "analyze", "serve", "validate", "reset", "export-pdf", "pr-markdown", "git-credential-helper", "mcp", "workspace"];
       const typoHint = formatTypoSuggestion(command, SV_COMMANDS, "sourcevision ");
       throw new CLIError(

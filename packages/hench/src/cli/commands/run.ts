@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
+import type { RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { loadConfig, listRuns } from "../../store/index.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
@@ -407,6 +408,114 @@ async function selectTask(
 }
 
 // ---------------------------------------------------------------------------
+// Change classification
+// ---------------------------------------------------------------------------
+
+type FileCategory = "code" | "test" | "docs" | "config" | "metadata";
+
+/**
+ * Classify a file path into a category based on its extension and name.
+ */
+function classifyFile(filePath: string): FileCategory {
+  // PRD metadata files
+  if (filePath.endsWith("prd.json") || filePath.includes(".rex/")) return "metadata";
+
+  // Test files
+  if (/\.test\.[jt]sx?$/.test(filePath) || /\.spec\.[jt]sx?$/.test(filePath) ||
+      filePath.includes("__tests__/") || filePath.includes("/tests/")) return "test";
+
+  // Docs
+  if (/\.md$/i.test(filePath) || /\.mdx$/i.test(filePath) ||
+      /\.txt$/i.test(filePath) || /\.rst$/i.test(filePath)) return "docs";
+
+  // Config files
+  if (/\.json$/i.test(filePath) || /\.ya?ml$/i.test(filePath) ||
+      /\.toml$/i.test(filePath) || /\.ini$/i.test(filePath) ||
+      /\.env/i.test(filePath) || /\.config\.[jt]s$/i.test(filePath)) return "config";
+
+  // Code (everything else — .ts, .js, .tsx, .jsx, .py, .go, etc.)
+  return "code";
+}
+
+/**
+ * Extract modified file paths from tool call records and classify them.
+ */
+function classifyChangedFiles(toolCalls: ToolCallRecord[]): Map<FileCategory, string[]> {
+  const changedFiles = new Set<string>();
+
+  for (const call of toolCalls) {
+    if (call.tool === "write_file") {
+      const path = call.input.path as string | undefined;
+      if (path) changedFiles.add(path);
+    }
+    // Also detect rex status updates as metadata changes
+    if (call.tool === "rex_update" || call.tool === "rex_add") {
+      changedFiles.add("prd.json");
+    }
+  }
+
+  const classified = new Map<FileCategory, string[]>();
+  for (const file of changedFiles) {
+    const category = classifyFile(file);
+    const existing = classified.get(category) ?? [];
+    existing.push(file);
+    classified.set(category, existing);
+  }
+
+  return classified;
+}
+
+/**
+ * Detect whether any tool calls include PRD status updates (rex_update).
+ */
+function hasPrdStatusUpdate(toolCalls: ToolCallRecord[]): boolean {
+  return toolCalls.some((c) => c.tool === "rex_update" || c.tool === "rex_add");
+}
+
+/**
+ * Format a change classification summary for the run output.
+ *
+ * Examples:
+ *   "Changes: 3 files (2 code, 1 test) + PRD status update"
+ *   "Changes: PRD status update only (no code changes)"
+ *   "Changes: 1 file (1 docs)"
+ */
+function formatChangeClassification(toolCalls: ToolCallRecord[]): string {
+  const classified = classifyChangedFiles(toolCalls);
+  const prdUpdate = hasPrdStatusUpdate(toolCalls);
+
+  // Remove metadata from the classified map for display purposes
+  // (metadata = prd.json, shown separately as "PRD status update")
+  classified.delete("metadata");
+
+  const totalFiles = [...classified.values()].reduce((sum, files) => sum + files.length, 0);
+
+  if (totalFiles === 0 && prdUpdate) {
+    return "Changes: PRD status update only (no code changes)";
+  }
+
+  if (totalFiles === 0 && !prdUpdate) {
+    return "Changes: none";
+  }
+
+  // Build category breakdown
+  const categoryLabels: string[] = [];
+  const ORDER: FileCategory[] = ["code", "test", "docs", "config"];
+  for (const cat of ORDER) {
+    const files = classified.get(cat);
+    if (files && files.length > 0) {
+      categoryLabels.push(`${files.length} ${cat}`);
+    }
+  }
+
+  const fileLabel = totalFiles === 1 ? "file" : "files";
+  const breakdown = categoryLabels.join(", ");
+  const prdSuffix = prdUpdate ? " + PRD status update" : "";
+
+  return `Changes: ${totalFiles} ${fileLabel} (${breakdown})${prdSuffix}`;
+}
+
+// ---------------------------------------------------------------------------
 // Single task execution
 // ---------------------------------------------------------------------------
 
@@ -423,10 +532,14 @@ async function runOne(
   review: boolean,
   excludeTaskIds?: Set<string>,
   epicId?: string,
+  runHistory?: RunRecord[],
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
   await assertSchemaCompatibility(store);
+
+  // Load run history for prior attempt display if not provided
+  const runs = runHistory ?? await listRuns(henchDir);
 
   // Apply CLI token budget override to config for CLI provider
   const effectiveConfig = tokenBudget != null
@@ -445,6 +558,7 @@ async function runOne(
         review,
         excludeTaskIds,
         epicId,
+        runHistory: runs,
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -459,6 +573,7 @@ async function runOne(
         review,
         excludeTaskIds,
         epicId,
+        runHistory: runs,
       });
 
   const { run } = result;
@@ -498,6 +613,9 @@ async function runOne(
       : "full suite";
     info(`Post-task tests: ${postTests.passed ? "passed" : "FAILED"} (${scope}, ${postTests.durationMs ?? 0}ms)`);
   }
+
+  // Change classification
+  info(formatChangeClassification(run.toolCalls));
 
   if (run.summary) {
     info(`\nSummary: ${run.summary}`);

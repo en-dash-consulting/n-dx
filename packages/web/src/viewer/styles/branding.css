@@ -97,18 +97,9 @@
 .branded-header-hench { color: var(--brand-orange); }
 .branded-header-hench .branded-header-logo { color: var(--brand-orange); }
 
-/* View page titles that follow a branded header */
+/* View headers are replaced by the breadcrumb — hide entirely */
 .view-header {
-  margin-bottom: var(--space-6);
-}
-
-.view-header .branded-header {
-  margin-bottom: var(--space-1);
-}
-
-/* When .section-header is inside .view-header, suppress its own bottom margin */
-.view-header .section-header {
-  margin-bottom: 0;
+  display: none;
 }
 
 .view-title {
