@@ -27,12 +27,14 @@ export default defineConfig({
         {
           text: "Guide",
           items: [
+            { text: "Quickstart", link: "/guide/quickstart" },
             { text: "Getting Started", link: "/guide/getting-started" },
             { text: "Workflow", link: "/guide/workflow" },
             { text: "Commands", link: "/guide/commands" },
             { text: "Configuration", link: "/guide/configuration" },
             { text: "MCP Integration", link: "/guide/mcp" },
             { text: "Self-Heal Loop", link: "/guide/self-heal" },
+            { text: "Troubleshooting", link: "/guide/troubleshooting" },
           ],
         },
       ],

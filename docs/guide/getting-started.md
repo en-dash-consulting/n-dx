@@ -15,7 +15,7 @@ pnpm install && pnpm build
 npm link
 ```
 
-After installing, `ndx`, `n-dx`, `rex`, `hench`, `sourcevision`, and `sv` are all available as commands.
+After installing, `ndx` (or `n-dx`) is available as the primary command. See the [Quickstart](./quickstart) for a 5-minute walkthrough.
 
 ## Initialize a Project
 
