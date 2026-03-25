@@ -14,23 +14,41 @@ Submit feedback about n-dx — bug reports, feature requests, suggestions, or ge
    - **Feature request** — new capability or workflow improvement
    - **Improvement** — enhancement to existing functionality
    - **Question** — confusion about how something works (may indicate a docs gap)
-3. Draft a GitHub issue with:
+3. Gather context automatically (see below)
+4. Ask the user: "Would you like to include project context (languages, file count, zone structure)? No code or sensitive data is shared." If yes, include the project profile.
+5. Draft a GitHub issue with:
    - Clear title (concise, actionable)
    - Description with context (what happened, what was expected, steps to reproduce for bugs)
    - Relevant labels: `bug`, `enhancement`, `question`, or `documentation`
-   - For bugs: include n-dx version, Node version, OS if relevant
-4. Present the draft to the user for review before submitting
-5. Create the issue using `gh issue create` on `en-dash-consulting/n-dx`
-6. If `gh` is not available or auth fails, provide the formatted issue content for manual submission
+   - Environment and optional project profile sections
+6. Present the draft to the user for review before submitting
+7. Create the issue using `gh issue create` on `en-dash-consulting/n-dx`
+8. If `gh` is not available or auth fails, provide the formatted issue content for manual submission
 
 ## Context gathering
 
-When creating a bug report, automatically include:
+**Always included (automatic):**
 - n-dx version from `package.json` or `ndx --version`
 - Node.js version
 - OS platform
-- Relevant config (sanitized — no API keys)
+- LLM provider (claude/codex) and mode (api/cli)
 - Recent error output if available from conversation context
+
+**Opt-in project profile** (only with user consent, never includes code):
+- Call `get_overview` (sourcevision MCP) to get:
+  - Primary languages and file count
+  - Number of architectural zones
+  - Analysis freshness (last run date)
+- Call `get_prd_status` (rex MCP) to get:
+  - Total PRD items and completion percentage
+  - Number of epics
+- This helps the n-dx team understand what kinds of projects hit which issues
+
+**Never included:**
+- Source code, file contents, or file paths
+- API keys, tokens, or credentials
+- Git history or commit messages
+- PRD item titles or descriptions
 
 ## Labels
 
@@ -44,22 +62,32 @@ When creating a bug report, automatically include:
 
 ## Example
 
-User: "ndx init keeps asking me for the provider even though I already configured it"
+User: "ndx analyze takes forever on my monorepo"
 
+→ Asks: "Would you like to include project context (languages, file count, zone structure)?"
+→ User: "sure"
 → Creates issue:
+
 ```
-Title: ndx init prompts for provider when config already exists
-Labels: bug, ux
-Body:
+Title: ndx analyze performance on large monorepos
+Labels: enhancement, ux
+
 ## Description
-Running `ndx init .` on an already-initialized project still prompts for
-LLM provider selection, even though `.n-dx.json` already has `llm.vendor` set.
+`ndx analyze` takes an unreasonably long time on a large monorepo.
 
 ## Expected behavior
-Init should detect existing config and skip the provider prompt.
+Analysis should complete in a reasonable time or provide progress feedback.
 
 ## Environment
 - n-dx: 0.1.8
 - Node: v20.19.2
 - OS: macOS 14.6
+- Provider: claude (api mode)
+
+## Project profile (opt-in)
+- Languages: TypeScript (68%), JavaScript (22%), CSS (10%)
+- Files: 1,247
+- Zones: 14
+- PRD: 340 items (72% complete, 8 epics)
+- Last analysis: 2 days ago
 ```
