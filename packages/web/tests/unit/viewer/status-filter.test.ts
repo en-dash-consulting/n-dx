@@ -109,8 +109,8 @@ describe("activePresetKey", () => {
     ).toBeNull();
   });
 
-  it("returns 'active' for default filter (Active Work set)", () => {
-    expect(activePresetKey(defaultStatusFilter())).toBe("active");
+  it("returns 'all' for default filter (all statuses)", () => {
+    expect(activePresetKey(defaultStatusFilter())).toBe("all");
   });
 
   it("returns null for empty set", () => {

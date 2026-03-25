@@ -305,15 +305,14 @@ describe("PRDTree", () => {
     expect(root.textContent).toContain("Build login form");
   });
 
-  it("uses default Active Work filter when activeStatuses prop is omitted", () => {
+  it("shows all items by default when activeStatuses prop is omitted", () => {
     const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
-    // Completed items should be hidden by the default Active Work filter
-    expect(root.textContent).not.toContain("Build login form");
-    // In-progress items should be visible
+    // Default filter shows everything — completed items are visible
+    expect(root.textContent).toContain("Build login form");
     expect(root.textContent).toContain("Add OAuth support");
   });
 
-  it("hides deleted items by default", () => {
+  it("shows deleted items with default all-statuses filter", () => {
     const docWithDeleted: PRDDocumentData = {
       schema: "rex/v1",
       title: "Test",
@@ -334,8 +333,8 @@ describe("PRDTree", () => {
     };
     const root = renderToDiv(h(PRDTree, { document: docWithDeleted }));
     expect(root.textContent).toContain("Active Task");
-    // Deleted items should be hidden by default (defaultStatusFilter is Active Work set)
-    expect(root.textContent).not.toContain("Deleted Task");
+    // Default filter is all statuses — deleted items are visible
+    expect(root.textContent).toContain("Deleted Task");
   });
 
   it("shows parent epic when it has visible children even if epic status is filtered", () => {

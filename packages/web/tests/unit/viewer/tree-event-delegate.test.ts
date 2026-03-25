@@ -203,15 +203,15 @@ describe("Tree event delegation", () => {
       }));
       const rows = root.querySelectorAll("[data-node-id]");
       for (const row of rows) {
-        // Edit and Status should always be present
-        expect(row.querySelector(".prd-node-action-edit")).not.toBeNull();
+        // Status and Delete should be present (Edit removed — detail panel handles it)
         expect(row.querySelector(".prd-node-action-status")).not.toBeNull();
-        // Delete is present when onRemoveItem is provided
         expect(row.querySelector(".prd-node-action-delete")).not.toBeNull();
+        // Checkbox should be present
+        expect(row.querySelector("[data-bulk-check]")).not.toBeNull();
       }
     });
 
-    it("renders Edit action on the edit button that selects the item", () => {
+    it("row click selects item for detail panel", () => {
       const onSelect = vi.fn();
       const root = renderToDiv(h(PRDTree, {
         document: sampleDoc,
@@ -219,9 +219,10 @@ describe("Tree event delegation", () => {
         onSelectItem: onSelect,
       }));
       const epic1 = root.querySelector('[data-node-id="epic-1"]') as HTMLElement;
-      const editBtn = epic1.querySelector(".prd-node-action-edit") as HTMLElement;
-      expect(editBtn).not.toBeNull();
-      editBtn.click();
+      // Click the row title area (not an action button)
+      const title = epic1.querySelector(".prd-node-title") as HTMLElement;
+      expect(title).not.toBeNull();
+      title.click();
       expect(onSelect).toHaveBeenCalledOnce();
       expect(onSelect.mock.calls[0][0].id).toBe("epic-1");
     });
