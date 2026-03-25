@@ -1,4 +1,5 @@
 export { analyzeInventory, detectLanguage, classifyRole, deriveCategory, isBinary, loadIgnoreFilter, IgnoreFilter } from "./inventory.js";
+export type { InventoryOptions, InventoryResult, InventoryStats } from "./inventory.js";
 export { analyzeImports, extractImports, extractPackageName } from "./imports.js";
 export {
   readManifest,
