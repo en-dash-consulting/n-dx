@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Common issues and how to fix them.
+Common issues and how to fix them. If your issue isn't listed here, use `/ndx-feedback` in Claude Code to report it — it'll file a GitHub issue with your environment details automatically.
 
 ## "Unknown command" when running rex/sourcevision/hench commands
 

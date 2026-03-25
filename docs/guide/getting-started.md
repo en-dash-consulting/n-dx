@@ -72,3 +72,13 @@ ndx status .
 ```
 
 That's it. See the [Workflow](./workflow) page for the full development loop, or [Commands](./commands) for the complete reference.
+
+## Feedback
+
+Found a bug or have a feature idea? Use the `/ndx-feedback` skill in Claude Code to submit it directly:
+
+```
+/ndx-feedback ndx init keeps prompting for provider even though it's already configured
+```
+
+This creates a GitHub issue with your environment details automatically included.

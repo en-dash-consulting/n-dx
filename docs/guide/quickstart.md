@@ -67,5 +67,6 @@ Opens a web dashboard at `http://localhost:3117` with interactive views of your 
 - **Add your own ideas**: `ndx add "Add SSO support with Google" .`
 - **Run multiple tasks**: `ndx work --auto --iterations=4 .`
 - **Self-healing loop**: `ndx self-heal 3 .` (analyze → recommend → work, repeated)
+- **Submit feedback**: `/ndx-feedback "description"` — files a GitHub issue with context
 - **Full command reference**: [Commands](./commands)
 - **Workflow guide**: [Workflow](./workflow)
