@@ -13,6 +13,7 @@ import type {
 } from "../schema/index.js";
 import { buildClassificationMap } from "./classify.js";
 import { deriveNextSteps } from "./next-steps.js";
+import { computeZoneAggregates, RISK_THRESHOLDS } from "./risk-scoring.js";
 
 export function generateContext(
   manifest: Manifest,
@@ -49,7 +50,14 @@ export function generateContext(
   lines.push(`Languages: ${topLangs}`);
 
   const describedZones = zones.zones.filter((z) => z.description).length;
+  const agg = computeZoneAggregates(zones.zones);
   lines.push(`Zones: ${zones.zones.length}, Described: ${describedZones}`);
+  if (agg.includedZoneCount > 0) {
+    lines.push(`Weighted avg cohesion: ${agg.weightedCohesion.toFixed(2)}, coupling: ${agg.weightedCoupling.toFixed(2)} (${agg.includedZoneCount} zones with ≥${RISK_THRESHOLDS.minZoneSize} files)`);
+  }
+  if (agg.excludedZoneCount > 0) {
+    lines.push(`Small zones excluded from averages: ${agg.excludedZoneCount} (<${RISK_THRESHOLDS.minZoneSize} files, unreliable metrics)`);
+  }
   lines.push(`Import edges: ${imports.summary.totalEdges}, External packages: ${imports.summary.totalExternal}`);
   if (imports.summary.circularCount > 0) {
     lines.push(`Circulars: ${imports.summary.circularCount}`);

@@ -9220,7 +9220,7 @@
             {
               "id": "6eca4ae5-048e-4b5d-a314-94a1bf133092",
               "title": "Exclude sub-threshold zones from aggregate cohesion",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Zones with fewer than 5 files already get a note that their metrics are unreliable. Exclude these zones from project-wide aggregate metrics (both weighted and unweighted averages). Report them in a separate \"small zones\" section so they're visible but don't skew the overall picture.",
               "acceptanceCriteria": [
@@ -9234,7 +9234,11 @@
                 "metrics",
                 "cohesion"
               ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24"
+              "source": "User feedback: react-big-schedule project, 2026-03-24",
+              "startedAt": "2026-03-25T05:24:16.870Z",
+              "completedAt": "2026-03-25T05:29:14.051Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added computeZoneAggregates() in risk-scoring.ts that computes weighted cohesion/coupling excluding zones below minZoneSize (5). Used in CONTEXT.md, llms.txt, and PDF report generators. Small zone count reported separately."
             },
             {
               "id": "f955d746-8b7d-42ae-b5f4-0c2462334591",
@@ -19120,6 +19124,8 @@
       "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
+      "startedAt": "2026-03-25T05:23:45.822Z",
+      "completedAt": "2026-03-25T05:23:45.822Z",
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20458,9 +20464,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-03-25T05:23:45.822Z",
-      "completedAt": "2026-03-25T05:23:45.822Z"
+      ]
     },
     {
       "id": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
