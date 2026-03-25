@@ -456,7 +456,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
 
     const features = results.filter((r) => r.kind === "feature");
     expect(features.some((f) => f.name === "Authentication")).toBe(true);
@@ -509,7 +509,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const tasks = results.filter((r) => r.kind === "task");
 
     // anti-pattern → "Fix:", suggestion → "Implement:"
@@ -547,7 +547,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const task = results.find((r) => r.kind === "task" && r.name.includes("Duplicated validation"));
     expect(task).toBeDefined();
     // Acceptance criteria includes affected file paths
@@ -572,7 +572,7 @@ describe("scanSourceVision", () => {
       ]),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
 
     const features = results.filter((r) => r.kind === "feature");
     expect(features.some((f) => f.name === "Authentication")).toBe(true);
@@ -596,7 +596,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const epics = results.filter((r) => r.kind === "epic");
     expect(epics.some((e) => e.name === "Components")).toBe(true);
     expect(epics.some((e) => e.name === "Services")).toBe(true);
@@ -619,7 +619,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const epics = results.filter((r) => r.kind === "epic");
     expect(epics.some((e) => e.name === "Components")).toBe(true);
     expect(epics.some((e) => e.name === "Services")).toBe(true);
@@ -645,7 +645,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const circulars = results.filter((r) => r.name.startsWith("Resolve circular"));
     expect(circulars.length).toBe(1);
     expect(circulars[0].name).toContain("src/moduleA.ts");
@@ -667,7 +667,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const circulars = results.filter((r) => r.name.startsWith("Resolve circular"));
     expect(circulars.length).toBe(1);
     expect(circulars[0].name).toContain("moduleA");
@@ -684,14 +684,14 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const circulars = results.filter((r) => r.name.startsWith("Resolve circular"));
     expect(circulars.length).toBe(1);
     expect(circulars[0].name).toContain("A");
   });
 
   it("returns empty when no .sourcevision directory", async () => {
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     expect(results).toEqual([]);
   });
 
@@ -715,7 +715,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results.some((r) => r.name === "Core")).toBe(true);
   });
@@ -752,7 +752,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const tasks = results.filter((r) => r.kind === "task");
 
     // Only anti-patterns and suggestions with warning/critical severity become tasks
@@ -797,7 +797,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const task = results.find((r) => r.kind === "task" && r.name.includes("Bidirectional"));
     expect(task).toBeDefined();
     expect(task!.acceptanceCriteria).toBeDefined();
@@ -834,7 +834,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const task = results.find((r) => r.kind === "task" && r.name.includes("validation middleware"));
     expect(task).toBeDefined();
     // Should include entry points
@@ -870,7 +870,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const task = results.find((r) => r.kind === "task" && r.name.includes("Low coupling"));
     expect(task).toBeDefined();
     // Should include zone metrics
@@ -906,7 +906,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const task = results.find((r) => r.kind === "task" && r.name.includes("Duplicated"));
     expect(task).toBeDefined();
     // Should suggest extracting to utility
@@ -942,7 +942,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const task = results.find((r) => r.kind === "task" && r.name.includes("God module"));
     expect(task).toBeDefined();
     // Should suggest splitting
@@ -980,7 +980,7 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const task = results.find((r) => r.kind === "task" && r.name.includes("documentation"));
     expect(task).toBeDefined();
     // Should include zone files since no explicit related files
@@ -1008,13 +1008,100 @@ describe("scanSourceVision", () => {
       }),
     );
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const circular = results.find((r) => r.name.startsWith("Resolve circular"));
     expect(circular).toBeDefined();
     // Should include fix suggestions for circular deps
     expect(circular!.acceptanceCriteria!.some((c: string) => c.includes("Suggested fixes:"))).toBe(true);
     expect(circular!.acceptanceCriteria!.some((c: string) => c.toLowerCase().includes("extract") || c.toLowerCase().includes("common"))).toBe(true);
     expect(circular!.acceptanceCriteria!.some((c: string) => c.toLowerCase().includes("dependency injection") || c.toLowerCase().includes("invert"))).toBe(true);
+  });
+
+  it("skips stale findings whose related files no longer exist", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+
+    // Inventory knows about src/core.ts but NOT src/deleted.ts
+    await writeFile(
+      join(tempDir, ".sourcevision", "inventory.json"),
+      JSON.stringify({
+        files: [
+          { path: "src/core.ts", category: "source", role: "source" },
+        ],
+      }),
+    );
+
+    await writeFile(
+      join(tempDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        zones: [{ id: "core", name: "Core", description: "Core", files: ["src/core.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 }],
+        findings: [
+          // This finding references a file that still exists — should be kept
+          { type: "anti-pattern", pass: 1, scope: "core", text: "Issue in core", severity: "warning", related: ["src/core.ts"] },
+          // This finding references only deleted files — should be stale
+          { type: "anti-pattern", pass: 1, scope: "core", text: "Issue in deleted module", severity: "warning", related: ["src/deleted.ts"] },
+        ],
+      }),
+    );
+
+    const { results, staleCount } = await scanSourceVision(tempDir);
+    const tasks = results.filter((r) => r.kind === "task");
+
+    expect(tasks.length).toBe(1);
+    expect(tasks[0].name).toContain("Issue in core");
+    expect(staleCount).toBe(1);
+  });
+
+  it("skips stale move-file findings when source file is gone", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+
+    await writeFile(
+      join(tempDir, ".sourcevision", "inventory.json"),
+      JSON.stringify({
+        files: [
+          { path: "src/existing.ts", category: "source", role: "source" },
+        ],
+      }),
+    );
+
+    await writeFile(
+      join(tempDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        zones: [{ id: "core", name: "Core", description: "Core", files: ["src/existing.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 }],
+        findings: [
+          { type: "move-file", pass: 0, scope: "core", text: "Move deleted.ts to lib/", severity: "info", from: "src/deleted.ts", to: "lib/deleted.ts" },
+          { type: "move-file", pass: 0, scope: "core", text: "Move existing.ts to lib/", severity: "info", from: "src/existing.ts", to: "lib/existing.ts" },
+        ],
+      }),
+    );
+
+    const { results, staleCount } = await scanSourceVision(tempDir);
+    const tasks = results.filter((r) => r.kind === "task");
+
+    expect(tasks.length).toBe(1);
+    expect(tasks[0].name).toContain("existing.ts");
+    expect(staleCount).toBe(1);
+  });
+
+  it("does not mark findings as stale when inventory is missing", async () => {
+    await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+    // No inventory.json — staleness check should be skipped
+
+    await writeFile(
+      join(tempDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        zones: [{ id: "core", name: "Core", description: "Core", files: ["src/core.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 }],
+        findings: [
+          { type: "anti-pattern", pass: 1, scope: "core", text: "Some issue", severity: "warning", related: ["src/nonexistent.ts"] },
+        ],
+      }),
+    );
+
+    const { results, staleCount } = await scanSourceVision(tempDir);
+    const tasks = results.filter((r) => r.kind === "task");
+
+    // Without inventory, no staleness check — finding should pass through
+    expect(tasks.length).toBe(1);
+    expect(staleCount).toBe(0);
   });
 });
 
