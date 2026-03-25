@@ -89,6 +89,10 @@ export interface ZoneAggregateMetrics {
   weightedCohesion: number;
   /** Weighted average coupling (by file count), excluding small zones */
   weightedCoupling: number;
+  /** Unweighted average cohesion (all included zones count equally) */
+  unweightedCohesion: number;
+  /** Unweighted average coupling (all included zones count equally) */
+  unweightedCoupling: number;
   /** Number of zones included in the averages */
   includedZoneCount: number;
   /** Number of zones excluded (below minZoneSize threshold) */
@@ -107,6 +111,8 @@ export function computeZoneAggregates(
   let totalFiles = 0;
   let weightedCohesion = 0;
   let weightedCoupling = 0;
+  let sumCohesion = 0;
+  let sumCoupling = 0;
   let includedCount = 0;
   let excludedCount = 0;
 
@@ -119,12 +125,16 @@ export function computeZoneAggregates(
     totalFiles += fileCount;
     weightedCohesion += z.cohesion * fileCount;
     weightedCoupling += z.coupling * fileCount;
+    sumCohesion += z.cohesion;
+    sumCoupling += z.coupling;
     includedCount++;
   }
 
   return {
     weightedCohesion: totalFiles > 0 ? Math.round((weightedCohesion / totalFiles) * 100) / 100 : 0,
     weightedCoupling: totalFiles > 0 ? Math.round((weightedCoupling / totalFiles) * 100) / 100 : 0,
+    unweightedCohesion: includedCount > 0 ? Math.round((sumCohesion / includedCount) * 100) / 100 : 0,
+    unweightedCoupling: includedCount > 0 ? Math.round((sumCoupling / includedCount) * 100) / 100 : 0,
     includedZoneCount: includedCount,
     excludedZoneCount: excludedCount,
   };

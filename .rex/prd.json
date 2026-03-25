@@ -9201,7 +9201,7 @@
             {
               "id": "eb1c87e3-c884-41c2-84a3-4059de4cf40c",
               "title": "Weighted cohesion metric by zone file count",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Compute project-wide average cohesion as a weighted average where each zone's contribution is proportional to its file count. A 51-file zone at 0.93 cohesion should matter far more than a 3-file zone at 0.00. Report both weighted and unweighted averages for transparency.",
               "acceptanceCriteria": [
@@ -9215,7 +9215,11 @@
                 "metrics",
                 "cohesion"
               ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24"
+              "source": "User feedback: react-big-schedule project, 2026-03-24",
+              "startedAt": "2026-03-25T05:29:46.760Z",
+              "completedAt": "2026-03-25T05:31:08.410Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added unweighted cohesion/coupling to ZoneAggregateMetrics alongside existing weighted averages. CONTEXT.md now reports both. The weighted metric (computed by file count) was already in place from the sub-threshold exclusion task."
             },
             {
               "id": "6eca4ae5-048e-4b5d-a314-94a1bf133092",

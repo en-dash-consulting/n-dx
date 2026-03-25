@@ -54,6 +54,7 @@ export function generateContext(
   lines.push(`Zones: ${zones.zones.length}, Described: ${describedZones}`);
   if (agg.includedZoneCount > 0) {
     lines.push(`Weighted avg cohesion: ${agg.weightedCohesion.toFixed(2)}, coupling: ${agg.weightedCoupling.toFixed(2)} (${agg.includedZoneCount} zones with ≥${RISK_THRESHOLDS.minZoneSize} files)`);
+    lines.push(`Unweighted avg cohesion: ${agg.unweightedCohesion.toFixed(2)}, coupling: ${agg.unweightedCoupling.toFixed(2)}`);
   }
   if (agg.excludedZoneCount > 0) {
     lines.push(`Small zones excluded from averages: ${agg.excludedZoneCount} (<${RISK_THRESHOLDS.minZoneSize} files, unreliable metrics)`);

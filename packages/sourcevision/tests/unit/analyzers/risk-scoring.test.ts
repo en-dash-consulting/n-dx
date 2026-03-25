@@ -365,6 +365,10 @@ describe("computeZoneAggregates", () => {
     expect(result.weightedCohesion).toBe(0.7);
     // Weighted: (0.1*10 + 0.4*20) / 30 = (1 + 8) / 30 = 0.3
     expect(result.weightedCoupling).toBe(0.3);
+    // Unweighted: (0.9 + 0.6) / 2 = 0.75
+    expect(result.unweightedCohesion).toBe(0.75);
+    // Unweighted: (0.1 + 0.4) / 2 = 0.25
+    expect(result.unweightedCoupling).toBe(0.25);
   });
 
   it("returns zeros when all zones are below threshold", () => {
