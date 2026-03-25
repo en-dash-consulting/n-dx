@@ -26,6 +26,12 @@ const PACKAGES = {
  */
 const PROJECT_SECTIONS = new Set(["claude", "llm", "web", "features"]);
 
+/**
+ * Valid values for the top-level `language` field in .n-dx.json.
+ * "auto" (or omitting the field) triggers marker-based detection.
+ */
+const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "auto"]);
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function fileExists(path) {
@@ -593,6 +599,13 @@ Feature toggles (.n-dx.json — managed via web UI or ndx config):
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
 
+Language detection override (.n-dx.json):
+  language                 string    Primary project language (default: "auto")
+                                    Valid values: typescript, javascript, go, auto
+                                    When set to a specific language, overrides
+                                    marker-based auto-detection in sourcevision.
+                                    Use "auto" (or omit) to use the detection chain.
+
 Project config (.n-dx.json):
   Place a .n-dx.json file at the project root to override package settings.
   Uses the same package-scoped keys (rex, hench, web, claude, llm). Project config
@@ -648,6 +661,8 @@ Examples:
                                                Set Codex CLI path
   n-dx config features.rex.showTokenBudget true
                                                Enable token budget display on tasks
+  n-dx config language go                      Set primary project language to Go
+  n-dx config language auto                    Reset to auto-detection
   n-dx config --test-connection                Test API key and/or CLI path
   n-dx config --json                           Show all settings as JSON
   n-dx config hench --json                     Show hench settings as JSON
@@ -731,6 +746,11 @@ async function loadAllConfigs(dir) {
     if (projectConfig[section] && typeof projectConfig[section] === "object") {
       configs[section] = projectConfig[section];
     }
+  }
+
+  // Expose the top-level language field (scalar, not a section object)
+  if (typeof projectConfig.language === "string") {
+    configs.language = projectConfig.language;
   }
 
   return { configs, rawConfigs };
@@ -926,6 +946,17 @@ async function handleSetPackageConfig(dir, pkg, settingPath, keyArg, valueArg, c
 
 /** Handle GET mode: retrieve and display a single key or whole section. */
 function handleGet(keyArg, configs, flags) {
+  // Special handling for top-level language key
+  if (keyArg === "language") {
+    const value = configs.language || "auto";
+    if (flags.json) {
+      console.log(JSON.stringify(value));
+    } else {
+      console.log(value);
+    }
+    return;
+  }
+
   const dotIdx = keyArg.indexOf(".");
   if (dotIdx === -1) {
     // Show whole package/section config
@@ -986,6 +1017,9 @@ function handleShowAll(configs, flags) {
   for (const [pkg, config] of Object.entries(configs)) {
     if (config._error) {
       console.log(`\n  ${pkg} (error: ${config._error})`);
+    } else if (typeof config === "string") {
+      // Scalar top-level keys (e.g. language)
+      console.log(`\n  ${pkg}  ${config}`);
     } else {
       printSection(pkg, config);
     }
@@ -1008,6 +1042,7 @@ export async function runConfig(args) {
 
   const keyTargetsProjectSection = (() => {
     if (!keyArg) return false;
+    if (keyArg === "language") return true;
     const dotIdx = keyArg.indexOf(".");
     if (dotIdx === -1) return PROJECT_SECTIONS.has(keyArg);
     return PROJECT_SECTIONS.has(keyArg.slice(0, dotIdx));
@@ -1026,6 +1061,22 @@ export async function runConfig(args) {
 
   // SET mode: key + value
   if (keyArg && valueArg !== undefined) {
+    // Special handling for top-level language key (no dot notation needed)
+    if (keyArg === "language") {
+      if (!VALID_LANGUAGES.has(valueArg)) {
+        console.error(
+          `Invalid language "${valueArg}". Valid values: ${[...VALID_LANGUAGES].join(", ")}`,
+        );
+        process.exit(1);
+      }
+      const configPath = join(dir, PROJECT_CONFIG_FILE);
+      const current = await loadProjectConfig(dir);
+      current.language = valueArg;
+      await saveProjectJSON(configPath, current);
+      console.log(`language = ${valueArg}`);
+      return;
+    }
+
     const dotIdx = keyArg.indexOf(".");
     if (dotIdx === -1) {
       console.error(`Invalid key "${keyArg}". Use dot notation: <package>.<setting>`);

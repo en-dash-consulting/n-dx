@@ -29,6 +29,12 @@ const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
 ]);
 
 /**
+ * Valid language identifiers accepted by the `.n-dx.json` `language` field.
+ * Includes `"auto"` which triggers marker-based detection.
+ */
+export const VALID_LANGUAGE_IDS: readonly string[] = ["typescript", "javascript", "go", "auto"] as const;
+
+/**
  * Look up a language config by id. Returns `undefined` for unknown ids.
  */
 export function getLanguageConfig(id: string): LanguageConfig | undefined {

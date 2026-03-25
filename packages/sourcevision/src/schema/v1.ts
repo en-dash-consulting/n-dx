@@ -31,6 +31,8 @@ export interface Manifest {
   children?: SubAnalysisRef[];
   /** True when this analysis is a workspace aggregation (not a single repo). */
   workspace?: boolean;
+  /** Resolved primary language after detection (e.g. "typescript", "go"). */
+  language?: string;
 }
 
 /** Reference to an incorporated sub-analysis. */

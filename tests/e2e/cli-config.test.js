@@ -1050,6 +1050,83 @@ describe("n-dx config", () => {
     });
   });
 
+  // ── Language config ────────────────────────────────────────────────────────
+
+  describe("language config", () => {
+    it("sets language to go in .n-dx.json", async () => {
+      const out = run(["language", "go", tmpDir]);
+      expect(out).toContain("language = go");
+
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.language).toBe("go");
+    });
+
+    it("sets language to typescript", async () => {
+      run(["language", "typescript", tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.language).toBe("typescript");
+    });
+
+    it("sets language to javascript", async () => {
+      run(["language", "javascript", tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.language).toBe("javascript");
+    });
+
+    it("sets language to auto", async () => {
+      // First set to go, then reset to auto
+      run(["language", "go", tmpDir]);
+      run(["language", "auto", tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.language).toBe("auto");
+    });
+
+    it("rejects invalid language values", async () => {
+      const stderr = runFail(["language", "python", tmpDir]);
+      expect(stderr).toContain('Invalid language "python"');
+      expect(stderr).toContain("typescript");
+      expect(stderr).toContain("javascript");
+      expect(stderr).toContain("go");
+      expect(stderr).toContain("auto");
+    });
+
+    it("reads language with GET mode", async () => {
+      run(["language", "go", tmpDir]);
+      const out = run(["language", tmpDir]);
+      expect(out.trim()).toBe("go");
+    });
+
+    it("returns auto as default when language not set", async () => {
+      const out = run(["language", tmpDir]);
+      expect(out.trim()).toBe("auto");
+    });
+
+    it("returns language in JSON mode", async () => {
+      run(["language", "go", tmpDir]);
+      const out = run(["language", "--json", tmpDir]);
+      expect(JSON.parse(out)).toBe("go");
+    });
+
+    it("shows language in SHOW ALL mode", async () => {
+      run(["language", "go", tmpDir]);
+      const out = run([tmpDir]);
+      expect(out).toContain("language");
+      expect(out).toContain("go");
+    });
+
+    it("preserves other config when setting language", async () => {
+      // Set some existing config first
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "claude" } }, null, 2) + "\n",
+      );
+      run(["language", "go", tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.language).toBe("go");
+      expect(config.llm.vendor).toBe("claude");
+    });
+  });
+
   // ── No config ──────────────────────────────────────────────────────────────
 
   describe("no config", () => {

@@ -17,6 +17,7 @@ import { DATA_FILES } from "../../schema/data-files.js";
 import { toCanonicalJSON } from "../../util/sort.js";
 import { analyzeInventory } from "../../analyzers/inventory.js";
 import type { InventoryResult } from "../../analyzers/inventory.js";
+import { detectLanguage } from "../../language/index.js";
 import { analyzeImports } from "../../analyzers/imports.js";
 import { analyzeClassifications, enrichClassificationsWithLLM, mergeClassificationResults } from "../../analyzers/classify.js";
 import { analyzeZones } from "../../analyzers/zones.js";
@@ -91,6 +92,12 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
       summary: ctx.inventoryResult.summary,
     }));
     updateManifestModule(ctx.absDir, "inventory", "complete");
+
+    // Record resolved language in manifest for downstream consumers
+    const langConfig = await detectLanguage(ctx.absDir);
+    const manifest = readManifest(ctx.absDir);
+    manifest.language = langConfig.id;
+    writeManifest(ctx.absDir, manifest);
 
     const stats = ctx.inventoryResult.stats;
     if (stats) {

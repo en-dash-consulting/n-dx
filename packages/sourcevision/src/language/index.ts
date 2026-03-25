@@ -12,4 +12,4 @@ export { typescriptConfig } from "./typescript.js";
 export { goConfig } from "./go.js";
 
 // Detection
-export { detectLanguage, getLanguageConfig } from "./detect.js";
+export { detectLanguage, getLanguageConfig, VALID_LANGUAGE_IDS } from "./detect.js";
