@@ -28,7 +28,7 @@ Submit feedback about n-dx — bug reports, feature requests, suggestions, or ge
 ## Context gathering
 
 **Always included (automatic):**
-- n-dx version from `package.json` or `ndx --version`
+- n-dx version from package.json or ndx --version
 - Node.js version
 - OS platform
 - LLM provider (claude/codex) and mode (api/cli)
@@ -59,35 +59,3 @@ Submit feedback about n-dx — bug reports, feature requests, suggestions, or ge
 | Improvement | `enhancement` |
 | Question / docs gap | `question` |
 | UX / ergonomics | `ux` |
-
-## Example
-
-User: "ndx analyze takes forever on my monorepo"
-
-→ Asks: "Would you like to include project context (languages, file count, zone structure)?"
-→ User: "sure"
-→ Creates issue:
-
-```
-Title: ndx analyze performance on large monorepos
-Labels: enhancement, ux
-
-## Description
-`ndx analyze` takes an unreasonably long time on a large monorepo.
-
-## Expected behavior
-Analysis should complete in a reasonable time or provide progress feedback.
-
-## Environment
-- n-dx: 0.1.8
-- Node: v20.19.2
-- OS: macOS 14.6
-- Provider: claude (api mode)
-
-## Project profile (opt-in)
-- Languages: TypeScript (68%), JavaScript (22%), CSS (10%)
-- Files: 1,247
-- Zones: 14
-- PRD: 340 items (72% complete, 8 epics)
-- Last analysis: 2 days ago
-```
