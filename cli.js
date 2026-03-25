@@ -478,6 +478,25 @@ async function signalLiveReload(dir) {
 
 // ── Command handlers ─────────────────────────────────────────────────────────
 
+/**
+ * Run a sub-package init command, capturing output instead of streaming it.
+ * Returns { code, stdout, stderr }.
+ */
+function runInitCapture(toolPath, args) {
+  return new Promise((resolve) => {
+    const child = spawn("node", [toolPath, ...args], {
+      cwd: process.cwd(),
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, FORCE_COLOR: "0" },
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => { stdout += d; });
+    child.stderr.on("data", (d) => { stderr += d; });
+    child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
+  });
+}
+
 async function handleInit(rest) {
   const providerFromFlag = extractInitProvider(rest);
   if (providerFromFlag !== undefined && !SUPPORTED_PROVIDERS.includes(providerFromFlag)) {
@@ -490,32 +509,72 @@ async function handleInit(rest) {
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
 
-  if (shouldShowInitBanner(providerFromFlag)) {
+  // Check for existing provider config before prompting
+  const existingVendor = readLLMVendor(dir);
+  let selectedProvider;
+  let providerSource;
+
+  if (providerFromFlag) {
+    selectedProvider = providerFromFlag;
+    providerSource = "from --provider flag";
+  } else if (existingVendor) {
+    selectedProvider = existingVendor;
+    providerSource = "from existing config";
+  } else {
+    // First run — show banner and prompt
     showInitBanner();
+    selectedProvider = await promptInitProvider();
+    providerSource = "selected";
   }
 
-  const selectedProvider = providerFromFlag ?? await promptInitProvider();
   if (!selectedProvider) {
     console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
     process.exit(1);
   }
 
-  await runOrDie(tools.sourcevision, ["init", ...flags, dir]);
-  await runOrDie(tools.rex, ["init", ...flags, dir]);
-  await runOrDie(tools.hench, ["init", ...flags, dir]);
-  await runConfig(["llm.vendor", selectedProvider, dir]);
+  // Check pre-existing state for status reporting
+  const svExists = existsSync(join(dir, ".sourcevision"));
+  const rexExists = existsSync(join(dir, ".rex"));
+  const henchExists = existsSync(join(dir, ".hench"));
 
-  // Claude Code integration (settings, skills, MCP servers)
+  // Run sub-inits with captured output
+  const svResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+  const rexResult = await runInitCapture(tools.rex, ["init", ...flags, dir]);
+  const henchResult = await runInitCapture(tools.hench, ["init", ...flags, dir]);
+
+  // Check for failures
+  if (svResult.code !== 0 || rexResult.code !== 0 || henchResult.code !== 0) {
+    if (svResult.code !== 0) console.error(svResult.stderr || svResult.stdout);
+    if (rexResult.code !== 0) console.error(rexResult.stderr || rexResult.stdout);
+    if (henchResult.code !== 0) console.error(henchResult.stderr || henchResult.stdout);
+    process.exit(1);
+  }
+
+  // Set provider (suppress output)
+  const origLog = console.log;
+  console.log = () => {};
+  try { await runConfig(["llm.vendor", selectedProvider, dir]); } finally { console.log = origLog; }
+
+  // Claude Code integration
+  let claudeSummary = "skipped";
   if (!noClaude) {
     try {
       const result = setupClaudeIntegration(dir);
-      printClaudeSetupSummary(result);
-    } catch (err) {
-      // Non-fatal — init succeeded even if Claude integration fails
-      console.log("");
-      console.log(`Claude Code integration: skipped (${err instanceof Error ? err.message : String(err)})`);
+      claudeSummary = `${result.skills.written} skills, ${result.settings.total} permissions`;
+    } catch {
+      claudeSummary = "skipped";
     }
   }
+
+  // Print unified summary
+  console.log("");
+  console.log("n-dx initialized");
+  console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
+  console.log(`  .rex/           ${rexExists ? "already exists (reused)" : "created"}`);
+  console.log(`  .hench/         ${henchExists ? "already exists (reused)" : "created"}`);
+  console.log(`  LLM provider    ${selectedProvider} (${providerSource})`);
+  console.log(`  Claude Code     ${claudeSummary}`);
+  console.log("");
 
   process.exit(0);
 }
