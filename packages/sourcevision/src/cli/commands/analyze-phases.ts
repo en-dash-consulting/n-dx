@@ -17,7 +17,7 @@ import { DATA_FILES } from "../../schema/data-files.js";
 import { toCanonicalJSON } from "../../util/sort.js";
 import { analyzeInventory } from "../../analyzers/inventory.js";
 import type { InventoryResult } from "../../analyzers/inventory.js";
-import { detectLanguage } from "../../language/index.js";
+import { detectLanguages, mergeLanguageConfigs } from "../../language/index.js";
 import { analyzeImports } from "../../analyzers/imports.js";
 import { analyzeClassifications, enrichClassificationsWithLLM, mergeClassificationResults } from "../../analyzers/classify.js";
 import { analyzeZones } from "../../analyzers/zones.js";
@@ -80,9 +80,16 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
   try {
     const previousInventory = loadPreviousData(join(ctx.svDir, DATA_FILES.inventory));
 
+    // Detect all languages and merge into a unified config for skip dirs, etc.
+    const langConfigs = await detectLanguages(ctx.absDir);
+    const mergedConfig = mergeLanguageConfigs(langConfigs);
+
     ctx.inventoryResult = await analyzeInventory(
       ctx.absDir,
-      !ctx.fullMode && previousInventory ? { previousInventory } : undefined,
+      {
+        ...((!ctx.fullMode && previousInventory) ? { previousInventory } : {}),
+        languageConfig: mergedConfig,
+      },
     );
 
     // Serialize only { files, summary } (strip stats/changedFiles)
@@ -93,10 +100,10 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
     }));
     updateManifestModule(ctx.absDir, "inventory", "complete");
 
-    // Record resolved language in manifest for downstream consumers
-    const langConfig = await detectLanguage(ctx.absDir);
+    // Record resolved language(s) in manifest for downstream consumers
     const manifest = readManifest(ctx.absDir);
-    manifest.language = langConfig.id;
+    manifest.language = mergedConfig.id;
+    manifest.languages = langConfigs.map((c) => c.id);
     writeManifest(ctx.absDir, manifest);
 
     const stats = ctx.inventoryResult.stats;
@@ -172,9 +179,10 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
     const customArchetypes = (archetypeConfig?.custom ?? []) as import("../../schema/index.js").ArchetypeDefinition[];
     const fileOverrides = (archetypeConfig?.overrides ?? {}) as Record<string, string>;
 
-    // Read project language from manifest (written in Phase 1)
+    // Read project language(s) from manifest (written in Phase 1)
     const manifest = readManifest(ctx.absDir);
     const projectLanguage = manifest.language;
+    const projectLanguages = manifest.languages;
 
     let classifications = analyzeClassifications(inventory, importsData, {
       previousClassifications: !ctx.fullMode ? previousClassifications : undefined,
@@ -182,6 +190,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
       customArchetypes: customArchetypes.length > 0 ? customArchetypes : undefined,
       overrides: Object.keys(fileOverrides).length > 0 ? fileOverrides : undefined,
       projectLanguage,
+      projectLanguages,
     });
 
     // LLM enrichment (skip in --fast mode)

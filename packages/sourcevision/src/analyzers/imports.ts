@@ -20,7 +20,8 @@ import { detectCirculars } from "../util/merge.js";
 import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { readManifest } from "./manifest.js";
-import { getLanguageConfig, detectLanguage } from "../language/index.js";
+import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/index.js";
+import type { LanguageConfig } from "../language/index.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -351,15 +352,26 @@ export async function analyzeImports(
   const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
 
   // ── Resolve language → build parseable extension set ──────────────────────
-  let langConfig = options?.language ? getLanguageConfig(options.language) : undefined;
-  if (!langConfig) {
-    const manifest = readManifest(targetDir);
-    if (manifest.language) {
-      langConfig = getLanguageConfig(manifest.language);
+  // Use all detected languages (from manifest.languages) so mixed projects
+  // produce import edges for both Go and TypeScript files.
+  let langConfig: LanguageConfig | undefined;
+  const manifest = readManifest(targetDir);
+  if (manifest.languages && manifest.languages.length > 0) {
+    const configs = manifest.languages
+      .map((id) => getLanguageConfig(id))
+      .filter((c): c is NonNullable<typeof c> => c != null);
+    if (configs.length > 0) {
+      langConfig = mergeLanguageConfigs(configs);
     }
   }
+  if (!langConfig && options?.language) {
+    langConfig = getLanguageConfig(options.language);
+  }
+  if (!langConfig && manifest.language) {
+    langConfig = getLanguageConfig(manifest.language);
+  }
   if (!langConfig) {
-    langConfig = await detectLanguage(targetDir);
+    langConfig = mergeLanguageConfigs(await detectLanguages(targetDir));
   }
 
   // Always include JS/TS for backward compatibility; add resolved language extensions.

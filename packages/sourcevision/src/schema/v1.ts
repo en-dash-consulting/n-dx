@@ -33,6 +33,13 @@ export interface Manifest {
   workspace?: boolean;
   /** Resolved primary language after detection (e.g. "typescript", "go"). */
   language?: string;
+  /**
+   * All detected languages, ordered primary-first.
+   * In a mixed Go + TypeScript project this would be `["go", "typescript"]`
+   * or `["typescript", "go"]` depending on which has more source files.
+   * Single-language projects contain one element matching `language`.
+   */
+  languages?: string[];
 }
 
 /** Reference to an incorporated sub-analysis. */

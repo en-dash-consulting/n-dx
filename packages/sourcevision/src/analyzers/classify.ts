@@ -46,6 +46,12 @@ export interface ClassifyOptions {
   overrides?: Record<string, string>;
   /** Detected project language (e.g. "go", "typescript"). Signals with a `languages` filter only fire when the project language matches. */
   projectLanguage?: string;
+  /**
+   * All detected project languages, ordered primary-first (e.g. `["go", "typescript"]`).
+   * When provided, archetype signals with a `languages` filter fire if ANY of these
+   * languages match. Falls back to `[projectLanguage]` when omitted.
+   */
+  projectLanguages?: string[];
 }
 
 /**
@@ -103,12 +109,14 @@ export function analyzeClassifications(
       }
     }
 
-    // Classify the file
+    // Classify the file — prefer projectLanguages array over single projectLanguage
+    const effectiveLanguages = options?.projectLanguages
+      ?? (options?.projectLanguage ? [options.projectLanguage] : undefined);
     const result = classifyFile(
       file.path,
       archetypes,
       exportMap.get(file.path),
-      options?.projectLanguage,
+      effectiveLanguages,
     );
     classifications.push(result);
   }
@@ -129,7 +137,7 @@ function classifyFile(
   filePath: string,
   archetypes: ArchetypeDefinition[],
   exports?: string[],
-  projectLanguage?: string,
+  projectLanguages?: string[],
 ): FileClassification {
   const fileName = basename(filePath);
   const evidence: ClassificationEvidence[] = [];
@@ -141,9 +149,9 @@ function classifyFile(
     let archetypeScore = 0;
 
     for (const signal of archetype.signals) {
-      // Skip signals scoped to languages that don't match the project
-      if (signal.languages && signal.languages.length > 0 && projectLanguage) {
-        if (!signal.languages.includes(projectLanguage)) continue;
+      // Skip signals scoped to languages that don't match any project language
+      if (signal.languages && signal.languages.length > 0 && projectLanguages && projectLanguages.length > 0) {
+        if (!projectLanguages.some((lang) => signal.languages!.includes(lang))) continue;
       }
 
       const match = matchSignal(signal, filePath, fileName, exports);
