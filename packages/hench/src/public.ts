@@ -27,7 +27,7 @@
 
 // ---- Schema constants & config factory ------------------------------------
 
-export { HENCH_SCHEMA_VERSION, DEFAULT_HENCH_CONFIG } from "./schema/v1.js";
+export { HENCH_SCHEMA_VERSION, DEFAULT_HENCH_CONFIG, guardDefaultsForLanguage } from "./schema/v1.js";
 
 // ---- Schema types (config, run records) ------------------------------------
 
@@ -40,6 +40,7 @@ export type {
   RuntimePoolConfig,
   RetryConfig,
   Provider,
+  ProjectLanguage,
   RunRecord,
   RunStatus,
   ToolCallRecord,

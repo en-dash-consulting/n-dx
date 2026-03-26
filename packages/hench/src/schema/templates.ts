@@ -7,6 +7,7 @@
  */
 
 import type { HenchConfig } from "./v1.js";
+import { guardDefaultsForLanguage } from "./v1.js";
 
 // ── Template types ────────────────────────────────────────────────────
 
@@ -167,6 +168,22 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
         baseDelayMs: 3000,
         maxDelayMs: 30000,
       },
+    },
+    builtIn: true,
+  },
+  {
+    id: "go-project",
+    name: "Go Project",
+    description: "Tuned for Go codebases: Go toolchain commands, vendor blocking, and make support",
+    useCases: [
+      "Go module projects with go.mod",
+      "Projects using Makefiles for build orchestration",
+      "Go microservice development",
+    ],
+    tags: ["go", "golang", "make"],
+    config: {
+      language: "go",
+      guard: guardDefaultsForLanguage("go"),
     },
     builtIn: true,
   },

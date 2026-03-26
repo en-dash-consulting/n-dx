@@ -47,6 +47,8 @@ const RetryConfigSchema = z.object({
   maxDelayMs: z.number().positive(),
 });
 
+const ProjectLanguageSchema = z.enum(["typescript", "javascript", "go"]).optional();
+
 export const HenchConfigSchema = z.object({
   schema: z.string(),
   provider: z.enum(["cli", "api"]).default("cli"),
@@ -64,6 +66,7 @@ export const HenchConfigSchema = z.object({
   }),
   loopPauseMs: z.number().int().nonnegative().optional().default(2000),
   maxFailedAttempts: z.number().int().positive().optional().default(3),
+  language: ProjectLanguageSchema,
 });
 
 const RunStatusSchema = z.enum(["running", "completed", "failed", "timeout", "budget_exceeded", "error_transient"]);
