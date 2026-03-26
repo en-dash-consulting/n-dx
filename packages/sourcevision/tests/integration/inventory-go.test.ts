@@ -35,7 +35,7 @@ describe("analyzeInventory — Go fixture project", () => {
   it("classifies all _test.go files as test", async () => {
     const inv = await analyzeInventory(GO_FIXTURE, opts);
     const testFiles = inv.files.filter((f) => f.path.endsWith("_test.go"));
-    expect(testFiles.length).toBe(3); // handler, service, repository
+    expect(testFiles.length).toBe(4); // handler, service, repository, response
     for (const f of testFiles) {
       expect(f.role).toBe("test");
     }

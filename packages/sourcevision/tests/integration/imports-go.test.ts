@@ -42,8 +42,9 @@ describe("analyzeImports — Go fixture project", () => {
   });
 
   it("total internal edge count matches expected", () => {
-    // main→handler, main→config, handler→service, service→repository
-    expect(result.edges).toHaveLength(4);
+    // main→handler, main→config, handler→service, service→repository,
+    // json_test.go→pkg/response (dot import from external test package)
+    expect(result.edges).toHaveLength(5);
   });
 
   // ── Third-party external packages ──────────────────────────────────────────
@@ -60,6 +61,22 @@ describe("analyzeImports — Go fixture project", () => {
     expect(sqlx, "expected sqlx in external packages").toBeDefined();
     expect(sqlx!.importedBy).toContain("internal/repository/db.go");
     expect(sqlx!.symbols).toEqual(["*"]);
+  });
+
+  it("includes lib/pq as external third-party package (blank import)", () => {
+    const pq = result.external.find((e) => e.package === "github.com/lib/pq");
+    expect(pq, "expected lib/pq in external packages").toBeDefined();
+    expect(pq!.importedBy).toContain("internal/repository/drivers.go");
+    expect(pq!.symbols).toEqual(["*"]);
+  });
+
+  it("includes chi/v5/middleware as external (aliased import)", () => {
+    const chimw = result.external.find(
+      (e) => e.package === "github.com/go-chi/chi/v5/middleware",
+    );
+    expect(chimw, "expected chi/v5/middleware in external packages").toBeDefined();
+    expect(chimw!.importedBy).toContain("cmd/api/setup.go");
+    expect(chimw!.symbols).toEqual(["*"]);
   });
 
   it("third-party entries are not prefixed with 'stdlib:'", () => {
@@ -82,12 +99,14 @@ describe("analyzeImports — Go fixture project", () => {
 
     // Every stdlib package imported by any .go file in the fixture
     const expected = [
+      "stdlib:database/sql",
       "stdlib:encoding/json",
       "stdlib:fmt",
       "stdlib:log",
       "stdlib:net/http",
       "stdlib:net/http/httptest",
       "stdlib:os",
+      "stdlib:strings",
       "stdlib:testing",
       "stdlib:time",
     ];
@@ -100,9 +119,10 @@ describe("analyzeImports — Go fixture project", () => {
   it("stdlib:net/http is imported by multiple source and test files", () => {
     const netHttp = result.external.find((e) => e.package === "stdlib:net/http");
     expect(netHttp).toBeDefined();
-    // At minimum: main.go, handler/user.go, middleware/auth.go,
-    // middleware/logging.go, pkg/response/json.go, handler/user_test.go
-    expect(netHttp!.importedBy.length).toBeGreaterThanOrEqual(5);
+    // At minimum: main.go, setup.go, handler/user.go, middleware/auth.go,
+    // middleware/logging.go, pkg/response/json.go, handler/user_test.go,
+    // pkg/response/json_test.go
+    expect(netHttp!.importedBy.length).toBeGreaterThanOrEqual(7);
     expect(netHttp!.importedBy).toContain("cmd/api/main.go");
     expect(netHttp!.importedBy).toContain("internal/handler/user.go");
     expect(netHttp!.importedBy).toContain("internal/middleware/auth.go");
@@ -132,10 +152,11 @@ describe("analyzeImports — Go fixture project", () => {
   it("captures imports from _test.go files (test imports are included)", () => {
     const testing = result.external.find((e) => e.package === "stdlib:testing");
     expect(testing, "expected stdlib:testing in external packages").toBeDefined();
-    // All three test files import "testing"
+    // All four test files import "testing"
     expect(testing!.importedBy).toContain("internal/handler/user_test.go");
     expect(testing!.importedBy).toContain("internal/service/user_test.go");
     expect(testing!.importedBy).toContain("internal/repository/user_test.go");
+    expect(testing!.importedBy).toContain("pkg/response/json_test.go");
   });
 
   it("_test.go imports contribute to stdlib entries (net/http/httptest)", () => {
@@ -143,15 +164,33 @@ describe("analyzeImports — Go fixture project", () => {
       (e) => e.package === "stdlib:net/http/httptest",
     );
     expect(httptest).toBeDefined();
-    // Only handler/user_test.go imports httptest
+    // handler/user_test.go and pkg/response/json_test.go import httptest
     expect(httptest!.importedBy).toContain("internal/handler/user_test.go");
+    expect(httptest!.importedBy).toContain("pkg/response/json_test.go");
   });
 
-  it("_test.go files with no internal imports produce no internal edges", () => {
-    // None of the fixture test files import internal packages —
-    // they only import stdlib packages
-    const testEdges = result.edges.filter((e) => e.from.endsWith("_test.go"));
-    expect(testEdges).toHaveLength(0);
+  it("_test.go files that only import stdlib produce no internal edges", () => {
+    // handler/user_test.go, service/user_test.go, repository/user_test.go
+    // only import stdlib packages — no internal edges expected from them.
+    // pkg/response/json_test.go uses a dot import of the internal response
+    // package, so it does produce an internal edge (tested separately).
+    const stdlibOnlyTestFiles = [
+      "internal/handler/user_test.go",
+      "internal/service/user_test.go",
+      "internal/repository/user_test.go",
+    ];
+    for (const file of stdlibOnlyTestFiles) {
+      const edges = result.edges.filter((e) => e.from === file);
+      expect(edges, `expected no edges from ${file}`).toHaveLength(0);
+    }
+  });
+
+  it("dot-import _test.go produces an internal edge to its target package", () => {
+    // pkg/response/json_test.go uses `. "github.com/example/go-project/pkg/response"`
+    const edge = result.edges.find(
+      (e) => e.from === "pkg/response/json_test.go" && e.to === "pkg/response",
+    );
+    expect(edge, "expected dot-import edge from json_test.go").toBeDefined();
   });
 
   // ── No phantom edges ──────────────────────────────────────────────────────
@@ -178,7 +217,9 @@ describe("analyzeImports — Go fixture project", () => {
     const filesWithNoInternalImports = [
       "internal/repository/user.go", // no imports at all
       "internal/repository/db.go", // only sqlx (third-party)
+      "internal/repository/drivers.go", // only lib/pq (blank) + database/sql (stdlib)
       "cmd/api/router.go", // only chi (third-party)
+      "cmd/api/setup.go", // only chi/middleware (aliased) + net/http (stdlib)
       "internal/config/config.go", // only os (stdlib)
       "internal/middleware/auth.go", // only net/http (stdlib)
       "internal/middleware/logging.go", // only stdlib
