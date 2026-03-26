@@ -33,6 +33,7 @@ const SKIP_DIRS = new Set([
   "coverage",
   ".next",
   ".turbo",
+  "vendor",
 ]);
 
 /** Directories that contain generated output — not human-written docs */
@@ -66,6 +67,8 @@ const SKIP_DOC_FILES = new Set([
   ".prettierrc.yaml",
   ".prettierrc.yml",
   "turbo.json",
+  "go.mod",
+  "go.sum",
 ]);
 
 async function globFiles(
@@ -102,7 +105,11 @@ async function globFiles(
 function isTestFile(rel: string): boolean {
   if (rel.includes("__tests__/")) return true;
   const base = basename(rel);
-  return /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(base);
+  // JS/TS test files: *.test.ts, *.spec.tsx, etc.
+  if (/\.(test|spec)\.(ts|tsx|js|jsx)$/.test(base)) return true;
+  // Go test files: *_test.go
+  if (base.endsWith("_test.go")) return true;
+  return false;
 }
 
 function toTitleCase(str: string): string {
@@ -948,6 +955,159 @@ export async function scanPackageJson(
           tags: ["engines"],
         });
       }
+    }
+  }
+
+  return results;
+}
+
+// ── scanGoMod ───────────────────────────────────────────────────────
+
+export interface GoModData {
+  module: string;
+  goVersion?: string;
+  dependencies: { path: string; version: string }[];
+}
+
+/**
+ * Parse a go.mod file and extract module name, Go version, and dependencies.
+ *
+ * Returns null when the go.mod file does not exist or cannot be read.
+ */
+export async function parseGoMod(goModPath: string): Promise<GoModData | null> {
+  let content: string;
+  try {
+    content = await readFile(goModPath, "utf-8");
+  } catch {
+    return null;
+  }
+
+  const lines = content.split("\n");
+  let module = "";
+  let goVersion: string | undefined;
+  const dependencies: { path: string; version: string }[] = [];
+  let inRequireBlock = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Module declaration: module github.com/example/project
+    const moduleMatch = trimmed.match(/^module\s+(.+)$/);
+    if (moduleMatch) {
+      module = moduleMatch[1].trim();
+      continue;
+    }
+
+    // Go version: go 1.21
+    const goMatch = trimmed.match(/^go\s+(.+)$/);
+    if (goMatch) {
+      goVersion = goMatch[1].trim();
+      continue;
+    }
+
+    // Start of require block
+    if (trimmed === "require (") {
+      inRequireBlock = true;
+      continue;
+    }
+
+    // End of require block
+    if (inRequireBlock && trimmed === ")") {
+      inRequireBlock = false;
+      continue;
+    }
+
+    // Dependency inside require block: github.com/foo/bar v1.2.3
+    if (inRequireBlock) {
+      const depMatch = trimmed.match(/^(\S+)\s+(\S+)/);
+      if (depMatch) {
+        dependencies.push({ path: depMatch[1], version: depMatch[2] });
+      }
+      continue;
+    }
+
+    // Single-line require: require github.com/foo/bar v1.2.3
+    const singleReqMatch = trimmed.match(/^require\s+(\S+)\s+(\S+)/);
+    if (singleReqMatch) {
+      dependencies.push({ path: singleReqMatch[1], version: singleReqMatch[2] });
+    }
+  }
+
+  return { module, goVersion, dependencies };
+}
+
+function isGoMod(rel: string): boolean {
+  return basename(rel) === "go.mod";
+}
+
+/**
+ * Scan go.mod files for Go project context.
+ *
+ * Mirrors the structure of scanPackageJson: emits a project epic, dependency
+ * summary features, and Go version tasks. Returns an empty array when no
+ * go.mod files are found.
+ */
+export async function scanGoMod(
+  dir: string,
+  opts: ScanOptions = {},
+): Promise<ScanResult[]> {
+  const files = await globFiles(dir, isGoMod);
+  const results: ScanResult[] = [];
+
+  for (const filePath of files) {
+    const rel = relative(dir, filePath);
+    const goMod = await parseGoMod(filePath);
+    if (!goMod) continue;
+
+    const moduleName = goMod.module || basename(dirname(filePath));
+    const isRoot = rel === "go.mod";
+
+    if (opts.lite) {
+      results.push({
+        name: moduleName,
+        source: "package",
+        sourceFile: rel,
+        kind: "feature",
+      });
+      continue;
+    }
+
+    // Emit a project epic for the root go.mod
+    if (isRoot) {
+      results.push({
+        name: moduleName,
+        source: "package",
+        sourceFile: rel,
+        kind: "epic",
+        description: `Go module: ${moduleName}`,
+      });
+    }
+
+    // Go version → task noting requirement
+    if (goMod.goVersion) {
+      results.push({
+        name: `Go version: ${goMod.goVersion}`,
+        source: "package",
+        sourceFile: rel,
+        kind: "task",
+        description: `Requires Go ${goMod.goVersion}`,
+        tags: ["engines"],
+      });
+    }
+
+    // Dependencies → feature summary (mirrors scanPackageJson)
+    if (goMod.dependencies.length > 0) {
+      const count = goMod.dependencies.length;
+      const depNames = goMod.dependencies.slice(0, 10).map((d) => d.path);
+      const suffix = count > 10 ? `, +${count - 10} more` : "";
+      results.push({
+        name: "Dependencies",
+        source: "package",
+        sourceFile: rel,
+        kind: "feature",
+        description: `${count} ${count === 1 ? "dependency" : "dependencies"}: ${depNames.join(", ")}${suffix}`,
+        tags: ["dependencies"],
+      });
     }
   }
 

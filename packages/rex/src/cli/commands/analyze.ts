@@ -16,6 +16,7 @@ import {
   scanDocs,
   scanSourceVision,
   scanPackageJson,
+  scanGoMod,
   reconcile,
   buildProposals,
   deduplicateScanResults,
@@ -692,14 +693,15 @@ async function runScannerMode(
 ): Promise<ScannerResult> {
   const { lite, noLlm, model, accept, formatJson } = opts;
   const scanOpts = { lite };
-  const [testResults, docResults, svResults, pkgResults] = await Promise.all([
+  const [testResults, docResults, svResults, pkgResults, goModResults] = await Promise.all([
     scanTests(dir, scanOpts),
     scanDocs(dir, scanOpts),
     scanSourceVision(dir),
     scanPackageJson(dir, scanOpts),
+    scanGoMod(dir, scanOpts),
   ]);
 
-  const rawResults: ScanResult[] = [...testResults, ...docResults, ...svResults, ...pkgResults];
+  const rawResults: ScanResult[] = [...testResults, ...docResults, ...svResults, ...pkgResults, ...goModResults];
   const allResults = deduplicateScanResults(rawResults);
 
   const testFiles = new Set(testResults.map((r) => r.sourceFile)).size;
