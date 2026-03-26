@@ -1,0 +1,7 @@
+{
+  "name": "mixed-project-docs",
+  "private": true,
+  "scripts": {
+    "dev": "next dev"
+  }
+}

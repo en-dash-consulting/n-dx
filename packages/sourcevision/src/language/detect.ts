@@ -11,6 +11,10 @@
  * 4. File-count tiebreak (both markers present) → whichever has more source files
  * 5. Fallback → TypeScript/JS (backward-compatible default)
  *
+ * Multi-language detection (`detectLanguages`) returns ALL detected language
+ * configs rather than picking a winner. `mergeLanguageConfigs` combines
+ * multiple configs into a single unified config for downstream analyzers.
+ *
  * @module sourcevision/language/detect
  */
 
@@ -161,4 +165,102 @@ export async function detectLanguage(rootDir: string): Promise<LanguageConfig> {
 
   // Step 5: No markers → fallback to TypeScript/JS
   return typescriptConfig;
+}
+
+// ── Multi-language detection ─────────────────────────────────────────────────
+
+/**
+ * Detect ALL languages present in a project.
+ *
+ * Unlike `detectLanguage` (which picks a single winner), this returns every
+ * language config whose marker file is present. When both `go.mod` and
+ * `package.json` exist, both Go and TypeScript configs are returned.
+ *
+ * The primary language (from `detectLanguage`) is always first in the array.
+ *
+ * Returns at least one config — TypeScript/JS as the fallback default.
+ */
+export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]> {
+  // Check for language markers
+  const [hasGoMod, hasPackageJson] = await Promise.all([
+    fileExists(join(rootDir, "go.mod")),
+    fileExists(join(rootDir, "package.json")),
+  ]);
+
+  const configs: LanguageConfig[] = [];
+
+  if (hasGoMod && hasPackageJson) {
+    // Both present — determine primary via file-count tiebreak, include both
+    const counts = await countSourceFiles(rootDir);
+    if (counts.go > counts.ts) {
+      configs.push(goConfig, typescriptConfig);
+    } else {
+      configs.push(typescriptConfig, goConfig);
+    }
+  } else if (hasGoMod) {
+    configs.push(goConfig);
+  } else if (hasPackageJson) {
+    configs.push(typescriptConfig);
+  } else {
+    // No markers — fallback to TypeScript/JS
+    configs.push(typescriptConfig);
+  }
+
+  return configs;
+}
+
+/**
+ * Merge multiple language configs into a single unified config.
+ *
+ * The first config in the array is treated as the primary (its `id` and
+ * `displayName` are used). All other fields are unioned:
+ * - `extensions`: union of all extensions
+ * - `parseableExtensions`: union of all parseable extensions
+ * - `testFilePatterns`: concatenation of all patterns
+ * - `configFilenames`: union of all config filenames
+ * - `skipDirectories`: union of all skip directories
+ * - `generatedFilePatterns`: concatenation of all patterns
+ * - `entryPointPatterns`: concatenation of all patterns
+ * - `moduleFile`: from the primary config
+ */
+export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig {
+  if (configs.length === 0) {
+    return typescriptConfig;
+  }
+  if (configs.length === 1) {
+    return configs[0];
+  }
+
+  const primary = configs[0];
+
+  const extensions = new Set<string>();
+  const parseableExtensions = new Set<string>();
+  const testFilePatterns: RegExp[] = [];
+  const configFilenames = new Set<string>();
+  const skipDirectories = new Set<string>();
+  const generatedFilePatterns: RegExp[] = [];
+  const entryPointPatterns: RegExp[] = [];
+
+  for (const config of configs) {
+    for (const ext of config.extensions) extensions.add(ext);
+    for (const ext of config.parseableExtensions) parseableExtensions.add(ext);
+    for (const p of config.testFilePatterns) testFilePatterns.push(p);
+    for (const f of config.configFilenames) configFilenames.add(f);
+    for (const d of config.skipDirectories) skipDirectories.add(d);
+    for (const p of config.generatedFilePatterns) generatedFilePatterns.push(p);
+    for (const p of config.entryPointPatterns) entryPointPatterns.push(p);
+  }
+
+  return {
+    id: primary.id,
+    displayName: primary.displayName,
+    extensions,
+    parseableExtensions,
+    testFilePatterns,
+    configFilenames,
+    skipDirectories,
+    generatedFilePatterns,
+    entryPointPatterns,
+    moduleFile: primary.moduleFile,
+  };
 }
