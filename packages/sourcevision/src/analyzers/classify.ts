@@ -44,6 +44,8 @@ export interface ClassifyOptions {
   customArchetypes?: ArchetypeDefinition[];
   /** Per-file overrides: path → archetype ID. */
   overrides?: Record<string, string>;
+  /** Detected project language (e.g. "go", "typescript"). Signals with a `languages` filter only fire when the project language matches. */
+  projectLanguage?: string;
 }
 
 /**
@@ -106,6 +108,7 @@ export function analyzeClassifications(
       file.path,
       archetypes,
       exportMap.get(file.path),
+      options?.projectLanguage,
     );
     classifications.push(result);
   }
@@ -126,6 +129,7 @@ function classifyFile(
   filePath: string,
   archetypes: ArchetypeDefinition[],
   exports?: string[],
+  projectLanguage?: string,
 ): FileClassification {
   const fileName = basename(filePath);
   const evidence: ClassificationEvidence[] = [];
@@ -137,6 +141,11 @@ function classifyFile(
     let archetypeScore = 0;
 
     for (const signal of archetype.signals) {
+      // Skip signals scoped to languages that don't match the project
+      if (signal.languages && signal.languages.length > 0 && projectLanguage) {
+        if (!signal.languages.includes(projectLanguage)) continue;
+      }
+
       const match = matchSignal(signal, filePath, fileName, exports);
       if (match) {
         archetypeScore += signal.weight;

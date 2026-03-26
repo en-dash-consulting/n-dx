@@ -493,6 +493,8 @@ export interface ArchetypeSignal {
   kind: "path" | "import" | "export" | "filename" | "directory";
   pattern: string;
   weight: number;
+  /** When set, this signal only fires for projects whose detected language is in the list. */
+  languages?: string[];
 }
 
 export interface ArchetypeDefinition {

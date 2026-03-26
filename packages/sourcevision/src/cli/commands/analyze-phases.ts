@@ -172,11 +172,16 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
     const customArchetypes = (archetypeConfig?.custom ?? []) as import("../../schema/index.js").ArchetypeDefinition[];
     const fileOverrides = (archetypeConfig?.overrides ?? {}) as Record<string, string>;
 
+    // Read project language from manifest (written in Phase 1)
+    const manifest = readManifest(ctx.absDir);
+    const projectLanguage = manifest.language;
+
     let classifications = analyzeClassifications(inventory, importsData, {
       previousClassifications: !ctx.fullMode ? previousClassifications : undefined,
       changedFiles: ctx.inventoryResult?.changedFiles,
       customArchetypes: customArchetypes.length > 0 ? customArchetypes : undefined,
       overrides: Object.keys(fileOverrides).length > 0 ? fileOverrides : undefined,
+      projectLanguage,
     });
 
     // LLM enrichment (skip in --fast mode)

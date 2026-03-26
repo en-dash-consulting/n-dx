@@ -113,6 +113,7 @@ const ArchetypeSignalSchema = z.object({
   kind: z.enum(["path", "import", "export", "filename", "directory"]),
   pattern: z.string(),
   weight: z.number().min(0).max(1),
+  languages: z.array(z.string()).optional(),
 });
 
 const ArchetypeDefinitionSchema = z.object({
