@@ -9459,7 +9459,7 @@
             {
               "id": "58bb83e1-d72f-4dab-a53d-638437c9c01e",
               "title": "Prefer previous zone names during LLM enrichment",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The LLM enrichment step assigns new zone IDs and names each run, even when the underlying file membership is nearly identical. When a new zone shares >70% of its files with a previous zone, preserve the previous zone's ID and name instead of letting the LLM invent a new one. This stabilizes the zone identity layer on top of the Louvain stability bias. Implementation: after Louvain + enrichment, compute file overlap between new and previous zones, and remap IDs/names for high-overlap matches.",
               "acceptanceCriteria": [
@@ -9477,7 +9477,11 @@
               "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
               "blockedBy": [
                 "801215db-7e3c-4abe-a83f-7174831aaa4a"
-              ]
+              ],
+              "startedAt": "2026-03-26T20:50:55.915Z",
+              "completedAt": "2026-03-26T20:54:30.293Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added preservePreviousZoneIdentity() using Jaccard file overlap (threshold 0.7). Called after enrichment in analyzeZones — zones with >70% overlap inherit previous ID/name/description. Greedy best-match prevents double-assignment. Logged for debuggability."
             },
             {
               "id": "43bbd40c-f64d-47cf-9bcb-3f24f9af765c",
@@ -19263,6 +19267,7 @@
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-03-25T05:23:45.822Z",
+      "completedAt": "2026-03-26T20:50:30.165Z",
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20663,8 +20668,7 @@
             }
           ]
         }
-      ],
-      "completedAt": "2026-03-26T20:50:30.165Z"
+      ]
     },
     {
       "id": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",

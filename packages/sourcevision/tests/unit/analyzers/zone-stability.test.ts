@@ -3,12 +3,13 @@ import {
   buildUndirectedGraph,
   louvainPhase1,
 } from "../../../src/analyzers/louvain.js";
-import { runZonePipeline } from "../../../src/analyzers/zones.js";
+import { runZonePipeline, preservePreviousZoneIdentity } from "../../../src/analyzers/zones.js";
 import {
   makeFileEntry,
   makeInventory,
   makeEdge,
   makeImports,
+  makeZone,
 } from "./zones-helpers.js";
 
 describe("zone stability bias", () => {
@@ -208,5 +209,95 @@ describe("zone stability bias", () => {
     const a1Zone = biased.zones.find(z => z.files.includes("src/a1.ts"))!;
     const a4Zone = biased.zones.find(z => z.files.includes("src/a4.ts"))!;
     expect(a4Zone.id).toBe(a1Zone.id);
+  });
+});
+
+describe("preservePreviousZoneIdentity", () => {
+  it("remaps zone ID/name when file overlap exceeds threshold", () => {
+    const newZones = [
+      makeZone("new-auth", ["src/auth.ts", "src/login.ts", "src/session.ts"]),
+      makeZone("new-api", ["src/api.ts", "src/routes.ts"]),
+    ];
+    const prevZones = [
+      makeZone("authentication", ["src/auth.ts", "src/login.ts", "src/session.ts", "src/logout.ts"],
+        { name: "Authentication", description: "Auth module" }),
+      makeZone("api-layer", ["src/api.ts", "src/routes.ts"],
+        { name: "API Layer", description: "REST endpoints" }),
+    ];
+
+    const result = preservePreviousZoneIdentity(newZones, prevZones);
+
+    // new-auth shares 3/4 files with authentication (75% Jaccard) → inherits identity
+    expect(result[0].id).toBe("authentication");
+    expect(result[0].name).toBe("Authentication");
+    // new-api shares 2/2 files with api-layer (100% Jaccard) → inherits identity
+    expect(result[1].id).toBe("api-layer");
+    expect(result[1].name).toBe("API Layer");
+    // Files are preserved from the new zone (not the previous)
+    expect(result[0].files).toEqual(["src/auth.ts", "src/login.ts", "src/session.ts"]);
+  });
+
+  it("does not remap when overlap is below threshold", () => {
+    const newZones = [
+      makeZone("new-zone", ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts"]),
+    ];
+    const prevZones = [
+      makeZone("old-zone", ["src/a.ts", "src/x.ts", "src/y.ts", "src/z.ts"],
+        { name: "Old Zone" }),
+    ];
+
+    const result = preservePreviousZoneIdentity(newZones, prevZones);
+
+    // Only 1 file in common out of 7 unique files (14% Jaccard) — no remap
+    expect(result[0].id).toBe("new-zone");
+    expect(result[0].name).not.toBe("Old Zone");
+  });
+
+  it("does not reuse the same previous zone for multiple new zones", () => {
+    const newZones = [
+      makeZone("zone-a", ["src/a.ts", "src/b.ts", "src/c.ts"]),
+      makeZone("zone-b", ["src/a.ts", "src/d.ts", "src/e.ts"]),
+    ];
+    const prevZones = [
+      makeZone("original", ["src/a.ts", "src/b.ts", "src/c.ts"],
+        { name: "Original" }),
+    ];
+
+    const result = preservePreviousZoneIdentity(newZones, prevZones);
+
+    // zone-a is the best match (3/3 = 100%) → gets the identity
+    expect(result[0].id).toBe("original");
+    // zone-b cannot reuse "original" → keeps its new identity
+    expect(result[1].id).toBe("zone-b");
+  });
+
+  it("returns zones unchanged when no previous zones", () => {
+    const newZones = [
+      makeZone("zone-a", ["src/a.ts"]),
+    ];
+
+    const result = preservePreviousZoneIdentity(newZones, []);
+
+    expect(result[0].id).toBe("zone-a");
+  });
+
+  it("respects custom threshold", () => {
+    const newZones = [
+      makeZone("new-zone", ["src/a.ts", "src/b.ts", "src/c.ts"]),
+    ];
+    const prevZones = [
+      makeZone("old-zone", ["src/a.ts", "src/b.ts", "src/x.ts", "src/y.ts"],
+        { name: "Old Zone" }),
+    ];
+    // Jaccard: 2 common / 5 unique = 0.4
+
+    // Default threshold (0.7) → no remap
+    const strict = preservePreviousZoneIdentity(newZones, prevZones);
+    expect(strict[0].id).toBe("new-zone");
+
+    // Custom threshold (0.3) → remap
+    const lenient = preservePreviousZoneIdentity(newZones, prevZones, 0.3);
+    expect(lenient[0].id).toBe("old-zone");
+    expect(lenient[0].name).toBe("Old Zone");
   });
 });

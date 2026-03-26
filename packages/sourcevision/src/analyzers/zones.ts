@@ -206,6 +206,73 @@ function addStabilityEdges(
   }
 }
 
+// ── Zone identity preservation ───────────────────────────────────────────────
+
+/** Default minimum file overlap ratio to inherit previous zone identity. */
+const ZONE_OVERLAP_THRESHOLD = 0.7;
+
+/**
+ * Preserve previous zone IDs and names when a new zone has high file overlap
+ * with a previous zone. Uses a greedy best-match approach: for each new zone,
+ * find the previous zone with the highest Jaccard overlap; if it exceeds the
+ * threshold, inherit the previous ID/name/description.
+ *
+ * This prevents the LLM from inventing new names for zones whose file
+ * membership barely changed — the #1 source of zone identity instability.
+ */
+export function preservePreviousZoneIdentity(
+  newZones: Zone[],
+  previousZones: Zone[],
+  threshold: number = ZONE_OVERLAP_THRESHOLD,
+): Zone[] {
+  if (previousZones.length === 0) return newZones;
+
+  // Build file sets for previous zones
+  const prevFileSets = previousZones.map(z => ({
+    zone: z,
+    files: new Set(z.files),
+  }));
+
+  const usedPrevIds = new Set<string>();
+  const result: Zone[] = [];
+
+  for (const zone of newZones) {
+    const newFiles = new Set(zone.files);
+    let bestMatch: { zone: Zone; overlap: number } | null = null;
+
+    for (const prev of prevFileSets) {
+      if (usedPrevIds.has(prev.zone.id)) continue;
+
+      // Jaccard overlap: |intersection| / |union|
+      let intersection = 0;
+      for (const f of newFiles) {
+        if (prev.files.has(f)) intersection++;
+      }
+      const union = newFiles.size + prev.files.size - intersection;
+      const overlap = union > 0 ? intersection / union : 0;
+
+      if (overlap >= threshold && (!bestMatch || overlap > bestMatch.overlap)) {
+        bestMatch = { zone: prev.zone, overlap };
+      }
+    }
+
+    if (bestMatch) {
+      usedPrevIds.add(bestMatch.zone.id);
+      console.log(`  [zones] preserving identity: "${zone.id}" → "${bestMatch.zone.id}" (${(bestMatch.overlap * 100).toFixed(0)}% file overlap)`);
+      result.push({
+        ...zone,
+        id: bestMatch.zone.id,
+        name: bestMatch.zone.name,
+        description: bestMatch.zone.description || zone.description,
+      });
+    } else {
+      result.push(zone);
+    }
+  }
+
+  return result;
+}
+
 // ── Zone ID / name derivation ───────────────────────────────────────────────
 
 const GENERIC_SEGMENTS = new Set([
@@ -2163,8 +2230,13 @@ export async function analyzeZones(
     expandedZones, imports, inventory, validPrevious, enrich, perZone, options?.fileArchetypes,
     zoneContentHashes, options?.hints,
   );
-  const { finalZones, aiZoneInsights, aiGlobalInsights, aiFindings,
+  const { finalZones: enrichedZones, aiZoneInsights, aiGlobalInsights, aiFindings,
     enrichmentPass, metaUpdatedFindings, enrichTokenUsage } = enrichResult;
+
+  // ── Preserve previous zone identity for high-overlap zones ──
+  const finalZones = previousZones
+    ? preservePreviousZoneIdentity(enrichedZones, previousZones.zones)
+    : enrichedZones;
 
   // ── Remap content hashes to post-enrichment zone IDs ──
   const remappedContentHashes = remapContentHashKeys(
