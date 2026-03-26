@@ -27,6 +27,7 @@ import type {
   Zone,
   ZoneCrossing,
   Zones,
+  ZoneStability,
   Finding,
   AnalyzeTokenUsage,
   SubAnalysisRef,
@@ -2087,6 +2088,61 @@ function computeMoveFindings(
   ];
 }
 
+// ── Zone stability computation ───────────────────────────────────────────────
+
+/**
+ * Compute zone stability metrics by comparing new zones against previous zones.
+ */
+function computeZoneStability(
+  newZones: Zone[],
+  previousZones: Zone[],
+): ZoneStability {
+  // Build file→zone maps
+  const prevFileZone = new Map<string, string>();
+  const prevZoneIds = new Set<string>();
+  for (const z of previousZones) {
+    prevZoneIds.add(z.id);
+    for (const f of z.files) prevFileZone.set(f, z.id);
+  }
+
+  const newZoneIds = new Set(newZones.map(z => z.id));
+
+  // File retention: files present in both runs that kept the same zone
+  let retained = 0;
+  let comparable = 0;
+  const reassigned: [string, string, string][] = [];
+
+  for (const z of newZones) {
+    for (const f of z.files) {
+      const prevZone = prevFileZone.get(f);
+      if (prevZone !== undefined) {
+        comparable++;
+        if (prevZone === z.id) {
+          retained++;
+        } else {
+          reassigned.push([f, prevZone, z.id]);
+        }
+      }
+    }
+  }
+
+  // Zone persistence
+  let persisted = 0;
+  for (const id of newZoneIds) {
+    if (prevZoneIds.has(id)) persisted++;
+  }
+  const newCount = newZoneIds.size - persisted;
+  const removedCount = prevZoneIds.size - persisted;
+
+  return {
+    fileRetention: comparable > 0 ? Math.round((retained / comparable) * 100) / 100 : 1,
+    persistedZones: persisted,
+    newZones: newCount,
+    removedZones: removedCount,
+    reassignedFiles: reassigned,
+  };
+}
+
 // ── Helper: build final result ───────────────────────────────────────────────
 
 /** Assemble the final AnalyzeZonesResult with sorted zones data. */
@@ -2102,11 +2158,12 @@ function buildAnalyzeZonesResult(opts: {
   previousZones: Zones | undefined;
   structureChanged: boolean;
   enrichTokenUsage: AnalyzeTokenUsage | undefined;
+  stability?: ZoneStability;
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage,
+    previousZones, structureChanged, enrichTokenUsage, stability,
   } = opts;
 
   const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
@@ -2130,6 +2187,7 @@ function buildAnalyzeZonesResult(opts: {
       structureHash,
       zoneContentHashes: remappedContentHashes,
       ...(lastReset ? { lastReset } : {}),
+      ...(stability ? { stability } : {}),
     }),
     tokenUsage: enrichTokenUsage,
     structureChanged,
@@ -2284,10 +2342,21 @@ export async function analyzeZones(
   // ── Back-populate findings into insights for backward compatibility ──
   backPopulateInsights(pinnedFinalZones, allFindings, allGlobalInsights);
 
+  // ── Zone stability metrics ──
+  const stability = previousZones?.zones
+    ? computeZoneStability(allZones, previousZones.zones)
+    : undefined;
+
+  if (stability) {
+    const pct = (stability.fileRetention * 100).toFixed(0);
+    const moved = stability.reassignedFiles.length;
+    console.log(`  [zones] stability: ${pct}% file retention, ${stability.persistedZones} persisted / ${stability.newZones} new / ${stability.removedZones} removed zones${moved > 0 ? `, ${moved} files reassigned` : ""}`);
+  }
+
   // ── Build result ──
   return buildAnalyzeZonesResult({
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage,
+    previousZones, structureChanged, enrichTokenUsage, stability,
   });
 }

@@ -295,6 +295,22 @@ export interface Zones {
   zoneContentHashes?: Record<string, string>;
   /** Records the last pass reset: { from: previousPass, to: currentPass } */
   lastReset?: { from: number; to: number };
+  /** Zone stability metrics compared to the previous analysis run. */
+  stability?: ZoneStability;
+}
+
+/** Zone stability metrics: how much the zone topology changed between runs. */
+export interface ZoneStability {
+  /** Fraction of files that kept the same zone ID (0–1). */
+  fileRetention: number;
+  /** Number of zones that persisted from the previous run. */
+  persistedZones: number;
+  /** Number of new zones not present in the previous run. */
+  newZones: number;
+  /** Number of previous zones that disappeared. */
+  removedZones: number;
+  /** Files that moved between zones: [file, fromZone, toZone]. */
+  reassignedFiles: [string, string, string][];
 }
 
 // ── Token Usage ─────────────────────────────────────────────────────────────

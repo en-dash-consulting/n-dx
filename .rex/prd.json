@@ -9438,7 +9438,7 @@
             {
               "id": "cc14fdd6-03c8-4271-96f5-84193473cb49",
               "title": "Report zone stability metric after each analysis run",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "After zone detection, compare the new zone assignment against the previous one and report: (1) percentage of files that stayed in the same zone, (2) number of zones that persisted vs appeared vs disappeared, (3) number of files reassigned. Store this in zones.json as a stability summary. Print to CLI output during analyze. This gives users visibility into whether zones are converging or churning.",
               "acceptanceCriteria": [
@@ -9454,7 +9454,11 @@
                 "stability",
                 "metrics"
               ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26"
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
+              "startedAt": "2026-03-26T20:54:58.641Z",
+              "completedAt": "2026-03-26T20:58:23.246Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added ZoneStability interface to schema, computeZoneStability() in zones.ts, stability field in zones.json output, and CLI logging of retention/persistence/reassignment metrics."
             },
             {
               "id": "58bb83e1-d72f-4dab-a53d-638437c9c01e",

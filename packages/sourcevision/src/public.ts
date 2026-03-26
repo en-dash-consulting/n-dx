@@ -88,6 +88,7 @@ export type {
   Finding,
   FindingType,
   FindingCategory,
+  ZoneStability,
   // components.json
   Components,
   ComponentDefinition,
