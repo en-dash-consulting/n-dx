@@ -105,6 +105,18 @@ export interface ZonePipelineOptions {
    * Default: 3. Configurable via `sourcevision.zones.mergeThreshold` in `.n-dx.json`.
    */
   smallZoneMergeThreshold?: number;
+  /**
+   * Previous zone assignments for stability bias. When provided, synthetic
+   * co-zone edges are added to the graph before Louvain to bias toward
+   * preserving the previous topology. Files that shared a zone previously
+   * are more likely to remain co-zoned.
+   */
+  previousZoneAssignment?: Map<string, string>;
+  /**
+   * Weight multiplier for co-zone stability edges, relative to the median
+   * import edge weight. Default: 0.3. Set to 0 to disable stability bias.
+   */
+  stabilityWeight?: number;
 }
 
 /** Result of running the zone detection pipeline. */
@@ -116,6 +128,82 @@ export interface ZonePipelineResult {
   filenameBasedZoneIds: Set<string>;
   /** Log of small-zone merge decisions for debuggability. */
   smallZoneMergeLog: MergeLogEntry[];
+}
+
+// ── Stability bias ──────────────────────────────────────────────────────────
+
+/**
+ * Compute the median edge weight from the import-only graph.
+ * Used to calibrate stability edge weight relative to real import signals.
+ */
+function medianEdgeWeight(importGraph: Map<string, Map<string, number>>): number {
+  const weights: number[] = [];
+  const seen = new Set<string>();
+  for (const [node, neighbors] of importGraph) {
+    for (const [neighbor, weight] of neighbors) {
+      const key = node < neighbor ? `${node}\0${neighbor}` : `${neighbor}\0${node}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        weights.push(weight);
+      }
+    }
+  }
+  if (weights.length === 0) return 1;
+  weights.sort((a, b) => a - b);
+  const mid = Math.floor(weights.length / 2);
+  return weights.length % 2 === 0 ? (weights[mid - 1] + weights[mid]) / 2 : weights[mid];
+}
+
+/**
+ * Add synthetic co-zone edges to bias Louvain toward preserving the previous
+ * zone topology. For each pair of files that shared a zone, add an edge with
+ * weight = median_import_weight * stabilityWeight.
+ *
+ * Only adds edges between files that are both present in the current graph.
+ * Does NOT add edges for new files (not in previousZoneAssignment) — they
+ * are assigned purely by import affinity.
+ *
+ * The edges are added to `graph` (which Louvain operates on) but NOT to
+ * `importOnlyGraph` (used for cohesion/coupling metrics), so stability bias
+ * doesn't inflate measured cohesion.
+ */
+function addStabilityEdges(
+  graph: Map<string, Map<string, number>>,
+  importOnlyGraph: Map<string, Map<string, number>>,
+  previousAssignment: Map<string, string>,
+  stabilityWeight: number,
+): void {
+  const edgeWeight = medianEdgeWeight(importOnlyGraph) * stabilityWeight;
+  if (edgeWeight <= 0) return;
+
+  // Group files by their previous zone
+  const zoneMembers = new Map<string, string[]>();
+  for (const [file, zone] of previousAssignment) {
+    // Only include files that exist in the current graph
+    if (!graph.has(file)) continue;
+    let members = zoneMembers.get(zone);
+    if (!members) {
+      members = [];
+      zoneMembers.set(zone, members);
+    }
+    members.push(file);
+  }
+
+  // Add pairwise co-zone edges
+  for (const members of zoneMembers.values()) {
+    if (members.length < 2) continue;
+    for (let i = 0; i < members.length; i++) {
+      const a = members[i];
+      const aNeighbors = graph.get(a)!;
+      for (let j = i + 1; j < members.length; j++) {
+        const b = members[j];
+        const bNeighbors = graph.get(b)!;
+        // Add stability edge (additive — doesn't replace existing import edges)
+        aNeighbors.set(b, (aNeighbors.get(b) ?? 0) + edgeWeight);
+        bNeighbors.set(a, (bNeighbors.get(a) ?? 0) + edgeWeight);
+      }
+    }
+  }
 }
 
 // ── Zone ID / name derivation ───────────────────────────────────────────────
@@ -1723,6 +1811,8 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     testFiles = new Set<string>(),
     zonePins,
     smallZoneMergeThreshold = 3,
+    previousZoneAssignment,
+    stabilityWeight = 0.3,
   } = options;
 
   // ── Build undirected graph ──
@@ -1757,6 +1847,14 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     return (nonImportDirCounts.get(dir) ?? 0) >= 2;
   });
   addDirectoryProximityEdges(graph, clusterableNonImportFiles);
+
+  // ── Add co-zone stability bias from previous run ──
+  // When previous zones exist, add synthetic edges between files that shared
+  // a zone. This biases Louvain toward preserving the previous topology while
+  // still allowing genuine import changes to override the bias.
+  if (previousZoneAssignment && previousZoneAssignment.size > 0 && stabilityWeight > 0) {
+    addStabilityEdges(graph, importOnlyGraph, previousZoneAssignment, stabilityWeight);
+  }
 
   // ── Scale maxZones by file count ──
   // Small packages shouldn't fragment into many zones. Scale from 3 (≤36 files)
@@ -2015,6 +2113,17 @@ export async function analyzeZones(
   const { filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes } =
     prepareScopeAndEdges(inventory, imports, subAnalyses);
 
+  // ── Build previous zone assignment for stability bias ──
+  let previousZoneAssignment: Map<string, string> | undefined;
+  if (previousZones?.zones) {
+    previousZoneAssignment = new Map<string, string>();
+    for (const zone of previousZones.zones) {
+      for (const file of zone.files) {
+        previousZoneAssignment.set(file, zone.id);
+      }
+    }
+  }
+
   // ── Run zone detection pipeline ──
   const pipeline = runZonePipeline({
     edges: filteredEdges,
@@ -2025,6 +2134,7 @@ export async function analyzeZones(
     testFiles,
     zonePins: options?.zonePins,
     smallZoneMergeThreshold: options?.smallZoneMergeThreshold,
+    previousZoneAssignment,
   });
   const { zones: expandedZones, unzoned, filenameBasedZoneIds, smallZoneMergeLog: mergeLog } = pipeline;
 

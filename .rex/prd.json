@@ -9414,7 +9414,7 @@
             {
               "id": "801215db-7e3c-4abe-a83f-7174831aaa4a",
               "title": "Add co-zone stability bias to Louvain community detection",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "When previous zones exist, add synthetic weighted edges between files that shared a zone in the previous run. Weight should be below real import edges but enough to break ties toward the status quo. This biases Louvain toward incremental zone evolution rather than recomputation from scratch. Implementation: in runZonePipeline(), after building the undirected graph and before running louvainPhase1(), iterate previous zone memberships and add co-zone edges with a configurable stability weight (default ~0.3x the median import edge weight).",
               "acceptanceCriteria": [
@@ -9429,7 +9429,11 @@
                 "louvain",
                 "stability"
               ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26"
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
+              "startedAt": "2026-03-26T20:44:25.304Z",
+              "completedAt": "2026-03-26T20:48:44.828Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added addStabilityEdges() to zones.ts that injects synthetic co-zone edges into the Louvain graph from previous zone assignments. Weight = median import edge weight * stabilityWeight (default 0.3). Edges added to Louvain graph only, not importOnlyGraph (so cohesion metrics aren't inflated). previousZoneAssignment built from previousZones in analyzeZones() and passed through to runZonePipeline()."
             },
             {
               "id": "cc14fdd6-03c8-4271-96f5-84193473cb49",
