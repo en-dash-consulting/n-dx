@@ -19259,7 +19259,7 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-03-25T05:23:45.822Z",
@@ -20604,7 +20604,7 @@
         {
           "id": "7b588605-f26a-4362-90ff-d60f32d620da",
           "title": "File-Level Self-Heal Metrics",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The self-heal loop's progress tracking and regression guard currently use zone-relative metrics (weighted cohesion, finding count including structural). Since zone boundaries are non-deterministic across runs, these metrics oscillate without meaningful signal. Shift all self-heal progress signals to zone-independent, file-level metrics: circular dependency count, unused exports, code-category finding count, god function count. Zone metrics remain available for reporting but are not used as optimization targets or termination conditions.",
           "priority": "high",
@@ -20614,11 +20614,13 @@
             "user-feedback"
           ],
           "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
+          "startedAt": "2026-03-26T20:50:30.055Z",
+          "completedAt": "2026-03-26T20:50:30.055Z",
           "children": [
             {
               "id": "fa464f14-067b-4c91-aa40-9724d0f8998f",
               "title": "Replace zone-relative progress signals with file-level metrics in self-heal loop",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The self-heal loop in cli.js uses two progress signals: (1) remaining finding count from rex recommend --actionable-only --format=json, (2) weighted cohesion from zones.json via readZoneMetrics(). Both are zone-relative. Replace with: circular dependency count (from imports.json summary.circularCount), code-category finding count (filter findings to category !== 'structural'), and unused export count (from callgraph.json). Read these from .sourcevision/ output files after each analysis step.",
               "acceptanceCriteria": [
@@ -20632,7 +20634,11 @@
                 "self-heal",
                 "metrics"
               ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26"
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
+              "startedAt": "2026-03-26T20:49:19.197Z",
+              "completedAt": "2026-03-26T20:50:29.832Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Replaced readZoneMetrics-based regression guard with readCodeHealthMetrics reading circular deps from imports.json, code-category findings from zones.json, and unused exports from callgraph.json. Zone metrics kept for informational logging only."
             },
             {
               "id": "d1f74bde-7297-4af0-911a-8a4e5ee82aa7",
@@ -20657,7 +20663,8 @@
             }
           ]
         }
-      ]
+      ],
+      "completedAt": "2026-03-26T20:50:30.165Z"
     },
     {
       "id": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
