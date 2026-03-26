@@ -12033,7 +12033,19 @@
       "status": "completed",
       "level": "epic",
       "description": "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring.",
-      "completedAt": "2026-03-24T04:16:45.798Z",
+      "startedAt": "2026-03-26T15:22:13.999Z",
+      "completedAt": "2026-03-26T15:22:13.999Z",
+      "mergedProposals": [
+        {
+          "proposalNodeKey": "p0:epic",
+          "proposalTitle": "Phase 3: Archetypes, Routes & Hench — Go Integration Spec",
+          "proposalKind": "epic",
+          "reason": "semantic_title",
+          "score": 0.95,
+          "mergedAt": "2026-03-26T06:15:44.202Z",
+          "source": "smart-add"
+        }
+      ],
       "children": [
         {
           "id": "6b0c3873-5607-4adc-9027-abd8d70ab0e3",
@@ -13029,6 +13041,306 @@
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-02-25T03:25:22.943Z"
               }
+            }
+          ]
+        },
+        {
+          "id": "c9447ae6-7521-40b0-997d-b56bfaa1993a",
+          "title": "Feature 1: Go-Aware Archetype System",
+          "status": "completed",
+          "level": "feature",
+          "description": "Add Go-specific signals to the existing archetype definitions in `packages/sourcevision/src/analyzers/archetypes.ts` and add a `languages` field to `ArchetypeSignal` in `packages/sourcevision/src/schema/v1.ts` so signals can be scoped to specific project languages. React-specific archetypes (`route-module`, `component`, `hook`, `page`) should not fire for Go projects.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T08:06:08.926Z",
+          "completedAt": "2026-03-26T08:06:08.926Z",
+          "children": [
+            {
+              "id": "7cbffe7e-3bfe-482b-8163-80f69b1690e4",
+              "title": "Implement language-scoped ArchetypeSignal schema and add Go signals to archetypes",
+              "status": "completed",
+              "level": "task",
+              "description": "Extend `ArchetypeSignal` in `packages/sourcevision/src/schema/v1.ts` with an optional `languages?: string[]` field, update the Zod validation schema in `validate.ts`, and update the classification engine in `classify.ts` to filter signals by detected project language before scoring. Then modify `BUILTIN_ARCHETYPES` in `archetypes.ts` to add Go-specific signals to `entrypoint`, `types`, `route-handler`, `config`, and `test-helper` archetypes, and scope React-specific archetypes (`route-module`, `component`, `hook`, `page`) to `languages: [\"typescript\", \"javascript\"]`. The schema change is the prerequisite for the signal work; both are delivered together to avoid a partial-state intermediate commit.",
+              "acceptanceCriteria": [
+                "ArchetypeSignal interface has optional `languages?: string[]` field",
+                "Zod validation schema accepts the new field",
+                "Signals without a languages field fire for all project languages (backward compatible)",
+                "Signals with `languages: [\"go\"]` only fire when project language is Go",
+                "Signals with `languages: [\"typescript\", \"javascript\"]` only fire for JS/TS projects",
+                "`entrypoint` archetype has Go signals: `{ kind: \"filename\", pattern: \"^main\\.go$\", weight: 0.9 }` and `{ kind: \"directory\", pattern: \"/cmd/\", weight: 0.7, languages: [\"go\"] }`",
+                "`types` archetype has Go signals: `types.go` (0.9), `models.go` (0.8), `entities.go` (0.8) filename patterns",
+                "`route-handler` archetype has Go signals: `handler.go`, `handlers.go` filename patterns and `/handler/`, `/handlers/` directory patterns (0.8)",
+                "`config` archetype has Go signal: `config.go` filename pattern (0.7)",
+                "`test-helper` archetype has Go signals: `/testdata/` (0.9) and `/testutil/` (0.8) directory patterns",
+                "`route-module`, `component` (tsx/jsx signals), `hook`, and `page` archetypes are scoped with `languages: [\"typescript\", \"javascript\"]`",
+                "Go fixture files classify correctly: `cmd/api/main.go` → entrypoint, `internal/handler/user.go` → route-handler, `internal/config/config.go` → config, testdata/ files → test-helper",
+                "React-specific archetypes do not fire for Go project files",
+                "All existing archetype tests pass unchanged (no regression)"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "archetypes",
+                "schema"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T07:47:26.333Z",
+              "completedAt": "2026-03-26T08:01:03.235Z"
+            },
+            {
+              "id": "4cba126c-e847-4510-8f4f-09e3272fb552",
+              "title": "Write archetype classification tests for Go projects",
+              "status": "completed",
+              "level": "task",
+              "description": "Create `packages/sourcevision/tests/unit/analyzers/go-archetypes.test.ts` validating archetype signal matching against Go fixture files. Tests must guard against both false positives (React archetypes firing on Go files) and false negatives (Go archetypes missing expected files), and serve as a regression guard for the JS/TS classification path.",
+              "acceptanceCriteria": [
+                "Tests verify cmd/api/main.go matches entrypoint archetype",
+                "Tests verify internal/handler/user.go matches route-handler archetype",
+                "Tests verify internal/config/config.go matches config archetype",
+                "Tests verify testdata/ files match test-helper archetype",
+                "Tests verify internal/service/user.go matches service archetype",
+                "Tests verify React archetypes (route-module, component, hook, page) do not match any Go fixture files",
+                "Tests verify that existing JS/TS archetype signals still match correctly (regression guard)",
+                "All tests pass with zero failures"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "archetypes",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T08:01:03.567Z",
+              "completedAt": "2026-03-26T08:06:08.766Z"
+            }
+          ]
+        },
+        {
+          "id": "4a348f37-2be0-4808-a5f4-ae265c10b7b6",
+          "title": "Feature 2: Go Server Route Detection",
+          "status": "completed",
+          "level": "feature",
+          "description": "Create a regex-based Go HTTP route detector that identifies route registrations from popular Go HTTP frameworks (net/http, chi, gin, echo, fiber, gorilla/mux). Output uses the existing `ServerRoute` and `ServerRouteGroup` types from the schema.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T07:47:26.043Z",
+          "completedAt": "2026-03-26T07:47:26.043Z",
+          "children": [
+            {
+              "id": "939ef567-fbd3-423f-94c7-a51b95fdcf68",
+              "title": "Implement Go route detection analyzer and integrate into the server-route pipeline",
+              "status": "completed",
+              "level": "task",
+              "description": "Create `packages/sourcevision/src/analyzers/go-route-detection.ts` with a `detectGoServerRoutes(sourceText: string, filePath: string): ServerRouteGroup[]` function covering all six framework patterns. Then modify `packages/sourcevision/src/analyzers/server-route-detection.ts` to dispatch to the Go detector for `.go` files, add `.go` to the PARSEABLE extension set, and merge Go routes into `components.json`. The implementation and integration are delivered together because the integration dispatch hook has no value without the implementation.",
+              "acceptanceCriteria": [
+                "net/http stdlib patterns (`http.HandleFunc`, `http.Handle`, `mux.HandleFunc`) are detected with correct method and path",
+                "chi method patterns (Get, Post, Put, Delete, Patch) are detected",
+                "gin uppercase method patterns (GET, POST, PUT, DELETE, PATCH) are detected",
+                "echo patterns are detected",
+                "fiber patterns are detected",
+                "gorilla/mux HandleFunc().Methods() chain pattern is detected",
+                "Route path parameters are preserved as-is (e.g., \"/users/{id}\", \"/users/:id\")",
+                "Comments and string literals in non-route code do not produce false positives",
+                "Output conforms to the existing ServerRouteGroup schema",
+                ".go files are dispatched to detectGoServerRoutes instead of the JS/TS route detector",
+                "JS/TS files continue to use the existing Express/Hono/Koa detection with no regression",
+                "The PARSEABLE extension set includes \".go\"",
+                "Go route results are merged into the components.json serverRoutes array",
+                "components.json summary.totalServerRoutes includes Go routes in the count"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "routes"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T06:35:53.041Z",
+              "completedAt": "2026-03-26T06:43:07.594Z"
+            },
+            {
+              "id": "49bff344-1bbe-4196-9a38-a507b841960c",
+              "title": "Write unit tests for Go route detection",
+              "status": "completed",
+              "level": "task",
+              "description": "Create `packages/sourcevision/tests/unit/analyzers/go-route-detection.test.ts` covering all six framework patterns. Tests verify method extraction, path extraction (including parametrized paths), route grouping by file, and false-positive safety for comments and non-route string literals.",
+              "acceptanceCriteria": [
+                "Tests cover all six frameworks (net/http, chi, gin, echo, fiber, gorilla/mux)",
+                "Tests verify correct HTTP method extraction for each framework",
+                "Tests verify correct path extraction including parameters ({id}, :id)",
+                "Tests verify route grouping by file",
+                "Tests verify comments and non-route string literals do not produce false positives",
+                "Tests verify empty files and files with no routes return empty arrays",
+                "All tests pass with zero failures"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "routes",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T06:43:07.929Z",
+              "completedAt": "2026-03-26T07:47:25.871Z"
+            }
+          ]
+        },
+        {
+          "id": "e117f1d3-5b28-4fe0-ad8b-8acc7c030963",
+          "title": "Feature 3: Rex Scanner Go Support",
+          "status": "completed",
+          "level": "feature",
+          "description": "Update Rex's analyze scanners to understand Go project structure: parse `go.mod` for dependency information, detect Go test files, and skip Go-specific directories.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T15:22:13.888Z",
+          "completedAt": "2026-03-26T15:22:13.888Z",
+          "children": [
+            {
+              "id": "2ba0deed-63c0-4650-bc6d-fb2fafb22687",
+              "title": "Add go.mod scanner, Go skip patterns, and test coverage to Rex",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify `packages/rex/src/analyze/scanners.ts` to add `\"vendor\"` to `SKIP_DIRS`, add `\"go.mod\"` and `\"go.sum\"` to `SKIP_DOC_FILES`, update test file detection to match `_test.go` files, and create a `scanGoMod()` function that extracts module name, Go version, and dependency list from `go.mod` mirroring the structure of `scanPackageJson()`. Deliver unit tests in the same task — the scanner is simple enough that implementation and verification constitute one focused session. Tests should cover the Go fixture project's `go.mod` and edge cases such as a missing file or empty require block.",
+              "acceptanceCriteria": [
+                "vendor/ directory is skipped during Rex analysis scans",
+                "go.mod and go.sum are not scanned as documentation files",
+                "_test.go files are recognized as test files by the test detection logic",
+                "scanGoMod reads the module name, Go version, and require dependencies from go.mod",
+                "scanGoMod output structure mirrors scanPackageJson where applicable (dependency list, version info)",
+                "A Go project directory produces meaningful Rex analysis proposals",
+                "Existing JS/TS scanning behavior is completely unchanged",
+                "Tests verify vendor/ is skipped",
+                "Tests verify go.mod/go.sum are treated as config, not scanned as docs",
+                "Tests verify _test.go files are detected as test files",
+                "Tests verify scanGoMod extracts module name, Go version, and dependencies correctly",
+                "Tests verify scanGoMod handles missing go.mod gracefully (returns empty/null)",
+                "All tests pass with zero failures"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "go",
+                "scanner"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T15:14:51.603Z",
+              "completedAt": "2026-03-26T15:22:13.708Z"
+            }
+          ]
+        },
+        {
+          "id": "8ae4d60a-f66a-40aa-afd7-dac7562ec263",
+          "title": "Feature 4: Hench Go Project Support",
+          "status": "completed",
+          "level": "feature",
+          "description": "Make Hench capable of executing tasks in Go projects: update guard defaults to allow Go toolchain commands, add Go test runner support, and make agent prompts language-aware.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T15:14:41.533Z",
+          "completedAt": "2026-03-26T15:14:41.533Z",
+          "children": [
+            {
+              "id": "fcfc2e7c-270b-4367-949e-59992caf6766",
+              "title": "Add Go guard defaults and language-aware config to Hench",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify `packages/hench/src/schema/v1.ts` and `packages/hench/src/schema/templates.ts` so that when a Go project is detected (go.mod present or language config is \"go\"), `allowedCommands` defaults to `[\"go\", \"make\", \"git\", \"golangci-lint\"]` and `blockedPaths` includes `\"vendor/**\"`. JS/TS project defaults remain unchanged. Detection should use the sourcevision language registry or go.mod presence check during `hench init`.",
+              "acceptanceCriteria": [
+                "Go projects get allowedCommands including \"go\", \"make\", \"git\", \"golangci-lint\"",
+                "Go projects get \"vendor/**\" in blockedPaths",
+                "JS/TS projects get the existing default allowedCommands unchanged",
+                "hench init detects Go projects and applies Go-appropriate defaults",
+                "The guard validates Go commands (go test, go build, make lint) as allowed for Go projects",
+                "Existing JS/TS guard behavior is unchanged"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "go",
+                "guard",
+                "config"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T06:16:07.320Z",
+              "completedAt": "2026-03-26T06:27:36.895Z"
+            },
+            {
+              "id": "a6862705-ed72-4d1a-aab7-090c85e50582",
+              "title": "Add Go test runner support to Hench",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify `packages/hench/src/tools/test-runner.ts` to recognize `_test.go` files, generate scoped Go test commands by mapping test file directories to package paths (e.g., `internal/handler/user_test.go` → `go test ./internal/handler/...`), and resolve test file candidates using Go's `_test.go` naming convention (same directory, different suffix from `.test.ts`).",
+              "acceptanceCriteria": [
+                "_test.go files are recognized by isTestFile()",
+                "candidateTestPaths(\"internal/handler/user.go\") includes \"internal/handler/user_test.go\"",
+                "Go test runner is detected from \"go test\" command string",
+                "Scoped Go test command is correctly formatted: `go test ./internal/handler/...` for targeted packages",
+                "Full Go test command is `go test ./...` when scoping is not possible",
+                "Existing JS/TS test runner behavior is completely unchanged",
+                "All existing test-runner tests pass"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "go",
+                "test-runner"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T06:28:00.347Z",
+              "completedAt": "2026-03-26T06:35:25.306Z"
+            },
+            {
+              "id": "ea5ba3f2-4f9e-46b1-9874-23bdc62f8130",
+              "title": "Make Hench agent prompts language-aware for Go projects",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify `packages/hench/src/agent/planning/prompt.ts` to include Go-specific context in the task brief when the project language is Go. Language detection uses `manifest.language` from `.sourcevision/` or go.mod presence. Go briefs replace JS/TS toolchain references with Go equivalents and add Go-specific naming, structure, and test conventions without altering the JS/TS prompt path.",
+              "acceptanceCriteria": [
+                "Go project briefs reference `go test ./...` instead of `npm test` or `vitest`",
+                "Go project briefs reference `go build ./...` for build verification",
+                "Go project briefs reference `go vet ./...` and `golangci-lint run` for linting",
+                "Go project briefs reference Go naming conventions: exported = PascalCase, unexported = camelCase, error handling via explicit returns (no try/catch)",
+                "Go project briefs reference Go project structure: `cmd/` for binaries, `internal/` for private packages, `pkg/` for public packages",
+                "Go project briefs reference Go test conventions: `_test.go` suffix, `testing.T` parameter, table-driven tests",
+                "JS/TS project briefs are completely unchanged",
+                "Language detection uses manifest.language or go.mod presence",
+                "The prompt includes language context only when language is detected, not hardcoded"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "go",
+                "prompts"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T14:59:05.256Z",
+              "completedAt": "2026-03-26T15:05:23.743Z"
+            },
+            {
+              "id": "121aefae-1c0b-4f83-b83c-fe972d76a29d",
+              "title": "Write tests for Hench Go guard defaults, test runner, and language-aware prompts",
+              "status": "completed",
+              "level": "task",
+              "description": "Create tests covering all three Hench Go support areas: guard defaults for Go projects, Go test runner behavior (file recognition, path candidate generation, scoped command formatting), and Go-specific prompt content. Tests must also verify that JS/TS behavior is unchanged across all three areas as a regression guard.",
+              "acceptanceCriteria": [
+                "Tests verify Go allowedCommands defaults",
+                "Tests verify Go blockedPaths include vendor/**",
+                "Tests verify _test.go is recognized as a test file",
+                "Tests verify Go test path candidate generation",
+                "Tests verify Go scoped test command formatting",
+                "Tests verify Go prompt includes Go-specific context",
+                "Tests verify JS/TS prompt is unchanged when project is not Go",
+                "All tests pass with zero failures"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "go",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T15:09:02.409Z",
+              "completedAt": "2026-03-26T15:14:41.351Z"
             }
           ]
         }
@@ -22460,22 +22772,26 @@
     {
       "id": "f00043c7-f5de-4d79-ab17-19fc6bd8d8db",
       "title": "Go / Multi-Language Support",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-03-26T05:57:25.506Z",
+      "completedAt": "2026-03-26T05:57:25.506Z",
       "children": [
         {
           "id": "dfa181b2-9543-4b37-a04b-bdcf0af58da6",
           "title": "Go Import Parser",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Create a regex-based Go import parser in sourcevision that handles all Go import syntax variants and classifies imports as stdlib, third-party, or internal using go.mod module path resolution.",
           "source": "smart-add",
+          "startedAt": "2026-03-26T05:10:44.727Z",
+          "completedAt": "2026-03-26T05:10:44.727Z",
           "children": [
             {
               "id": "32f70fa2-70d8-4b26-98a1-e54baeccbf97",
               "title": "Implement extractGoImports function with full Go import syntax coverage",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create packages/sourcevision/src/analyzers/go-imports.ts with an extractGoImports(sourceText, filePath) function. Reads go.mod once to extract the module path and classifies each import as stdlib (no domain prefix, e.g. fmt, net/http), third-party (has domain, e.g. github.com/go-chi/chi), or internal (starts with module path). Handles single imports, grouped import blocks, aliased imports (alias \"pkg\"), blank imports (_ \"pkg\"), and dot imports (. \"pkg\"). Internal imports resolve to relative directory paths as import edges. All Go imports use ImportType.static.",
               "acceptanceCriteria": [
@@ -22499,12 +22815,14 @@
                 "imports",
                 "parser"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:01:09.933Z",
+              "completedAt": "2026-03-26T05:07:17.320Z"
             },
             {
               "id": "afab2a23-e2c0-4d95-9325-256f8f5192fd",
               "title": "Write comprehensive unit tests for go-imports.ts covering all syntax variants and edge cases",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Write unit tests for go-imports.ts using the existing Go fixture at packages/sourcevision/tests/fixtures/go-project/, which contains real Go files with stdlib, third-party, and internal imports. Tests must cover every import syntax variant, alias and blank import handling, module path resolution from go.mod, and edge cases such as comments inside import blocks and string literals that resemble import statements.",
               "acceptanceCriteria": [
@@ -22525,22 +22843,26 @@
                 "imports",
                 "tests"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:07:43.892Z",
+              "completedAt": "2026-03-26T05:10:44.563Z"
             }
           ]
         },
         {
           "id": "aac0a41c-0157-4cca-a75d-efd7655ba909",
           "title": "Import Analyzer Language Dispatch",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Modify the SourceVision import analyzer (imports.ts) to dispatch to the Go import parser when processing .go files, reading go.mod once per invocation and producing file-to-package edges for internal imports. Integration tests validate the full import graph against the Go fixture.",
           "source": "smart-add",
+          "startedAt": "2026-03-26T05:34:37.680Z",
+          "completedAt": "2026-03-26T05:34:37.680Z",
           "children": [
             {
               "id": "19509120-0d5b-4aac-a83e-2b200ed8aabf",
               "title": "Modify imports.ts to route .go files to the Go import parser",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Expand or replace the JS_TS_EXTENSIONS gate in packages/sourcevision/src/analyzers/imports.ts to include .go files, or replace the check with the language registry's parseableExtensions. The analyzeImports function reads go.mod once per invocation (not per-file) and passes the extracted module path to extractGoImports for each .go file. Internal Go import edges resolve to directory paths (file-to-package rather than file-to-file). Language is determined from manifest.language or via detectLanguage from the language registry. JS/TS dispatch must remain unchanged.",
               "acceptanceCriteria": [
@@ -22559,12 +22881,14 @@
                 "imports",
                 "dispatch"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:15:49.167Z",
+              "completedAt": "2026-03-26T05:24:08.530Z"
             },
             {
               "id": "c42858ab-4a23-467f-b6e2-fccee6cb99f6",
               "title": "Write integration tests validating the Go import graph against the fixture project",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Write integration tests that run the full import analyzer against the Go fixture at packages/sourcevision/tests/fixtures/go-project/ and assert on the produced import graph structure. Tests cover internal edges (main.go→handler/, handler/→service/, service/→repository/), third-party external packages (go-chi/chi, jmoiron/sqlx), stdlib entries, and the handling of _test.go imports.",
               "acceptanceCriteria": [
@@ -22583,22 +22907,26 @@
                 "imports",
                 "integration-tests"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:27:41.472Z",
+              "completedAt": "2026-03-26T05:34:37.493Z"
             }
           ]
         },
         {
           "id": "41a438d4-def7-4e85-ac41-e7b023184764",
           "title": "Go Fixture Enhancement",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Extend the Go fixture project to cover import syntax edge cases required by the parser (aliased, blank, dot imports, test files), update go.mod to match new dependencies, and produce a coverage map documenting which fixture file exercises which syntax variant.",
           "source": "smart-add",
+          "startedAt": "2026-03-26T05:46:12.440Z",
+          "completedAt": "2026-03-26T05:46:12.440Z",
           "children": [
             {
               "id": "3a247c6a-8613-490d-888e-016ae0dd5ec2",
               "title": "Add aliased, blank, and dot import files to the Go fixture and update go.mod",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add new Go source files to packages/sourcevision/tests/fixtures/go-project/ to exercise import syntax variants not yet present: a file with aliased imports (e.g. chi \"github.com/go-chi/chi/v5\"), a file with blank/side-effect imports (e.g. _ \"github.com/lib/pq\"), and a dot import if it fits the fixture's domain. Add at least one _test.go file with a testing stdlib import to verify test file capture. Update go.mod require block to include any new third-party dependencies.",
               "acceptanceCriteria": [
@@ -22615,12 +22943,14 @@
                 "sourcevision",
                 "fixtures"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:36:12.973Z",
+              "completedAt": "2026-03-26T05:41:51.850Z"
             },
             {
               "id": "7e41ce28-7691-4211-8b95-a325919bdb6b",
               "title": "Create syntax variant coverage map for the Go fixture",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Audit the enhanced fixture against all import syntax variants that go-imports.ts must handle. For each supported variant (single, grouped, aliased, blank, dot, test file imports), identify which fixture file demonstrates it. Add a coverage comment to go-imports.test.ts or a FIXTURE.md file in the fixture directory mapping each file to the variant(s) it exercises. Document any intentionally absent variant with a rationale.",
               "acceptanceCriteria": [
@@ -22637,22 +22967,26 @@
                 "fixtures",
                 "documentation"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:42:12.856Z",
+              "completedAt": "2026-03-26T05:46:12.268Z"
             }
           ]
         },
         {
           "id": "fe5bf3cc-7584-4e97-9a58-e1d5ff37c6bd",
           "title": "Zone Detection Validation for Go Projects",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Validate the end-to-end SourceVision pipeline for Go projects by running Louvain community detection against the Go fixture's import graph and asserting sensible zone boundaries corresponding to Go package structure. The detection algorithm requires no changes; this feature validates the data chain from Go source to zones.",
           "source": "smart-add",
+          "startedAt": "2026-03-26T05:57:25.393Z",
+          "completedAt": "2026-03-26T05:57:25.393Z",
           "children": [
             {
               "id": "f2234f89-f5b2-4bab-b901-30744cf878e0",
               "title": "Write end-to-end zone detection integration test for the Go fixture",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Write go-zones.test.ts that runs the full SourceVision pipeline (inventory → imports → zones) against packages/sourcevision/tests/fixtures/go-project/ and validates that Louvain community detection produces zones mapping to Go package boundaries. Expected zones correspond to cmd/, internal/handler/, internal/service/, and internal/repository/. The test must fail with a descriptive error if the import graph contains zero edges, guarding against silent parser failures upstream.",
               "acceptanceCriteria": [
@@ -22670,14 +23004,15 @@
                 "zones",
                 "integration-tests"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:46:36.251Z",
+              "completedAt": "2026-03-26T05:52:26.151Z"
             },
             {
               "id": "81da168f-62be-4c39-a20d-18a53d808d47",
               "title": "Document Go zone detection behavior, edge semantics, and known limitations",
+              "status": "completed",
               "level": "task",
-              "status": "pending",
-              "source": "smart-add",
               "description": "Add documentation in docs/architecture/ or the sourcevision package README covering how Go file-to-package import edges feed into zone detection, how this differs from JS/TS file-to-file edges and its impact on zone granularity, known limitations (e.g. large Go monorepos may produce fragmented zones, no function-level call graph), and how zone names are derived from Go package paths. Reference go-zones.test.ts as the canonical end-to-end validation.",
               "acceptanceCriteria": [
                 "Documentation explains the difference between Go file-to-package edges and JS/TS file-to-file edges with at least one concrete example",
@@ -22693,7 +23028,148 @@
                 "sourcevision",
                 "zones",
                 "documentation"
-              ]
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:52:56.668Z",
+              "completedAt": "2026-03-26T05:57:25.227Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4700c8ae-721d-4f18-86e7-1eaf5a559bb4",
+      "title": "Pre-PR Fixes: Zone Edge Resolution & Mixed-Language Support",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "d373f51a-ed4c-4b13-b1be-0db05e992df5",
+          "title": "Fix 1: Go Zone Edge Resolution",
+          "status": "completed",
+          "level": "feature",
+          "description": "Go import edges target package directories rather than individual files, causing the zone crossing algorithm to silently drop all Go cross-zone imports. This produces 0 crossings and 0 coupling in Go projects (observed: PocketBase had 756 edges but only 49 crossings; grit had 12 edges and 0 crossings). The fix introduces prefix-matching at all edge consumption points so directory-targeted edges resolve to their constituent files. This fix is independent of Fix 2 but is recommended first due to smaller scope and high impact on pure Go projects.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "9c28061d-d830-4ebb-9389-fae26db29adf",
+              "title": "Implement Go directory-to-files resolver and update zone pipeline",
+              "status": "completed",
+              "level": "task",
+              "description": "Go import edges from `go-imports.ts` target package directories (e.g., `internal/generate`) rather than individual files. The zone crossing algorithm in `buildCrossings()` (zones.ts ~1475), the Louvain graph builder in `buildUndirectedGraph()` (louvain.ts), and `computeZoneMetrics()` all do exact string lookups against file paths — silently dropping every Go cross-zone edge. Create a directory-to-files resolver utility and apply it at all three consumption points so directory-targeted edges expand to their constituent files. JS/TS exact-match behavior must remain unchanged.",
+              "acceptanceCriteria": [
+                "Directory-to-files resolver utility returns the exact file for JS/TS-style file path inputs",
+                "Resolver returns all files whose paths begin with the directory prefix for Go-style directory path inputs",
+                "`buildUndirectedGraph()` expands directory-target edges into file-level edges before graph construction so Louvain receives real file-level nodes",
+                "`buildCrossings()` falls back to prefix matching (`edge.to + \"/\"`) when exact `fileToZone` lookup fails",
+                "`computeZoneMetrics()` applies the same prefix expansion when computing cohesion and coupling from the graph",
+                "Go projects with cross-package imports produce non-zero zone crossings",
+                "Zone coupling scores are non-zero for zones with incoming or outgoing cross-package imports",
+                "Zone cohesion scores reflect intra-package import density",
+                "PocketBase re-analysis produces significantly more than 49 crossings",
+                "grit re-analysis produces non-zero crossings between Go zones",
+                "JS/TS zone crossing results are unchanged (no regression)"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "zones"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T20:30:24.097Z",
+              "completedAt": "2026-03-26T20:47:10.595Z"
+            },
+            {
+              "id": "95dde960-5ab0-4acd-b53e-7004ce3591d4",
+              "title": "Add test coverage for Go zone edge resolution",
+              "status": "completed",
+              "level": "task",
+              "description": "Validate the directory-to-files resolver and updated zone pipeline with unit and integration tests. Tests must cover the resolver in isolation, Go-specific crossing detection end-to-end, and a regression guard ensuring JS/TS zone behavior is unchanged.",
+              "acceptanceCriteria": [
+                "Unit test: directory-to-files resolver returns exact match for JS/TS-style file path input",
+                "Unit test: directory-to-files resolver returns all files under the prefix for Go-style directory path input",
+                "Unit test: `buildCrossings()` produces non-zero crossings when given Go-style directory edges",
+                "Integration test: full zone pipeline run against a Go fixture produces non-zero crossings and non-zero coupling scores",
+                "Regression test: JS/TS fixture zone crossings are identical before and after the resolver change"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T20:09:20.039Z"
+            }
+          ],
+          "startedAt": "2026-03-26T20:47:10.759Z",
+          "completedAt": "2026-03-26T20:47:10.759Z"
+        },
+        {
+          "id": "a40abbfe-7834-4adc-885b-70e7d80092e1",
+          "title": "Fix 2: Mixed-Language Support",
+          "status": "pending",
+          "level": "feature",
+          "description": "Projects containing both Go and TypeScript files (e.g., a Go CLI with a Next.js docs site) detect only a single primary language. The non-primary language's files are inventoried but produce sparse import edges and orphan zones with 0 cohesion because `manifest.language` is a single string, archetype signal filtering scopes to one language, and only the primary language's skip directories, config file names, and test patterns are applied. Applying Fix 1 (zone edge resolution) first is recommended, but this fix is independent — together they make mixed Go+TS projects produce fully meaningful analysis.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d567173b-1770-490a-9757-41712acaa91d",
+              "title": "Implement multi-language detection and extend Manifest schema",
+              "status": "pending",
+              "level": "task",
+              "description": "Extend `detectLanguage()` in `detect.ts` to return multiple language configs when both Go and TypeScript markers coexist (go.mod + package.json). Add a `languages` string-array field to the Manifest schema in `schema/v1.ts` while keeping the existing `language` string field set to the primary language for backward compatibility. Propagate the languages array through `analyze-phases.ts`, merge skip directories, config filenames, and test patterns from all detected languages, and update classification signal filtering in `classify.ts` to check signals against the full `languages` array instead of a single string.",
+              "acceptanceCriteria": [
+                "`manifest.languages` added to schema/v1.ts as a string array ordered primary-first",
+                "`manifest.language` remains set to the primary language (backward compatibility preserved)",
+                "Updated detector returns Go config when go.mod is present",
+                "Updated detector returns TypeScript config when package.json is present",
+                "Primary language is the one with more source files using the existing tiebreak logic",
+                "`analyze-phases.ts` writes both `language` and `languages` to the manifest on each analysis run",
+                "Archetype signal filtering checks `signal.languages` against `manifest.languages` array so signals fire for all detected languages",
+                "Merged language config combines `skipDirectories` from all detected languages (`vendor/` and `node_modules/` both skipped in a mixed project)",
+                "Merged language config combines `configFilenames` (`go.mod` and `package.json` both detected as config files in a mixed project)",
+                "Merged language config combines `testFilePatterns` (`_test.go` and `.test.ts` both classified as test role in a mixed project)",
+                "Import edges are produced for both Go and TypeScript files in a mixed project",
+                "Zone detection produces meaningful zones for both language groups in a mixed project",
+                "Pure Go projects produce identical results to before",
+                "Pure TypeScript projects produce identical results to before"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "typescript",
+                "languages"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "44a1fcf3-1830-407b-acc1-889e6f45e8f2",
+              "title": "Add test coverage for mixed-language detection",
+              "status": "pending",
+              "level": "task",
+              "description": "Validate the multi-language detection pipeline with unit and integration tests. Tests must cover the updated detector, merged language config construction, signal filtering against an array, and the full pipeline against a mixed Go+TS fixture. Pure-language regression tests guard against unintended behavior changes.",
+              "acceptanceCriteria": [
+                "Unit test: updated detector returns both Go and TypeScript configs when both go.mod and package.json are present",
+                "Unit test: merged language config includes skip directories from both languages",
+                "Unit test: merged language config includes test file patterns from both languages",
+                "Unit test: classification signal filtering matches a signal when its language is in the `languages` array",
+                "Integration test: mixed Go + TS fixture produces import edges for both Go and TypeScript source files",
+                "Integration test: mixed Go + TS fixture records both go.mod and package.json as detected config files",
+                "Regression test: pure Go project detection and manifest output are unchanged",
+                "Regression test: pure TypeScript project detection and manifest output are unchanged"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "typescript",
+                "tests"
+              ],
+              "source": "smart-add"
             }
           ]
         }
