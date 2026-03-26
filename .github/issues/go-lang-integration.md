@@ -1,6 +1,6 @@
 ## Summary
 
-Add first-class Go language support to the n-dx toolkit (SourceVision, Rex, Hench), enabling the full `ndx init → analyze → plan → work` workflow on Go codebases.
+Add Go language support to the n-dx toolkit (SourceVision, Rex, Hench), enabling the full `ndx init → analyze → plan → work` workflow on Go codebases.
 
 ## Motivation
 
