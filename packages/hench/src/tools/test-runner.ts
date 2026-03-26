@@ -49,12 +49,13 @@ export interface TestRunnerOptions {
 
 const DEFAULT_TIMEOUT = 120_000;
 
-/** Common test file patterns — matches *.test.ts, *.spec.js, etc. */
+/** Common test file patterns — matches *.test.ts, *.spec.js, *_test.go, etc. */
 const TEST_FILE_PATTERNS = [
   /\.test\.[jt]sx?$/,
   /\.spec\.[jt]sx?$/,
   /_test\.[jt]sx?$/,
   /_spec\.[jt]sx?$/,
+  /_test\.go$/,
 ];
 
 /** Test runners that support file-path arguments for scoped runs. */
@@ -73,6 +74,9 @@ const TEST_DIR_CANDIDATES = [
   "tests",
   "test",
 ];
+
+/** Runner name used for Go test detection and scoping. */
+const GO_TEST_RUNNER = "go";
 
 // ---------------------------------------------------------------------------
 // Test file discovery
@@ -101,7 +105,13 @@ export function candidateTestPaths(filePath: string): string[] {
   const base = basename(filePath, ext);
   const candidates: string[] = [];
 
-  // Co-located: same directory with .test/.spec suffix
+  // Go source files: _test.go in the same directory (Go convention)
+  if (ext === ".go") {
+    candidates.push(join(dir, `${base}_test.go`));
+    return candidates;
+  }
+
+  // JS/TS: Co-located with .test/.spec suffix
   for (const suffix of [".test", ".spec"]) {
     candidates.push(join(dir, `${base}${suffix}${ext}`));
   }
@@ -185,6 +195,15 @@ export function detectRunner(testCommand: string): string | undefined {
     if (name in SCOPEABLE_RUNNERS) return name;
   }
 
+  // Detect Go test runner: requires "go test" pattern (not just "go")
+  if (
+    parts.length >= 2 &&
+    basename(parts[0]) === GO_TEST_RUNNER &&
+    parts[1] === "test"
+  ) {
+    return GO_TEST_RUNNER;
+  }
+
   return undefined;
 }
 
@@ -200,6 +219,11 @@ export function buildScopedCommand(
   runner: string,
   testFiles: string[],
 ): string | undefined {
+  // Go uses package-path scoping (replaces targets, doesn't append file paths)
+  if (runner === GO_TEST_RUNNER) {
+    return buildGoScopedCommand(testCommand, testFiles);
+  }
+
   const scopeFn = SCOPEABLE_RUNNERS[runner];
   if (!scopeFn) return undefined;
 
@@ -226,6 +250,56 @@ export function buildScopedCommand(
 
   // Package manager wrapper (e.g. "pnpm test") — append with --
   return `${testCommand} -- ${testFiles.join(" ")}`;
+}
+
+/**
+ * Build a Go-specific scoped test command.
+ *
+ * Go tests target package paths, not individual files. Extracts unique
+ * directories from test file paths and converts them to Go package patterns:
+ *   `internal/handler/user_test.go` → `go test ./internal/handler/...`
+ *
+ * Preserves flags (e.g. `-v`, `-count=1`) and drops existing package targets
+ * (e.g. `./...`) since they are replaced by the scoped paths.
+ */
+function buildGoScopedCommand(
+  testCommand: string,
+  testFiles: string[],
+): string {
+  const pkgPaths = goPackagePaths(testFiles);
+  const parts = testCommand.trim().split(/\s+/);
+  const goIdx = parts.findIndex((p) => basename(p) === GO_TEST_RUNNER);
+
+  if (goIdx < 0) {
+    return `go test ${pkgPaths.join(" ")}`;
+  }
+
+  const testIdx = parts.indexOf("test", goIdx + 1);
+  if (testIdx < 0) {
+    // "go" found but no "test" subcommand — add it
+    return [...parts, "test", ...pkgPaths].join(" ");
+  }
+
+  // Keep "go test", preserve flags (start with -), replace package targets
+  const prefix = parts.slice(0, testIdx + 1);
+  const afterTest = parts.slice(testIdx + 1);
+  const flags = afterTest.filter((p) => p.startsWith("-"));
+
+  return [...prefix, ...flags, ...pkgPaths].join(" ");
+}
+
+/**
+ * Convert test file paths to Go package path patterns.
+ *   `internal/handler/user_test.go` → `./internal/handler/...`
+ *   `main_test.go` (root)           → `.`
+ */
+function goPackagePaths(testFiles: string[]): string[] {
+  const dirs = new Set<string>();
+  for (const f of testFiles) {
+    const d = dirname(f);
+    dirs.add(d === "." ? "." : `./${d}/...`);
+  }
+  return [...dirs];
 }
 
 // ---------------------------------------------------------------------------
