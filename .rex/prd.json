@@ -5,11 +5,10 @@
     {
       "id": "ebe4c082-7e93-44ee-a286-cf01c05dd907",
       "title": "SourceVision",
-      "status": "completed",
+      "status": "pending",
       "level": "epic",
       "description": "Static analysis engine: file inventory, import graph, zone detection (Louvain community detection), React component catalog, PR markdown generation. Produces .sourcevision/CONTEXT.md and llms.txt for AI consumption.",
       "startedAt": "2026-03-25T05:39:49.717Z",
-      "completedAt": "2026-03-25T05:39:49.717Z",
       "children": [
         {
           "id": "3bf3754c-c0d0-4fb7-9cbd-5ebbddb85d51",
@@ -9394,6 +9393,105 @@
                   "resolutionDetail": "Server augments /api/sv/zones response with zone pins from .n-dx.json. ZoneSlideout component shows \"pinned\" badge on files with zone pin overrides."
                 }
               ]
+            }
+          ]
+        },
+        {
+          "id": "22ecc00b-ceb0-4fa3-8e40-fb29fd4e8869",
+          "title": "Incremental Zone Topology Preservation",
+          "status": "pending",
+          "level": "feature",
+          "description": "Louvain community detection recomputes zones from scratch each run, producing 32 unique zone IDs across 8 runs of the same ~87-file project. Not a single zone survived all 8 runs. The pipeline should preserve the previous zone topology incrementally: bias Louvain toward the previous assignment via synthetic co-zone edges, only reassign files when import neighborhood genuinely shifted, and report a zone stability metric (% files unchanged). This makes zone-relative metrics meaningful as trend indicators rather than noise.",
+          "priority": "high",
+          "tags": [
+            "zones",
+            "louvain",
+            "stability",
+            "user-feedback"
+          ],
+          "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
+          "children": [
+            {
+              "id": "801215db-7e3c-4abe-a83f-7174831aaa4a",
+              "title": "Add co-zone stability bias to Louvain community detection",
+              "status": "pending",
+              "level": "task",
+              "description": "When previous zones exist, add synthetic weighted edges between files that shared a zone in the previous run. Weight should be below real import edges but enough to break ties toward the status quo. This biases Louvain toward incremental zone evolution rather than recomputation from scratch. Implementation: in runZonePipeline(), after building the undirected graph and before running louvainPhase1(), iterate previous zone memberships and add co-zone edges with a configurable stability weight (default ~0.3x the median import edge weight).",
+              "acceptanceCriteria": [
+                "When previousZones is provided, synthetic co-zone edges are added to the graph before Louvain",
+                "Stability weight is configurable (default: 0.3x median import edge weight)",
+                "Files that were co-zoned previously are more likely to remain co-zoned",
+                "New files (not in previous zones) are assigned purely by import affinity with no bias",
+                "Stability bias can be disabled via config (weight = 0)"
+              ],
+              "priority": "high",
+              "tags": [
+                "louvain",
+                "stability"
+              ],
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26"
+            },
+            {
+              "id": "cc14fdd6-03c8-4271-96f5-84193473cb49",
+              "title": "Report zone stability metric after each analysis run",
+              "status": "pending",
+              "level": "task",
+              "description": "After zone detection, compare the new zone assignment against the previous one and report: (1) percentage of files that stayed in the same zone, (2) number of zones that persisted vs appeared vs disappeared, (3) number of files reassigned. Store this in zones.json as a stability summary. Print to CLI output during analyze. This gives users visibility into whether zones are converging or churning.",
+              "acceptanceCriteria": [
+                "zones.json includes stability summary when previous zones exist",
+                "CLI output shows zone stability % after analysis",
+                "stability.fileRetention: fraction of files that kept the same zone ID",
+                "stability.zonePersistence: count of zones that survived from previous run",
+                "stability.reassignedFiles: list of files that moved between zones"
+              ],
+              "priority": "high",
+              "tags": [
+                "zones",
+                "stability",
+                "metrics"
+              ],
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26"
+            },
+            {
+              "id": "58bb83e1-d72f-4dab-a53d-638437c9c01e",
+              "title": "Prefer previous zone names during LLM enrichment",
+              "status": "pending",
+              "level": "task",
+              "description": "The LLM enrichment step assigns new zone IDs and names each run, even when the underlying file membership is nearly identical. When a new zone shares >70% of its files with a previous zone, preserve the previous zone's ID and name instead of letting the LLM invent a new one. This stabilizes the zone identity layer on top of the Louvain stability bias. Implementation: after Louvain + enrichment, compute file overlap between new and previous zones, and remap IDs/names for high-overlap matches.",
+              "acceptanceCriteria": [
+                "Zones with >70% file overlap with a previous zone inherit its ID and name",
+                "Overlap threshold is configurable",
+                "New zones (no previous match above threshold) get fresh LLM-assigned names as before",
+                "Zone ID remapping is logged for debuggability"
+              ],
+              "priority": "high",
+              "tags": [
+                "zones",
+                "enrichment",
+                "stability"
+              ],
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
+              "blockedBy": [
+                "801215db-7e3c-4abe-a83f-7174831aaa4a"
+              ]
+            },
+            {
+              "id": "43bbd40c-f64d-47cf-9bcb-3f24f9af765c",
+              "title": "Fix gitSha recording in history snapshots",
+              "status": "pending",
+              "level": "task",
+              "description": "All 8 history snapshots in react-big-schedule recorded the same gitSha (the pre-heal base commit) despite 83 commits happening between runs. The manifest.gitSha is captured at init time and not refreshed before each analysis run. Fix: re-read HEAD sha at the start of each analyze invocation so history snapshots accurately reflect which code state was analyzed.",
+              "acceptanceCriteria": [
+                "manifest.gitSha reflects HEAD at analysis start, not init time",
+                "History snapshots record distinct shas when code changes between runs",
+                "gitBranch is also refreshed"
+              ],
+              "priority": "medium",
+              "tags": [
+                "history",
+                "git"
+              ],
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26"
             }
           ]
         }
@@ -19157,11 +19255,10 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "completed",
+      "status": "pending",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-03-25T05:23:45.822Z",
-      "completedAt": "2026-03-25T05:23:45.822Z",
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20497,6 +20594,62 @@
               "completedAt": "2026-03-25T05:22:09.410Z",
               "resolutionType": "code-change",
               "resolutionDetail": "Added --exclude-structural flag to rex recommend that filters findings with category=structural. Self-heal loop passes it by default; --include-structural opts in. Structural skip count reported in recommend output."
+            }
+          ]
+        },
+        {
+          "id": "7b588605-f26a-4362-90ff-d60f32d620da",
+          "title": "File-Level Self-Heal Metrics",
+          "status": "pending",
+          "level": "feature",
+          "description": "The self-heal loop's progress tracking and regression guard currently use zone-relative metrics (weighted cohesion, finding count including structural). Since zone boundaries are non-deterministic across runs, these metrics oscillate without meaningful signal. Shift all self-heal progress signals to zone-independent, file-level metrics: circular dependency count, unused exports, code-category finding count, god function count. Zone metrics remain available for reporting but are not used as optimization targets or termination conditions.",
+          "priority": "high",
+          "tags": [
+            "self-heal",
+            "metrics",
+            "user-feedback"
+          ],
+          "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
+          "children": [
+            {
+              "id": "fa464f14-067b-4c91-aa40-9724d0f8998f",
+              "title": "Replace zone-relative progress signals with file-level metrics in self-heal loop",
+              "status": "pending",
+              "level": "task",
+              "description": "The self-heal loop in cli.js uses two progress signals: (1) remaining finding count from rex recommend --actionable-only --format=json, (2) weighted cohesion from zones.json via readZoneMetrics(). Both are zone-relative. Replace with: circular dependency count (from imports.json summary.circularCount), code-category finding count (filter findings to category !== 'structural'), and unused export count (from callgraph.json). Read these from .sourcevision/ output files after each analysis step.",
+              "acceptanceCriteria": [
+                "Self-heal regression guard uses circular dep count + code finding count instead of weighted cohesion",
+                "readZoneMetrics() replaced with readCodeHealthMetrics() reading imports.json + zones.json findings",
+                "Loop aborts when code-level metrics regress, not when zone metrics regress",
+                "Zone metrics still logged for informational purposes but not used as termination signals"
+              ],
+              "priority": "high",
+              "tags": [
+                "self-heal",
+                "metrics"
+              ],
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26"
+            },
+            {
+              "id": "d1f74bde-7297-4af0-911a-8a4e5ee82aa7",
+              "title": "Filter recommend --format=json progress count to code-category findings only",
+              "status": "completed",
+              "level": "task",
+              "description": "The self-heal loop's finding count check (cli.js line ~960) counts all task-level findings from rex recommend --actionable-only --format=json. This includes structural findings even when --exclude-structural is passed for the accept step, because the progress check is a separate call. Ensure the progress check also passes --exclude-structural so the count only reflects code-level findings the loop is actually acting on.",
+              "acceptanceCriteria": [
+                "Progress check in self-heal loop uses same filters as the accept step",
+                "Finding count used for termination only counts findings the loop would act on"
+              ],
+              "priority": "high",
+              "tags": [
+                "self-heal",
+                "findings"
+              ],
+              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
+              "startedAt": "2026-03-26T20:08:40.979Z",
+              "completedAt": "2026-03-26T20:08:40.979Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Already implemented in the --exclude-structural work. The progress check at cli.js:990 passes ...structuralFlag to the recommend --format=json call, ensuring only code-category findings are counted."
             }
           ]
         }
