@@ -9523,6 +9523,7 @@
       "level": "epic",
       "description": "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json.",
       "startedAt": "2026-03-24T20:09:27.774Z",
+      "completedAt": "2026-03-27T04:28:57.725Z",
       "children": [
         {
           "id": "95bfdba2-2cba-4921-b614-3a34779e0892",
@@ -12376,8 +12377,7 @@
           "resolutionType": "code-change",
           "resolutionDetail": "computeStats now counts childless features as work items. The root cause was isWorkItem() returning false for features, so childless features were invisible to stats. Fix: count items where level is not epic AND (is a work item OR has no children)."
         }
-      ],
-      "completedAt": "2026-03-27T04:28:57.725Z"
+      ]
     },
     {
       "id": "4fc05c48-48b0-4da3-8126-4fa237b924d9",
@@ -13386,7 +13386,7 @@
         {
           "id": "83b64074-3eda-48a6-b3f6-9524cfd6fad7",
           "title": "Hench should fail tasks when no code changes are made",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "Hench marks tasks as completed even when the agent made no code changes (e.g., due to permission failures preventing tool use). The run shows 'Changes: none' and 'Status: completed', causing the finding to be acknowledged as resolved when the underlying problem persists. Hench should detect zero-change runs and mark the task as failing instead of completed.",
           "acceptanceCriteria": [
@@ -13400,7 +13400,11 @@
             "self-heal",
             "bug"
           ],
-          "source": "Observed during self-heal testing on react-big-schedule, 2026-03-27"
+          "source": "Observed during self-heal testing on react-big-schedule, 2026-03-27",
+          "startedAt": "2026-03-27T04:29:28.224Z",
+          "completedAt": "2026-03-27T04:33:06.659Z",
+          "resolutionType": "acknowledgment",
+          "resolutionDetail": "Investigation found that the no-changes case is already handled correctly: validateCompletion checks git diff against startingHead, returns valid:false when no changes exist, and handleRunFailure reverts the PRD status to pending. The user-reported issue was actually about eslint-ignore comment changes (which DO show up in git diff), not truly zero changes. This is addressed by the workflow prohibition added earlier — the agent is now instructed to fail instead of adding suppression comments."
         },
         {
           "id": "f5b21324-3b32-4567-93c8-05850e59333a",
