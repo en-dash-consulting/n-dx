@@ -13378,6 +13378,21 @@
             "bug"
           ],
           "source": "Observed during self-heal testing on react-big-schedule, 2026-03-27"
+        },
+        {
+          "id": "f5b21324-3b32-4567-93c8-05850e59333a",
+          "title": "Self-Adapting Execution Workflow",
+          "level": "feature",
+          "status": "pending",
+          "description": "After each hench execution, run an LLM reflection pass that reads the run transcript, the current workflow, and the project state, then recommends or directly applies adjustments to the workflow for future runs. This makes n-dx self-customizing — the agent learns from its own executions without requiring users to manually tune the workflow. The LLM decides in natural language what worked, what didn't, and what rules to add/modify. No rigid schema needed. This also supports moving workflow files to .hench/ (where execution config belongs) and splitting into pre-execution (instructions) and post-execution (reflection/adaptation) phases.",
+          "priority": "medium",
+          "tags": [
+            "hench",
+            "workflow",
+            "self-adapting",
+            "LLM"
+          ],
+          "source": "Design discussion, 2026-03-27"
         }
       ]
     },
