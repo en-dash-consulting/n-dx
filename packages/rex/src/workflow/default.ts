@@ -1,4 +1,5 @@
-export const DEFAULT_WORKFLOW = `\
+/** Base n-dx workflow — written to .rex/n-dx_workflow.md. Not user-editable. */
+export const NDX_WORKFLOW = `\
 This codebase will outlive you. Every shortcut you take becomes someone else's burden.
 Fight entropy. Leave the codebase better than you found it.
 
@@ -29,3 +30,32 @@ PROHIBITED CHANGES (mark the task as failing instead):
 If you cannot make a real fix, mark the task as failing with a clear explanation
 of what blocked you. Do not commit superficial changes.
 `;
+
+/** Sample workflow.md — user-editable overrides and additions. */
+export const USER_WORKFLOW_TEMPLATE = `\
+<!-- Project Workflow Customizations
+
+Add your project-specific workflow rules below. These will be appended
+to the base n-dx workflow (in .rex/n-dx_workflow.md) when the agent
+reads task execution instructions.
+
+Examples of what to put here:
+
+- Project-specific validation commands:
+  "Run 'pnpm lint' after every change."
+
+- Architectural constraints:
+  "Never add dependencies between the client/ and server/ directories."
+
+- Style preferences:
+  "Use functional components, not class components."
+  "Prefer named exports over default exports."
+
+- Prohibited patterns specific to your project:
+  "Do not use any() type assertions in TypeScript."
+
+Delete this comment block and add your rules below. -->
+`;
+
+// Backward compatibility
+export const DEFAULT_WORKFLOW = NDX_WORKFLOW;

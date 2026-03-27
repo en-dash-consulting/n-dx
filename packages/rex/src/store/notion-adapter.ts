@@ -263,7 +263,22 @@ export class NotionStore implements PRDStore {
   }
 
   async loadWorkflow(): Promise<string> {
-    return readFile(this.path("workflow.md"), "utf-8");
+    // Load base n-dx workflow + user customizations (same logic as file-adapter)
+    let base = "";
+    try {
+      base = await readFile(this.path("n-dx_workflow.md"), "utf-8");
+    } catch { /* no base workflow */ }
+
+    let userRaw = "";
+    try {
+      userRaw = await readFile(this.path("workflow.md"), "utf-8");
+    } catch { /* no user workflow */ }
+
+    if (!base) return userRaw || "";
+
+    const user = userRaw.replace(/<!--[\s\S]*?-->/g, "").trim();
+    if (user) return `${base}\n\n## Project-Specific Rules\n\n${user}`;
+    return base;
   }
 
   async saveWorkflow(content: string): Promise<void> {

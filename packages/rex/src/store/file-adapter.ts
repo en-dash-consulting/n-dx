@@ -177,7 +177,33 @@ export class FileStore implements PRDStore {
   }
 
   async loadWorkflow(): Promise<string> {
-    return readFile(this.path("workflow.md"), "utf-8");
+    // Load base n-dx workflow + user customizations
+    let base = "";
+    try {
+      base = await readFile(this.path("n-dx_workflow.md"), "utf-8");
+    } catch {
+      // n-dx_workflow.md doesn't exist — legacy or pre-split installation
+    }
+
+    let userRaw = "";
+    try {
+      userRaw = await readFile(this.path("workflow.md"), "utf-8");
+    } catch {
+      // No user workflow
+    }
+
+    if (!base) {
+      // Legacy mode: workflow.md is the only file, return as-is
+      return userRaw || "";
+    }
+
+    // Strip HTML comments from user workflow (the default template is one big comment)
+    const user = userRaw.replace(/<!--[\s\S]*?-->/g, "").trim();
+
+    if (user) {
+      return `${base}\n\n## Project-Specific Rules\n\n${user}`;
+    }
+    return base;
   }
 
   async saveWorkflow(content: string): Promise<void> {
