@@ -2,7 +2,7 @@
 
 > **Status:** Phase 2 — delivered
 > **Canonical test:** [`packages/sourcevision/tests/integration/go-zones.test.ts`](../../packages/sourcevision/tests/integration/go-zones.test.ts)
-> **Related:** [go-integration-plan.md](./go-integration-plan.md), [zone-naming-conventions.md](./zone-naming-conventions.md)
+> **Related:** [go-integration.md](./go-integration.md), [zone-naming-conventions.md](./zone-naming-conventions.md)
 
 ---
 
@@ -141,7 +141,7 @@ Go import edges resolve to package directories, not individual files. The zone a
 - Sub-file architectural patterns (e.g., "the handler calls the `CreateUser` function in the service, not the `DeleteUser` function") are invisible to zone detection.
 - A Go package with 50 files will appear as one unit in the import graph, even if internal sub-groups exist.
 
-**Workaround:** None currently. A future function-level call graph (Phase 4 — see [go-integration-plan.md](./go-integration-plan.md)) could provide finer granularity.
+**Workaround:** None currently. A future function-level call graph (Phase 4 — see [go-integration.md](./go-integration.md)) could provide finer granularity.
 
 ### 2. No function-level call graph
 
