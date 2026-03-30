@@ -70,6 +70,7 @@ import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integr
 import { runExport } from "./export.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const MONOREPO_ROOT = resolve(__dir, "../..");
 
 /** Map monorepo directory names to npm package names. */
 const PKG_NAMES = {
@@ -92,15 +93,15 @@ const _require = createRequire(import.meta.url);
  */
 function resolveToolPath(pkgDir) {
   // 1. Monorepo path — works when running from source checkout or npm link
-  const pkgPath = join(__dir, pkgDir, "package.json");
+  const pkgPath = join(MONOREPO_ROOT, pkgDir, "package.json");
   try {
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
     if (typeof pkg.bin === "string") {
-      return join(__dir, pkgDir, pkg.bin);
+      return join(MONOREPO_ROOT, pkgDir, pkg.bin);
     }
     if (pkg.bin && typeof pkg.bin === "object") {
       const first = Object.values(pkg.bin)[0];
-      if (first) return join(__dir, pkgDir, first);
+      if (first) return join(MONOREPO_ROOT, pkgDir, first);
     }
   } catch {
     // Not in monorepo — fall through to node_modules resolution
@@ -116,7 +117,7 @@ function resolveToolPath(pkgDir) {
     }
   }
 
-  return join(__dir, pkgDir, "dist/cli/index.js");
+  return join(MONOREPO_ROOT, pkgDir, "dist/cli/index.js");
 }
 
 /**
@@ -124,8 +125,8 @@ function resolveToolPath(pkgDir) {
  * then node_modules. Used for non-CLI entry points (build.js, dev.js).
  */
 function resolvePackageFile(pkgDir, file) {
-  const monoPath = join(__dir, pkgDir, file);
-  if (existsSync(monoPath)) return join(pkgDir, file);
+  const monoPath = join(MONOREPO_ROOT, pkgDir, file);
+  if (existsSync(monoPath)) return monoPath;
 
   const npmName = PKG_NAMES[pkgDir];
   if (npmName) {
@@ -171,7 +172,7 @@ function formatError(err) {
 }
 
 function run(script, args) {
-  const scriptPath = isAbsolute(script) ? script : resolve(__dir, script);
+  const scriptPath = isAbsolute(script) ? script : resolve(MONOREPO_ROOT, script);
   return new Promise((res) => {
     const child = spawn(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
@@ -859,7 +860,7 @@ async function handleDev(rest) {
 async function handleStart(rest, commandName = "start") {
   const dir = resolveDir(rest);
   try {
-    const code = await runWeb(dir, rest, { run, tools, __dir, commandName });
+    const code = await runWeb(dir, rest, { run, tools, __dir: MONOREPO_ROOT, commandName });
     process.exit(code);
   } catch (err) {
     console.error(formatError(err));
@@ -873,7 +874,7 @@ async function handleStart(rest, commandName = "start") {
  */
 function runCapture(script, args) {
   return new Promise((res) => {
-    const child = spawn(process.execPath, [resolve(__dir, script), ...args], {
+    const child = spawn(process.execPath, [resolve(MONOREPO_ROOT, script), ...args], {
       stdio: ["inherit", "pipe", "inherit"],
     });
     let stdout = "";

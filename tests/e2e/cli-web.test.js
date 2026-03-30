@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
 
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
+const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
 function runResult(args) {
   try {

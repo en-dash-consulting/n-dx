@@ -21,13 +21,14 @@ import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const MONOREPO_ROOT = resolve(__dir, "../..");
 const _require = createRequire(import.meta.url);
 
 /**
  * Resolve a file within a package — monorepo first, then node_modules.
  */
 function resolvePackagePath(pkgDir, npmName, filePath) {
-  const monoPath = join(__dir, pkgDir, filePath);
+  const monoPath = join(MONOREPO_ROOT, pkgDir, filePath);
   if (existsSync(monoPath)) return monoPath;
   try {
     return dirname(_require.resolve(npmName + "/package.json")) + "/" + filePath;

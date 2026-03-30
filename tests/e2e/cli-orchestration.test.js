@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
+const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
 /**
  * Run an ndx command, returning { stdout, stderr, code }.

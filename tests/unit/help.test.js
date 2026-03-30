@@ -10,7 +10,7 @@ import {
   formatToolHelp,
   getRelatedCommands,
   formatRelatedCommands,
-} from "../../help.js";
+} from "../../packages/core/help.js";
 
 describe("help.js", () => {
   describe("editDistance", () => {

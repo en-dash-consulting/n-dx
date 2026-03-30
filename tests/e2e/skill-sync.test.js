@@ -18,7 +18,7 @@ const ROOT = join(import.meta.dirname, "../..");
  * Returns a Map of skill name → content string.
  */
 function extractSkillsFromCI() {
-  const src = readFileSync(join(ROOT, "claude-integration.js"), "utf-8");
+  const src = readFileSync(join(ROOT, "packages/core/claude-integration.js"), "utf-8");
 
   const start = src.indexOf("const SKILLS = {");
   if (start === -1) throw new Error("Could not find SKILLS object in claude-integration.js");

@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 // ---------------------------------------------------------------------------
 
 /** Path to the main n-dx CLI entry point. */
-export const CLI_PATH = join(import.meta.dirname, "../../cli.js");
+export const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
 /** Default timeout for CLI commands (ms). */
 export const DEFAULT_TIMEOUT = 10000;

@@ -28,15 +28,12 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 
 ```
 packages/
+  core/            # CLI orchestrator (published as @n-dx/core)
   sourcevision/    # analysis engine
   rex/             # PRD + task tracker
   hench/           # autonomous agent
   llm-client/      # vendor-neutral LLM foundation (claude adapter + future vendors)
   web/             # dashboard + MCP HTTP server
-ci.js              # CI pipeline (analysis + PRD health validation)
-cli.js             # n-dx entry point (orchestration + delegation)
-config.js          # unified config command (view/edit all package settings)
-web.js             # server orchestration: dashboard + MCP (start/stop/status)
 ```
 
 ### Architecture
@@ -44,7 +41,7 @@ web.js             # server orchestration: dashboard + MCP (start/stop/status)
 Four-tier dependency hierarchy (each layer imports only from the layer below):
 
 ```
-  Orchestration   cli.js, web.js, ci.js        (spawns CLIs, no library imports)
+  Orchestration   packages/core/               (spawns CLIs, no library imports)
                   config.js                     (spawn-exempt — see note below)
        ↓
   Execution       hench                         (agent loops, tool dispatch)

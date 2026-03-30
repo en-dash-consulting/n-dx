@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const ROOT = join(import.meta.dirname, "../..");
-const CLI_PATH = join(ROOT, "cli.js");
+const CLI_PATH = join(ROOT, "packages/core/cli.js");
 
 /**
  * Mirror the resolveToolPath logic used in cli.js to verify

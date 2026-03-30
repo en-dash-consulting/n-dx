@@ -53,25 +53,11 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: bash scripts/version.sh
+          version: pnpm exec changeset version
           publish: pnpm exec changeset publish --access public
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-
-      - name: Publish @n-dx/core (root package)
-        run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          NPM_VERSION=$(npm view @n-dx/core version 2>/dev/null || echo "0.0.0")
-          if [ "$CURRENT" != "$NPM_VERSION" ]; then
-            echo "Publishing @n-dx/core@$CURRENT (npm has $NPM_VERSION)"
-            npm publish --access public --provenance
-          else
-            echo "@n-dx/core@$CURRENT already published, skipping"
-          fi
-        env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

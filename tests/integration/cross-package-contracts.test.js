@@ -781,7 +781,7 @@ describe("orchestration spawn call-sites match package CLI parsers", () => {
     hench: join(ROOT, "packages/hench/src/cli/index.ts"),
   };
 
-  const cliJsPath = join(ROOT, "cli.js");
+  const cliJsPath = join(ROOT, "packages/core/cli.js");
   const spawnedCommands = parseSpawnedSubcommands(cliJsPath);
 
   for (const [pkg, sourcePath] of Object.entries(CLI_SOURCES)) {

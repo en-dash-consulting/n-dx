@@ -7,7 +7,7 @@ import {
   validateRefreshStep,
   validateRefreshCompletion,
   rollbackRefreshState,
-} from "../../refresh-validate.js";
+} from "../../packages/core/refresh-validate.js";
 
 // ---------------------------------------------------------------------------
 // snapshotRefreshState

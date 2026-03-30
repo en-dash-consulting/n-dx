@@ -1,67 +1,12 @@
 {
-  "name": "@n-dx/core",
-  "publishConfig": {
-    "access": "public"
-  },
-  "version": "0.1.9",
-  "description": "AI-powered development toolkit — analyze a codebase, build a PRD, and execute tasks autonomously",
+  "name": "n-dx",
+  "private": true,
   "type": "module",
-  "keywords": [
-    "ai",
-    "cli",
-    "prd",
-    "agent",
-    "sourcevision",
-    "rex",
-    "hench",
-    "codebase-analysis",
-    "autonomous",
-    "developer-tools"
-  ],
-  "author": "Nick Daniel <nick@endash.us>",
-  "license": "Elastic-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/en-dash-consulting/n-dx.git"
-  },
-  "bugs": {
-    "url": "https://github.com/en-dash-consulting/n-dx/issues"
-  },
-  "homepage": "https://github.com/en-dash-consulting/n-dx#readme",
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "workspaces": [
     "packages/*"
   ],
-  "bin": {
-    "n-dx": "./cli.js",
-    "ndx": "./cli.js",
-    "rex": "./bin/rex.js",
-    "hench": "./bin/hench.js",
-    "sourcevision": "./bin/sourcevision.js",
-    "sv": "./bin/sourcevision.js"
-  },
-  "files": [
-    "bin/",
-    "cli.js",
-    "config.js",
-    "ci.js",
-    "web.js",
-    "help.js",
-    "gateway-rules.json",
-    "refresh-plan.js",
-    "refresh-artifacts.js",
-    "export.js",
-    "claude-integration.js",
-    "refresh-validate.js"
-  ],
-  "dependencies": {
-    "@n-dx/rex": "workspace:*",
-    "@n-dx/hench": "workspace:*",
-    "@n-dx/sourcevision": "workspace:*",
-    "@n-dx/llm-client": "workspace:*",
-    "@n-dx/web": "workspace:*"
+  "engines": {
+    "node": ">=18.0.0"
   },
   "scripts": {
     "build": "pnpm -r run build",
@@ -69,7 +14,7 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run && pnpm -r run test",
     "validate": "pnpm -r run validate",
-    "verify": "vitest run tests/e2e && node ci.js .",
+    "verify": "vitest run tests/e2e && node packages/core/ci.js .",
     "pr-check": "node pr-check.js",
     "prepublishOnly": "if [ -z \"$CI\" ]; then pnpm run build && pnpm run typecheck && pnpm run test; fi",
     "prepare": "pnpm run build",
@@ -86,6 +31,5 @@
     "vitepress": "^1.6.4",
     "vitest": "^4.0.18"
   },
-  "codeOfConduct": "./CODE_OF_CONDUCT.md",
   "packageManager": "pnpm@10.28.2+sha512.41872f037ad22f7348e3b1debbaf7e867cfd448f2726d9cf74c08f19507c31d2c8e7a11525b983febc2df640b5438dee6023ebb1f84ed43cc2d654d2bc326264"
 }

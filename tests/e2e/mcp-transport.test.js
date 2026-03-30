@@ -22,7 +22,7 @@ import {
   setupSourcevisionDir,
 } from "./e2e-helpers.js";
 
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
+const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
 /**
  * Wait for the server to accept connections on the given port.

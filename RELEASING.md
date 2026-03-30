@@ -1,6 +1,6 @@
 # Releasing n-dx
 
-Only the root `n-dx` package is published to npm. Sub-packages (`rex`, `hench`, `sourcevision`, `@n-dx/llm-client`, `@n-dx/web`) are bundled inside it and marked `private: true`.
+All packages (`@n-dx/core`, `@n-dx/rex`, `@n-dx/hench`, `@n-dx/sourcevision`, `@n-dx/llm-client`, `@n-dx/web`) are published to npm. They share a single version number via a [Changesets fixed group](https://github.com/changesets/changesets/blob/main/docs/fixed-packages.md).
 
 ## How versioning works
 
@@ -32,25 +32,27 @@ A `.changeset/<random-name>.md` file is created. Commit it with your PR — it's
 After merging PRs with changeset files to `main`:
 
 1. The release workflow opens (or updates) a **"Version Packages"** PR
-2. That PR bumps `version` in `package.json`, writes `CHANGELOG.md`, and removes consumed changeset files
+2. That PR bumps `version` in all packages, writes `CHANGELOG.md`, and removes consumed changeset files
 3. Review the PR — it shows exactly what version bump and changelog entries will be created
 4. **Merge the "Version Packages" PR** → the workflow runs `changeset publish`, which:
-   - Publishes to npm
-   - Creates a git tag (`n-dx@x.y.z`)
+   - Publishes all packages to npm (using `pnpm publish`, which resolves `workspace:*` to real versions)
+   - Creates git tags
 
 ### Required secrets
 
-The release workflow needs an `NPM_TOKEN` secret in the GitHub repo settings. Create one at [npmjs.com/settings/tokens](https://www.npmjs.com/settings/tokens) with publish permission.
+The release workflow needs an `NPM_TOKEN` secret in the GitHub repo settings. Create one at [npmjs.com/settings/tokens](https://www.npmjs.com/settings/tokens) with publish permission scoped to `@n-dx/*`.
 
 ## What gets published
 
-The `files` field in `package.json` controls the tarball contents:
+The `@n-dx/core` package is the main CLI entry point. Its `files` field in `packages/core/package.json` controls the tarball contents:
 
-- Root orchestration scripts (`cli.js`, `config.js`, `web.js`, `ci.js`, etc.)
-- Compiled sub-packages (`packages/*/dist/` + their `package.json` files)
+- Orchestration scripts (`cli.js`, `config.js`, `web.js`, `ci.js`, etc.)
+- `bin/` shims for direct tool access (`rex`, `hench`, `sourcevision`)
 - `LICENSE`, `README.md`, `package.json` (included automatically by npm)
 
-Verify with `npm pack --dry-run` before publishing.
+The sub-packages (`@n-dx/rex`, `@n-dx/hench`, etc.) are published independently and listed as dependencies of `@n-dx/core`.
+
+Verify with `pnpm pack --dry-run` from `packages/core/`.
 
 ## CLI commands registered on install
 
@@ -59,10 +61,10 @@ When users run `npm i -g @n-dx/core`, these commands become available:
 | Command | Binary |
 |---------|--------|
 | `n-dx` / `ndx` | `cli.js` |
-| `rex` | `packages/rex/dist/cli/index.js` |
-| `hench` | `packages/hench/dist/cli/index.js` |
-| `sourcevision` / `sv` | `packages/sourcevision/dist/cli/index.js` |
+| `rex` | `bin/rex.js` → `packages/rex/dist/cli/index.js` |
+| `hench` | `bin/hench.js` → `packages/hench/dist/cli/index.js` |
+| `sourcevision` / `sv` | `bin/sourcevision.js` → `packages/sourcevision/dist/cli/index.js` |
 
 ## Git tags
 
-Created automatically by `changeset publish`. Format: `n-dx@0.2.0`. No manual tagging needed.
+Created automatically by `changeset publish`. Format: `@n-dx/core@0.2.0`. No manual tagging needed.

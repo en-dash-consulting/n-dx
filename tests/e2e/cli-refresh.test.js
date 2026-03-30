@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
+const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
 function runRefresh(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "refresh", ...args], {

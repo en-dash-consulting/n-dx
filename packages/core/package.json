@@ -1,0 +1,67 @@
+{
+  "name": "@n-dx/core",
+  "version": "0.1.9",
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "AI-powered development toolkit — analyze a codebase, build a PRD, and execute tasks autonomously",
+  "type": "module",
+  "keywords": [
+    "ai",
+    "cli",
+    "prd",
+    "agent",
+    "sourcevision",
+    "rex",
+    "hench",
+    "codebase-analysis",
+    "autonomous",
+    "developer-tools"
+  ],
+  "author": "Nick Daniel <nick@endash.us>",
+  "license": "Elastic-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/en-dash-consulting/n-dx.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/en-dash-consulting/n-dx/issues"
+  },
+  "homepage": "https://github.com/en-dash-consulting/n-dx#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "bin": {
+    "n-dx": "./cli.js",
+    "ndx": "./cli.js",
+    "rex": "./bin/rex.js",
+    "hench": "./bin/hench.js",
+    "sourcevision": "./bin/sourcevision.js",
+    "sv": "./bin/sourcevision.js"
+  },
+  "files": [
+    "bin/",
+    "cli.js",
+    "config.js",
+    "ci.js",
+    "web.js",
+    "help.js",
+    "gateway-rules.json",
+    "refresh-plan.js",
+    "refresh-artifacts.js",
+    "export.js",
+    "claude-integration.js",
+    "refresh-validate.js"
+  ],
+  "scripts": {
+    "build": "echo '@n-dx/core: plain JS, no build needed'"
+  },
+  "dependencies": {
+    "@n-dx/rex": "workspace:*",
+    "@n-dx/hench": "workspace:*",
+    "@n-dx/sourcevision": "workspace:*",
+    "@n-dx/llm-client": "workspace:*",
+    "@n-dx/web": "workspace:*"
+  }
+}

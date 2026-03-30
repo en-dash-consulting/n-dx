@@ -36,7 +36,7 @@ async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCod
   return filePath;
 }
 
-const CLI_PATH = join(import.meta.dirname, "../../cli.js");
+const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "config", ...args], {

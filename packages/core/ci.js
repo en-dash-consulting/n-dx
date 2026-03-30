@@ -24,6 +24,7 @@ import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const MONOREPO_ROOT = resolve(__dir, "../..");
 
 /**
  * Run a subprocess and capture its stdout/stderr.
@@ -33,7 +34,7 @@ function runCapture(script, args) {
   return new Promise((res) => {
     const child = spawn(
       process.execPath,
-      [resolve(__dir, script), ...args],
+      [resolve(MONOREPO_ROOT, script), ...args],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
 

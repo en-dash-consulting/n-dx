@@ -337,12 +337,12 @@ describe("architecture policy: orchestration tier boundary", () => {
    * in the orchestration tier — it must follow the same rules.
    */
   const ORCHESTRATION_FILES = [
-    "cli.js",
-    "ci.js",
-    "web.js",
-    "config.js",
-    "pr-check.js",
-    "claude-integration.js",
+    "packages/core/cli.js",
+    "packages/core/ci.js",
+    "packages/core/web.js",
+    "packages/core/config.js",
+    "packages/core/pr-check.js",
+    "packages/core/claude-integration.js",
   ];
 
   const DOMAIN_PACKAGES = ["@n-dx/rex", "@n-dx/sourcevision", "@n-dx/hench", "@n-dx/web"];
@@ -382,7 +382,7 @@ describe("architecture policy: orchestration tier boundary", () => {
    * filesystem I/O and child_process coordination.
    */
   it("config.js must only import from node: builtins", () => {
-    const fullPath = join(ROOT, "config.js");
+    const fullPath = join(ROOT, "packages/core/config.js");
     if (!existsSync(fullPath)) return;
 
     const content = readFileSync(fullPath, "utf-8");
@@ -425,7 +425,7 @@ describe("architecture policy: orchestration tier boundary", () => {
  * This is the single source of truth for gateway file paths and allowed
  * import patterns, shared with ci.js to prevent silent divergence.
  */
-const _gatewayConfig = JSON.parse(readFileSync(join(ROOT, "gateway-rules.json"), "utf-8"));
+const _gatewayConfig = JSON.parse(readFileSync(join(ROOT, "packages/core/gateway-rules.json"), "utf-8"));
 
 const GATEWAY_RULES = _gatewayConfig.gateways.map((g) => ({
   packageDir: g.consumer,
@@ -1077,12 +1077,12 @@ describe("architecture policy: production → test boundary", () => {
  */
 describe("architecture policy: foundation tier boundary (@n-dx/llm-client)", () => {
   const ORCHESTRATION_FILES = [
-    "cli.js",
-    "ci.js",
-    "web.js",
-    "config.js",
-    "pr-check.js",
-    "claude-integration.js",
+    "packages/core/cli.js",
+    "packages/core/ci.js",
+    "packages/core/web.js",
+    "packages/core/config.js",
+    "packages/core/pr-check.js",
+    "packages/core/claude-integration.js",
   ];
 
   for (const file of ORCHESTRATION_FILES) {

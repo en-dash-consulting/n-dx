@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildRefreshPlan, RefreshPlanError } from "../../refresh-plan.js";
+import { buildRefreshPlan, RefreshPlanError } from "../../packages/core/refresh-plan.js";
 
 describe("buildRefreshPlan", () => {
   it("builds a UI-only plan that skips data refresh steps", () => {

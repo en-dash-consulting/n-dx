@@ -37,14 +37,14 @@ const ALLOWED = new Set([
   "packages/llm-client/src/codex-cli-provider.ts",
   "packages/hench/src/agent/lifecycle/cli-loop.ts",
   // Orchestration layer — spawns CLIs directly (no library imports)
-  "bin/rex.js",
-  "bin/hench.js",
-  "bin/sourcevision.js",
-  "cli.js",
-  "ci.js",
-  "web.js",
-  "config.js",
-  "export.js",
+  "packages/core/bin/rex.js",
+  "packages/core/bin/hench.js",
+  "packages/core/bin/sourcevision.js",
+  "packages/core/cli.js",
+  "packages/core/ci.js",
+  "packages/core/web.js",
+  "packages/core/config.js",
+  "packages/core/export.js",
   "pr-check.js",
   // Development scripts
   "packages/web/dev.js",
@@ -59,7 +59,7 @@ const ALLOWED = new Set([
   "packages/web/src/server/routes-hench.ts",
   "packages/web/src/server/routes-sourcevision.ts",
   // Claude Code integration — runs `claude mcp add` via execSync
-  "claude-integration.js",
+  "packages/core/claude-integration.js",
 ]);
 
 /** Directories to skip entirely. */
@@ -183,7 +183,7 @@ describe("architecture policy: intra-package layering", () => {
  * Peer orchestration imports (cli.js importing from web.js, etc.) are
  * allowed — they are all at the same tier level.
  */
-const ORCHESTRATION_FILES = ["cli.js", "web.js", "ci.js"];
+const ORCHESTRATION_FILES = ["packages/core/cli.js", "packages/core/web.js", "packages/core/ci.js"];
 
 /**
  * Files at the orchestration tier that are allowed to be imported by
@@ -191,14 +191,14 @@ const ORCHESTRATION_FILES = ["cli.js", "web.js", "ci.js"];
  */
 const ORCHESTRATION_PEERS = new Set([
   "cli-brand.js",
-  "config.js",
-  "web.js",
-  "ci.js",
-  "help.js",
-  "refresh-plan.js",
-  "refresh-artifacts.js",
-  "refresh-validate.js",
-  "claude-integration.js",
+  "packages/core/config.js",
+  "packages/core/web.js",
+  "packages/core/ci.js",
+  "packages/core/help.js",
+  "packages/core/refresh-plan.js",
+  "packages/core/refresh-artifacts.js",
+  "packages/core/refresh-validate.js",
+  "packages/core/claude-integration.js",
 ]);
 
 /**
@@ -1180,6 +1180,8 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/web/src/server/routes-integrations.ts", "Lazy-loads integration handlers on demand"],
   ["packages/web/src/server/routes-notion.ts", "Lazy-loads Notion integration on demand"],
   ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
+  // Core orchestrator — dynamic import of rex public API for export pre-rendering
+  ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],
 ]);
 
 describe("architecture policy: dynamic import audit", () => {

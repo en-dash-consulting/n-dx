@@ -7,22 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@n-dx/hench':
-        specifier: workspace:*
-        version: link:packages/hench
-      '@n-dx/llm-client':
-        specifier: workspace:*
-        version: link:packages/llm-client
-      '@n-dx/rex':
-        specifier: workspace:*
-        version: link:packages/rex
-      '@n-dx/sourcevision':
-        specifier: workspace:*
-        version: link:packages/sourcevision
-      '@n-dx/web':
-        specifier: workspace:*
-        version: link:packages/web
     devDependencies:
       '@changesets/changelog-github':
         specifier: ^0.6.0
@@ -36,6 +20,24 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@25.2.0)(jsdom@27.4.0)
+
+  packages/core:
+    dependencies:
+      '@n-dx/hench':
+        specifier: workspace:*
+        version: link:../hench
+      '@n-dx/llm-client':
+        specifier: workspace:*
+        version: link:../llm-client
+      '@n-dx/rex':
+        specifier: workspace:*
+        version: link:../rex
+      '@n-dx/sourcevision':
+        specifier: workspace:*
+        version: link:../sourcevision
+      '@n-dx/web':
+        specifier: workspace:*
+        version: link:../web
 
   packages/hench:
     dependencies:

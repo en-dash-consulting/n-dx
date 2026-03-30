@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { refreshSourcevisionDashboardArtifacts } from "../../refresh-artifacts.js";
+import { refreshSourcevisionDashboardArtifacts } from "../../packages/core/refresh-artifacts.js";
 
 describe("refreshSourcevisionDashboardArtifacts", () => {
   let tmpDir;
