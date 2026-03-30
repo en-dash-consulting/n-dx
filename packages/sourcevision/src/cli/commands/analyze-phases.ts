@@ -314,6 +314,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
           zonePins: Object.keys(zonePins).length > 0 ? zonePins : undefined,
+          reuseStructure: true,
         });
         zones = zonesResult.zones;
         if (zonesResult.tokenUsage) {

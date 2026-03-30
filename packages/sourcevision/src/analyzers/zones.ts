@@ -2310,6 +2310,11 @@ export async function analyzeZones(
      * Default: 3. Configurable via `sourcevision.zones.mergeThreshold` in `.n-dx.json`.
      */
     smallZoneMergeThreshold?: number;
+    /**
+     * Skip Louvain zone detection and reuse the zone structure from previousZones.
+     * Used by --full enrichment passes to avoid non-deterministic re-partitioning.
+     */
+    reuseStructure?: boolean;
   }
 ): Promise<AnalyzeZonesResult> {
   const enrich = options?.enrich ?? true;
@@ -2321,41 +2326,61 @@ export async function analyzeZones(
   const { filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes } =
     prepareScopeAndEdges(inventory, imports, subAnalyses);
 
-  // ── Build previous zone assignment for stability bias ──
-  let previousZoneAssignment: Map<string, string> | undefined;
-  if (previousZones?.zones) {
-    previousZoneAssignment = new Map<string, string>();
-    for (const zone of previousZones.zones) {
-      for (const file of zone.files) {
-        previousZoneAssignment.set(file, zone.id);
+  let expandedZones: Zone[];
+  let unzoned: string[];
+  let filenameBasedZoneIds: Set<string> | undefined;
+  let structureHash: string;
+  let structureChanged: boolean;
+
+  if (options?.reuseStructure && previousZones) {
+    // Reuse existing zone structure — skip Louvain to avoid non-deterministic
+    // re-partitioning that resets enrichmentPass on every --full iteration.
+    expandedZones = previousZones.zones.map((z) => ({ ...z }));
+    unzoned = previousZones.unzoned ?? [];
+    filenameBasedZoneIds = undefined;
+    structureHash = previousZones.structureHash ?? computeStructureHash(expandedZones);
+    structureChanged = false;
+  } else {
+    // ── Build previous zone assignment for stability bias ──
+    let previousZoneAssignment: Map<string, string> | undefined;
+    if (previousZones?.zones) {
+      previousZoneAssignment = new Map<string, string>();
+      for (const zone of previousZones.zones) {
+        for (const file of zone.files) {
+          previousZoneAssignment.set(file, zone.id);
+        }
       }
     }
-  }
 
-  // ── Run zone detection pipeline ──
-  const pipeline = runZonePipeline({
-    edges: filteredEdges,
-    inventory,
-    imports,
-    scopeFiles,
-    maxZonePercent: options?.maxZonePercent,
-    testFiles,
-    zonePins: options?.zonePins,
-    smallZoneMergeThreshold: options?.smallZoneMergeThreshold,
-    previousZoneAssignment,
-  });
-  const { zones: expandedZones, unzoned, filenameBasedZoneIds, smallZoneMergeLog: mergeLog } = pipeline;
+    // ── Run zone detection pipeline ──
+    const pipeline = runZonePipeline({
+      edges: filteredEdges,
+      inventory,
+      imports,
+      scopeFiles,
+      maxZonePercent: options?.maxZonePercent,
+      testFiles,
+      zonePins: options?.zonePins,
+      smallZoneMergeThreshold: options?.smallZoneMergeThreshold,
+      previousZoneAssignment,
+    });
+    const mergeLog = pipeline.smallZoneMergeLog;
+    expandedZones = pipeline.zones;
+    unzoned = pipeline.unzoned;
+    filenameBasedZoneIds = pipeline.filenameBasedZoneIds;
 
-  // Log small-zone merge decisions for debuggability
-  if (mergeLog.length > 0) {
-    for (const entry of mergeLog) {
-      console.log(`  [zones] merged small zone "${entry.smallCommunity}" (${entry.memberCount} files) → "${entry.mergedInto}" (import weight: ${entry.importWeight})`);
+    // Log small-zone merge decisions for debuggability
+    if (mergeLog.length > 0) {
+      for (const entry of mergeLog) {
+        console.log(`  [zones] merged small zone "${entry.smallCommunity}" (${entry.memberCount} files) → "${entry.mergedInto}" (import weight: ${entry.importWeight})`);
+      }
     }
+
+    // ── Structure hash & change detection ──
+    structureHash = computeStructureHash(expandedZones);
+    structureChanged = previousZones?.structureHash !== structureHash;
   }
 
-  // ── Structure hash & change detection ──
-  const structureHash = computeStructureHash(expandedZones);
-  const structureChanged = previousZones?.structureHash !== structureHash;
   const validPrevious = structureChanged ? undefined : previousZones;
 
   if (structureChanged && previousZones?.enrichmentPass && options?.onReset) {
