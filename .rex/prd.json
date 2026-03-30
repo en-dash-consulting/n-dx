@@ -19257,10 +19257,9 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "completed",
+      "status": "pending",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
-      "completedAt": "2026-03-24T13:06:25.502Z",
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20532,6 +20531,25 @@
               "completedAt": "2026-03-24T13:06:25.502Z"
             }
           ]
+        },
+        {
+          "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
+          "title": "Support .n-dx.local.json for machine-specific config overrides",
+          "status": "pending",
+          "level": "task",
+          "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
+          "acceptanceCriteria": [
+            "config.js loads .n-dx.local.json and deep-merges it over .n-dx.json (local wins)",
+            "ndx init appends .n-dx.local.json to .gitignore if not already present",
+            "ndx config writes machine-specific keys (cli_path, etc.) to .n-dx.local.json instead of .n-dx.json",
+            "Missing .n-dx.local.json is not an error — silent no-op"
+          ],
+          "priority": "medium",
+          "tags": [
+            "config",
+            "dx"
+          ],
+          "source": "conversation — hit when Steve's Windows cli_path in .n-dx.json broke ndx init on macOS"
         }
       ]
     },
