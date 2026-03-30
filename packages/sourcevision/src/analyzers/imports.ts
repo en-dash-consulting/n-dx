@@ -1,6 +1,7 @@
 /**
  * Deterministic import graph analyzer.
- * Uses the TypeScript compiler API for AST parsing — no Claude invocation.
+ * Uses the TypeScript compiler API for JS/TS AST parsing and the Go import
+ * parser for .go files — no Claude invocation.
  */
 
 import { readFile } from "node:fs/promises";
@@ -17,10 +18,15 @@ import type {
 import { sortImports } from "../util/sort.js";
 import { detectCirculars } from "../util/merge.js";
 import { toPosix } from "../util/paths.js";
+import { extractGoImports, readGoModulePath } from "./go-imports.js";
+import { readManifest } from "./manifest.js";
+import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/index.js";
+import type { LanguageConfig } from "../language/index.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
 const JS_TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+const GO_EXTENSION = ".go";
 const PROBE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
 
 // ── AST extraction ───────────────────────────────────────────────────────────
@@ -330,6 +336,8 @@ export interface ImportsOptions {
   previousImports?: Imports;
   changedFiles?: Set<string>;
   fileSetChanged?: boolean;
+  /** Primary language id (e.g. "go", "typescript"). Reads manifest.language / detectLanguage when omitted. */
+  language?: string;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -342,6 +350,37 @@ export async function analyzeImports(
   const fileSet = new Set(inventory.files.map((f) => f.path));
   const tsconfigPaths = await readTsconfigPaths(targetDir);
   const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
+
+  // ── Resolve language → build parseable extension set ──────────────────────
+  // Use all detected languages (from manifest.languages) so mixed projects
+  // produce import edges for both Go and TypeScript files.
+  let langConfig: LanguageConfig | undefined;
+  const manifest = readManifest(targetDir);
+  if (manifest.languages && manifest.languages.length > 0) {
+    const configs = manifest.languages
+      .map((id) => getLanguageConfig(id))
+      .filter((c): c is NonNullable<typeof c> => c != null);
+    if (configs.length > 0) {
+      langConfig = mergeLanguageConfigs(configs);
+    }
+  }
+  if (!langConfig && options?.language) {
+    langConfig = getLanguageConfig(options.language);
+  }
+  if (!langConfig && manifest.language) {
+    langConfig = getLanguageConfig(manifest.language);
+  }
+  if (!langConfig) {
+    langConfig = mergeLanguageConfigs(await detectLanguages(targetDir));
+  }
+
+  // Always include JS/TS for backward compatibility; add resolved language extensions.
+  const parseableExts = new Set<string>(JS_TS_EXTENSIONS);
+  for (const ext of langConfig.parseableExtensions) parseableExts.add(ext);
+
+  // ── Read go.mod once if any Go files exist in the inventory ───────────────
+  const hasGoFiles = inventory.files.some((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
+  const goModulePath = hasGoFiles ? await readGoModulePath(targetDir) : null;
 
   const prev = options?.previousImports;
   const changedFiles = options?.changedFiles;
@@ -401,14 +440,29 @@ export async function analyzeImports(
       } catch {
         continue;
       }
-      const rawImports = extractImports(sourceText, filePath);
-      for (const raw of rawImports) {
-        if (raw.specifier.startsWith("node:") || raw.specifier.startsWith(".")) continue;
-        const pkg = extractPackageName(raw.specifier);
-        const existing = externalMap.get(pkg);
-        if (existing) {
-          const symbols = new Set([...existing.symbols, ...raw.symbols]);
-          existing.symbols = Array.from(symbols);
+
+      const fileExt = extname(filePath).toLowerCase();
+      if (fileExt === GO_EXTENSION) {
+        // Go file: re-extract external imports using Go parser
+        const goResult = extractGoImports(sourceText, filePath, goModulePath);
+        for (const goExt of goResult.external) {
+          const existing = externalMap.get(goExt.package);
+          if (existing) {
+            const symbols = new Set([...existing.symbols, ...goExt.symbols]);
+            existing.symbols = Array.from(symbols);
+          }
+        }
+      } else {
+        // JS/TS file: existing logic
+        const rawImports = extractImports(sourceText, filePath);
+        for (const raw of rawImports) {
+          if (raw.specifier.startsWith("node:") || raw.specifier.startsWith(".")) continue;
+          const pkg = extractPackageName(raw.specifier);
+          const existing = externalMap.get(pkg);
+          if (existing) {
+            const symbols = new Set([...existing.symbols, ...raw.symbols]);
+            existing.symbols = Array.from(symbols);
+          }
         }
       }
     }
@@ -417,12 +471,17 @@ export async function analyzeImports(
   // Determine which files to parse
   const parseable = inventory.files.filter((f) => {
     const ext = extname(f.path).toLowerCase();
-    if (!JS_TS_EXTENSIONS.has(ext)) return false;
+    if (!parseableExts.has(ext)) return false;
     if (canIncremental) return changedFiles.has(f.path);
     return true;
   });
 
-  for (const file of parseable) {
+  // Partition into JS/TS and Go files to prevent cross-language contamination
+  const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
+  const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
+
+  // ── Process JS/TS files ───────────────────────────────────────────────────
+  for (const file of jsTsFiles) {
     const fullPath = join(targetDir, file.path);
     let sourceText: string;
     try {
@@ -477,6 +536,47 @@ export async function analyzeImports(
         }
       }
       // Unresolved relative imports are silently skipped
+    }
+  }
+
+  // ── Process Go files ──────────────────────────────────────────────────────
+  for (const file of goParseableFiles) {
+    const fullPath = join(targetDir, file.path);
+    let sourceText: string;
+    try {
+      sourceText = await readFile(fullPath, "utf-8");
+    } catch {
+      continue;
+    }
+
+    const goResult = extractGoImports(sourceText, file.path, goModulePath);
+
+    // Merge Go internal edges
+    for (const edge of goResult.edges) {
+      const key = `${edge.from}\0${edge.to}\0${edge.type}`;
+      const existing = edgeMap.get(key);
+      if (existing) {
+        const merged = new Set([...existing.symbols, ...edge.symbols]);
+        edgeMap.set(key, { ...existing, symbols: Array.from(merged) });
+      } else {
+        edgeMap.set(key, edge);
+      }
+    }
+
+    // Merge Go external imports
+    for (const goExt of goResult.external) {
+      const existing = externalMap.get(goExt.package);
+      if (existing) {
+        const importedBy = new Set([...existing.importedBy, ...goExt.importedBy]);
+        const symbols = new Set([...existing.symbols, ...goExt.symbols]);
+        externalMap.set(goExt.package, {
+          package: goExt.package,
+          importedBy: Array.from(importedBy),
+          symbols: Array.from(symbols),
+        });
+      } else {
+        externalMap.set(goExt.package, { ...goExt });
+      }
     }
   }
 

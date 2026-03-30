@@ -8,8 +8,7 @@
       "status": "completed",
       "level": "epic",
       "description": "Static analysis engine: file inventory, import graph, zone detection (Louvain community detection), React component catalog, PR markdown generation. Produces .sourcevision/CONTEXT.md and llms.txt for AI consumption.",
-      "startedAt": "2026-03-25T05:39:49.717Z",
-      "completedAt": "2026-03-26T21:00:03.668Z",
+      "completedAt": "2026-03-24T04:16:45.798Z",
       "children": [
         {
           "id": "3bf3754c-c0d0-4fb7-9cbd-5ebbddb85d51",
@@ -9185,334 +9184,6 @@
             "matchedItemStatus": "completed",
             "createdAt": "2026-02-25T03:25:22.943Z"
           }
-        },
-        {
-          "id": "4eb57dc8-3b8b-4fbd-ba8e-77514c95c915",
-          "title": "Zone Metric Accuracy",
-          "status": "completed",
-          "level": "feature",
-          "description": "Zone cohesion/coupling metrics are skewed by small zones (<5 files) that score 0.00 cohesion due to having no internal import edges. Since project-wide averages include all zones equally, each new tiny zone drags the average down — making it look like the project is degrading when it isn't. Metrics should be weighted by zone size and sub-threshold zones should be excluded or reported separately.",
-          "priority": "high",
-          "tags": [
-            "metrics",
-            "cohesion",
-            "user-feedback"
-          ],
-          "source": "User feedback: react-big-schedule project, 2026-03-24",
-          "startedAt": "2026-03-25T05:35:47.719Z",
-          "completedAt": "2026-03-25T05:35:47.719Z",
-          "children": [
-            {
-              "id": "eb1c87e3-c884-41c2-84a3-4059de4cf40c",
-              "title": "Weighted cohesion metric by zone file count",
-              "status": "completed",
-              "level": "task",
-              "description": "Compute project-wide average cohesion as a weighted average where each zone's contribution is proportional to its file count. A 51-file zone at 0.93 cohesion should matter far more than a 3-file zone at 0.00. Report both weighted and unweighted averages for transparency.",
-              "acceptanceCriteria": [
-                "zones.ts computes weighted average cohesion using file count as weight",
-                "Both weighted and unweighted averages are available in output",
-                "CONTEXT.md and llms.txt report weighted average as the primary metric",
-                "Unweighted average still available for backwards compatibility"
-              ],
-              "priority": "high",
-              "tags": [
-                "metrics",
-                "cohesion"
-              ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24",
-              "startedAt": "2026-03-25T05:29:46.760Z",
-              "completedAt": "2026-03-25T05:31:08.410Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added unweighted cohesion/coupling to ZoneAggregateMetrics alongside existing weighted averages. CONTEXT.md now reports both. The weighted metric (computed by file count) was already in place from the sub-threshold exclusion task."
-            },
-            {
-              "id": "6eca4ae5-048e-4b5d-a314-94a1bf133092",
-              "title": "Exclude sub-threshold zones from aggregate cohesion",
-              "status": "completed",
-              "level": "task",
-              "description": "Zones with fewer than 5 files already get a note that their metrics are unreliable. Exclude these zones from project-wide aggregate metrics (both weighted and unweighted averages). Report them in a separate \"small zones\" section so they're visible but don't skew the overall picture.",
-              "acceptanceCriteria": [
-                "Zones with <5 files are excluded from project-wide cohesion/coupling averages",
-                "Small zones are reported in a separate section in CONTEXT.md",
-                "The 5-file threshold is configurable via sourcevision config",
-                "Dashboard and MCP tools reflect the updated averages"
-              ],
-              "priority": "high",
-              "tags": [
-                "metrics",
-                "cohesion"
-              ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24",
-              "startedAt": "2026-03-25T05:24:16.870Z",
-              "completedAt": "2026-03-25T05:29:14.051Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added computeZoneAggregates() in risk-scoring.ts that computes weighted cohesion/coupling excluding zones below minZoneSize (5). Used in CONTEXT.md, llms.txt, and PDF report generators. Small zone count reported separately."
-            },
-            {
-              "id": "f955d746-8b7d-42ae-b5f4-0c2462334591",
-              "title": "Smarter small-zone merge after remediation",
-              "status": "completed",
-              "level": "task",
-              "description": "After self-heal creates or moves files, re-run zone detection may produce new tiny zones (build-configuration, test-infrastructure-mocks, etc.) with 0.00 cohesion. The existing mergeSmallCommunities() should be more aggressive about absorbing these into neighboring zones based on import affinity rather than letting them stand alone. Consider making the merge threshold configurable.",
-              "acceptanceCriteria": [
-                "mergeSmallCommunities() considers import affinity when choosing merge target",
-                "Merge threshold is configurable via sourcevision config",
-                "Zones created by remediation that have <3 files are auto-merged",
-                "Zone merge decisions are logged for debuggability"
-              ],
-              "priority": "medium",
-              "tags": [
-                "zones",
-                "merge"
-              ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24",
-              "startedAt": "2026-03-25T05:31:31.872Z",
-              "completedAt": "2026-03-25T05:35:47.533Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "mergeSmallCommunities already used import affinity. Added: configurable threshold via smallZoneMergeThreshold option (wired from analyzeZones → runZonePipeline → mergeSmallCommunities), MergeLogEntry interface for merge decision logging, console output of merge decisions during zone detection."
-            }
-          ]
-        },
-        {
-          "id": "3cfc11dd-63df-4cba-a872-27cfb97cc771",
-          "title": "Finding Reliability",
-          "status": "completed",
-          "level": "feature",
-          "description": "Findings generated by SourceVision enrichment lack category distinction and staleness detection. Structural findings (zone boundary opinions like \"this zone spans too many directories\") are treated the same as code findings (actual bugs/duplication). Additionally, findings from previous scans can persist even after the underlying code has been fixed, causing the self-heal loop to attempt remediation of non-existent problems.",
-          "priority": "high",
-          "tags": [
-            "findings",
-            "enrichment",
-            "user-feedback"
-          ],
-          "source": "User feedback: react-big-schedule project, 2026-03-24",
-          "startedAt": "2026-03-25T05:18:00.349Z",
-          "completedAt": "2026-03-25T05:18:00.349Z",
-          "children": [
-            {
-              "id": "3dd54ff2-dddc-4a3d-b76a-8cbd93fe6f80",
-              "title": "Finding category taxonomy (structural vs code)",
-              "status": "completed",
-              "level": "task",
-              "description": "Add a category field to findings that distinguishes structural findings (zone boundary opinions, directory sprawl, zone-level coupling) from code findings (duplication, anti-patterns, actual bugs, unused exports). Update the enrichment prompts to emit category, and add a classification heuristic as fallback for findings without an explicit category. This enables downstream consumers (self-heal, dashboard, recommendations) to filter and prioritize appropriately.",
-              "acceptanceCriteria": [
-                "Finding interface includes category field: 'structural' | 'code' | 'documentation'",
-                "Enrichment prompts request category classification from LLM",
-                "Fallback heuristic classifies findings when LLM doesn't provide category",
-                "Existing finding consumers (recommend, dashboard) can filter by category",
-                "Schema version bumped appropriately"
-              ],
-              "priority": "high",
-              "tags": [
-                "findings",
-                "taxonomy"
-              ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24",
-              "startedAt": "2026-03-25T05:05:28.657Z",
-              "completedAt": "2026-03-25T05:11:39.849Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added FindingCategory type to schema, classifyFinding heuristic in enrich-parsing.ts, LLM prompt updates for category field, and rex scanner integration. 25 new tests."
-            },
-            {
-              "id": "a0a13954-4e7a-473d-98a1-4eeb250e8677",
-              "title": "Finding staleness validation",
-              "status": "completed",
-              "level": "task",
-              "description": "Before acting on a finding, validate that the referenced code/pattern still exists. Findings reference files, zones, and patterns that may have changed since the finding was generated. If the finding's targets no longer match reality (files moved/deleted, imports restructured), mark the finding as stale and skip it. This prevents the self-heal loop from attempting remediation of already-fixed problems.",
-              "acceptanceCriteria": [
-                "Findings that reference deleted/moved files are automatically marked stale",
-                "Findings about imports are validated against current import graph",
-                "Stale findings are excluded from recommend output and self-heal input",
-                "Stale finding count is reported in analysis summary"
-              ],
-              "priority": "high",
-              "tags": [
-                "findings",
-                "staleness"
-              ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24",
-              "startedAt": "2026-03-25T05:12:38.837Z",
-              "completedAt": "2026-03-25T05:18:00.138Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added isStaleFinding() validator in scanners.ts that checks finding.related and finding.from against inventory file set. Stale count returned from scanSourceVision and reported in rex analyze summary."
-            }
-          ]
-        },
-        {
-          "id": "a678b0fc-a779-4b63-a58c-22908e5c8548",
-          "title": "Zone Pin Discoverability",
-          "status": "completed",
-          "level": "feature",
-          "description": "Zone pins (sourcevision.zones.pins in .n-dx.json) already allow users to override algorithmic zone assignments, but users don't know this capability exists. The feedback user specifically requested this feature, not realizing it was already implemented. Need to surface zone pins in CLI help, dashboard UI, self-heal output, and documentation.",
-          "priority": "medium",
-          "tags": [
-            "zone-pins",
-            "discoverability",
-            "user-feedback"
-          ],
-          "source": "User feedback: react-big-schedule project, 2026-03-24",
-          "startedAt": "2026-03-25T05:39:49.607Z",
-          "completedAt": "2026-03-25T05:39:49.607Z",
-          "children": [
-            {
-              "id": "f6078a29-12a0-4382-aef2-0735c9590041",
-              "title": "Surface zone pins in CLI, dashboard, and self-heal output",
-              "status": "completed",
-              "level": "task",
-              "description": "Zone pins (sourcevision.zones.pins in .n-dx.json) exist but users don't discover them. Surface this capability in: (1) ndx analyze output — when zones seem misassigned, suggest pinning, (2) ndx config --help — document the pins config path, (3) dashboard zone view — show which files are pinned and allow pin management, (4) self-heal output — when structural findings relate to zone boundaries, mention pins as an alternative to code changes.",
-              "acceptanceCriteria": [
-                "ndx analyze output suggests zone pins when misassignment patterns detected",
-                "ndx config --help documents sourcevision.zones.pins",
-                "Dashboard zone detail view shows pinned files",
-                "Self-heal structural finding output mentions zone pins as alternative"
-              ],
-              "priority": "medium",
-              "tags": [
-                "zone-pins",
-                "UX"
-              ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24",
-              "startedAt": "2026-03-25T05:36:14.964Z",
-              "completedAt": "2026-03-25T05:47:30.838Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "All 4 ACs now met: analyze output hints, config help docs, dashboard pin badges, recommend structural tip.",
-              "children": [
-                {
-                  "id": "aabb1b50-5e7c-4c00-b1f1-9247a05da847",
-                  "title": "Show pinned files in dashboard zone detail view",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Load .n-dx.json zone pins in the web server and pass them to the viewer. In the zone slideout component, annotate pinned files with a pin indicator. Requires changes to web-server (load config), web-viewer zone-slideout.ts (display pins).",
-                  "priority": "low",
-                  "tags": [
-                    "dashboard",
-                    "zone-pins"
-                  ],
-                  "startedAt": "2026-03-25T05:47:30.614Z",
-                  "completedAt": "2026-03-25T05:47:30.614Z",
-                  "resolutionType": "code-change",
-                  "resolutionDetail": "Server augments /api/sv/zones response with zone pins from .n-dx.json. ZoneSlideout component shows \"pinned\" badge on files with zone pin overrides."
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "22ecc00b-ceb0-4fa3-8e40-fb29fd4e8869",
-          "title": "Incremental Zone Topology Preservation",
-          "status": "completed",
-          "level": "feature",
-          "description": "Louvain community detection recomputes zones from scratch each run, producing 32 unique zone IDs across 8 runs of the same ~87-file project. Not a single zone survived all 8 runs. The pipeline should preserve the previous zone topology incrementally: bias Louvain toward the previous assignment via synthetic co-zone edges, only reassign files when import neighborhood genuinely shifted, and report a zone stability metric (% files unchanged). This makes zone-relative metrics meaningful as trend indicators rather than noise.",
-          "priority": "high",
-          "tags": [
-            "zones",
-            "louvain",
-            "stability",
-            "user-feedback"
-          ],
-          "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
-          "startedAt": "2026-03-26T21:00:03.513Z",
-          "completedAt": "2026-03-26T21:00:03.513Z",
-          "children": [
-            {
-              "id": "801215db-7e3c-4abe-a83f-7174831aaa4a",
-              "title": "Add co-zone stability bias to Louvain community detection",
-              "status": "completed",
-              "level": "task",
-              "description": "When previous zones exist, add synthetic weighted edges between files that shared a zone in the previous run. Weight should be below real import edges but enough to break ties toward the status quo. This biases Louvain toward incremental zone evolution rather than recomputation from scratch. Implementation: in runZonePipeline(), after building the undirected graph and before running louvainPhase1(), iterate previous zone memberships and add co-zone edges with a configurable stability weight (default ~0.3x the median import edge weight).",
-              "acceptanceCriteria": [
-                "When previousZones is provided, synthetic co-zone edges are added to the graph before Louvain",
-                "Stability weight is configurable (default: 0.3x median import edge weight)",
-                "Files that were co-zoned previously are more likely to remain co-zoned",
-                "New files (not in previous zones) are assigned purely by import affinity with no bias",
-                "Stability bias can be disabled via config (weight = 0)"
-              ],
-              "priority": "high",
-              "tags": [
-                "louvain",
-                "stability"
-              ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
-              "startedAt": "2026-03-26T20:44:25.304Z",
-              "completedAt": "2026-03-26T20:48:44.828Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added addStabilityEdges() to zones.ts that injects synthetic co-zone edges into the Louvain graph from previous zone assignments. Weight = median import edge weight * stabilityWeight (default 0.3). Edges added to Louvain graph only, not importOnlyGraph (so cohesion metrics aren't inflated). previousZoneAssignment built from previousZones in analyzeZones() and passed through to runZonePipeline()."
-            },
-            {
-              "id": "cc14fdd6-03c8-4271-96f5-84193473cb49",
-              "title": "Report zone stability metric after each analysis run",
-              "status": "completed",
-              "level": "task",
-              "description": "After zone detection, compare the new zone assignment against the previous one and report: (1) percentage of files that stayed in the same zone, (2) number of zones that persisted vs appeared vs disappeared, (3) number of files reassigned. Store this in zones.json as a stability summary. Print to CLI output during analyze. This gives users visibility into whether zones are converging or churning.",
-              "acceptanceCriteria": [
-                "zones.json includes stability summary when previous zones exist",
-                "CLI output shows zone stability % after analysis",
-                "stability.fileRetention: fraction of files that kept the same zone ID",
-                "stability.zonePersistence: count of zones that survived from previous run",
-                "stability.reassignedFiles: list of files that moved between zones"
-              ],
-              "priority": "high",
-              "tags": [
-                "zones",
-                "stability",
-                "metrics"
-              ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
-              "startedAt": "2026-03-26T20:54:58.641Z",
-              "completedAt": "2026-03-26T20:58:23.246Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added ZoneStability interface to schema, computeZoneStability() in zones.ts, stability field in zones.json output, and CLI logging of retention/persistence/reassignment metrics."
-            },
-            {
-              "id": "58bb83e1-d72f-4dab-a53d-638437c9c01e",
-              "title": "Prefer previous zone names during LLM enrichment",
-              "status": "completed",
-              "level": "task",
-              "description": "The LLM enrichment step assigns new zone IDs and names each run, even when the underlying file membership is nearly identical. When a new zone shares >70% of its files with a previous zone, preserve the previous zone's ID and name instead of letting the LLM invent a new one. This stabilizes the zone identity layer on top of the Louvain stability bias. Implementation: after Louvain + enrichment, compute file overlap between new and previous zones, and remap IDs/names for high-overlap matches.",
-              "acceptanceCriteria": [
-                "Zones with >70% file overlap with a previous zone inherit its ID and name",
-                "Overlap threshold is configurable",
-                "New zones (no previous match above threshold) get fresh LLM-assigned names as before",
-                "Zone ID remapping is logged for debuggability"
-              ],
-              "priority": "high",
-              "tags": [
-                "zones",
-                "enrichment",
-                "stability"
-              ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
-              "blockedBy": [
-                "801215db-7e3c-4abe-a83f-7174831aaa4a"
-              ],
-              "startedAt": "2026-03-26T20:50:55.915Z",
-              "completedAt": "2026-03-26T20:54:30.293Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added preservePreviousZoneIdentity() using Jaccard file overlap (threshold 0.7). Called after enrichment in analyzeZones — zones with >70% overlap inherit previous ID/name/description. Greedy best-match prevents double-assignment. Logged for debuggability."
-            },
-            {
-              "id": "43bbd40c-f64d-47cf-9bcb-3f24f9af765c",
-              "title": "Fix gitSha recording in history snapshots",
-              "status": "completed",
-              "level": "task",
-              "description": "All 8 history snapshots in react-big-schedule recorded the same gitSha (the pre-heal base commit) despite 83 commits happening between runs. The manifest.gitSha is captured at init time and not refreshed before each analysis run. Fix: re-read HEAD sha at the start of each analyze invocation so history snapshots accurately reflect which code state was analyzed.",
-              "acceptanceCriteria": [
-                "manifest.gitSha reflects HEAD at analysis start, not init time",
-                "History snapshots record distinct shas when code changes between runs",
-                "gitBranch is also refreshed"
-              ],
-              "priority": "medium",
-              "tags": [
-                "history",
-                "git"
-              ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
-              "startedAt": "2026-03-26T20:58:49.721Z",
-              "completedAt": "2026-03-26T21:00:03.354Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "updateManifestModule now refreshes gitSha and gitBranch from HEAD when status is 'running' (start of analysis). History snapshots will now record distinct shas when code changes between runs."
-            }
-          ]
         }
       ]
     },
@@ -9523,7 +9194,7 @@
       "level": "epic",
       "description": "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json.",
       "startedAt": "2026-03-24T20:09:27.774Z",
-      "completedAt": "2026-03-27T04:28:57.725Z",
+      "completedAt": "2026-03-24T20:09:27.774Z",
       "children": [
         {
           "id": "95bfdba2-2cba-4921-b614-3a34779e0892",
@@ -12353,38 +12024,28 @@
           ],
           "startedAt": "2026-03-24T05:12:16.787Z",
           "completedAt": "2026-03-24T05:20:58.936Z"
-        },
-        {
-          "id": "3907a54b-dfe1-42fe-beaa-05e95c756140",
-          "title": "get_prd_status undercounts items when childless features exist",
-          "status": "completed",
-          "level": "task",
-          "description": "get_prd_status reports Hench total as 48 when it should be 49 (47 completed + 1 pending task + 1 pending feature with no children). The stats computation appears to skip or miscount features that have no child tasks. The self-adapting workflow feature is pending under Hench but not reflected in the epic's total or pending count.",
-          "acceptanceCriteria": [
-            "Features with no children are counted in parent epic stats",
-            "get_prd_status total matches actual descendant count",
-            "Pending childless features increment the pending count"
-          ],
-          "priority": "high",
-          "tags": [
-            "rex",
-            "bug",
-            "stats"
-          ],
-          "source": "Observed during self-heal feedback session, 2026-03-27",
-          "startedAt": "2026-03-27T04:17:11.408Z",
-          "completedAt": "2026-03-27T04:28:57.526Z",
-          "resolutionType": "code-change",
-          "resolutionDetail": "computeStats now counts childless features as work items. The root cause was isWorkItem() returning false for features, so childless features were invisible to stats. Fix: count items where level is not epic AND (is a work item OR has no children)."
         }
       ]
     },
     {
       "id": "4fc05c48-48b0-4da3-8126-4fa237b924d9",
       "title": "Hench",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring.",
+      "startedAt": "2026-03-26T15:22:13.999Z",
+      "completedAt": "2026-03-26T15:22:13.999Z",
+      "mergedProposals": [
+        {
+          "proposalNodeKey": "p0:epic",
+          "proposalTitle": "Phase 3: Archetypes, Routes & Hench — Go Integration Spec",
+          "proposalKind": "epic",
+          "reason": "semantic_title",
+          "score": 0.95,
+          "mergedAt": "2026-03-26T06:15:44.202Z",
+          "source": "smart-add"
+        }
+      ],
       "children": [
         {
           "id": "6b0c3873-5607-4adc-9027-abd8d70ab0e3",
@@ -13384,42 +13045,304 @@
           ]
         },
         {
-          "id": "83b64074-3eda-48a6-b3f6-9524cfd6fad7",
-          "title": "Hench should fail tasks when no code changes are made",
+          "id": "c9447ae6-7521-40b0-997d-b56bfaa1993a",
+          "title": "Feature 1: Go-Aware Archetype System",
           "status": "completed",
-          "level": "task",
-          "description": "Hench marks tasks as completed even when the agent made no code changes (e.g., due to permission failures preventing tool use). The run shows 'Changes: none' and 'Status: completed', causing the finding to be acknowledged as resolved when the underlying problem persists. Hench should detect zero-change runs and mark the task as failing instead of completed.",
-          "acceptanceCriteria": [
-            "Runs that produce no file changes are marked as failing, not completed",
-            "Failure reason includes 'no changes made' with context about what blocked the agent",
-            "Acknowledged findings are not created for zero-change completions"
-          ],
-          "priority": "high",
-          "tags": [
-            "hench",
-            "self-heal",
-            "bug"
-          ],
-          "source": "Observed during self-heal testing on react-big-schedule, 2026-03-27",
-          "startedAt": "2026-03-27T04:29:28.224Z",
-          "completedAt": "2026-03-27T04:33:06.659Z",
-          "resolutionType": "acknowledgment",
-          "resolutionDetail": "Investigation found that the no-changes case is already handled correctly: validateCompletion checks git diff against startingHead, returns valid:false when no changes exist, and handleRunFailure reverts the PRD status to pending. The user-reported issue was actually about eslint-ignore comment changes (which DO show up in git diff), not truly zero changes. This is addressed by the workflow prohibition added earlier — the agent is now instructed to fail instead of adding suppression comments."
+          "level": "feature",
+          "description": "Add Go-specific signals to the existing archetype definitions in `packages/sourcevision/src/analyzers/archetypes.ts` and add a `languages` field to `ArchetypeSignal` in `packages/sourcevision/src/schema/v1.ts` so signals can be scoped to specific project languages. React-specific archetypes (`route-module`, `component`, `hook`, `page`) should not fire for Go projects.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T08:06:08.926Z",
+          "completedAt": "2026-03-26T08:06:08.926Z",
+          "children": [
+            {
+              "id": "7cbffe7e-3bfe-482b-8163-80f69b1690e4",
+              "title": "Implement language-scoped ArchetypeSignal schema and add Go signals to archetypes",
+              "status": "completed",
+              "level": "task",
+              "description": "Extend `ArchetypeSignal` in `packages/sourcevision/src/schema/v1.ts` with an optional `languages?: string[]` field, update the Zod validation schema in `validate.ts`, and update the classification engine in `classify.ts` to filter signals by detected project language before scoring. Then modify `BUILTIN_ARCHETYPES` in `archetypes.ts` to add Go-specific signals to `entrypoint`, `types`, `route-handler`, `config`, and `test-helper` archetypes, and scope React-specific archetypes (`route-module`, `component`, `hook`, `page`) to `languages: [\"typescript\", \"javascript\"]`. The schema change is the prerequisite for the signal work; both are delivered together to avoid a partial-state intermediate commit.",
+              "acceptanceCriteria": [
+                "ArchetypeSignal interface has optional `languages?: string[]` field",
+                "Zod validation schema accepts the new field",
+                "Signals without a languages field fire for all project languages (backward compatible)",
+                "Signals with `languages: [\"go\"]` only fire when project language is Go",
+                "Signals with `languages: [\"typescript\", \"javascript\"]` only fire for JS/TS projects",
+                "`entrypoint` archetype has Go signals: `{ kind: \"filename\", pattern: \"^main\\.go$\", weight: 0.9 }` and `{ kind: \"directory\", pattern: \"/cmd/\", weight: 0.7, languages: [\"go\"] }`",
+                "`types` archetype has Go signals: `types.go` (0.9), `models.go` (0.8), `entities.go` (0.8) filename patterns",
+                "`route-handler` archetype has Go signals: `handler.go`, `handlers.go` filename patterns and `/handler/`, `/handlers/` directory patterns (0.8)",
+                "`config` archetype has Go signal: `config.go` filename pattern (0.7)",
+                "`test-helper` archetype has Go signals: `/testdata/` (0.9) and `/testutil/` (0.8) directory patterns",
+                "`route-module`, `component` (tsx/jsx signals), `hook`, and `page` archetypes are scoped with `languages: [\"typescript\", \"javascript\"]`",
+                "Go fixture files classify correctly: `cmd/api/main.go` → entrypoint, `internal/handler/user.go` → route-handler, `internal/config/config.go` → config, testdata/ files → test-helper",
+                "React-specific archetypes do not fire for Go project files",
+                "All existing archetype tests pass unchanged (no regression)"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "archetypes",
+                "schema"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T07:47:26.333Z",
+              "completedAt": "2026-03-26T08:01:03.235Z"
+            },
+            {
+              "id": "4cba126c-e847-4510-8f4f-09e3272fb552",
+              "title": "Write archetype classification tests for Go projects",
+              "status": "completed",
+              "level": "task",
+              "description": "Create `packages/sourcevision/tests/unit/analyzers/go-archetypes.test.ts` validating archetype signal matching against Go fixture files. Tests must guard against both false positives (React archetypes firing on Go files) and false negatives (Go archetypes missing expected files), and serve as a regression guard for the JS/TS classification path.",
+              "acceptanceCriteria": [
+                "Tests verify cmd/api/main.go matches entrypoint archetype",
+                "Tests verify internal/handler/user.go matches route-handler archetype",
+                "Tests verify internal/config/config.go matches config archetype",
+                "Tests verify testdata/ files match test-helper archetype",
+                "Tests verify internal/service/user.go matches service archetype",
+                "Tests verify React archetypes (route-module, component, hook, page) do not match any Go fixture files",
+                "Tests verify that existing JS/TS archetype signals still match correctly (regression guard)",
+                "All tests pass with zero failures"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "archetypes",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T08:01:03.567Z",
+              "completedAt": "2026-03-26T08:06:08.766Z"
+            }
+          ]
         },
         {
-          "id": "f5b21324-3b32-4567-93c8-05850e59333a",
-          "title": "Self-Adapting Execution Workflow",
-          "status": "pending",
+          "id": "4a348f37-2be0-4808-a5f4-ae265c10b7b6",
+          "title": "Feature 2: Go Server Route Detection",
+          "status": "completed",
           "level": "feature",
-          "description": "After each hench execution, run an LLM reflection pass that reads the run transcript, the current workflow, and the project state, then recommends or directly applies adjustments to the workflow for future runs. This makes n-dx self-customizing — the agent learns from its own executions without requiring users to manually tune the workflow. The LLM decides in natural language what worked, what didn't, and what rules to add/modify. No rigid schema needed. This also supports moving workflow files to .hench/ (where execution config belongs) and splitting into pre-execution (instructions) and post-execution (reflection/adaptation) phases.",
-          "priority": "medium",
-          "tags": [
-            "hench",
-            "workflow",
-            "self-adapting",
-            "LLM"
-          ],
-          "source": "Design discussion, 2026-03-27"
+          "description": "Create a regex-based Go HTTP route detector that identifies route registrations from popular Go HTTP frameworks (net/http, chi, gin, echo, fiber, gorilla/mux). Output uses the existing `ServerRoute` and `ServerRouteGroup` types from the schema.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T07:47:26.043Z",
+          "completedAt": "2026-03-26T07:47:26.043Z",
+          "children": [
+            {
+              "id": "939ef567-fbd3-423f-94c7-a51b95fdcf68",
+              "title": "Implement Go route detection analyzer and integrate into the server-route pipeline",
+              "status": "completed",
+              "level": "task",
+              "description": "Create `packages/sourcevision/src/analyzers/go-route-detection.ts` with a `detectGoServerRoutes(sourceText: string, filePath: string): ServerRouteGroup[]` function covering all six framework patterns. Then modify `packages/sourcevision/src/analyzers/server-route-detection.ts` to dispatch to the Go detector for `.go` files, add `.go` to the PARSEABLE extension set, and merge Go routes into `components.json`. The implementation and integration are delivered together because the integration dispatch hook has no value without the implementation.",
+              "acceptanceCriteria": [
+                "net/http stdlib patterns (`http.HandleFunc`, `http.Handle`, `mux.HandleFunc`) are detected with correct method and path",
+                "chi method patterns (Get, Post, Put, Delete, Patch) are detected",
+                "gin uppercase method patterns (GET, POST, PUT, DELETE, PATCH) are detected",
+                "echo patterns are detected",
+                "fiber patterns are detected",
+                "gorilla/mux HandleFunc().Methods() chain pattern is detected",
+                "Route path parameters are preserved as-is (e.g., \"/users/{id}\", \"/users/:id\")",
+                "Comments and string literals in non-route code do not produce false positives",
+                "Output conforms to the existing ServerRouteGroup schema",
+                ".go files are dispatched to detectGoServerRoutes instead of the JS/TS route detector",
+                "JS/TS files continue to use the existing Express/Hono/Koa detection with no regression",
+                "The PARSEABLE extension set includes \".go\"",
+                "Go route results are merged into the components.json serverRoutes array",
+                "components.json summary.totalServerRoutes includes Go routes in the count"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "routes"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T06:35:53.041Z",
+              "completedAt": "2026-03-26T06:43:07.594Z"
+            },
+            {
+              "id": "49bff344-1bbe-4196-9a38-a507b841960c",
+              "title": "Write unit tests for Go route detection",
+              "status": "completed",
+              "level": "task",
+              "description": "Create `packages/sourcevision/tests/unit/analyzers/go-route-detection.test.ts` covering all six framework patterns. Tests verify method extraction, path extraction (including parametrized paths), route grouping by file, and false-positive safety for comments and non-route string literals.",
+              "acceptanceCriteria": [
+                "Tests cover all six frameworks (net/http, chi, gin, echo, fiber, gorilla/mux)",
+                "Tests verify correct HTTP method extraction for each framework",
+                "Tests verify correct path extraction including parameters ({id}, :id)",
+                "Tests verify route grouping by file",
+                "Tests verify comments and non-route string literals do not produce false positives",
+                "Tests verify empty files and files with no routes return empty arrays",
+                "All tests pass with zero failures"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "routes",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T06:43:07.929Z",
+              "completedAt": "2026-03-26T07:47:25.871Z"
+            }
+          ]
+        },
+        {
+          "id": "e117f1d3-5b28-4fe0-ad8b-8acc7c030963",
+          "title": "Feature 3: Rex Scanner Go Support",
+          "status": "completed",
+          "level": "feature",
+          "description": "Update Rex's analyze scanners to understand Go project structure: parse `go.mod` for dependency information, detect Go test files, and skip Go-specific directories.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T15:22:13.888Z",
+          "completedAt": "2026-03-26T15:22:13.888Z",
+          "children": [
+            {
+              "id": "2ba0deed-63c0-4650-bc6d-fb2fafb22687",
+              "title": "Add go.mod scanner, Go skip patterns, and test coverage to Rex",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify `packages/rex/src/analyze/scanners.ts` to add `\"vendor\"` to `SKIP_DIRS`, add `\"go.mod\"` and `\"go.sum\"` to `SKIP_DOC_FILES`, update test file detection to match `_test.go` files, and create a `scanGoMod()` function that extracts module name, Go version, and dependency list from `go.mod` mirroring the structure of `scanPackageJson()`. Deliver unit tests in the same task — the scanner is simple enough that implementation and verification constitute one focused session. Tests should cover the Go fixture project's `go.mod` and edge cases such as a missing file or empty require block.",
+              "acceptanceCriteria": [
+                "vendor/ directory is skipped during Rex analysis scans",
+                "go.mod and go.sum are not scanned as documentation files",
+                "_test.go files are recognized as test files by the test detection logic",
+                "scanGoMod reads the module name, Go version, and require dependencies from go.mod",
+                "scanGoMod output structure mirrors scanPackageJson where applicable (dependency list, version info)",
+                "A Go project directory produces meaningful Rex analysis proposals",
+                "Existing JS/TS scanning behavior is completely unchanged",
+                "Tests verify vendor/ is skipped",
+                "Tests verify go.mod/go.sum are treated as config, not scanned as docs",
+                "Tests verify _test.go files are detected as test files",
+                "Tests verify scanGoMod extracts module name, Go version, and dependencies correctly",
+                "Tests verify scanGoMod handles missing go.mod gracefully (returns empty/null)",
+                "All tests pass with zero failures"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "go",
+                "scanner"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T15:14:51.603Z",
+              "completedAt": "2026-03-26T15:22:13.708Z"
+            }
+          ]
+        },
+        {
+          "id": "8ae4d60a-f66a-40aa-afd7-dac7562ec263",
+          "title": "Feature 4: Hench Go Project Support",
+          "status": "completed",
+          "level": "feature",
+          "description": "Make Hench capable of executing tasks in Go projects: update guard defaults to allow Go toolchain commands, add Go test runner support, and make agent prompts language-aware.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T15:14:41.533Z",
+          "completedAt": "2026-03-26T15:14:41.533Z",
+          "children": [
+            {
+              "id": "fcfc2e7c-270b-4367-949e-59992caf6766",
+              "title": "Add Go guard defaults and language-aware config to Hench",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify `packages/hench/src/schema/v1.ts` and `packages/hench/src/schema/templates.ts` so that when a Go project is detected (go.mod present or language config is \"go\"), `allowedCommands` defaults to `[\"go\", \"make\", \"git\", \"golangci-lint\"]` and `blockedPaths` includes `\"vendor/**\"`. JS/TS project defaults remain unchanged. Detection should use the sourcevision language registry or go.mod presence check during `hench init`.",
+              "acceptanceCriteria": [
+                "Go projects get allowedCommands including \"go\", \"make\", \"git\", \"golangci-lint\"",
+                "Go projects get \"vendor/**\" in blockedPaths",
+                "JS/TS projects get the existing default allowedCommands unchanged",
+                "hench init detects Go projects and applies Go-appropriate defaults",
+                "The guard validates Go commands (go test, go build, make lint) as allowed for Go projects",
+                "Existing JS/TS guard behavior is unchanged"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "go",
+                "guard",
+                "config"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T06:16:07.320Z",
+              "completedAt": "2026-03-26T06:27:36.895Z"
+            },
+            {
+              "id": "a6862705-ed72-4d1a-aab7-090c85e50582",
+              "title": "Add Go test runner support to Hench",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify `packages/hench/src/tools/test-runner.ts` to recognize `_test.go` files, generate scoped Go test commands by mapping test file directories to package paths (e.g., `internal/handler/user_test.go` → `go test ./internal/handler/...`), and resolve test file candidates using Go's `_test.go` naming convention (same directory, different suffix from `.test.ts`).",
+              "acceptanceCriteria": [
+                "_test.go files are recognized by isTestFile()",
+                "candidateTestPaths(\"internal/handler/user.go\") includes \"internal/handler/user_test.go\"",
+                "Go test runner is detected from \"go test\" command string",
+                "Scoped Go test command is correctly formatted: `go test ./internal/handler/...` for targeted packages",
+                "Full Go test command is `go test ./...` when scoping is not possible",
+                "Existing JS/TS test runner behavior is completely unchanged",
+                "All existing test-runner tests pass"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "go",
+                "test-runner"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T06:28:00.347Z",
+              "completedAt": "2026-03-26T06:35:25.306Z"
+            },
+            {
+              "id": "ea5ba3f2-4f9e-46b1-9874-23bdc62f8130",
+              "title": "Make Hench agent prompts language-aware for Go projects",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify `packages/hench/src/agent/planning/prompt.ts` to include Go-specific context in the task brief when the project language is Go. Language detection uses `manifest.language` from `.sourcevision/` or go.mod presence. Go briefs replace JS/TS toolchain references with Go equivalents and add Go-specific naming, structure, and test conventions without altering the JS/TS prompt path.",
+              "acceptanceCriteria": [
+                "Go project briefs reference `go test ./...` instead of `npm test` or `vitest`",
+                "Go project briefs reference `go build ./...` for build verification",
+                "Go project briefs reference `go vet ./...` and `golangci-lint run` for linting",
+                "Go project briefs reference Go naming conventions: exported = PascalCase, unexported = camelCase, error handling via explicit returns (no try/catch)",
+                "Go project briefs reference Go project structure: `cmd/` for binaries, `internal/` for private packages, `pkg/` for public packages",
+                "Go project briefs reference Go test conventions: `_test.go` suffix, `testing.T` parameter, table-driven tests",
+                "JS/TS project briefs are completely unchanged",
+                "Language detection uses manifest.language or go.mod presence",
+                "The prompt includes language context only when language is detected, not hardcoded"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "go",
+                "prompts"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T14:59:05.256Z",
+              "completedAt": "2026-03-26T15:05:23.743Z"
+            },
+            {
+              "id": "121aefae-1c0b-4f83-b83c-fe972d76a29d",
+              "title": "Write tests for Hench Go guard defaults, test runner, and language-aware prompts",
+              "status": "completed",
+              "level": "task",
+              "description": "Create tests covering all three Hench Go support areas: guard defaults for Go projects, Go test runner behavior (file recognition, path candidate generation, scoped command formatting), and Go-specific prompt content. Tests must also verify that JS/TS behavior is unchanged across all three areas as a regression guard.",
+              "acceptanceCriteria": [
+                "Tests verify Go allowedCommands defaults",
+                "Tests verify Go blockedPaths include vendor/**",
+                "Tests verify _test.go is recognized as a test file",
+                "Tests verify Go test path candidate generation",
+                "Tests verify Go scoped test command formatting",
+                "Tests verify Go prompt includes Go-specific context",
+                "Tests verify JS/TS prompt is unchanged when project is not Go",
+                "All tests pass with zero failures"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "go",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T15:09:02.409Z",
+              "completedAt": "2026-03-26T15:14:41.351Z"
+            }
+          ]
         }
       ]
     },
@@ -19337,8 +19260,7 @@
       "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
-      "startedAt": "2026-03-25T05:23:45.822Z",
-      "completedAt": "2026-03-26T20:50:30.165Z",
+      "completedAt": "2026-03-24T13:06:25.502Z",
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20608,134 +20530,6 @@
                 "d0c0c683-75e6-4857-8ef2-0c1a0bb90680"
               ],
               "completedAt": "2026-03-24T13:06:25.502Z"
-            }
-          ]
-        },
-        {
-          "id": "c7963f49-483b-4fa5-b540-e378d7b6e70c",
-          "title": "Self-Heal Loop Quality",
-          "status": "completed",
-          "level": "feature",
-          "description": "The self-heal loop (analyze → recommend → execute) can degrade project metrics instead of improving them. Each cycle may reduce average cohesion, generate new findings about problems introduced by the previous cycle, and continue indefinitely without detecting regression. This feature adds safeguards to ensure the loop converges toward improvement.",
-          "priority": "high",
-          "tags": [
-            "self-heal",
-            "user-feedback"
-          ],
-          "source": "User feedback: react-big-schedule project, 2026-03-24",
-          "startedAt": "2026-03-25T05:23:45.700Z",
-          "completedAt": "2026-03-25T05:23:45.700Z",
-          "children": [
-            {
-              "id": "ed594365-c094-41ad-a9dd-a16829e0adb7",
-              "title": "Metric regression guard for self-heal loop",
-              "status": "completed",
-              "level": "task",
-              "description": "Before committing changes in each self-heal cycle, compare new cohesion/coupling metrics to the baseline captured at cycle start. If average cohesion dropped or total findings count increased, abort the cycle and report the regression. The current loop only checks finding count — it needs to also track weighted cohesion, coupling, and zone count as regression signals.",
-              "acceptanceCriteria": [
-                "Self-heal loop captures cohesion/coupling baseline before each cycle",
-                "Loop aborts if weighted average cohesion decreases after a cycle",
-                "Loop aborts if total zone count increases without cohesion improvement",
-                "Regression report is printed to stdout with before/after metrics"
-              ],
-              "priority": "high",
-              "tags": [
-                "self-heal",
-                "regression"
-              ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24",
-              "startedAt": "2026-03-25T05:22:32.269Z",
-              "completedAt": "2026-03-25T05:23:45.478Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added readZoneMetrics() helper and regression guard to self-heal loop. Captures weighted cohesion baseline, compares after each analysis cycle, aborts on cohesion decrease or zone proliferation without quality improvement."
-            },
-            {
-              "id": "13ae33a3-19c4-4d47-85fd-9bde56ff8370",
-              "title": "Deprioritize structural findings in autonomous self-heal",
-              "status": "completed",
-              "level": "task",
-              "description": "When the self-heal loop runs autonomously, it should skip or defer structural findings (zone boundary opinions, directory sprawl warnings) and focus on code-level findings (duplication, anti-patterns, actual bugs). Depends on the finding category taxonomy from the Finding Reliability feature. Without this, the loop wastes cycles reshuffling zone boundaries instead of fixing real code issues.",
-              "acceptanceCriteria": [
-                "Self-heal loop filters findings by category when available",
-                "Structural findings are skipped in --auto mode by default",
-                "Flag --include-structural allows opting in to structural fixes",
-                "Skipped structural findings are reported in cycle summary"
-              ],
-              "priority": "high",
-              "tags": [
-                "self-heal",
-                "findings"
-              ],
-              "source": "User feedback: react-big-schedule project, 2026-03-24",
-              "blockedBy": [
-                "3dd54ff2-dddc-4a3d-b76a-8cbd93fe6f80"
-              ],
-              "startedAt": "2026-03-25T05:18:27.425Z",
-              "completedAt": "2026-03-25T05:22:09.410Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added --exclude-structural flag to rex recommend that filters findings with category=structural. Self-heal loop passes it by default; --include-structural opts in. Structural skip count reported in recommend output."
-            }
-          ]
-        },
-        {
-          "id": "7b588605-f26a-4362-90ff-d60f32d620da",
-          "title": "File-Level Self-Heal Metrics",
-          "status": "completed",
-          "level": "feature",
-          "description": "The self-heal loop's progress tracking and regression guard currently use zone-relative metrics (weighted cohesion, finding count including structural). Since zone boundaries are non-deterministic across runs, these metrics oscillate without meaningful signal. Shift all self-heal progress signals to zone-independent, file-level metrics: circular dependency count, unused exports, code-category finding count, god function count. Zone metrics remain available for reporting but are not used as optimization targets or termination conditions.",
-          "priority": "high",
-          "tags": [
-            "self-heal",
-            "metrics",
-            "user-feedback"
-          ],
-          "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
-          "startedAt": "2026-03-26T20:50:30.055Z",
-          "completedAt": "2026-03-26T20:50:30.055Z",
-          "children": [
-            {
-              "id": "fa464f14-067b-4c91-aa40-9724d0f8998f",
-              "title": "Replace zone-relative progress signals with file-level metrics in self-heal loop",
-              "status": "completed",
-              "level": "task",
-              "description": "The self-heal loop in cli.js uses two progress signals: (1) remaining finding count from rex recommend --actionable-only --format=json, (2) weighted cohesion from zones.json via readZoneMetrics(). Both are zone-relative. Replace with: circular dependency count (from imports.json summary.circularCount), code-category finding count (filter findings to category !== 'structural'), and unused export count (from callgraph.json). Read these from .sourcevision/ output files after each analysis step.",
-              "acceptanceCriteria": [
-                "Self-heal regression guard uses circular dep count + code finding count instead of weighted cohesion",
-                "readZoneMetrics() replaced with readCodeHealthMetrics() reading imports.json + zones.json findings",
-                "Loop aborts when code-level metrics regress, not when zone metrics regress",
-                "Zone metrics still logged for informational purposes but not used as termination signals"
-              ],
-              "priority": "high",
-              "tags": [
-                "self-heal",
-                "metrics"
-              ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
-              "startedAt": "2026-03-26T20:49:19.197Z",
-              "completedAt": "2026-03-26T20:50:29.832Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Replaced readZoneMetrics-based regression guard with readCodeHealthMetrics reading circular deps from imports.json, code-category findings from zones.json, and unused exports from callgraph.json. Zone metrics kept for informational logging only."
-            },
-            {
-              "id": "d1f74bde-7297-4af0-911a-8a4e5ee82aa7",
-              "title": "Filter recommend --format=json progress count to code-category findings only",
-              "status": "completed",
-              "level": "task",
-              "description": "The self-heal loop's finding count check (cli.js line ~960) counts all task-level findings from rex recommend --actionable-only --format=json. This includes structural findings even when --exclude-structural is passed for the accept step, because the progress check is a separate call. Ensure the progress check also passes --exclude-structural so the count only reflects code-level findings the loop is actually acting on.",
-              "acceptanceCriteria": [
-                "Progress check in self-heal loop uses same filters as the accept step",
-                "Finding count used for termination only counts findings the loop would act on"
-              ],
-              "priority": "high",
-              "tags": [
-                "self-heal",
-                "findings"
-              ],
-              "source": "Analysis of react-big-schedule self-heal history, 2026-03-26",
-              "startedAt": "2026-03-26T20:08:40.979Z",
-              "completedAt": "2026-03-26T20:08:40.979Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Already implemented in the --exclude-structural work. The progress check at cli.js:990 passes ...structuralFlag to the recommend --format=json call, ensuring only code-category findings are counted."
             }
           ]
         }
@@ -22842,6 +22636,548 @@
                   }
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aead1bea-1a28-42f0-92ca-7256469ddf77",
+      "title": "Go / Multi-Language Support",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-03-26T04:05:46.164Z",
+      "completedAt": "2026-03-26T04:05:46.164Z",
+      "children": [
+        {
+          "id": "956b7119-989e-41f1-ba0e-3e8d26494fee",
+          "title": "Phase 1: Language Registry & Inventory Foundation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Establish a language registry abstraction in SourceVision so that Go projects can be inventoried correctly alongside JS/TS. All existing JS/TS behavior is preserved as the default path; Go support is purely additive.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T04:05:46.055Z",
+          "completedAt": "2026-03-26T04:05:46.055Z",
+          "children": [
+            {
+              "id": "67760efe-1f60-4c4a-9018-d5231486b081",
+              "title": "Implement language registry module in sourcevision",
+              "status": "completed",
+              "level": "task",
+              "description": "Create packages/sourcevision/src/language/ with four files: registry.ts (LanguageConfig interface), go.ts (Go language config: extensions, skipDirectories including vendor/, testFilePatterns for _test.go, generatedFilePatterns for _gen.go/_pb.go/wire_gen.go, configFilenames for go.mod/go.sum/.golangci.yml, entryPointPatterns), typescript.ts (extract existing JS/TS hardcoded constants into registry shape), and detect.ts (auto-detection: check .n-dx.json override → go.mod → package.json → file-count tiebreak → fallback to JS/TS). The registry becomes the single source of truth for all downstream language-specific decisions.",
+              "acceptanceCriteria": [
+                "packages/sourcevision/src/language/registry.ts exports LanguageConfig interface with all fields from spec (id, displayName, extensions, parseableExtensions, testFilePatterns, configFilenames, skipDirectories, generatedFilePatterns, entryPointPatterns, moduleFile)",
+                "packages/sourcevision/src/language/go.ts exports a LanguageConfig that includes vendor/ in skipDirectories, _test.go in testFilePatterns, .go in extensions, and go.mod as moduleFile",
+                "packages/sourcevision/src/language/typescript.ts exports a LanguageConfig whose skipDirectories and configFilenames match the current hardcoded values in inventory.ts",
+                "packages/sourcevision/src/language/detect.ts implements the five-step detection chain: .n-dx.json override → go.mod → package.json → file-count tiebreak → JS/TS fallback",
+                "detect.ts returns the TS/JS config for a project with no go.mod (backward-compatible fallback)",
+                "detect.ts returns the Go config for a project with go.mod and no package.json",
+                "All four files are re-exported from a language/index.ts barrel"
+              ],
+              "priority": "critical",
+              "tags": [
+                "sourcevision",
+                "go",
+                "language-registry"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-25T20:23:35.621Z",
+              "completedAt": "2026-03-25T20:35:14.515Z"
+            },
+            {
+              "id": "e27102cc-3e46-4c45-a124-0ba8c56fa1b4",
+              "title": "Refactor inventory.ts to consume language registry",
+              "status": "completed",
+              "level": "task",
+              "description": "Update packages/sourcevision/src/analyzers/inventory.ts to replace all hardcoded SKIP_DIRS and CONFIG_FILENAMES constants with values from the language registry. Add Go-specific role classification: _test.go files → role 'test', generated file patterns (_gen.go, .pb.go, wire_gen.go, mock_*.go) → role 'generated', testdata/ contents → role 'asset', cmd/*/main.go → role 'source' (entrypoint archetype applied later). The language is resolved once per analysis run via detectLanguage() and threaded through the analyzer.",
+              "acceptanceCriteria": [
+                "inventory.ts imports from packages/sourcevision/src/language/ and uses languageConfig.skipDirectories instead of hardcoded SKIP_DIRS",
+                "inventory.ts uses languageConfig.configFilenames instead of hardcoded CONFIG_FILENAMES",
+                "Files matching languageConfig.testFilePatterns receive role 'test' in inventory output",
+                "Files matching languageConfig.generatedFilePatterns receive role 'generated' in inventory output",
+                "Files under testdata/ directories receive role 'asset'",
+                "All existing inventory unit tests pass without modification (JS/TS behavior unchanged)",
+                "Running sourcevision analyze on a JS/TS project produces identical inventory.json output before and after this change (no regression)"
+              ],
+              "priority": "critical",
+              "tags": [
+                "sourcevision",
+                "go",
+                "inventory",
+                "refactor"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-25T20:37:22.910Z",
+              "completedAt": "2026-03-25T20:54:29.154Z"
+            },
+            {
+              "id": "a070e70d-af05-40aa-b6e7-0f06eea257ea",
+              "title": "Add language field to .n-dx.json schema and wire config support",
+              "status": "completed",
+              "level": "task",
+              "description": "Add an optional language field to the .n-dx.json project config schema with valid values: 'typescript', 'javascript', 'go', 'auto' (default). Update config.js to read, validate, and expose this field. This allows users to explicitly override language detection for edge cases (e.g. mixed repos, unusual layouts). The field must be respected by detectLanguage() as the highest-priority signal.",
+              "acceptanceCriteria": [
+                ".n-dx.json schema accepts an optional 'language' field with enum values: 'typescript', 'javascript', 'go', 'auto'",
+                "config.js reads the language field and includes it in the unified config view",
+                "ndx config language go sets the language field to 'go' in .n-dx.json",
+                "detectLanguage() reads .n-dx.json and returns the corresponding LanguageConfig when language is explicitly set",
+                "Setting language to 'auto' (or omitting the field) triggers the marker-based detection chain",
+                "Invalid language values produce a validation error with the list of valid options",
+                ".sourcevision/manifest.json records the resolved language after analysis"
+              ],
+              "priority": "high",
+              "tags": [
+                "config",
+                "sourcevision",
+                "go",
+                "schema"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-25T21:35:00.413Z",
+              "completedAt": "2026-03-25T21:50:17.784Z"
+            },
+            {
+              "id": "fa93b525-872e-4802-a92b-985a38010776",
+              "title": "Create Go fixture project and language registry test suite",
+              "status": "completed",
+              "level": "task",
+              "description": "Create tests/fixtures/go-project/ with the standard Go layout specified in the plan (cmd/api/main.go, internal/handler/, internal/service/, internal/repository/, internal/middleware/, internal/config/, pkg/response/, testdata/, go.mod, go.sum, Makefile, .golangci.yml). Write the three test files specified in Phase 1.4: language-registry.test.ts (unit, verifies registry returns correct config per language), language-detect.test.ts (unit, auto-detection from go.mod/package.json/both/neither), and inventory-go.test.ts (integration, runs inventory analyzer against the Go fixture and asserts correct language/role/category classification for each file type).",
+              "acceptanceCriteria": [
+                "tests/fixtures/go-project/ exists with go.mod, go.sum, Makefile, .golangci.yml, cmd/api/main.go, internal/handler/user.go + user_test.go, internal/service/user.go + user_test.go, internal/repository/user.go + user_test.go, internal/middleware/auth.go + logging.go, internal/config/config.go, pkg/response/json.go, testdata/users.json",
+                "language-registry.test.ts asserts Go config includes vendor/ in skipDirectories and _test.go in testFilePatterns",
+                "language-registry.test.ts asserts TypeScript config includes node_modules/ in skipDirectories",
+                "language-detect.test.ts: directory with go.mod only → Go; directory with package.json only → TypeScript; directory with neither → TypeScript (fallback)",
+                "language-detect.test.ts: .n-dx.json with language:'go' overrides marker detection even when no go.mod present",
+                "inventory-go.test.ts: internal/handler/user_test.go classified with role 'test'",
+                "inventory-go.test.ts: cmd/api/main.go classified with role 'source'",
+                "inventory-go.test.ts: vendor/ directory (if present) skipped entirely from inventory",
+                "All existing sourcevision tests continue to pass"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "testing",
+                "fixtures"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T03:58:52.698Z",
+              "completedAt": "2026-03-26T04:05:45.874Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "f00043c7-f5de-4d79-ab17-19fc6bd8d8db",
+      "title": "Go / Multi-Language Support",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-03-26T05:57:25.506Z",
+      "completedAt": "2026-03-26T05:57:25.506Z",
+      "children": [
+        {
+          "id": "dfa181b2-9543-4b37-a04b-bdcf0af58da6",
+          "title": "Go Import Parser",
+          "status": "completed",
+          "level": "feature",
+          "description": "Create a regex-based Go import parser in sourcevision that handles all Go import syntax variants and classifies imports as stdlib, third-party, or internal using go.mod module path resolution.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T05:10:44.727Z",
+          "completedAt": "2026-03-26T05:10:44.727Z",
+          "children": [
+            {
+              "id": "32f70fa2-70d8-4b26-98a1-e54baeccbf97",
+              "title": "Implement extractGoImports function with full Go import syntax coverage",
+              "status": "completed",
+              "level": "task",
+              "description": "Create packages/sourcevision/src/analyzers/go-imports.ts with an extractGoImports(sourceText, filePath) function. Reads go.mod once to extract the module path and classifies each import as stdlib (no domain prefix, e.g. fmt, net/http), third-party (has domain, e.g. github.com/go-chi/chi), or internal (starts with module path). Handles single imports, grouped import blocks, aliased imports (alias \"pkg\"), blank imports (_ \"pkg\"), and dot imports (. \"pkg\"). Internal imports resolve to relative directory paths as import edges. All Go imports use ImportType.static.",
+              "acceptanceCriteria": [
+                "Single-line import statements (import \"fmt\") are parsed and classified correctly",
+                "Grouped import blocks with all syntax variants are fully parsed",
+                "Aliased imports extract both the alias and underlying package path",
+                "Blank imports (_ \"pkg\") are classified as external packages without crashing",
+                "Dot imports (. \"pkg\") are extracted and classified correctly",
+                "go.mod is read and the module path is extracted before import classification",
+                "Stdlib imports are classified as external with a stdlib: prefix",
+                "Third-party imports are classified as external",
+                "Internal imports produce import edges resolved to relative directory paths",
+                "All produced edges carry ImportType.static",
+                "Comment lines inside grouped import blocks do not produce false edges",
+                "String literals in non-import source code containing import-like text do not produce false edges"
+              ],
+              "priority": "critical",
+              "tags": [
+                "go",
+                "sourcevision",
+                "imports",
+                "parser"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:01:09.933Z",
+              "completedAt": "2026-03-26T05:07:17.320Z"
+            },
+            {
+              "id": "afab2a23-e2c0-4d95-9325-256f8f5192fd",
+              "title": "Write comprehensive unit tests for go-imports.ts covering all syntax variants and edge cases",
+              "status": "completed",
+              "level": "task",
+              "description": "Write unit tests for go-imports.ts using the existing Go fixture at packages/sourcevision/tests/fixtures/go-project/, which contains real Go files with stdlib, third-party, and internal imports. Tests must cover every import syntax variant, alias and blank import handling, module path resolution from go.mod, and edge cases such as comments inside import blocks and string literals that resemble import statements.",
+              "acceptanceCriteria": [
+                "Tests cover single-line and grouped import block parsing",
+                "Tests cover aliased, blank, and dot import variants in isolation",
+                "Tests verify stdlib imports produce stdlib: prefixed external entries",
+                "Tests verify third-party imports are classified as external",
+                "Tests verify internal imports resolve to correct relative directory paths",
+                "Tests cover comment lines and blank lines inside grouped import blocks",
+                "Tests verify source string literals do not produce spurious import edges",
+                "All tests pass with zero failures when run against the Go fixture files",
+                "Test file is placed adjacent to go-imports.ts or in the package unit test directory"
+              ],
+              "priority": "critical",
+              "tags": [
+                "go",
+                "sourcevision",
+                "imports",
+                "tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:07:43.892Z",
+              "completedAt": "2026-03-26T05:10:44.563Z"
+            }
+          ]
+        },
+        {
+          "id": "aac0a41c-0157-4cca-a75d-efd7655ba909",
+          "title": "Import Analyzer Language Dispatch",
+          "status": "completed",
+          "level": "feature",
+          "description": "Modify the SourceVision import analyzer (imports.ts) to dispatch to the Go import parser when processing .go files, reading go.mod once per invocation and producing file-to-package edges for internal imports. Integration tests validate the full import graph against the Go fixture.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T05:34:37.680Z",
+          "completedAt": "2026-03-26T05:34:37.680Z",
+          "children": [
+            {
+              "id": "19509120-0d5b-4aac-a83e-2b200ed8aabf",
+              "title": "Modify imports.ts to route .go files to the Go import parser",
+              "status": "completed",
+              "level": "task",
+              "description": "Expand or replace the JS_TS_EXTENSIONS gate in packages/sourcevision/src/analyzers/imports.ts to include .go files, or replace the check with the language registry's parseableExtensions. The analyzeImports function reads go.mod once per invocation (not per-file) and passes the extracted module path to extractGoImports for each .go file. Internal Go import edges resolve to directory paths (file-to-package rather than file-to-file). Language is determined from manifest.language or via detectLanguage from the language registry. JS/TS dispatch must remain unchanged.",
+              "acceptanceCriteria": [
+                ".go files are routed to extractGoImports and not the JS/TS parser",
+                "go.mod is read exactly once per analyzeImports call, not once per .go file",
+                "Internal Go import edges use directory paths (e.g. cmd/api/main.go → internal/handler/)",
+                "JS/TS files continue to be processed by the existing parser with no regression",
+                "Language dispatch reads manifest.language or uses detectLanguage from the language registry",
+                "A mixed-language project directory does not crash or produce cross-language edge contamination",
+                "go.mod is not read when no .go files are present in the scanned directory"
+              ],
+              "priority": "critical",
+              "tags": [
+                "go",
+                "sourcevision",
+                "imports",
+                "dispatch"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:15:49.167Z",
+              "completedAt": "2026-03-26T05:24:08.530Z"
+            },
+            {
+              "id": "c42858ab-4a23-467f-b6e2-fccee6cb99f6",
+              "title": "Write integration tests validating the Go import graph against the fixture project",
+              "status": "completed",
+              "level": "task",
+              "description": "Write integration tests that run the full import analyzer against the Go fixture at packages/sourcevision/tests/fixtures/go-project/ and assert on the produced import graph structure. Tests cover internal edges (main.go→handler/, handler/→service/, service/→repository/), third-party external packages (go-chi/chi, jmoiron/sqlx), stdlib entries, and the handling of _test.go imports.",
+              "acceptanceCriteria": [
+                "Integration test runs analyzeImports end-to-end against the Go fixture directory",
+                "Internal edges main.go→internal/handler/, handler/→internal/service/, service/→internal/repository/ appear in the graph",
+                "Third-party packages (go-chi/chi, jmoiron/sqlx) appear as external entries in the graph",
+                "Stdlib packages (fmt, net/http, etc.) appear as external entries with stdlib: prefix",
+                "_test.go import handling is explicitly tested and the behavior (captured or excluded) is documented in the test",
+                "No edges from non-existent internal packages appear in the output",
+                "All integration tests pass with zero failures"
+              ],
+              "priority": "critical",
+              "tags": [
+                "go",
+                "sourcevision",
+                "imports",
+                "integration-tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:27:41.472Z",
+              "completedAt": "2026-03-26T05:34:37.493Z"
+            }
+          ]
+        },
+        {
+          "id": "41a438d4-def7-4e85-ac41-e7b023184764",
+          "title": "Go Fixture Enhancement",
+          "status": "completed",
+          "level": "feature",
+          "description": "Extend the Go fixture project to cover import syntax edge cases required by the parser (aliased, blank, dot imports, test files), update go.mod to match new dependencies, and produce a coverage map documenting which fixture file exercises which syntax variant.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T05:46:12.440Z",
+          "completedAt": "2026-03-26T05:46:12.440Z",
+          "children": [
+            {
+              "id": "3a247c6a-8613-490d-888e-016ae0dd5ec2",
+              "title": "Add aliased, blank, and dot import files to the Go fixture and update go.mod",
+              "status": "completed",
+              "level": "task",
+              "description": "Add new Go source files to packages/sourcevision/tests/fixtures/go-project/ to exercise import syntax variants not yet present: a file with aliased imports (e.g. chi \"github.com/go-chi/chi/v5\"), a file with blank/side-effect imports (e.g. _ \"github.com/lib/pq\"), and a dot import if it fits the fixture's domain. Add at least one _test.go file with a testing stdlib import to verify test file capture. Update go.mod require block to include any new third-party dependencies.",
+              "acceptanceCriteria": [
+                "A Go source file with at least one aliased import is present in the fixture",
+                "A Go source file with at least one blank/side-effect import (_ \"pkg\") is present",
+                "At least one _test.go file with a testing or testing/assert import is present",
+                "go.mod require block includes all new third-party packages referenced by the added files",
+                "New files follow the existing fixture package and directory naming conventions",
+                "Files are syntactically valid Go (verified by the import parser not erroring during tests)"
+              ],
+              "priority": "high",
+              "tags": [
+                "go",
+                "sourcevision",
+                "fixtures"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:36:12.973Z",
+              "completedAt": "2026-03-26T05:41:51.850Z"
+            },
+            {
+              "id": "7e41ce28-7691-4211-8b95-a325919bdb6b",
+              "title": "Create syntax variant coverage map for the Go fixture",
+              "status": "completed",
+              "level": "task",
+              "description": "Audit the enhanced fixture against all import syntax variants that go-imports.ts must handle. For each supported variant (single, grouped, aliased, blank, dot, test file imports), identify which fixture file demonstrates it. Add a coverage comment to go-imports.test.ts or a FIXTURE.md file in the fixture directory mapping each file to the variant(s) it exercises. Document any intentionally absent variant with a rationale.",
+              "acceptanceCriteria": [
+                "All five import syntax variants (single, grouped, aliased, blank, dot) map to at least one fixture file in the coverage map",
+                "A coverage comment in go-imports.test.ts or a FIXTURE.md file lists the file→variant mapping",
+                "Any intentionally absent variant is documented with a rationale rather than silently omitted",
+                "The coverage map is accurate after the preceding fixture-addition task completes",
+                "No variant listed in the go-imports.ts spec is silently uncovered"
+              ],
+              "priority": "high",
+              "tags": [
+                "go",
+                "sourcevision",
+                "fixtures",
+                "documentation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:42:12.856Z",
+              "completedAt": "2026-03-26T05:46:12.268Z"
+            }
+          ]
+        },
+        {
+          "id": "fe5bf3cc-7584-4e97-9a58-e1d5ff37c6bd",
+          "title": "Zone Detection Validation for Go Projects",
+          "status": "completed",
+          "level": "feature",
+          "description": "Validate the end-to-end SourceVision pipeline for Go projects by running Louvain community detection against the Go fixture's import graph and asserting sensible zone boundaries corresponding to Go package structure. The detection algorithm requires no changes; this feature validates the data chain from Go source to zones.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T05:57:25.393Z",
+          "completedAt": "2026-03-26T05:57:25.393Z",
+          "children": [
+            {
+              "id": "f2234f89-f5b2-4bab-b901-30744cf878e0",
+              "title": "Write end-to-end zone detection integration test for the Go fixture",
+              "status": "completed",
+              "level": "task",
+              "description": "Write go-zones.test.ts that runs the full SourceVision pipeline (inventory → imports → zones) against packages/sourcevision/tests/fixtures/go-project/ and validates that Louvain community detection produces zones mapping to Go package boundaries. Expected zones correspond to cmd/, internal/handler/, internal/service/, and internal/repository/. The test must fail with a descriptive error if the import graph contains zero edges, guarding against silent parser failures upstream.",
+              "acceptanceCriteria": [
+                "go-zones.test.ts runs the full SourceVision pipeline (inventory → imports → zones) against the Go fixture",
+                "Zone detection produces at least 2 distinct zones from the Go import graph",
+                "Each expected package boundary (cmd, handler, service, repository) is represented in at least one zone",
+                "Files from distinct packages are not co-located in the same zone unless the import graph warrants it",
+                "Test fails with a descriptive message if the import graph contains zero edges",
+                "All assertions pass with zero failures against the enhanced Go fixture"
+              ],
+              "priority": "high",
+              "tags": [
+                "go",
+                "sourcevision",
+                "zones",
+                "integration-tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:46:36.251Z",
+              "completedAt": "2026-03-26T05:52:26.151Z"
+            },
+            {
+              "id": "81da168f-62be-4c39-a20d-18a53d808d47",
+              "title": "Document Go zone detection behavior, edge semantics, and known limitations",
+              "status": "completed",
+              "level": "task",
+              "description": "Add documentation in docs/architecture/ or the sourcevision package README covering how Go file-to-package import edges feed into zone detection, how this differs from JS/TS file-to-file edges and its impact on zone granularity, known limitations (e.g. large Go monorepos may produce fragmented zones, no function-level call graph), and how zone names are derived from Go package paths. Reference go-zones.test.ts as the canonical end-to-end validation.",
+              "acceptanceCriteria": [
+                "Documentation explains the difference between Go file-to-package edges and JS/TS file-to-file edges with at least one concrete example",
+                "Impact on zone shape and granularity is described",
+                "At least two known limitations for Go zone detection are listed (minimum: package-level granularity, no function-level call graph)",
+                "go-zones.test.ts is referenced as the canonical zone validation source",
+                "Documentation is placed in docs/architecture/ or an appropriate package-level README",
+                "Documentation accurately reflects the Phase 2 implementation as delivered"
+              ],
+              "priority": "medium",
+              "tags": [
+                "go",
+                "sourcevision",
+                "zones",
+                "documentation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T05:52:56.668Z",
+              "completedAt": "2026-03-26T05:57:25.227Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4700c8ae-721d-4f18-86e7-1eaf5a559bb4",
+      "title": "Pre-PR Fixes: Zone Edge Resolution & Mixed-Language Support",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-03-26T21:19:10.882Z",
+      "completedAt": "2026-03-26T21:19:10.882Z",
+      "children": [
+        {
+          "id": "d373f51a-ed4c-4b13-b1be-0db05e992df5",
+          "title": "Fix 1: Go Zone Edge Resolution",
+          "status": "completed",
+          "level": "feature",
+          "description": "Go import edges target package directories rather than individual files, causing the zone crossing algorithm to silently drop all Go cross-zone imports. This produces 0 crossings and 0 coupling in Go projects (observed: PocketBase had 756 edges but only 49 crossings; grit had 12 edges and 0 crossings). The fix introduces prefix-matching at all edge consumption points so directory-targeted edges resolve to their constituent files. This fix is independent of Fix 2 but is recommended first due to smaller scope and high impact on pure Go projects.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T20:47:10.759Z",
+          "completedAt": "2026-03-26T20:47:10.759Z",
+          "children": [
+            {
+              "id": "9c28061d-d830-4ebb-9389-fae26db29adf",
+              "title": "Implement Go directory-to-files resolver and update zone pipeline",
+              "status": "completed",
+              "level": "task",
+              "description": "Go import edges from `go-imports.ts` target package directories (e.g., `internal/generate`) rather than individual files. The zone crossing algorithm in `buildCrossings()` (zones.ts ~1475), the Louvain graph builder in `buildUndirectedGraph()` (louvain.ts), and `computeZoneMetrics()` all do exact string lookups against file paths — silently dropping every Go cross-zone edge. Create a directory-to-files resolver utility and apply it at all three consumption points so directory-targeted edges expand to their constituent files. JS/TS exact-match behavior must remain unchanged.",
+              "acceptanceCriteria": [
+                "Directory-to-files resolver utility returns the exact file for JS/TS-style file path inputs",
+                "Resolver returns all files whose paths begin with the directory prefix for Go-style directory path inputs",
+                "`buildUndirectedGraph()` expands directory-target edges into file-level edges before graph construction so Louvain receives real file-level nodes",
+                "`buildCrossings()` falls back to prefix matching (`edge.to + \"/\"`) when exact `fileToZone` lookup fails",
+                "`computeZoneMetrics()` applies the same prefix expansion when computing cohesion and coupling from the graph",
+                "Go projects with cross-package imports produce non-zero zone crossings",
+                "Zone coupling scores are non-zero for zones with incoming or outgoing cross-package imports",
+                "Zone cohesion scores reflect intra-package import density",
+                "PocketBase re-analysis produces significantly more than 49 crossings",
+                "grit re-analysis produces non-zero crossings between Go zones",
+                "JS/TS zone crossing results are unchanged (no regression)"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "zones"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T20:30:24.097Z",
+              "completedAt": "2026-03-26T20:47:10.595Z"
+            },
+            {
+              "id": "95dde960-5ab0-4acd-b53e-7004ce3591d4",
+              "title": "Add test coverage for Go zone edge resolution",
+              "status": "completed",
+              "level": "task",
+              "description": "Validate the directory-to-files resolver and updated zone pipeline with unit and integration tests. Tests must cover the resolver in isolation, Go-specific crossing detection end-to-end, and a regression guard ensuring JS/TS zone behavior is unchanged.",
+              "acceptanceCriteria": [
+                "Unit test: directory-to-files resolver returns exact match for JS/TS-style file path input",
+                "Unit test: directory-to-files resolver returns all files under the prefix for Go-style directory path input",
+                "Unit test: `buildCrossings()` produces non-zero crossings when given Go-style directory edges",
+                "Integration test: full zone pipeline run against a Go fixture produces non-zero crossings and non-zero coupling scores",
+                "Regression test: JS/TS fixture zone crossings are identical before and after the resolver change"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T20:09:20.039Z"
+            }
+          ]
+        },
+        {
+          "id": "a40abbfe-7834-4adc-885b-70e7d80092e1",
+          "title": "Fix 2: Mixed-Language Support",
+          "status": "completed",
+          "level": "feature",
+          "description": "Projects containing both Go and TypeScript files (e.g., a Go CLI with a Next.js docs site) detect only a single primary language. The non-primary language's files are inventoried but produce sparse import edges and orphan zones with 0 cohesion because `manifest.language` is a single string, archetype signal filtering scopes to one language, and only the primary language's skip directories, config file names, and test patterns are applied. Applying Fix 1 (zone edge resolution) first is recommended, but this fix is independent — together they make mixed Go+TS projects produce fully meaningful analysis.",
+          "source": "smart-add",
+          "startedAt": "2026-03-26T21:19:10.766Z",
+          "completedAt": "2026-03-26T21:19:10.766Z",
+          "children": [
+            {
+              "id": "d567173b-1770-490a-9757-41712acaa91d",
+              "title": "Implement multi-language detection and extend Manifest schema",
+              "status": "completed",
+              "level": "task",
+              "description": "Extend `detectLanguage()` in `detect.ts` to return multiple language configs when both Go and TypeScript markers coexist (go.mod + package.json). Add a `languages` string-array field to the Manifest schema in `schema/v1.ts` while keeping the existing `language` string field set to the primary language for backward compatibility. Propagate the languages array through `analyze-phases.ts`, merge skip directories, config filenames, and test patterns from all detected languages, and update classification signal filtering in `classify.ts` to check signals against the full `languages` array instead of a single string.",
+              "acceptanceCriteria": [
+                "`manifest.languages` added to schema/v1.ts as a string array ordered primary-first",
+                "`manifest.language` remains set to the primary language (backward compatibility preserved)",
+                "Updated detector returns Go config when go.mod is present",
+                "Updated detector returns TypeScript config when package.json is present",
+                "Primary language is the one with more source files using the existing tiebreak logic",
+                "`analyze-phases.ts` writes both `language` and `languages` to the manifest on each analysis run",
+                "Archetype signal filtering checks `signal.languages` against `manifest.languages` array so signals fire for all detected languages",
+                "Merged language config combines `skipDirectories` from all detected languages (`vendor/` and `node_modules/` both skipped in a mixed project)",
+                "Merged language config combines `configFilenames` (`go.mod` and `package.json` both detected as config files in a mixed project)",
+                "Merged language config combines `testFilePatterns` (`_test.go` and `.test.ts` both classified as test role in a mixed project)",
+                "Import edges are produced for both Go and TypeScript files in a mixed project",
+                "Zone detection produces meaningful zones for both language groups in a mixed project",
+                "Pure Go projects produce identical results to before",
+                "Pure TypeScript projects produce identical results to before"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "typescript",
+                "languages"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T21:08:17.813Z",
+              "completedAt": "2026-03-26T21:19:10.594Z"
+            },
+            {
+              "id": "44a1fcf3-1830-407b-acc1-889e6f45e8f2",
+              "title": "Add test coverage for mixed-language detection",
+              "status": "completed",
+              "level": "task",
+              "description": "Validate the multi-language detection pipeline with unit and integration tests. Tests must cover the updated detector, merged language config construction, signal filtering against an array, and the full pipeline against a mixed Go+TS fixture. Pure-language regression tests guard against unintended behavior changes.",
+              "acceptanceCriteria": [
+                "Unit test: updated detector returns both Go and TypeScript configs when both go.mod and package.json are present",
+                "Unit test: merged language config includes skip directories from both languages",
+                "Unit test: merged language config includes test file patterns from both languages",
+                "Unit test: classification signal filtering matches a signal when its language is in the `languages` array",
+                "Integration test: mixed Go + TS fixture produces import edges for both Go and TypeScript source files",
+                "Integration test: mixed Go + TS fixture records both go.mod and package.json as detected config files",
+                "Regression test: pure Go project detection and manifest output are unchanged",
+                "Regression test: pure TypeScript project detection and manifest output are unchanged"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "go",
+                "typescript",
+                "tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-03-26T20:48:15.058Z",
+              "completedAt": "2026-03-26T21:07:33.306Z"
             }
           ]
         }

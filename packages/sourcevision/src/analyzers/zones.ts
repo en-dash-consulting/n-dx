@@ -1658,6 +1658,33 @@ async function applyEnrichment(
   };
 }
 
+// ── Helper: resolve directory-targeted edges ─────────────────────────────────
+
+/**
+ * Resolve an import-edge target to actual file paths.
+ *
+ * JS/TS imports target individual files — a direct `fileSet.has()` hit returns
+ * the target unchanged. Go imports target package *directories* (e.g.
+ * `internal/handler`), so when the target is missing from the file set we fall
+ * back to prefix-matching to find all constituent files beneath that directory.
+ *
+ * @param target - edge target path (file or directory)
+ * @param fileSet - set of all known file paths (typically zone files or inventory)
+ * @returns matched file paths (empty when no match)
+ */
+export function resolveEdgeTarget(target: string, fileSet: Set<string>): string[] {
+  // Direct match — JS/TS file-level imports, or any exact file path
+  if (fileSet.has(target)) return [target];
+
+  // Directory prefix match — Go package-level imports
+  const prefix = target + "/";
+  const matches: string[] = [];
+  for (const file of fileSet) {
+    if (file.startsWith(prefix)) matches.push(file);
+  }
+  return matches;
+}
+
 // ── Helper: build crossings ──────────────────────────────────────────────────
 
 /** Build zone crossings from import edges and promoted sub-analysis crossings. */
@@ -1670,13 +1697,19 @@ function buildCrossings(
   for (const zone of allZones) {
     for (const file of zone.files) fileToZone.set(file, zone.id);
   }
+  const allFiles = new Set(fileToZone.keys());
 
   const crossings: ZoneCrossing[] = [...promotedCrossings];
   for (const edge of imports.edges) {
     const fromZone = fileToZone.get(edge.from);
-    const toZone = fileToZone.get(edge.to);
-    if (fromZone && toZone && fromZone !== toZone) {
-      crossings.push({ from: edge.from, to: edge.to, fromZone, toZone });
+    if (!fromZone) continue;
+
+    const targets = resolveEdgeTarget(edge.to, allFiles);
+    for (const target of targets) {
+      const toZone = fileToZone.get(target);
+      if (toZone && fromZone !== toZone) {
+        crossings.push({ from: edge.from, to: target, fromZone, toZone });
+      }
     }
   }
   return crossings;
@@ -1916,8 +1949,25 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     stabilityWeight = 0.5,
   } = options;
 
+  // ── Resolve directory-targeted edges ──
+  // Go import edges target package directories (e.g. "internal/handler") rather
+  // than individual files. Expand these to per-file edges so Louvain clusters
+  // real files instead of phantom directory nodes.
+  const scopeFileSet = new Set(scopeFiles);
+  const resolvedEdges: ImportEdge[] = [];
+  for (const edge of edges) {
+    const targets = resolveEdgeTarget(edge.to, scopeFileSet);
+    if (targets.length === 0 || (targets.length === 1 && targets[0] === edge.to)) {
+      resolvedEdges.push(edge);
+    } else {
+      for (const t of targets) {
+        resolvedEdges.push({ ...edge, to: t });
+      }
+    }
+  }
+
   // ── Build undirected graph ──
-  const graph = buildUndirectedGraph(edges);
+  const graph = buildUndirectedGraph(resolvedEdges);
 
   // Snapshot the import-only graph for metrics computation. Proximity edges
   // exist to help Louvain cluster disconnected files but they are NOT

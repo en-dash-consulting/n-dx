@@ -22,3 +22,5 @@ ndx-export/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 scripts/HENCH_CALLGRAPH_FINDINGS.md
+
+.github/issues/

@@ -11,24 +11,15 @@ import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
 import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import { toPosix } from "../util/paths.js";
+import { detectLanguage as detectProjectLanguage, typescriptConfig } from "../language/index.js";
+import type { LanguageConfig } from "../language/index.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
 
-const SKIP_DIRS = new Set([
+/** Always-skipped directories regardless of language config. */
+const BASE_SKIP_DIRS: ReadonlySet<string> = new Set([
   ".git",
-  "node_modules",
   PROJECT_DIRS.SOURCEVISION,
-  "dist",
-  "build",
-  "__pycache__",
-  ".react-router",
-  ".next",
-  ".nuxt",
-  ".svelte-kit",
-  ".turbo",
-  ".cache",
-  "coverage",
-  ".output",
 ]);
 
 // ── Language detection ───────────────────────────────────────────────────────
@@ -127,87 +118,8 @@ export function detectLanguage(filePath: string): string {
 
 // ── Role classification ──────────────────────────────────────────────────────
 
-const CONFIG_FILENAMES = new Set([
-  "package.json",
-  "package-lock.json",
-  "tsconfig.json",
-  "jsconfig.json",
-  ".eslintrc",
-  ".eslintrc.js",
-  ".eslintrc.json",
-  ".eslintrc.yml",
-  ".prettierrc",
-  ".prettierrc.js",
-  ".prettierrc.json",
-  ".prettierrc.yml",
-  "prettier.config.js",
-  "eslint.config.js",
-  "eslint.config.mjs",
-  "eslint.config.ts",
-  ".editorconfig",
-  ".gitignore",
-  ".gitattributes",
-  ".npmrc",
-  ".npmignore",
-  ".nvmrc",
-  ".node-version",
-  ".tool-versions",
-  ".env.example",
-  "babel.config.js",
-  "babel.config.json",
-  ".babelrc",
-  "jest.config.js",
-  "jest.config.ts",
-  "jest.config.mjs",
-  "vitest.config.ts",
-  "vitest.config.js",
-  "vitest.config.mjs",
-  "webpack.config.js",
-  "webpack.config.ts",
-  "rollup.config.js",
-  "rollup.config.mjs",
-  "rollup.config.ts",
-  "vite.config.ts",
-  "vite.config.js",
-  "vite.config.mjs",
-  "esbuild.config.js",
-  "esbuild.config.mjs",
-  "postcss.config.js",
-  "postcss.config.mjs",
-  "postcss.config.cjs",
-  "tailwind.config.js",
-  "tailwind.config.ts",
-  "tailwind.config.mjs",
-  "next.config.js",
-  "next.config.mjs",
-  "next.config.ts",
-  "nuxt.config.ts",
-  "nuxt.config.js",
-  "svelte.config.js",
-  "astro.config.mjs",
-  "astro.config.ts",
-  "prettier.config.mjs",
-  "prettier.config.ts",
-  "babel.config.mjs",
-  "babel.config.cjs",
-  "Cargo.toml",
-  "Cargo.lock",
-  "go.mod",
-  "go.sum",
-  "pyproject.toml",
-  "setup.py",
-  "setup.cfg",
-  "Pipfile",
-  "Gemfile",
-  "Gemfile.lock",
-  "Rakefile",
-  "composer.json",
-  "composer.lock",
-  "Makefile",
-  "GNUmakefile",
-  "CMakeLists.txt",
-  "Justfile",
-]);
+// CONFIG_FILENAMES — now sourced from languageConfig.configFilenames.
+// See packages/sourcevision/src/language/ for per-language config sets.
 
 const LOCKFILE_NAMES = new Set([
   "package-lock.json",
@@ -280,32 +192,30 @@ const PROGRAMMING_LANGUAGES = new Set([
   "Astro",
 ]);
 
-export function classifyRole(filePath: string, language: string): FileRole {
+export function classifyRole(filePath: string, language: string, langConfig?: LanguageConfig): FileRole {
   const name = basename(filePath);
   const lower = filePath.toLowerCase();
   const ext = extname(filePath).toLowerCase();
 
-  // 1. Test
-  if (
-    name.includes(".test.") ||
-    name.includes(".spec.") ||
-    lower.includes("__tests__/") ||
-    lower.includes("/test/") ||
-    lower.includes("/tests/") ||
-    lower.startsWith("test/") ||
-    lower.startsWith("tests/")
-  ) {
+  const config = langConfig ?? typescriptConfig;
+
+  // 1. Test — language-specific patterns (e.g. _test.go for Go, .test./.spec. for TS)
+  if (config.testFilePatterns.some((pat) => pat.test(filePath))) {
     return "test";
   }
 
-  // 2. Generated
-  if (LOCKFILE_NAMES.has(name) || lower.includes("generated")) {
+  // 2. Generated — universal checks + language-specific patterns
+  if (
+    LOCKFILE_NAMES.has(name) ||
+    lower.includes("generated") ||
+    config.generatedFilePatterns.some((pat) => pat.test(filePath))
+  ) {
     return "generated";
   }
 
-  // 3. Config
+  // 3. Config — language-specific filenames + universal heuristics
   if (
-    CONFIG_FILENAMES.has(name) ||
+    config.configFilenames.has(name) ||
     name.startsWith("tsconfig") ||
     name === ".env" ||
     name.startsWith(".env.") ||
@@ -331,7 +241,7 @@ export function classifyRole(filePath: string, language: string): FileRole {
     return "docs";
   }
 
-  // 5. Asset
+  // 5. Asset — universal checks + Go testdata/ convention
   if (
     ASSET_EXTENSIONS.has(ext) ||
     lower.includes("/assets/") ||
@@ -339,7 +249,8 @@ export function classifyRole(filePath: string, language: string): FileRole {
     lower.includes("/public/") ||
     lower.startsWith("public/") ||
     lower.includes("/static/") ||
-    lower.startsWith("static/")
+    lower.startsWith("static/") ||
+    (config.id === "go" && (lower.includes("/testdata/") || lower.startsWith("testdata/")))
   ) {
     return "asset";
   }
@@ -529,12 +440,12 @@ export async function loadIgnoreFilter(rootDir: string): Promise<IgnoreFilter> {
 
 // ── File discovery ───────────────────────────────────────────────────────────
 
-async function walkDir(dir: string, rootDir: string, ig: IgnoreFilter): Promise<string[]> {
+async function walkDir(dir: string, rootDir: string, ig: IgnoreFilter, skipDirs: ReadonlySet<string>): Promise<string[]> {
   const files: string[] = [];
   const entries = await readdir(dir, { withFileTypes: true });
 
   for (const entry of entries) {
-    if (SKIP_DIRS.has(entry.name)) continue;
+    if (skipDirs.has(entry.name)) continue;
     if (entry.name === ".gitkeep") continue;
 
     const fullPath = join(dir, entry.name);
@@ -542,7 +453,7 @@ async function walkDir(dir: string, rootDir: string, ig: IgnoreFilter): Promise<
 
     if (entry.isDirectory()) {
       if (ig.ignores(relPath + "/")) continue;
-      const sub = await walkDir(fullPath, rootDir, ig);
+      const sub = await walkDir(fullPath, rootDir, ig, skipDirs);
       files.push(...sub);
     } else if (entry.isFile()) {
       if (ig.ignores(relPath)) continue;
@@ -557,6 +468,8 @@ async function walkDir(dir: string, rootDir: string, ig: IgnoreFilter): Promise<
 
 export interface InventoryOptions {
   previousInventory?: Inventory;
+  /** Pre-resolved language config. When omitted, detectLanguage() auto-detects. */
+  languageConfig?: LanguageConfig;
 }
 
 export interface InventoryStats {
@@ -580,8 +493,15 @@ export async function analyzeInventory(
   options?: InventoryOptions
 ): Promise<InventoryResult> {
   const absDir = join(targetDir); // normalize
+
+  // Resolve language config once per analysis run
+  const langConfig = options?.languageConfig ?? await detectProjectLanguage(absDir);
+
+  // Build skip set: always-skipped dirs + language-specific dirs
+  const skipDirs = new Set([...BASE_SKIP_DIRS, ...langConfig.skipDirectories]);
+
   const ig = await loadIgnoreFilter(absDir);
-  const filePaths = await walkDir(absDir, absDir, ig);
+  const filePaths = await walkDir(absDir, absDir, ig, skipDirs);
 
   const prev = options?.previousInventory;
   const prevMap = new Map<string, FileEntry>();
@@ -616,7 +536,7 @@ export async function analyzeInventory(
     const buf = await readFile(fullPath);
     const hash = createHash("sha256").update(buf).digest("hex");
     const language = detectLanguage(relPath);
-    const role = classifyRole(relPath, language);
+    const role = classifyRole(relPath, language, langConfig);
     const category = deriveCategory(relPath);
 
     let lineCount = 0;

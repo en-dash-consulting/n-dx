@@ -1,5 +1,50 @@
 import type { HenchConfig, TaskBriefProject } from "../../schema/index.js";
 
+// ---------------------------------------------------------------------------
+// Go-specific prompt context
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns Go-specific language context for the system prompt.
+ * Covers toolchain commands, naming conventions, project structure,
+ * and test conventions so the agent produces idiomatic Go code.
+ */
+function buildGoLanguageContext(): string {
+  const lines: string[] = [];
+
+  lines.push("## Language: Go");
+  lines.push("");
+  lines.push("### Toolchain");
+  lines.push("- Build: `go build ./...`");
+  lines.push("- Test: `go test ./...`");
+  lines.push("- Vet: `go vet ./...`");
+  lines.push("- Lint: `golangci-lint run`");
+  lines.push("");
+  lines.push("### Naming Conventions");
+  lines.push("- Exported identifiers use PascalCase (e.g. `HandleRequest`, `UserService`).");
+  lines.push("- Unexported identifiers use camelCase (e.g. `parseInput`, `defaultTimeout`).");
+  lines.push("- Error handling uses explicit return values — no try/catch. Check every returned `error`.");
+  lines.push("- Acronyms are all-caps when exported (`HTTPClient`, `ID`) and all-lower when unexported (`httpClient`, `id`).");
+  lines.push("");
+  lines.push("### Project Structure");
+  lines.push("- `cmd/` — main packages (one subdirectory per binary).");
+  lines.push("- `internal/` — private packages (not importable by other modules).");
+  lines.push("- `pkg/` — public library packages (importable by external modules).");
+  lines.push("- `go.mod` / `go.sum` — module definition and dependency checksums.");
+  lines.push("");
+  lines.push("### Test Conventions");
+  lines.push("- Test files use the `_test.go` suffix in the same package.");
+  lines.push("- Test functions accept `*testing.T` (e.g. `func TestParseInput(t *testing.T)`).");
+  lines.push("- Prefer table-driven tests with `t.Run` subtests for comprehensive coverage.");
+  lines.push("- Test helpers call `t.Helper()` so failures report the caller's line.");
+
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// System prompt builder
+// ---------------------------------------------------------------------------
+
 export function buildSystemPrompt(
   project: TaskBriefProject,
   config: HenchConfig,
@@ -38,6 +83,12 @@ export function buildSystemPrompt(
     lines.push(`Test command: \`${project.testCommand}\``);
   }
   lines.push("");
+
+  // Language-specific context (only when detected)
+  if (config.language === "go") {
+    lines.push(buildGoLanguageContext());
+    lines.push("");
+  }
 
   lines.push("## Workflow");
 

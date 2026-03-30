@@ -5,6 +5,7 @@
  * 1. JSDoc/comment annotations with "METHOD /path" patterns
  * 2. Express/Hono/Koa-style method calls: app.get("/path", handler)
  * 3. Manual routing patterns: if (method === "GET" && path === "...")
+ * 4. Go HTTP framework patterns (net/http, chi, gin, echo, fiber, gorilla/mux)
  */
 
 import { readFile } from "node:fs/promises";
@@ -18,9 +19,10 @@ import type {
   Classifications,
 } from "../schema/index.js";
 import { buildClassificationMap } from "./classify.js";
+import { detectGoServerRoutes } from "./go-route-detection.js";
 
 const VALID_METHODS = new Set<string>(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
-const PARSEABLE = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+const PARSEABLE = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".go"]);
 
 // HTTP method names used in framework-style chaining: app.get(), router.post(), etc.
 const FRAMEWORK_METHOD_NAMES = new Set(["get", "post", "put", "patch", "delete", "options", "head"]);
@@ -163,6 +165,15 @@ function isLikelyRouteFile(filePath: string, role: string, archetypeMap?: Map<st
     if (archetype === "route-handler") return true;
   }
   const lower = filePath.toLowerCase();
+
+  // Go files: main.go, router.go, routes.go, handler files, cmd/ or api/ directories
+  if (lower.endsWith(".go")) {
+    if (/_test\.go$/.test(lower)) return false;
+    if (/(?:^|\/)(?:main|router|routes?)\.go$/.test(lower)) return true;
+    if (/(?:^|\/)(?:cmd|api|handler|handlers|route|routes|server)\//.test(lower)) return true;
+    return false;
+  }
+
   // File named routes-*.ts or routes/*.ts or router.ts
   if (/(?:^|\/)routes?[-./]/.test(lower)) return true;
   if (/(?:^|\/)router\.[tj]sx?$/.test(lower)) return true;
@@ -198,6 +209,16 @@ export async function detectServerRoutes(
       continue;
     }
 
+    const ext = extname(file.path).toLowerCase();
+
+    // Dispatch Go files to the dedicated Go detector
+    if (ext === ".go") {
+      const goGroups = detectGoServerRoutes(sourceText, file.path);
+      groups.push(...goGroups);
+      continue;
+    }
+
+    // JS/TS path: JSDoc extraction + framework pattern detection
     // Try JSDoc extraction first (most reliable for well-documented APIs)
     let routes = extractRoutesFromComments(sourceText, file.path);
 

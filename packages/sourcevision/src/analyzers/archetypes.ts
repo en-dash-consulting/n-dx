@@ -24,6 +24,8 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
       { kind: "filename", pattern: "^cli\\.[tj]sx?$", weight: 0.8 },
       { kind: "filename", pattern: "^public\\.[tj]sx?$", weight: 0.9 },
       { kind: "filename", pattern: "^mod\\.[tj]sx?$", weight: 0.7 },
+      { kind: "filename", pattern: "^main\\.go$", weight: 0.9, languages: ["go"] },
+      { kind: "directory", pattern: "/cmd/", weight: 0.7, languages: ["go"] },
     ],
     analysisHints: {
       deadExports: "skip",
@@ -61,6 +63,9 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
       { kind: "filename", pattern: "\\.types\\.[tj]sx?$", weight: 0.9 },
       { kind: "filename", pattern: "\\.constants\\.[tj]sx?$", weight: 0.9 },
       { kind: "filename", pattern: "\\.d\\.ts$", weight: 0.9 },
+      { kind: "filename", pattern: "^types\\.go$", weight: 0.9, languages: ["go"] },
+      { kind: "filename", pattern: "^models\\.go$", weight: 0.8, languages: ["go"] },
+      { kind: "filename", pattern: "^entities\\.go$", weight: 0.8, languages: ["go"] },
     ],
     analysisHints: {
       couplingExpectation: "unidirectional",
@@ -79,6 +84,9 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
       { kind: "filename", pattern: "^router\\.[tj]sx?$", weight: 0.8 },
       { kind: "directory", pattern: "/routes/", weight: 0.7 },
       { kind: "directory", pattern: "/api/", weight: 0.6 },
+      { kind: "filename", pattern: "^handlers?\\.go$", weight: 0.8, languages: ["go"] },
+      { kind: "directory", pattern: "/handler/", weight: 0.8, languages: ["go"] },
+      { kind: "directory", pattern: "/handlers/", weight: 0.8, languages: ["go"] },
     ],
     analysisHints: {
       description: "Server-side route handlers",
@@ -89,7 +97,7 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Route Module",
     description: "Framework convention route modules (Remix/React Router) with loader/action/default exports.",
     signals: [
-      { kind: "export", pattern: "^(loader|action|default|meta|links|headers|ErrorBoundary)$", weight: 0.8 },
+      { kind: "export", pattern: "^(loader|action|default|meta|links|headers|ErrorBoundary)$", weight: 0.8, languages: ["typescript", "javascript"] },
     ],
     analysisHints: {
       deadExports: "skip",
@@ -101,9 +109,9 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Component",
     description: "React/UI component files with JSX-returning functions.",
     signals: [
-      { kind: "filename", pattern: "\\.[tj]sx$", weight: 0.4 },
-      { kind: "directory", pattern: "/components/", weight: 0.6 },
-      { kind: "directory", pattern: "/ui/", weight: 0.5 },
+      { kind: "filename", pattern: "\\.[tj]sx$", weight: 0.4, languages: ["typescript", "javascript"] },
+      { kind: "directory", pattern: "/components/", weight: 0.6, languages: ["typescript", "javascript"] },
+      { kind: "directory", pattern: "/ui/", weight: 0.5, languages: ["typescript", "javascript"] },
     ],
     analysisHints: {
       godFunctionThresholdMultiplier: "2",
@@ -172,6 +180,7 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
       { kind: "filename", pattern: "^config\\.[tj]sx?$", weight: 0.7 },
       { kind: "filename", pattern: "\\.config\\.[tj]sx?$", weight: 0.8 },
       { kind: "directory", pattern: "/config/", weight: 0.6 },
+      { kind: "filename", pattern: "^config\\.go$", weight: 0.7, languages: ["go"] },
     ],
     analysisHints: {
       hubThresholdMultiplier: "2",
@@ -185,8 +194,8 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Hook",
     description: "React hooks — custom hooks encapsulating reusable stateful logic.",
     signals: [
-      { kind: "filename", pattern: "^use[A-Z].*\\.[tj]sx?$", weight: 0.9 },
-      { kind: "directory", pattern: "/hooks/", weight: 0.8 },
+      { kind: "filename", pattern: "^use[A-Z].*\\.[tj]sx?$", weight: 0.9, languages: ["typescript", "javascript"] },
+      { kind: "directory", pattern: "/hooks/", weight: 0.8, languages: ["typescript", "javascript"] },
     ],
     analysisHints: {
       description: "React hooks follow the use* naming convention",
@@ -239,9 +248,9 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
     name: "Page",
     description: "Page-level components, views, or screens — top-level UI entry points for routes.",
     signals: [
-      { kind: "directory", pattern: "/pages/", weight: 0.8 },
-      { kind: "directory", pattern: "/views/", weight: 0.7 },
-      { kind: "directory", pattern: "/screens/", weight: 0.7 },
+      { kind: "directory", pattern: "/pages/", weight: 0.8, languages: ["typescript", "javascript"] },
+      { kind: "directory", pattern: "/views/", weight: 0.7, languages: ["typescript", "javascript"] },
+      { kind: "directory", pattern: "/screens/", weight: 0.7, languages: ["typescript", "javascript"] },
     ],
     analysisHints: {
       godFunctionThresholdMultiplier: "2",
@@ -260,6 +269,8 @@ export const BUILTIN_ARCHETYPES: ArchetypeDefinition[] = [
       { kind: "filename", pattern: "^test-utils\\.[tj]sx?$", weight: 0.8 },
       { kind: "filename", pattern: "^test-helpers\\.[tj]sx?$", weight: 0.8 },
       { kind: "filename", pattern: "^setup\\.[tj]sx?$", weight: 0.5 },
+      { kind: "directory", pattern: "/testdata/", weight: 0.9, languages: ["go"] },
+      { kind: "directory", pattern: "/testutil/", weight: 0.8, languages: ["go"] },
     ],
     analysisHints: {
       description: "Test utility files",

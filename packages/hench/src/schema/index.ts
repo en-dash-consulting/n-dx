@@ -1,6 +1,7 @@
 export {
   HENCH_SCHEMA_VERSION,
   DEFAULT_HENCH_CONFIG,
+  guardDefaultsForLanguage,
 } from "./v1.js";
 
 export type {
@@ -9,6 +10,7 @@ export type {
   RetryConfig,
   HenchConfig,
   Provider,
+  ProjectLanguage,
   RunStatus,
   ToolCallRecord,
   TokenUsage,

@@ -14,6 +14,7 @@ vi.mock("../../../../src/analyze/scanners.js", () => ({
   scanDocs: vi.fn().mockResolvedValue([]),
   scanSourceVision: vi.fn().mockResolvedValue({ results: [], staleCount: 0 }),
   scanPackageJson: vi.fn().mockResolvedValue([]),
+  scanGoMod: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../../../src/analyze/dedupe.js", () => ({

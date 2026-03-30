@@ -31,6 +31,15 @@ export interface Manifest {
   children?: SubAnalysisRef[];
   /** True when this analysis is a workspace aggregation (not a single repo). */
   workspace?: boolean;
+  /** Resolved primary language after detection (e.g. "typescript", "go"). */
+  language?: string;
+  /**
+   * All detected languages, ordered primary-first.
+   * In a mixed Go + TypeScript project this would be `["go", "typescript"]`
+   * or `["typescript", "go"]` depending on which has more source files.
+   * Single-language projects contain one element matching `language`.
+   */
+  languages?: string[];
 }
 
 /** Reference to an incorporated sub-analysis. */
@@ -512,6 +521,8 @@ export interface ArchetypeSignal {
   kind: "path" | "import" | "export" | "filename" | "directory";
   pattern: string;
   weight: number;
+  /** When set, this signal only fires for projects whose detected language is in the list. */
+  languages?: string[];
 }
 
 export interface ArchetypeDefinition {

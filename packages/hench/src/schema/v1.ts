@@ -9,6 +9,12 @@ import type { RuntimePoolConfig } from "../process/pool.js";
 export const HENCH_SCHEMA_VERSION = "hench/v1";
 
 /**
+ * Supported project languages for language-aware guard configuration.
+ * "auto" triggers detection during `hench init`.
+ */
+export type ProjectLanguage = "typescript" | "javascript" | "go";
+
+/**
  * Configurable subset of policy limits (all optional, defaults applied at runtime).
  *
  * Defined here (schema) rather than in guard/contracts so that schema/v1
@@ -82,9 +88,55 @@ export interface HenchConfig {
   maxFailedAttempts: number;
   /** When true, the agent is running in self-heal mode (structural fixes). */
   selfHeal?: boolean;
+  /** Detected project language. Drives guard defaults during init. */
+  language?: ProjectLanguage;
 }
 
-export function DEFAULT_HENCH_CONFIG(): HenchConfig {
+// ── Language-specific guard defaults ──────────────────────────────────
+
+/** Guard defaults for JS/TS projects (the existing default). */
+const JS_TS_GUARD_DEFAULTS: GuardConfig = {
+  blockedPaths: [`${PROJECT_DIRS.HENCH}/**`, `${PROJECT_DIRS.REX}/**`, ".git/**", "node_modules/**"],
+  allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"],
+  commandTimeout: 30000,
+  maxFileSize: 1048576,
+  spawnTimeout: 300000,          // 5 minutes
+  maxConcurrentProcesses: 3,
+  allowedGitSubcommands: [
+    "status", "add", "commit", "diff", "log",
+    "branch", "checkout", "stash", "show", "rev-parse",
+  ],
+};
+
+/** Guard defaults for Go projects. */
+const GO_GUARD_DEFAULTS: GuardConfig = {
+  blockedPaths: [`${PROJECT_DIRS.HENCH}/**`, `${PROJECT_DIRS.REX}/**`, ".git/**", "vendor/**"],
+  allowedCommands: ["go", "make", "git", "golangci-lint"],
+  commandTimeout: 30000,
+  maxFileSize: 1048576,
+  spawnTimeout: 300000,          // 5 minutes
+  maxConcurrentProcesses: 3,
+  allowedGitSubcommands: [
+    "status", "add", "commit", "diff", "log",
+    "branch", "checkout", "stash", "show", "rev-parse",
+  ],
+};
+
+/**
+ * Returns the language-appropriate guard defaults.
+ * Falls back to JS/TS defaults for unknown languages.
+ */
+export function guardDefaultsForLanguage(language?: ProjectLanguage): GuardConfig {
+  if (language === "go") return { ...GO_GUARD_DEFAULTS };
+  return { ...JS_TS_GUARD_DEFAULTS };
+}
+
+/**
+ * Default hench configuration. When `language` is provided, guard defaults
+ * are tuned for that language's toolchain. Omitting it preserves the
+ * existing JS/TS defaults for backward compatibility.
+ */
+export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
   return {
     schema: HENCH_SCHEMA_VERSION,
     provider: "cli",
@@ -94,18 +146,7 @@ export function DEFAULT_HENCH_CONFIG(): HenchConfig {
     tokenBudget: 0,
     rexDir: PROJECT_DIRS.REX,
     apiKeyEnv: "ANTHROPIC_API_KEY",
-    guard: {
-      blockedPaths: [`${PROJECT_DIRS.HENCH}/**`, `${PROJECT_DIRS.REX}/**`, ".git/**", "node_modules/**"],
-      allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"],
-      commandTimeout: 30000,
-      maxFileSize: 1048576,
-      spawnTimeout: 300000,          // 5 minutes
-      maxConcurrentProcesses: 3,
-      allowedGitSubcommands: [
-        "status", "add", "commit", "diff", "log",
-        "branch", "checkout", "stash", "show", "rev-parse",
-      ],
-    },
+    guard: guardDefaultsForLanguage(language),
     retry: {
       maxRetries: 3,
       baseDelayMs: 2000,
@@ -113,6 +154,7 @@ export function DEFAULT_HENCH_CONFIG(): HenchConfig {
     },
     loopPauseMs: 2000,
     maxFailedAttempts: 3,
+    ...(language ? { language } : {}),
   };
 }
 
