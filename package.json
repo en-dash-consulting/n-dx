@@ -71,7 +71,7 @@
     "validate": "pnpm -r run validate",
     "verify": "vitest run tests/e2e && node ci.js .",
     "pr-check": "node pr-check.js",
-    "prepublishOnly": "pnpm run build && pnpm run typecheck && pnpm run test",
+    "prepublishOnly": "if [ -z \"$CI\" ]; then pnpm run build && pnpm run typecheck && pnpm run test; fi",
     "prepare": "pnpm run build",
     "changeset": "changeset",
     "version-packages": "changeset version",
