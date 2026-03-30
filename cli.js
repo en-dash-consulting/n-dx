@@ -882,6 +882,71 @@ function runCapture(script, args) {
   });
 }
 
+/**
+ * Read file-level code health metrics for self-heal regression detection.
+ * These are zone-independent signals that don't fluctuate with zone reassignment.
+ */
+function readCodeHealthMetrics(dir) {
+  try {
+    const svDir = resolve(dir, ".sourcevision");
+    let circularDeps = 0;
+    let codeFindingCount = 0;
+    let unusedExports = 0;
+
+    // Circular dependency count from imports.json
+    try {
+      const importsData = JSON.parse(readFileSync(resolve(svDir, "imports.json"), "utf-8"));
+      circularDeps = importsData.summary?.circularCount ?? 0;
+    } catch { /* imports.json may not exist */ }
+
+    // Code-category finding count from zones.json
+    try {
+      const zonesData = JSON.parse(readFileSync(resolve(svDir, "zones.json"), "utf-8"));
+      const findings = zonesData.findings ?? [];
+      codeFindingCount = findings.filter(
+        (f) => f.category === "code" && (f.severity === "warning" || f.severity === "critical")
+      ).length;
+    } catch { /* zones.json may not exist */ }
+
+    // Unused export count from callgraph.json
+    try {
+      const callgraphData = JSON.parse(readFileSync(resolve(svDir, "callgraph.json"), "utf-8"));
+      unusedExports = callgraphData.summary?.unusedExportCount ?? 0;
+    } catch { /* callgraph.json may not exist */ }
+
+    return { circularDeps, codeFindingCount, unusedExports };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read zone metrics for informational logging (not used as termination signals).
+ */
+function readZoneMetrics(dir) {
+  try {
+    const zonesPath = resolve(dir, ".sourcevision", "zones.json");
+    const data = JSON.parse(readFileSync(zonesPath, "utf-8"));
+    const zones = data.zones ?? [];
+    if (zones.length === 0) return null;
+
+    let totalFiles = 0;
+    let weightedCohesion = 0;
+    for (const z of zones) {
+      const fileCount = z.files?.length ?? 0;
+      totalFiles += fileCount;
+      weightedCohesion += (z.cohesion ?? 0) * fileCount;
+    }
+
+    return {
+      weightedCohesion: totalFiles > 0 ? Math.round((weightedCohesion / totalFiles) * 1000) / 1000 : 0,
+      zoneCount: zones.length,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function handleSelfHeal(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex", ".hench", ".sourcevision"]);
@@ -900,9 +965,14 @@ async function handleSelfHeal(rest) {
     return !isNaN(n) && n > 0 ? n : found;
   }, 1);
 
-  console.log(`[self-heal] starting ${iterCount} iteration${iterCount === 1 ? "" : "s"}`);
+  // --include-structural opts in to structural findings; excluded by default
+  const includeStructural = rest.includes("--include-structural");
+  const structuralFlag = includeStructural ? [] : ["--exclude-structural"];
+
+  console.log(`[self-heal] starting ${iterCount} iteration${iterCount === 1 ? "" : "s"}${includeStructural ? "" : " (excluding structural findings)"}`);
 
   let prevFindingCount = Infinity;
+  let baselineHealth = readCodeHealthMetrics(dir);
 
   for (let i = 1; i <= iterCount; i++) {
     console.log(`\n[self-heal] ── iteration ${i}/${iterCount} ──\n`);
@@ -910,11 +980,45 @@ async function handleSelfHeal(rest) {
     console.log("[self-heal] step 1/5: sourcevision analyze --deep --full");
     await runOrDie(tools.sourcevision, ["analyze", "--deep", "--full", dir]);
 
+    // Regression guard: compare file-level code health metrics to baseline
+    const currentHealth = readCodeHealthMetrics(dir);
+    if (baselineHealth && currentHealth && i > 1) {
+      const circularDelta = currentHealth.circularDeps - baselineHealth.circularDeps;
+      const codeFindingDelta = currentHealth.codeFindingCount - baselineHealth.codeFindingCount;
+      const totalBefore = baselineHealth.circularDeps + baselineHealth.codeFindingCount + baselineHealth.unusedExports;
+      const totalAfter = currentHealth.circularDeps + currentHealth.codeFindingCount + currentHealth.unusedExports;
+
+      if (circularDelta > 0) {
+        console.log(`\n[self-heal] REGRESSION DETECTED after iteration ${i}:`);
+        console.log(`  circular deps: ${baselineHealth.circularDeps} → ${currentHealth.circularDeps} (+${circularDelta})`);
+        console.log(`  code findings: ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
+        console.log(`  Aborting self-heal — new circular dependencies introduced.`);
+        break;
+      }
+
+      if (totalAfter > totalBefore) {
+        console.log(`\n[self-heal] REGRESSION DETECTED after iteration ${i}:`);
+        console.log(`  code health issues: ${totalBefore} → ${totalAfter} (+${totalAfter - totalBefore})`);
+        console.log(`    circular deps:  ${baselineHealth.circularDeps} → ${currentHealth.circularDeps}`);
+        console.log(`    code findings:  ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
+        console.log(`    unused exports: ${baselineHealth.unusedExports} → ${currentHealth.unusedExports}`);
+        console.log(`  Aborting self-heal — code health degraded instead of improving.`);
+        break;
+      }
+
+      // Log zone metrics for information (not used as termination signals)
+      const zoneInfo = readZoneMetrics(dir);
+      const zoneStr = zoneInfo ? `, zones: ${zoneInfo.zoneCount} (cohesion ${zoneInfo.weightedCohesion})` : "";
+      console.log(`[self-heal] code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
+    }
+    // Update baseline for next iteration
+    if (currentHealth) baselineHealth = currentHealth;
+
     console.log("\n[self-heal] step 2/5: rex recommend --actionable-only");
-    await runOrDie(tools.rex, ["recommend", "--actionable-only", dir]);
+    await runOrDie(tools.rex, ["recommend", "--actionable-only", ...structuralFlag, dir]);
 
     console.log("\n[self-heal] step 3/5: rex recommend --actionable-only --accept");
-    await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", dir]);
+    await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", ...structuralFlag, dir]);
 
     console.log("\n[self-heal] step 4/5: hench run --auto --loop --self-heal");
     await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", dir]);
@@ -922,8 +1026,8 @@ async function handleSelfHeal(rest) {
     console.log("\n[self-heal] step 5/5: acknowledge completed findings");
     await runOrDie(tools.rex, ["recommend", "--acknowledge-completed", dir]);
 
-    // Check progress: count remaining findings
-    const { code, stdout } = await runCapture(tools.rex, ["recommend", "--actionable-only", "--format=json", dir]);
+    // Check progress: count remaining findings (same filter as accept step)
+    const { code, stdout } = await runCapture(tools.rex, ["recommend", "--actionable-only", ...structuralFlag, "--format=json", dir]);
     if (code === 0 && stdout.trim()) {
       try {
         const remaining = JSON.parse(stdout.trim());

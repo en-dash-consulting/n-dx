@@ -152,6 +152,9 @@ export interface Imports {
 
 export type FindingType = "observation" | "pattern" | "relationship" | "anti-pattern" | "suggestion" | "move-file";
 
+/** Category distinguishes what kind of issue a finding describes. */
+export type FindingCategory = "structural" | "code" | "documentation";
+
 export interface Finding {
   type: FindingType;
   /** Which pass produced this finding */
@@ -162,6 +165,8 @@ export interface Finding {
   severity?: "info" | "warning" | "critical";
   /** Related zone IDs or file paths */
   related?: string[];
+  /** Category: structural (zone boundary opinions), code (real bugs/duplication), documentation (naming/conventions) */
+  category?: FindingCategory;
 }
 
 /** Reason a file-move is recommended. */
@@ -299,6 +304,22 @@ export interface Zones {
   zoneContentHashes?: Record<string, string>;
   /** Records the last pass reset: { from: previousPass, to: currentPass } */
   lastReset?: { from: number; to: number };
+  /** Zone stability metrics compared to the previous analysis run. */
+  stability?: ZoneStability;
+}
+
+/** Zone stability metrics: how much the zone topology changed between runs. */
+export interface ZoneStability {
+  /** Fraction of files that kept the same zone ID (0–1). */
+  fileRetention: number;
+  /** Number of zones that persisted from the previous run. */
+  persistedZones: number;
+  /** Number of new zones not present in the previous run. */
+  newZones: number;
+  /** Number of previous zones that disappeared. */
+  removedZones: number;
+  /** Files that moved between zones: [file, fromZone, toZone]. */
+  reassignedFiles: [string, string, string][];
 }
 
 // ── Token Usage ─────────────────────────────────────────────────────────────

@@ -66,7 +66,7 @@ describe("scanSourceVision with acknowledgment", () => {
     store = acknowledgeFinding(store, hash, "Hardcoded secret in config", "architectural", "user");
     await saveAcknowledged(rexDir, store);
 
-    const results = await scanSourceVision(tempDir, { rexDir });
+    const { results } = await scanSourceVision(tempDir, { rexDir });
     const tasks = results.filter((r) => r.kind === "task");
 
     // Only the unacknowledged finding should produce a task
@@ -78,7 +78,7 @@ describe("scanSourceVision with acknowledgment", () => {
     await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
     await writeFile(join(tempDir, ".sourcevision", "zones.json"), JSON.stringify(ZONES_DATA));
 
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const tasks = results.filter((r) => r.kind === "task");
 
     expect(tasks.length).toBe(2);
@@ -94,7 +94,7 @@ describe("scanSourceVision with acknowledgment", () => {
     await writeFile(join(tempDir, ".sourcevision", "zones.json"), JSON.stringify(ZONES_DATA));
 
     // No .rex directory — should still produce all findings
-    const results = await scanSourceVision(tempDir);
+    const { results } = await scanSourceVision(tempDir);
     const tasks = results.filter((r) => r.kind === "task");
     expect(tasks.length).toBe(2);
   });

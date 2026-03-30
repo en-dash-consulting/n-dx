@@ -288,6 +288,17 @@
   margin-left: 8px;
 }
 
+.zone-slideout-pin-badge {
+  font-size: 9px;
+  background: var(--orange, #e6a817);
+  color: white;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
 /* Navigation buttons */
 .zone-slideout-nav {
   display: flex;

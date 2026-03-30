@@ -20,7 +20,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    - Group related epics into ~7-12 top-level epics max (one per product area)
    - Each epic should have 3-15 features; each feature should have 2-10 tasks
    - Suggest new parent epics if needed to group scattered items
-   - Suggest level changes (epic→feature, feature→task, etc.)
+   - Suggest level changes (epic->feature, feature->task, etc.)
    - Suggest merges for overlapping items
 4. After user approval, execute the restructuring:
    - Create new parent epics/features with `add_item` (rex MCP)
@@ -37,7 +37,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
 - **Preserve meaning**: when changing levels or merging, keep the original intent clear in descriptions
 - **Natural groupings**: organize by product area (e.g., SourceVision, Rex, Hench, Web, CLI, Infrastructure) rather than by work type (bugfixes, features, refactors)
 - **Living spec**: the PRD should read as a product spec, not a task backlog. Epic titles should describe product capabilities, not work items
-- **Level cascade**: when demoting an epic to a feature, its children may need to move down too (features→tasks, tasks→subtasks)
+- **Level cascade**: when demoting an epic to a feature, its children may need to move down too (features->tasks, tasks->subtasks)
 
 ## MCP Tools Used
 

@@ -166,13 +166,20 @@ describe("rex init", () => {
     expect(log).toBe("");
   });
 
-  it("creates workflow.md with content", async () => {
+  it("creates n-dx_workflow.md with base workflow and workflow.md as template", async () => {
     run(["init", tmpDir]);
-    const workflow = await readFile(
+    const base = await readFile(
+      join(tmpDir, ".rex", "n-dx_workflow.md"),
+      "utf-8",
+    );
+    expect(base).toContain("get_next_task");
+    expect(base).toContain("PROHIBITED CHANGES");
+
+    const user = await readFile(
       join(tmpDir, ".rex", "workflow.md"),
       "utf-8",
     );
-    expect(workflow).toContain("get_next_task");
+    expect(user).toContain("Project Workflow Customizations");
   });
 
   it("is idempotent on re-run", async () => {

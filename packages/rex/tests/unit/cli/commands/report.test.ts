@@ -170,13 +170,13 @@ describe("cmdReport", () => {
       const report = parseOutput() as Record<string, unknown>;
       const stats = report.stats as Record<string, unknown>;
 
-      // Only counts tasks/subtasks, not epics/features
+      // Counts tasks/subtasks + childless features (f2 is childless and deferred)
       expect(stats).toBeDefined();
-      expect(stats.total).toBe(3); // t1, t2, t3
+      expect(stats.total).toBe(4); // t1, t2, t3, f2
       expect(stats.completed).toBe(1); // t1
       expect(stats.inProgress).toBe(0);
       expect(stats.pending).toBe(1); // t2
-      expect(stats.deferred).toBe(0);
+      expect(stats.deferred).toBe(1); // f2 (childless feature)
       expect(stats.blocked).toBe(1); // t3
     });
 
@@ -188,12 +188,12 @@ describe("cmdReport", () => {
       const report = parseOutput() as Record<string, unknown>;
       const progress = report.progress as Record<string, unknown>;
 
-      // Only counts tasks/subtasks, not epics/features
+      // Counts tasks/subtasks + childless features
       expect(progress).toBeDefined();
       expect(typeof progress.percent).toBe("number");
-      expect(progress.percent).toBe(33); // 1/3 ≈ 33.3% → rounds to 33
+      expect(progress.percent).toBe(25); // 1/4 = 25% (f2 is childless and deferred)
       expect(progress.completed).toBe(1);
-      expect(progress.total).toBe(3);
+      expect(progress.total).toBe(4);
     });
 
     it("includes breakdown by level", async () => {

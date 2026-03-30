@@ -301,13 +301,10 @@ describe("n-dx config", () => {
       expect(stderr).toContain("Cannot modify schema");
     });
 
-    it("prevents setting sourcevision (read-only)", () => {
-      const stderr = runFail([
-        "sourcevision.schemaVersion",
-        "2.0.0",
-        tmpDir,
-      ]);
-      expect(stderr).toContain("read-only");
+    it("allows setting sourcevision config in .n-dx.json", () => {
+      // sourcevision config now routes to .n-dx.json (zone pins, merge threshold, etc.)
+      const result = run(["sourcevision.zones.mergeThreshold", "5", tmpDir]);
+      expect(result).toContain("sourcevision.zones.mergeThreshold");
     });
 
     it("prevents setting an object key directly", () => {
@@ -381,10 +378,10 @@ describe("n-dx config", () => {
       expect(output).toContain("string[]");
     });
 
-    it("notes sourcevision is read-only", () => {
+    it("documents sourcevision zone config", () => {
       const output = run(["--help"]);
-      expect(output).toContain("sourcevision");
-      expect(output).toContain("read-only");
+      expect(output).toContain("sourcevision.zones.pins");
+      expect(output).toContain("sourcevision.zones.mergeThreshold");
     });
 
     it("documents type coercion rules", () => {

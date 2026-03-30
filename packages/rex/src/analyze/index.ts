@@ -1,4 +1,4 @@
-export type { ScanResult, ScanOptions, GoModData } from "./scanners.js";
+export type { ScanResult, ScanOptions, ScanSourceVisionResult, GoModData } from "./scanners.js";
 export { scanTests, scanDocs, scanSourceVision, scanPackageJson, scanGoMod, parseGoMod } from "./scanners.js";
 
 export type { ReconcileStats, UpdateCandidate, ReconcileOptions } from "./reconcile.js";

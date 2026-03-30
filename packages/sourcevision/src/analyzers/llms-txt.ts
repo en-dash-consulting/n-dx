@@ -13,6 +13,7 @@ import type {
 } from "../schema/index.js";
 import { buildClassificationMap } from "./classify.js";
 import { deriveNextSteps } from "./next-steps.js";
+import { computeZoneAggregates, RISK_THRESHOLDS } from "./risk-scoring.js";
 
 export function generateLlmsTxt(
   manifest: Manifest,
@@ -66,7 +67,14 @@ function buildProjectIdentity(manifest: Manifest, inventory: Inventory, zones: Z
   lines.push(`- **Languages**: ${topLangs}`);
 
   const describedZones = zones.zones.filter((z) => z.description).length;
+  const agg = computeZoneAggregates(zones.zones);
   lines.push(`- **Zones**: ${zones.zones.length} (${describedZones} with descriptions)`);
+  if (agg.includedZoneCount > 0) {
+    lines.push(`- **Avg cohesion**: ${agg.weightedCohesion.toFixed(2)}, **avg coupling**: ${agg.weightedCoupling.toFixed(2)} (weighted by file count, ${agg.includedZoneCount} zones with ≥${RISK_THRESHOLDS.minZoneSize} files)`);
+  }
+  if (agg.excludedZoneCount > 0) {
+    lines.push(`- **Small zones**: ${agg.excludedZoneCount} excluded from averages (<${RISK_THRESHOLDS.minZoneSize} files)`);
+  }
 
   if (gitInfo) {
     lines.push(`- **Git**: ${gitInfo}`);

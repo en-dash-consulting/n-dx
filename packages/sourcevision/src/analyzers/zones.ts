@@ -27,6 +27,7 @@ import type {
   Zone,
   ZoneCrossing,
   Zones,
+  ZoneStability,
   Finding,
   AnalyzeTokenUsage,
   SubAnalysisRef,
@@ -53,6 +54,7 @@ import {
   capZoneCount,
   splitLargeCommunities,
 } from "./louvain.js";
+import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import type { EnrichResult, PerZoneEnrichResult } from "./enrich.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
@@ -98,6 +100,24 @@ export interface ZonePipelineOptions {
    * Stored in `.n-dx.json` under `sourcevision.zones.pins`.
    */
   zonePins?: Record<string, string>;
+  /**
+   * Minimum zone size for the small-zone merge pass. Zones with fewer files
+   * than this threshold are merged into their closest neighbor by import affinity.
+   * Default: 3. Configurable via `sourcevision.zones.mergeThreshold` in `.n-dx.json`.
+   */
+  smallZoneMergeThreshold?: number;
+  /**
+   * Previous zone assignments for stability bias. When provided, synthetic
+   * co-zone edges are added to the graph before Louvain to bias toward
+   * preserving the previous topology. Files that shared a zone previously
+   * are more likely to remain co-zoned.
+   */
+  previousZoneAssignment?: Map<string, string>;
+  /**
+   * Weight multiplier for co-zone stability edges, relative to the median
+   * import edge weight. Default: 0.5. Set to 0 to disable stability bias.
+   */
+  stabilityWeight?: number;
 }
 
 /** Result of running the zone detection pipeline. */
@@ -107,6 +127,184 @@ export interface ZonePipelineResult {
   unzoned: string[];
   /** Zone IDs that were derived from filename patterns rather than directory structure. */
   filenameBasedZoneIds: Set<string>;
+  /** Log of small-zone merge decisions for debuggability. */
+  smallZoneMergeLog: MergeLogEntry[];
+}
+
+// ── Stability bias ──────────────────────────────────────────────────────────
+
+/**
+ * Compute the median edge weight from the import-only graph.
+ * Used to calibrate stability edge weight relative to real import signals.
+ */
+function medianEdgeWeight(importGraph: Map<string, Map<string, number>>): number {
+  const weights: number[] = [];
+  const seen = new Set<string>();
+  for (const [node, neighbors] of importGraph) {
+    for (const [neighbor, weight] of neighbors) {
+      const key = node < neighbor ? `${node}\0${neighbor}` : `${neighbor}\0${node}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        weights.push(weight);
+      }
+    }
+  }
+  if (weights.length === 0) return 1;
+  weights.sort((a, b) => a - b);
+  const mid = Math.floor(weights.length / 2);
+  return weights.length % 2 === 0 ? (weights[mid - 1] + weights[mid]) / 2 : weights[mid];
+}
+
+/**
+ * Add synthetic co-zone edges to bias Louvain toward preserving the previous
+ * zone topology. For each pair of files that shared a zone, add an edge with
+ * weight = median_import_weight * stabilityWeight.
+ *
+ * Only adds edges between files that are both present in the current graph.
+ * Does NOT add edges for new files (not in previousZoneAssignment) — they
+ * are assigned purely by import affinity.
+ *
+ * The edges are added to `graph` (which Louvain operates on) but NOT to
+ * `importOnlyGraph` (used for cohesion/coupling metrics), so stability bias
+ * doesn't inflate measured cohesion.
+ */
+function addStabilityEdges(
+  graph: Map<string, Map<string, number>>,
+  importOnlyGraph: Map<string, Map<string, number>>,
+  previousAssignment: Map<string, string>,
+  stabilityWeight: number,
+): void {
+  const edgeWeight = medianEdgeWeight(importOnlyGraph) * stabilityWeight;
+  if (edgeWeight <= 0) return;
+
+  // Group files by their previous zone
+  const zoneMembers = new Map<string, string[]>();
+  for (const [file, zone] of previousAssignment) {
+    // Only include files that exist in the current graph
+    if (!graph.has(file)) continue;
+    let members = zoneMembers.get(zone);
+    if (!members) {
+      members = [];
+      zoneMembers.set(zone, members);
+    }
+    members.push(file);
+  }
+
+  // Add pairwise co-zone edges (capped for large zones to avoid O(n²) blowup)
+  const MAX_PAIRS_PER_ZONE = 500;
+  for (const members of zoneMembers.values()) {
+    if (members.length < 2) continue;
+    const totalPairs = members.length * (members.length - 1) / 2;
+
+    if (totalPairs <= MAX_PAIRS_PER_ZONE) {
+      // Small zone: add all pairwise edges
+      for (let i = 0; i < members.length; i++) {
+        const a = members[i];
+        const aNeighbors = graph.get(a)!;
+        for (let j = i + 1; j < members.length; j++) {
+          const b = members[j];
+          const bNeighbors = graph.get(b)!;
+          aNeighbors.set(b, (aNeighbors.get(b) ?? 0) + edgeWeight);
+          bNeighbors.set(a, (bNeighbors.get(a) ?? 0) + edgeWeight);
+        }
+      }
+    } else {
+      // Large zone: connect each file to its existing import neighbors within
+      // the zone, plus a star topology through the first member as hub.
+      // This gives O(n) edges instead of O(n²) while still biasing Louvain.
+      const hub = members[0];
+      const hubNeighbors = graph.get(hub)!;
+      const memberSet = new Set(members);
+
+      for (let i = 1; i < members.length; i++) {
+        const file = members[i];
+        const fileNeighbors = graph.get(file)!;
+
+        // Star edge: connect to hub
+        hubNeighbors.set(file, (hubNeighbors.get(file) ?? 0) + edgeWeight);
+        fileNeighbors.set(hub, (fileNeighbors.get(hub) ?? 0) + edgeWeight);
+
+        // Reinforce existing import edges within the zone
+        for (const [neighbor, _] of importOnlyGraph.get(file) ?? []) {
+          if (memberSet.has(neighbor) && neighbor !== hub) {
+            const nNeighbors = graph.get(neighbor)!;
+            fileNeighbors.set(neighbor, (fileNeighbors.get(neighbor) ?? 0) + edgeWeight);
+            nNeighbors.set(file, (nNeighbors.get(file) ?? 0) + edgeWeight);
+          }
+        }
+      }
+    }
+  }
+}
+
+// ── Zone identity preservation ───────────────────────────────────────────────
+
+/** Default minimum file overlap ratio to inherit previous zone identity.
+ * Uses directional overlap (fraction of previous zone's files in the new zone)
+ * rather than Jaccard, so zones that grow by absorbing new files still match. */
+const ZONE_OVERLAP_THRESHOLD = 0.5;
+
+/**
+ * Preserve previous zone IDs and names when a new zone has high file overlap
+ * with a previous zone. Uses a greedy best-match approach: for each new zone,
+ * find the previous zone with the highest Jaccard overlap; if it exceeds the
+ * threshold, inherit the previous ID/name/description.
+ *
+ * This prevents the LLM from inventing new names for zones whose file
+ * membership barely changed — the #1 source of zone identity instability.
+ */
+export function preservePreviousZoneIdentity(
+  newZones: Zone[],
+  previousZones: Zone[],
+  threshold: number = ZONE_OVERLAP_THRESHOLD,
+): Zone[] {
+  if (previousZones.length === 0) return newZones;
+
+  // Build file sets for previous zones
+  const prevFileSets = previousZones.map(z => ({
+    zone: z,
+    files: new Set(z.files),
+  }));
+
+  const usedPrevIds = new Set<string>();
+  const result: Zone[] = [];
+
+  for (const zone of newZones) {
+    const newFiles = new Set(zone.files);
+    let bestMatch: { zone: Zone; overlap: number } | null = null;
+
+    for (const prev of prevFileSets) {
+      if (usedPrevIds.has(prev.zone.id)) continue;
+
+      // Directional overlap: what fraction of the previous zone's files
+      // appear in this new zone. This handles zones that grow (absorb files)
+      // better than Jaccard, which penalizes size differences.
+      let intersection = 0;
+      for (const f of prev.files) {
+        if (newFiles.has(f)) intersection++;
+      }
+      const overlap = prev.files.size > 0 ? intersection / prev.files.size : 0;
+
+      if (overlap >= threshold && (!bestMatch || overlap > bestMatch.overlap)) {
+        bestMatch = { zone: prev.zone, overlap };
+      }
+    }
+
+    if (bestMatch) {
+      usedPrevIds.add(bestMatch.zone.id);
+      console.log(`  [zones] preserving identity: "${zone.id}" → "${bestMatch.zone.id}" (${(bestMatch.overlap * 100).toFixed(0)}% file overlap)`);
+      result.push({
+        ...zone,
+        id: bestMatch.zone.id,
+        name: bestMatch.zone.name,
+        description: bestMatch.zone.description || zone.description,
+      });
+    } else {
+      result.push(zone);
+    }
+  }
+
+  return result;
 }
 
 // ── Zone ID / name derivation ───────────────────────────────────────────────
@@ -1746,6 +1944,9 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     depth = 0,
     testFiles = new Set<string>(),
     zonePins,
+    smallZoneMergeThreshold = 3,
+    previousZoneAssignment,
+    stabilityWeight = 0.5,
   } = options;
 
   // ── Resolve directory-targeted edges ──
@@ -1798,6 +1999,14 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   });
   addDirectoryProximityEdges(graph, clusterableNonImportFiles);
 
+  // ── Add co-zone stability bias from previous run ──
+  // When previous zones exist, add synthetic edges between files that shared
+  // a zone. This biases Louvain toward preserving the previous topology while
+  // still allowing genuine import changes to override the bias.
+  if (previousZoneAssignment && previousZoneAssignment.size > 0 && stabilityWeight > 0) {
+    addStabilityEdges(graph, importOnlyGraph, previousZoneAssignment, stabilityWeight);
+  }
+
   // ── Scale maxZones by file count ──
   // Small packages shouldn't fragment into many zones. Scale from 3 (≤36 files)
   // up to the configured cap (default 30 at 360+ files).
@@ -1811,9 +2020,10 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   const scaledMaxZones = Math.min(maxZones, Math.max(scaledByCount, minForSizePolicy));
 
   // ── Louvain community detection ──
-  let community = louvainPhase1(graph);
+  const smallZoneMergeLog: MergeLogEntry[] = [];
+  let community = louvainPhase1(graph, 100, 1.0, previousZoneAssignment);
   community = mergeBidirectionalCoupling(community, graph);
-  community = mergeSmallCommunities(community, graph);
+  community = mergeSmallCommunities(community, graph, smallZoneMergeThreshold, smallZoneMergeLog);
   community = mergeSatelliteCommunities(community, graph);
   community = capZoneCount(community, graph, scaledMaxZones);
 
@@ -1847,7 +2057,7 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   // ── Build crossings ──
   const crossings = buildCrossings(pinnedZones, imports, []);
 
-  return { zones: pinnedZones, crossings, unzoned, filenameBasedZoneIds };
+  return { zones: pinnedZones, crossings, unzoned, filenameBasedZoneIds, smallZoneMergeLog };
 }
 
 // ── Non-importable file extensions ────────────────────────────────────────────
@@ -1961,6 +2171,61 @@ function computeMoveFindings(
   ];
 }
 
+// ── Zone stability computation ───────────────────────────────────────────────
+
+/**
+ * Compute zone stability metrics by comparing new zones against previous zones.
+ */
+function computeZoneStability(
+  newZones: Zone[],
+  previousZones: Zone[],
+): ZoneStability {
+  // Build file→zone maps
+  const prevFileZone = new Map<string, string>();
+  const prevZoneIds = new Set<string>();
+  for (const z of previousZones) {
+    prevZoneIds.add(z.id);
+    for (const f of z.files) prevFileZone.set(f, z.id);
+  }
+
+  const newZoneIds = new Set(newZones.map(z => z.id));
+
+  // File retention: files present in both runs that kept the same zone
+  let retained = 0;
+  let comparable = 0;
+  const reassigned: [string, string, string][] = [];
+
+  for (const z of newZones) {
+    for (const f of z.files) {
+      const prevZone = prevFileZone.get(f);
+      if (prevZone !== undefined) {
+        comparable++;
+        if (prevZone === z.id) {
+          retained++;
+        } else {
+          reassigned.push([f, prevZone, z.id]);
+        }
+      }
+    }
+  }
+
+  // Zone persistence
+  let persisted = 0;
+  for (const id of newZoneIds) {
+    if (prevZoneIds.has(id)) persisted++;
+  }
+  const newCount = newZoneIds.size - persisted;
+  const removedCount = prevZoneIds.size - persisted;
+
+  return {
+    fileRetention: comparable > 0 ? Math.round((retained / comparable) * 100) / 100 : 1,
+    persistedZones: persisted,
+    newZones: newCount,
+    removedZones: removedCount,
+    reassignedFiles: reassigned,
+  };
+}
+
 // ── Helper: build final result ───────────────────────────────────────────────
 
 /** Assemble the final AnalyzeZonesResult with sorted zones data. */
@@ -1976,11 +2241,12 @@ function buildAnalyzeZonesResult(opts: {
   previousZones: Zones | undefined;
   structureChanged: boolean;
   enrichTokenUsage: AnalyzeTokenUsage | undefined;
+  stability?: ZoneStability;
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage,
+    previousZones, structureChanged, enrichTokenUsage, stability,
   } = opts;
 
   const prevMetaCount = previousZones?.metaEvaluationCount ?? 0;
@@ -2004,6 +2270,7 @@ function buildAnalyzeZonesResult(opts: {
       structureHash,
       zoneContentHashes: remappedContentHashes,
       ...(lastReset ? { lastReset } : {}),
+      ...(stability ? { stability } : {}),
     }),
     tokenUsage: enrichTokenUsage,
     structureChanged,
@@ -2038,6 +2305,11 @@ export async function analyzeZones(
      * Passed through to the zone pipeline to override Louvain placement.
      */
     zonePins?: Record<string, string>;
+    /**
+     * Minimum zone size for small-zone merge. Zones below this are auto-merged.
+     * Default: 3. Configurable via `sourcevision.zones.mergeThreshold` in `.n-dx.json`.
+     */
+    smallZoneMergeThreshold?: number;
   }
 ): Promise<AnalyzeZonesResult> {
   const enrich = options?.enrich ?? true;
@@ -2049,6 +2321,17 @@ export async function analyzeZones(
   const { filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes } =
     prepareScopeAndEdges(inventory, imports, subAnalyses);
 
+  // ── Build previous zone assignment for stability bias ──
+  let previousZoneAssignment: Map<string, string> | undefined;
+  if (previousZones?.zones) {
+    previousZoneAssignment = new Map<string, string>();
+    for (const zone of previousZones.zones) {
+      for (const file of zone.files) {
+        previousZoneAssignment.set(file, zone.id);
+      }
+    }
+  }
+
   // ── Run zone detection pipeline ──
   const pipeline = runZonePipeline({
     edges: filteredEdges,
@@ -2058,8 +2341,17 @@ export async function analyzeZones(
     maxZonePercent: options?.maxZonePercent,
     testFiles,
     zonePins: options?.zonePins,
+    smallZoneMergeThreshold: options?.smallZoneMergeThreshold,
+    previousZoneAssignment,
   });
-  const { zones: expandedZones, unzoned, filenameBasedZoneIds } = pipeline;
+  const { zones: expandedZones, unzoned, filenameBasedZoneIds, smallZoneMergeLog: mergeLog } = pipeline;
+
+  // Log small-zone merge decisions for debuggability
+  if (mergeLog.length > 0) {
+    for (const entry of mergeLog) {
+      console.log(`  [zones] merged small zone "${entry.smallCommunity}" (${entry.memberCount} files) → "${entry.mergedInto}" (import weight: ${entry.importWeight})`);
+    }
+  }
 
   // ── Structure hash & change detection ──
   const structureHash = computeStructureHash(expandedZones);
@@ -2079,8 +2371,13 @@ export async function analyzeZones(
     expandedZones, imports, inventory, validPrevious, enrich, perZone, options?.fileArchetypes,
     zoneContentHashes, options?.hints,
   );
-  const { finalZones, aiZoneInsights, aiGlobalInsights, aiFindings,
+  const { finalZones: enrichedZones, aiZoneInsights, aiGlobalInsights, aiFindings,
     enrichmentPass, metaUpdatedFindings, enrichTokenUsage } = enrichResult;
+
+  // ── Preserve previous zone identity for high-overlap zones ──
+  const finalZones = previousZones
+    ? preservePreviousZoneIdentity(enrichedZones, previousZones.zones)
+    : enrichedZones;
 
   // ── Remap content hashes to post-enrichment zone IDs ──
   const remappedContentHashes = remapContentHashKeys(
@@ -2128,10 +2425,21 @@ export async function analyzeZones(
   // ── Back-populate findings into insights for backward compatibility ──
   backPopulateInsights(pinnedFinalZones, allFindings, allGlobalInsights);
 
+  // ── Zone stability metrics ──
+  const stability = previousZones?.zones
+    ? computeZoneStability(allZones, previousZones.zones)
+    : undefined;
+
+  if (stability) {
+    const pct = (stability.fileRetention * 100).toFixed(0);
+    const moved = stability.reassignedFiles.length;
+    console.log(`  [zones] stability: ${pct}% file retention, ${stability.persistedZones} persisted / ${stability.newZones} new / ${stability.removedZones} removed zones${moved > 0 ? `, ${moved} files reassigned` : ""}`);
+  }
+
   // ── Build result ──
   return buildAnalyzeZonesResult({
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
     enrichmentPass, structureHash, remappedContentHashes,
-    previousZones, structureChanged, enrichTokenUsage,
+    previousZones, structureChanged, enrichTokenUsage, stability,
   });
 }

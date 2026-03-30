@@ -24,7 +24,7 @@ const PACKAGES = {
  * Sections stored in .n-dx.json rather than package config files.
  * These are cross-cutting settings that apply to all packages.
  */
-const PROJECT_SECTIONS = new Set(["claude", "llm", "web", "features"]);
+const PROJECT_SECTIONS = new Set(["claude", "llm", "web", "features", "sourcevision"]);
 
 /**
  * Valid values for the top-level `language` field in .n-dx.json.
@@ -595,6 +595,11 @@ Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.hench.autoRetry          boolean   Auto-retry on failure (default: true)
   features.hench.guardRails         boolean   Security guard rails (default: true)
   features.hench.adaptiveWorkflow   boolean   Adaptive workflow adjustment (default: false)
+
+Sourcevision zone overrides (.n-dx.json):
+  sourcevision.zones.pins  object    Override zone assignments: {"file/path.ts": "zone-id"}
+  sourcevision.zones.mergeThreshold
+                           number    Min zone size for small-zone merge (default: 3)
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)

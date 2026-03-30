@@ -197,10 +197,10 @@ describe("computeStats", () => {
 
   it("counts nested items", () => {
     const stats = computeStats(sampleTree);
-    // Only counts tasks and subtasks, not epics/features
-    expect(stats.total).toBe(2); // t1, t2
+    // Counts tasks, subtasks, and childless features (f2 has no children)
+    expect(stats.total).toBe(3); // t1, t2, f2 (childless)
     expect(stats.completed).toBe(1); // t2
-    expect(stats.pending).toBe(1); // t1
+    expect(stats.pending).toBe(2); // t1, f2
   });
 
   it("returns zeros for empty tree", () => {

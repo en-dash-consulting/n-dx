@@ -4,6 +4,7 @@ import {
   classifyRiskLevel,
   assessZoneRisk,
   assessAllZoneRisks,
+  computeZoneAggregates,
   RISK_THRESHOLDS,
 } from "../../../src/analyzers/risk-scoring.js";
 import type { Zone, Zones, Finding } from "../../../src/schema/v1.js";
@@ -346,5 +347,65 @@ describe("assessAllZoneRisks", () => {
     const result2 = assessAllZoneRisks(makeZones(zones), { justifications: [] });
     expect(result2.findings.length).toBeGreaterThan(0);
     expect(result2.findings[0].severity).toBe("critical");
+  });
+});
+
+describe("computeZoneAggregates", () => {
+  it("computes weighted averages excluding small zones", () => {
+    const zones = [
+      { files: Array(10).fill("f"), cohesion: 0.9, coupling: 0.1 },
+      { files: Array(20).fill("f"), cohesion: 0.6, coupling: 0.4 },
+      { files: Array(3).fill("f"), cohesion: 0.0, coupling: 1.0 }, // small zone — excluded
+    ];
+
+    const result = computeZoneAggregates(zones);
+    expect(result.includedZoneCount).toBe(2);
+    expect(result.excludedZoneCount).toBe(1);
+    // Weighted: (0.9*10 + 0.6*20) / 30 = (9 + 12) / 30 = 0.7
+    expect(result.weightedCohesion).toBe(0.7);
+    // Weighted: (0.1*10 + 0.4*20) / 30 = (1 + 8) / 30 = 0.3
+    expect(result.weightedCoupling).toBe(0.3);
+    // Unweighted: (0.9 + 0.6) / 2 = 0.75
+    expect(result.unweightedCohesion).toBe(0.75);
+    // Unweighted: (0.1 + 0.4) / 2 = 0.25
+    expect(result.unweightedCoupling).toBe(0.25);
+  });
+
+  it("returns zeros when all zones are below threshold", () => {
+    const zones = [
+      { files: Array(2).fill("f"), cohesion: 0.5, coupling: 0.5 },
+      { files: Array(3).fill("f"), cohesion: 0.8, coupling: 0.2 },
+    ];
+
+    const result = computeZoneAggregates(zones);
+    expect(result.includedZoneCount).toBe(0);
+    expect(result.excludedZoneCount).toBe(2);
+    expect(result.weightedCohesion).toBe(0);
+    expect(result.weightedCoupling).toBe(0);
+  });
+
+  it("handles empty zones array", () => {
+    const result = computeZoneAggregates([]);
+    expect(result.includedZoneCount).toBe(0);
+    expect(result.excludedZoneCount).toBe(0);
+    expect(result.weightedCohesion).toBe(0);
+  });
+
+  it("respects custom minZoneSize threshold", () => {
+    const zones = [
+      { files: Array(3).fill("f"), cohesion: 0.9, coupling: 0.1 },
+      { files: Array(8).fill("f"), cohesion: 0.5, coupling: 0.5 },
+    ];
+
+    // Default threshold (5) excludes the 3-file zone
+    const defaultResult = computeZoneAggregates(zones);
+    expect(defaultResult.includedZoneCount).toBe(1);
+    expect(defaultResult.weightedCohesion).toBe(0.5);
+
+    // Custom threshold (2) includes both
+    const customResult = computeZoneAggregates(zones, 2);
+    expect(customResult.includedZoneCount).toBe(2);
+    // Weighted: (0.9*3 + 0.5*8) / 11 = (2.7 + 4) / 11 ≈ 0.61
+    expect(customResult.weightedCohesion).toBeCloseTo(0.61, 1);
   });
 });

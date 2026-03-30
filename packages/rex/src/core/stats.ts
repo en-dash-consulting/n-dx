@@ -25,8 +25,12 @@ export function computeStats(items: PRDItem[]): TreeStats {
     deleted: 0,
   };
   for (const { item } of walkTree(items)) {
-    // Only count work items (not containers) for accurate work metrics
-    if (!isWorkItem(item.level)) continue;
+    // Count work items (tasks, subtasks) and childless containers (features
+    // with no children represent actual work, not just groupings).
+    // Epics are never counted — they are pure groupings.
+    const isLeafContainer = !isWorkItem(item.level) && (!item.children || item.children.length === 0);
+    if (!isWorkItem(item.level) && !isLeafContainer) continue;
+    if (item.level === "epic") continue;
 
     // Deleted items are tracked separately and excluded from total
     if (item.status === "deleted") {

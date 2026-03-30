@@ -127,6 +127,7 @@ export function sortZonesData(zones: Zones): Zones {
     ...(zones.structureHash ? { structureHash: zones.structureHash } : {}),
     ...(zones.zoneContentHashes ? { zoneContentHashes: zones.zoneContentHashes } : {}),
     ...(zones.lastReset ? { lastReset: zones.lastReset } : {}),
+    ...(zones.stability ? { stability: zones.stability } : {}),
   };
 }
 

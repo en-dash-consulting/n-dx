@@ -21,7 +21,7 @@ export {
   DEFAULT_CODEX_MODEL,
 } from "./claude-client.js";
 export type { CallClaudeResult } from "./claude-client.js";
-export { tryParseJSON, extractFindings, mergeZonesByName, deduplicateFindings } from "./enrich-parsing.js";
+export { tryParseJSON, extractFindings, mergeZonesByName, deduplicateFindings, classifyFinding } from "./enrich-parsing.js";
 export type { EnrichResult } from "./enrich-parsing.js";
 export { emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage } from "./token-usage.js";
 export { enrichZonesPerZone, computeZoneStructureHash } from "./enrich-per-zone.js";

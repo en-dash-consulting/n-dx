@@ -1584,6 +1584,14 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
   const [expandedSubZones, setExpandedSubZones] = useState<ExpandedSubZones>(new Map());
   const [slideoutZone, setSlideoutZone] = useState<Zone | null>(null);
 
+  // Zone pins from .n-dx.json (augmented by server onto zones response)
+  const pinnedFiles = useMemo(() => {
+    const pins = (zones as Record<string, unknown> | null)?.zonePins;
+    return pins && typeof pins === "object" && !Array.isArray(pins)
+      ? new Set(Object.keys(pins as Record<string, string>))
+      : new Set<string>();
+  }, [zones]);
+
   // ── Drill-down navigation state ─────────────────────────────────────
   const ROOT_BREADCRUMB: ZoneBreadcrumb = { zoneId: null, label: "All Zones" };
   const [drillPath, setDrillPath] = useState<ZoneBreadcrumb[]>([ROOT_BREADCRUMB]);
@@ -1877,6 +1885,7 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
       zone: slideoutZone,
       crossings: zones.crossings,
       allZones: zones.zones,
+      pinnedFiles,
       onClose: handleSlideoutClose,
       onFileClick: handleFileSelect,
       navigateTo,

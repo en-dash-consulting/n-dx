@@ -15,6 +15,8 @@ export interface ZoneSlideoutProps {
   crossings: ZoneCrossing[];
   /** Full zone list for color lookup and dependency name resolution. */
   allZones: Zone[];
+  /** File paths that are manually pinned to a zone via .n-dx.json zone pins. */
+  pinnedFiles?: Set<string>;
   /** Close the slideout. */
   onClose: () => void;
   /** Navigate to a file when clicked. */
@@ -29,6 +31,7 @@ export function ZoneSlideout({
   zone,
   crossings,
   allZones,
+  pinnedFiles,
   onClose,
   onFileClick,
   navigateTo,
@@ -252,6 +255,9 @@ export function ZoneSlideout({
                   onClick: onFileClick ? () => onFileClick(f) : undefined,
                 },
                   h("span", { class: "zone-slideout-file-path" }, f),
+                  pinnedFiles?.has(f)
+                    ? h("span", { class: "zone-slideout-pin-badge" }, "pinned")
+                    : null,
                   zone.entryPoints.includes(f)
                     ? h("span", { class: "zone-slideout-entry-badge" }, "entry")
                     : null,

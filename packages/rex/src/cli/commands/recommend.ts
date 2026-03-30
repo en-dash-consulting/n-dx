@@ -673,9 +673,18 @@ export async function cmdRecommend(
   // --actionable-only: keep only concretely actionable finding types
   const ACTIONABLE_TYPES = new Set(["anti-pattern", "suggestion", "move-file"]);
   const actionableOnly = flags["actionable-only"] !== undefined;
-  const filteredFindings = actionableOnly
+  const excludeStructural = flags["exclude-structural"] !== undefined;
+  let filteredFindings = actionableOnly
     ? findings.filter((f) => ACTIONABLE_TYPES.has(f.type))
     : findings;
+
+  // --exclude-structural: skip findings categorized as structural (zone boundary opinions)
+  let structuralSkipped = 0;
+  if (excludeStructural) {
+    const before = filteredFindings.length;
+    filteredFindings = filteredFindings.filter((f) => f.category !== "structural");
+    structuralSkipped = before - filteredFindings.length;
+  }
 
   if (filteredFindings.length === 0) {
     result("No findings to recommend.");
@@ -684,6 +693,9 @@ export async function cmdRecommend(
     }
     if (actionableOnly && findings.length > 0) {
       info(`(${findings.length} non-actionable finding${findings.length === 1 ? "" : "s"} filtered out by --actionable-only)`);
+    }
+    if (structuralSkipped > 0) {
+      info(`(${structuralSkipped} structural finding${structuralSkipped === 1 ? "" : "s"} excluded, use without --exclude-structural to include)`);
     }
     return;
   }
@@ -699,6 +711,18 @@ export async function cmdRecommend(
   }
 
   displayRecommendations(recommendations, filteredFindings, ackStore, showAll, acknowledgedCount);
+
+  if (structuralSkipped > 0) {
+    info(`(${structuralSkipped} structural finding${structuralSkipped === 1 ? "" : "s"} excluded by --exclude-structural)`);
+  }
+
+  // Hint about zone pins when structural findings are present
+  const hasStructural = filteredFindings.some((f) => f.category === "structural");
+  if (hasStructural) {
+    info("");
+    info("Tip: Structural findings reflect zone boundary opinions. If assignments look wrong,");
+    info("  override them with zone pins: ndx config sourcevision.zones.pins '{\"file.ts\": \"zone-id\"}'");
+  }
 
   if (flags.accept) {
     await acceptRecommendations(rexDir, flags.accept, recommendations, flags);

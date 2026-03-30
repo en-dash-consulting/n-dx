@@ -424,6 +424,7 @@ interface SVFinding {
   text: string;
   severity?: "info" | "warning" | "critical";
   related?: string[];
+  category?: "structural" | "code" | "documentation";
   // move-file specific fields
   from?: string;
   to?: string;
@@ -485,6 +486,30 @@ interface SVImportsData {
   // Legacy formats
   circularDependencies?: { from: string; to: string }[];
   circular?: string[][];
+}
+
+/**
+ * Check if a finding references files/patterns that no longer exist.
+ * Returns true if the finding is stale and should be skipped.
+ */
+function isStaleFinding(finding: SVFinding, knownFiles: Set<string>): boolean {
+  if (knownFiles.size === 0) return false; // No inventory — can't validate
+
+  // move-file: if the source file no longer exists, the move is stale
+  if (finding.type === "move-file" && finding.from) {
+    if (!knownFiles.has(finding.from)) return true;
+  }
+
+  // Related files: if ALL related files are gone, finding is stale
+  if (finding.related && finding.related.length > 0) {
+    // Filter to entries that look like file paths (contain a dot or slash)
+    const filePaths = finding.related.filter(r => r.includes("/") || r.includes("."));
+    if (filePaths.length > 0 && filePaths.every(f => !knownFiles.has(f))) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** Map finding type to an actionable task prefix */
@@ -569,15 +594,20 @@ function generateFixSuggestion(finding: SVFinding, zone?: SVZone): string[] {
   return suggestions;
 }
 
+export interface ScanSourceVisionResult {
+  results: ScanResult[];
+  staleCount: number;
+}
+
 export async function scanSourceVision(
   dir: string,
   options?: { rexDir?: string },
-): Promise<ScanResult[]> {
+): Promise<ScanSourceVisionResult> {
   const svDir = join(dir, PROJECT_DIRS.SOURCEVISION);
   try {
     await access(svDir);
   } catch {
-    return [];
+    return { results: [], staleCount: 0 };
   }
 
   // Load acknowledged findings to filter them out
@@ -590,6 +620,21 @@ export async function scanSourceVision(
   }
 
   const results: ScanResult[] = [];
+  let staleCount = 0;
+
+  // Load inventory file set for staleness validation
+  const knownFiles = new Set<string>();
+  try {
+    const invRaw = await readFile(join(svDir, "inventory.json"), "utf-8");
+    const invData = JSON.parse(invRaw);
+    if (Array.isArray(invData.files)) {
+      for (const entry of invData.files) {
+        if (entry.path) knownFiles.add(entry.path);
+      }
+    }
+  } catch {
+    // Inventory not available — skip staleness checks
+  }
 
   // Read zones.json — supports both canonical (v1) and legacy formats
   try {
@@ -642,6 +687,12 @@ export async function scanSourceVision(
           // Compute stable hash and skip acknowledged findings
           const hash = computeFindingHash(finding);
           if (ackStore && isAcknowledged(ackStore, hash)) continue;
+
+          // Skip stale findings whose referenced files no longer exist
+          if (isStaleFinding(finding, knownFiles)) {
+            staleCount++;
+            continue;
+          }
 
           const priority: Priority =
             finding.severity === "critical"
@@ -711,9 +762,10 @@ export async function scanSourceVision(
             }
           }
 
-          // Build tags: zone name + finding hash for feedback loop
+          // Build tags: zone name + finding hash + category for feedback loop
           const tags: string[] = zone ? [zone.name] : finding.scope !== "global" ? [finding.scope] : [];
           tags.push(`finding:${hash}`);
+          if (finding.category) tags.push(`finding-category:${finding.category}`);
           if (finding.type === "move-file") tags.push("structural-debt");
 
           results.push({
@@ -834,7 +886,7 @@ export async function scanSourceVision(
     // imports.json not found or invalid, skip
   }
 
-  return results;
+  return { results, staleCount };
 }
 
 // ── scanPackageJson ─────────────────────────────────────────────────

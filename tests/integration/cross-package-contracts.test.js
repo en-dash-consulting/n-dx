@@ -759,8 +759,9 @@ describe("orchestration spawn call-sites match package CLI parsers", () => {
     if (!existsSync(cliJsPath)) return {};
     const content = readFileSync(cliJsPath, "utf-8");
     const spawned = {};
-    // Match: run(tools.PKG, ["CMD" or runOrDie(tools.PKG, ["CMD"
-    const spawnRegex = /(?:run|runOrDie)\(tools\.(\w+),\s*\["([a-z][\w-]*)"/g;
+    // Match: run(tools.PKG, ["CMD" or runOrDie(tools.PKG, ["CMD" or runInitCapture(tools.PKG, ["CMD"
+    // or runCapture(tools.PKG, ["CMD"
+    const spawnRegex = /(?:run|runOrDie|runInitCapture|runCapture)\(tools\.(\w+),\s*\["([a-z][\w-]*)"/g;
     let match;
     while ((match = spawnRegex.exec(content)) !== null) {
       const pkg = match[1] === "sv" ? "sourcevision" : match[1];

@@ -82,6 +82,64 @@ export const RISK_THRESHOLDS = {
   minZoneSize: 5,
 } as const;
 
+// ── Aggregate metrics ────────────────────────────────────────────────────────
+
+export interface ZoneAggregateMetrics {
+  /** Weighted average cohesion (by file count), excluding small zones */
+  weightedCohesion: number;
+  /** Weighted average coupling (by file count), excluding small zones */
+  weightedCoupling: number;
+  /** Unweighted average cohesion (all included zones count equally) */
+  unweightedCohesion: number;
+  /** Unweighted average coupling (all included zones count equally) */
+  unweightedCoupling: number;
+  /** Number of zones included in the averages */
+  includedZoneCount: number;
+  /** Number of zones excluded (below minZoneSize threshold) */
+  excludedZoneCount: number;
+}
+
+/**
+ * Compute aggregate zone metrics, excluding zones with fewer files than
+ * the reliability threshold. Small zones have unreliable cohesion/coupling
+ * readings that skew project-wide averages.
+ */
+export function computeZoneAggregates(
+  zones: { files: string[]; cohesion: number; coupling: number }[],
+  minZoneSize: number = RISK_THRESHOLDS.minZoneSize,
+): ZoneAggregateMetrics {
+  let totalFiles = 0;
+  let weightedCohesion = 0;
+  let weightedCoupling = 0;
+  let sumCohesion = 0;
+  let sumCoupling = 0;
+  let includedCount = 0;
+  let excludedCount = 0;
+
+  for (const z of zones) {
+    if (z.files.length < minZoneSize) {
+      excludedCount++;
+      continue;
+    }
+    const fileCount = z.files.length;
+    totalFiles += fileCount;
+    weightedCohesion += z.cohesion * fileCount;
+    weightedCoupling += z.coupling * fileCount;
+    sumCohesion += z.cohesion;
+    sumCoupling += z.coupling;
+    includedCount++;
+  }
+
+  return {
+    weightedCohesion: totalFiles > 0 ? Math.round((weightedCohesion / totalFiles) * 100) / 100 : 0,
+    weightedCoupling: totalFiles > 0 ? Math.round((weightedCoupling / totalFiles) * 100) / 100 : 0,
+    unweightedCohesion: includedCount > 0 ? Math.round((sumCohesion / includedCount) * 100) / 100 : 0,
+    unweightedCoupling: includedCount > 0 ? Math.round((sumCoupling / includedCount) * 100) / 100 : 0,
+    includedZoneCount: includedCount,
+    excludedZoneCount: excludedCount,
+  };
+}
+
 // ── Risk computation ────────────────────────────────────────────────────────
 
 /**

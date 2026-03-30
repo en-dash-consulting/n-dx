@@ -6,6 +6,7 @@ import type {
   Zone,
   Finding,
   FindingType,
+  FindingCategory,
   AnalyzeTokenUsage,
 } from "../schema/index.js";
 
@@ -48,6 +49,49 @@ export function tryParseJSON(response: string): any | null {
   return null;
 }
 
+// ── Finding classification ───────────────────────────────────────────────────
+
+const STRUCTURAL_PATTERNS = [
+  /\bzone\b.*\b(?:boundar|split|merg|sprawl|span|assignment|misassign|placement|belongs?\s+in)/i,
+  /\b(?:directory|dir)\b.*\b(?:sprawl|consolidat|scatter|spread)/i,
+  /\b(?:belongs?\s+in\b.*\bzone|should\s+(?:be\s+in|move\s+to)\b.*\bzone|misplaced|wrong\s+zone)/i,
+  /\bzone[\s-]?level\b.*\bcoupling\b/i,
+  /\b(?:should\s+be\s+(?:split|merged)|should\s+(?:split|merg))\b/i,
+  /\b(?:split|merg\w*)\b.*\bzone\b/i,
+  /\btoo\s+(?:many|few)\s+(?:files|zones|directories)\b/i,
+  /\bzone\b.*\b(?:too\s+large|too\s+small)\b/i,
+];
+
+const CODE_PATTERNS = [
+  /\bduplicat(?:ed|ion|e)\b/i,
+  /\b(?:dead\s+code|unused\s+export|unused\s+import|god\s+function|god\s+class)\b/i,
+  /\b(?:circular\s+(?:dep\w*|import)|cycle)\b/i,
+  /\b(?:anti-?pattern|code\s+smell|tight(?:ly)?\s+coupl)/i,
+  /\b(?:fan-?in\s+hotspot|hub\s+function|tightly\s+coupled\s+modules)\b/i,
+  /\b(?:missing\s+(?:abstraction|interface|error\s+handling))\b/i,
+  /\b(?:leaky\s+abstraction|internal\s+detail|implementation\s+detail)\b/i,
+];
+
+const DOCUMENTATION_PATTERNS = [
+  /\bnaming\s+(?:inconsisten|convention)/i,
+  /\bshould\s+be\s+(?:renamed|documented)\b/i,
+  /\b(?:implicit\s+convention|undocumented)\b/i,
+  /\b(?:jsdoc|readme|comment)\b.*\b(?:missing|needed|should)\b/i,
+];
+
+/**
+ * Classify a finding as structural, code, or documentation based on text patterns.
+ * Returns undefined if no pattern matches (callers should treat as unclassified).
+ */
+export function classifyFinding(text: string): FindingCategory | undefined {
+  // Code patterns take priority — a finding about "circular dependency in zone X"
+  // is a code issue, not a structural one
+  if (CODE_PATTERNS.some(p => p.test(text))) return "code";
+  if (STRUCTURAL_PATTERNS.some(p => p.test(text))) return "structural";
+  if (DOCUMENTATION_PATTERNS.some(p => p.test(text))) return "documentation";
+  return undefined;
+}
+
 // ── Finding extraction ───────────────────────────────────────────────────────
 
 /**
@@ -63,10 +107,13 @@ export function extractFindings(
   const defaultType = expectedTypes[0] ?? "observation";
   const validTypes: FindingType[] = ["observation", "pattern", "relationship", "anti-pattern", "suggestion"];
   const validSeverities = ["info", "warning", "critical"];
+  const validCategories: FindingCategory[] = ["structural", "code", "documentation"];
 
   const parseFinding = (f: any, fallbackScope: string) => {
     if (f && typeof f === "object" && typeof f.text === "string") {
       const type: FindingType = validTypes.includes(f.type) ? f.type : defaultType;
+      const explicitCategory: FindingCategory | undefined = validCategories.includes(f.category) ? f.category : undefined;
+      const category = explicitCategory ?? classifyFinding(f.text);
       findings.push({
         type,
         pass: passNumber,
@@ -74,6 +121,7 @@ export function extractFindings(
         text: f.text,
         ...(validSeverities.includes(f.severity) ? { severity: f.severity } : {}),
         ...(Array.isArray(f.related) ? { related: f.related.filter((r: any) => typeof r === "string") } : {}),
+        ...(category ? { category } : {}),
       });
     }
   };
@@ -100,11 +148,13 @@ export function extractFindings(
     if (Array.isArray(parsed.insights)) {
       for (const s of parsed.insights) {
         if (typeof s === "string") {
+          const category = classifyFinding(s);
           findings.push({
             type: defaultType,
             pass: passNumber,
             scope: "global",
             text: s,
+            ...(category ? { category } : {}),
           });
         }
       }
@@ -118,11 +168,13 @@ export function extractFindings(
         if (Array.isArray(insightsArr)) {
           for (const s of insightsArr) {
             if (typeof s === "string") {
+              const category = classifyFinding(s);
               findings.push({
                 type: defaultType,
                 pass: passNumber,
                 scope: zoneId,
                 text: s,
+                ...(category ? { category } : {}),
               });
             }
           }

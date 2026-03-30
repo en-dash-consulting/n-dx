@@ -416,6 +416,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     options: [
       { flag: "--accept[=all|=1,4,5]", description: "Accept all or selected recommendations into PRD as new items" },
       { flag: "--force", description: "Create items even when conflicts with existing PRD items are detected" },
+      { flag: "--actionable-only", description: "Only include anti-patterns, suggestions, and move-file findings" },
+      { flag: "--exclude-structural", description: "Skip structural findings (zone boundary opinions, file placement)" },
       { flag: "--show-all", description: "Include acknowledged findings in recommendation output" },
       { flag: "--acknowledge=<all|1,2>", description: "Acknowledge all or selected findings by index (hides from future runs)" },
       { flag: "--format=json", description: "Machine-readable output" },

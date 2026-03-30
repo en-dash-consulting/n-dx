@@ -3,7 +3,7 @@ import { writeFile, access } from "node:fs/promises";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { ensureRexDir } from "../../store/index.js";
-import { DEFAULT_WORKFLOW } from "../../workflow/default.js";
+import { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "../../workflow/default.js";
 import { REX_DIR } from "./constants.js";
 import { info } from "../output.js";
 import type { PRDDocument } from "../../schema/index.js";
@@ -54,14 +54,19 @@ export async function cmdInit(
     info("Created execution-log.jsonl");
   }
 
-  // workflow.md
+  // n-dx_workflow.md (base workflow — always overwritten to stay current)
+  const ndxWorkflowPath = join(rexDir, "n-dx_workflow.md");
+  await writeFile(ndxWorkflowPath, NDX_WORKFLOW, "utf-8");
+  info("Updated n-dx_workflow.md");
+
+  // workflow.md (user customizations — only created if missing)
   const workflowPath = join(rexDir, "workflow.md");
   try {
     await access(workflowPath);
     info("workflow.md already exists, skipping");
   } catch {
-    await writeFile(workflowPath, DEFAULT_WORKFLOW, "utf-8");
-    info("Created workflow.md");
+    await writeFile(workflowPath, USER_WORKFLOW_TEMPLATE, "utf-8");
+    info("Created workflow.md (edit to add project-specific rules)");
   }
 
   info(`\nInitialized .rex/ in ${dir}`);

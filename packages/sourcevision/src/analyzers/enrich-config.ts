@@ -204,9 +204,10 @@ Your tasks:
 4. CONTRADICTIONS: Flag findings that contradict each other and explain which is correct.
 
 Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
+Each finding MUST include a "category" field: "structural" (zone boundary opinions, file placement, directory sprawl), "code" (bugs, duplication, anti-patterns, missing abstractions), or "documentation" (naming conventions, missing docs).
 
 Respond with ONLY a JSON object (no markdown, no explanation):
-{"severityUpdates":[{"findingIndex":0,"newSeverity":"warning"}],"zones":[{"id":"zone-id","newInsights":[],"findings":[{"type":"suggestion","scope":"zone-id","text":"...","severity":"warning"}]}],"insights":["meta-observation"],"findings":[{"type":"pattern","scope":"global","text":"...","severity":"info"}]}
+{"severityUpdates":[{"findingIndex":0,"newSeverity":"warning"}],"zones":[{"id":"zone-id","newInsights":[],"findings":[{"type":"suggestion","scope":"zone-id","text":"...","severity":"warning","category":"code"}]}],"insights":["meta-observation"],"findings":[{"type":"pattern","scope":"global","text":"...","severity":"info","category":"code"}]}
 
 Empty arrays are fine. Do NOT repeat existing findings.`;
 }

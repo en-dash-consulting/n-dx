@@ -87,6 +87,8 @@ export type {
   ZoneTokenUsage,
   Finding,
   FindingType,
+  FindingCategory,
+  ZoneStability,
   // components.json
   Components,
   ComponentDefinition,

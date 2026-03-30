@@ -229,6 +229,23 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
   finalizeTokenUsage(ctx, llmConfig);
 
+  // Hint about zone pins when move-file or structural findings exist
+  try {
+    const zonesPath = join(ctx.svDir, "zones.json");
+    const zonesRaw = readFileSync(zonesPath, "utf-8");
+    const zonesData = JSON.parse(zonesRaw);
+    const findings = zonesData.findings ?? [];
+    const moveCount = findings.filter((f: { type: string }) => f.type === "move-file").length;
+    const structuralCount = findings.filter((f: { category?: string }) => f.category === "structural").length;
+    if (moveCount > 0 || structuralCount > 0) {
+      info("");
+      info(`Tip: ${moveCount > 0 ? `${moveCount} file-move suggestion${moveCount === 1 ? "" : "s"} detected. ` : ""}If zone assignments look wrong, you can override them with zone pins:`);
+      info("  ndx config sourcevision.zones.pins '{\"path/to/file.ts\": \"target-zone-id\"}'");
+    }
+  } catch {
+    // Non-critical — don't fail the analysis
+  }
+
   info("");
   info("Done.");
 }

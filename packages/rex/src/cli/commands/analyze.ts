@@ -693,13 +693,14 @@ async function runScannerMode(
 ): Promise<ScannerResult> {
   const { lite, noLlm, model, accept, formatJson } = opts;
   const scanOpts = { lite };
-  const [testResults, docResults, svResults, pkgResults, goModResults] = await Promise.all([
+  const [testResults, docResults, svScan, pkgResults, goModResults] = await Promise.all([
     scanTests(dir, scanOpts),
     scanDocs(dir, scanOpts),
     scanSourceVision(dir),
     scanPackageJson(dir, scanOpts),
     scanGoMod(dir, scanOpts),
   ]);
+  const svResults = svScan.results;
 
   const rawResults: ScanResult[] = [...testResults, ...docResults, ...svResults, ...pkgResults, ...goModResults];
   const allResults = deduplicateScanResults(rawResults);
@@ -707,6 +708,7 @@ async function runScannerMode(
   const testFiles = new Set(testResults.map((r) => r.sourceFile)).size;
   const docFiles = new Set(docResults.map((r) => r.sourceFile)).size;
   const svZones = svResults.filter((r) => r.kind === "feature" && r.source === "sourcevision").length;
+  const svStale = svScan.staleCount;
   const pkgFiles = new Set(pkgResults.map((r) => r.sourceFile)).size;
 
   const { results: newResults, stats, updateCandidates = [] } = reconcile(
@@ -736,7 +738,7 @@ async function runScannerMode(
   if (formatJson) {
     result(
       JSON.stringify(
-        { scanned: { testFiles, docFiles, svZones, pkgFiles }, stats, proposals, updateCandidates, tokenUsage },
+        { scanned: { testFiles, docFiles, svZones, pkgFiles, staleFindings: svStale }, stats, proposals, updateCandidates, tokenUsage },
         null,
         2,
       ),
@@ -747,6 +749,9 @@ async function runScannerMode(
   info(
     `Scanned: ${testFiles} test files, ${docFiles} docs, ${svZones} sourcevision zones, ${pkgFiles} package.json files`,
   );
+  if (svStale > 0) {
+    info(`Skipped: ${svStale} stale finding${svStale === 1 ? "" : "s"} (referenced files no longer exist)`);
+  }
   info(
     `Found: ${stats.total} proposals (${stats.newCount} new, ${stats.alreadyTracked} already tracked)`,
   );

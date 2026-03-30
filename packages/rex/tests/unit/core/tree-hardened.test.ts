@@ -452,7 +452,7 @@ describe("computeStats — hardened", () => {
     expect(stats.pending).toBe(1); // s2
   });
 
-  it("excludes epics and features from count", () => {
+  it("excludes epics from count; childless features count as work items", () => {
     const items: PRDItem[] = [
       makeItem({ id: "e1", title: "Epic", level: "epic", status: "in_progress" }),
       makeItem({ id: "f1", title: "Feature", level: "feature", status: "pending" }),
@@ -460,11 +460,25 @@ describe("computeStats — hardened", () => {
       makeItem({ id: "s1", title: "Subtask", level: "subtask", status: "blocked" }),
     ];
     const stats = computeStats(items);
-    expect(stats.total).toBe(2); // t1 + s1
+    expect(stats.total).toBe(3); // f1 (childless) + t1 + s1
     expect(stats.completed).toBe(1);
     expect(stats.blocked).toBe(1);
     expect(stats.inProgress).toBe(0); // epic doesn't count
-    expect(stats.pending).toBe(0); // feature doesn't count
+    expect(stats.pending).toBe(1); // childless feature counts
+  });
+
+  it("features with children are still excluded from count", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "f1", title: "Feature", level: "feature", status: "pending",
+        children: [
+          makeItem({ id: "t1", title: "Task", level: "task", status: "completed" }),
+        ],
+      }),
+    ];
+    const stats = computeStats(items);
+    expect(stats.total).toBe(1); // only t1, not f1
+    expect(stats.completed).toBe(1);
   });
 
   it("handles items with empty children array", () => {
@@ -727,7 +741,7 @@ describe("computeStats — deleted items excluded from total", () => {
     expect(stats.pending).toBe(1); // s2
   });
 
-  it("deleted epics and features are not counted in stats (only tasks/subtasks)", () => {
+  it("deleted epics are not counted; deleted childless features and tasks are", () => {
     const items: PRDItem[] = [
       makeItem({ id: "e1", title: "Deleted Epic", level: "epic", status: "deleted" }),
       makeItem({ id: "f1", title: "Deleted Feature", level: "feature", status: "deleted" }),
@@ -735,6 +749,6 @@ describe("computeStats — deleted items excluded from total", () => {
     ];
     const stats = computeStats(items);
     expect(stats.total).toBe(0);
-    expect(stats.deleted).toBe(1); // only the task-level deleted item
+    expect(stats.deleted).toBe(2); // f1 (childless) + t1
   });
 });

@@ -582,6 +582,60 @@ describe("extractFindings", () => {
     const findings = extractFindings(parsed, 1, ["pattern"]);
     expect(findings[0].related).toEqual(["a.ts", "b.ts"]);
   });
+
+  it("parses explicit category from LLM response", () => {
+    const parsed = {
+      findings: [
+        { type: "anti-pattern", scope: "global", text: "Duplicated logic", severity: "warning", category: "code" },
+        { type: "suggestion", scope: "zone-a", text: "Split this zone", severity: "info", category: "structural" },
+      ],
+      zones: [],
+    };
+
+    const findings = extractFindings(parsed, 1, ["anti-pattern"]);
+    expect(findings[0].category).toBe("code");
+    expect(findings[1].category).toBe("structural");
+  });
+
+  it("falls back to heuristic classification when category not provided", () => {
+    const parsed = {
+      findings: [
+        { type: "anti-pattern", scope: "global", text: "God function: handleDrop has 45 outgoing calls", severity: "warning" },
+        { type: "suggestion", scope: "zone-a", text: "This zone spans 17 directories and should be split", severity: "info" },
+      ],
+      zones: [],
+    };
+
+    const findings = extractFindings(parsed, 1, ["anti-pattern"]);
+    expect(findings[0].category).toBe("code");
+    expect(findings[1].category).toBe("structural");
+  });
+
+  it("ignores invalid category values from LLM", () => {
+    const parsed = {
+      findings: [
+        { type: "observation", scope: "global", text: "Clean architecture", severity: "info", category: "bogus" },
+      ],
+      zones: [],
+    };
+
+    const findings = extractFindings(parsed, 1, ["observation"]);
+    // "bogus" is ignored, heuristic doesn't match either → no category
+    expect(findings[0].category).toBeUndefined();
+  });
+
+  it("classifies legacy insight strings via heuristic", () => {
+    const parsed = {
+      zones: [
+        { id: "core", insights: ["Circular dependency between core and utils"] },
+      ],
+      insights: ["Zone boundary misassignment: file belongs in different zone"],
+    };
+
+    const findings = extractFindings(parsed, 1, ["observation"]);
+    expect(findings[0].category).toBe("structural");  // zone boundary
+    expect(findings[1].category).toBe("code");         // circular dependency
+  });
 });
 
 // ── buildMetaPrompt ────────────────────────────────────────────────────────

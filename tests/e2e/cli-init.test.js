@@ -85,7 +85,8 @@ describe("n-dx init provider selection", () => {
       expect(output).toContain("Select active LLM provider:");
       expect(output).toContain("1) codex");
       expect(output).toContain("2) claude");
-      expect(output).toContain("llm.vendor = codex");
+      // Unified summary shows provider confirmation
+      expect(output).toMatch(/LLM provider\s+codex|llm\.vendor = codex/);
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }
@@ -156,8 +157,9 @@ describe("n-dx init provider selection", () => {
         },
       });
 
-      expect(output).toContain("llm.vendor = codex");
-      expect(output).not.toContain("n-dx init");
+      expect(output).toMatch(/LLM provider\s+codex|llm\.vendor = codex/);
+      // Banner box should be suppressed; "n-dx initialized" summary is fine
+      expect(output).not.toContain("Guided project setup");
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }
@@ -181,7 +183,7 @@ describe("n-dx init provider selection", () => {
           { env: pathEnvWith(binDir) },
         );
 
-        expect(output).toContain("llm.vendor = codex");
+        expect(output).toMatch(/LLM provider\s+codex|llm\.vendor = codex/);
         expect(output).not.toContain("Next step: run");
       } finally {
         await rm(binDir, { recursive: true, force: true });
@@ -216,7 +218,7 @@ describe("n-dx init provider selection", () => {
           { env: pathEnvWith(binDir) },
         );
 
-        expect(output).toContain("llm.vendor = claude");
+        expect(output).toMatch(/LLM provider\s+claude|llm\.vendor = claude/);
         expect(output).not.toContain("Next step: run");
       } finally {
         await rm(binDir, { recursive: true, force: true });

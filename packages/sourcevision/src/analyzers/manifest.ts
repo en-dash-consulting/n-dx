@@ -54,6 +54,14 @@ export function updateManifestModule(
 
   manifest.analyzedAt = now;
 
+  // Refresh git info at the start of each analysis run so history snapshots
+  // reflect the actual code state being analyzed, not the init-time state.
+  if (status === "running") {
+    const git = getGitInfo(resolve(dir));
+    if (git.sha) manifest.gitSha = git.sha;
+    if (git.branch) manifest.gitBranch = git.branch;
+  }
+
   if (!manifest.modules[moduleName]) {
     manifest.modules[moduleName] = { status };
   } else {

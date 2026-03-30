@@ -89,12 +89,17 @@ export function buildUndirectedGraph(edges: ImportEdge[]): UndirectedGraph {
 export function louvainPhase1(
   graph: UndirectedGraph,
   maxPasses = 100,
-  resolution = 1.0
+  resolution = 1.0,
+  /** Seed community assignment from a previous run. Files not in the seed
+   *  start in their own community. Files in the seed start in their previous
+   *  community and only move when modularity gain justifies it. */
+  seed?: Map<string, string>,
 ): Map<string, string> {
-  // Each node starts in its own community (ID = node name)
+  // Seed from previous assignment or start each node in its own community
   const community = new Map<string, string>();
   for (const node of graph.keys()) {
-    community.set(node, node);
+    const prev = seed?.get(node);
+    community.set(node, prev ?? node);
   }
 
   // Total weight of all edges (each undirected edge counted once per direction,
@@ -119,10 +124,11 @@ export function louvainPhase1(
     degree.set(node, d);
   }
 
-  // Sum of degrees in each community
+  // Sum of degrees in each community (aggregated when seeded)
   const communityDegreeSum = new Map<string, number>();
   for (const [node, d] of degree) {
-    communityDegreeSum.set(node, d);
+    const comm = community.get(node)!;
+    communityDegreeSum.set(comm, (communityDegreeSum.get(comm) ?? 0) + d);
   }
 
   // Sorted nodes for determinism
@@ -209,10 +215,19 @@ export function louvainPhase1(
  * Communities with fewer than `minSize` files get absorbed into
  * their most-connected neighbor community.
  */
+/** Log entries from mergeSmallCommunities for debuggability */
+export interface MergeLogEntry {
+  smallCommunity: string;
+  memberCount: number;
+  mergedInto: string;
+  importWeight: number;
+}
+
 export function mergeSmallCommunities(
   community: Map<string, string>,
   graph: UndirectedGraph,
-  minSize = 3
+  minSize = 3,
+  mergeLog?: MergeLogEntry[],
 ): Map<string, string> {
   const result = new Map(community);
 
@@ -270,6 +285,14 @@ export function mergeSmallCommunities(
       }
 
       // Merge: reassign all members to the best neighbor community
+      if (mergeLog) {
+        mergeLog.push({
+          smallCommunity: smallComm,
+          memberCount: currentMembers.length,
+          mergedInto: bestNeighbor,
+          importWeight: bestWeight,
+        });
+      }
       for (const node of currentMembers) {
         result.set(node, bestNeighbor);
       }

@@ -17,6 +17,7 @@ import type {
   Components,
   ImportType,
 } from "../schema/index.js";
+import { computeZoneAggregates, RISK_THRESHOLDS } from "../analyzers/risk-scoring.js";
 
 export interface PdfReportData {
   manifest: Manifest;
@@ -151,15 +152,17 @@ function renderZoneArchitecture(doc: PDFKit.PDFDocument, zones: Zones): void {
   sectionHeading(doc, "Zone Architecture");
 
   const totalZonedFiles = zones.zones.reduce((sum, z) => sum + z.files.length, 0);
-  const avgCohesion = zones.zones.reduce((sum, z) => sum + z.cohesion, 0) / zones.zones.length;
-  const avgCoupling = zones.zones.reduce((sum, z) => sum + z.coupling, 0) / zones.zones.length;
+  const agg = computeZoneAggregates(zones.zones);
 
   bodyText(doc, `Zones: ${zones.zones.length}`);
   bodyText(doc, `Zoned files: ${totalZonedFiles}`);
   if (zones.unzoned.length > 0) {
     bodyText(doc, `Unzoned files: ${zones.unzoned.length}`);
   }
-  bodyText(doc, `Avg cohesion: ${avgCohesion.toFixed(2)}  |  Avg coupling: ${avgCoupling.toFixed(2)}`);
+  bodyText(doc, `Weighted avg cohesion: ${agg.weightedCohesion.toFixed(2)}  |  Weighted avg coupling: ${agg.weightedCoupling.toFixed(2)} (${agg.includedZoneCount} zones ≥${RISK_THRESHOLDS.minZoneSize} files)`);
+  if (agg.excludedZoneCount > 0) {
+    bodyText(doc, `Small zones excluded from averages: ${agg.excludedZoneCount}`);
+  }
   bodyText(doc, `Cross-zone imports: ${zones.crossings.length}`);
   doc.moveDown(0.5);
 
