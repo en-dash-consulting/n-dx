@@ -1,5 +1,15 @@
 # @n-dx/hench
 
+## 0.2.1
+
+### Patch Changes
+
+- [#126](https://github.com/en-dash-consulting/n-dx/pull/126) [`6c88d23`](https://github.com/en-dash-consulting/n-dx/commit/6c88d237f83594c4877f0f975b383e880fd656bf) Thanks [@dnaniel](https://github.com/dnaniel)! - Fix ndx work failing when .hench/runs/ directory is missing after a fresh clone. Add generated rex files to .gitignore on init. Exclude source map files from published packages.
+
+- Updated dependencies [[`6c88d23`](https://github.com/en-dash-consulting/n-dx/commit/6c88d237f83594c4877f0f975b383e880fd656bf)]:
+  - @n-dx/rex@0.2.1
+  - @n-dx/llm-client@0.2.1
+
 ## 0.2.0
 
 ### Patch Changes

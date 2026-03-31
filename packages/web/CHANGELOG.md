@@ -1,5 +1,14 @@
 # @n-dx/web
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`6c88d23`](https://github.com/en-dash-consulting/n-dx/commit/6c88d237f83594c4877f0f975b383e880fd656bf)]:
+  - @n-dx/rex@0.2.1
+  - @n-dx/sourcevision@0.2.1
+  - @n-dx/llm-client@0.2.1
+
 ## 0.2.0
 
 ### Patch Changes
