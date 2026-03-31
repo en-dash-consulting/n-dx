@@ -1,5 +1,5 @@
 import { join, basename } from "node:path";
-import { writeFile, access } from "node:fs/promises";
+import { readFile, writeFile, access } from "node:fs/promises";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { ensureRexDir } from "../../store/index.js";
@@ -69,8 +69,35 @@ export async function cmdInit(
     info("Created workflow.md (edit to add project-specific rules)");
   }
 
+  // Ensure .gitignore covers generated rex files
+  await ensureGitignoreEntries(dir, [
+    ".rex/n-dx_workflow.md",
+    ".rex/execution-log*.jsonl",
+  ]);
+
   info(`\nInitialized .rex/ in ${dir}`);
   info("Next steps:");
   info("  rex add epic --title=\"Your first epic\" " + dir);
   info("  rex status " + dir);
+}
+
+/**
+ * Append entries to .gitignore if not already present.
+ * Creates .gitignore if it doesn't exist.
+ */
+async function ensureGitignoreEntries(dir: string, entries: string[]): Promise<void> {
+  const gitignorePath = join(dir, ".gitignore");
+  let content = "";
+  try {
+    content = await readFile(gitignorePath, "utf-8");
+  } catch {
+    // No .gitignore yet
+  }
+
+  const missing = entries.filter((e) => !content.includes(e));
+  if (missing.length === 0) return;
+
+  const suffix = (content.length > 0 && !content.endsWith("\n") ? "\n" : "")
+    + missing.join("\n") + "\n";
+  await writeFile(gitignorePath, content + suffix, "utf-8");
 }
