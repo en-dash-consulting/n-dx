@@ -1,5 +1,14 @@
 # @n-dx/web
 
+## 0.2.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @n-dx/rex@0.2.0
+  - @n-dx/sourcevision@0.2.0
+  - @n-dx/llm-client@0.2.0
+
 ## 0.1.9
 
 ### Patch Changes
