@@ -67,6 +67,7 @@ import {
   formatOrchestratorCommandHelp,
 } from "./help.js";
 import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integration.js";
+import { setupCodexIntegration, printCodexSetupSummary } from "./codex-integration.js";
 import { runExport } from "./export.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -505,7 +506,8 @@ async function handleInit(rest) {
   }
 
   const noClaude = rest.includes("--no-claude");
-  const initArgs = stripInitProviderFlag(rest).filter((a) => a !== "--no-claude");
+  const noCodex = rest.includes("--no-codex");
+  const initArgs = stripInitProviderFlag(rest).filter((a) => a !== "--no-claude" && a !== "--no-codex");
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
 
@@ -566,6 +568,17 @@ async function handleInit(rest) {
     }
   }
 
+  // Codex integration
+  let codexSummary = "skipped";
+  if (!noCodex) {
+    try {
+      const result = setupCodexIntegration(dir);
+      codexSummary = `${result.skills.written} skills, ${result.config.serverCount} MCP servers`;
+    } catch {
+      codexSummary = "skipped";
+    }
+  }
+
   // Print unified summary
   console.log("");
   console.log("n-dx initialized");
@@ -574,6 +587,7 @@ async function handleInit(rest) {
   console.log(`  .hench/         ${henchExists ? "already exists (reused)" : "created"}`);
   console.log(`  LLM provider    ${selectedProvider} (${providerSource})`);
   console.log(`  Claude Code     ${claudeSummary}`);
+  console.log(`  Codex           ${codexSummary}`);
   console.log("");
 
   process.exit(0);
