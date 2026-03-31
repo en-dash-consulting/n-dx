@@ -573,7 +573,7 @@ async function handleInit(rest) {
   if (!noCodex) {
     try {
       const result = setupCodexIntegration(dir);
-      codexSummary = `${result.skills.written} skills, ${result.config.serverCount} MCP servers`;
+      codexSummary = `AGENTS.md, ${result.skills.written} skills, ${result.config.serverCount} MCP servers`;
     } catch {
       codexSummary = "skipped";
     }

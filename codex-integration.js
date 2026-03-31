@@ -4,8 +4,9 @@
  *
  * This module is called by cli.js during init (unless --no-codex is passed).
  * It writes:
- *   1. `.codex/config.toml` — stdio MCP server definitions for Rex and SourceVision
- *   2. `.agents/skills/` — workflow skill files (overwritten on each init)
+ *   1. `AGENTS.md` — project instructions generated from the assistant asset layer
+ *   2. `.codex/config.toml` — stdio MCP server definitions for Rex and SourceVision
+ *   3. `.agents/skills/` — workflow skill files (overwritten on each init)
  *
  * Skill content is sourced from `assistant-assets/` — the vendor-neutral
  * canonical location.  Skill writing is delegated to the shared
@@ -24,6 +25,7 @@ import {
   getMcpServers,
   writeVendorSkills,
   renderCodexConfigToml,
+  renderAgentsMd,
 } from "./assistant-assets/index.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -69,6 +71,24 @@ function writeCodexConfig(dir) {
   };
 }
 
+// ── AGENTS.md writing ───────────────────────────────────────────────────────────
+
+/**
+ * Write `AGENTS.md` to the project root.
+ *
+ * The content is generated from the shared assistant asset layer so that it
+ * stays in sync with the manifest's skill and MCP definitions automatically.
+ *
+ * @param {string} dir  Absolute project root directory
+ * @returns {{ written: boolean, path: string }}
+ */
+function writeAgentsMd(dir) {
+  const agentsPath = join(dir, "AGENTS.md");
+  const content = renderAgentsMd();
+  writeFileSync(agentsPath, content);
+  return { written: true, path: agentsPath };
+}
+
 // ── Skill writing ──────────────────────────────────────────────────────────────
 
 /**
@@ -87,15 +107,16 @@ function writeSkills(dir) {
  * Run the full Codex integration setup.
  *
  * @param {string} dir  Project root directory
- * @returns {{ config: object, skills: object }}
+ * @returns {{ config: object, skills: object, agents: object }}
  */
 export function setupCodexIntegration(dir) {
   const absDir = resolve(dir);
 
   const config = writeCodexConfig(absDir);
   const skills = writeSkills(absDir);
+  const agents = writeAgentsMd(absDir);
 
-  return { config, skills };
+  return { config, skills, agents };
 }
 
 /**
@@ -104,6 +125,11 @@ export function setupCodexIntegration(dir) {
 export function printCodexSetupSummary(result) {
   console.log("");
   console.log("Codex integration:");
+
+  // AGENTS.md
+  if (result.agents && result.agents.written) {
+    console.log("  AGENTS.md: wrote project instructions");
+  }
 
   // Config
   if (result.config.written) {
