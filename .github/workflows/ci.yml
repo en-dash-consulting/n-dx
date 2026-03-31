@@ -65,3 +65,13 @@ jobs:
 
       - name: PR check
         run: pnpm pr-check
+
+      - name: Require changeset
+        if: github.event_name == 'pull_request'
+        run: |
+          # Check for .changeset/*.md files (not config.json, not README)
+          CHANGESETS=$(ls .changeset/*.md 2>/dev/null | grep -v README || true)
+          if [ -z "$CHANGESETS" ]; then
+            echo "No changeset found. Add one with 'pnpm changeset' or 'pnpm changeset --empty' if no release is needed."
+            exit 1
+          fi
