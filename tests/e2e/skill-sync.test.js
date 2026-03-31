@@ -1,10 +1,11 @@
 /**
- * Validates that skill definitions stay in sync across three locations:
+ * Validates that the assistant asset manifest is well-formed and that skill
+ * definitions stay in sync across three locations:
  *
  *   1. `assistant-assets/` — the vendor-neutral canonical source
- *      (registry.json + skills/*.md)
+ *      (manifest.json + skills/*.md)
  *   2. `.claude/skills/` — the Claude Code output
- *      (rendered from assistant-assets/ via renderClaudeSkill)
+ *      (rendered from assistant-assets/ via renderSkill)
  *   3. `claude-integration.js` — the init module that writes (2)
  *      (must import from assistant-assets/, not define skills inline)
  *
@@ -14,13 +15,23 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, readdirSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import {
+  getManifest,
   getRegistry,
   getSkillNames,
   getSkillBody,
   listSkillFiles,
+  getMcpServers,
+  getMcpServer,
+  getVendors,
+  getVendorTarget,
+  getToolIds,
+  getAutoApprovedToolIds,
+  renderSkill,
+  renderAllSkills,
   renderClaudeSkill,
+  renderAllClaudeSkills,
 } from "../../assistant-assets/index.js";
 
 const ROOT = join(import.meta.dirname, "../..");
@@ -29,11 +40,11 @@ const ROOT = join(import.meta.dirname, "../..");
 
 /** Normalize whitespace so trivial formatting differences don't break sync. */
 const normalize = (s) =>
-  s.replace(/→/g, "->").replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
+  s.replace(/\u2192/g, "->").replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
 
 /**
  * Read all local Claude skill files from .claude/skills/.
- * Returns a Map of skill name → content string.
+ * Returns a Map of skill name -> content string.
  */
 function readClaudeSkills() {
   const skillsDir = join(ROOT, ".claude", "skills");
@@ -51,43 +62,31 @@ function readClaudeSkills() {
   return skills;
 }
 
-// ── Canonical source integrity (assistant-assets/) ──────────────────────────
+// ── Manifest structure validation ───────────────────────────────────────────
 
-describe("assistant-assets canonical source", () => {
-  const registry = getRegistry();
-  const registryNames = Object.keys(registry.skills).sort();
-  const fileNames = listSkillFiles();
+describe("assistant-assets manifest structure", () => {
+  const manifest = getManifest();
 
-  it("registry.json has an entry for every skill file", () => {
-    const missing = fileNames.filter((f) => !registry.skills[f]);
-    if (missing.length > 0) {
-      expect.fail(
-        `Skill files without registry entries: ${missing.join(", ")}\n` +
-        "Add entries to assistant-assets/registry.json.",
-      );
-    }
+  it("manifest has required top-level keys", () => {
+    expect(manifest).toHaveProperty("skills");
+    expect(manifest).toHaveProperty("mcpServers");
+    expect(manifest).toHaveProperty("vendors");
   });
 
-  it("every registry entry has a corresponding skill file", () => {
-    const missing = registryNames.filter((n) => !fileNames.includes(n));
-    if (missing.length > 0) {
-      expect.fail(
-        `Registry entries without skill files: ${missing.join(", ")}\n` +
-        "Create matching assistant-assets/skills/<name>.md files.",
-      );
-    }
+  it("skills section has at least one entry", () => {
+    expect(Object.keys(manifest.skills).length).toBeGreaterThan(0);
   });
 
-  it("every registry entry has a non-empty description", () => {
-    const bad = registryNames.filter((n) => !registry.skills[n].description);
+  it("every skill has a non-empty description", () => {
+    const bad = Object.entries(manifest.skills)
+      .filter(([, meta]) => !meta.description || meta.description.trim() === "")
+      .map(([name]) => name);
     if (bad.length > 0) {
-      expect.fail(
-        `Registry entries missing description: ${bad.join(", ")}`,
-      );
+      expect.fail(`Skills missing description: ${bad.join(", ")}`);
     }
   });
 
-  it("every skill body is non-empty", () => {
+  it("every skill body file exists and is non-empty", () => {
     const empty = [];
     for (const name of getSkillNames()) {
       const body = getSkillBody(name);
@@ -99,9 +98,219 @@ describe("assistant-assets canonical source", () => {
       expect.fail(`Empty skill bodies: ${empty.join(", ")}`);
     }
   });
+
+  it("every skill file has a manifest entry", () => {
+    const fileNames = listSkillFiles();
+    const missing = fileNames.filter((f) => !manifest.skills[f]);
+    if (missing.length > 0) {
+      expect.fail(
+        `Skill files without manifest entries: ${missing.join(", ")}\n` +
+        "Add entries to assistant-assets/manifest.json.",
+      );
+    }
+  });
+
+  it("every manifest skill entry has a corresponding skill file", () => {
+    const fileNames = listSkillFiles();
+    const missing = Object.keys(manifest.skills).filter((n) => !fileNames.includes(n));
+    if (missing.length > 0) {
+      expect.fail(
+        `Manifest entries without skill files: ${missing.join(", ")}\n` +
+        "Create matching assistant-assets/skills/<name>.md files.",
+      );
+    }
+  });
 });
 
-// ── Claude output sync (.claude/skills/ ↔ assistant-assets/) ────────────────
+describe("manifest MCP server descriptors", () => {
+  const servers = getMcpServers();
+  const serverNames = Object.keys(servers);
+
+  it("manifest defines at least one MCP server", () => {
+    expect(serverNames.length).toBeGreaterThan(0);
+  });
+
+  for (const name of serverNames) {
+    describe(`server "${name}"`, () => {
+      const desc = servers[name];
+
+      it("has required fields", () => {
+        expect(desc).toHaveProperty("package");
+        expect(desc).toHaveProperty("npmName");
+        expect(desc).toHaveProperty("entrypoint");
+        expect(desc).toHaveProperty("mcpCommand");
+        expect(desc).toHaveProperty("tools");
+        expect(desc.tools).toHaveProperty("read");
+        expect(desc.tools).toHaveProperty("write");
+      });
+
+      it("package directory exists", () => {
+        const pkgDir = join(ROOT, desc.package);
+        expect(existsSync(pkgDir)).toBe(true);
+      });
+
+      it("entrypoint file exists after build", () => {
+        const entry = join(ROOT, desc.package, desc.entrypoint);
+        // This file exists only after build, so skip if not built
+        if (!existsSync(entry)) {
+          return; // gracefully skip pre-build
+        }
+        expect(existsSync(entry)).toBe(true);
+      });
+
+      it("read tools array is non-empty", () => {
+        expect(desc.tools.read.length).toBeGreaterThan(0);
+      });
+
+      it("no tool appears in both read and write lists", () => {
+        const overlap = desc.tools.read.filter((t) => desc.tools.write.includes(t));
+        if (overlap.length > 0) {
+          expect.fail(
+            `Tools in both read and write for "${name}": ${overlap.join(", ")}`,
+          );
+        }
+      });
+    });
+  }
+});
+
+describe("manifest vendor delivery targets", () => {
+  const vendors = getVendors();
+  const vendorIds = Object.keys(vendors);
+
+  it("manifest defines both claude and codex vendors", () => {
+    expect(vendorIds).toContain("claude");
+    expect(vendorIds).toContain("codex");
+  });
+
+  for (const id of vendorIds) {
+    describe(`vendor "${id}"`, () => {
+      const target = vendors[id];
+
+      it("has required fields", () => {
+        expect(target).toHaveProperty("skillDir");
+        expect(target).toHaveProperty("skillFile");
+        expect(target).toHaveProperty("skillWrapper");
+        expect(target).toHaveProperty("instructionFile");
+        expect(target).toHaveProperty("toolPrefix");
+      });
+
+      it("skillWrapper is a known format", () => {
+        expect(["yaml-frontmatter", "plain"]).toContain(target.skillWrapper);
+      });
+    });
+  }
+});
+
+// ── Render contract ─────────────────────────────────────────────────────────
+
+describe("render contract", () => {
+  const skillNames = getSkillNames();
+
+  describe("renderSkill dispatches by vendor", () => {
+    for (const name of skillNames) {
+      it(`"${name}" renders for claude (yaml-frontmatter)`, () => {
+        const content = renderSkill(name, "claude");
+        expect(content).toMatch(/^---\n/);
+        expect(content).toContain(`name: ${name}`);
+        expect(content).toContain("description:");
+        expect(content).toMatch(/---\n\n/);
+      });
+
+      it(`"${name}" renders for codex (plain body)`, () => {
+        const content = renderSkill(name, "codex");
+        const body = getSkillBody(name);
+        expect(content).toBe(body);
+        // Plain wrapper means no YAML frontmatter
+        expect(content).not.toMatch(/^---\n/);
+      });
+    }
+  });
+
+  it("renderAllSkills covers all registered skills", () => {
+    for (const vendor of ["claude", "codex"]) {
+      const rendered = renderAllSkills(vendor);
+      expect(Object.keys(rendered).sort()).toEqual([...skillNames].sort());
+    }
+  });
+
+  it("renderClaudeSkill is equivalent to renderSkill(name, 'claude')", () => {
+    for (const name of skillNames) {
+      expect(renderClaudeSkill(name)).toBe(renderSkill(name, "claude"));
+    }
+  });
+
+  it("renderAllClaudeSkills is equivalent to renderAllSkills('claude')", () => {
+    const a = renderAllClaudeSkills();
+    const b = renderAllSkills("claude");
+    expect(a).toEqual(b);
+  });
+});
+
+// ── Tool ID derivation ──────────────────────────────────────────────────────
+
+describe("tool ID derivation", () => {
+  it("claude read tools are prefixed with mcp__{server}__", () => {
+    const ids = getAutoApprovedToolIds("claude");
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) {
+      expect(id).toMatch(/^mcp__(rex|sourcevision)__/);
+    }
+  });
+
+  it("claude write tools are prefixed with mcp__{server}__", () => {
+    const ids = getToolIds("claude", "write");
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) {
+      expect(id).toMatch(/^mcp__(rex|sourcevision)__/);
+    }
+  });
+
+  it("codex tools have no prefix (toolPrefix is null)", () => {
+    const ids = getAutoApprovedToolIds("codex");
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) {
+      expect(id).not.toContain("mcp__");
+    }
+  });
+
+  it("read and write tool IDs do not overlap for any vendor", () => {
+    for (const vendor of ["claude", "codex"]) {
+      const read = new Set(getToolIds(vendor, "read"));
+      const write = getToolIds(vendor, "write");
+      const overlap = write.filter((t) => read.has(t));
+      if (overlap.length > 0) {
+        expect.fail(
+          `Overlapping read/write tool IDs for "${vendor}": ${overlap.join(", ")}`,
+        );
+      }
+    }
+  });
+});
+
+// ── Backward compatibility ──────────────────────────────────────────────────
+
+describe("backward compatibility", () => {
+  it("getRegistry() returns { skills } subset of manifest", () => {
+    const registry = getRegistry();
+    expect(registry).toHaveProperty("skills");
+    expect(registry.skills).toEqual(getManifest().skills);
+  });
+
+  it("getMcpServer() throws for unknown server", () => {
+    expect(() => getMcpServer("nonexistent")).toThrow("not in manifest");
+  });
+
+  it("getVendorTarget() throws for unknown vendor", () => {
+    expect(() => getVendorTarget("nonexistent")).toThrow("not in manifest");
+  });
+
+  it("renderSkill() throws for unknown skill", () => {
+    expect(() => renderSkill("nonexistent", "claude")).toThrow("not in manifest");
+  });
+});
+
+// ── Claude output sync (.claude/skills/ <-> assistant-assets/) ──────────────
 
 describe("claude skill file sync", () => {
   const claudeSkills = readClaudeSkills();

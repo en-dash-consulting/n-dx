@@ -1,0 +1,103 @@
+{
+  "skills": {
+    "ndx-plan": {
+      "description": "Analyze the codebase and propose PRD updates"
+    },
+    "ndx-status": {
+      "description": "Show comprehensive project status combining PRD progress and codebase health"
+    },
+    "ndx-capture": {
+      "description": "Capture a requirement, feature idea, or task from conversation context",
+      "argumentHint": "[description]"
+    },
+    "ndx-zone": {
+      "description": "Deep-dive into an architectural zone's structure and health",
+      "argumentHint": "[zone-id]"
+    },
+    "ndx-work": {
+      "description": "Pick up a task from the PRD and begin working on it",
+      "argumentHint": "[task-id]"
+    },
+    "ndx-config": {
+      "description": "View or change n-dx configuration with guided assistance",
+      "argumentHint": "[key] [value]"
+    },
+    "ndx-reshape": {
+      "description": "Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers"
+    },
+    "ndx-feedback": {
+      "description": "Submit feedback, bug reports, or feature requests for n-dx",
+      "argumentHint": "[description]"
+    }
+  },
+
+  "mcpServers": {
+    "rex": {
+      "package": "packages/rex",
+      "npmName": "@n-dx/rex",
+      "entrypoint": "dist/cli/index.js",
+      "mcpCommand": "mcp",
+      "tools": {
+        "read": [
+          "get_prd_status",
+          "get_next_task",
+          "get_item",
+          "get_capabilities",
+          "get_recommendations",
+          "health",
+          "facets"
+        ],
+        "write": [
+          "update_task_status",
+          "add_item",
+          "edit_item",
+          "move_item",
+          "merge_items",
+          "append_log",
+          "sync_with_remote",
+          "verify_criteria",
+          "reorganize"
+        ]
+      }
+    },
+    "sourcevision": {
+      "package": "packages/sourcevision",
+      "npmName": "@n-dx/sourcevision",
+      "entrypoint": "dist/cli/index.js",
+      "mcpCommand": "mcp",
+      "tools": {
+        "read": [
+          "get_overview",
+          "get_next_steps",
+          "get_zone",
+          "get_findings",
+          "get_file_info",
+          "search_files",
+          "get_imports",
+          "get_classifications",
+          "get_route_tree"
+        ],
+        "write": [
+          "set_file_archetype"
+        ]
+      }
+    }
+  },
+
+  "vendors": {
+    "claude": {
+      "skillDir": ".claude/skills",
+      "skillFile": "SKILL.md",
+      "skillWrapper": "yaml-frontmatter",
+      "toolPrefix": "mcp__{server}__",
+      "instructionFile": "CLAUDE.md"
+    },
+    "codex": {
+      "skillDir": ".agents/skills",
+      "skillFile": "SKILL.md",
+      "skillWrapper": "plain",
+      "toolPrefix": null,
+      "instructionFile": "AGENTS.md"
+    }
+  }
+}

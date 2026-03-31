@@ -23202,18 +23202,29 @@
             {
               "id": "9470f4e3-8ec9-49de-bf20-632b64d9b4a3",
               "title": "Create vendor-neutral assistant asset source directory",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Introduce a canonical assistant asset location, likely assistant-assets/, that stores the shared n-dx workflow skill bodies once.\n\nThe source must be suitable for both Claude and Codex output generation and should cover the existing ndx-plan, ndx-status, ndx-capture, ndx-zone, ndx-work, ndx-config, ndx-reshape, ndx-pr-description, and ndx-feedback workflows.",
-              "priority": "critical"
+              "priority": "critical",
+              "startedAt": "2026-03-31T15:54:46.985Z",
+              "completedAt": "2026-03-31T16:20:55.804Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created assistant-assets/ directory with 8 skill body .md files, registry.json, and index.js module. Refactored claude-integration.js to import from the canonical source. Updated skill-sync.test.js for three-way validation (16 tests, all passing). All 471 e2e tests pass."
             },
             {
               "id": "7bd0e002-d1a7-4aaa-82a1-30fdad108618",
               "title": "Define assistant asset manifest and render contract",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add a manifest that enumerates shared workflow skills, assistant delivery targets, MCP server descriptors, and any assistant-specific metadata wrappers.\n\nKeep vendor adapters thin so the manifest defines shared meaning while Claude/Codex writers only adapt file locations and wrappers.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "9470f4e3-8ec9-49de-bf20-632b64d9b4a3"
+              ],
+              "startedAt": "2026-03-31T17:47:50.508Z",
+              "completedAt": "2026-03-31T18:15:08.026Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created assistant-assets/manifest.json with three sections: skills (migrated from registry.json), mcpServers (rex + sourcevision with read/write tool categorization), and vendors (claude + codex delivery targets). Updated index.js with vendor-neutral render contract API (getManifest, getMcpServers, getVendorTarget, getToolIds, renderSkill, renderAllSkills) plus backward-compatible aliases. Refactored claude-integration.js to derive AUTO_APPROVED_TOOLS and MCP registration from the manifest. Expanded skill-sync.test.js from 16 to 61 tests covering manifest structure, render contract, tool ID derivation, and backward compatibility."
             },
             {
               "id": "79659c41-7011-4c68-a3ba-98f534029bb0",
@@ -23221,7 +23232,10 @@
               "status": "pending",
               "level": "task",
               "description": "Stop treating claude-integration.js and .claude/skills as separate sources of truth.\n\nUpdate the generation path so Claude artifacts are emitted from the canonical asset source and future Codex artifacts use the same shared content.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "7bd0e002-d1a7-4aaa-82a1-30fdad108618"
+              ]
             }
           ]
         },
@@ -23239,7 +23253,11 @@
               "status": "pending",
               "level": "task",
               "description": "Emit a project-local AGENTS.md that explains the n-dx workflow, lists available generated skills, and tells Codex when to use Rex and SourceVision MCP capabilities.\n\nThe content should be generated from the shared assistant asset layer rather than hand-maintained independently.",
-              "priority": "critical"
+              "priority": "critical",
+              "blockedBy": [
+                "7bd0e002-d1a7-4aaa-82a1-30fdad108618",
+                "3f98efc4-382d-431a-a1e0-64ca91ac7b57"
+              ]
             },
             {
               "id": "ceb4b95d-4c78-45eb-bb40-5604a10180ac",
@@ -23247,7 +23265,11 @@
               "status": "pending",
               "level": "task",
               "description": "During init, create one generated .agents/skills/<name>/SKILL.md directory per shared n-dx workflow skill.\n\nThe emitted content should stay structurally aligned with the Claude-delivered skills while using the Codex repository-local skill layout.",
-              "priority": "critical"
+              "priority": "critical",
+              "blockedBy": [
+                "7bd0e002-d1a7-4aaa-82a1-30fdad108618",
+                "3f98efc4-382d-431a-a1e0-64ca91ac7b57"
+              ]
             },
             {
               "id": "73346263-26ca-4499-8fe8-a3bcb689435d",
@@ -23255,7 +23277,10 @@
               "status": "pending",
               "level": "task",
               "description": "Generate project-local Codex MCP server definitions for Rex and SourceVision.\n\nThe first implementation should prefer stdio transport because it matches current Claude-side init behavior and avoids fixed-port drift. HTTP transport can remain documented as a later/manual option.",
-              "priority": "critical"
+              "priority": "critical",
+              "blockedBy": [
+                "3f98efc4-382d-431a-a1e0-64ca91ac7b57"
+              ]
             },
             {
               "id": "c9f700ec-3ca9-4516-a4e7-5ed4d493740d",
@@ -23263,7 +23288,12 @@
               "status": "pending",
               "level": "task",
               "description": "Add automated checks that ndx init writes AGENTS.md, generated .agents skills, and .codex/config.toml in a stable format.\n\nTests should protect against path drift, missing skills, and malformed MCP definitions.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "6b1b809b-8a37-4f44-b433-0ed111deaef5",
+                "ceb4b95d-4c78-45eb-bb40-5604a10180ac",
+                "73346263-26ca-4499-8fe8-a3bcb689435d"
+              ]
             }
           ]
         },
@@ -23281,7 +23311,13 @@
               "status": "pending",
               "level": "task",
               "description": "Introduce an assistant-neutral orchestration entry point, such as setupAssistantIntegrations, that provisions supported assistant surfaces without coupling ndx init to Claude-specific logic.\n\nThe refactor must preserve current behavior for Claude while making Codex a first-class setup target.",
-              "priority": "critical"
+              "priority": "critical",
+              "blockedBy": [
+                "79659c41-7011-4c68-a3ba-98f534029bb0",
+                "6b1b809b-8a37-4f44-b433-0ed111deaef5",
+                "ceb4b95d-4c78-45eb-bb40-5604a10180ac",
+                "73346263-26ca-4499-8fe8-a3bcb689435d"
+              ]
             },
             {
               "id": "312a5f34-98fa-4a1c-825c-71846026acab",
@@ -23289,7 +23325,10 @@
               "status": "pending",
               "level": "task",
               "description": "Extend init UX to report assistant provisioning separately from llm.vendor and add configuration toggles such as --no-codex alongside backward-compatible Claude options.\n\nThe init summary should make it obvious which assistant artifacts were provisioned for the repo.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
+              ]
             },
             {
               "id": "b18f544f-3d53-4616-9d85-469d51412f6a",
@@ -23297,7 +23336,10 @@
               "status": "pending",
               "level": "task",
               "description": "Keep existing Claude onboarding intact while the shared assistant setup path is introduced.\n\nAny migration of generated assets or flags must avoid breaking current users and should include compatibility handling where needed.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
+              ]
             }
           ]
         },
@@ -23315,7 +23357,10 @@
               "status": "pending",
               "level": "task",
               "description": "Update README.md and guide documentation to explain how repos are provisioned for both Claude and Codex, including where generated assistant artifacts live and how users start working from each surface.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
+              ]
             },
             {
               "id": "6d93d8fd-b72b-4d34-9313-9154236f17fc",
@@ -23323,7 +23368,10 @@
               "status": "pending",
               "level": "task",
               "description": "Bring MCP docs in line with the current tool names and transports actually exposed by the Rex and SourceVision MCP servers.\n\nThis repair should happen as part of the Codex rollout so new assistant docs do not encode stale names.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "73346263-26ca-4499-8fe8-a3bcb689435d"
+              ]
             },
             {
               "id": "f51c83b1-af4f-407d-bf7d-715ae8c9026f",
@@ -23331,7 +23379,10 @@
               "status": "pending",
               "level": "task",
               "description": "Update startup text, help output, and repo guidance so they no longer imply that Claude is the only first-class assistant path.\\n\\nThe implementation should explicitly define the intended roles of AGENTS.md, CODEX.md, and CLAUDE.md so future init and docs work cannot drift: AGENTS.md as the canonical shared guidance surface, CLAUDE.md as the Claude-facing bridge or import surface, and CODEX.md only if the project chooses to keep a compatibility layer.",
-              "priority": "medium"
+              "priority": "medium",
+              "blockedBy": [
+                "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
+              ]
             }
           ]
         },
@@ -23349,7 +23400,11 @@
               "status": "pending",
               "level": "task",
               "description": "Add coverage that verifies the canonical assistant asset source renders the expected Claude and Codex outputs.\n\nThis should replace the current Claude-only sync assumption with dual-vendor contract checks.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "79659c41-7011-4c68-a3ba-98f534029bb0",
+                "ceb4b95d-4c78-45eb-bb40-5604a10180ac"
+              ]
             },
             {
               "id": "625a955a-57b9-49f8-b155-dc747502192b",
@@ -23357,7 +23412,10 @@
               "status": "pending",
               "level": "task",
               "description": "Verify that generated .codex/config.toml entries reference the correct stdio commands, arguments, and stable project-local paths.\n\nReuse existing MCP transport tests where possible instead of reimplementing server protocol coverage.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "73346263-26ca-4499-8fe8-a3bcb689435d"
+              ]
             },
             {
               "id": "8242a482-67d2-4dd4-a4c3-22e7b6dbb430",
@@ -23365,7 +23423,11 @@
               "status": "pending",
               "level": "task",
               "description": "Add smoke checks that help text, init guidance, and startup output mention both supported assistant paths and do not regress back to Claude-only wording.",
-              "priority": "medium"
+              "priority": "medium",
+              "blockedBy": [
+                "aa6fe37f-470a-4358-ad89-2a7ceaf485b9",
+                "f51c83b1-af4f-407d-bf7d-715ae8c9026f"
+              ]
             }
           ]
         },
@@ -23391,7 +23453,22 @@
               "status": "pending",
               "level": "task",
               "description": "Record the Claude/Codex runtime differences that still remain after the baseline guardrails in this epic land, including API-mode gaps, deeper multi-turn observability differences, and any vendor capability mismatches that do not block the shared workflow contract.\\n\\nThis task should make the post-epic boundary explicit so future work can target true residual gaps instead of reopening questions that the runtime-identity feature already resolved.",
-              "priority": "medium"
+              "priority": "medium",
+              "blockedBy": [
+                "3f98efc4-382d-431a-a1e0-64ca91ac7b57",
+                "547ba5e2-b5cf-47d8-a608-eaef28398411"
+              ]
+            },
+            {
+              "id": "7b017860-5bff-4a50-a096-44d0031ebed6",
+              "title": "Wire blockedBy dependency edges for Codex Workflow Parity task ordering",
+              "status": "completed",
+              "level": "task",
+              "priority": "critical",
+              "startedAt": "2026-03-31T16:23:03.488Z",
+              "completedAt": "2026-03-31T17:28:39.484Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Wired 34 blockedBy dependency edges across 24 tasks in the Codex Workflow Parity epic. DAG validated with zero cycles, 5 execution layers. get_next_task now respects ordering."
             }
           ]
         },
@@ -23409,7 +23486,10 @@
               "status": "pending",
               "level": "task",
               "description": "Create a shared runtime contract module that defines the prompt envelope, sandbox and approval policy object, normalized event schema, and shared failure categories for both vendors. Initial touchpoints should include packages/hench/src/agent/lifecycle/, packages/hench/src/cli/commands/run.ts, and packages/llm-client/src/types.ts. Done when vendor wrappers compile from one contract instead of embedding ad hoc defaults.",
-              "priority": "critical"
+              "priority": "critical",
+              "blockedBy": [
+                "3f98efc4-382d-431a-a1e0-64ca91ac7b57"
+              ]
             },
             {
               "id": "99fe140a-103d-43bd-bcbd-eb8690eb3e17",
@@ -23417,7 +23497,10 @@
               "status": "pending",
               "level": "task",
               "description": "Refactor the Codex execution path in packages/hench/src/agent/lifecycle/cli-loop.ts and packages/llm-client/src/codex-cli-provider.ts to prefer official machine-readable Codex output, set sandbox and approval intent explicitly, and treat heuristic stdout normalization as a compatibility fallback only. Done when Codex runs can be mapped into the same internal lifecycle states that Claude stream-json events already support.",
-              "priority": "critical"
+              "priority": "critical",
+              "blockedBy": [
+                "547ba5e2-b5cf-47d8-a608-eaef28398411"
+              ]
             },
             {
               "id": "67c0ada9-003e-48fe-9a0d-e822d66e2e11",
@@ -23425,7 +23508,11 @@
               "status": "pending",
               "level": "task",
               "description": "Wire runtime instruction loading so Codex, Claude, and repo-generated assistant assets resolve back to the same workflow guidance instead of drifting by surface. Coordinate the asset and init work so AGENTS.md is the canonical shared guidance, CLAUDE.md imports or mirrors that guidance as the Claude-facing surface, and CODEX.md is either retired or kept only as an explicit compatibility layer. Done when both vendors start runs from equivalent repo instructions.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "547ba5e2-b5cf-47d8-a608-eaef28398411",
+                "79659c41-7011-4c68-a3ba-98f534029bb0"
+              ]
             },
             {
               "id": "cebf61e0-2fc9-41d1-8970-932f0539d0d2",
@@ -23433,7 +23520,10 @@
               "status": "pending",
               "level": "task",
               "description": "Unify token-usage mapping and failure classification across Claude and Codex in packages/hench/src/agent/lifecycle/token-usage.ts, packages/hench/src/cli/errors.ts, and packages/llm-client/src/token-usage.ts. Missing usage data must surface as an explicit degraded diagnostic instead of a silent zero-value success path, and vendor-specific raw errors must map into one shared user-facing taxonomy.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "547ba5e2-b5cf-47d8-a608-eaef28398411"
+              ]
             },
             {
               "id": "8a2f9f66-8210-436b-b7ac-bce8cad8ef13",
@@ -23441,7 +23531,12 @@
               "status": "pending",
               "level": "task",
               "description": "Add fixtures and smoke coverage that prove Claude and Codex runs share the same prompt sections, MCP availability, permission envelope, normalized event schema, failure classification, and completion gates. This should include unit coverage in packages/hench plus at least one fresh-project init-to-run smoke path so Codex can be validated as a first-class execution surface.",
-              "priority": "high"
+              "priority": "high",
+              "blockedBy": [
+                "99fe140a-103d-43bd-bcbd-eb8690eb3e17",
+                "67c0ada9-003e-48fe-9a0d-e822d66e2e11",
+                "cebf61e0-2fc9-41d1-8970-932f0539d0d2"
+              ]
             }
           ]
         }

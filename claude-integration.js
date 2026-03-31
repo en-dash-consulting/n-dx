@@ -21,7 +21,12 @@ import { join, resolve } from "path";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import { renderAllClaudeSkills, getSkillNames } from "./assistant-assets/index.js";
+import {
+  renderAllClaudeSkills,
+  getSkillNames,
+  getAutoApprovedToolIds,
+  getMcpServers,
+} from "./assistant-assets/index.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const _require = createRequire(import.meta.url);
@@ -41,31 +46,13 @@ function resolveSubPackageCli(pkgDir, npmName) {
 
 // ── Permission tiers ──────────────────────────────────────────────────────────
 
-/** Read-only MCP tools — auto-approved without user confirmation. */
-const AUTO_APPROVED_TOOLS = [
-  // Sourcevision read tools
-  "mcp__sourcevision__get_overview",
-  "mcp__sourcevision__get_zone",
-  "mcp__sourcevision__get_file_info",
-  "mcp__sourcevision__get_imports",
-  "mcp__sourcevision__search_files",
-  "mcp__sourcevision__get_findings",
-  "mcp__sourcevision__get_classifications",
-  "mcp__sourcevision__get_next_steps",
-  "mcp__sourcevision__get_route_tree",
-  // Rex read tools
-  "mcp__rex__get_prd_status",
-  "mcp__rex__get_next_task",
-  "mcp__rex__get_item",
-  "mcp__rex__get_capabilities",
-  "mcp__rex__get_recommendations",
-  "mcp__rex__health",
-  "mcp__rex__facets",
-];
-
-// Write tools are intentionally omitted — they require user approval by default.
-// This includes: add_item, update_task_status, move_item, merge_items,
-// set_file_archetype, reorganize, append_log, verify_criteria, sync_with_remote
+/**
+ * Read-only MCP tools — auto-approved without user confirmation.
+ *
+ * Derived from the manifest's MCP server descriptors + Claude vendor prefix.
+ * Write tools are intentionally omitted — they require user approval by default.
+ */
+const AUTO_APPROVED_TOOLS = getAutoApprovedToolIds("claude");
 
 // ── Skills ────────────────────────────────────────────────────────────────────
 
@@ -182,30 +169,21 @@ function registerMcpServers(dir) {
   }
 
   const results = [];
-
-  // Always use stdio — it doesn't require a running server
-  const rexBin = resolveSubPackageCli("packages/rex", "@n-dx/rex");
-  const svBin = resolveSubPackageCli("packages/sourcevision", "@n-dx/sourcevision");
   const absDir = resolve(dir);
+  const servers = getMcpServers();
 
-  try {
-    execSync(
-      `claude mcp add rex -- node "${rexBin}" mcp "${absDir}"`,
-      { stdio: "ignore", timeout: 10_000 },
-    );
-    results.push({ name: "rex", transport: "stdio", ok: true });
-  } catch {
-    results.push({ name: "rex", transport: "stdio", ok: false });
-  }
-
-  try {
-    execSync(
-      `claude mcp add sourcevision -- node "${svBin}" mcp "${absDir}"`,
-      { stdio: "ignore", timeout: 10_000 },
-    );
-    results.push({ name: "sourcevision", transport: "stdio", ok: true });
-  } catch {
-    results.push({ name: "sourcevision", transport: "stdio", ok: false });
+  // Register each MCP server defined in the manifest via stdio transport
+  for (const [name, descriptor] of Object.entries(servers)) {
+    const bin = resolveSubPackageCli(descriptor.package, descriptor.npmName);
+    try {
+      execSync(
+        `claude mcp add ${name} -- node "${bin}" ${descriptor.mcpCommand} "${absDir}"`,
+        { stdio: "ignore", timeout: 10_000 },
+      );
+      results.push({ name, transport: "stdio", ok: true });
+    } catch {
+      results.push({ name, transport: "stdio", ok: false });
+    }
   }
 
   return { registered: true, servers: results };

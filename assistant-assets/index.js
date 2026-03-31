@@ -1,11 +1,19 @@
 /**
- * Vendor-neutral assistant asset registry.
+ * Vendor-neutral assistant asset manifest and render contract.
  *
- * This module is the programmatic entry point for the canonical skill
- * definitions stored in `assistant-assets/skills/`.  It provides read-only
- * access to skill bodies and metadata so that vendor-specific integration
- * modules (claude-integration.js, future codex-integration.js) can render
- * assistant artifacts from one shared source of truth.
+ * This module is the programmatic entry point for the canonical asset
+ * definitions stored in `assistant-assets/`.  It provides read-only access
+ * to skill bodies, MCP server descriptors, and vendor delivery targets so
+ * that vendor-specific integration modules (claude-integration.js, future
+ * codex-integration.js) can render assistant artifacts from one shared
+ * source of truth.
+ *
+ * ## Render contract
+ *
+ * Vendor adapters call {@link renderSkill} or {@link renderAllSkills} with
+ * a vendor id ("claude" or "codex").  The manifest defines the shared
+ * meaning (skill metadata, MCP tool classification, delivery paths); vendor
+ * adapters only adapt file locations and wrapper formatting.
  *
  * @module assistant-assets
  */
@@ -16,23 +24,41 @@ import { fileURLToPath } from "url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
-// ── Registry ────────────────────────────────────────────────────────────────
+// ── Manifest ─────────────────────────────────────────────────────────────────
 
-/** @type {import('./types').Registry | null} */
-let _registryCache = null;
+/** @type {object | null} */
+let _manifestCache = null;
 
 /**
- * Load the skill registry from `registry.json`.
+ * Load the full asset manifest from `manifest.json`.
+ *
+ * The manifest is the single source of truth for skills, MCP server
+ * descriptors, and vendor delivery targets.
+ *
+ * @returns {{ skills: Record<string, { description: string, argumentHint?: string }>,
+ *             mcpServers: Record<string, object>,
+ *             vendors: Record<string, object> }}
+ */
+export function getManifest() {
+  if (!_manifestCache) {
+    _manifestCache = JSON.parse(
+      readFileSync(join(__dir, "manifest.json"), "utf-8"),
+    );
+  }
+  return _manifestCache;
+}
+
+/**
+ * Load the skill registry (backward-compatible view of the manifest).
+ *
+ * Returns the same `{ skills: ... }` shape that registry.json provided.
+ * Existing callers that used `getRegistry().skills[name]` continue to work.
  *
  * @returns {{ skills: Record<string, { description: string, argumentHint?: string }> }}
  */
 export function getRegistry() {
-  if (!_registryCache) {
-    _registryCache = JSON.parse(
-      readFileSync(join(__dir, "registry.json"), "utf-8"),
-    );
-  }
-  return _registryCache;
+  const { skills } = getManifest();
+  return { skills };
 }
 
 // ── Skill enumeration ───────────────────────────────────────────────────────
@@ -43,7 +69,7 @@ export function getRegistry() {
  * @returns {string[]}
  */
 export function getSkillNames() {
-  return Object.keys(getRegistry().skills);
+  return Object.keys(getManifest().skills);
 }
 
 // ── Skill body access ───────────────────────────────────────────────────────
@@ -66,7 +92,7 @@ export function getSkillBody(name) {
 /**
  * Read all skill bodies keyed by name.
  *
- * @returns {Map<string, string>}  skill name → markdown body
+ * @returns {Map<string, string>}  skill name -> markdown body
  */
 export function getAllSkillBodies() {
   const bodies = new Map();
@@ -76,23 +102,199 @@ export function getAllSkillBodies() {
   return bodies;
 }
 
-// ── Claude rendering ────────────────────────────────────────────────────────
+// ── MCP server descriptors ──────────────────────────────────────────────────
+
+/**
+ * Return the MCP server descriptors from the manifest.
+ *
+ * Each descriptor contains package location, npm name, CLI entrypoint,
+ * and tool lists categorized as `read` (safe to auto-approve) or `write`
+ * (require user confirmation).
+ *
+ * @returns {Record<string, { package: string, npmName: string, entrypoint: string,
+ *                            mcpCommand: string, tools: { read: string[], write: string[] } }>}
+ */
+export function getMcpServers() {
+  return getManifest().mcpServers;
+}
+
+/**
+ * Return a single MCP server descriptor by name.
+ *
+ * @param {string} name  Server name (e.g. "rex", "sourcevision")
+ * @returns {{ package: string, npmName: string, entrypoint: string,
+ *             mcpCommand: string, tools: { read: string[], write: string[] } }}
+ * @throws {Error}  If the server is not in the manifest
+ */
+export function getMcpServer(name) {
+  const servers = getMcpServers();
+  if (!servers[name]) {
+    throw new Error(`MCP server not in manifest: ${name}`);
+  }
+  return servers[name];
+}
+
+// ── Vendor delivery targets ─────────────────────────────────────────────────
+
+/**
+ * Return all vendor delivery target descriptors.
+ *
+ * @returns {Record<string, { skillDir: string, skillFile: string, skillWrapper: string,
+ *                            toolPrefix: string | null, instructionFile: string }>}
+ */
+export function getVendors() {
+  return getManifest().vendors;
+}
+
+/**
+ * Return the delivery target descriptor for a specific vendor.
+ *
+ * @param {string} vendor  Vendor id ("claude" or "codex")
+ * @returns {{ skillDir: string, skillFile: string, skillWrapper: string,
+ *             toolPrefix: string | null, instructionFile: string }}
+ * @throws {Error}  If the vendor is not in the manifest
+ */
+export function getVendorTarget(vendor) {
+  const vendors = getVendors();
+  if (!vendors[vendor]) {
+    throw new Error(`Vendor not in manifest: ${vendor}`);
+  }
+  return vendors[vendor];
+}
+
+// ── Tool ID derivation ──────────────────────────────────────────────────────
+
+/**
+ * Derive the vendor-prefixed tool IDs for a given tier (read or write).
+ *
+ * For Claude, read tools become `["mcp__rex__get_prd_status", ...]`.
+ * For vendors without a prefix (e.g. codex), bare tool names are returned.
+ *
+ * @param {string} vendor  Vendor id
+ * @param {"read" | "write"} tier  Tool tier
+ * @returns {string[]}  Vendor-prefixed (or bare) tool IDs
+ */
+export function getToolIds(vendor, tier) {
+  const vendorTarget = getVendorTarget(vendor);
+  const servers = getMcpServers();
+  const ids = [];
+
+  for (const [serverName, descriptor] of Object.entries(servers)) {
+    const tools = descriptor.tools[tier] ?? [];
+    for (const tool of tools) {
+      if (vendorTarget.toolPrefix) {
+        ids.push(vendorTarget.toolPrefix.replace("{server}", serverName) + tool);
+      } else {
+        ids.push(tool);
+      }
+    }
+  }
+
+  return ids;
+}
+
+/**
+ * Derive the vendor-prefixed read-only tool IDs (suitable for auto-approval).
+ *
+ * Convenience wrapper around `getToolIds(vendor, "read")`.
+ *
+ * @param {string} vendor  Vendor id
+ * @returns {string[]}
+ */
+export function getAutoApprovedToolIds(vendor) {
+  return getToolIds(vendor, "read");
+}
+
+// ── Skill rendering (vendor-neutral contract) ───────────────────────────────
+
+/**
+ * Render a single skill for a specific vendor.
+ *
+ * This is the primary render contract function.  Vendor adapters call this
+ * instead of building skill content themselves.  The manifest controls the
+ * wrapper format; vendor adapters only write the returned string to disk.
+ *
+ * Supported wrappers:
+ * - `"yaml-frontmatter"` (Claude): YAML block with name/description/argument-hint + body
+ * - `"plain"` (Codex): raw markdown body (no wrapper)
+ *
+ * @param {string} name    Skill name (e.g. "ndx-plan")
+ * @param {string} vendor  Vendor id ("claude" or "codex")
+ * @returns {string}       Fully rendered skill content
+ */
+export function renderSkill(name, vendor) {
+  const vendorTarget = getVendorTarget(vendor);
+  const meta = getManifest().skills[name];
+  if (!meta) {
+    throw new Error(`Skill not in manifest: ${name}`);
+  }
+
+  const body = getSkillBody(name);
+
+  switch (vendorTarget.skillWrapper) {
+    case "yaml-frontmatter":
+      return renderYamlFrontmatter(name, meta, body);
+    case "plain":
+      return body;
+    default:
+      throw new Error(
+        `Unknown skill wrapper "${vendorTarget.skillWrapper}" for vendor "${vendor}"`,
+      );
+  }
+}
+
+/**
+ * Render all skills for a specific vendor.
+ *
+ * @param {string} vendor  Vendor id ("claude" or "codex")
+ * @returns {Record<string, string>}  skill name -> rendered content
+ */
+export function renderAllSkills(vendor) {
+  const result = {};
+  for (const name of getSkillNames()) {
+    result[name] = renderSkill(name, vendor);
+  }
+  return result;
+}
+
+// ── Claude-specific aliases (backward compatibility) ────────────────────────
 
 /**
  * Render a skill as a Claude Code SKILL.md (YAML frontmatter + body).
+ *
+ * Equivalent to `renderSkill(name, "claude")`.  Kept for backward
+ * compatibility with existing callers and tests.
  *
  * @param {string} name  Skill name
  * @returns {string}     Complete SKILL.md content
  */
 export function renderClaudeSkill(name) {
-  const meta = getRegistry().skills[name];
-  if (!meta) {
-    throw new Error(`Skill not in registry: ${name}`);
-  }
+  return renderSkill(name, "claude");
+}
 
-  const body = getSkillBody(name);
+/**
+ * Render all skills as Claude Code SKILL.md content.
+ *
+ * Equivalent to `renderAllSkills("claude")`.  Kept for backward
+ * compatibility with existing callers and tests.
+ *
+ * @returns {Record<string, string>}  skill name -> SKILL.md content
+ */
+export function renderAllClaudeSkills() {
+  return renderAllSkills("claude");
+}
 
-  // Build YAML frontmatter
+// ── Internal renderers ──────────────────────────────────────────────────────
+
+/**
+ * Build YAML frontmatter + body for a skill.
+ *
+ * @param {string} name                   Skill name
+ * @param {{ description: string, argumentHint?: string }} meta  Skill metadata
+ * @param {string} body                   Markdown body
+ * @returns {string}
+ */
+function renderYamlFrontmatter(name, meta, body) {
   const lines = ["---", `name: ${name}`, `description: ${meta.description}`];
   if (meta.argumentHint) {
     lines.push(`argument-hint: "${meta.argumentHint}"`);
@@ -103,25 +305,12 @@ export function renderClaudeSkill(name) {
   return lines.join("\n") + "\n\n" + body;
 }
 
-/**
- * Render all skills as Claude Code SKILL.md content.
- *
- * @returns {Record<string, string>}  skill name → SKILL.md content
- */
-export function renderAllClaudeSkills() {
-  const result = {};
-  for (const name of getSkillNames()) {
-    result[name] = renderClaudeSkill(name);
-  }
-  return result;
-}
-
 // ── File-system discovery (for test validation) ─────────────────────────────
 
 /**
  * List all `.md` files present in `skills/`, returning their base names
  * (without extension).  This is useful for tests that need to verify the
- * directory contents match the registry.
+ * directory contents match the manifest.
  *
  * @returns {string[]}
  */
