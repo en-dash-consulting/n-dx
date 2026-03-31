@@ -42,6 +42,21 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Check no source maps in publish
+        run: |
+          MAPS=""
+          for pkg in packages/*/; do
+            [ -f "$pkg/package.json" ] || continue
+            FOUND=$(cd "$pkg" && pnpm pack --dry-run 2>&1 | grep '\.map$' || true)
+            if [ -n "$FOUND" ]; then
+              MAPS="$MAPS\n$pkg:\n$FOUND"
+            fi
+          done
+          if [ -n "$MAPS" ]; then
+            echo -e "Source map files would be published to npm:\n$MAPS"
+            exit 1
+          fi
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -50,3 +65,13 @@ jobs:
 
       - name: PR check
         run: pnpm pr-check
+
+      - name: Require changeset
+        if: github.event_name == 'pull_request'
+        run: |
+          # Check for .changeset/*.md files (not config.json, not README)
+          CHANGESETS=$(ls .changeset/*.md 2>/dev/null | grep -v README || true)
+          if [ -z "$CHANGESETS" ]; then
+            echo "No changeset found. Add one with 'pnpm changeset' or 'pnpm changeset --empty' if no release is needed."
+            exit 1
+          fi
