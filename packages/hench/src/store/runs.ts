@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readFile, writeFile, readdir, access } from "node:fs/promises";
+import { readFile, writeFile, readdir, access, mkdir } from "node:fs/promises";
 import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
 import { validateRunRecord } from "../schema/index.js";
@@ -27,8 +27,9 @@ export async function saveRun(
   henchDir: string,
   run: RunRecord,
 ): Promise<void> {
-  const runPath = join(henchDir, "runs", `${run.id}.json`);
-  await writeFile(runPath, toCanonicalJSON(run), "utf-8");
+  const runsDir = join(henchDir, "runs");
+  await mkdir(runsDir, { recursive: true });
+  await writeFile(join(runsDir, `${run.id}.json`), toCanonicalJSON(run), "utf-8");
 }
 
 export async function loadRun(
