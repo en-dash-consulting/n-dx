@@ -20,7 +20,10 @@ import {
   assemblePrompt,
   mapErrorReasonToFailureCategory,
   mapRunFailureToCategory,
+  classifyVendorError,
+  failureCategoryLabel,
 } from "../../src/runtime-contract.js";
+import { ClaudeClientError } from "../../src/types.js";
 
 // ── PromptSection ────────────────────────────────────────────────────────
 
@@ -510,5 +513,116 @@ describe("RuntimeDiagnostics", () => {
     expect(diag.vendor).toBe("claude");
     expect(diag.tokenDiagnosticStatus).toBe("complete");
     expect(diag.notes).toHaveLength(0);
+  });
+});
+
+// ── classifyVendorError ──────────────────────────────────────────────────
+
+describe("classifyVendorError", () => {
+  it("classifies ClaudeClientError with auth reason", () => {
+    const err = new ClaudeClientError("unauthorized", "auth", false);
+    expect(classifyVendorError(err)).toBe("auth");
+  });
+
+  it("classifies ClaudeClientError with rate-limit reason", () => {
+    const err = new ClaudeClientError("too many requests", "rate-limit", true);
+    expect(classifyVendorError(err)).toBe("rate_limit");
+  });
+
+  it("classifies ClaudeClientError with timeout reason", () => {
+    const err = new ClaudeClientError("timed out", "timeout", true);
+    expect(classifyVendorError(err)).toBe("timeout");
+  });
+
+  it("classifies ClaudeClientError with not-found reason", () => {
+    const err = new ClaudeClientError("model not found", "not-found", false);
+    expect(classifyVendorError(err)).toBe("not_found");
+  });
+
+  it("classifies ClaudeClientError with unknown reason", () => {
+    const err = new ClaudeClientError("something broke", "unknown", false);
+    expect(classifyVendorError(err)).toBe("unknown");
+  });
+
+  it("classifies plain Error with auth pattern", () => {
+    expect(classifyVendorError(new Error("Error: invalid api key"))).toBe("auth");
+  });
+
+  it("classifies plain Error with ANTHROPIC_API_KEY pattern", () => {
+    expect(classifyVendorError(new Error("Missing ANTHROPIC_API_KEY"))).toBe("auth");
+  });
+
+  it("classifies plain Error with OPENAI_API_KEY pattern", () => {
+    expect(classifyVendorError(new Error("Missing OPENAI_API_KEY"))).toBe("auth");
+  });
+
+  it("classifies plain Error with 401 pattern", () => {
+    expect(classifyVendorError(new Error("HTTP 401 Unauthorized"))).toBe("auth");
+  });
+
+  it("classifies plain Error with rate limit pattern", () => {
+    expect(classifyVendorError(new Error("rate limit exceeded"))).toBe("rate_limit");
+  });
+
+  it("classifies plain Error with 429 pattern", () => {
+    expect(classifyVendorError(new Error("HTTP 429 Too Many Requests"))).toBe("rate_limit");
+  });
+
+  it("classifies plain Error with timeout pattern", () => {
+    expect(classifyVendorError(new Error("request timed out"))).toBe("timeout");
+  });
+
+  it("classifies plain Error with ETIMEDOUT pattern", () => {
+    expect(classifyVendorError(new Error("connect ETIMEDOUT"))).toBe("timeout");
+  });
+
+  it("classifies plain Error with not found pattern", () => {
+    expect(classifyVendorError(new Error("codex: not found"))).toBe("not_found");
+  });
+
+  it("classifies plain Error with ENOENT pattern", () => {
+    expect(classifyVendorError(new Error("ENOENT: no such file"))).toBe("not_found");
+  });
+
+  it("classifies plain Error with malformed output pattern", () => {
+    expect(classifyVendorError(new Error("Unexpected token < in JSON"))).toBe("malformed_output");
+  });
+
+  it("classifies plain Error with transient patterns", () => {
+    expect(classifyVendorError(new Error("HTTP 502 Bad Gateway"))).toBe("transient_exhausted");
+    expect(classifyVendorError(new Error("ECONNRESET"))).toBe("transient_exhausted");
+    expect(classifyVendorError(new Error("socket hang up"))).toBe("transient_exhausted");
+  });
+
+  it("classifies budget exceeded pattern", () => {
+    expect(classifyVendorError(new Error("budget exceeded for this run"))).toBe("budget_exceeded");
+  });
+
+  it("falls back to unknown for unrecognized errors", () => {
+    expect(classifyVendorError(new Error("something completely unexpected"))).toBe("unknown");
+  });
+
+  it("handles string input", () => {
+    expect(classifyVendorError("ENOENT: missing file")).toBe("not_found");
+  });
+});
+
+// ── failureCategoryLabel ─────────────────────────────────────────────────
+
+describe("failureCategoryLabel", () => {
+  it("returns a human-readable label for every category", () => {
+    for (const category of ALL_FAILURE_CATEGORIES) {
+      const label = failureCategoryLabel(category);
+      expect(typeof label).toBe("string");
+      expect(label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("returns specific labels for known categories", () => {
+    expect(failureCategoryLabel("auth")).toBe("authentication failure");
+    expect(failureCategoryLabel("rate_limit")).toBe("rate limit exceeded");
+    expect(failureCategoryLabel("timeout")).toBe("operation timed out");
+    expect(failureCategoryLabel("not_found")).toBe("resource not found");
+    expect(failureCategoryLabel("unknown")).toBe("unexpected error");
   });
 });

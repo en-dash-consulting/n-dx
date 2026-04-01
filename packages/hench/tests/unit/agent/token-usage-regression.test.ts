@@ -6,6 +6,7 @@ import {
   parseStreamTokenUsage,
   mapCodexUsageToTokenUsage,
 } from "../../../src/agent/lifecycle/token-usage.js";
+import type { TokenDiagnosticStatus } from "../../../src/agent/lifecycle/token-usage.js";
 
 interface ClaudeFixtureCase {
   name: string;
@@ -20,7 +21,7 @@ interface CodexFixtureCase {
   expected: {
     usage: { input: number; output: number };
     total: number;
-    diagnostic: "codex_usage_missing" | null;
+    diagnosticStatus: TokenDiagnosticStatus;
   };
 }
 
@@ -58,7 +59,7 @@ describe("token usage regression fixtures", () => {
         const parsed = mapCodexUsageToTokenUsage(testCase.payload);
         expect(parsed.usage).toEqual(testCase.expected.usage);
         expect(parsed.total).toBe(testCase.expected.total);
-        expect(parsed.diagnostic ?? null).toBe(testCase.expected.diagnostic);
+        expect(parsed.diagnosticStatus).toBe(testCase.expected.diagnosticStatus);
       });
     }
   });

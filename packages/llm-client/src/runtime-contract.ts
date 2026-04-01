@@ -35,7 +35,8 @@
  */
 
 import type { LLMVendor } from "./provider-interface.js";
-import type { TokenUsage } from "./types.js";
+import type { TokenUsage, ErrorReason } from "./types.js";
+import { ClaudeClientError } from "./types.js";
 
 // ── Prompt envelope ──────────────────────────────────────────────────────
 
@@ -412,5 +413,102 @@ export function mapRunFailureToCategory(
       return "transient_exhausted";
     default:
       return "unknown";
+  }
+}
+
+// ── Vendor-neutral error classification ──────────────────────────────────
+
+/**
+ * Regex patterns for classifying vendor-agnostic error messages into
+ * {@link FailureCategory} values.
+ *
+ * Order matters — first match wins. More specific patterns come before
+ * broader ones.
+ */
+const VENDOR_ERROR_PATTERNS: ReadonlyArray<readonly [RegExp, FailureCategory]> = [
+  // Auth failures (Claude + Codex)
+  [/ANTHROPIC_API_KEY|OPENAI_API_KEY|api.key/i, "auth"],
+  [/unauthorized|invalid api key|api key was rejected|forbidden|auth failed|\b401\b/i, "auth"],
+  [/not logged in|login required/i, "auth"],
+
+  // Rate limiting
+  [/rate.limit|too many requests|\b429\b/i, "rate_limit"],
+
+  // Timeout
+  [/timeout|timed? ?out|ETIMEDOUT/i, "timeout"],
+
+  // Budget
+  [/budget.exceeded|spending limit|token limit reached/i, "budget_exceeded"],
+
+  // Not found (CLI binary, model, endpoint)
+  [/not found|ENOENT|\b404\b/i, "not_found"],
+
+  // Malformed output
+  [/unexpected token|malformed|invalid json|parse error|SyntaxError/i, "malformed_output"],
+
+  // Transient infrastructure
+  [/\b500\b|\b502\b|\b503\b|\b529\b|overloaded|ECONNRESET|ECONNREFUSED|socket hang up|stream disconnected/i, "transient_exhausted"],
+];
+
+/**
+ * Classify an arbitrary error into the shared {@link FailureCategory} taxonomy.
+ *
+ * Classification strategy (in priority order):
+ * 1. {@link ClaudeClientError} — uses the existing `reason` field via
+ *    {@link mapErrorReasonToFailureCategory}.
+ * 2. Error message pattern matching — vendor-agnostic regex patterns.
+ * 3. Fallback — `"unknown"`.
+ *
+ * This is the single entry point for user-facing error classification.
+ * Both Claude and Codex error paths should converge here.
+ */
+export function classifyVendorError(err: unknown): FailureCategory {
+  // ClaudeClientError already carries a classified reason
+  if (err instanceof ClaudeClientError) {
+    return mapErrorReasonToFailureCategory(err.reason);
+  }
+
+  const message = err instanceof Error ? err.message : String(err);
+
+  for (const [pattern, category] of VENDOR_ERROR_PATTERNS) {
+    if (pattern.test(message)) {
+      return category;
+    }
+  }
+
+  return "unknown";
+}
+
+/**
+ * User-facing label for a {@link FailureCategory}.
+ *
+ * Returns a short, lowercase, human-readable phrase suitable for log
+ * messages and CLI output. Keeps the taxonomy readable without exposing
+ * raw enum values to users.
+ */
+export function failureCategoryLabel(category: FailureCategory): string {
+  switch (category) {
+    case "auth":
+      return "authentication failure";
+    case "not_found":
+      return "resource not found";
+    case "timeout":
+      return "operation timed out";
+    case "rate_limit":
+      return "rate limit exceeded";
+    case "completion_rejected":
+      return "completion rejected";
+    case "budget_exceeded":
+      return "token budget exceeded";
+    case "spin_detected":
+      return "agent loop detected";
+    case "malformed_output":
+      return "malformed output";
+    case "mcp_unavailable":
+      return "MCP server unavailable";
+    case "transient_exhausted":
+      return "transient failures exhausted retries";
+    case "unknown":
+      return "unexpected error";
   }
 }

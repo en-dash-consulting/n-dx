@@ -151,8 +151,17 @@ export {
 // Token usage parsing
 export {
   parseApiTokenUsage,
+  parseApiTokenUsageWithDiagnostic,
   parseCliTokenUsage,
+  parseCliTokenUsageWithDiagnostic,
   parseStreamTokenUsage,
+  parseStreamTokenUsageWithDiagnostic,
+  mapCodexUsageToTokenUsage,
+} from "./token-usage.js";
+
+export type {
+  TokenParseResult,
+  CodexTokenMapping,
 } from "./token-usage.js";
 
 // Providers
@@ -261,6 +270,8 @@ export {
   assemblePrompt,
   mapErrorReasonToFailureCategory,
   mapRunFailureToCategory,
+  classifyVendorError,
+  failureCategoryLabel,
 } from "./runtime-contract.js";
 
 // CLI help formatting

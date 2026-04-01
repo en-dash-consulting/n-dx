@@ -923,7 +923,7 @@ async function spawnCodex(
           for (const warning of normalized.warnings) {
             stream("Warn", warning);
           }
-          if (codexTokenMapping.diagnostic) {
+          if (codexTokenMapping.diagnosticStatus === "unavailable") {
             stream("Warn", "Codex response omitted usage; token accounting defaulted to zero (heuristic fallback).");
           }
 
@@ -977,10 +977,10 @@ async function spawnCodex(
         // try to extract from the raw stdout (heuristic).
         if (structuredEventCount > 0 && result.tokenUsage.input === 0 && result.tokenUsage.output === 0) {
           const codexTokenMapping = mapCodexUsageToTokenUsage(parseMaybeJson(stdout));
-          if (!codexTokenMapping.diagnostic) {
+          if (codexTokenMapping.diagnosticStatus !== "unavailable") {
             result.tokenUsage = codexTokenMapping.usage;
           }
-          if (codexTokenMapping.diagnostic) {
+          if (codexTokenMapping.diagnosticStatus === "unavailable") {
             stream("Warn", "Codex structured output omitted usage; token accounting defaulted to zero.");
           }
         }

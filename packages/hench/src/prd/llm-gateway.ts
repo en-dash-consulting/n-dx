@@ -77,7 +77,10 @@ export {
 // ---- Token usage parsing ----------------------------------------------------
 export {
   parseApiTokenUsage,
+  parseApiTokenUsageWithDiagnostic,
   parseStreamTokenUsage,
+  parseStreamTokenUsageWithDiagnostic,
+  mapCodexUsageToTokenUsage,
 } from "@n-dx/llm-client";
 
 // ---- Model resolution -------------------------------------------------------
@@ -95,6 +98,8 @@ export {
   assemblePrompt,
   mapErrorReasonToFailureCategory,
   mapRunFailureToCategory,
+  classifyVendorError,
+  failureCategoryLabel,
 } from "@n-dx/llm-client";
 
 // ---- Codex policy compilation -----------------------------------------------
@@ -126,4 +131,6 @@ export type {
   FailureCategory,
   TokenDiagnosticStatus,
   RuntimeDiagnostics,
+  TokenParseResult,
+  CodexTokenMapping,
 } from "@n-dx/llm-client";
