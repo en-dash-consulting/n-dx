@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, readFile, writeFile, chmod } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -334,6 +335,155 @@ describe("n-dx init provider selection", () => {
         expect(result.status).not.toBe(0);
         expect(result.stderr).toContain("Provider auth preflight failed for \"claude\"");
         expect(result.stderr).toContain("Next step: run 'claude login'");
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  // ── backward-compatible re-init ────────────────────────────────────────────
+
+  describe("backward-compatible re-init detection", () => {
+    function pathEnvWith(...dirs) {
+      return {
+        ...process.env,
+        PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
+      };
+    }
+
+    it("re-init on Claude-only project skips Codex when no flags are passed", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-compat-claude-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+
+        // First init: provisions both vendors
+        run(
+          ["init", "--provider=codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+        expect(existsSync(join(tmpDir, ".claude"))).toBe(true);
+        expect(existsSync(join(tmpDir, "AGENTS.md"))).toBe(true);
+
+        // Remove Codex artifacts to simulate a prior Claude-only project
+        await rm(join(tmpDir, ".codex"), { recursive: true, force: true });
+        await rm(join(tmpDir, ".agents"), { recursive: true, force: true });
+        await rm(join(tmpDir, "AGENTS.md"), { force: true });
+
+        // Re-init without flags — should only re-provision Claude
+        const output = run(
+          ["init", "--provider=codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).toContain("Claude Code");
+        expect(output).toMatch(/Codex\s+skipped/);
+        expect(existsSync(join(tmpDir, "AGENTS.md"))).toBe(false);
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+
+    it("re-init on Codex-only project skips Claude when no flags are passed", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-compat-codex-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+
+        // First init: provisions both vendors
+        run(
+          ["init", "--provider=codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        // Remove Claude artifacts to simulate a prior Codex-only project
+        await rm(join(tmpDir, ".claude"), { recursive: true, force: true });
+        await rm(join(tmpDir, "CLAUDE.md"), { force: true });
+
+        // Re-init without flags — should only re-provision Codex
+        const output = run(
+          ["init", "--provider=codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).toMatch(/Claude Code\s+skipped/);
+        expect(output).toContain("Codex");
+        expect(output).toContain("AGENTS.md");
+        expect(existsSync(join(tmpDir, "CLAUDE.md"))).toBe(false);
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+
+    it("re-init provisions both when both surfaces already exist", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-compat-both-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+
+        // First init: provisions both
+        run(
+          ["init", "--provider=codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        // Re-init without flags — both already exist → both re-provisioned
+        const output = run(
+          ["init", "--provider=codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).not.toMatch(/Claude Code\s+skipped/);
+        expect(output).not.toMatch(/Codex\s+skipped/);
+        expect(existsSync(join(tmpDir, "CLAUDE.md"))).toBe(true);
+        expect(existsSync(join(tmpDir, "AGENTS.md"))).toBe(true);
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+
+    it("first init provisions both vendors when no surfaces exist", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-compat-fresh-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+
+        const output = run(
+          ["init", "--provider=codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).not.toMatch(/Claude Code\s+skipped/);
+        expect(output).not.toMatch(/Codex\s+skipped/);
+        expect(existsSync(join(tmpDir, "CLAUDE.md"))).toBe(true);
+        expect(existsSync(join(tmpDir, "AGENTS.md"))).toBe(true);
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+
+    it("explicit --assistants= overrides re-init detection", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-compat-override-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+
+        // First init: provisions both
+        run(
+          ["init", "--provider=codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        // Remove Codex artifacts (simulating Claude-only)
+        await rm(join(tmpDir, ".codex"), { recursive: true, force: true });
+        await rm(join(tmpDir, ".agents"), { recursive: true, force: true });
+        await rm(join(tmpDir, "AGENTS.md"), { force: true });
+
+        // Re-init with explicit --assistants=claude,codex overrides detection
+        const output = run(
+          ["init", "--provider=codex", "--assistants=claude,codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).not.toMatch(/Claude Code\s+skipped/);
+        expect(output).not.toMatch(/Codex\s+skipped/);
+        expect(existsSync(join(tmpDir, "CLAUDE.md"))).toBe(true);
+        expect(existsSync(join(tmpDir, "AGENTS.md"))).toBe(true);
       } finally {
         await rm(binDir, { recursive: true, force: true });
       }

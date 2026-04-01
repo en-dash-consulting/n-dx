@@ -381,6 +381,65 @@ describe("cli.js assistant-selection flags", () => {
   });
 });
 
+// ── backward-compatibility: re-init detection ────────────────────────────────
+
+describe("cli.js backward-compatible re-init detection", () => {
+  const src = readFileSync(join(ROOT, "cli.js"), "utf-8");
+
+  it("defines hasExplicitAssistantFlags function", () => {
+    expect(src).toContain("function hasExplicitAssistantFlags");
+  });
+
+  it("calls hasExplicitAssistantFlags in handleInit", () => {
+    expect(src).toContain("hasExplicitAssistantFlags(rest)");
+  });
+
+  it("detects existing Claude surfaces (.claude or CLAUDE.md)", () => {
+    expect(src).toContain("claudePresent");
+    expect(src).toContain('".claude"');
+    expect(src).toContain('"CLAUDE.md"');
+  });
+
+  it("detects existing Codex surfaces (.codex, .agents, or AGENTS.md)", () => {
+    expect(src).toContain("codexPresent");
+    expect(src).toContain('".codex"');
+    expect(src).toContain('".agents"');
+    expect(src).toContain('"AGENTS.md"');
+  });
+
+  it("narrows assistantEnabled when only one vendor surface exists", () => {
+    // Should disable the absent vendor when only one exists
+    expect(src).toContain("claudePresent && !codexPresent");
+    expect(src).toContain("!claudePresent && codexPresent");
+  });
+});
+
+// ── backward-compatibility: deprecated exports ───────────────────────────────
+
+describe("deprecated vendor summary exports are preserved", () => {
+  it("claude-integration.js still exports printClaudeSetupSummary", () => {
+    const src = readFileSync(join(ROOT, "claude-integration.js"), "utf-8");
+    expect(src).toContain("export function printClaudeSetupSummary");
+    expect(src).toContain("@deprecated");
+  });
+
+  it("codex-integration.js still exports printCodexSetupSummary", () => {
+    const src = readFileSync(join(ROOT, "codex-integration.js"), "utf-8");
+    expect(src).toContain("export function printCodexSetupSummary");
+    expect(src).toContain("@deprecated");
+  });
+
+  it("printClaudeSetupSummary is importable (not removed)", async () => {
+    const mod = await import("../../claude-integration.js");
+    expect(typeof mod.printClaudeSetupSummary).toBe("function");
+  });
+
+  it("printCodexSetupSummary is importable (not removed)", async () => {
+    const mod = await import("../../codex-integration.js");
+    expect(typeof mod.printCodexSetupSummary).toBe("function");
+  });
+});
+
 // ── help.js init documentation ──────────────────────────────────────────────
 
 describe("help.js init help documents all assistant flags", () => {

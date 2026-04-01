@@ -216,6 +216,10 @@ export function setupClaudeIntegration(dir) {
 
 /**
  * Print a summary of what was configured.
+ *
+ * @deprecated Use `formatInitReport()` from `assistant-integration.js` instead.
+ * This function is retained for backward compatibility with external callers
+ * and will be removed in a future major release.
  */
 export function printClaudeSetupSummary(result) {
   console.log("");

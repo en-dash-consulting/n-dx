@@ -231,6 +231,17 @@ function stripAssistantFlags(args) {
 }
 
 /**
+ * Returns true when the user explicitly passed any assistant-selection flag.
+ *
+ * Used for backward-compatibility detection: when no flags are present and
+ * the project already has assistant surfaces from a prior init, only the
+ * existing surfaces are re-provisioned (rather than adding new ones).
+ */
+function hasExplicitAssistantFlags(args) {
+  return args.some((a) => ASSISTANT_FLAGS.includes(a) || a.startsWith("--assistants="));
+}
+
+/**
  * Resolve which assistants are enabled from the init CLI flags.
  *
  * Priority: --assistants= > --claude-only / --codex-only > --no-claude / --no-codex > default (both)
@@ -567,11 +578,31 @@ async function handleInit(rest) {
   }
 
   // Resolve assistant-selection flags (--assistants= > --*-only > --no-* > default)
-  const assistantEnabled = resolveAssistantFlags(rest);
+  let assistantEnabled = resolveAssistantFlags(rest);
 
   const initArgs = stripAssistantFlags(stripInitProviderFlag(rest));
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
+
+  // ── Backward-compatibility: re-init detection ─────────────────────────────
+  //
+  // When no explicit assistant flags are passed and the project already has
+  // surfaces from a prior init, only re-provision the surfaces that already
+  // exist.  This prevents existing Claude-only users from unexpectedly
+  // receiving Codex artifacts (AGENTS.md, .codex/, .agents/) on upgrade.
+  //
+  // First-time init (no existing surfaces) provisions both vendors by default.
+  if (!hasExplicitAssistantFlags(rest)) {
+    const claudePresent = existsSync(join(dir, ".claude")) || existsSync(join(dir, "CLAUDE.md"));
+    const codexPresent = existsSync(join(dir, ".codex")) || existsSync(join(dir, ".agents")) || existsSync(join(dir, "AGENTS.md"));
+
+    if (claudePresent && !codexPresent) {
+      assistantEnabled = { ...assistantEnabled, codex: false };
+    } else if (!claudePresent && codexPresent) {
+      assistantEnabled = { ...assistantEnabled, claude: false };
+    }
+    // Both present or neither → keep default (both enabled)
+  }
 
   // Check for existing provider config before prompting
   const existingVendor = readLLMVendor(dir);
