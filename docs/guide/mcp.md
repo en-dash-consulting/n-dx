@@ -100,6 +100,8 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 | `facets` | List configured facets |
 | `get_recommendations` | SourceVision-based recommendations |
 | `append_log` | Write to the execution log |
+| `sync_with_remote` | Sync with remote adapter (e.g. Notion) |
+| `get_capabilities` | Server capabilities and configuration |
 
 ## SourceVision MCP Tools
 
@@ -114,6 +116,7 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 | `get_imports` | Import graph edges |
 | `get_classifications` | File archetype classifications |
 | `get_route_tree` | Route structure (pages, API routes, layouts) |
+| `set_file_archetype` | Override archetype classification for a file |
 
 ## Migrating from stdio to HTTP (Claude)
 

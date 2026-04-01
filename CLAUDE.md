@@ -266,7 +266,7 @@ sv <command> [args]               # alias for sourcevision
 
 ## MCP Servers
 
-Rex and sourcevision expose MCP servers for Claude Code tool use. Two transport options are available: **HTTP** (recommended) and **stdio** (legacy).
+Rex and sourcevision expose MCP servers for Claude Code and Codex tool use. Two transport options are available: **HTTP** (recommended for Claude) and **stdio** (default for both assistants after `ndx init`).
 
 ### HTTP transport (recommended)
 
@@ -304,21 +304,35 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 
 ### Rex MCP tools
 
-- `rex_status` — PRD tree with completion stats
-- `rex_next` — next actionable task
-- `rex_add` — add epic/feature/task/subtask
-- `rex_update` — update item status/priority/title
-- `rex_validate` — check PRD integrity
-- `rex_analyze` — scan project and propose PRD items
-- `rex_recommend` — get sourcevision-based recommendations
+- `get_prd_status` — PRD title, overall stats, and per-epic stats
+- `get_next_task` — next actionable task based on priority and dependencies
+- `update_task_status` — update item status
+- `add_item` — add epic/feature/task/subtask
+- `edit_item` — edit item content (title, description, priority, tags)
+- `get_item` — full item details with parent chain
+- `move_item` — reparent an item in the PRD tree
+- `merge_items` — consolidate duplicate sibling items
+- `get_recommendations` — sourcevision-based recommendations
+- `verify_criteria` — map acceptance criteria to test files
+- `reorganize` — detect and fix structural issues
+- `health` — PRD structure health score
+- `facets` — list configured facets with distribution
+- `append_log` — write structured log entry
+- `sync_with_remote` — sync with remote adapter (e.g. Notion)
+- `get_capabilities` — server capabilities and configuration
 
 ### Sourcevision MCP tools
 
-- `sv_inventory` — file listing with metadata
-- `sv_imports` — dependency graph for a file
-- `sv_zones` — architectural zone map
-- `sv_components` — React component catalog
-- `sv_context` — full CONTEXT.md contents
+- `get_overview` — project summary statistics
+- `get_next_steps` — prioritized improvement recommendations
+- `get_zone` — architectural zone details
+- `get_findings` — analysis findings (anti-patterns, suggestions, observations)
+- `get_file_info` — file inventory entry, zone, and imports
+- `search_files` — search inventory by path, role, or language
+- `get_imports` — import graph edges
+- `get_classifications` — file archetype classifications
+- `set_file_archetype` — override archetype classification for a file
+- `get_route_tree` — route structure (pages, API routes, layouts)
 
 ## Development Workflow
 

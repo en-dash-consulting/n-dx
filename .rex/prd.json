@@ -23425,13 +23425,17 @@
             {
               "id": "6d93d8fd-b72b-4d34-9313-9154236f17fc",
               "title": "Correct MCP tool-name and transport documentation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Bring MCP docs in line with the current tool names and transports actually exposed by the Rex and SourceVision MCP servers.\n\nThis repair should happen as part of the Codex rollout so new assistant docs do not encode stale names.",
               "priority": "high",
               "blockedBy": [
                 "73346263-26ca-4499-8fe8-a3bcb689435d"
-              ]
+              ],
+              "startedAt": "2026-04-01T18:59:16.072Z",
+              "completedAt": "2026-04-01T19:08:04.447Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Replaced stale rex_*/sv_* MCP tool names with current names (get_prd_status, get_next_task, etc.) across README.md, CLAUDE.md, docs/packages/rex.md, docs/guide/mcp.md. Added MCP tools section to docs/packages/sourcevision.md. Updated language to be assistant-neutral (Claude + Codex)."
             },
             {
               "id": "f51c83b1-af4f-407d-bf7d-715ae8c9026f",
