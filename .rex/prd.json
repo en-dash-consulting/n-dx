@@ -23324,10 +23324,12 @@
         {
           "id": "63be7d6a-273f-4099-9c15-3f297d144037",
           "title": "Assistant-Neutral Init Orchestration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Refactor init orchestration so assistant setup is no longer Claude-only and can provision both Claude and Codex consistently from the orchestration layer.\\n\\nThis feature depends on the canonical asset and artifact-generation work having clear writers and target file contracts. Keep the orchestration changes in cli/orchestration code rather than moving assistant concerns into Rex or SourceVision domain packages.\\n\\nDone when ndx init can provision the intended assistant surfaces deterministically and report what was generated without Claude-specific branching dominating the flow.",
           "priority": "critical",
+          "startedAt": "2026-04-01T03:19:34.478Z",
+          "completedAt": "2026-04-01T03:19:34.478Z",
           "children": [
             {
               "id": "93b1bf7d-d985-4123-b7a1-fb58fdb6115d",
@@ -23350,25 +23352,32 @@
             {
               "id": "312a5f34-98fa-4a1c-825c-71846026acab",
               "title": "Add assistant-specific init flags and summary reporting",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Extend init UX to report assistant provisioning separately from llm.vendor and add configuration toggles such as --no-codex alongside backward-compatible Claude options.\n\nThe init summary should make it obvious which assistant artifacts were provisioned for the repo.",
               "priority": "high",
               "blockedBy": [
                 "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
               ],
-              "startedAt": "2026-04-01T01:25:20.198Z"
+              "startedAt": "2026-04-01T01:25:20.198Z",
+              "completedAt": "2026-04-01T02:38:13.775Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Enhanced formatInitReport with verbose per-artifact detail, added --claude-only/--codex-only/--assistants= flags, updated help text, added 18 tests"
             },
             {
               "id": "b18f544f-3d53-4616-9d85-469d51412f6a",
               "title": "Preserve backward-compatible Claude setup behavior during parity rollout",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Keep existing Claude onboarding intact while the shared assistant setup path is introduced.\n\nAny migration of generated assets or flags must avoid breaking current users and should include compatibility handling where needed.",
               "priority": "high",
               "blockedBy": [
                 "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
-              ]
+              ],
+              "startedAt": "2026-04-01T02:53:59.450Z",
+              "completedAt": "2026-04-01T03:19:34.194Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added re-init surface detection to handleInit that narrows default assistant provisioning based on existing project surfaces, preventing Claude-only users from unexpectedly receiving Codex artifacts on upgrade. Deprecated printClaudeSetupSummary and printCodexSetupSummary. Added 14 tests."
             }
           ]
         },
