@@ -23473,13 +23473,17 @@
             {
               "id": "625a955a-57b9-49f8-b155-dc747502192b",
               "title": "Add Codex config generation and MCP contract tests",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Verify that generated .codex/config.toml entries reference the correct stdio commands, arguments, and stable project-local paths.\n\nReuse existing MCP transport tests where possible instead of reimplementing server protocol coverage.",
               "priority": "high",
               "blockedBy": [
                 "73346263-26ca-4499-8fe8-a3bcb689435d"
-              ]
+              ],
+              "startedAt": "2026-04-01T19:09:11.233Z",
+              "completedAt": "2026-04-01T19:14:40.694Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added tests/e2e/codex-mcp-contract.test.js with 19 tests covering: entrypoint existence, path locality (project-local not global npm), command structure, stdio MCP server lifecycle (spawns both rex and sourcevision with exact config.toml commands), tool list parity with manifest, bare tool names verification, and config.toml path stability across regeneration."
             },
             {
               "id": "8242a482-67d2-4dd4-a4c3-22e7b6dbb430",
