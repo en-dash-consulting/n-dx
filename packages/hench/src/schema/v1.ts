@@ -90,6 +90,15 @@ export interface HenchConfig {
   selfHeal?: boolean;
   /** Detected project language. Drives guard defaults during init. */
   language?: ProjectLanguage;
+  /**
+   * When true, the CLI loop uses EventAccumulator for result accumulation
+   * instead of inline SpawnResult mutation. Spin detection and token budget
+   * checks operate on the RuntimeEvent stream via the accumulator.
+   *
+   * This is a migration flag — both paths produce equivalent run records.
+   * Will be removed once the event pipeline is validated in production.
+   */
+  useEventPipeline?: boolean;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────

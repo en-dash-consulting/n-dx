@@ -60,6 +60,7 @@ import {
 import type { SharedLoopOptions } from "./shared.js";
 import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
 import { resolveVendorAdapter } from "./adapters/index.js";
+import { EventAccumulator } from "./event-accumulator.js";
 
 // ── Backward compatibility re-exports ─────────────────────────────────────
 //
@@ -227,6 +228,82 @@ function applyRuntimeEvent(
   }
 }
 
+// ── Event pipeline helpers ─────────────────────────────────────────────────
+
+/**
+ * Emit UI stream output for a RuntimeEvent.
+ *
+ * Pure side-effect function: writes to the dashboard/CLI output stream.
+ * Used by the event pipeline path where `applyRuntimeEvent` is replaced
+ * by `EventAccumulator.push()` (which doesn't emit UI output).
+ *
+ * @internal Exported for testing.
+ */
+export function emitStreamOutput(event: RuntimeEvent): void {
+  switch (event.type) {
+    case "assistant": {
+      if (event.text) stream("Agent", event.text);
+      break;
+    }
+    case "tool_use": {
+      const toolName = event.toolCall?.tool ?? "unknown";
+      const toolInput = event.toolCall?.input ?? {};
+      stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
+      break;
+    }
+    case "tool_result": {
+      const output = event.toolResult?.output ?? "";
+      const preview = output.slice(0, 200);
+      stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
+      break;
+    }
+    case "failure": {
+      // Failures are logged elsewhere; no stream emission needed
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/**
+ * Convert raw JSON token usage into a `token_usage` RuntimeEvent.
+ *
+ * Checks the standard locations where vendors embed usage data
+ * (`event.usage`, `event.message.usage`) and returns a RuntimeEvent
+ * for accumulation, or `null` if no usage was found.
+ *
+ * @internal Exported for testing.
+ */
+export function rawJsonToTokenUsageEvent(
+  rawJson: Record<string, unknown>,
+  turn: number,
+  metadata: SpawnTokenMetadata,
+): RuntimeEvent | null {
+  let usage: Record<string, unknown> | undefined;
+
+  if (rawJson.usage && typeof rawJson.usage === "object") {
+    usage = rawJson.usage as Record<string, unknown>;
+  } else if (rawJson.message && typeof rawJson.message === "object") {
+    const msg = rawJson.message as Record<string, unknown>;
+    if (msg.usage && typeof msg.usage === "object") {
+      usage = msg.usage as Record<string, unknown>;
+    }
+  }
+
+  if (!usage) return null;
+
+  const { usage: parsed } = parseTokenUsageWithDiagnostic(usage);
+
+  return {
+    type: "token_usage",
+    vendor: metadata.vendor,
+    turn: turn || 1,
+    timestamp: new Date().toISOString(),
+    tokenUsage: parsed,
+  };
+}
+
 // ── Token usage extraction from raw JSON ──────────────────────────────────
 
 /**
@@ -345,6 +422,10 @@ interface SpawnWithAdapterOptions {
   cliEnv?: NodeJS.ProcessEnv;
   cwd: string;
   tokenMetadata: SpawnTokenMetadata;
+  /** When true, use EventAccumulator instead of inline SpawnResult mutation. */
+  useEventPipeline?: boolean;
+  /** Caller-provided accumulator — events are pushed here when useEventPipeline is true. */
+  accumulator?: EventAccumulator;
 }
 
 /**
@@ -357,6 +438,8 @@ interface SpawnWithAdapterOptions {
  * 1. SpawnConfig determines the process args, env, and stdin behavior
  * 2. adapter.parseEvent() normalizes each output line into a RuntimeEvent
  * 3. applyRuntimeEvent() bridges RuntimeEvents into SpawnResult mutations
+ *    (legacy path), OR events are pushed into an EventAccumulator (event
+ *    pipeline path, gated by `useEventPipeline`)
  * 4. Token usage is extracted from raw JSON in parallel
  *
  * The function also handles:
@@ -364,9 +447,20 @@ interface SpawnWithAdapterOptions {
  * - Summary fallback from raw stdout
  * - ENOENT error messages with vendor-appropriate help text
  * - Non-zero exit code error reporting
+ *
+ * ## Event pipeline mode (`useEventPipeline: true`)
+ *
+ * When enabled, `adapter.parseEvent()` output and raw JSON token usage are
+ * converted to RuntimeEvents and pushed into the caller-provided
+ * `EventAccumulator`. On process close, `SpawnResult` is derived from
+ * `accumulator.toCliRunResult()` instead of inline mutation. This produces
+ * equivalent run records while operating entirely on the RuntimeEvent stream.
  */
 function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
-  const { adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata } = opts;
+  const {
+    adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
+    useEventPipeline, accumulator,
+  } = opts;
 
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
@@ -395,6 +489,11 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
     let stderr = "";
     let fullStdout = "";
     let eventCount = 0;
+
+    // Event pipeline: track completion metadata from raw JSON since
+    // RuntimeEvent doesn't carry num_turns or cost_usd.
+    let completionTurns: number | undefined;
+    let completionCostUsd: number | undefined;
 
     const vendorLabel = adapter.vendor === "codex" ? "Codex" : "Agent";
 
@@ -438,60 +537,144 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         processLine(lineBuffer);
       }
 
-      // Whole-output heuristic fallback: if no structured events were parsed
-      // line-by-line, try the entire stdout as a single input to the adapter.
-      // This handles older Codex versions that output non-JSONL responses.
-      if (eventCount === 0 && fullStdout.trim()) {
-        const fallbackEvent = adapter.parseEvent(fullStdout, 1, {});
-        if (fallbackEvent) {
-          applyRuntimeEvent(fallbackEvent, result, turnCounter);
-        }
+      if (useEventPipeline && accumulator) {
+        // ── Event pipeline close path ──────────────────────────────────
 
-        // Codex-specific: extract token usage from raw stdout via heuristic mapping
-        if (adapter.vendor === "codex") {
-          try {
-            const raw = JSON.parse(fullStdout);
-            const codexMapping = mapCodexUsageToTokenUsage(raw);
-            if (codexMapping.diagnosticStatus !== "unavailable") {
-              result.tokenUsage = codexMapping.usage;
-              result.turnTokenUsage.push({
-                turn: 1,
-                input: codexMapping.usage.input,
-                output: codexMapping.usage.output,
-                vendor: tokenMetadata.vendor,
-                model: tokenMetadata.model,
-              });
+        // Whole-output heuristic fallback
+        if (eventCount === 0 && fullStdout.trim()) {
+          const fallbackEvent = adapter.parseEvent(fullStdout, 1, {});
+          if (fallbackEvent) {
+            accumulator.push(fallbackEvent);
+            emitStreamOutput(fallbackEvent);
+          }
+
+          // Codex-specific: extract token usage from raw stdout
+          if (adapter.vendor === "codex") {
+            try {
+              const raw = JSON.parse(fullStdout);
+              const codexMapping = mapCodexUsageToTokenUsage(raw);
+              if (codexMapping.diagnosticStatus !== "unavailable") {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: codexMapping.usage,
+                });
+              }
+            } catch {
+              // Non-JSON stdout — no token usage to extract
             }
-          } catch {
-            // Non-JSON stdout — no token usage to extract
           }
         }
 
-        // Ensure at least 1 turn for heuristic fallback
-        if (result.turns === 0) result.turns = 1;
-      }
-
-      // Ensure turns is at least the turn counter
-      if (result.turns === 0) {
-        result.turns = turnCounter.value || (eventCount > 0 ? 1 : 0);
-      }
-
-      // Summary fallback from raw stdout
-      if (!result.summary && fullStdout.trim()) {
-        result.summary = fullStdout.trim().slice(0, MAX_SUMMARY_LENGTH);
-      }
-
-      // Token usage fallback: structured events were parsed but no usage found
-      if (eventCount > 0 && result.tokenUsage.input === 0 && result.tokenUsage.output === 0) {
-        if (adapter.vendor === "codex") {
-          try {
-            const raw = JSON.parse(fullStdout);
-            const codexMapping = mapCodexUsageToTokenUsage(raw);
-            if (codexMapping.diagnosticStatus !== "unavailable") {
-              result.tokenUsage = codexMapping.usage;
+        // Codex token usage fallback: structured events parsed but no usage
+        if (eventCount > 0 && accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
+          if (adapter.vendor === "codex") {
+            try {
+              const raw = JSON.parse(fullStdout);
+              const codexMapping = mapCodexUsageToTokenUsage(raw);
+              if (codexMapping.diagnosticStatus !== "unavailable") {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: codexMapping.usage,
+                });
+              }
+            } catch {
+              // Non-JSON stdout
             }
-          } catch {
-            // Non-JSON stdout
+          }
+        }
+
+        // Derive SpawnResult from accumulator
+        const derived = accumulator.toCliRunResult();
+        result.turns = completionTurns ?? derived.turns;
+        result.toolCalls = derived.toolCalls;
+        result.tokenUsage = derived.tokenUsage;
+        result.turnTokenUsage = derived.turnTokenUsage;
+        result.summary = derived.summary;
+        result.error = derived.error;
+        result.costUsd = completionCostUsd;
+
+        // Ensure turns is at least 1 for heuristic fallback
+        if (result.turns === 0 && eventCount === 0 && fullStdout.trim()) {
+          result.turns = 1;
+        }
+        // Ensure turns is at least the turn counter
+        if (result.turns === 0) {
+          result.turns = turnCounter.value || (eventCount > 0 ? 1 : 0);
+        }
+
+        // Summary fallback from raw stdout
+        if (!result.summary && fullStdout.trim()) {
+          result.summary = fullStdout.trim().slice(0, MAX_SUMMARY_LENGTH);
+        }
+
+        // Enrich per-turn usage with model (not carried by RuntimeEvent)
+        for (const tu of result.turnTokenUsage) {
+          if (!tu.model) tu.model = tokenMetadata.model;
+        }
+      } else {
+        // ── Legacy close path (inline mutation) ────────────────────────
+
+        // Whole-output heuristic fallback: if no structured events were parsed
+        // line-by-line, try the entire stdout as a single input to the adapter.
+        // This handles older Codex versions that output non-JSONL responses.
+        if (eventCount === 0 && fullStdout.trim()) {
+          const fallbackEvent = adapter.parseEvent(fullStdout, 1, {});
+          if (fallbackEvent) {
+            applyRuntimeEvent(fallbackEvent, result, turnCounter);
+          }
+
+          // Codex-specific: extract token usage from raw stdout via heuristic mapping
+          if (adapter.vendor === "codex") {
+            try {
+              const raw = JSON.parse(fullStdout);
+              const codexMapping = mapCodexUsageToTokenUsage(raw);
+              if (codexMapping.diagnosticStatus !== "unavailable") {
+                result.tokenUsage = codexMapping.usage;
+                result.turnTokenUsage.push({
+                  turn: 1,
+                  input: codexMapping.usage.input,
+                  output: codexMapping.usage.output,
+                  vendor: tokenMetadata.vendor,
+                  model: tokenMetadata.model,
+                });
+              }
+            } catch {
+              // Non-JSON stdout — no token usage to extract
+            }
+          }
+
+          // Ensure at least 1 turn for heuristic fallback
+          if (result.turns === 0) result.turns = 1;
+        }
+
+        // Ensure turns is at least the turn counter
+        if (result.turns === 0) {
+          result.turns = turnCounter.value || (eventCount > 0 ? 1 : 0);
+        }
+
+        // Summary fallback from raw stdout
+        if (!result.summary && fullStdout.trim()) {
+          result.summary = fullStdout.trim().slice(0, MAX_SUMMARY_LENGTH);
+        }
+
+        // Token usage fallback: structured events were parsed but no usage found
+        if (eventCount > 0 && result.tokenUsage.input === 0 && result.tokenUsage.output === 0) {
+          if (adapter.vendor === "codex") {
+            try {
+              const raw = JSON.parse(fullStdout);
+              const codexMapping = mapCodexUsageToTokenUsage(raw);
+              if (codexMapping.diagnosticStatus !== "unavailable") {
+                result.tokenUsage = codexMapping.usage;
+              }
+            } catch {
+              // Non-JSON stdout
+            }
           }
         }
       }
@@ -508,27 +691,75 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
     function processLine(line: string): void {
       // Step 1: Parse the line through the adapter for event classification
       const event = adapter.parseEvent(line, turnCounter.value + 1, {});
-      if (event) {
-        eventCount++;
-        applyRuntimeEvent(event, result, turnCounter);
-      }
 
-      // Step 2: Extract token usage from raw JSON (parallel to event parsing)
-      // Token usage lives in the raw JSON payload, not in RuntimeEvent.
-      if (line.trim()) {
-        try {
-          const rawJson = JSON.parse(line);
-          extractTokenUsage(rawJson, result, turnCounter, tokenMetadata);
+      if (useEventPipeline && accumulator) {
+        // ── Event pipeline: push to accumulator + emit UI ──
+        if (event) {
+          eventCount++;
+          accumulator.push(event);
+          emitStreamOutput(event);
+          if (event.type === "assistant") turnCounter.value++;
+        }
 
-          // Extract completion metadata (num_turns, cost_usd, fallback usage)
-          const type = rawJson.type as string | undefined;
-          if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
-            extractCompletionMetadata(rawJson, result);
+        // Step 2: Extract token usage → RuntimeEvent → accumulator
+        if (line.trim()) {
+          try {
+            const rawJson = JSON.parse(line);
+            const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata);
+            if (tokenEvent) accumulator.push(tokenEvent);
+
+            // Extract completion metadata (num_turns, cost_usd) from raw JSON
+            const type = rawJson.type as string | undefined;
+            if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
+              if (typeof rawJson.num_turns === "number") completionTurns = rawJson.num_turns;
+              if (typeof rawJson.cost_usd === "number") completionCostUsd = rawJson.cost_usd;
+
+              // Fallback token usage from completion event
+              if (rawJson.usage && typeof rawJson.usage === "object") {
+                if (accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
+                  const fallback = parseStreamTokenUsage(rawJson);
+                  if (fallback) {
+                    accumulator.push({
+                      type: "token_usage",
+                      vendor: tokenMetadata.vendor,
+                      turn: turnCounter.value || 1,
+                      timestamp: new Date().toISOString(),
+                      tokenUsage: fallback,
+                    });
+                  }
+                }
+              }
+            }
+          } catch {
+            if (!event && line.trim()) {
+              info(line);
+            }
           }
-        } catch {
-          // Not JSON — stream raw output for visibility if adapter didn't handle it
-          if (!event && line.trim()) {
-            info(line);
+        }
+      } else {
+        // ── Legacy: inline mutation ──
+        if (event) {
+          eventCount++;
+          applyRuntimeEvent(event, result, turnCounter);
+        }
+
+        // Step 2: Extract token usage from raw JSON (parallel to event parsing)
+        // Token usage lives in the raw JSON payload, not in RuntimeEvent.
+        if (line.trim()) {
+          try {
+            const rawJson = JSON.parse(line);
+            extractTokenUsage(rawJson, result, turnCounter, tokenMetadata);
+
+            // Extract completion metadata (num_turns, cost_usd, fallback usage)
+            const type = rawJson.type as string | undefined;
+            if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
+              extractCompletionMetadata(rawJson, result);
+            }
+          } catch {
+            // Not JSON — stream raw output for visibility if adapter didn't handle it
+            if (!event && line.trim()) {
+              info(line);
+            }
           }
         }
       }
@@ -605,20 +836,36 @@ interface SuccessContext {
   tokenBudget?: number;
   review?: boolean;
   selfHeal?: boolean;
+  /** Per-attempt EventAccumulator (event pipeline path). */
+  attemptAccumulator?: EventAccumulator;
+  /** Cross-retry EventAccumulator (event pipeline path). */
+  runAccumulator?: EventAccumulator;
 }
 
 /**
  * Process a CLI result that completed without a process-level error.
  * Handles spin detection, completion validation, budget checks, and review gating.
+ *
+ * When `attemptAccumulator` and `runAccumulator` are provided (event pipeline
+ * path), spin detection and budget checking operate directly on the
+ * RuntimeEvent stream via the accumulators instead of the legacy SpawnResult.
  */
 async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessAction> {
   const { run, result, accumulated, attempt, store, taskId, projectDir } = ctx;
 
   // Post-run spin detection: many turns with zero tool calls
-  if (isSpinningRun(result.turns, result.toolCalls.length)) {
+  // Event pipeline: use accumulator-derived counts directly
+  const spinTurns = ctx.attemptAccumulator
+    ? ctx.attemptAccumulator.maxTurn
+    : result.turns;
+  const spinToolCount = ctx.attemptAccumulator
+    ? ctx.attemptAccumulator.toolCalls.count
+    : result.toolCalls.length;
+
+  if (isSpinningRun(spinTurns, spinToolCount)) {
     syncRunFromAccumulated(run, accumulated, attempt);
     run.status = "failed";
-    run.error = `Agent spin detected: ${result.turns} turns with 0 tool calls.`;
+    run.error = `Agent spin detected: ${spinTurns} turns with 0 tool calls.`;
     info(`\n${run.error}`);
     await handleRunFailure(store, taskId, "deferred", "spin_detected", run.error);
     return "break";
@@ -634,7 +881,11 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
   syncRunFromAccumulated(run, accumulated, attempt);
 
   // Post-run token budget check (CLI provider can only check after run)
-  const budgetCheck = checkTokenBudget(run.tokenUsage, ctx.tokenBudget);
+  // Event pipeline: use cross-retry accumulator totals directly
+  const budgetUsage = ctx.runAccumulator
+    ? ctx.runAccumulator.tokenUsage.total
+    : run.tokenUsage;
+  const budgetCheck = checkTokenBudget(budgetUsage, ctx.tokenBudget);
   if (budgetCheck.exceeded) {
     run.status = "budget_exceeded";
     run.summary = result.summary;
@@ -792,6 +1043,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   const accumulated = createAccumulatedState();
   const tokenMetadata: SpawnTokenMetadata = { vendor, model: eventModel };
+  const useEventPipeline = config.useEventPipeline ?? false;
+
+  // Event pipeline: cross-retry accumulator that collects events from all attempts.
+  // Spin detection uses the per-attempt accumulator; budget checking uses this
+  // cross-retry accumulator so it sees total token usage across all retries.
+  const runAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
 
   // Build the execution policy from guard config
   const policy: ExecutionPolicy = {
@@ -823,6 +1080,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       section(`Agent Run${opts.model ? ` (${opts.model})` : ""}${attempt > 0 ? ` (retry ${attempt}/${retryConfig.maxRetries})` : ""}`);
       stream("CLI", `Spawning ${vendor}${opts.model ? ` (model: ${opts.model})` : ""}...`);
 
+      // Event pipeline: create a per-attempt accumulator. Events from this
+      // attempt are pushed here, then merged into runAccumulator after spawn.
+      const attemptAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
+
       // Generic adapter-based spawn — replaces dispatchVendorSpawn
       const result = await spawnWithAdapter({
         adapter,
@@ -831,7 +1092,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         cliEnv,
         cwd: projectDir,
         tokenMetadata,
+        useEventPipeline,
+        accumulator: attemptAccumulator,
       });
+
+      // Merge per-attempt events into the cross-retry accumulator
+      if (useEventPipeline && attemptAccumulator && runAccumulator) {
+        runAccumulator.push(...attemptAccumulator.events);
+      }
 
       accumulateResult(accumulated, result);
 
@@ -843,6 +1111,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           tokenBudget: config.tokenBudget,
           review: opts.review,
           selfHeal: config.selfHeal,
+          attemptAccumulator,
+          runAccumulator,
         });
         if (action === "break") break;
       } else {
