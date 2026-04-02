@@ -23726,7 +23726,7 @@
             {
               "id": "b5ff0dd8-5a10-4bd4-8db1-b98812e6c05b",
               "title": "Prompt parity tests",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Assert both adapters receive the same PromptEnvelope sections for a given task. Assert instruction files (CLAUDE.md, AGENTS.md) derive from the same source and contain equivalent workflow content. Builds on existing instruction-alignment.test.js but adds section-level granularity.",
               "acceptanceCriteria": [
@@ -23739,7 +23739,8 @@
                 "phase-2",
                 "contract-tests",
                 "prompt-parity"
-              ]
+              ],
+              "startedAt": "2026-04-02T15:11:07.062Z"
             },
             {
               "id": "18b7bd14-b952-474d-88d2-f058ce2db3c6",
