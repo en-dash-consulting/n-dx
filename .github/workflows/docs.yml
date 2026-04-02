@@ -37,6 +37,9 @@ jobs:
 
       - run: pnpm docs:build
 
+      - name: Run unit tests
+        run: npm test
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs/.vitepress/dist

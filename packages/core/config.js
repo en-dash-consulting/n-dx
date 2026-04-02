@@ -13,6 +13,7 @@ import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
+const LOCAL_PROJECT_CONFIG_FILE = ".n-dx.local.json";
 
 const PACKAGES = {
   rex: { dir: ".rex", file: "config.json" },
@@ -46,6 +47,15 @@ async function fileExists(path) {
 async function loadJSON(path) {
   const raw = await readFile(path, "utf-8");
   return JSON.parse(raw);
+}
+
+async function loadOptionalJSON(path) {
+  if (!(await fileExists(path))) return {};
+  try {
+    return await loadJSON(path);
+  } catch {
+    return {};
+  }
 }
 
 async function saveJSON(path, data) {
@@ -96,14 +106,29 @@ function deepMerge(target, source) {
  * Load the project-level .n-dx.json config from the project root.
  * Returns an empty object if the file doesn't exist or is invalid.
  */
+async function loadProjectConfigFile(dir, fileName) {
+  return loadOptionalJSON(join(dir, fileName));
+}
+
+async function loadProjectConfigLayers(dir) {
+  const shared = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
+  const local = await loadProjectConfigFile(dir, LOCAL_PROJECT_CONFIG_FILE);
+  return {
+    shared,
+    local,
+    merged: deepMerge(shared, local),
+  };
+}
+
 async function loadProjectConfig(dir) {
-  const configPath = join(dir, PROJECT_CONFIG_FILE);
-  if (!(await fileExists(configPath))) return {};
-  try {
-    return await loadJSON(configPath);
-  } catch {
-    return {};
-  }
+  const { merged } = await loadProjectConfigLayers(dir);
+  return merged;
+}
+
+function isLocalProjectSetting(pkg, settingPath) {
+  if (pkg === "claude") return settingPath === "cli_path";
+  if (pkg === "llm") return settingPath.endsWith(".cli_path");
+  return false;
 }
 
 /**
@@ -447,7 +472,13 @@ function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
       return { ok: true, binary, args };
     }
     const detail = combined.trim() || "unknown error";
-    return { ok: false, binary, args, detail };
+    return {
+      ok: false,
+      binary,
+      args,
+      detail,
+      errorCode: typeof err?.code === "string" ? err.code : undefined,
+    };
   }
 }
 
@@ -457,6 +488,114 @@ function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
 function getVendorLoginCommand(vendor, llmConfig, legacyClaudeConfig) {
   const { binary } = getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig);
   return `${binary} login`;
+}
+
+function isBareCommand(binary) {
+  return typeof binary === "string" && binary.length > 0 && !binary.includes("/") && !binary.includes("\\");
+}
+
+function hasClaudeAuthenticatedEvidence(detailLower) {
+  return [
+    "already authenticated",
+    "already logged in",
+    "logged in as",
+    "authenticated as",
+    "personal account authenticated",
+    "enterprise account authenticated",
+  ].some((phrase) => detailLower.includes(phrase));
+}
+
+function hasClaudeAuthRequiredEvidence(detailLower) {
+  return (
+    detailLower.includes("please login") ||
+    detailLower.includes("not logged in") ||
+    detailLower.includes("login required")
+  );
+}
+
+function formatClaudePreflightFailure(preflight) {
+  const detail = preflight.detail || "unknown error";
+  const detailLower = detail.toLowerCase();
+  const binary = preflight.binary;
+  const retryCommand = "ndx config llm.vendor claude";
+
+  if (preflight.errorCode === "ENOENT" || detail.includes("ENOENT")) {
+    if (binary === "claude" || !isBareCommand(binary)) {
+      return {
+        code: "NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED",
+        lines: [
+          "Install the Claude Code CLI before selecting Claude for this project.",
+          "Install command: npm install -g @anthropic-ai/claude-code",
+          `Verify installation: ${binary === "claude" ? "claude" : binary} --version`,
+          `Retry after installation: ${retryCommand}`,
+        ],
+      };
+    }
+
+    return {
+      code: "NDX_CLAUDE_PREFLIGHT_NOT_ON_PATH",
+      lines: [
+        "Verify what ndx can resolve from this shell and fix PATH resolution before retrying.",
+        `Check PATH resolution: command -v ${binary}`,
+        `If the binary exists elsewhere, either update PATH or set 'n-dx config llm.claude.cli_path /absolute/path/to/claude'.`,
+        `Retry after fixing PATH: ${retryCommand}`,
+      ],
+    };
+  }
+
+  if (hasClaudeAuthenticatedEvidence(detailLower)) {
+    return {
+      code: "NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED",
+      lines: [
+        "Claude appears to be installed, but ndx could not launch a usable executable from this environment.",
+        `Verify the executable ndx can launch: '${binary} --version'`,
+        `If that succeeds, run the same binary directly with the preflight arguments and confirm it works outside ndx.`,
+        "If ndx is resolving the wrong executable, update PATH or set 'n-dx config llm.claude.cli_path /absolute/path/to/claude'.",
+        `Retry after fixing the executable resolution: ${retryCommand}`,
+      ],
+    };
+  }
+
+  if (hasClaudeAuthRequiredEvidence(detailLower)) {
+    return {
+      code: "NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED",
+      lines: [
+        `Next step: run '${getVendorLoginCommand("claude", { claude: { cli_path: binary } })}', then retry '${retryCommand}'.`,
+      ],
+    };
+  }
+
+  return {
+    code: "NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED",
+    lines: [
+      "Claude appears to be installed, but ndx could not launch a usable executable from this environment.",
+      `Verify the executable ndx can launch: '${binary} --version'`,
+      `If that succeeds, run the same binary directly with the preflight arguments and confirm it works outside ndx.`,
+      "If ndx is resolving the wrong executable, update PATH or set 'n-dx config llm.claude.cli_path /absolute/path/to/claude'.",
+      `Retry after fixing the executable resolution: ${retryCommand}`,
+    ],
+  };
+}
+
+function printVendorPreflightFailure(vendor, preflight, llmConfig, legacyClaudeConfig) {
+  console.error(
+    `Provider auth preflight failed for "${vendor}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
+  );
+  if (preflight.detail) {
+    console.error(`Details: ${preflight.detail}`);
+  }
+
+  if (vendor !== "claude") {
+    const loginCommand = getVendorLoginCommand(vendor, llmConfig, legacyClaudeConfig);
+    console.error(`Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${vendor}'.`);
+    return;
+  }
+
+  const classified = formatClaudePreflightFailure(preflight);
+  console.error(`[${classified.code}]`);
+  for (const line of classified.lines) {
+    console.error(line);
+  }
 }
 
 // ── Display ──────────────────────────────────────────────────────────────────
@@ -549,11 +688,12 @@ Hench guard settings (security boundaries):
 Sourcevision manifest (.sourcevision/manifest.json):
   sourcevision.*           (read-only, generated by analysis)
 
-Claude settings (.n-dx.json — shared across all packages):
+Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
   claude.cli_path          string    Path to Claude Code CLI binary (optional)
                                     When set, hench uses this path instead of looking
                                     for "claude" on PATH. Validated: must exist and be
                                     executable. Use --force to skip validation.
+                                    Stored in .n-dx.local.json.
   claude.api_key           string    Anthropic API key (optional)
                                     When set, packages use this key instead of reading
                                     from the ANTHROPIC_API_KEY environment variable.
@@ -571,17 +711,25 @@ Claude settings (.n-dx.json — shared across all packages):
                                     Examples: claude-sonnet-4-6, claude-opus-4-20250514
                                     Default: claude-sonnet-4-6
 
-LLM vendor settings (.n-dx.json — preferred for multi-vendor setup):
+LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendor setup):
   llm.vendor               string    Active LLM vendor: "claude" or "codex"
                                     Required for multi-vendor workflows.
   llm.claude.cli_path      string    Claude CLI path (optional; validated executable)
+                                    Stored in .n-dx.local.json.
   llm.claude.api_key       string    Claude API key (optional)
   llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
   llm.claude.model         string    Claude default model (optional)
   llm.codex.cli_path       string    Codex CLI path (optional; validated executable)
+                                    Stored in .n-dx.local.json.
   llm.codex.api_key        string    Codex API key (optional)
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
   llm.codex.model          string    Codex default model (optional)
+
+Claude preflight error codes:
+  NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED  Claude CLI is not installed; install it before retrying
+  NDX_CLAUDE_PREFLIGHT_NOT_ON_PATH    Configured Claude command is not resolvable on PATH
+  NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED  Claude CLI is present but needs authentication
+  NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED  Claude appears authenticated/installed, but ndx cannot launch a usable executable
 
 Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.rex.showTokenBudget      boolean   Show token budget on task items (default: false)
@@ -624,6 +772,10 @@ Project config (.n-dx.json):
       "claude": { "cli_path": "/usr/local/bin/claude" },
       "llm":    { "vendor": "claude" }
     }
+
+  Machine-local overrides:
+  Place a .n-dx.local.json file at the project root for machine-specific settings
+  such as CLI binary paths. It deep-merges over .n-dx.json and should be gitignored.
 
 Options:
   --json                   Output as JSON
@@ -851,14 +1003,7 @@ function runLLMVendorPreflight(coerced, configs) {
 
   const preflight = runVendorAuthPreflight(coerced, llmForPreflight, legacyClaude);
   if (!preflight.ok) {
-    const loginCommand = getVendorLoginCommand(coerced, llmForPreflight, legacyClaude);
-    console.error(
-      `Provider auth preflight failed for "${coerced}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
-    );
-    if (preflight.detail) {
-      console.error(`Details: ${preflight.detail}`);
-    }
-    console.error(`Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${coerced}'.`);
+    printVendorPreflightFailure(coerced, preflight, llmForPreflight, legacyClaude);
     process.exit(1);
   }
 }
@@ -876,10 +1021,15 @@ async function handleSetProjectSection(dir, pkg, settingPath, keyArg, valueArg, 
 
   setByPath(configs[pkg], settingPath, coerced);
 
-  // Write back to .n-dx.json
-  const configPath = join(dir, PROJECT_CONFIG_FILE);
-  const current = await loadProjectConfig(dir);
-  current[pkg] = configs[pkg];
+  const targetFile = isLocalProjectSetting(pkg, settingPath)
+    ? LOCAL_PROJECT_CONFIG_FILE
+    : PROJECT_CONFIG_FILE;
+  const configPath = join(dir, targetFile);
+  const current = await loadProjectConfigFile(dir, targetFile);
+  if (!current[pkg] || typeof current[pkg] !== "object") {
+    current[pkg] = {};
+  }
+  setByPath(current[pkg], settingPath, coerced);
 
   // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
   if (pkg === "llm" && settingPath.startsWith("claude.")) {
@@ -1075,7 +1225,7 @@ export async function runConfig(args) {
         process.exit(1);
       }
       const configPath = join(dir, PROJECT_CONFIG_FILE);
-      const current = await loadProjectConfig(dir);
+      const current = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
       current.language = valueArg;
       await saveProjectJSON(configPath, current);
       console.log(`language = ${valueArg}`);
