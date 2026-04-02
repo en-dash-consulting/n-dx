@@ -50,7 +50,8 @@ const MAX_SUMMARY_LENGTH = 500;
  * Safely parse a string that might be JSON. Returns the parsed value on
  * success or the original value on failure.
  */
-function parseMaybeJson(value: unknown): unknown {
+/** @internal Exported for backward compat in event-accumulator.ts */
+export function parseMaybeJson(value: unknown): unknown {
   if (typeof value !== "string") {
     return value;
   }

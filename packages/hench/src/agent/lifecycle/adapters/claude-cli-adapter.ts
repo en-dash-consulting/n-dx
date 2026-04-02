@@ -67,12 +67,14 @@ export function buildAllowedTools(allowedCommands: ReadonlyArray<string>): strin
  *
  * @internal Exported for snapshot testing — not part of the adapter's public API.
  */
-export function buildClaudeCliArgs(input: {
+export interface ClaudeCliInput {
   systemPrompt: string;
   promptText: string;
   allowedTools: string[];
   modelOverride?: string;
-}): { args: string[]; stdinContent: string } {
+}
+
+export function buildClaudeCliArgs(input: ClaudeCliInput): { args: string[]; stdinContent: string } {
   const isWindows = process.platform === "win32";
 
   // On Windows, cmd.exe can't handle multi-line strings or special chars
