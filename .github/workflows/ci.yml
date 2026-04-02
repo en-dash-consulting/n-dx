@@ -60,6 +60,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Run unit tests
+        run: npm test
+
       - name: Docs build
         run: pnpm docs:build
 
