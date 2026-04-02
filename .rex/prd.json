@@ -23683,7 +23683,7 @@
         {
           "id": "da21807f-fc7b-4680-bd13-253c0ac9fd17",
           "title": "Cross-Vendor Contract Test Suite",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Codify the runtime identity contract as automated tests BEFORE any refactoring begins. Establishes the regression baseline that every subsequent epic is validated against. Without this, adapter extraction has no automated gate for the Claude path. Tests initially validate existing code paths directly — they don't require the adapter interface to exist yet.",
           "acceptanceCriteria": [
@@ -23699,6 +23699,8 @@
             "contract-tests",
             "regression-baseline"
           ],
+          "startedAt": "2026-04-02T15:53:54.659Z",
+          "completedAt": "2026-04-02T15:53:54.659Z",
           "children": [
             {
               "id": "0609ab37-cee4-45ec-8e87-24646f86d23f",
@@ -23726,7 +23728,7 @@
             {
               "id": "b5ff0dd8-5a10-4bd4-8db1-b98812e6c05b",
               "title": "Prompt parity tests",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Assert both adapters receive the same PromptEnvelope sections for a given task. Assert instruction files (CLAUDE.md, AGENTS.md) derive from the same source and contain equivalent workflow content. Builds on existing instruction-alignment.test.js but adds section-level granularity.",
               "acceptanceCriteria": [
@@ -23740,12 +23742,15 @@
                 "contract-tests",
                 "prompt-parity"
               ],
-              "startedAt": "2026-04-02T15:11:07.062Z"
+              "startedAt": "2026-04-02T15:11:07.062Z",
+              "completedAt": "2026-04-02T15:22:46.217Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created 56 prompt parity tests across 2 files: packages/hench/tests/unit/agent/prompt-parity.test.ts (20 tests) and tests/e2e/prompt-section-parity.test.js (36 tests)."
             },
             {
               "id": "18b7bd14-b952-474d-88d2-f058ce2db3c6",
               "title": "Run record parity tests",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Assert run records from both vendors contain diagnostics field. Assert token usage fields are populated or explicitly marked as unavailable (no silent zeros). Assert both vendors produce the same RunStatus for equivalent outcomes.",
               "acceptanceCriteria": [
@@ -23759,7 +23764,11 @@
                 "phase-2",
                 "contract-tests",
                 "run-records"
-              ]
+              ],
+              "startedAt": "2026-04-02T15:26:55.102Z",
+              "completedAt": "2026-04-02T15:53:54.474Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added diagnosticStatus to TurnTokenUsage, RunDiagnostics to RunRecord, updated Zod schemas, wired diagnostic capture in stream processors, and created 31 parity tests covering all acceptance criteria."
             },
             {
               "id": "93568386-9120-41fd-84d6-3fe1f7b36642",
@@ -23813,7 +23822,7 @@
             {
               "id": "5b7cde87-7c99-4ca9-8f66-00ba26a50b70",
               "title": "Define VendorAdapter interface and SpawnConfig type",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Define VendorAdapter interface in packages/hench/src/agent/lifecycle/vendor-adapter.ts with: buildSpawnConfig(envelope, policy, model) → SpawnConfig; parseEvent(line, turn, metadata) → RuntimeEvent | null; classifyError(err) → FailureCategory; readonly vendor: LLMVendor; readonly parseMode: string. Define SpawnConfig type (binary, args, env, stdinContent, cwd). Export through hench's internal barrel.",
               "acceptanceCriteria": [
@@ -23827,7 +23836,8 @@
                 "phase-2",
                 "adapter-extraction",
                 "interface"
-              ]
+              ],
+              "startedAt": "2026-04-02T16:01:39.498Z"
             },
             {
               "id": "b321915a-9f3f-418c-9ddc-5f0c50d0bc10",
