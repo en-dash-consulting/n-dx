@@ -87,6 +87,57 @@ describe("loadClaudeConfig", () => {
     const config = await loadClaudeConfig(tmpDir);
     expect(config).toEqual({ model: "sonnet" });
   });
+
+  it("merges .n-dx.local.json over .n-dx.json (local wins)", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ claude: { model: "claude-sonnet-4-6", api_key: "sk-ant-shared" } }),
+    );
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ claude: { cli_path: "/my/local/claude" } }),
+    );
+
+    const config = await loadClaudeConfig(tmpDir);
+    expect(config.cli_path).toBe("/my/local/claude");
+    expect(config.api_key).toBe("sk-ant-shared");
+    expect(config.model).toBe("claude-sonnet-4-6");
+  });
+
+  it("uses .n-dx.local.json when .n-dx.json does not exist", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ claude: { cli_path: "/local/claude" } }),
+    );
+
+    const config = await loadClaudeConfig(tmpDir);
+    expect(config.cli_path).toBe("/local/claude");
+  });
+
+  it("local values override shared values", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ claude: { model: "claude-sonnet-4-6" } }),
+    );
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ claude: { model: "claude-opus-4-20250514" } }),
+    );
+
+    const config = await loadClaudeConfig(tmpDir);
+    expect(config.model).toBe("claude-opus-4-20250514");
+  });
+
+  it("silently ignores invalid .n-dx.local.json", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ claude: { model: "claude-sonnet-4-6" } }),
+    );
+    await writeFile(join(tmpDir, ".n-dx.local.json"), "not json");
+
+    const config = await loadClaudeConfig(tmpDir);
+    expect(config.model).toBe("claude-sonnet-4-6");
+  });
 });
 
 describe("resolveApiKey", () => {

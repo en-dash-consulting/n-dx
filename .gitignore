@@ -4,6 +4,7 @@ package-lock.json
 *.tsbuildinfo
 .hench/runs/
 .n-dx.json
+.n-dx.local.json
 .n-dx2.json
 .n-dx-web.pid
 .n-dx-web.port

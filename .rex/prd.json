@@ -20535,7 +20535,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "pending",
+          "status": "in_progress",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
@@ -20549,7 +20549,8 @@
             "config",
             "dx"
           ],
-          "source": "conversation — hit when Steve's Windows cli_path in .n-dx.json broke ndx init on macOS"
+          "source": "conversation — hit when Steve's Windows cli_path in .n-dx.json broke ndx init on macOS",
+          "startedAt": "2026-04-02T03:07:34.316Z"
         }
       ]
     },
@@ -23208,6 +23209,8 @@
       "level": "epic",
       "description": "Implement assistant-surface parity plus baseline runtime guardrails so Codex can participate in the n-dx workflow with first-class project artifacts, shared workflow skills, MCP configuration, and a consistent execution contract instead of relying on the current Claude-only outer-layer setup.\\n\\nExecution sources for this epic:\\n- docs/analysis/claude-codex-runtime-identity-discovery.md\\n- docs/process/codex-workflow-parity-plan.md when present on the branch\\n- docs/analysis/codex-workflow-parity-audit.md when present on the branch\\n\\nIf the plan or audit docs are absent, the epic and task descriptions in .rex/prd.json are the implementation contract for this branch.\\n\\nScope:\\n- canonical vendor-neutral assistant asset layer\\n- Codex project artifact generation (AGENTS.md, .agents/skills, .codex/config.toml)\\n- assistant-neutral init orchestration\\n- documentation and startup/help parity\\n- baseline runtime identity guardrails for prompt delivery, sandbox and approval policy, event normalization, diagnostics, and failure taxonomy\\n- regression tests that prevent Claude/Codex workflow drift\\n\\nNon-goals for this epic:\\n- identical assistant prose or code edits across vendors\\n- full Claude/Codex runtime equivalence beyond the defined workflow contract\\n- API-mode parity for Codex in the first implementation pass",
       "priority": "critical",
+      "startedAt": "2026-04-02T03:06:10.916Z",
+      "completedAt": "2026-04-02T03:06:10.916Z",
       "children": [
         {
           "id": "ca1e2dc0-1903-4927-b66c-76685d839456",
@@ -23656,9 +23659,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-02T03:06:10.916Z",
-      "completedAt": "2026-04-02T03:06:10.916Z"
+      ]
     }
   ]
 }

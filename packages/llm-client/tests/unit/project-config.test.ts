@@ -83,6 +83,47 @@ describe("loadProjectOverrides", () => {
     const result = await loadProjectOverrides(configDir, "rex");
     expect(result).toEqual({});
   });
+
+  it("merges .n-dx.local.json over .n-dx.json (local wins)", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ rex: { model: "sonnet", validate: "pnpm test" } }),
+    );
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ rex: { model: "opus" } }),
+    );
+    const result = await loadProjectOverrides(configDir, "rex");
+    expect(result).toEqual({ model: "opus", validate: "pnpm test" });
+  });
+
+  it("uses .n-dx.local.json when .n-dx.json does not exist", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ rex: { model: "opus" } }),
+    );
+    const result = await loadProjectOverrides(configDir, "rex");
+    expect(result).toEqual({ model: "opus" });
+  });
+
+  it("silently ignores missing .n-dx.local.json", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ rex: { model: "sonnet" } }),
+    );
+    const result = await loadProjectOverrides(configDir, "rex");
+    expect(result).toEqual({ model: "sonnet" });
+  });
+
+  it("silently ignores invalid JSON in .n-dx.local.json", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ rex: { model: "sonnet" } }),
+    );
+    await writeFile(join(tmpDir, ".n-dx.local.json"), "not json");
+    const result = await loadProjectOverrides(configDir, "rex");
+    expect(result).toEqual({ model: "sonnet" });
+  });
 });
 
 describe("mergeWithOverrides", () => {

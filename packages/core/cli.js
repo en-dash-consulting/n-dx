@@ -35,7 +35,7 @@
  */
 
 import { spawn } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -540,6 +540,23 @@ async function signalLiveReload(dir) {
   }
 }
 
+/**
+ * Append an entry to .gitignore if not already present.
+ * Creates .gitignore if it doesn't exist. Uses sync I/O (matches cli.js patterns).
+ */
+function ensureGitignoreEntry(dir, entry) {
+  const gitignorePath = join(dir, ".gitignore");
+  let content = "";
+  try {
+    content = readFileSync(gitignorePath, "utf-8");
+  } catch {
+    // No .gitignore yet
+  }
+  if (content.includes(entry)) return;
+  const suffix = (content.length > 0 && !content.endsWith("\n") ? "\n" : "") + entry + "\n";
+  writeFileSync(gitignorePath, content + suffix, "utf-8");
+}
+
 // ── Command handlers ─────────────────────────────────────────────────────────
 
 /**
@@ -645,6 +662,9 @@ async function handleInit(rest) {
     if (henchResult.code !== 0) console.error(henchResult.stderr || henchResult.stdout);
     process.exit(1);
   }
+
+  // Ensure .n-dx.local.json is in .gitignore (machine-specific config)
+  ensureGitignoreEntry(dir, ".n-dx.local.json");
 
   // Set provider (suppress output)
   const origLog = console.log;

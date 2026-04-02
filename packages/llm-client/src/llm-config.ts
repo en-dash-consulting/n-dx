@@ -7,10 +7,12 @@
 
 import { join } from "node:path";
 import { access, readFile } from "node:fs/promises";
+import { deepMerge } from "./project-config.js";
 import type { LLMConfig, LLMVendor, CodexConfig } from "./llm-types.js";
 import type { ClaudeConfig } from "./types.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
+const LOCAL_CONFIG_FILE = ".n-dx.local.json";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
@@ -45,7 +47,39 @@ function extractCodexConfig(value: unknown): CodexConfig | undefined {
 }
 
 /**
- * Load the vendor-neutral LLM config from `.n-dx.json`.
+ * Load and parse a JSON file, returning null on failure.
+ */
+async function loadJSONFile(filePath: string): Promise<Record<string, unknown> | null> {
+  try {
+    await access(filePath);
+    const raw = await readFile(filePath, "utf-8");
+    const data = JSON.parse(raw);
+    return asRecord(data) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract an LLMConfig from a merged root object.
+ */
+function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
+  const llm = asRecord(root.llm);
+  const llmVendor = extractVendor(llm?.vendor);
+  const llmClaude = extractClaudeConfig(llm?.claude);
+  const llmCodex = extractCodexConfig(llm?.codex);
+  const legacyClaude = extractClaudeConfig(root.claude);
+
+  const config: LLMConfig = {};
+  if (llmVendor) config.vendor = llmVendor;
+  if (llmClaude || legacyClaude) config.claude = llmClaude ?? legacyClaude;
+  if (llmCodex) config.codex = llmCodex;
+  return config;
+}
+
+/**
+ * Load the vendor-neutral LLM config from `.n-dx.json`,
+ * with `.n-dx.local.json` overrides merged on top (local wins).
  *
  * Merge behavior:
  * - Reads `llm.vendor` if present.
@@ -53,26 +87,17 @@ function extractCodexConfig(value: unknown): CodexConfig | undefined {
  * - Falls back to legacy top-level `claude` block for compatibility.
  */
 export async function loadLLMConfig(dir: string): Promise<LLMConfig> {
-  const path = join(dir, PROJECT_CONFIG_FILE);
-  try {
-    await access(path);
-    const raw = await readFile(path, "utf-8");
-    const data = JSON.parse(raw);
-    const root = asRecord(data);
-    if (!root) return {};
+  const projectData = await loadJSONFile(join(dir, PROJECT_CONFIG_FILE));
+  const localData = await loadJSONFile(join(dir, LOCAL_CONFIG_FILE));
 
-    const llm = asRecord(root.llm);
-    const llmVendor = extractVendor(llm?.vendor);
-    const llmClaude = extractClaudeConfig(llm?.claude);
-    const llmCodex = extractCodexConfig(llm?.codex);
-    const legacyClaude = extractClaudeConfig(root.claude);
-
-    const config: LLMConfig = {};
-    if (llmVendor) config.vendor = llmVendor;
-    if (llmClaude || legacyClaude) config.claude = llmClaude ?? legacyClaude;
-    if (llmCodex) config.codex = llmCodex;
-    return config;
-  } catch {
-    return {};
+  // Merge project and local configs (local wins)
+  let merged: Record<string, unknown> | null = projectData;
+  if (projectData && localData) {
+    merged = deepMerge(projectData, localData);
+  } else if (localData) {
+    merged = localData;
   }
+
+  if (!merged) return {};
+  return extractLLMConfig(merged);
 }
