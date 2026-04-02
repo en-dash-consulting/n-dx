@@ -146,10 +146,16 @@ const RunMemoryStatsSchema = z.object({
   systemTotalBytes: z.number(),
 });
 
+const PromptSectionDiagnosticSchema = z.object({
+  name: z.string(),
+  byteLength: z.number().int().nonnegative(),
+});
+
 const RunDiagnosticsSchema = z.object({
   tokenDiagnosticStatus: TokenDiagnosticStatusSchema,
   parseMode: z.string(),
   notes: z.array(z.string()),
+  promptSections: z.array(PromptSectionDiagnosticSchema).optional(),
 });
 
 export const RunRecordSchema = z.object({

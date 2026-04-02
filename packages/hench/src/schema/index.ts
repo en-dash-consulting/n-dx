@@ -21,6 +21,8 @@ export type {
   SummaryCounts,
   RunSummaryData,
   RunMemoryStats,
+  RunDiagnostics,
+  PromptSectionDiagnostic,
   RunRecord,
   TaskBrief,
   TaskBriefTask,

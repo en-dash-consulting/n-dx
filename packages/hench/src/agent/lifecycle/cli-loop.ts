@@ -61,6 +61,8 @@ import type { SharedLoopOptions } from "./shared.js";
 import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
 import { resolveVendorAdapter } from "./adapters/index.js";
 import { EventAccumulator } from "./event-accumulator.js";
+import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
+import type { PromptSectionDiagnostic } from "../../schema/v1.js";
 
 // ── Backward compatibility re-exports ─────────────────────────────────────
 //
@@ -1060,6 +1062,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // subprocess doesn't appear stale to the web dashboard during long tool calls.
   const heartbeat = startHeartbeat(henchDir, run);
 
+  // Prompt section diagnostics — captured on first attempt, stored on run record.
+  let promptSectionDiagnostics: PromptSectionDiagnostic[] | undefined;
+
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
       const promptText = attempt === 0
@@ -1079,8 +1084,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       // Use the adapter to build the vendor-specific spawn configuration
       const spawnConfig = adapter.buildSpawnConfig(envelope, policy, opts.model);
 
+      // Capture prompt section diagnostics on the first attempt for run-level storage.
+      // Log section names and byte sizes on every attempt for CLI observability.
+      const sectionDiags = extractPromptSectionDiagnostics(envelope);
+      if (attempt === 0) {
+        promptSectionDiagnostics = sectionDiags;
+      }
+
       section(`Agent Run${opts.model ? ` (${opts.model})` : ""}${attempt > 0 ? ` (retry ${attempt}/${retryConfig.maxRetries})` : ""}`);
       stream("CLI", `Spawning ${vendor}${opts.model ? ` (model: ${opts.model})` : ""}...`);
+      logPromptSections(sectionDiags);
 
       // Event pipeline: create a per-attempt accumulator. Events from this
       // attempt are pushed here, then merged into runAccumulator after spawn.
@@ -1141,6 +1154,19 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // Stop heartbeat before finalization
   heartbeat.stop();
+
+  // Attach prompt section diagnostics to the run record.
+  // Initialize diagnostics if not already present, then populate promptSections.
+  if (promptSectionDiagnostics) {
+    if (!run.diagnostics) {
+      run.diagnostics = {
+        tokenDiagnosticStatus: "unavailable",
+        parseMode: adapter.parseMode,
+        notes: [],
+      };
+    }
+    run.diagnostics.promptSections = promptSectionDiagnostics;
+  }
 
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
   await finalizeRun({

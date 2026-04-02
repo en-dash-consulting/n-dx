@@ -52,6 +52,7 @@ export type {
   PostRunTestRecord,
   RunSummaryData,
   RunDiagnostics,
+  PromptSectionDiagnostic,
 } from "./schema/v1.js";
 
 // ---- Task brief types ------------------------------------------------------

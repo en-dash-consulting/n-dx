@@ -263,6 +263,20 @@ export interface RunMemoryStats {
 }
 
 /**
+ * Diagnostic metadata for a single prompt section.
+ *
+ * Captured at prompt construction time and stored on the run record
+ * so post-hoc analysis can verify prompt composition without replaying
+ * the full prompt text.
+ */
+export interface PromptSectionDiagnostic {
+  /** Section name (e.g. "system", "brief", "workflow"). */
+  name: string;
+  /** Byte length of the section content (UTF-8). */
+  byteLength: number;
+}
+
+/**
  * Run-level diagnostics captured during execution.
  *
  * Provides observability into how token usage was parsed and whether
@@ -283,6 +297,14 @@ export interface RunDiagnostics {
   parseMode: string;
   /** Vendor-specific diagnostic notes (e.g. "codex_usage_missing"). */
   notes: string[];
+  /**
+   * Prompt section diagnostics from the initial prompt envelope.
+   *
+   * Captures the name and byte size of each section assembled into
+   * the prompt, enabling observability into prompt composition without
+   * storing the full prompt text.
+   */
+  promptSections?: PromptSectionDiagnostic[];
 }
 
 export interface RunRecord {
