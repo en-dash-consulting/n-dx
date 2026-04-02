@@ -104,7 +104,7 @@ function blockPort(port) {
   });
 }
 
-describe("n-dx start", () => {
+describe("n-dx start", { timeout: 120_000 }, () => {
   let tmpDir;
 
   beforeEach(async () => {

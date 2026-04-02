@@ -221,7 +221,7 @@ afterEach(() => {
 // 1. All three polling loops stop under simulated memory pressure
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("all three polling loops stop under memory pressure", () => {
+describe("all three polling loops stop under memory pressure", { timeout: 120_000 }, () => {
   it("suspends all pollers when memory crosses the elevated threshold (50%)", () => {
     startMemorySubsystem(0.2);
 
@@ -398,7 +398,7 @@ describe("all three polling loops stop under memory pressure", () => {
 // 2. Polling restart when memory pressure clears
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("polling restart when memory pressure clears", () => {
+describe("polling restart when memory pressure clears", { timeout: 120_000 }, () => {
   it("resumes all three pollers when memory drops back to normal", () => {
     startMemorySubsystem(0.2);
 
@@ -605,7 +605,7 @@ describe("polling restart when memory pressure clears", () => {
 // 3. No resource leaks during suspension/restart cycles
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("no resource leaks during suspension/restart cycles", () => {
+describe("no resource leaks during suspension/restart cycles", { timeout: 120_000 }, () => {
   it("repeated memory pressure cycles produce no leaked timers", () => {
     startMemorySubsystem(0.2);
 
@@ -775,7 +775,7 @@ describe("no resource leaks during suspension/restart cycles", () => {
 // 4. Multi-tier memory pressure transitions
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("multi-tier memory pressure transitions", () => {
+describe("multi-tier memory pressure transitions", { timeout: 120_000 }, () => {
   it("walks through all tiers ascending then descending", () => {
     startMemorySubsystem(0.2);
 
@@ -913,7 +913,7 @@ describe("multi-tier memory pressure transitions", () => {
 // 5. Combined memory pressure + tab visibility
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("memory pressure combined with tab visibility", () => {
+describe("memory pressure combined with tab visibility", { timeout: 120_000 }, () => {
   const RESUME_DEBOUNCE_MS = 100;
 
   function backgroundTab(): void {

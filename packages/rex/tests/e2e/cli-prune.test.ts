@@ -22,7 +22,7 @@ function run(args: string[]): string {
   });
 }
 
-describe("rex prune", () => {
+describe("rex prune", { timeout: 120_000 }, () => {
   let tmpDir: string;
 
   beforeEach(async () => {

@@ -2,9 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createServer, type Server } from "node:http";
+import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { startRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal PRD document for testing. */
 function makePRD(items: Array<Record<string, unknown>> = []): Record<string, unknown> {
@@ -20,24 +21,7 @@ function startTestServer(
   ctx: ServerContext,
   broadcast?: (data: unknown) => void,
 ): Promise<{ server: Server; port: number }> {
-  return new Promise((resolve) => {
-    const server = createServer(async (req, res) => {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      const result = handleHenchRoute(req, res, ctx, broadcast);
-      if (result instanceof Promise) {
-        if (await result) return;
-      } else if (result) {
-        return;
-      }
-      res.writeHead(404);
-      res.end("Not found");
-    });
-    server.listen(0, () => {
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      resolve({ server, port });
-    });
-  });
+  return startRouteTestServer((req, res) => Promise.resolve(handleHenchRoute(req, res, ctx, broadcast)));
 }
 
 describe("POST /api/hench/execute", () => {

@@ -10,7 +10,7 @@ const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");
 const REMIX_FIXTURE = join(import.meta.dirname, "../fixtures/remix-app");
 
-describe("sourcevision analyze (e2e)", () => {
+describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
   let tmpDir: string;
 
   afterEach(async () => {

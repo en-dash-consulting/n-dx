@@ -4,10 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdUsage } from "../../../../src/cli/commands/usage.js";
 import type { PRDDocument, RexConfig } from "../../../../src/schema/index.js";
-
-function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
-}
+import { writeConfig, writePRD } from "../../../helpers/rex-dir-test-support.js";
 
 function writeLog(dir: string, entries: Array<Record<string, unknown>>): void {
   const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
@@ -31,10 +28,6 @@ function writeSvManifest(
   const svDir = join(dir, ".sourcevision");
   mkdirSync(svDir, { recursive: true });
   writeFileSync(join(svDir, "manifest.json"), JSON.stringify(manifest));
-}
-
-function writeConfig(dir: string, config: RexConfig): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
 }
 
 const MINIMAL_PRD: PRDDocument = {

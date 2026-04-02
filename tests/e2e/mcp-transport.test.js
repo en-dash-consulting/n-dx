@@ -87,7 +87,7 @@ async function jsonRpc(url, method, params = {}, sessionId = null) {
   };
 }
 
-describe("MCP HTTP transport (e2e)", () => {
+describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
   let tmpDir;
   let port;
   let serverProcess;

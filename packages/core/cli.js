@@ -479,6 +479,16 @@ async function signalLiveReload(dir) {
 
 // ── Command handlers ─────────────────────────────────────────────────────────
 
+function handleVersion(rest) {
+  const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+  if (rest.includes("--json")) {
+    console.log(JSON.stringify({ version }));
+  } else {
+    console.log(version);
+  }
+  process.exit(0);
+}
+
 /**
  * Run a sub-package init command, capturing output instead of streaming it.
  * Returns { code, stdout, stderr }.
@@ -1266,6 +1276,7 @@ async function main() {
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   switch (command) {
+    case "version":   return handleVersion(rest);
     case "help":      return handleHelp(rest);
     case "init":      return handleInit(rest);
     case "analyze":   return handleAnalyze(rest);

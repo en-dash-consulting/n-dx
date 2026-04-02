@@ -23,6 +23,10 @@ import {
   startTabVisibilityMonitor,
   resetTabVisibility,
 } from "../../../src/viewer/polling/tab-visibility.js";
+import {
+  setDocumentVisibility,
+  simulateVisibilityChange,
+} from "../../helpers/visibility-test-support.js";
 
 // ─── Constants (mirror status-indicators.ts) ─────────────────────────────────
 
@@ -34,27 +38,13 @@ const RESUME_DEBOUNCE_MS = 100;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Simulate a visibility state change by setting the property and dispatching the event. */
-function simulateVisibilityChange(state: "visible" | "hidden"): void {
-  Object.defineProperty(document, "visibilityState", {
-    value: state,
-    writable: true,
-    configurable: true,
-  });
-  document.dispatchEvent(new Event("visibilitychange"));
-}
-
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
 let originalVisibilityState: string;
 
 beforeEach(() => {
   originalVisibilityState = document.visibilityState;
-  Object.defineProperty(document, "visibilityState", {
-    value: "visible",
-    writable: true,
-    configurable: true,
-  });
+  setDocumentVisibility("visible");
   vi.useFakeTimers();
   resetTabVisibility();
   resetPollingManager();
@@ -66,11 +56,7 @@ afterEach(() => {
   resetPollingManager();
   resetTabVisibility();
   vi.useRealTimers();
-  Object.defineProperty(document, "visibilityState", {
-    value: originalVisibilityState,
-    writable: true,
-    configurable: true,
-  });
+  setDocumentVisibility(originalVisibilityState);
 });
 
 // ─── Acceptance criteria ──────────────────────────────────────────────────────

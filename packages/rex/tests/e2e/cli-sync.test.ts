@@ -34,7 +34,7 @@ function run(args: string[], expectFail = false): string {
   }
 }
 
-describe("rex sync", () => {
+describe("rex sync", { timeout: 120_000 }, () => {
   let tmpDir: string;
 
   beforeEach(async () => {

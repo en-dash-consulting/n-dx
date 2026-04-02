@@ -1,9 +1,10 @@
 {
   "llm": {
-    "vendor": "claude"
+    "vendor": "codex"
   },
   "sourcevision": {
     "zones": {
+      "mergeThreshold": 5,
       "pins": {
         "packages/web/src/viewer/views/hench-runs.ts": "web-dashboard",
         "packages/web/src/viewer/hooks/use-polling.ts": "web-dashboard",
@@ -94,6 +95,11 @@
         "packages/rex/tests/e2e/cli-workflow.test.ts": "rex-cli-e2e",
         "packages/rex/vitest.config.ts": "rex-prd-engine",
         "packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl": "rex-cli-e2e"
+      },
+      "types": {
+        "repo-ops-shell": "infrastructure",
+        "server-route-guardrails-tests": "test",
+        "web-build-tooling": "infrastructure"
       }
     }
   }

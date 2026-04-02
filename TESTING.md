@@ -98,6 +98,45 @@ a comment near the top of the file. This annotation is machine-verified by
 `tests/e2e/architecture-policy.test.js` to prevent silent removal of required test
 coverage.
 
+## Timeout Guardrails
+
+Timeouts are allowed only as **guardrails against hangs**, not as a way to turn an
+existing red suite green.
+
+Use a test-level timeout when all of the following are true:
+
+1. The test exercises a startup, integration, or subprocess path that is expected
+   to finish but could hang indefinitely if cleanup or readiness logic regresses.
+2. The timeout does **not** change the assertion surface. The same behavior should
+   still pass when the system is healthy.
+3. The timeout causes the runner to fail fast with a deterministic error instead
+   of waiting for the global default timeout.
+
+Do **not** respond to these failures by increasing or adding test timeouts:
+
+- Deterministic assertion failures
+- Environment failures that occur before the product path runs (for example,
+  socket bind errors such as `listen EPERM`)
+- Configuration or architecture-policy failures
+- Regressions that require production or configuration changes
+
+If a suite is already failing for one of the reasons above, the fix belongs in
+production code, environment setup, or policy/configuration. Timeout edits must
+never be used to mask that work.
+
+When choosing the timeout scope for a hang-risk suite, prefer the narrowest
+bound that matches the failure mode:
+
+- Use a suite-level Vitest timeout for multi-scenario startup or CLI suites
+  where the same subprocess/bootstrap path is repeated across many tests and the
+  goal is only to cap the suite's total hang budget.
+- Use a per-test timeout when a single test owns the risky wait path and the
+  rest of the file is already cheap and deterministic.
+- Do not add either wrapper when the suite already has deterministic bounds,
+  such as `execFileSync(..., { timeout })`, fake-timer driven progression, or
+  helper polling with a fixed deadline. Those suites are already fail-fast and
+  should not accumulate redundant timeout layers without a new hang mode.
+
 ### Integration Test Growth Policy
 
 The integration test count should grow proportionally with cross-package

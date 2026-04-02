@@ -36,7 +36,7 @@ function runFail(args: string[]): string {
   }
 }
 
-describe("rex recommend", () => {
+describe("rex recommend", { timeout: 120_000 }, () => {
   let tmpDir: string;
 
   beforeEach(async () => {

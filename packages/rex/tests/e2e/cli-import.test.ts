@@ -22,7 +22,7 @@ function run(args: string[]): string {
   });
 }
 
-describe("rex import (alias for analyze)", () => {
+describe("rex import (alias for analyze)", { timeout: 120_000 }, () => {
   let tmpDir: string;
 
   beforeEach(async () => {

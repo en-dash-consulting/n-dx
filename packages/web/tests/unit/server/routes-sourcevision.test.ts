@@ -3,25 +3,14 @@ import { mkdtemp, writeFile, mkdir, rm, appendFile, utimes } from "node:fs/promi
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
-import { createServer, type Server } from "node:http";
+import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision.js";
+import { startRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs sourcevision routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
-  return new Promise((resolve) => {
-    const server = createServer((req, res) => {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      if (handleSourcevisionRoute(req, res, ctx)) return;
-      res.writeHead(404);
-      res.end("Not found");
-    });
-    server.listen(0, () => {
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      resolve({ server, port });
-    });
-  });
+  return startRouteTestServer((req, res) => handleSourcevisionRoute(req, res, ctx));
 }
 
 describe("Sourcevision API routes", () => {
