@@ -19257,9 +19257,11 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
+      "startedAt": "2026-04-02T03:23:53.067Z",
+      "completedAt": "2026-04-02T03:23:53.067Z",
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20535,7 +20537,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "in_progress",
+          "status": "completed",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
@@ -20550,7 +20552,10 @@
             "dx"
           ],
           "source": "conversation — hit when Steve's Windows cli_path in .n-dx.json broke ndx init on macOS",
-          "startedAt": "2026-04-02T03:07:34.316Z"
+          "startedAt": "2026-04-02T03:07:34.316Z",
+          "completedAt": "2026-04-02T03:23:52.875Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Implemented .n-dx.local.json support across the full config stack: config.js (orchestration), llm-client (foundation), and cli.js (init). Machine-specific keys (cli_path variants) auto-route to local file. Deep merge with local wins. 22 new tests, all passing."
         }
       ]
     },
@@ -23656,6 +23661,580 @@
               "completedAt": "2026-04-01T01:24:40.637Z",
               "resolutionType": "code-change",
               "resolutionDetail": "Added 92 tests (72 unit + 20 integration) across 3 files proving cross-vendor runtime parity for all 8 contract areas: prompt sections, execution policy, permission envelope, event schema, failure classification, token diagnostics, completion gates, and runtime diagnostics."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7f2fbdca-f2ad-457b-99cb-cc128a1a5665",
+      "title": "Vendor-Normalized Hench Execution (Phase 2)",
+      "status": "pending",
+      "level": "epic",
+      "description": "Make the hench agent execution process produce consistent, observable behavior regardless of which LLM vendor (Claude, Codex, or future providers) is selected. Extracts vendor-specific code into adapter modules, adopts the PromptEnvelope and RuntimeEvent types from Phase 1, adds run diagnostics, and codifies cross-vendor parity as automated contract tests. See docs/architecture/phase2-vendor-normalization.md for the full plan.",
+      "priority": "critical",
+      "tags": [
+        "phase-2",
+        "vendor-normalization",
+        "hench"
+      ],
+      "source": "docs/architecture/phase2-vendor-normalization.md",
+      "children": [
+        {
+          "id": "da21807f-fc7b-4680-bd13-253c0ac9fd17",
+          "title": "Cross-Vendor Contract Test Suite",
+          "status": "pending",
+          "level": "feature",
+          "description": "Codify the runtime identity contract as automated tests BEFORE any refactoring begins. Establishes the regression baseline that every subsequent epic is validated against. Without this, adapter extraction has no automated gate for the Claude path. Tests initially validate existing code paths directly — they don't require the adapter interface to exist yet.",
+          "acceptanceCriteria": [
+            "Contract test suite covers adapter interface, prompt parity, run record parity, and E2E smoke",
+            "Both vendors produce the same RuntimeEvent schema for equivalent scenarios",
+            "Both vendors map errors to the same FailureCategory",
+            "Run records from both vendors contain comparable diagnostic data",
+            "All tests pass against existing (pre-refactor) code paths"
+          ],
+          "priority": "critical",
+          "tags": [
+            "phase-2",
+            "contract-tests",
+            "regression-baseline"
+          ],
+          "children": [
+            {
+              "id": "0609ab37-cee4-45ec-8e87-24646f86d23f",
+              "title": "Adapter contract tests",
+              "status": "completed",
+              "level": "task",
+              "description": "Create packages/hench/tests/unit/vendor-adapter-contract.test.ts. Assert both adapters implement the full VendorAdapter interface. Feed identical mock events to both adapters, assert RuntimeEvent output shape matches. Feed identical error strings, assert FailureCategory matches. Initially tests validate existing code paths directly (buildClaudeCliArgs, processStreamLine, processCodexJsonLine, classifyVendorError).",
+              "acceptanceCriteria": [
+                "vendor-adapter-contract.test.ts exists with passing tests",
+                "Both vendors' parse functions tested with identical mock events",
+                "RuntimeEvent output shape assertions for both vendors",
+                "FailureCategory mapping assertions for both vendors",
+                "Snapshot baselines capture exact Claude CLI args and token totals"
+              ],
+              "priority": "critical",
+              "tags": [
+                "phase-2",
+                "contract-tests"
+              ],
+              "startedAt": "2026-04-02T03:38:59.959Z",
+              "completedAt": "2026-04-02T04:01:22.166Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created vendor-adapter-contract.test.ts with 60 passing tests covering parse function parity, RuntimeEvent shape, FailureCategory mapping, CLI arg snapshots, policy flag snapshots, token total snapshots, and full multi-event sequence parity. Exported buildClaudeCliArgs for testing."
+            },
+            {
+              "id": "b5ff0dd8-5a10-4bd4-8db1-b98812e6c05b",
+              "title": "Prompt parity tests",
+              "status": "pending",
+              "level": "task",
+              "description": "Assert both adapters receive the same PromptEnvelope sections for a given task. Assert instruction files (CLAUDE.md, AGENTS.md) derive from the same source and contain equivalent workflow content. Builds on existing instruction-alignment.test.js but adds section-level granularity.",
+              "acceptanceCriteria": [
+                "Both vendors receive identical prompt section names for the same task",
+                "Instruction file content equivalence validated at section level",
+                "Test captures baseline prompt output for regression comparison"
+              ],
+              "priority": "high",
+              "tags": [
+                "phase-2",
+                "contract-tests",
+                "prompt-parity"
+              ]
+            },
+            {
+              "id": "18b7bd14-b952-474d-88d2-f058ce2db3c6",
+              "title": "Run record parity tests",
+              "status": "pending",
+              "level": "task",
+              "description": "Assert run records from both vendors contain diagnostics field. Assert token usage fields are populated or explicitly marked as unavailable (no silent zeros). Assert both vendors produce the same RunStatus for equivalent outcomes.",
+              "acceptanceCriteria": [
+                "Run record schema assertions for both vendors",
+                "Token usage fields validated (populated or explicitly unavailable)",
+                "RunStatus equivalence for matching outcomes",
+                "No silent zeros in token fields"
+              ],
+              "priority": "high",
+              "tags": [
+                "phase-2",
+                "contract-tests",
+                "run-records"
+              ]
+            },
+            {
+              "id": "93568386-9120-41fd-84d6-3fe1f7b36642",
+              "title": "E2E smoke tests for cross-vendor parity",
+              "status": "completed",
+              "level": "task",
+              "description": "Add E2E test: fresh project init → hench run with Claude CLI → verify run record shape. Add E2E test: fresh project init → hench run with Codex CLI → verify run record shape. Assert both E2E runs produce structurally identical run records (modulo vendor/model fields).",
+              "acceptanceCriteria": [
+                "E2E test for Claude CLI run record shape passes",
+                "E2E test for Codex CLI run record shape passes",
+                "Structural identity assertion between both vendors' run records",
+                "Only vendor/model fields allowed to differ"
+              ],
+              "priority": "high",
+              "tags": [
+                "phase-2",
+                "contract-tests",
+                "e2e"
+              ],
+              "startedAt": "2026-04-02T04:04:31.371Z",
+              "completedAt": "2026-04-02T04:13:47.220Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created packages/hench/tests/e2e/cross-vendor-run-record-smoke.test.ts with 11 tests across 3 describe blocks validating full run record lifecycle parity between Claude and Codex vendors."
+            }
+          ]
+        },
+        {
+          "id": "357ef25f-c555-4e60-8258-c79bcfd23a6f",
+          "title": "Vendor Adapter Extraction",
+          "status": "pending",
+          "level": "feature",
+          "description": "Extract vendor-specific code from cli-loop.ts (1200+ lines) into self-contained adapter modules. Define VendorAdapter interface, extract ClaudeCliAdapter and CodexCliAdapter, refactor cli-loop.ts to use adapter-based dispatch. Highest-risk refactor in Phase 2 — physically moves Claude CLI functions into new modules. Must be done with contract tests (Feature 6) as the regression safety net.",
+          "acceptanceCriteria": [
+            "VendorAdapter interface defined with buildSpawnConfig, parseEvent, classifyError, vendor, parseMode",
+            "ClaudeCliAdapter extracted with all Claude-specific functions from cli-loop.ts",
+            "CodexCliAdapter extracted with all Codex-specific functions from cli-loop.ts",
+            "cli-loop.ts uses adapter-based dispatch instead of if/else vendor branching",
+            "Existing E2E tests pass without behavioral changes",
+            "cli-loop.ts reduced by ~600 lines (vendor-specific code moved to adapters)"
+          ],
+          "priority": "critical",
+          "tags": [
+            "phase-2",
+            "adapter-extraction",
+            "hench"
+          ],
+          "blockedBy": [
+            "da21807f-fc7b-4680-bd13-253c0ac9fd17"
+          ],
+          "children": [
+            {
+              "id": "5b7cde87-7c99-4ca9-8f66-00ba26a50b70",
+              "title": "Define VendorAdapter interface and SpawnConfig type",
+              "status": "pending",
+              "level": "task",
+              "description": "Define VendorAdapter interface in packages/hench/src/agent/lifecycle/vendor-adapter.ts with: buildSpawnConfig(envelope, policy, model) → SpawnConfig; parseEvent(line, turn, metadata) → RuntimeEvent | null; classifyError(err) → FailureCategory; readonly vendor: LLMVendor; readonly parseMode: string. Define SpawnConfig type (binary, args, env, stdinContent, cwd). Export through hench's internal barrel.",
+              "acceptanceCriteria": [
+                "VendorAdapter interface defined in vendor-adapter.ts",
+                "SpawnConfig type defined with binary, args, env, stdinContent, cwd",
+                "Types exported through hench's internal barrel",
+                "Interface uses existing types from runtime-contract.ts (RuntimeEvent, FailureCategory, PromptEnvelope, ExecutionPolicy)"
+              ],
+              "priority": "critical",
+              "tags": [
+                "phase-2",
+                "adapter-extraction",
+                "interface"
+              ]
+            },
+            {
+              "id": "b321915a-9f3f-418c-9ddc-5f0c50d0bc10",
+              "title": "Extract ClaudeCliAdapter",
+              "status": "pending",
+              "level": "task",
+              "description": "Move buildClaudeCliArgs(), processStreamLine(), and spawnClaude() subprocess config into packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts. Implement VendorAdapter interface: buildSpawnConfig() wraps buildClaudeCliArgs, parseEvent() produces RuntimeEvent objects from stream-json, classifyError() delegates to classifyVendorError(). Add unit tests for Claude adapter in isolation. CRITICAL: snapshot test capturing exact args array before extraction, assert byte-identical after.",
+              "acceptanceCriteria": [
+                "claude-cli-adapter.ts implements VendorAdapter",
+                "buildClaudeCliArgs logic moved from cli-loop.ts",
+                "processStreamLine logic moved and wrapped as parseEvent()",
+                "spawnClaude config wrapped as buildSpawnConfig()",
+                "classifyError delegates to classifyVendorError()",
+                "Snapshot test: exact args array identical to pre-extraction baseline",
+                "Unit tests pass in isolation"
+              ],
+              "priority": "critical",
+              "tags": [
+                "phase-2",
+                "adapter-extraction",
+                "claude"
+              ],
+              "blockedBy": [
+                "5b7cde87-7c99-4ca9-8f66-00ba26a50b70"
+              ]
+            },
+            {
+              "id": "18aa02a2-e4d6-4fac-a0db-b7d68c96d01e",
+              "title": "Extract CodexCliAdapter",
+              "status": "pending",
+              "level": "task",
+              "description": "Move spawnCodex(), processCodexJsonLine(), normalizeCodexResponse(), and compileCodexPolicyFlags() into packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts. Implement VendorAdapter interface: buildSpawnConfig() compiles ExecutionPolicy to Codex flags, parseEvent() produces RuntimeEvent from JSONL with heuristic fallback, classifyError() delegates to classifyVendorError(). Add unit tests for Codex adapter in isolation.",
+              "acceptanceCriteria": [
+                "codex-cli-adapter.ts implements VendorAdapter",
+                "All Codex-specific functions moved from cli-loop.ts",
+                "buildSpawnConfig compiles ExecutionPolicy to Codex flags",
+                "parseEvent produces RuntimeEvent from JSONL with heuristic fallback",
+                "classifyError delegates to classifyVendorError()",
+                "Unit tests pass in isolation"
+              ],
+              "priority": "critical",
+              "tags": [
+                "phase-2",
+                "adapter-extraction",
+                "codex"
+              ],
+              "blockedBy": [
+                "5b7cde87-7c99-4ca9-8f66-00ba26a50b70"
+              ]
+            },
+            {
+              "id": "2f1b47d2-da25-425e-bfd0-d94b9a500201",
+              "title": "Refactor cli-loop.ts to use adapter-based dispatch",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace dispatchVendorSpawn() with adapter-based dispatch. Create resolveVendorAdapter(vendor: LLMVendor): VendorAdapter factory. Refactor the main loop to call adapter.buildSpawnConfig() → spawn → adapter.parseEvent() per line. Remove vendor-specific functions from cli-loop.ts (now in adapter modules). Verify existing E2E tests pass without behavioral changes.",
+              "acceptanceCriteria": [
+                "dispatchVendorSpawn() replaced with adapter-based dispatch",
+                "resolveVendorAdapter factory created",
+                "Main loop uses adapter.buildSpawnConfig() and adapter.parseEvent()",
+                "Vendor-specific functions removed from cli-loop.ts",
+                "cli-loop.ts reduced by ~600 lines",
+                "All existing E2E tests pass",
+                "pnpm test green across all packages"
+              ],
+              "priority": "critical",
+              "tags": [
+                "phase-2",
+                "adapter-extraction",
+                "refactor"
+              ],
+              "blockedBy": [
+                "b321915a-9f3f-418c-9ddc-5f0c50d0bc10",
+                "18aa02a2-e4d6-4fac-a0db-b7d68c96d01e"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "07b75236-2a3c-4725-8d95-929dc6b74754",
+          "title": "Prompt Envelope Adoption",
+          "status": "pending",
+          "level": "feature",
+          "description": "Use the existing PromptEnvelope type throughout prompt construction so both vendors receive tagged, traceable prompt sections. Refactor planning/prompt.ts to produce PromptEnvelope instead of flat strings. Each vendor adapter translates the envelope to native delivery format. Sections are logged for diagnostics. Low risk — output should be identical strings with tagged metadata.",
+          "acceptanceCriteria": [
+            "prompt.ts produces PromptEnvelope instead of flat strings",
+            "Each section tagged with canonical name (system, workflow, brief, files, validation, completion)",
+            "Both adapters use assemblePrompt() in buildSpawnConfig()",
+            "Prompt section names and sizes logged in run diagnostics",
+            "Byte-identical prompt output compared to pre-refactor baseline"
+          ],
+          "priority": "high",
+          "tags": [
+            "phase-2",
+            "prompt-envelope",
+            "hench"
+          ],
+          "blockedBy": [
+            "357ef25f-c555-4e60-8258-c79bcfd23a6f"
+          ],
+          "children": [
+            {
+              "id": "5c298011-399d-496d-95c2-93bc40864e64",
+              "title": "Refactor prompt construction to produce PromptEnvelope",
+              "status": "pending",
+              "level": "task",
+              "description": "Update packages/hench/src/agent/planning/prompt.ts to produce PromptEnvelope instead of flat strings. Tag each section with its canonical name (system, workflow, brief, files, validation, completion). Update packages/hench/src/agent/planning/brief.ts to contribute sections to the envelope. CRITICAL: capture exact system prompt strings for 3+ representative tasks before the change, assert byte-identical output after.",
+              "acceptanceCriteria": [
+                "prompt.ts produces PromptEnvelope with tagged sections",
+                "brief.ts contributes sections to the envelope",
+                "Regression test: byte-identical prompt output for representative tasks",
+                "Section names: system, workflow, brief, files, validation, completion"
+              ],
+              "priority": "high",
+              "tags": [
+                "phase-2",
+                "prompt-envelope"
+              ]
+            },
+            {
+              "id": "851ce775-c477-4b30-bfb2-14af614cead8",
+              "title": "Vendor-specific prompt delivery via adapters",
+              "status": "pending",
+              "level": "task",
+              "description": "ClaudeCliAdapter.buildSpawnConfig() uses assemblePrompt() to split system/task. CodexCliAdapter.buildSpawnConfig() uses assemblePrompt() and formats as SYSTEM:\\n...\\nTASK:\\n... Log prompt section names and sizes in run diagnostics.",
+              "acceptanceCriteria": [
+                "Claude adapter uses assemblePrompt() for system/task split",
+                "Codex adapter formats with SYSTEM/TASK headers",
+                "Prompt section names and sizes logged in run diagnostics"
+              ],
+              "priority": "high",
+              "tags": [
+                "phase-2",
+                "prompt-envelope",
+                "adapters"
+              ],
+              "blockedBy": [
+                "5c298011-399d-496d-95c2-93bc40864e64"
+              ]
+            },
+            {
+              "id": "5409318d-45df-4709-9283-c0cef15c4fd3",
+              "title": "Prompt envelope parity tests",
+              "status": "pending",
+              "level": "task",
+              "description": "Assert both adapters receive identical section names for the same task. Assert section content is equivalent (not just present). Assert no vendor receives sections the other doesn't.",
+              "acceptanceCriteria": [
+                "Both adapters receive identical section names",
+                "Section content equivalence validated",
+                "No vendor receives exclusive sections"
+              ],
+              "priority": "high",
+              "tags": [
+                "phase-2",
+                "prompt-envelope",
+                "tests"
+              ],
+              "blockedBy": [
+                "851ce775-c477-4b30-bfb2-14af614cead8"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "a1e10c77-5187-49b8-9b50-a5403f9fef94",
+          "title": "Unified Event Pipeline",
+          "status": "pending",
+          "level": "feature",
+          "description": "Make all run evaluation operate on RuntimeEvent streams instead of ad hoc CliRunResult shapes. Create EventAccumulator that collects RuntimeEvent[] and derives token usage, tool calls, assistant text, completion summary, and failure details. Wire into CLI loop, update spin detection and budget checks. Feature-flag gated (config.useEventPipeline). Keep CliRunResult as backward-compat bridge during migration.",
+          "acceptanceCriteria": [
+            "EventAccumulator class created and tested",
+            "CLI loop feeds adapter.parseEvent() output into accumulator",
+            "Spin detection operates on RuntimeEvent stream",
+            "Token budget checking uses accumulator totals",
+            "toCliRunResult() backward-compat bridge works",
+            "Feature-flag gated: config.useEventPipeline",
+            "Run records contain equivalent data post-migration"
+          ],
+          "priority": "high",
+          "tags": [
+            "phase-2",
+            "event-pipeline",
+            "hench",
+            "flag-gated"
+          ],
+          "blockedBy": [
+            "357ef25f-c555-4e60-8258-c79bcfd23a6f"
+          ],
+          "children": [
+            {
+              "id": "e8e087e8-5a02-40c1-b6dc-ce42fcb08b19",
+              "title": "Create EventAccumulator",
+              "status": "pending",
+              "level": "task",
+              "description": "Create packages/hench/src/agent/lifecycle/event-accumulator.ts. Implement EventAccumulator class that collects RuntimeEvent[] and derives: total token usage (with diagnostic status), tool call count and list, assistant message text, completion summary, failure details. Add toCliRunResult() method for backward compatibility during migration. Add unit tests.",
+              "acceptanceCriteria": [
+                "EventAccumulator class in event-accumulator.ts",
+                "Derives token usage, tool calls, text, completion, failures from RuntimeEvent[]",
+                "toCliRunResult() produces backward-compatible CliRunResult",
+                "Unit tests cover all derivation paths"
+              ],
+              "priority": "high",
+              "tags": [
+                "phase-2",
+                "event-pipeline"
+              ]
+            },
+            {
+              "id": "f257df67-5470-4661-ac03-b0f74a994ae3",
+              "title": "Wire event pipeline into CLI loop",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace inline result accumulation with EventAccumulator. Feed adapter.parseEvent() output directly into accumulator. Update spin detection to operate on RuntimeEvent stream. Update token budget checking to use accumulator totals. Verify run records contain equivalent data post-migration. Gate behind config.useEventPipeline flag.",
+              "acceptanceCriteria": [
+                "Inline accumulation replaced with EventAccumulator",
+                "adapter.parseEvent() feeds into accumulator",
+                "Spin detection uses RuntimeEvent stream",
+                "Budget checking uses accumulator totals",
+                "Feature-flag gated: config.useEventPipeline",
+                "Run records equivalent pre/post migration"
+              ],
+              "priority": "high",
+              "tags": [
+                "phase-2",
+                "event-pipeline",
+                "flag-gated"
+              ],
+              "blockedBy": [
+                "e8e087e8-5a02-40c1-b6dc-ce42fcb08b19"
+              ]
+            },
+            {
+              "id": "0fbbf86f-5ffa-483a-bedd-2dc97793fb7d",
+              "title": "Event persistence in run records",
+              "status": "pending",
+              "level": "task",
+              "description": "Add optional events: RuntimeEvent[] field to RunRecord schema (v1 additive — no migration needed). Store events when verbose/debug mode is enabled. Add hench show --events run-id subcommand for debugging.",
+              "acceptanceCriteria": [
+                "Optional events field on RunRecord schema",
+                "Events stored in verbose/debug mode",
+                "hench show --events displays event stream for a run"
+              ],
+              "priority": "medium",
+              "tags": [
+                "phase-2",
+                "event-pipeline",
+                "persistence"
+              ],
+              "blockedBy": [
+                "f257df67-5470-4661-ac03-b0f74a994ae3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "bcfd200e-0c19-4306-ba43-efd2d25b5dd0",
+          "title": "API Provider Generalization",
+          "status": "pending",
+          "level": "feature",
+          "description": "Remove the Claude-only gate from the API execution path (loop.ts) and enable registry-based provider resolution. Generalize agentLoop() to accept any LLMProvider from ProviderRegistry. Define vendor-neutral tool schema. Feature-flag gated (config.useRegistryProvider). Stretch: add OpenAI API adapter. Highest Claude-path impact — execute last.",
+          "acceptanceCriteria": [
+            "Claude-only vendor check in loop.ts replaced with ProviderRegistry.getActiveProvider()",
+            "initApiResources() accepts any LLMProvider",
+            "Vendor-neutral tool schema defined in llm-client",
+            "Feature-flag gated: config.useRegistryProvider",
+            "Integration test verifies Claude API loop produces identical results",
+            "hench run --provider=api works with Claude API key"
+          ],
+          "priority": "medium",
+          "tags": [
+            "phase-2",
+            "api-generalization",
+            "hench",
+            "flag-gated",
+            "stretch"
+          ],
+          "blockedBy": [
+            "357ef25f-c555-4e60-8258-c79bcfd23a6f"
+          ],
+          "children": [
+            {
+              "id": "9df5dd83-8bd7-4104-809e-ae99831cd88f",
+              "title": "Generalize agentLoop for registry-based provider resolution",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace the Claude vendor check in loop.ts with ProviderRegistry.getActiveProvider(). Refactor initApiResources() to accept any LLMProvider. Gate behind config.useRegistryProvider flag (default false). Add integration test verifying Claude API loop produces identical results before and after.",
+              "acceptanceCriteria": [
+                "Claude vendor check replaced with ProviderRegistry resolution",
+                "initApiResources accepts any LLMProvider",
+                "Feature-flag: config.useRegistryProvider (default false)",
+                "Integration test: identical Claude API results pre/post"
+              ],
+              "priority": "medium",
+              "tags": [
+                "phase-2",
+                "api-generalization",
+                "flag-gated"
+              ]
+            },
+            {
+              "id": "ea9bc425-60cc-4bb6-95ca-2362465cca84",
+              "title": "Define vendor-neutral tool schema",
+              "status": "pending",
+              "level": "task",
+              "description": "Define a vendor-neutral tool schema type in packages/llm-client/src/tool-schema.ts. Add compilation functions: toAnthropicToolDef(), toOpenAiToolDef(). Refactor TOOL_DEFINITIONS in hench to use the neutral format. Both CLI adapters and API providers compile from the same source.",
+              "acceptanceCriteria": [
+                "Vendor-neutral tool schema type in tool-schema.ts",
+                "toAnthropicToolDef() and toOpenAiToolDef() compilation functions",
+                "TOOL_DEFINITIONS uses neutral format",
+                "Both adapters and API providers compile from same source"
+              ],
+              "priority": "medium",
+              "tags": [
+                "phase-2",
+                "api-generalization",
+                "tool-schema"
+              ]
+            },
+            {
+              "id": "94233ff5-fbf9-4d0c-813c-457c9161ccea",
+              "title": "OpenAI API adapter (stretch)",
+              "status": "pending",
+              "level": "task",
+              "description": "Add OpenAiApiProvider implementing LLMProvider in packages/llm-client/src/openai-api-provider.ts. Register in ProviderRegistry with vendor \"codex\" + mode \"api\". Implement complete() and stream() for tool-use loop. Add auth detection for OPENAI_API_KEY. STRETCH GOAL — lower priority than all other Phase 2 work.",
+              "acceptanceCriteria": [
+                "OpenAiApiProvider implements LLMProvider",
+                "Registered in ProviderRegistry",
+                "complete() and stream() implemented",
+                "OPENAI_API_KEY auth detection works",
+                "hench run --provider=api --vendor=codex works"
+              ],
+              "priority": "low",
+              "tags": [
+                "phase-2",
+                "api-generalization",
+                "stretch",
+                "openai"
+              ],
+              "blockedBy": [
+                "9df5dd83-8bd7-4104-809e-ae99831cd88f",
+                "ea9bc425-60cc-4bb6-95ca-2362465cca84"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "94d3911c-5f9a-48ea-a906-499d3e1b48c3",
+          "title": "Run Diagnostics & Observability",
+          "status": "pending",
+          "level": "feature",
+          "description": "Every run produces structured RuntimeDiagnostics that make the vendor contract floor observable. Add diagnostics field to RunRecord schema (additive, no migration). Collect at run start/end in shared.ts. Surface in hench show output and web dashboard. Low risk — additive schema change only.",
+          "acceptanceCriteria": [
+            "RuntimeDiagnostics field added to RunRecord schema (optional, additive)",
+            "Diagnostics collected at run start in initRunRecord()",
+            "Diagnostics updated at run end with final token status and parse mode",
+            "hench show displays diagnostics",
+            "Dashboard run detail view surfaces vendor diagnostics",
+            "Old run records without diagnostics field remain valid"
+          ],
+          "priority": "medium",
+          "tags": [
+            "phase-2",
+            "diagnostics",
+            "observability",
+            "hench"
+          ],
+          "blockedBy": [
+            "a1e10c77-5187-49b8-9b50-a5403f9fef94"
+          ],
+          "children": [
+            {
+              "id": "1e041757-f9d8-455e-88bd-8fd1b8566b55",
+              "title": "Diagnostics collection in run lifecycle",
+              "status": "pending",
+              "level": "task",
+              "description": "Add diagnostics: RuntimeDiagnostics field to RunRecord schema. Collect diagnostics at run start in shared.ts initRunRecord() — vendor, model, sandbox, approvals, parseMode. Update diagnostics at run end with final token status. Include diagnostics in hench show output.",
+              "acceptanceCriteria": [
+                "RuntimeDiagnostics field on RunRecord (optional, additive)",
+                "Diagnostics captured at run start and updated at run end",
+                "hench show displays diagnostics snapshot",
+                "Old records without field remain valid"
+              ],
+              "priority": "medium",
+              "tags": [
+                "phase-2",
+                "diagnostics"
+              ]
+            },
+            {
+              "id": "3a6c9338-ca59-4619-ba93-c4cabb597799",
+              "title": "Dashboard integration for vendor diagnostics",
+              "status": "pending",
+              "level": "task",
+              "description": "Surface vendor diagnostics in the web dashboard run detail view. Add vendor/model filtering to run history views. Show token diagnostic status indicators (complete/partial/unavailable).",
+              "acceptanceCriteria": [
+                "Dashboard run detail shows vendor diagnostics",
+                "Run history filterable by vendor/model",
+                "Token diagnostic status indicators displayed"
+              ],
+              "priority": "low",
+              "tags": [
+                "phase-2",
+                "diagnostics",
+                "dashboard"
+              ],
+              "blockedBy": [
+                "1e041757-f9d8-455e-88bd-8fd1b8566b55"
+              ]
             }
           ]
         }
