@@ -1040,7 +1040,8 @@ function syncRunFromAccumulated(
 // CLI arg construction (platform-aware)
 // ---------------------------------------------------------------------------
 
-interface ClaudeCliInput {
+/** @internal Exported for testing. */
+export interface ClaudeCliInput {
   systemPrompt: string;
   promptText: string;
   allowedTools: string[];
@@ -1050,8 +1051,9 @@ interface ClaudeCliInput {
 /**
  * Build the Claude CLI args and stdin content.
  * Handles Windows cmd.exe escaping quirks.
+ * @internal Exported for testing.
  */
-function buildClaudeCliArgs(input: ClaudeCliInput): { args: string[]; stdinContent: string } {
+export function buildClaudeCliArgs(input: ClaudeCliInput): { args: string[]; stdinContent: string } {
   const isWindows = process.platform === "win32";
 
   // On Windows, cmd.exe can't handle multi-line strings or special chars
