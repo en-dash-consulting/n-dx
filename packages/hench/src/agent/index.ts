@@ -30,6 +30,9 @@ export type { CliLoopOptions, CliLoopResult } from "./lifecycle/cli-loop.js";
 // Vendor adapter interface
 export type { VendorAdapter, SpawnConfig } from "./lifecycle/vendor-adapter.js";
 
+// Vendor adapter implementations
+export { claudeCliAdapter } from "./lifecycle/adapters/claude-cli-adapter.js";
+
 // Token budget
 export { checkTokenBudget } from "./lifecycle/token-budget.js";
 export type { TokenBudgetResult } from "./lifecycle/token-budget.js";
