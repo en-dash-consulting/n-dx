@@ -19257,9 +19257,20 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
+      "mergedProposals": [
+        {
+          "proposalNodeKey": "p0:epic",
+          "proposalTitle": "CLI & Developer Tools / Test Infrastructure",
+          "proposalKind": "epic",
+          "reason": "semantic_title",
+          "score": 0.95,
+          "mergedAt": "2026-04-02T16:40:24.655Z",
+          "source": "smart-add"
+        }
+      ],
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20535,7 +20546,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "pending",
+          "status": "deferred",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
@@ -20549,9 +20560,339 @@
             "config",
             "dx"
           ],
-          "source": "conversation — hit when Steve's Windows cli_path in .n-dx.json broke ndx init on macOS"
+          "source": "conversation — hit when Steve's Windows cli_path in .n-dx.json broke ndx init on macOS",
+          "startedAt": "2026-04-02T17:55:34.698Z"
+        },
+        {
+          "id": "f9b208b6-43d9-44d3-a1cf-518e956aabd5",
+          "title": "Shared Unit Test Utilities",
+          "status": "completed",
+          "level": "feature",
+          "description": "Reduce duplication across unit tests by consolidating repeated constants and helper functions into test-only shared utilities without changing production code or altering test coverage.",
+          "source": "smart-add",
+          "startedAt": "2026-04-02T17:55:31.910Z",
+          "completedAt": "2026-04-02T17:55:31.910Z",
+          "children": [
+            {
+              "id": "7ed4c848-e4be-4f6e-b495-5d70a9457fec",
+              "title": "Inventory duplicated unit-test constants across suites",
+              "status": "deferred",
+              "level": "task",
+              "description": "Review unit test files to identify repeated constants that appear in more than four files and record where they are used so consolidation candidates are explicitly defined.",
+              "acceptanceCriteria": [
+                "A concrete inventory exists for duplicated constants used in more than four unit test files",
+                "The inventory excludes constants that are unique to a single suite or tightly coupled to one test file"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "maintainability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:55:20.914Z"
+            },
+            {
+              "id": "40d16bdb-e1a6-4619-b52d-163811e82156",
+              "title": "Catalog reusable helper-function patterns in unit tests",
+              "status": "completed",
+              "level": "task",
+              "description": "Identify helper functions reused across multiple unit test files and define which patterns should be moved versus which should remain local to a suite.",
+              "acceptanceCriteria": [
+                "A concrete inventory exists for duplicated helper functions used in more than four unit test files",
+                "The inventory excludes helpers that are unique to a single suite or tightly coupled to one test file"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "maintainability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:37:03.736Z",
+              "completedAt": "2026-04-02T17:42:24.806Z"
+            },
+            {
+              "id": "794b70a1-8956-4afe-bdf4-38def2e397b7",
+              "title": "Define a test-only consolidation baseline and scope",
+              "status": "completed",
+              "level": "task",
+              "description": "Establish the refactor scope by documenting where shared utilities will live under test-only paths and by capturing the pre-change test inventory for later comparison.",
+              "acceptanceCriteria": [
+                "The proposed shared utilities are located only under test-only paths and do not require production file changes",
+                "A before-change baseline of total test file count and total test case count is captured for comparison after refactoring"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "maintainability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:52:10.687Z",
+              "completedAt": "2026-04-02T17:55:18.042Z"
+            },
+            {
+              "id": "71e079b5-bffc-4424-aa42-9ce682f7befc",
+              "title": "Create shared test-only utility modules for duplicated setup code",
+              "status": "completed",
+              "level": "task",
+              "description": "Move the repeated constants and setup helpers identified during the audit into reusable test-only modules without changing any production files.",
+              "acceptanceCriteria": [
+                "Repeated constants and helper functions identified in the audit are moved into shared test-only modules",
+                "Only test files and newly added test helper files are modified for this refactor"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "deduplication"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:42:27.637Z",
+              "completedAt": "2026-04-02T17:52:07.821Z"
+            },
+            {
+              "id": "9311f36a-e0e4-4275-90f7-badca8d60ee6",
+              "title": "Update unit test callers to use shared utilities",
+              "status": "deferred",
+              "level": "task",
+              "description": "Refactor existing unit test files to consume the new shared helpers and constants while preserving existing assertions, names, and suite intent.",
+              "acceptanceCriteria": [
+                "No assertions, test names, or suite coverage are removed as part of the consolidation",
+                "The number of discovered tests before and after the refactor is identical"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "deduplication"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:55:26.079Z"
+            },
+            {
+              "id": "4094dafb-78c0-462f-bc09-dd5a630762bb",
+              "title": "Validate behavioral equivalence after test utility extraction",
+              "status": "deferred",
+              "level": "task",
+              "description": "Run the refactored unit suites and compare outcomes against the pre-refactor baseline to confirm that the shared utility extraction did not alter behavior or coverage.",
+              "acceptanceCriteria": [
+                "Unit tests continue to execute with behavior equivalent to the pre-refactor baseline",
+                "The number of discovered tests before and after the refactor is identical"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "deduplication"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:55:30.232Z"
+            }
+          ]
+        },
+        {
+          "id": "0fb7be48-74a2-495d-a184-dced4d6d2d87",
+          "title": "Timeout Guardrails for Hanging Tests",
+          "status": "completed",
+          "level": "feature",
+          "description": "Prevent indefinite hangs in long-running tests by applying explicit timeout limits to suites that can block CI or local validation.",
+          "source": "smart-add",
+          "startedAt": "2026-04-02T17:37:00.910Z",
+          "completedAt": "2026-04-02T17:37:00.910Z",
+          "children": [
+            {
+              "id": "1f2d2024-1223-40c6-bfde-66f52c150d4e",
+              "title": "Review test suites for observable hang-risk patterns",
+              "status": "completed",
+              "level": "task",
+              "description": "Inspect unit, integration, and end-to-end tests for process spawning, server lifecycle handling, retry loops, polling, or external waits that could cause indefinite execution.",
+              "acceptanceCriteria": [
+                "Tests with realistic hang risk are identified using observable patterns such as process spawning, server lifecycle handling, or retry loops",
+                "The identified set covers all current long-running and externally coordinated test suites"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "reliability",
+                "timeouts",
+                "ci"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:33:05.465Z",
+              "completedAt": "2026-04-02T17:37:00.616Z"
+            },
+            {
+              "id": "1052726c-5e00-4305-873f-3d98ca6bcd5d",
+              "title": "Document timeout strategies for at-risk suites",
+              "status": "completed",
+              "level": "task",
+              "description": "Define whether each at-risk suite should use per-test or per-suite timeout handling and explicitly exclude suites that are already deterministically bounded.",
+              "acceptanceCriteria": [
+                "Each identified suite has a documented timeout strategy at the test or suite level",
+                "Tests that are already deterministically bounded are not given redundant timeout wrappers without cause"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "reliability",
+                "timeouts",
+                "ci"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:29:56.913Z",
+              "completedAt": "2026-04-02T17:33:02.617Z"
+            },
+            {
+              "id": "55d8280d-4b05-4109-99da-f803b8330b1a",
+              "title": "Configure explicit timeouts on identified hanging-test candidates",
+              "status": "completed",
+              "level": "task",
+              "description": "Apply explicit timeout settings to every at-risk test or suite so that hangs fail within a bounded window of 120 seconds or less.",
+              "acceptanceCriteria": [
+                "Every identified at-risk test or suite has an explicit timeout configured at or below 120 seconds",
+                "Timeout configuration changes are limited to test files or test-only setup files"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "timeouts",
+                "vitest",
+                "stability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T16:40:48.635Z",
+              "completedAt": "2026-04-02T16:45:50.275Z"
+            },
+            {
+              "id": "f792fbaf-1a66-4a2f-955e-1e812bc6badb",
+              "title": "Verify timeout failures surface as standard Vitest errors",
+              "status": "completed",
+              "level": "task",
+              "description": "Confirm that timeout enforcement causes normal Vitest failures rather than leaving orphaned background work, and ensure unaffected fast tests remain stable.",
+              "acceptanceCriteria": [
+                "Timeout failures produce a standard Vitest failure instead of leaving orphaned hangs",
+                "Existing fast-running tests retain their current behavior and do not become less deterministic after timeout changes"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "timeouts",
+                "vitest",
+                "stability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T16:45:50.920Z",
+              "completedAt": "2026-04-02T16:50:00.410Z"
+            }
+          ]
+        },
+        {
+          "id": "982f45e5-cb5f-41be-84a3-3736378247c9",
+          "title": "Full-Suite Red-to-Green Verification",
+          "status": "completed",
+          "level": "feature",
+          "description": "Restore full test pass status across the project while preserving the integrity of the test refactor and avoiding test edits that merely mask real failures.",
+          "source": "smart-add",
+          "startedAt": "2026-04-02T17:19:13.841Z",
+          "completedAt": "2026-04-02T17:19:13.841Z",
+          "children": [
+            {
+              "id": "cf78aa03-deb6-44b0-bc79-f1fb5c30b891",
+              "title": "Group failing suites by shared production-side root cause",
+              "status": "completed",
+              "level": "task",
+              "description": "Analyze current failures and cluster them by the underlying application, CLI, configuration, or architectural issue rather than by individual failing assertions.",
+              "acceptanceCriteria": [
+                "Current failures are grouped by root cause rather than by individual assertion",
+                "Each failure group clearly identifies whether the fix belongs in application code, configuration, or environment setup"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "triage",
+                "regression",
+                "quality"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T16:50:01.088Z",
+              "completedAt": "2026-04-02T16:56:47.408Z"
+            },
+            {
+              "id": "c097f90b-722b-41b3-9777-492db05e50da",
+              "title": "Separate legitimate timeout work from red-to-green defect fixes",
+              "status": "completed",
+              "level": "task",
+              "description": "Document which failures require implementation or configuration fixes and distinguish those from timeout guardrails so test edits are not used to hide real regressions.",
+              "acceptanceCriteria": [
+                "No test file change is proposed solely to make an existing failing test pass",
+                "The diagnosis explicitly separates legitimate timeout additions from red-to-green production fixes"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "triage",
+                "regression",
+                "quality"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:15:47.631Z",
+              "completedAt": "2026-04-02T17:19:13.578Z"
+            },
+            {
+              "id": "7a0ed21e-ffe1-46a5-8110-728fd7e6e768",
+              "title": "Implement root-cause fixes in production or configuration code",
+              "status": "completed",
+              "level": "task",
+              "description": "Apply fixes only in the application, CLI, configuration, or environment setup areas identified during diagnosis so failing tests are resolved at their actual source.",
+              "acceptanceCriteria": [
+                "No test file is modified for the sole purpose of forcing previously failing tests to pass",
+                "Any production or config changes made to fix failures are limited to the actual root-cause areas identified during diagnosis"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "verification",
+                "ci",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T16:56:48.061Z",
+              "completedAt": "2026-04-02T17:06:58.274Z"
+            },
+            {
+              "id": "ece5c797-5a9d-4272-96f9-1fceffde9204",
+              "title": "Run project-wide test commands and compare against baseline coverage",
+              "status": "deferred",
+              "level": "task",
+              "description": "Validate the completed fixes by running both required test commands and confirming that the total executed test count still matches the pre-refactor baseline.",
+              "acceptanceCriteria": [
+                "Running `vitest run` completes successfully with all tests passing",
+                "Running `pnpm -r run test` completes successfully with all package tests passing",
+                "The total number of executed tests matches the pre-refactor baseline"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "verification",
+                "ci",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:06:58.905Z"
+            }
+          ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-02T17:55:36.327Z",
+      "completedAt": "2026-04-02T17:55:36.327Z"
     },
     {
       "id": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
