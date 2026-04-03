@@ -263,6 +263,10 @@ describe("hench → llm-client gateway contract", () => {
     "compileCodexPolicyFlags",
     "mapSandboxToCodexFlag",
     "mapApprovalToCodexFlag",
+    "toAnthropicToolDef",
+    "toAnthropicToolDefs",
+    "toOpenAiToolDef",
+    "toOpenAiToolDefs",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
@@ -600,7 +604,8 @@ describe("gateway export auto-detection", () => {
         "resolveModel", "formatUsage",
         "createPromptEnvelope", "assemblePrompt", "mapErrorReasonToFailureCategory",
         "mapRunFailureToCategory", "classifyVendorError", "failureCategoryLabel",
-        "compileCodexPolicyFlags", "mapSandboxToCodexFlag", "mapApprovalToCodexFlag"],
+        "compileCodexPolicyFlags", "mapSandboxToCodexFlag", "mapApprovalToCodexFlag",
+        "toAnthropicToolDef", "toAnthropicToolDefs", "toOpenAiToolDef", "toOpenAiToolDefs"],
       ...["PROJECT_DIRS", "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS",
         "ALL_FAILURE_CATEGORIES"],
     ]);

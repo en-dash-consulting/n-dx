@@ -109,6 +109,14 @@ export {
   mapApprovalToCodexFlag,
 } from "@n-dx/llm-client";
 
+// ---- Vendor-neutral tool schema ---------------------------------------------
+export {
+  toAnthropicToolDef,
+  toAnthropicToolDefs,
+  toOpenAiToolDef,
+  toOpenAiToolDefs,
+} from "@n-dx/llm-client";
+
 // ---- Type re-exports --------------------------------------------------------
 export type {
   ClaudeConfig,
@@ -133,4 +141,9 @@ export type {
   RuntimeDiagnostics,
   TokenParseResult,
   CodexTokenMapping,
+  ToolDefinition,
+  ToolInputSchema,
+  ToolPropertySchema,
+  AnthropicToolDef,
+  OpenAiToolDef,
 } from "@n-dx/llm-client";

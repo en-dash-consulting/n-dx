@@ -23955,6 +23955,8 @@
           "blockedBy": [
             "357ef25f-c555-4e60-8258-c79bcfd23a6f"
           ],
+          "startedAt": "2026-04-02T23:45:50.169Z",
+          "completedAt": "2026-04-02T23:45:50.169Z",
           "children": [
             {
               "id": "5c298011-399d-496d-95c2-93bc40864e64",
@@ -24025,14 +24027,12 @@
               ],
               "startedAt": "2026-04-02T23:41:44.713Z"
             }
-          ],
-          "startedAt": "2026-04-02T23:45:50.169Z",
-          "completedAt": "2026-04-02T23:45:50.169Z"
+          ]
         },
         {
           "id": "a1e10c77-5187-49b8-9b50-a5403f9fef94",
           "title": "Unified Event Pipeline",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Make all run evaluation operate on RuntimeEvent streams instead of ad hoc CliRunResult shapes. Create EventAccumulator that collects RuntimeEvent[] and derives token usage, tool calls, assistant text, completion summary, and failure details. Wire into CLI loop, update spin detection and budget checks. Feature-flag gated (config.useEventPipeline). Keep CliRunResult as backward-compat bridge during migration.",
           "acceptanceCriteria": [
@@ -24054,6 +24054,8 @@
           "blockedBy": [
             "357ef25f-c555-4e60-8258-c79bcfd23a6f"
           ],
+          "startedAt": "2026-04-03T02:40:43.714Z",
+          "completedAt": "2026-04-03T02:40:43.714Z",
           "children": [
             {
               "id": "e8e087e8-5a02-40c1-b6dc-ce42fcb08b19",
@@ -24108,7 +24110,7 @@
             {
               "id": "0fbbf86f-5ffa-483a-bedd-2dc97793fb7d",
               "title": "Event persistence in run records",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add optional events: RuntimeEvent[] field to RunRecord schema (v1 additive — no migration needed). Store events when verbose/debug mode is enabled. Add hench show --events run-id subcommand for debugging.",
               "acceptanceCriteria": [
@@ -24124,7 +24126,11 @@
               ],
               "blockedBy": [
                 "f257df67-5470-4661-ac03-b0f74a994ae3"
-              ]
+              ],
+              "startedAt": "2026-04-03T02:27:57.505Z",
+              "completedAt": "2026-04-03T02:40:43.540Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added PersistedRuntimeEvent type and events field to RunRecord schema. Events stored when useEventPipeline is active. Added hench show --events subcommand. 31 tests passing."
             }
           ]
         },
@@ -24176,7 +24182,7 @@
             {
               "id": "ea9bc425-60cc-4bb6-95ca-2362465cca84",
               "title": "Define vendor-neutral tool schema",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Define a vendor-neutral tool schema type in packages/llm-client/src/tool-schema.ts. Add compilation functions: toAnthropicToolDef(), toOpenAiToolDef(). Refactor TOOL_DEFINITIONS in hench to use the neutral format. Both CLI adapters and API providers compile from the same source.",
               "acceptanceCriteria": [
@@ -24190,7 +24196,11 @@
                 "phase-2",
                 "api-generalization",
                 "tool-schema"
-              ]
+              ],
+              "startedAt": "2026-04-03T02:47:08.263Z",
+              "completedAt": "2026-04-03T02:58:54.548Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Defined vendor-neutral ToolDefinition type in tool-schema.ts. Added toAnthropicToolDef() and toOpenAiToolDef() compilation functions. Refactored TOOL_DEFINITIONS in hench dispatch.ts to use neutral format with backward-compatible compiled export. All 30 new tests + 2022 hench tests + 286 architecture tests pass."
             },
             {
               "id": "94233ff5-fbf9-4d0c-813c-457c9161ccea",

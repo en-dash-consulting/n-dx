@@ -274,6 +274,23 @@ export {
   failureCategoryLabel,
 } from "./runtime-contract.js";
 
+// Vendor-neutral tool schema
+export type {
+  JsonSchemaType,
+  ToolPropertySchema,
+  ToolInputSchema,
+  ToolDefinition,
+  AnthropicToolDef,
+  OpenAiToolDef,
+} from "./tool-schema.js";
+
+export {
+  toAnthropicToolDef,
+  toAnthropicToolDefs,
+  toOpenAiToolDef,
+  toOpenAiToolDefs,
+} from "./tool-schema.js";
+
 // CLI help formatting
 export {
   isColorEnabled,

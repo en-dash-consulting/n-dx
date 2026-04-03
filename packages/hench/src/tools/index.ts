@@ -11,7 +11,7 @@
  */
 
 // Dispatch layer — tool definitions and routing
-export { TOOL_DEFINITIONS, dispatchTool } from "./dispatch.js";
+export { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, dispatchTool } from "./dispatch.js";
 
 // Tool implementations
 export {
