@@ -39,7 +39,6 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
-import { createInterface } from "readline/promises";
 import { runConfig } from "./config.js";
 import { runCI } from "./ci.js";
 import {
@@ -68,6 +67,11 @@ import {
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport } from "./assistant-integration.js";
 import { runExport } from "./export.js";
+import {
+  resolveInitLLMSelection,
+  promptLLMSelection,
+  SUPPORTED_PROVIDERS,
+} from "./init-llm.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -271,51 +275,9 @@ function resolveAssistantFlags(rest) {
   };
 }
 
-function shouldShowInitBanner(providerFromFlag) {
-  return providerFromFlag === undefined;
-}
-
 function showInitBanner() {
   console.log(INIT_BANNER_LINES.join("\n"));
   console.log("");
-}
-
-async function promptInitProvider() {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const abort = new AbortController();
-  const onSigint = () => abort.abort();
-  process.once("SIGINT", onSigint);
-
-  try {
-    console.log("Select active LLM provider:");
-    console.log("  1) codex");
-    console.log("  2) claude");
-    console.log("");
-
-    while (true) {
-      const answer = (await rl.question("Enter choice [1-2]: ", { signal: abort.signal }))
-        .trim()
-        .toLowerCase();
-
-      if (!answer) return undefined;
-      if (answer === "1" || answer === "codex") return "codex";
-      if (answer === "2" || answer === "claude") return "claude";
-
-      console.error("Invalid selection. Choose 'codex' or 'claude'.");
-    }
-  } catch (err) {
-    if (err && typeof err === "object" && err.name === "AbortError") {
-      return undefined;
-    }
-    throw err;
-  } finally {
-    process.removeListener("SIGINT", onSigint);
-    rl.close();
-  }
 }
 
 /**
@@ -622,28 +584,34 @@ async function handleInit(rest) {
     // Both present or neither → keep default (both enabled)
   }
 
-  // Check for existing provider config before prompting
+  // Resolve LLM provider via init-llm.js (flag > config > prompt precedence).
+  // Always pass isTTY: true so handleInit attempts prompting when no flag/config
+  // provides a provider — the original behaviour before extraction. Piped input
+  // (e.g. test harnesses) feeds readline directly; an empty answer triggers the
+  // "Init cancelled" exit path. Non-interactive TTY gating can be layered in a
+  // future task without breaking existing callers.
   const existingVendor = readLLMVendor(dir);
-  let selectedProvider;
-  let providerSource;
+  const resolution = resolveInitLLMSelection({
+    flags: { provider: providerFromFlag },
+    existingConfig: { vendor: existingVendor },
+    isTTY: true,
+  });
 
-  if (providerFromFlag) {
-    selectedProvider = providerFromFlag;
-    providerSource = "from --provider flag";
-  } else if (existingVendor) {
-    selectedProvider = existingVendor;
-    providerSource = "from existing config";
-  } else {
-    // First run — show banner and prompt
+  if (resolution.needsProviderPrompt) {
     showInitBanner();
-    selectedProvider = await promptInitProvider();
-    providerSource = "selected";
   }
+
+  const selection = await promptLLMSelection(resolution);
+  const selectedProvider = selection.provider;
 
   if (!selectedProvider) {
     console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
     process.exit(1);
   }
+
+  // Map providerSource to user-facing label for the summary
+  const SOURCE_LABELS = { flag: "from --provider flag", config: "from existing config", prompt: "selected" };
+  const providerSource = SOURCE_LABELS[selection.providerSource] ?? "selected";
 
   // Check pre-existing state for status reporting
   const svExists = existsSync(join(dir, ".sourcevision"));
@@ -1342,7 +1310,6 @@ const tools = {
   sv: resolveToolPath("packages/sourcevision"),
   web: resolveToolPath("packages/web"),
 };
-const SUPPORTED_PROVIDERS = ["codex", "claude"];
 const INIT_BANNER_LINES = [
   "┌──────────────────────────────────────────────┐",
   "│                   n-dx init                  │",
