@@ -1048,12 +1048,22 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Shared: transition task to in_progress
   await transitionToInProgress(store, taskId, brief.task.status);
 
+  // Build the execution policy from guard config (needed for diagnostics at init)
+  const policy: ExecutionPolicy = {
+    ...DEFAULT_EXECUTION_POLICY,
+    allowedCommands: config.guard.allowedCommands,
+  };
+
   // Shared: initialize run record + capture start memory snapshot
   const { run, memoryCtx } = await initRunRecord({
     taskId,
     taskTitle: brief.task.title,
     model,
     henchDir,
+    vendor,
+    sandbox: policy.sandbox,
+    approvals: policy.approvals,
+    parseMode: adapter.parseMode,
   });
 
   // CLI-specific: load config for CLI path and env resolution
@@ -1077,12 +1087,6 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Spin detection uses the per-attempt accumulator; budget checking uses this
   // cross-retry accumulator so it sees total token usage across all retries.
   const runAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
-
-  // Build the execution policy from guard config
-  const policy: ExecutionPolicy = {
-    ...DEFAULT_EXECUTION_POLICY,
-    allowedCommands: config.guard.allowedCommands,
-  };
 
   // Start heartbeat — writes lastActivityAt to disk periodically so the CLI
   // subprocess doesn't appear stale to the web dashboard during long tool calls.

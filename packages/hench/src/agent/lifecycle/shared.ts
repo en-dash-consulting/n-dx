@@ -242,6 +242,14 @@ export interface InitRunOptions {
   taskTitle: string;
   model: string;
   henchDir: string;
+  /** LLM vendor for this run (e.g. "claude", "codex"). Captured in diagnostics. */
+  vendor?: string;
+  /** Sandbox mode in effect (e.g. "workspace-write"). Captured in diagnostics. */
+  sandbox?: string;
+  /** Approval policy in effect (e.g. "never"). Captured in diagnostics. */
+  approvals?: string;
+  /** Output parse mode (e.g. "stream-json", "api-sdk"). Captured in diagnostics. */
+  parseMode?: string;
 }
 
 /**
@@ -271,6 +279,19 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     toolCalls: [],
     model: opts.model,
   };
+
+  // Capture initial runtime diagnostics snapshot when identity fields are provided.
+  // tokenDiagnosticStatus starts as "unavailable" and is updated at run end.
+  if (opts.vendor || opts.parseMode) {
+    run.diagnostics = {
+      tokenDiagnosticStatus: "unavailable",
+      parseMode: opts.parseMode ?? "unknown",
+      notes: [],
+      vendor: opts.vendor,
+      sandbox: opts.sandbox,
+      approvals: opts.approvals,
+    };
+  }
 
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
@@ -393,6 +414,33 @@ export async function runPostTaskTestsIfNeeded(
 }
 
 // ---------------------------------------------------------------------------
+// Token diagnostic status derivation
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive the run-level token diagnostic status from per-turn data.
+ *
+ * Priority: `unavailable` > `partial` > `complete`.
+ * If any turn is `unavailable` the whole run is `unavailable`.
+ * If any turn is `partial` (and none `unavailable`) the run is `partial`.
+ * If all turns are `complete` (or there are no turns) the run is `complete`.
+ */
+export function deriveTokenDiagnosticStatus(
+  turnTokenUsage: ReadonlyArray<{ diagnosticStatus?: "complete" | "partial" | "unavailable" }>,
+): "complete" | "partial" | "unavailable" {
+  let overall: "complete" | "partial" | "unavailable" = "complete";
+  for (const ttu of turnTokenUsage) {
+    if (ttu.diagnosticStatus === "unavailable") {
+      return "unavailable";
+    }
+    if (ttu.diagnosticStatus === "partial" && overall === "complete") {
+      overall = "partial";
+    }
+  }
+  return overall;
+}
+
+// ---------------------------------------------------------------------------
 // Run finalization (identical in both loops)
 // ---------------------------------------------------------------------------
 
@@ -407,13 +455,20 @@ export interface FinalizeRunOptions {
 
 /**
  * Finalize a run: build structured summary, capture memory stats,
- * run post-task tests, set timestamps, and persist.
+ * update diagnostics with final token status, run post-task tests,
+ * set timestamps, and persist.
  * Called at the end of both loops.
  */
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
+
+  // Update token diagnostic status from per-turn data
+  if (run.diagnostics && run.turnTokenUsage) {
+    run.diagnostics.tokenDiagnosticStatus =
+      deriveTokenDiagnosticStatus(run.turnTokenUsage);
+  }
 
   // Assemble memory stats if context was captured at init
   if (memoryCtx) {

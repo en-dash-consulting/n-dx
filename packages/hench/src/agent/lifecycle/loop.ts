@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel, defaultRegistry } from "../../prd/llm-gateway.js";
+import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY } from "../../prd/llm-gateway.js";
 import type { LLMProvider } from "../../prd/llm-gateway.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
@@ -337,6 +337,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     taskTitle: brief.task.title,
     model,
     henchDir,
+    vendor,
+    sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
+    approvals: DEFAULT_EXECUTION_POLICY.approvals,
+    parseMode: "api-sdk",
   });
 
   const messages: Anthropic.MessageParam[] = [

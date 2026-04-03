@@ -132,6 +132,26 @@ export async function cmdShow(
     }
   }
 
+  // Runtime diagnostics snapshot
+  const diag = run.diagnostics;
+  if (diag) {
+    info(`\nDiagnostics:`);
+    if (diag.vendor) info(`  Vendor: ${diag.vendor}`);
+    info(`  Parse mode: ${diag.parseMode}`);
+    if (diag.sandbox) info(`  Sandbox: ${diag.sandbox}`);
+    if (diag.approvals) info(`  Approvals: ${diag.approvals}`);
+    info(`  Token status: ${diag.tokenDiagnosticStatus}`);
+    if (diag.notes.length > 0) {
+      info(`  Notes: ${diag.notes.join(", ")}`);
+    }
+    if (diag.promptSections && diag.promptSections.length > 0) {
+      info(`  Prompt sections:`);
+      for (const ps of diag.promptSections) {
+        info(`    ${ps.name}: ${ps.byteLength} bytes`);
+      }
+    }
+  }
+
   if (run.toolCalls.length > 0) {
     info(`\nTool Calls (${run.toolCalls.length}):`);
     for (const call of run.toolCalls) {

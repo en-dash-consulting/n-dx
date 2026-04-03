@@ -24008,7 +24008,7 @@
             {
               "id": "5409318d-45df-4709-9283-c0cef15c4fd3",
               "title": "Prompt envelope parity tests",
-              "status": "deferred",
+              "status": "completed",
               "level": "task",
               "description": "Assert both adapters receive identical section names for the same task. Assert section content is equivalent (not just present). Assert no vendor receives sections the other doesn't.",
               "acceptanceCriteria": [
@@ -24025,7 +24025,10 @@
               "blockedBy": [
                 "851ce775-c477-4b30-bfb2-14af614cead8"
               ],
-              "startedAt": "2026-04-02T23:41:44.713Z"
+              "startedAt": "2026-04-02T23:41:44.713Z",
+              "completedAt": "2026-04-03T03:20:02.507Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "34 parity tests already existed (written by prior interrupted hench run, committed in 5ce6c524). Verified all pass: AC1 (7 tests, identical section names across 6 envelope shapes + ordering), AC2 (13 tests, byte-identical content, canonical reference, policy/model invariance), AC3 (12 tests, no exclusive sections, correct channel routing, empty filtering, non-canonical names), plus 2 symmetry proof tests. Full hench suite: 2031/2031 pass, typecheck clean."
             }
           ]
         },
@@ -24163,7 +24166,7 @@
             {
               "id": "9df5dd83-8bd7-4104-809e-ae99831cd88f",
               "title": "Generalize agentLoop for registry-based provider resolution",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Replace the Claude vendor check in loop.ts with ProviderRegistry.getActiveProvider(). Refactor initApiResources() to accept any LLMProvider. Gate behind config.useRegistryProvider flag (default false). Add integration test verifying Claude API loop produces identical results before and after.",
               "acceptanceCriteria": [
@@ -24178,7 +24181,10 @@
                 "api-generalization",
                 "flag-gated"
               ],
-              "startedAt": "2026-04-03T02:59:56.194Z"
+              "startedAt": "2026-04-03T02:59:56.194Z",
+              "completedAt": "2026-04-03T03:13:45.881Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Replaced hardcoded Claude vendor check with ProviderRegistry resolution. initApiResources() now accepts any LLMProvider. Feature-gated via config.useRegistryProvider (default false). 9 integration tests verify parity."
             },
             {
               "id": "ea9bc425-60cc-4bb6-95ca-2362465cca84",
@@ -24258,7 +24264,7 @@
             {
               "id": "1e041757-f9d8-455e-88bd-8fd1b8566b55",
               "title": "Diagnostics collection in run lifecycle",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Add diagnostics: RuntimeDiagnostics field to RunRecord schema. Collect diagnostics at run start in shared.ts initRunRecord() — vendor, model, sandbox, approvals, parseMode. Update diagnostics at run end with final token status. Include diagnostics in hench show output.",
               "acceptanceCriteria": [
@@ -24271,7 +24277,8 @@
               "tags": [
                 "phase-2",
                 "diagnostics"
-              ]
+              ],
+              "startedAt": "2026-04-03T03:20:44.069Z"
             },
             {
               "id": "3a6c9338-ca59-4619-ba93-c4cabb597799",

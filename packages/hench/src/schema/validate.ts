@@ -157,6 +157,9 @@ const RunDiagnosticsSchema = z.object({
   parseMode: z.string(),
   notes: z.array(z.string()),
   promptSections: z.array(PromptSectionDiagnosticSchema).optional(),
+  vendor: z.string().optional(),
+  sandbox: z.string().optional(),
+  approvals: z.string().optional(),
 });
 
 const PersistedRuntimeEventSchema = z.object({

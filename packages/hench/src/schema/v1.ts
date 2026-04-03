@@ -302,7 +302,7 @@ export interface RunDiagnostics {
    * - `unavailable` — at least one turn had no token data
    */
   tokenDiagnosticStatus: "complete" | "partial" | "unavailable";
-  /** Output parse mode used by the vendor wrapper (e.g. "stream-json", "json"). */
+  /** Output parse mode used by the vendor wrapper (e.g. "stream-json", "json", "api-sdk"). */
   parseMode: string;
   /** Vendor-specific diagnostic notes (e.g. "codex_usage_missing"). */
   notes: string[];
@@ -314,6 +314,27 @@ export interface RunDiagnostics {
    * storing the full prompt text.
    */
   promptSections?: PromptSectionDiagnostic[];
+
+  // ── Runtime identity fields (captured at run start) ───────────────
+
+  /**
+   * LLM vendor active for this run (e.g. "claude", "codex").
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  vendor?: string;
+  /**
+   * Sandbox mode in effect (e.g. "workspace-write", "read-only").
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  sandbox?: string;
+  /**
+   * Approval policy in effect (e.g. "never", "on-request").
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  approvals?: string;
 }
 
 /**
