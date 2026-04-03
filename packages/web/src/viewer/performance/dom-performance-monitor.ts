@@ -154,11 +154,11 @@ export function countDOMNodes(container: Element): DOMNodeSnapshot {
   let treeItemCount = 0;
   let maxDepth = 0;
 
-  // Non-recursive DFS using an explicit stack: [node, depth]
-  const stack: Array<[Node, number]> = [[container, 0]];
+  // Pointer-based DFS avoids tuple allocation and repeated childNodes lookups.
+  let node: Node | null = container;
+  let depth = 0;
 
-  while (stack.length > 0) {
-    const [node, depth] = stack.pop()!;
+  while (node) {
     totalNodes++;
 
     if (depth > maxDepth) {
@@ -173,11 +173,22 @@ export function countDOMNodes(container: Element): DOMNodeSnapshot {
       }
     }
 
-    // Push children in reverse so the first child is processed first
-    const children = node.childNodes;
-    for (let i = children.length - 1; i >= 0; i--) {
-      stack.push([children[i], depth + 1]);
+    if (node.firstChild) {
+      node = node.firstChild;
+      depth++;
+      continue;
     }
+
+    while (node && node !== container && !node.nextSibling) {
+      node = node.parentNode;
+      depth--;
+    }
+
+    if (!node || node === container) {
+      break;
+    }
+
+    node = node.nextSibling;
   }
 
   return {
