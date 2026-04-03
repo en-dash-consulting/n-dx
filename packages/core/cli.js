@@ -886,7 +886,7 @@ async function handleCI(rest) {
   }
 
   try {
-    const ok = await runCI(dir, flags, { run, tools });
+    const ok = await runCI(dir, flags, { run, tools, spawnTracked });
     exitWithCleanup(ok ? 0 : 1);
   } catch (err) {
     if (err instanceof ExitRequest) throw err;

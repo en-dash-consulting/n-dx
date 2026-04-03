@@ -29,10 +29,16 @@ const MONOREPO_ROOT = resolve(__dir, "../..");
 /**
  * Run a subprocess and capture its stdout/stderr.
  * Returns { code, stdout, stderr }.
+ *
+ * @param {string}   script    Path to the Node.js script to run.
+ * @param {string[]} args      Arguments forwarded to the script.
+ * @param {Function} spawnFn  spawn-compatible function used to create the
+ *   child process.  Callers pass a tracked wrapper so the child is
+ *   registered with the global cleanup gate and terminated on SIGINT/SIGTERM.
  */
-function runCapture(script, args) {
+function runCapture(script, args, spawnFn) {
   return new Promise((res) => {
-    const child = spawn(
+    const child = spawnFn(
       process.execPath,
       [resolve(MONOREPO_ROOT, script), ...args],
       { stdio: ["ignore", "pipe", "pipe"] },
@@ -54,7 +60,7 @@ function runCapture(script, args) {
  * @param {{ run, tools }}    Injected dependencies from cli.js
  * @returns {Promise<boolean>}
  */
-export async function runCI(dir, flags, { run, tools }) {
+export async function runCI(dir, flags, { run, tools, spawnTracked = spawn }) {
   const isQuiet = flags.includes("--quiet") || flags.includes("-q");
   const isJSON = flags.some((f) => f === "--format=json");
 
@@ -171,7 +177,7 @@ export async function runCI(dir, flags, { run, tools }) {
   // broken markdown, etc.). Catches documentation regressions before merge.
   info("── docs build ──");
   const docsBuild = await new Promise((res) => {
-    const child = spawn("pnpm", ["docs:build"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawnTracked("pnpm", ["docs:build"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => { stdout += d; });
@@ -201,7 +207,7 @@ export async function runCI(dir, flags, { run, tools }) {
 
   // ── Step 1: sourcevision analyze ────────────────────────────────────────
   info("── sourcevision analyze ──");
-  const svAnalyze = await runCapture(tools.sourcevision, ["analyze", "--fast", "--quiet", dir]);
+  const svAnalyze = await runCapture(tools.sourcevision, ["analyze", "--fast", "--quiet", dir], spawnTracked);
   const svOk = svAnalyze.code === 0;
   if (!svOk) allOk = false;
 
@@ -220,7 +226,7 @@ export async function runCI(dir, flags, { run, tools }) {
 
   // ── Step 2: sourcevision validate ───────────────────────────────────────
   info("── sourcevision validate ──");
-  const svValidate = await runCapture(tools.sourcevision, ["validate", "--quiet", dir]);
+  const svValidate = await runCapture(tools.sourcevision, ["validate", "--quiet", dir], spawnTracked);
   const svValOk = svValidate.code === 0;
   if (!svValOk) allOk = false;
 
@@ -374,7 +380,7 @@ export async function runCI(dir, flags, { run, tools }) {
 
   // ── Step 4: rex validate ────────────────────────────────────────────────
   info("── rex validate ──");
-  const rexValidate = await runCapture(tools.rex, ["validate", "--format=json", dir]);
+  const rexValidate = await runCapture(tools.rex, ["validate", "--format=json", dir], spawnTracked);
 
   let validateChecks = [];
   let validateReport = null;
@@ -423,7 +429,7 @@ export async function runCI(dir, flags, { run, tools }) {
 
   // ── Step 4b: structure health ─────────────────────────────────────────
   info("── structure health ──");
-  const rexHealth = await runCapture(tools.rex, ["health", "--format=json", dir]);
+  const rexHealth = await runCapture(tools.rex, ["health", "--format=json", dir], spawnTracked);
   let healthOk = rexHealth.code === 0;
   let healthData = null;
   try {
@@ -459,7 +465,7 @@ export async function runCI(dir, flags, { run, tools }) {
 
   // ── Step 5: rex status ──────────────────────────────────────────────────
   info("── rex status ──");
-  const rexStatus = await runCapture(tools.rex, ["status", "--format=json", dir]);
+  const rexStatus = await runCapture(tools.rex, ["status", "--format=json", dir], spawnTracked);
   const statusOk = rexStatus.code === 0;
 
   let statusData = null;
