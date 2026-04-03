@@ -14,11 +14,22 @@ const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
 
 /**
+ * Default Claude model ID used when no model is explicitly configured.
+ *
+ * This constant is the single source of truth for the Claude default within
+ * the foundation layer. The orchestration-tier model catalog
+ * (`packages/core/llm-model-catalog.js`) has a corresponding `recommended`
+ * entry that must stay aligned — enforced by the catalog-runtime contract
+ * test in `tests/e2e/catalog-runtime-contract.test.js`.
+ */
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
+
+/**
  * Map of shorthand model aliases to full Anthropic API model IDs.
  * The Claude CLI resolves these internally, but the API requires full IDs.
  */
 const MODEL_ALIASES: Record<string, string> = {
-  sonnet: "claude-sonnet-4-6",
+  sonnet: DEFAULT_CLAUDE_MODEL,
   opus: "claude-opus-4-20250514",
   haiku: "claude-haiku-4-20250414",
 };

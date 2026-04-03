@@ -142,6 +142,7 @@ export type { CreateLLMClientOptions } from "./llm-client.js";
 
 // Config
 export {
+  DEFAULT_CLAUDE_MODEL,
   loadClaudeConfig,
   resolveApiKey,
   resolveCliPath,
@@ -172,6 +173,7 @@ export { createCliClient } from "./cli-provider.js";
 export type { CliProviderOptions } from "./cli-provider.js";
 
 export {
+  DEFAULT_CODEX_MODEL,
   createCodexCliClient,
   compileCodexPolicyFlags,
   mapSandboxToCodexFlag,

@@ -49,7 +49,14 @@ const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_DELAY_MS = 10000;
 const DEFAULT_CODEX_BINARY = "codex";
-const DEFAULT_CODEX_MODEL = "gpt-5-codex";
+/**
+ * Default Codex model ID used when no model is explicitly configured.
+ *
+ * Exported so the catalog-runtime contract test can cross-reference this
+ * value against the orchestration-tier model catalog's `recommended` entry.
+ * @see tests/e2e/catalog-runtime-contract.test.js
+ */
+export const DEFAULT_CODEX_MODEL = "gpt-5-codex";
 
 export interface CodexCliProviderOptions {
   codexConfig?: CodexConfig;
