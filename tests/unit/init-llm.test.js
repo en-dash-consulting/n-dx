@@ -282,6 +282,7 @@ describe("promptLLMSelection", () => {
         model: "claude-sonnet-4-6",
         providerSource: "config",
         modelSource: "config",
+        cancelled: false,
       });
     });
 
@@ -300,6 +301,7 @@ describe("promptLLMSelection", () => {
         model: "gpt-5-codex",
         providerSource: "flag",
         modelSource: "flag",
+        cancelled: false,
       });
     });
 
@@ -315,6 +317,7 @@ describe("promptLLMSelection", () => {
       const result = await promptLLMSelection(resolution);
       expect(result).not.toHaveProperty("needsProviderPrompt");
       expect(result).not.toHaveProperty("needsModelPrompt");
+      expect(result).toHaveProperty("cancelled", false);
     });
   });
 
@@ -436,6 +439,7 @@ describe("promptLLMSelection", () => {
       });
       expect(result.provider).toBeUndefined();
       expect(result.providerSource).toBeUndefined();
+      expect(result.cancelled).toBe(true);
       expect(modelPrompt).not.toHaveBeenCalled();
     });
 
@@ -455,6 +459,55 @@ describe("promptLLMSelection", () => {
       expect(result.providerSource).toBe("config");
       expect(result.model).toBeUndefined();
       expect(result.modelSource).toBeUndefined();
+      expect(result.cancelled).toBe(true);
+    });
+
+    it("sets cancelled to false when no prompts are needed", async () => {
+      const resolution = {
+        provider: "claude",
+        model: "claude-sonnet-4-6",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: false,
+        needsModelPrompt: false,
+      };
+      const result = await promptLLMSelection(resolution);
+      expect(result.cancelled).toBe(false);
+    });
+
+    it("sets cancelled to false when all prompts succeed", async () => {
+      const resolution = {
+        provider: undefined,
+        model: undefined,
+        providerSource: undefined,
+        modelSource: undefined,
+        needsProviderPrompt: true,
+        needsModelPrompt: true,
+      };
+      const result = await promptLLMSelection(resolution, {
+        promptProvider: async () => "codex",
+        promptModel: async () => "gpt-5-codex",
+      });
+      expect(result.cancelled).toBe(false);
+    });
+
+    it("sets cancelled when model prompt is cancelled after successful provider prompt", async () => {
+      const resolution = {
+        provider: undefined,
+        model: undefined,
+        providerSource: undefined,
+        modelSource: undefined,
+        needsProviderPrompt: true,
+        needsModelPrompt: true,
+      };
+      const result = await promptLLMSelection(resolution, {
+        promptProvider: async () => "claude",
+        promptModel: async () => undefined,
+      });
+      expect(result.provider).toBe("claude");
+      expect(result.providerSource).toBe("prompt");
+      expect(result.model).toBeUndefined();
+      expect(result.cancelled).toBe(true);
     });
   });
 
@@ -479,6 +532,7 @@ describe("promptLLMSelection", () => {
         model: "gpt-5-codex",
         providerSource: "prompt",
         modelSource: "prompt",
+        cancelled: false,
       });
     });
 
@@ -532,7 +586,7 @@ describe("promptLLMSelection", () => {
   // ── Return shape ──────────────────────────────────────────────────────────
 
   describe("returns normalized selection object", () => {
-    it("always has exactly four keys", async () => {
+    it("always has exactly five keys", async () => {
       const resolution = {
         provider: undefined,
         model: undefined,
@@ -543,7 +597,7 @@ describe("promptLLMSelection", () => {
       };
       const result = await promptLLMSelection(resolution);
       expect(Object.keys(result).sort()).toEqual(
-        ["model", "modelSource", "provider", "providerSource"],
+        ["cancelled", "model", "modelSource", "provider", "providerSource"],
       );
     });
   });

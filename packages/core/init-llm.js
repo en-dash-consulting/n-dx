@@ -259,11 +259,12 @@ async function promptModelEnquirer(provider, models) {
  * @param {object} [options]
  * @param {() => Promise<string|undefined>}         [options.promptProvider]  Override provider prompt
  * @param {(provider: string) => Promise<string|undefined>}  [options.promptModel]  Override model prompt
- * @returns {Promise<{ provider?: string, model?: string, providerSource?: string, modelSource?: string }>}
+ * @returns {Promise<{ provider?: string, model?: string, providerSource?: string, modelSource?: string, cancelled: boolean }>}
  */
 export async function promptLLMSelection(resolution, options = {}) {
   let { provider, model, providerSource, modelSource } = resolution;
   const { needsProviderPrompt, needsModelPrompt } = resolution;
+  let cancelled = false;
 
   if (needsProviderPrompt) {
     const promptFn = options.promptProvider ?? defaultPromptProvider;
@@ -271,6 +272,8 @@ export async function promptLLMSelection(resolution, options = {}) {
     if (selected) {
       provider = selected;
       providerSource = "prompt";
+    } else {
+      cancelled = true;
     }
   }
 
@@ -280,10 +283,12 @@ export async function promptLLMSelection(resolution, options = {}) {
     if (selected) {
       model = selected;
       modelSource = "prompt";
+    } else {
+      cancelled = true;
     }
   }
 
-  return { provider, model, providerSource, modelSource };
+  return { provider, model, providerSource, modelSource, cancelled };
 }
 
 export { SUPPORTED_PROVIDERS, PROVIDER_LABELS };

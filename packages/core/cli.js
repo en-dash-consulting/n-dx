@@ -631,8 +631,15 @@ async function handleInit(rest) {
 
   const selection = await promptLLMSelection(resolution);
   const selectedProvider = selection.provider;
+  const llmSkipped = selection.cancelled;
 
-  if (!selectedProvider) {
+  if (llmSkipped) {
+    console.log("LLM configuration skipped.");
+  }
+
+  // When no provider is available and it wasn't a user cancellation (e.g.
+  // non-TTY with no flags or config), exit with a clear message.
+  if (!selectedProvider && !llmSkipped) {
     console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
     process.exit(1);
   }
@@ -663,18 +670,22 @@ async function handleInit(rest) {
   ensureGitignoreEntry(dir, ".n-dx.local.json");
 
   // Persist LLM selection (suppress output). Vendor first, then model.
+  // Skip entirely when the user cancelled an interactive prompt — no partial
+  // config should be written on cancellation.
   // runConfig("llm.vendor", ...) runs auth preflight. If preflight fails,
   // it calls process.exit(1) so the model key is never written.
-  const selectedModel = selection.model;
-  const origLog = console.log;
-  console.log = () => {};
-  try {
-    await runConfig(["llm.vendor", selectedProvider, dir]);
-    if (selectedModel) {
-      await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
+  if (!llmSkipped && selectedProvider) {
+    const selectedModel = selection.model;
+    const origLog = console.log;
+    console.log = () => {};
+    try {
+      await runConfig(["llm.vendor", selectedProvider, dir]);
+      if (selectedModel) {
+        await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
+      }
+    } finally {
+      console.log = origLog;
     }
-  } finally {
-    console.log = origLog;
   }
 
   // Assistant integrations (vendor-neutral dispatch)
@@ -686,7 +697,11 @@ async function handleInit(rest) {
   console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
   console.log(`  .rex/           ${rexExists ? "already exists (reused)" : "created"}`);
   console.log(`  .hench/         ${henchExists ? "already exists (reused)" : "created"}`);
-  console.log(`  LLM provider    ${selectedProvider} (${providerSource})`);
+  if (llmSkipped) {
+    console.log("  LLM provider    skipped");
+  } else {
+    console.log(`  LLM provider    ${selectedProvider} (${providerSource})`);
+  }
   for (const line of formatInitReport(assistantResults)) {
     console.log(line);
   }
