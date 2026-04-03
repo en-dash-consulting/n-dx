@@ -24347,7 +24347,7 @@
     {
       "id": "8273b9d3-ae67-402a-80bf-3112fdf331fd",
       "title": "Init LLM Provider & Model Selection",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Make ndx init configure the active LLM in one guided flow: choose vendor first, then choose a vendor-specific model using a keyboard-driven terminal selector. Persist to .n-dx.json under llm.&lt;vendor&gt;.model. Supports both interactive and flag-driven non-interactive flows. Reference: docs/architecture/init-llm-provider-model-selection.md",
       "priority": "high",
@@ -24357,6 +24357,8 @@
         "ux",
         "config"
       ],
+      "startedAt": "2026-04-03T21:56:37.802Z",
+      "completedAt": "2026-04-03T21:56:37.802Z",
       "children": [
         {
           "id": "b7fb2054-06e0-4292-9afd-162fa5ff4693",
@@ -24606,6 +24608,8 @@
           "blockedBy": [
             "c2ba412c-92cb-43e3-a259-297168f99696"
           ],
+          "startedAt": "2026-04-03T21:18:32.569Z",
+          "completedAt": "2026-04-03T21:18:32.569Z",
           "children": [
             {
               "id": "42ea107c-f26d-4b6f-9cb8-a38bff1fcbfd",
@@ -24659,14 +24663,12 @@
               "resolutionType": "code-change",
               "resolutionDetail": "Added validateInitFlags() function to init-llm.js, --claude-model/--codex-model flag extraction to cli.js, wired validation into handleInit, added help text entries, 21 unit tests + 10 E2E tests."
             }
-          ],
-          "startedAt": "2026-04-03T21:18:32.569Z",
-          "completedAt": "2026-04-03T21:18:32.569Z"
+          ]
         },
         {
           "id": "3a53d6cb-e0aa-41b1-ba49-1137ac01aa3e",
           "title": "Docs & Help Text Updates",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Update help.js with new init flags (--model, --claude-model, --codex-model). Update docs/guide/configuration.md with model selection documentation. Document that .codex/config.toml remains MCP-only and model config lives in .n-dx.json.",
           "priority": "medium",
@@ -24676,11 +24678,13 @@
           "blockedBy": [
             "1a037921-5f73-48f2-8400-bc46122071a4"
           ],
+          "startedAt": "2026-04-03T21:56:37.682Z",
+          "completedAt": "2026-04-03T21:56:37.682Z",
           "children": [
             {
               "id": "2154cb61-604e-4182-8a4e-91f8de0528e0",
               "title": "Update packages/core/help.js with new init flags",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add documentation for --model, --claude-model, and --codex-model flags to the ndx init help text in packages/core/help.js. Include brief descriptions and examples.",
               "acceptanceCriteria": [
@@ -24688,12 +24692,16 @@
                 "Each flag has a brief description",
                 "Help text includes at least one usage example"
               ],
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-04-03T21:38:41.007Z",
+              "completedAt": "2026-04-03T21:49:28.352Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added model flag examples (--model, --claude-model, --codex-model, combined) and search keywords to help.js init command"
             },
             {
               "id": "dd074270-381e-4ab4-8220-9ec833d99124",
               "title": "Update docs/guide/configuration.md with model selection docs",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Document the new LLM model selection in docs/guide/configuration.md. Cover: interactive flow description, available model options per vendor, flag-based configuration, .n-dx.json config keys (llm.vendor, llm.&lt;vendor&gt;.model), and the explicit note that .codex/config.toml remains MCP-only.",
               "acceptanceCriteria": [
@@ -24702,19 +24710,27 @@
                 "Documents .n-dx.json config keys for LLM settings",
                 "States that .codex/config.toml remains MCP-only"
               ],
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-04-03T21:34:07.319Z",
+              "completedAt": "2026-04-03T21:38:12.064Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added LLM model selection documentation to docs/guide/configuration.md covering interactive flow, model catalog, flag-based config, .n-dx.json keys, and .codex/config.toml MCP-only note."
             },
             {
               "id": "ef73798b-7988-4761-97c6-345ffd680b02",
               "title": "Update assistant instruction files via ndx init regeneration",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "After implementation, regenerate CLAUDE.md and AGENTS.md via ndx init to reflect new init flow documentation. Ensure the command reference in both files includes the new --model flags for ndx init.",
               "acceptanceCriteria": [
                 "CLAUDE.md and AGENTS.md reflect new ndx init flags after regeneration",
                 "No manual edits to generated files — changes flow through assistant-assets/"
               ],
-              "priority": "low"
+              "priority": "low",
+              "startedAt": "2026-04-03T21:49:57.125Z",
+              "completedAt": "2026-04-03T21:56:37.498Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Updated project-guidance.md with new init --model flags and .n-dx.json LLM config keys. Regenerated CLAUDE.md and AGENTS.md from the shared source of truth — no manual edits to generated files."
             }
           ]
         },
