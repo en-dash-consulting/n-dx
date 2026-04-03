@@ -50,7 +50,7 @@ jobs:
         run: pnpm build
 
       - name: Run unit tests
-        run: npm test
+        run: pnpm -r run test
 
       - name: Create Release PR or Publish
         id: changesets

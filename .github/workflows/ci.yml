@@ -67,7 +67,7 @@ jobs:
         run: pnpm pr-check
 
       - name: Run unit tests
-        run: npm test
+        run: pnpm -r run test
 
       - name: Require changeset
         if: github.event_name == 'pull_request'
