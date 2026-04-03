@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { processCodexJsonLine } from "../../../src/agent/lifecycle/cli-loop.js";
-import type { CliRunResult } from "../../../src/agent/lifecycle/cli-loop.js";
+import { processCodexJsonLine } from "../../../src/agent/lifecycle/event-accumulator.js";
+import type { CliRunResult } from "../../../src/agent/lifecycle/event-accumulator.js";
 
 function createResult(): CliRunResult {
   return {

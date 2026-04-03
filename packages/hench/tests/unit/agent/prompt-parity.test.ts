@@ -39,7 +39,7 @@ import {
   FULL_PROMPT_SECTIONS,
   MINIMAL_PROMPT_SECTIONS,
 } from "../../fixtures/cross-vendor-runtime.js";
-import { buildClaudeCliArgs } from "../../../src/agent/lifecycle/cli-loop.js";
+import { buildClaudeCliArgs } from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 
 // ── Deterministic test fixtures ──────────────────────────────────────────────
 

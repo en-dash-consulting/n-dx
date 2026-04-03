@@ -20,7 +20,7 @@ import {
 } from "../../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
 import {
   normalizeCodexResponse as originalNormalizeCodexResponse,
-} from "../../../src/agent/lifecycle/cli-loop.js";
+} from "../../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
 import type { VendorAdapter, SpawnConfig } from "../../../src/agent/lifecycle/vendor-adapter.js";
 import {
   DEFAULT_EXECUTION_POLICY,

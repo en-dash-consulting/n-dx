@@ -64,22 +64,6 @@ import { EventAccumulator } from "./event-accumulator.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/v1.js";
 
-// ── Backward compatibility re-exports ─────────────────────────────────────
-//
-// Tests import these symbols from cli-loop.ts. The actual implementations
-// now live in the adapter modules and event-accumulator.ts. Re-exporting
-// preserves the existing import paths so tests don't need changes.
-
-export { processStreamLine, processCodexJsonLine } from "./event-accumulator.js";
-export type { CliRunResult, TokenEventMetadata } from "./event-accumulator.js";
-export { buildClaudeCliArgs, buildAllowedTools } from "./adapters/claude-cli-adapter.js";
-export type { ClaudeCliInput } from "./adapters/claude-cli-adapter.js";
-export { normalizeCodexResponse } from "./adapters/codex-cli-adapter.js";
-export type { NormalizedCodexToolEvent, NormalizedCodexResponse } from "./adapters/codex-cli-adapter.js";
-
-// Re-export resolveVendorAdapter so it's available from the main loop module
-export { resolveVendorAdapter } from "./adapters/index.js";
-
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export interface CliLoopOptions extends SharedLoopOptions {}

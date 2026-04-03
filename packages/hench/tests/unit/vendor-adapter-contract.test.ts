@@ -19,13 +19,13 @@ import { describe, it, expect } from "vitest";
 import {
   processStreamLine,
   processCodexJsonLine,
+} from "../../src/agent/lifecycle/event-accumulator.js";
+import type { CliRunResult } from "../../src/agent/lifecycle/event-accumulator.js";
+import {
   buildClaudeCliArgs,
   buildAllowedTools,
-} from "../../src/agent/lifecycle/cli-loop.js";
-import type {
-  CliRunResult,
-  ClaudeCliInput,
-} from "../../src/agent/lifecycle/cli-loop.js";
+} from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
+import type { ClaudeCliInput } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import {
   classifyVendorError,
   failureCategoryLabel,

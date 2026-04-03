@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   processStreamLine,
   type CliRunResult,
-} from "../../../src/agent/lifecycle/cli-loop.js";
+} from "../../../src/agent/lifecycle/event-accumulator.js";
 import type { TurnTokenUsage } from "../../../src/schema/v1.js";
 
 function makeResult(): CliRunResult {

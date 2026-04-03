@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeCodexResponse } from "../../../src/agent/lifecycle/cli-loop.js";
+import { normalizeCodexResponse } from "../../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
 
 describe("normalizeCodexResponse", () => {
   const malformedFixtures: Array<{

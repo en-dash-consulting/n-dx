@@ -21,8 +21,8 @@ import {
 import {
   buildClaudeCliArgs as originalBuildClaudeCliArgs,
   buildAllowedTools as originalBuildAllowedTools,
-} from "../../../src/agent/lifecycle/cli-loop.js";
-import type { ClaudeCliInput } from "../../../src/agent/lifecycle/cli-loop.js";
+} from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
+import type { ClaudeCliInput } from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import type { VendorAdapter, SpawnConfig } from "../../../src/agent/lifecycle/vendor-adapter.js";
 import {
   DEFAULT_EXECUTION_POLICY,
