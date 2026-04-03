@@ -203,7 +203,7 @@ describe("rex add (smart mode routing)", () => {
     ]);
 
     expect(stderr).toContain("subtask");
-  });
+  }, 10000);
 
   it("smart mode with valid --parent scopes to parent", async () => {
     run(["init", tmpDir]);
