@@ -182,11 +182,20 @@ class ExitRequest extends Error {
   }
 }
 
-const childTracker = createChildProcessTracker();
+const childTracker = createChildProcessTracker({ processGroups: true });
 let exitPromise = null;
 
+/**
+ * On POSIX systems, spawn each child with `detached: true` so it becomes the
+ * leader of a new process group.  This lets the process-group-aware tracker
+ * kill grandchildren (spawned by the child) by signalling `-pgid` instead of
+ * only the direct child PID.  On Windows the flag is omitted — process groups
+ * are not supported and detached mode has different semantics there.
+ */
+const SPAWN_DETACHED = process.platform !== "win32" ? { detached: true } : {};
+
 function spawnTracked(command, args, options) {
-  return childTracker.register(spawn(command, args, options));
+  return childTracker.register(spawn(command, args, { ...SPAWN_DETACHED, ...options }));
 }
 
 function exitWithCleanup(code = 0) {
