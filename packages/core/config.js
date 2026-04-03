@@ -24,7 +24,7 @@ const PACKAGES = {
  * Sections stored in .n-dx.json rather than package config files.
  * These are cross-cutting settings that apply to all packages.
  */
-const PROJECT_SECTIONS = new Set(["claude", "llm", "web", "features", "sourcevision"]);
+const PROJECT_SECTIONS = new Set(["claude", "llm", "web", "features", "sourcevision", "cli"]);
 
 /**
  * Valid values for the top-level `language` field in .n-dx.json.
@@ -96,7 +96,7 @@ function deepMerge(target, source) {
  * Load the project-level .n-dx.json config from the project root.
  * Returns an empty object if the file doesn't exist or is invalid.
  */
-async function loadProjectConfig(dir) {
+export async function loadProjectConfig(dir) {
   const configPath = join(dir, PROJECT_CONFIG_FILE);
   if (!(await fileExists(configPath))) return {};
   try {

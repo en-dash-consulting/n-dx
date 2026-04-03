@@ -40,7 +40,8 @@ import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig } from "./config.js";
+import { runConfig, loadProjectConfig } from "./config.js";
+import { resolveCommandTimeout, withCommandTimeout } from "./cli-timeout.js";
 import { runCI } from "./ci.js";
 import {
   runWeb,
@@ -1354,60 +1355,75 @@ async function main() {
     exitWithCleanup(0);
   }
 
+  // ── Resolve command timeout from project config ─────────────────────────
+  // Load project config from the directory inferred from args (best-effort:
+  // failure is silently ignored so a missing .n-dx.json never blocks startup).
+  const dir = resolveDir(rest);
+  const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
+  const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+
   // ── Dispatch to command handler ─────────────────────────────────────────
-  switch (command) {
-    case "version":   return handleVersion(rest);
-    case "help":      return handleHelp(rest);
-    case "init":      return handleInit(rest);
-    case "analyze":   return handleAnalyze(rest);
-    case "recommend": return handleRecommend(rest);
-    case "plan":      return handlePlan(rest);
-    case "add":       return handleAdd(rest);
-    case "refresh":   return handleRefresh(rest);
-    case "work":      return handleWork(rest);
-    case "status":  return handleStatus(rest);
-    case "usage":   return handleUsage(rest);
-    case "sync":    return handleSync(rest);
-    case "ci":      return handleCI(rest);
-    case "dev":     return handleDev(rest);
-    case "start":   return handleStart(rest, "start");
-    case "web":     return handleStart(rest, "web");
-    case "export":    return handleExport(rest);
-    case "config":    return handleConfig(rest);
-    case "self-heal": return handleSelfHeal(rest);
+  const runCommand = async () => {
+    switch (command) {
+      case "version":   return handleVersion(rest);
+      case "help":      return handleHelp(rest);
+      case "init":      return handleInit(rest);
+      case "analyze":   return handleAnalyze(rest);
+      case "recommend": return handleRecommend(rest);
+      case "plan":      return handlePlan(rest);
+      case "add":       return handleAdd(rest);
+      case "refresh":   return handleRefresh(rest);
+      case "work":      return handleWork(rest);
+      case "status":  return handleStatus(rest);
+      case "usage":   return handleUsage(rest);
+      case "sync":    return handleSync(rest);
+      case "ci":      return handleCI(rest);
+      case "dev":     return handleDev(rest);
+      case "start":   return handleStart(rest, "start");
+      case "web":     return handleStart(rest, "web");
+      case "export":    return handleExport(rest);
+      case "config":    return handleConfig(rest);
+      case "self-heal": return handleSelfHeal(rest);
 
-    // ── Delegated rex commands ──
-    case "validate":    return handleValidate(rest);
-    case "fix":         return handleFix(rest);
-    case "health":      return handleHealth(rest);
-    case "report":      return handleReport(rest);
-    case "verify":      return handleVerify(rest);
-    case "update":      return handleUpdate(rest);
-    case "remove":      return handleRemove(rest);
-    case "move":        return handleMove(rest);
-    case "reshape":     return handleReshape(rest);
-    case "reorganize":  return handleReorganize(rest);
-    case "prune":       return handlePrune(rest);
-    case "next":        return handleNext(rest);
+      // ── Delegated rex commands ──
+      case "validate":    return handleValidate(rest);
+      case "fix":         return handleFix(rest);
+      case "health":      return handleHealth(rest);
+      case "report":      return handleReport(rest);
+      case "verify":      return handleVerify(rest);
+      case "update":      return handleUpdate(rest);
+      case "remove":      return handleRemove(rest);
+      case "move":        return handleMove(rest);
+      case "reshape":     return handleReshape(rest);
+      case "reorganize":  return handleReorganize(rest);
+      case "prune":       return handlePrune(rest);
+      case "next":        return handleNext(rest);
 
-    // ── Delegated sourcevision commands ──
-    case "reset":       return handleReset(rest);
+      // ── Delegated sourcevision commands ──
+      case "reset":       return handleReset(rest);
 
-    // ── Delegated hench commands ──
-    case "show":        return handleShow(rest);
+      // ── Delegated hench commands ──
+      case "show":        return handleShow(rest);
+    }
+
+    // ── Tool delegation ─────────────────────────────────────────────────────
+    if (tools[command]) {
+      const code = await run(tools[command], rest);
+      exitWithCleanup(code);
+    }
+
+    // ── Unknown command or no command ───────────────────────────────────────
+    if (command) {
+      return handleUnknownCommand(command);
+    }
+
+    showMainHelp();
+    exitWithCleanup(0);
+  };
+
+  if (timeoutMs > 0) {
+    await withCommandTimeout(command ?? "", timeoutMs, runCommand);
+  } else {
+    await runCommand();
   }
-
-  // ── Tool delegation ───────────────────────────────────────────────────────
-  if (tools[command]) {
-    const code = await run(tools[command], rest);
-    exitWithCleanup(code);
-  }
-
-  // ── Unknown command or no command ─────────────────────────────────────────
-  if (command) {
-    return handleUnknownCommand(command);
-  }
-
-  showMainHelp();
-  exitWithCleanup(0);
 }

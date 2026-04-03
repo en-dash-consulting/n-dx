@@ -52,7 +52,9 @@
     "refresh-artifacts.js",
     "export.js",
     "claude-integration.js",
-    "refresh-validate.js"
+    "refresh-validate.js",
+    "child-lifecycle.js",
+    "cli-timeout.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"
