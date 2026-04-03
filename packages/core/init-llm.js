@@ -18,10 +18,20 @@
  * 4. Runtime default fallback (handled by caller)
  */
 
-import { createInterface } from "node:readline/promises";
 import { getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";
 
 const SUPPORTED_PROVIDERS = ["codex", "claude"];
+
+/**
+ * Friendly display labels for each supported provider.
+ * Used by the enquirer Select prompt during interactive init.
+ *
+ * @type {Record<string, string>}
+ */
+const PROVIDER_LABELS = {
+  codex: "Codex (OpenAI)",
+  claude: "Claude (Anthropic)",
+};
 
 /**
  * Check whether the current environment supports interactive terminal prompts.
@@ -115,61 +125,47 @@ export function resolveInitLLMSelection({ flags, existingConfig, isTTY }) {
 // ── Internal prompt helpers ──────────────────────────────────────────────────
 
 /**
- * Default interactive provider prompt using readline.
+ * Default interactive provider prompt using enquirer's Select prompt.
  *
- * This is the non-TTY-safe fallback prompt. Enquirer-based prompts (added by
- * sibling tasks) require a real TTY for keyboard navigation; this readline
- * version works with piped input and test harnesses. Use isInteractiveTerminal()
- * to choose between enquirer and this fallback.
+ * Displays supported providers as a keyboard-navigable list. Arrow keys
+ * navigate, Enter confirms. Provider names are shown with friendly labels
+ * (e.g. "Claude (Anthropic)") while the returned value is the canonical
+ * provider key (e.g. "claude").
+ *
+ * This function is only called when resolveInitLLMSelection() determines
+ * a provider prompt is needed (i.e. isTTY is true). The non-TTY safety
+ * fallback returns undefined, which the caller treats as cancellation.
  *
  * @returns {Promise<string|undefined>}  Selected provider or undefined on cancel.
  */
 async function defaultPromptProvider() {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const abort = new AbortController();
-  const onSigint = () => abort.abort();
-  process.once("SIGINT", onSigint);
+  if (!isInteractiveTerminal()) {
+    // Non-TTY environments should not reach here (resolveInitLLMSelection
+    // sets needsProviderPrompt=false when isTTY is false). Safety fallback.
+    return undefined;
+  }
 
   try {
-    console.log("Select active LLM provider:");
-    for (let i = 0; i < SUPPORTED_PROVIDERS.length; i++) {
-      console.log(`  ${i + 1}) ${SUPPORTED_PROVIDERS[i]}`);
-    }
-    console.log("");
+    const { default: Enquirer } = await import("enquirer");
+    const enquirer = new Enquirer();
 
-    while (true) {
-      const answer = (
-        await rl.question("Enter choice [1-2]: ", { signal: abort.signal })
-      )
-        .trim()
-        .toLowerCase();
+    const choices = SUPPORTED_PROVIDERS.map((p) => ({
+      name: p,
+      message: PROVIDER_LABELS[p] || p,
+    }));
 
-      if (!answer) return undefined;
+    const response = await enquirer.prompt({
+      type: "select",
+      name: "provider",
+      message: "Select LLM provider",
+      choices,
+    });
 
-      const idx = parseInt(answer, 10);
-      if (idx >= 1 && idx <= SUPPORTED_PROVIDERS.length) {
-        return SUPPORTED_PROVIDERS[idx - 1];
-      }
-      if (SUPPORTED_PROVIDERS.includes(answer)) {
-        return answer;
-      }
-
-      console.error(
-        `Invalid selection. Choose ${SUPPORTED_PROVIDERS.map((p) => `'${p}'`).join(" or ")}.`,
-      );
-    }
+    return response.provider || undefined;
   } catch (err) {
-    if (err && typeof err === "object" && err.name === "AbortError") {
-      return undefined;
-    }
+    // Ctrl+C or Esc — treat as cancellation
+    if (err === "" || (err && err.message === "")) return undefined;
     throw err;
-  } finally {
-    process.removeListener("SIGINT", onSigint);
-    rl.close();
   }
 }
 
@@ -256,7 +252,7 @@ async function promptModelEnquirer(provider, models) {
  * the internal prompting signals (needsProviderPrompt / needsModelPrompt).
  *
  * Prompt functions can be injected for testability.  Defaults:
- * - Provider prompt: readline-based numeric/text selector.
+ * - Provider prompt: enquirer Select with arrow-key navigation (TTY only).
  * - Model prompt: enquirer Select (TTY) or auto-select recommended (non-TTY), driven by llm-model-catalog.js.
  *
  * @param {object} resolution                       Output of resolveInitLLMSelection()
@@ -290,5 +286,5 @@ export async function promptLLMSelection(resolution, options = {}) {
   return { provider, model, providerSource, modelSource };
 }
 
-export { SUPPORTED_PROVIDERS };
+export { SUPPORTED_PROVIDERS, PROVIDER_LABELS };
 export { LLM_MODEL_CATALOG, getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";

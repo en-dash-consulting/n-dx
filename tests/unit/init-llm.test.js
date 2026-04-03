@@ -3,6 +3,8 @@ import {
   resolveInitLLMSelection,
   promptLLMSelection,
   isInteractiveTerminal,
+  SUPPORTED_PROVIDERS,
+  PROVIDER_LABELS,
   LLM_MODEL_CATALOG,
   getModelsForVendor,
   getRecommendedModel,
@@ -595,6 +597,40 @@ describe("isInteractiveTerminal", () => {
     process.stdin.isTTY = true;
     delete process.env.CI;
     expect(isInteractiveTerminal()).toBe(true);
+  });
+});
+
+// ─── Provider Labels (keyboard-driven select) ───────────────────────────────
+
+describe("PROVIDER_LABELS", () => {
+  it("has a label for every supported provider", () => {
+    for (const provider of SUPPORTED_PROVIDERS) {
+      expect(
+        PROVIDER_LABELS[provider],
+        `Missing label for provider '${provider}'`,
+      ).toBeTruthy();
+    }
+  });
+
+  it("includes both codex and claude as selectable options", () => {
+    expect(PROVIDER_LABELS).toHaveProperty("codex");
+    expect(PROVIDER_LABELS).toHaveProperty("claude");
+  });
+
+  it("labels are friendly display strings, not raw keys", () => {
+    // Labels should be more descriptive than the raw key
+    for (const [key, label] of Object.entries(PROVIDER_LABELS)) {
+      expect(label.length, `Label for '${key}' should be longer than the key`).toBeGreaterThan(key.length);
+      expect(typeof label).toBe("string");
+    }
+  });
+
+  it("codex label is Codex (OpenAI)", () => {
+    expect(PROVIDER_LABELS.codex).toBe("Codex (OpenAI)");
+  });
+
+  it("claude label is Claude (Anthropic)", () => {
+    expect(PROVIDER_LABELS.claude).toBe("Claude (Anthropic)");
   });
 });
 

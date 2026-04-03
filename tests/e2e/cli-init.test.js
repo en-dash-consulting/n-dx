@@ -69,23 +69,17 @@ describe("n-dx init provider selection", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("prompts with codex and claude options only", async () => {
+  it("selects codex provider via --provider flag and shows confirmation", async () => {
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-prompt-"));
     try {
       await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
 
-      const output = run(["init", tmpDir], {
-        input: "1\n",
+      const output = run(["init", "--provider=codex", tmpDir], {
         env: {
           ...process.env,
           PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
         },
       });
-      expect(output).toContain("n-dx init");
-      expect(output.indexOf("n-dx init")).toBeLessThan(output.indexOf("Select active LLM provider:"));
-      expect(output).toContain("Select active LLM provider:");
-      expect(output).toContain("1) codex");
-      expect(output).toContain("2) claude");
       // Unified summary shows provider confirmation
       expect(output).toMatch(/LLM provider\s+codex|llm\.vendor = codex/);
     } finally {
@@ -98,8 +92,7 @@ describe("n-dx init provider selection", () => {
     try {
       await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
 
-      run(["init", tmpDir], {
-        input: "2\n",
+      run(["init", "--provider=claude", tmpDir], {
         env: {
           ...process.env,
           PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
@@ -140,8 +133,8 @@ describe("n-dx init provider selection", () => {
     }
   });
 
-  it("exits non-zero with clear message when selection is cancelled", () => {
-    const result = runFail(["init", tmpDir], { input: "\n" });
+  it("exits non-zero with clear message when no provider is given in non-TTY mode", () => {
+    const result = runFail(["init", tmpDir]);
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Init cancelled: no provider selected");
   });

@@ -585,16 +585,15 @@ async function handleInit(rest) {
   }
 
   // Resolve LLM provider via init-llm.js (flag > config > prompt precedence).
-  // Always pass isTTY: true so handleInit attempts prompting when no flag/config
-  // provides a provider — the original behaviour before extraction. Piped input
-  // (e.g. test harnesses) feeds readline directly; an empty answer triggers the
-  // "Init cancelled" exit path. Non-interactive TTY gating can be layered in a
-  // future task without breaking existing callers.
+  // Pass real TTY state: enquirer's keyboard-driven Select prompt requires a
+  // real TTY. In non-TTY environments (piped input, CI), if no --provider flag
+  // or config is present, the prompt is skipped and init exits with a clear
+  // message asking the user to re-run with --provider=.
   const existingVendor = readLLMVendor(dir);
   const resolution = resolveInitLLMSelection({
     flags: { provider: providerFromFlag },
     existingConfig: { vendor: existingVendor },
-    isTTY: true,
+    isTTY: process.stdin.isTTY === true,
   });
 
   if (resolution.needsProviderPrompt) {

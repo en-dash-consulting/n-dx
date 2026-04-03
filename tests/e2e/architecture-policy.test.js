@@ -1186,8 +1186,8 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
   // Core orchestrator — dynamic import of rex public API for export pre-rendering
   ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],
-  // Core init-llm — lazy-loads enquirer for interactive model selection (TTY-only)
-  ["packages/core/init-llm.js", "Lazy-loads enquirer for keyboard-driven model selector in TTY environments"],
+  // Core init-llm — lazy-loads enquirer for interactive provider & model selection (TTY-only)
+  ["packages/core/init-llm.js", "Lazy-loads enquirer for keyboard-driven provider and model selectors in TTY environments"],
 ]);
 
 describe("architecture policy: dynamic import audit", () => {
