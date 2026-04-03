@@ -24544,7 +24544,7 @@
             {
               "id": "86b700c8-96e1-4bac-ad05-17dbfac5bf80",
               "title": "Persist selected model via runConfig()",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "After LLM selection completes, persist using runConfig() in order: (1) llm.vendor, (2) llm.&lt;vendor&gt;.model. This reuses existing validation and auth preflight. If provider preflight fails, do not write the model key. Do not write to .codex/config.toml, .claude/settings.local.json, or .hench/config.json — model config lives exclusively in .n-dx.json.",
               "acceptanceCriteria": [
@@ -24555,7 +24555,10 @@
                 "No model config written to .codex/config.toml or .hench/config.json"
               ],
               "priority": "high",
-              "startedAt": "2026-04-03T16:09:37.008Z"
+              "startedAt": "2026-04-03T16:09:37.008Z",
+              "completedAt": "2026-04-03T16:28:22.248Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Implemented model persistence via runConfig() in handleInit(). Added extractInitModel(), stripInitModelFlag(), readLLMModel() helpers. Wired --model= flag and existing config model into resolveInitLLMSelection. Added 6 e2e tests covering all acceptance criteria."
             },
             {
               "id": "fb7099f7-8561-465a-aa1d-3a49653719ae",
