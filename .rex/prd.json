@@ -24212,7 +24212,7 @@
             {
               "id": "94233ff5-fbf9-4d0c-813c-457c9161ccea",
               "title": "OpenAI API adapter (stretch)",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Add OpenAiApiProvider implementing LLMProvider in packages/llm-client/src/openai-api-provider.ts. Register in ProviderRegistry with vendor \"codex\" + mode \"api\". Implement complete() and stream() for tool-use loop. Add auth detection for OPENAI_API_KEY. STRETCH GOAL — lower priority than all other Phase 2 work.",
               "acceptanceCriteria": [
@@ -24232,7 +24232,8 @@
               "blockedBy": [
                 "9df5dd83-8bd7-4104-809e-ae99831cd88f",
                 "ea9bc425-60cc-4bb6-95ca-2362465cca84"
-              ]
+              ],
+              "startedAt": "2026-04-03T03:56:48.311Z"
             }
           ]
         },
@@ -24264,7 +24265,7 @@
             {
               "id": "1e041757-f9d8-455e-88bd-8fd1b8566b55",
               "title": "Diagnostics collection in run lifecycle",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Add diagnostics: RuntimeDiagnostics field to RunRecord schema. Collect diagnostics at run start in shared.ts initRunRecord() — vendor, model, sandbox, approvals, parseMode. Update diagnostics at run end with final token status. Include diagnostics in hench show output.",
               "acceptanceCriteria": [
@@ -24278,7 +24279,10 @@
                 "phase-2",
                 "diagnostics"
               ],
-              "startedAt": "2026-04-03T03:20:44.069Z"
+              "startedAt": "2026-04-03T03:20:44.069Z",
+              "completedAt": "2026-04-03T03:41:39.908Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added runtime diagnostics to RunRecord lifecycle: vendor/sandbox/approvals captured at init, tokenDiagnosticStatus derived at finalization, displayed in hench show output. 19 new tests, all 2050 hench tests passing."
             },
             {
               "id": "3a6c9338-ca59-4619-ba93-c4cabb597799",

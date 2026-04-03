@@ -41,6 +41,7 @@ import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
 import type { LLMConfig } from "./llm-types.js";
 import { createClient } from "./create-client.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
+import { createOpenAiApiProvider, resolveOpenAiApiKey } from "./openai-api-provider.js";
 
 // ── Factory type ──────────────────────────────────────────────────────────
 
@@ -174,11 +175,19 @@ export function createDefaultRegistry(): ProviderRegistry {
     createClient({ claudeConfig: config.claude ?? {} }),
   );
 
-  // Codex: wrap the CLI client in an LLMProvider adapter.
-  // createCodexCliClient returns ClaudeClient (no `info`), so we add the
-  // required ProviderInfo here until the codex adapter is refactored to
-  // implement LLMProvider directly (tracked in the sibling refactor task).
+  // Codex: dual provider stack (API + CLI) with automatic detection.
+  // When an OpenAI API key is available (config or env), uses the API provider.
+  // Otherwise falls back to the CLI provider adapter.
   registry.register("codex", (config) => {
+    const apiKey = resolveOpenAiApiKey(config.codex);
+    if (apiKey) {
+      return createOpenAiApiProvider({ codexConfig: config.codex });
+    }
+
+    // CLI fallback: wrap createCodexCliClient in an LLMProvider adapter.
+    // createCodexCliClient returns ClaudeClient (no `info`), so we add the
+    // required ProviderInfo here until the codex adapter is refactored to
+    // implement LLMProvider directly (tracked in the sibling refactor task).
     const client = createCodexCliClient({ codexConfig: config.codex });
     const info: ProviderInfo = {
       vendor: "codex",

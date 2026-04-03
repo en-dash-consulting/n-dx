@@ -10,6 +10,7 @@ import { createClient, detectAuthMode, type CreateClientOptions } from "./create
 import type { AuthMode, ClaudeClient, ClaudeConfig } from "./types.js";
 import type { LLMVendor, LLMConfig } from "./llm-types.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
+import { resolveOpenAiApiKey } from "./openai-api-provider.js";
 
 /**
  * Vendor-neutral client creation options.
@@ -38,12 +39,19 @@ function resolveVendor(options: CreateLLMClientOptions): LLMVendor {
 /**
  * Detect auth mode for the resolved vendor.
  *
- * For now this delegates to Claude's auth-mode detection. Codex returns `cli`
- * as a conservative default until its provider adapters are implemented.
+ * Delegates to vendor-specific auth detection:
+ * - Claude: API key presence check (config or `ANTHROPIC_API_KEY` env)
+ * - Codex: OpenAI API key presence check (config or `OPENAI_API_KEY` env)
  */
 export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
   const vendor = resolveVendor(options);
-  if (vendor === "codex") return "cli";
+  if (vendor === "codex") {
+    const apiKey = resolveOpenAiApiKey(
+      options.llmConfig?.codex,
+      options.apiKeyEnv ?? "OPENAI_API_KEY",
+    );
+    return apiKey ? "api" : "cli";
+  }
 
   const claudeConfig = options.claudeConfig ?? options.llmConfig?.claude ?? {};
   return detectAuthMode({

@@ -179,6 +179,13 @@ export {
 } from "./codex-cli-provider.js";
 export type { CodexCliProviderOptions } from "./codex-cli-provider.js";
 
+export {
+  createOpenAiApiProvider,
+  resolveOpenAiApiKey,
+  parseOpenAiTokenUsage,
+} from "./openai-api-provider.js";
+export type { OpenAiApiProviderOptions } from "./openai-api-provider.js";
+
 // Factory
 export {
   createClient,
