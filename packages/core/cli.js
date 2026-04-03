@@ -70,6 +70,7 @@ import { runExport } from "./export.js";
 import {
   resolveInitLLMSelection,
   promptLLMSelection,
+  validateInitFlags,
   SUPPORTED_PROVIDERS,
 } from "./init-llm.js";
 
@@ -220,6 +221,22 @@ function stripInitProviderFlag(args) {
 
 function stripInitModelFlag(args) {
   return args.filter((a) => !a.startsWith("--model="));
+}
+
+function extractInitClaudeModel(args) {
+  const flag = args.find((a) => a.startsWith("--claude-model="));
+  if (!flag) return undefined;
+  return flag.slice("--claude-model=".length).trim();
+}
+
+function extractInitCodexModel(args) {
+  const flag = args.find((a) => a.startsWith("--codex-model="));
+  if (!flag) return undefined;
+  return flag.slice("--codex-model=".length).trim();
+}
+
+function stripInitVendorModelFlags(args) {
+  return args.filter((a) => !a.startsWith("--claude-model=") && !a.startsWith("--codex-model="));
 }
 
 /**
@@ -570,10 +587,38 @@ function runInitCapture(toolPath, args) {
 async function handleInit(rest) {
   const providerFromFlag = extractInitProvider(rest);
   const modelFromFlag = extractInitModel(rest);
+  const claudeModelFromFlag = extractInitClaudeModel(rest);
+  const codexModelFromFlag = extractInitCodexModel(rest);
+
   if (providerFromFlag !== undefined && !SUPPORTED_PROVIDERS.includes(providerFromFlag)) {
     console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude.`);
     process.exit(1);
   }
+
+  // Validate flag combinations (incompatible combos, unknown models)
+  const validation = validateInitFlags({
+    provider: providerFromFlag,
+    model: modelFromFlag,
+    claudeModel: claudeModelFromFlag,
+    codexModel: codexModelFromFlag,
+  });
+
+  if (validation.errors.length > 0) {
+    for (const err of validation.errors) {
+      console.error(`Error: ${err}`);
+    }
+    process.exit(1);
+  }
+
+  for (const warn of validation.warnings) {
+    console.warn(`Warning: ${warn}`);
+  }
+
+  // Resolve effective model from vendor-specific flags.
+  // --claude-model=X implies --provider=claude --model=X
+  // --codex-model=X implies --provider=codex --model=X
+  const effectiveProvider = providerFromFlag || (claudeModelFromFlag ? "claude" : codexModelFromFlag ? "codex" : undefined);
+  const effectiveModel = modelFromFlag || claudeModelFromFlag || codexModelFromFlag;
 
   // Validate --assistants= values
   const assistantsSet = extractAssistantsFlag(rest);
@@ -588,7 +633,7 @@ async function handleInit(rest) {
   // Resolve assistant-selection flags (--assistants= > --*-only > --no-* > default)
   let assistantEnabled = resolveAssistantFlags(rest);
 
-  const initArgs = stripAssistantFlags(stripInitModelFlag(stripInitProviderFlag(rest)));
+  const initArgs = stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest))));
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
 
@@ -618,9 +663,9 @@ async function handleInit(rest) {
   // or config is present, the prompt is skipped and init exits with a clear
   // message asking the user to re-run with --provider=.
   const existingVendor = readLLMVendor(dir);
-  const existingModel = readLLMModel(dir, providerFromFlag || existingVendor);
+  const existingModel = readLLMModel(dir, effectiveProvider || existingVendor);
   const resolution = resolveInitLLMSelection({
-    flags: { provider: providerFromFlag, model: modelFromFlag },
+    flags: { provider: effectiveProvider, model: effectiveModel },
     existingConfig: { vendor: existingVendor, model: existingModel },
     isTTY: process.stdin.isTTY === true,
   });
@@ -644,9 +689,14 @@ async function handleInit(rest) {
     process.exit(1);
   }
 
-  // Map providerSource / modelSource to user-facing labels for the summary
-  const PROVIDER_SOURCE_LABELS = { flag: "from --provider flag", config: "from existing config", prompt: "selected" };
-  const MODEL_SOURCE_LABELS = { flag: "from --model flag", config: "from existing config", prompt: "selected" };
+  // Map providerSource / modelSource to user-facing labels for the summary.
+  // Use the actual flag name when a vendor-specific model flag was used.
+  const modelFlagLabel = claudeModelFromFlag ? "--claude-model" : codexModelFromFlag ? "--codex-model" : "--model";
+  const providerFlagLabel = (!providerFromFlag && (claudeModelFromFlag || codexModelFromFlag))
+    ? `--${claudeModelFromFlag ? "claude" : "codex"}-model`
+    : "--provider";
+  const PROVIDER_SOURCE_LABELS = { flag: `from ${providerFlagLabel} flag`, config: "from existing config", prompt: "selected" };
+  const MODEL_SOURCE_LABELS = { flag: `from ${modelFlagLabel} flag`, config: "from existing config", prompt: "selected" };
   const providerSource = PROVIDER_SOURCE_LABELS[selection.providerSource] ?? "selected";
   const modelSource = MODEL_SOURCE_LABELS[selection.modelSource] ?? "";
 

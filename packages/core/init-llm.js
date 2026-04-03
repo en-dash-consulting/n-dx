@@ -291,5 +291,68 @@ export async function promptLLMSelection(resolution, options = {}) {
   return { provider, model, providerSource, modelSource, cancelled };
 }
 
+/**
+ * Validate CLI flag combinations for `ndx init` LLM configuration.
+ *
+ * Pure decision logic — no I/O. Returns arrays of errors (fatal, should exit
+ * non-zero) and warnings (informational, should not block init).
+ *
+ * Called by handleInit() after flag extraction and before resolution/prompting.
+ *
+ * @param {object} flags
+ * @param {string} [flags.provider]      --provider= value
+ * @param {string} [flags.model]         --model= value
+ * @param {string} [flags.claudeModel]   --claude-model= value
+ * @param {string} [flags.codexModel]    --codex-model= value
+ *
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validateInitFlags({ provider, model, claudeModel, codexModel }) {
+  const errors = [];
+  const warnings = [];
+
+  // ── Incompatible flag combinations ──────────────────────────────────────
+
+  // Both vendor-specific model flags at once
+  if (claudeModel && codexModel) {
+    errors.push("Cannot set both --claude-model and --codex-model. Choose one provider.");
+  }
+
+  // Vendor-specific model + generic --model (ambiguous)
+  if (claudeModel && model) {
+    errors.push("Cannot set both --claude-model and --model. Use one or the other.");
+  }
+  if (codexModel && model) {
+    errors.push("Cannot set both --codex-model and --model. Use one or the other.");
+  }
+
+  // Vendor-specific model + conflicting --provider
+  if (provider === "codex" && claudeModel) {
+    errors.push("Cannot set --claude-model when --provider is codex. Use --codex-model instead.");
+  }
+  if (provider === "claude" && codexModel) {
+    errors.push("Cannot set --codex-model when --provider is claude. Use --claude-model instead.");
+  }
+
+  // ── Unknown model warning ──────────────────────────────────────────────
+
+  // Determine effective provider and model for catalog lookup.
+  // Vendor-specific flags imply the provider even without --provider.
+  const effectiveProvider = provider || (claudeModel ? "claude" : codexModel ? "codex" : undefined);
+  const effectiveModel = model || claudeModel || codexModel;
+
+  if (effectiveProvider && effectiveModel && errors.length === 0) {
+    const catalog = getModelsForVendor(effectiveProvider);
+    if (catalog && !catalog.some((m) => m.id === effectiveModel)) {
+      warnings.push(
+        `Unknown model "${effectiveModel}" for ${effectiveProvider}. ` +
+        `Known models: ${catalog.map((m) => m.id).join(", ")}. Proceeding anyway.`,
+      );
+    }
+  }
+
+  return { errors, warnings };
+}
+
 export { SUPPORTED_PROVIDERS, PROVIDER_LABELS };
 export { LLM_MODEL_CATALOG, getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";

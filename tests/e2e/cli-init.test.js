@@ -960,4 +960,159 @@ describe("n-dx init provider selection", () => {
       }
     });
   });
+
+  // ── incompatible flag validation ──────────────────────────────────────────
+
+  describe("incompatible flag combination validation", () => {
+    it("rejects --provider=codex with --claude-model", () => {
+      const result = runFail(["init", "--provider=codex", "--claude-model=claude-sonnet-4-6", tmpDir]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Cannot set --claude-model when --provider is codex");
+      expect(result.stderr).toContain("Use --codex-model instead");
+    });
+
+    it("rejects --provider=claude with --codex-model", () => {
+      const result = runFail(["init", "--provider=claude", "--codex-model=gpt-5-codex", tmpDir]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Cannot set --codex-model when --provider is claude");
+      expect(result.stderr).toContain("Use --claude-model instead");
+    });
+
+    it("rejects both --claude-model and --codex-model together", () => {
+      const result = runFail(["init", "--claude-model=claude-sonnet-4-6", "--codex-model=gpt-5-codex", tmpDir]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Cannot set both --claude-model and --codex-model");
+    });
+
+    it("rejects --claude-model with --model (ambiguous)", () => {
+      const result = runFail(["init", "--claude-model=claude-sonnet-4-6", "--model=claude-opus-4-20250514", tmpDir]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Cannot set both --claude-model and --model");
+    });
+
+    it("rejects --codex-model with --model (ambiguous)", () => {
+      const result = runFail(["init", "--codex-model=gpt-5-codex", "--model=gpt-5-codex", tmpDir]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Cannot set both --codex-model and --model");
+    });
+  });
+
+  // ── unknown model warning ─────────────────────────────────────────────────
+
+  describe("unknown model ID warning", () => {
+    function pathEnvWith(...dirs) {
+      return {
+        ...process.env,
+        PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
+      };
+    }
+
+    it("warns but succeeds when --model is not in vendor catalog", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-unknown-model-"));
+      try {
+        await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
+
+        const output = run(
+          ["init", "--provider=claude", "--model=claude-custom-v99", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        // Should still succeed (warning does not block init)
+        expect(output).toContain("n-dx initialized");
+        expect(output).toContain("LLM configuration");
+        expect(output).toMatch(/Model\s+claude-custom-v99/);
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+
+    it("does not warn when model is in vendor catalog", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-known-model-"));
+      try {
+        await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
+
+        const output = run(
+          ["init", "--provider=claude", "--model=claude-sonnet-4-6", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).toContain("n-dx initialized");
+        expect(output).not.toContain("Unknown model");
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+
+    it("--claude-model with known model does not warn", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-claude-known-"));
+      try {
+        await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
+
+        const output = run(
+          ["init", "--claude-model=claude-sonnet-4-6", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).toContain("n-dx initialized");
+        expect(output).not.toContain("Unknown model");
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  // ── vendor-specific model flags work end-to-end ───────────────────────────
+
+  describe("vendor-specific model flags (--claude-model, --codex-model)", () => {
+    function pathEnvWith(...dirs) {
+      return {
+        ...process.env,
+        PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
+      };
+    }
+
+    it("--claude-model implies provider=claude and persists both", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-claude-model-"));
+      try {
+        await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
+
+        const output = run(
+          ["init", "--claude-model=claude-sonnet-4-6", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).toContain("n-dx initialized");
+        expect(output).toMatch(/Provider\s+claude/);
+        expect(output).toMatch(/Model\s+claude-sonnet-4-6/);
+
+        const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("claude");
+        expect(ndxConfig.llm.claude.model).toBe("claude-sonnet-4-6");
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+
+    it("--codex-model implies provider=codex and persists both", async () => {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-codex-model-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+
+        const output = run(
+          ["init", "--codex-model=gpt-5-codex", tmpDir],
+          { env: pathEnvWith(binDir) },
+        );
+
+        expect(output).toContain("n-dx initialized");
+        expect(output).toMatch(/Provider\s+codex/);
+        expect(output).toMatch(/Model\s+gpt-5-codex/);
+
+        const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("codex");
+        expect(ndxConfig.llm.codex.model).toBe("gpt-5-codex");
+      } finally {
+        await rm(binDir, { recursive: true, force: true });
+      }
+    });
+  });
 });

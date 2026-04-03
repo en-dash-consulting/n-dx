@@ -3,6 +3,7 @@ import {
   resolveInitLLMSelection,
   promptLLMSelection,
   isInteractiveTerminal,
+  validateInitFlags,
   SUPPORTED_PROVIDERS,
   PROVIDER_LABELS,
   LLM_MODEL_CATALOG,
@@ -857,6 +858,167 @@ describe("promptLLMSelection model prompt integration", () => {
       const result = await promptLLMSelection(resolution);
       expect(result.model).toBeUndefined();
       expect(result.modelSource).toBeUndefined();
+    });
+  });
+});
+
+// ─── validateInitFlags ──────────────────────────────────────────────────────────
+
+describe("validateInitFlags", () => {
+  // ── No errors for valid combinations ──────────────────────────────────────
+
+  describe("accepts valid flag combinations", () => {
+    it("returns no errors when no flags are provided", () => {
+      const { errors, warnings } = validateInitFlags({});
+      expect(errors).toEqual([]);
+      expect(warnings).toEqual([]);
+    });
+
+    it("returns no errors for --provider alone", () => {
+      const { errors } = validateInitFlags({ provider: "claude" });
+      expect(errors).toEqual([]);
+    });
+
+    it("returns no errors for --provider + --model (matching vendor)", () => {
+      const { errors } = validateInitFlags({ provider: "claude", model: "claude-sonnet-4-6" });
+      expect(errors).toEqual([]);
+    });
+
+    it("returns no errors for --claude-model alone", () => {
+      const { errors } = validateInitFlags({ claudeModel: "claude-sonnet-4-6" });
+      expect(errors).toEqual([]);
+    });
+
+    it("returns no errors for --codex-model alone", () => {
+      const { errors } = validateInitFlags({ codexModel: "gpt-5-codex" });
+      expect(errors).toEqual([]);
+    });
+
+    it("returns no errors for --provider=claude + --claude-model (same vendor)", () => {
+      const { errors } = validateInitFlags({ provider: "claude", claudeModel: "claude-sonnet-4-6" });
+      expect(errors).toEqual([]);
+    });
+
+    it("returns no errors for --provider=codex + --codex-model (same vendor)", () => {
+      const { errors } = validateInitFlags({ provider: "codex", codexModel: "gpt-5-codex" });
+      expect(errors).toEqual([]);
+    });
+  });
+
+  // ── Incompatible provider + vendor-specific model ─────────────────────────
+
+  describe("rejects incompatible provider + vendor-specific model flags", () => {
+    it("errors when --provider=codex + --claude-model", () => {
+      const { errors } = validateInitFlags({ provider: "codex", claudeModel: "claude-sonnet-4-6" });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("Cannot set --claude-model when --provider is codex");
+      expect(errors[0]).toContain("Use --codex-model instead");
+    });
+
+    it("errors when --provider=claude + --codex-model", () => {
+      const { errors } = validateInitFlags({ provider: "claude", codexModel: "gpt-5-codex" });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("Cannot set --codex-model when --provider is claude");
+      expect(errors[0]).toContain("Use --claude-model instead");
+    });
+  });
+
+  // ── Incompatible dual model flags ─────────────────────────────────────────
+
+  describe("rejects dual model flag combinations", () => {
+    it("errors when both --claude-model and --codex-model are set", () => {
+      const { errors } = validateInitFlags({ claudeModel: "claude-sonnet-4-6", codexModel: "gpt-5-codex" });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("Cannot set both --claude-model and --codex-model");
+    });
+
+    it("errors when --claude-model and --model are both set", () => {
+      const { errors } = validateInitFlags({ claudeModel: "claude-sonnet-4-6", model: "claude-opus-4-20250514" });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("Cannot set both --claude-model and --model");
+    });
+
+    it("errors when --codex-model and --model are both set", () => {
+      const { errors } = validateInitFlags({ codexModel: "gpt-5-codex", model: "gpt-5-codex" });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("Cannot set both --codex-model and --model");
+    });
+  });
+
+  // ── Multiple errors for triple-conflict ───────────────────────────────────
+
+  describe("reports multiple errors for compounding conflicts", () => {
+    it("reports both dual-model and provider-mismatch errors", () => {
+      const { errors } = validateInitFlags({
+        provider: "codex",
+        claudeModel: "claude-sonnet-4-6",
+        model: "some-model",
+      });
+      // --claude-model + --model → error, plus --provider=codex + --claude-model → error
+      expect(errors.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  // ── Unknown model warnings ────────────────────────────────────────────────
+
+  describe("warns on unknown model IDs", () => {
+    it("warns when --model is not in vendor catalog", () => {
+      const { errors, warnings } = validateInitFlags({ provider: "claude", model: "claude-custom-v99" });
+      expect(errors).toEqual([]);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('Unknown model "claude-custom-v99"');
+      expect(warnings[0]).toContain("Proceeding anyway");
+    });
+
+    it("warns when --codex-model is not in codex catalog", () => {
+      const { errors, warnings } = validateInitFlags({ codexModel: "gpt-custom-v99" });
+      expect(errors).toEqual([]);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('Unknown model "gpt-custom-v99"');
+      expect(warnings[0]).toContain("codex");
+    });
+
+    it("warns when --claude-model is not in claude catalog", () => {
+      const { errors, warnings } = validateInitFlags({ claudeModel: "claude-custom-v99" });
+      expect(errors).toEqual([]);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('Unknown model "claude-custom-v99"');
+      expect(warnings[0]).toContain("claude");
+    });
+
+    it("does not warn when model is in vendor catalog", () => {
+      const { warnings } = validateInitFlags({ provider: "claude", model: "claude-sonnet-4-6" });
+      expect(warnings).toEqual([]);
+    });
+
+    it("does not warn when codex model is in codex catalog", () => {
+      const { warnings } = validateInitFlags({ codexModel: "gpt-5-codex" });
+      expect(warnings).toEqual([]);
+    });
+
+    it("includes known model IDs in warning message", () => {
+      const { warnings } = validateInitFlags({ provider: "claude", model: "unknown-model" });
+      expect(warnings[0]).toContain("claude-sonnet-4-6");
+    });
+
+    it("does not warn when there are errors (skips catalog check)", () => {
+      const { warnings } = validateInitFlags({
+        provider: "codex",
+        claudeModel: "unknown-model",
+      });
+      // Has an error (provider mismatch), so catalog check is skipped
+      expect(warnings).toEqual([]);
+    });
+  });
+
+  // ── Return shape ──────────────────────────────────────────────────────────
+
+  describe("returns correct shape", () => {
+    it("always returns errors and warnings arrays", () => {
+      const result = validateInitFlags({});
+      expect(Array.isArray(result.errors)).toBe(true);
+      expect(Array.isArray(result.warnings)).toBe(true);
+      expect(Object.keys(result).sort()).toEqual(["errors", "warnings"]);
     });
   });
 });

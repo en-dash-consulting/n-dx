@@ -694,6 +694,9 @@ const ORCHESTRATOR_HELP_DEFS = {
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
       { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude or codex (skips interactive prompt)" },
+      { flag: "--model=<id>", description: "Model ID to persist (used with --provider)" },
+      { flag: "--claude-model=<id>", description: "Claude model ID (implies --provider=claude)" },
+      { flag: "--codex-model=<id>", description: "Codex model ID (implies --provider=codex)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
       { flag: "--no-claude", description: "Skip Claude Code integration (no CLAUDE.md, .claude/ modifications)" },
       { flag: "--no-codex", description: "Skip Codex integration (no AGENTS.md, .agents/, .codex/ modifications)" },
@@ -705,6 +708,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
       { command: "ndx init --provider=claude .", description: "Initialize with Claude (skips vendor prompt)" },
       { command: "ndx init --provider=codex .", description: "Initialize with Codex (skips vendor prompt)" },
+      { command: "ndx init --claude-model=claude-sonnet-4-6 .", description: "Set Claude as vendor and choose a model in one flag" },
       { command: "ndx init --analyze .", description: "Initialize and analyze codebase" },
       { command: "ndx init --claude-only .", description: "Initialize with Claude surfaces only" },
       { command: "ndx init --codex-only .", description: "Initialize with Codex surfaces only" },
