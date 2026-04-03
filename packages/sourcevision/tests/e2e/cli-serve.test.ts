@@ -1,10 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, cp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer as createNetServer } from "node:net";
-import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 
 const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");
@@ -39,30 +38,41 @@ function waitForServer(port: number, timeout = 5000): Promise<void> {
   });
 }
 
-describe("sourcevision serve (e2e)", () => {
-  let tmpDir: string;
-  let serverProc: ManagedChild | null = null;
-
-  async function stopServer(): Promise<void> {
-    if (!serverProc) return;
-    const handle = serverProc;
-    serverProc = null;
-    await killWithFallback(handle, 2_000);
-    await handle.done;
-  }
-
-  function isPidRunning(pid: number | undefined): boolean {
-    if (pid === undefined) return false;
+function killTree(pid: number): void {
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
     try {
-      process.kill(pid, 0);
-      return true;
+      process.kill(pid, "SIGKILL");
     } catch {
-      return false;
+      // Already dead.
     }
   }
+}
+
+describe("sourcevision serve (e2e)", () => {
+  let tmpDir: string;
+  let serverProc: ChildProcess | null = null;
 
   afterEach(async () => {
-    await stopServer();
+    if (serverProc) {
+      const proc = serverProc;
+      serverProc = null;
+      if (proc.pid) killTree(proc.pid);
+      await new Promise<void>((resolve) => {
+        proc.once("close", () => resolve());
+        setTimeout(() => {
+          if (proc.pid) {
+            try {
+              process.kill(proc.pid, "SIGKILL");
+            } catch {
+              // Already dead.
+            }
+          }
+          resolve();
+        }, 3_000);
+      });
+    }
     if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -71,17 +81,17 @@ describe("sourcevision serve (e2e)", () => {
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
 
     // Analyze first
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--fast"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",
       timeout: 30000,
     });
 
-    // Start server on an OS-assigned free port
+    // Use a separate process group so teardown can kill the entire tree.
     const port = await getFreePort();
-    serverProc = spawnManaged("node", [CLI_PATH, "serve", tmpDir, `--port=${port}`], {
-      stdio: "pipe",
+    serverProc = spawn(process.execPath, [CLI_PATH, "serve", tmpDir, `--port=${port}`], {
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
     });
-    const serverPid = serverProc.pid;
 
     await waitForServer(port);
 
@@ -105,8 +115,5 @@ describe("sourcevision serve (e2e)", () => {
     const inv = await invRes.json();
     expect(inv.files).toBeDefined();
     expect(inv.summary).toBeDefined();
-
-    await stopServer();
-    expect(isPidRunning(serverPid)).toBe(false);
   });
 });

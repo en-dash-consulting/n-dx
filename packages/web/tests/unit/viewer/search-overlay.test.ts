@@ -374,7 +374,7 @@ describe("useSearchOverlay", () => {
   });
 
   afterEach(() => {
-    if (root) cleanup(root);
+    if (root) cleanupRenderedDiv(root);
   });
 
   it("opens on Ctrl+K", () => {

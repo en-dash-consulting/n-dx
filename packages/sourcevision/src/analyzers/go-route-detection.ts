@@ -280,13 +280,21 @@ export function detectGoServerRoutes(sourceText: string, filePath: string): Serv
 /** Infer a common prefix from a set of routes. */
 function inferPrefix(routes: ServerRoute[]): string {
   if (routes.length === 0) return "/";
+  if (routes.length === 1) {
+    const onlyPath = routes[0].path;
+    if (onlyPath.endsWith("/")) return onlyPath;
+    const lastSlash = onlyPath.lastIndexOf("/");
+    return lastSlash > 0 ? onlyPath.slice(0, lastSlash + 1) : "/";
+  }
+
   const paths = routes.map((r) => r.path);
   let prefix = paths[0];
   for (let i = 1; i < paths.length; i++) {
     while (!paths[i].startsWith(prefix)) {
-      const lastSlash = prefix.lastIndexOf("/");
+      const trimEnd = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+      const lastSlash = trimEnd.lastIndexOf("/");
       if (lastSlash <= 0) return "/";
-      prefix = prefix.slice(0, lastSlash + 1);
+      prefix = trimEnd.slice(0, lastSlash + 1);
     }
   }
   // Ensure prefix ends with /

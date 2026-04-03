@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 import { resolve } from "node:path";
 
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
+const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "1";
 
 export default defineConfig({
   resolve: {
@@ -16,5 +17,10 @@ export default defineConfig({
     include: [
       "tests/**/*.test.ts",
     ],
+    exclude: sandboxBlocksNetwork
+      ? [
+          "tests/e2e/cli-serve.test.ts",
+        ]
+      : [],
   },
 });

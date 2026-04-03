@@ -51,6 +51,7 @@ import {
   NotionConfigView,
   IntegrationConfigView,
   FeatureTogglesView,
+  CliTimeoutsView,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -144,6 +145,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "feature-toggles": () =>
     h(FeatureTogglesView, null),
+
+  "cli-timeouts": () =>
+    h(CliTimeoutsView, null),
 };
 
 /** Render the view identified by `view` using props from `ctx`. */
@@ -162,7 +166,7 @@ const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
 };
 
 /** Cross-cutting views available in all scopes. */
-const CROSS_CUTTING_VIEWS: ViewId[] = ["token-usage", "feature-toggles"];
+const CROSS_CUTTING_VIEWS: ViewId[] = ["token-usage", "feature-toggles", "cli-timeouts"];
 
 const ALL_VIEWS = new Set<ViewId>([...Object.values(VIEWS_BY_SCOPE).flat(), ...CROSS_CUTTING_VIEWS] as ViewId[]);
 

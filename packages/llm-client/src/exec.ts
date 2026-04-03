@@ -287,15 +287,15 @@ export function spawnTool(
 
     let stdout = "";
     let stderr = "";
-    let resolved = false;
+    let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
 
     const finish = (exitCode: number | null) => {
-      if (resolved) return;
-      resolved = true;
       if (timer) clearTimeout(timer);
       if (killTimer) clearTimeout(killTimer);
+      if (settled) return;
+      settled = true;
       resolve({ exitCode, stdout, stderr });
     };
 
@@ -306,10 +306,12 @@ export function spawnTool(
         // Escalate to SIGKILL after grace period if still alive
         killTimer = setTimeout(() => child.kill("SIGKILL"), KILL_ESCALATION_MS);
         // Resolve immediately — caller sees timeout (exitCode: null).
-        // killTimer stays active as a cleanup safety net until the child
-        // actually exits (handled by the "close" listener clearing it).
-        resolved = true;
-        resolve({ exitCode: null, stdout, stderr });
+        // Keep the close/error handlers active so they can clear the
+        // escalation timer if the child exits before SIGKILL is needed.
+        if (!settled) {
+          settled = true;
+          resolve({ exitCode: null, stdout, stderr });
+        }
       }, timeout);
     }
 
@@ -364,15 +366,15 @@ export function spawnManaged(
   const done = new Promise<SpawnToolResult>((resolve) => {
     let stdout = "";
     let stderr = "";
-    let resolved = false;
+    let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
 
     const finish = (exitCode: number | null) => {
-      if (resolved) return;
-      resolved = true;
       if (timer) clearTimeout(timer);
       if (killTimer) clearTimeout(killTimer);
+      if (settled) return;
+      settled = true;
       resolve({ exitCode, stdout, stderr });
     };
 
@@ -383,10 +385,12 @@ export function spawnManaged(
         // Escalate to SIGKILL after grace period if still alive
         killTimer = setTimeout(() => child.kill("SIGKILL"), KILL_ESCALATION_MS);
         // Resolve immediately — caller sees timeout (exitCode: null).
-        // killTimer stays active as a cleanup safety net until the child
-        // actually exits (handled by the "close" listener clearing it).
-        resolved = true;
-        resolve({ exitCode: null, stdout, stderr });
+        // Keep the close/error handlers active so they can clear the
+        // escalation timer if the child exits before SIGKILL is needed.
+        if (!settled) {
+          settled = true;
+          resolve({ exitCode: null, stdout, stderr });
+        }
       }, timeout);
     }
 

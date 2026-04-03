@@ -23643,6 +23643,7 @@
       "description": "Automated recommendations from SourceVision analysis. 4 zone+category groups covering 5 total findings.",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-04-03T14:35:15.499Z",
       "children": [
         {
           "id": "ff6c5a83-fbcb-4c16-8ef3-279c92f81249",
@@ -23822,8 +23823,153 @@
       "recommendationMeta": {
         "findingCount": 5
       },
-      "startedAt": "2026-04-03T14:35:15.499Z",
-      "completedAt": "2026-04-03T14:35:15.499Z"
+      "completedAt": "2026-04-03T19:28:35.406Z"
+    },
+    {
+      "id": "f8dfe9ab-671d-494d-9c20-84fbb79b37ee",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-03T19:06:50.606Z",
+      "completedAt": "2026-04-03T19:20:03.350Z",
+      "children": [
+        {
+          "id": "8abe3c45-9434-4862-aeee-0f56f107d130",
+          "title": "Runtime Process and Thread Lifecycle Enforcement",
+          "status": "completed",
+          "level": "feature",
+          "description": "Ensure that no worker threads or child processes are left behind during normal n-dx operation — not just at exit. Covers the full command lifecycle: spawn, execution, and teardown for all CLI entry points.",
+          "source": "smart-add",
+          "startedAt": "2026-04-03T18:50:24.588Z",
+          "completedAt": "2026-04-03T18:50:24.588Z",
+          "children": [
+            {
+              "id": "b1dc5843-120b-4151-933c-82fdead1faf3",
+              "title": "Audit and enforce worker thread cleanup across all CLI entry points",
+              "status": "completed",
+              "level": "task",
+              "description": "Review every spawn and worker-thread creation site in cli.js, ci.js, web.js, and config.js. Ensure all threads are explicitly joined or terminated before the parent process exits. Identify any code paths (errors, cancellations, SIGINT) where threads escape the cleanup gate.",
+              "acceptanceCriteria": [
+                "All worker thread creation sites in orchestration scripts are catalogued",
+                "Each creation site has a corresponding explicit teardown path for success, error, and signal cases",
+                "Running `ndx analyze` and `ndx work` leaves zero lingering node threads as verified by process inspection",
+                "A new regression test verifies thread count returns to baseline after each CLI command completes"
+              ],
+              "priority": "high",
+              "tags": [
+                "process-lifecycle",
+                "cli",
+                "reliability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T18:34:48.270Z",
+              "completedAt": "2026-04-03T18:42:49.486Z"
+            },
+            {
+              "id": "4e870c51-cd43-47a2-89f2-02e8e4f3ce57",
+              "title": "Implement orphan process detection and cleanup for spawned subcommands",
+              "status": "completed",
+              "level": "task",
+              "description": "Add a process-group-aware cleanup layer so that any child processes spawned during a CLI run (e.g., sourcevision analyze, hench run) are tracked and forcibly reaped if they outlive their parent command. Extend the existing graceful shutdown to cover abnormal termination paths.",
+              "acceptanceCriteria": [
+                "All child processes are registered in a process registry at spawn time",
+                "On parent exit (clean, SIGINT, or unhandled exception), all registered children are sent SIGTERM then SIGKILL after a grace period",
+                "A test simulates a mid-run SIGINT and confirms no orphan processes remain after 5 seconds",
+                "The registry is a no-op in environments where process groups are not supported (Windows CI) — no crash, just a warning log"
+              ],
+              "priority": "high",
+              "tags": [
+                "process-lifecycle",
+                "cli",
+                "reliability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T18:42:52.392Z",
+              "completedAt": "2026-04-03T18:50:24.323Z"
+            }
+          ]
+        },
+        {
+          "id": "888de653-60ad-43bf-843c-a859341d22a3",
+          "title": "Configurable CLI Operation Timeouts",
+          "status": "completed",
+          "level": "feature",
+          "description": "Introduce a per-command timeout system with a long, safe default so a single stalled process cannot hang the CLI indefinitely. Expose the timeout threshold as a first-class config key editable from both the CLI config command and the web settings UI.",
+          "source": "smart-add",
+          "startedAt": "2026-04-03T19:06:50.409Z",
+          "completedAt": "2026-04-03T19:06:50.409Z",
+          "children": [
+            {
+              "id": "d8f5d40d-a68f-4da7-8c97-63e5513ff034",
+              "title": "Implement default long timeout with per-command override support",
+              "status": "completed",
+              "level": "task",
+              "description": "Add a timeout enforcement layer around the main execution path of each CLI command. The default timeout should be long enough for real workloads (e.g., 30 minutes) but terminate and surface an actionable error if exceeded. Support per-command overrides so commands like `ndx work` can use a different threshold than `ndx analyze`.",
+              "acceptanceCriteria": [
+                "All CLI commands respect a `cli.timeoutMs` config key; default is 1800000ms (30 minutes)",
+                "When a command exceeds its timeout, it exits with a non-zero code and prints a clear message naming the command and elapsed time",
+                "Per-command overrides (`cli.timeouts.analyze`, `cli.timeouts.work`, etc.) take precedence over the global default",
+                "A unit test verifies timeout enforcement fires at the configured threshold using a mock timer"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "timeout",
+                "config"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T18:50:27.384Z",
+              "completedAt": "2026-04-03T18:58:23.179Z"
+            },
+            {
+              "id": "4b559467-5391-4612-ab7d-27b71daac4dc",
+              "title": "Expose timeout configuration in .n-dx.json schema and ndx config command",
+              "status": "deferred",
+              "level": "task",
+              "description": "Add `cli.timeoutMs` and `cli.timeouts.*` keys to the .n-dx.json config schema with documentation, validation, and support through `ndx config get/set`. Ensure `ndx config --help` describes the timeout keys and their defaults.",
+              "acceptanceCriteria": [
+                "`ndx config set cli.timeoutMs 3600000` persists the value to .n-dx.json and is read at next command invocation",
+                "`ndx config get cli.timeoutMs` prints the current value with its default noted if unset",
+                "The config schema validation rejects non-numeric or negative values with a descriptive error",
+                "`ndx config --help` lists all timeout-related keys with their defaults and descriptions",
+                "A unit test covers schema validation for valid, zero, and negative timeout values"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "config",
+                "timeout"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T19:06:47.150Z"
+            },
+            {
+              "id": "1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
+              "title": "Add timeout configuration panel to web settings UI",
+              "status": "deferred",
+              "level": "task",
+              "description": "Surface the CLI timeout settings in the n-dx web dashboard settings panel so users can view and update timeouts without touching the CLI. The panel should show the current global default and any per-command overrides, with save/reset controls that write back to .n-dx.json via the existing config API.",
+              "acceptanceCriteria": [
+                "The settings UI includes a 'CLI Timeouts' section showing the global timeout and any active per-command overrides",
+                "Editing and saving a timeout value calls the config API and persists to .n-dx.json",
+                "A reset button restores a field to its default value",
+                "Invalid inputs (non-numeric, negative) are rejected client-side with an inline error before submission",
+                "The settings panel reflects external config changes on next page load (no stale cache)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web-ui",
+                "config",
+                "timeout",
+                "settings"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T18:58:26.092Z"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

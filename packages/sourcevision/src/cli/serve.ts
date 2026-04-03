@@ -12,7 +12,7 @@
 import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
+import { spawnTool } from "@n-dx/llm-client";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -39,55 +39,9 @@ function resolveWebCli(): string {
 
 export async function startServe(dir: string, port: number = 3117): Promise<void> {
   const webCli = resolveWebCli();
-  const handle = spawnManaged(
+  const result = await spawnTool(
     process.execPath,
     [webCli, "serve", "--scope=sourcevision", `--port=${port}`, dir],
   );
-  const disposeSignalForwarding = forwardTerminationSignals(handle);
-
-  try {
-    const result = await handle.done;
-    process.exit(result.exitCode ?? 1);
-  } finally {
-    disposeSignalForwarding();
-  }
-}
-
-function forwardTerminationSignals(handle: ManagedChild): () => void {
-  let forwarding = false;
-
-  const forwardAndExit = (signal: NodeJS.Signals): void => {
-    if (forwarding) return;
-    forwarding = true;
-
-    void killWithFallback(handle, 2_000).finally(() => {
-      removeListeners();
-      try {
-        process.kill(process.pid, signal);
-      } catch {
-        process.exit(1);
-      }
-    });
-  };
-
-  const onSigint = () => forwardAndExit("SIGINT");
-  const onSigterm = () => forwardAndExit("SIGTERM");
-  const onSighup = () => forwardAndExit("SIGHUP");
-  const onExit = () => {
-    handle.kill("SIGTERM");
-  };
-
-  const removeListeners = (): void => {
-    process.removeListener("SIGINT", onSigint);
-    process.removeListener("SIGTERM", onSigterm);
-    process.removeListener("SIGHUP", onSighup);
-    process.removeListener("exit", onExit);
-  };
-
-  process.on("SIGINT", onSigint);
-  process.on("SIGTERM", onSigterm);
-  process.on("SIGHUP", onSighup);
-  process.on("exit", onExit);
-
-  return removeListeners;
+  process.exit(result.exitCode ?? 1);
 }

@@ -5,6 +5,7 @@ const rexRoot = resolve(import.meta.dirname, "../rex");
 const svRoot = resolve(import.meta.dirname, "../sourcevision");
 const claudeClientRoot = resolve(import.meta.dirname, "../claude-client");
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
+const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "1";
 
 export default defineConfig({
   resolve: {
@@ -29,5 +30,12 @@ export default defineConfig({
     include: [
       "tests/**/*.test.ts",
     ],
+    exclude: sandboxBlocksNetwork
+      ? [
+          "tests/unit/server/**/*.test.ts",
+          "tests/integration/smart-add-dispatch.test.ts",
+          "tests/integration/ws-health-integration.test.ts",
+        ]
+      : [],
   },
 });
