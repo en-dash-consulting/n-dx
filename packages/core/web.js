@@ -297,9 +297,11 @@ async function showStatus(dir, port, label = "n-dx server") {
  * @param {Function} deps.run   Run a tool script (foreground)
  * @param {object} deps.tools   Tool script paths
  * @param {string} deps.__dir   Root directory of n-dx
+ * @param {Function} deps.exit               Shared exit request helper for synchronous command flow
+ * @param {Function} deps.flushExit          Shared async exit helper for signal callbacks
  * @param {string} [deps.commandName="web"]  CLI command name for messaging ("start" or "web")
  */
-export async function runWeb(dir, rest, { run, tools, __dir, commandName = "web" }) {
+export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, commandName = "web" }) {
   const absDir = resolve(dir);
 
   // Parse flags and detect subcommand
@@ -330,7 +332,7 @@ export async function runWeb(dir, rest, { run, tools, __dir, commandName = "web"
     const parsed = parseInt(flags.port, 10);
     if (isNaN(parsed) || parsed < 1 || parsed > 65535) {
       console.error(`Invalid port: ${flags.port}`);
-      process.exit(1);
+      exit(1);
     }
     port = parsed;
   } else {
@@ -445,11 +447,11 @@ export async function runWeb(dir, rest, { run, tools, __dir, commandName = "web"
 
   process.on("SIGINT", async () => {
     await cleanup();
-    process.exit(0);
+    await flushExit(0);
   });
   process.on("SIGTERM", async () => {
     await cleanup();
-    process.exit(0);
+    await flushExit(0);
   });
 
   const code = await run(tools.web, serveArgs);

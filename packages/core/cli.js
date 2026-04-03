@@ -68,6 +68,10 @@ import {
 } from "./help.js";
 import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integration.js";
 import { runExport } from "./export.js";
+import {
+  createChildProcessTracker,
+  installTrackedChildProcessHandlers,
+} from "./child-lifecycle.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -171,10 +175,40 @@ function formatError(err) {
   return `Error: ${message}`;
 }
 
+class ExitRequest extends Error {
+  constructor(code) {
+    super(`Exit requested with code ${code}`);
+    this.code = code;
+  }
+}
+
+const childTracker = createChildProcessTracker();
+let exitPromise = null;
+
+function spawnTracked(command, args, options) {
+  return childTracker.register(spawn(command, args, options));
+}
+
+function exitWithCleanup(code = 0) {
+  throw new ExitRequest(code);
+}
+
+async function flushAndExit(code = 0) {
+  if (!exitPromise) {
+    exitPromise = (async () => {
+      signalHandlers.dispose();
+      await childTracker.cleanup();
+      process.exit(code);
+    })();
+  }
+
+  return exitPromise;
+}
+
 function run(script, args) {
   const scriptPath = isAbsolute(script) ? script : resolve(MONOREPO_ROOT, script);
   return new Promise((res) => {
-    const child = spawn(process.execPath, [scriptPath, ...args], {
+    const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
     });
     child.on("close", (code) => res(code ?? 1));
@@ -183,7 +217,7 @@ function run(script, args) {
 
 async function runOrDie(script, args) {
   const code = await run(script, args);
-  if (code !== 0) process.exit(code);
+  if (code !== 0) exitWithCleanup(code);
 }
 
 function resolveDir(args) {
@@ -280,7 +314,7 @@ function requireInit(dir, dirs) {
   if (missing.length > 0) {
     console.error(`Error: Missing ${missing.join(", ")} in ${dir}`);
     console.error(`Hint: Run 'ndx init ${dir === process.cwd() ? "" : dir}' to set up the project.`.trimEnd());
-    process.exit(1);
+    exitWithCleanup(1);
   }
 }
 
@@ -486,7 +520,7 @@ function handleVersion(rest) {
   } else {
     console.log(version);
   }
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 /**
@@ -495,7 +529,7 @@ function handleVersion(rest) {
  */
 function runInitCapture(toolPath, args) {
   return new Promise((resolve) => {
-    const child = spawn("node", [toolPath, ...args], {
+    const child = spawnTracked("node", [toolPath, ...args], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, FORCE_COLOR: "0" },
@@ -512,7 +546,7 @@ async function handleInit(rest) {
   const providerFromFlag = extractInitProvider(rest);
   if (providerFromFlag !== undefined && !SUPPORTED_PROVIDERS.includes(providerFromFlag)) {
     console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude.`);
-    process.exit(1);
+    exitWithCleanup(1);
   }
 
   const noClaude = rest.includes("--no-claude");
@@ -540,7 +574,7 @@ async function handleInit(rest) {
 
   if (!selectedProvider) {
     console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
-    process.exit(1);
+    exitWithCleanup(1);
   }
 
   // Check pre-existing state for status reporting
@@ -558,7 +592,7 @@ async function handleInit(rest) {
     if (svResult.code !== 0) console.error(svResult.stderr || svResult.stdout);
     if (rexResult.code !== 0) console.error(rexResult.stderr || rexResult.stdout);
     if (henchResult.code !== 0) console.error(henchResult.stderr || henchResult.stdout);
-    process.exit(1);
+    exitWithCleanup(1);
   }
 
   // Set provider (suppress output)
@@ -587,7 +621,7 @@ async function handleInit(rest) {
   console.log(`  Claude Code     ${claudeSummary}`);
   console.log("");
 
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleAnalyze(rest) {
@@ -595,7 +629,7 @@ async function handleAnalyze(rest) {
   requireInit(dir, [".sourcevision"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.sourcevision, ["analyze", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleRecommend(rest) {
@@ -603,7 +637,7 @@ async function handleRecommend(rest) {
   requireInit(dir, [".rex", ".sourcevision"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["recommend", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleAdd(rest) {
@@ -612,7 +646,7 @@ async function handleAdd(rest) {
   // checks whether the last positional is an existing directory).
   requireInit(process.cwd(), [".rex"]);
   await runOrDie(tools.rex, ["add", ...rest]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handlePlan(rest) {
@@ -627,7 +661,7 @@ async function handlePlan(rest) {
   }
 
   await runOrDie(tools.rex, ["analyze", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 /** Execute one refresh pipeline step; returns true on success, false on failure. */
@@ -694,7 +728,7 @@ async function handleRefresh(rest) {
       `Error: Dashboard server (PID ${conflict.pid}) is running and could not be stopped automatically.`,
     );
     console.error(`Stop it manually: ndx start stop "${absDir}"`);
-    process.exit(1);
+    exitWithCleanup(1);
   }
 
   let plan;
@@ -704,7 +738,7 @@ async function handleRefresh(rest) {
     if (err instanceof RefreshPlanError) {
       console.error(`Error: ${err.message}`);
       if (err.suggestion) console.error(`Hint: ${err.suggestion}`);
-      process.exit(1);
+      exitWithCleanup(1);
     }
     throw err;
   }
@@ -762,15 +796,16 @@ async function handleRefresh(rest) {
       if (!succeeded) {
         await performRollback();
         printRefreshStepSummary(stepStatuses);
-        process.exit(1);
+        exitWithCleanup(1);
       }
     } catch (err) {
+      if (err instanceof ExitRequest) throw err;
       const detail = err instanceof Error ? err.message : String(err);
       printRefreshStepTransition(step.kind, "failed", detail);
       stepStatuses.push({ kind: step.kind, status: "failed", detail });
       await performRollback();
       printRefreshStepSummary(stepStatuses);
-      process.exit(1);
+      exitWithCleanup(1);
     }
   }
 
@@ -784,14 +819,14 @@ async function handleRefresh(rest) {
     }
     await performRollback();
     printRefreshStepSummary(stepStatuses);
-    process.exit(1);
+    exitWithCleanup(1);
   }
 
   printRefreshStepSummary(stepStatuses);
   console.log(`[refresh] completed — all outputs validated`);
   const reload = await signalLiveReload(dir);
   console.log(reload.message);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleWork(rest) {
@@ -807,12 +842,12 @@ async function handleWork(rest) {
     if (!vendor) {
       console.error("Error: No LLM vendor configured for this project.");
       console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
-      process.exit(1);
+      exitWithCleanup(1);
     }
   }
 
   await runOrDie(tools.hench, ["run", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleStatus(rest) {
@@ -820,7 +855,7 @@ async function handleStatus(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["status", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleUsage(rest) {
@@ -828,7 +863,7 @@ async function handleUsage(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["usage", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleSync(rest) {
@@ -836,7 +871,7 @@ async function handleSync(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["sync", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleCI(rest) {
@@ -852,10 +887,11 @@ async function handleCI(rest) {
 
   try {
     const ok = await runCI(dir, flags, { run, tools });
-    process.exit(ok ? 0 : 1);
+    exitWithCleanup(ok ? 0 : 1);
   } catch (err) {
+    if (err instanceof ExitRequest) throw err;
     console.error(formatError(err));
-    process.exit(1);
+    exitWithCleanup(1);
   }
 }
 
@@ -864,17 +900,25 @@ async function handleDev(rest) {
   requireInit(dir, [".sourcevision"]);
   const flags = extractFlags(rest);
   const code = await run(resolvePackageFile("packages/web", "dev.js"), [...flags, dir]);
-  process.exit(code);
+  exitWithCleanup(code);
 }
 
 async function handleStart(rest, commandName = "start") {
   const dir = resolveDir(rest);
   try {
-    const code = await runWeb(dir, rest, { run, tools, __dir: MONOREPO_ROOT, commandName });
-    process.exit(code);
+    const code = await runWeb(dir, rest, {
+      exit: exitWithCleanup,
+      flushExit: flushAndExit,
+      run,
+      tools,
+      __dir: MONOREPO_ROOT,
+      commandName,
+    });
+    exitWithCleanup(code);
   } catch (err) {
+    if (err instanceof ExitRequest) throw err;
     console.error(formatError(err));
-    process.exit(1);
+    exitWithCleanup(1);
   }
 }
 
@@ -884,7 +928,7 @@ async function handleStart(rest, commandName = "start") {
  */
 function runCapture(script, args) {
   return new Promise((res) => {
-    const child = spawn(process.execPath, [resolve(MONOREPO_ROOT, script), ...args], {
+    const child = spawnTracked(process.execPath, [resolve(MONOREPO_ROOT, script), ...args], {
       stdio: ["inherit", "pipe", "inherit"],
     });
     let stdout = "";
@@ -966,7 +1010,7 @@ async function handleSelfHeal(rest) {
   if (!vendor) {
     console.error("Error: No LLM vendor configured for this project.");
     console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
-    process.exit(1);
+    exitWithCleanup(1);
   }
 
   // Parse iteration count from positional args (e.g. `ndx self-heal 3 .` or `ndx self-heal . 3`)
@@ -1061,16 +1105,17 @@ async function handleSelfHeal(rest) {
   }
 
   console.log(`\n[self-heal] completed`);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleExport(rest) {
   try {
     const code = await runExport(rest);
-    process.exit(code);
+    exitWithCleanup(code);
   } catch (err) {
+    if (err instanceof ExitRequest) throw err;
     console.error(formatError(err));
-    process.exit(1);
+    exitWithCleanup(1);
   }
 }
 
@@ -1079,7 +1124,7 @@ async function handleConfig(rest) {
     await runConfig(rest);
   } catch (err) {
     console.error(formatError(err));
-    process.exit(1);
+    exitWithCleanup(1);
   }
 }
 
@@ -1090,7 +1135,7 @@ async function handleValidate(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["validate", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleFix(rest) {
@@ -1098,7 +1143,7 @@ async function handleFix(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["fix", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleHealth(rest) {
@@ -1106,7 +1151,7 @@ async function handleHealth(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["health", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleReport(rest) {
@@ -1114,7 +1159,7 @@ async function handleReport(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["report", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleVerify(rest) {
@@ -1122,28 +1167,28 @@ async function handleVerify(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["verify", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleUpdate(rest) {
   // First positional arg is the item ID, not a dir
   requireInit(process.cwd(), [".rex"]);
   await runOrDie(tools.rex, ["update", ...rest]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleRemove(rest) {
   // First positional arg is the item ID (or level), not a dir
   requireInit(process.cwd(), [".rex"]);
   await runOrDie(tools.rex, ["remove", ...rest]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleMove(rest) {
   // First positional arg is the item ID, not a dir
   requireInit(process.cwd(), [".rex"]);
   await runOrDie(tools.rex, ["move", ...rest]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleReshape(rest) {
@@ -1151,7 +1196,7 @@ async function handleReshape(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["reshape", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleReorganize(rest) {
@@ -1159,7 +1204,7 @@ async function handleReorganize(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["reorganize", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handlePrune(rest) {
@@ -1167,7 +1212,7 @@ async function handlePrune(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["prune", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 async function handleNext(rest) {
@@ -1175,7 +1220,7 @@ async function handleNext(rest) {
   requireInit(dir, [".rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["next", ...flags, dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 // ── Delegated sourcevision commands ───────────────────────────────────────────
@@ -1184,7 +1229,7 @@ async function handleReset(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".sourcevision"]);
   await runOrDie(tools.sourcevision, ["reset", dir]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 // ── Delegated hench commands ─────────────────────────────────────────────────
@@ -1193,29 +1238,29 @@ async function handleShow(rest) {
   // First positional arg is the run ID, not a dir
   requireInit(process.cwd(), [".hench"]);
   await runOrDie(tools.hench, ["show", ...rest]);
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 function handleHelp(rest) {
   const query = rest.filter((a) => !a.startsWith("-")).join(" ");
   if (!query) {
     showMainHelp();
-    process.exit(0);
+    exitWithCleanup(0);
   }
   // If query is a tool name, show its subcommand summary with navigation hints
   const toolHelp = formatToolHelp(query);
   if (toolHelp) {
     console.log(toolHelp);
-    process.exit(0);
+    exitWithCleanup(0);
   }
   // If query matches an orchestration command, show its help
   if (showCommandHelp(query)) {
-    process.exit(0);
+    exitWithCleanup(0);
   }
   // Otherwise search across all help content
   const results = searchHelp(query);
   console.log(formatSearchResults(results, query));
-  process.exit(0);
+  exitWithCleanup(0);
 }
 
 function handleUnknownCommand(command) {
@@ -1227,7 +1272,7 @@ function handleUnknownCommand(command) {
   } else {
     console.error("Hint: Run 'ndx --help' to see available commands, or 'ndx help <keyword>' to search.");
   }
-  process.exit(1);
+  exitWithCleanup(1);
 }
 
 function showMainHelp() {
@@ -1250,20 +1295,46 @@ const INIT_BANNER_LINES = [
   "│        Guided project setup is starting      │",
   "└──────────────────────────────────────────────┘",
 ];
+const signalHandlers = installTrackedChildProcessHandlers({
+  tracker: childTracker,
+  signals: ["SIGINT", "SIGTERM", "SIGHUP"],
+  onSignal: async (signal) => {
+    const signalExitCode = signal === "SIGHUP" ? 129 : signal === "SIGINT" ? 130 : 143;
+    await flushAndExit(signalExitCode);
+  },
+});
 
 // Catch unhandled errors at the top level — never show stack traces
 process.on("uncaughtException", (err) => {
+  if (err instanceof ExitRequest) {
+    void flushAndExit(err.code);
+    return;
+  }
   console.error(formatError(err));
-  process.exit(1);
+  void flushAndExit(1);
 });
 process.on("unhandledRejection", (err) => {
+  if (err instanceof ExitRequest) {
+    void flushAndExit(err.code);
+    return;
+  }
   console.error(formatError(err));
-  process.exit(1);
+  void flushAndExit(1);
 });
 
 // ── Main dispatch ────────────────────────────────────────────────────────────
 
-await main();
+try {
+  await main();
+  await flushAndExit(0);
+} catch (err) {
+  if (err instanceof ExitRequest) {
+    await flushAndExit(err.code);
+  } else {
+    console.error(formatError(err));
+    await flushAndExit(1);
+  }
+}
 
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
@@ -1271,7 +1342,7 @@ async function main() {
   // ── Per-command --help ──────────────────────────────────────────────────
   const hasHelp = rest.some((a) => a === "--help" || a === "-h");
   if (hasHelp && command && showCommandHelp(command)) {
-    process.exit(0);
+    exitWithCleanup(0);
   }
 
   // ── Dispatch to command handler ─────────────────────────────────────────
@@ -1320,7 +1391,7 @@ async function main() {
   // ── Tool delegation ───────────────────────────────────────────────────────
   if (tools[command]) {
     const code = await run(tools[command], rest);
-    process.exit(code);
+    exitWithCleanup(code);
   }
 
   // ── Unknown command or no command ─────────────────────────────────────────
@@ -1329,5 +1400,5 @@ async function main() {
   }
 
   showMainHelp();
-  process.exit(0);
+  exitWithCleanup(0);
 }

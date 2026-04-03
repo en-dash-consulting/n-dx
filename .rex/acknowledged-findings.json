@@ -161,6 +161,5452 @@
       "text": "The REQUIRED_CONTRACTS weak-match means the llm-gateway contract (packages/hench/src/prd/llm-gateway.ts, 30 functions + 10 types) is not independently verified at integration level; add a dedicated assertion block in cross-package-contracts.test.js that imports and exercises at least one symbol from the llm-gateway to close the gap the policy test currently fails to detect",
       "acknowledgedAt": "2026-03-11T04:37:21.714Z",
       "acknowledgedBy": "user"
+    },
+    {
+      "hash": "ddc831d1e606",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "26cfb4e9244c",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "819db31ad7e3",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "396510974c68",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "53404d7921bf",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "00a34888261f",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "185cc8b2a9d4",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8d4aa911253f",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cb9475913de8",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f0b5137e8c53",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "773f8a1d05df",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "980f18efccfd",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4c15da0b5901",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "10a6240f1c32",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7c7e31624919",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8a0e591eca2e",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0c622cf6160f",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8e6f8ac50b42",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8cfd10e3b866",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4becd149b126",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "824590d0e41e",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1ac221565b82",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9c8a0a18cdab",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b064101a040c",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "73d1bfc1b764",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9ec502cad34e",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f17242ecf07f",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "41aa7c79e88b",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7560ae5a40cd",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "19e141012498",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1aedce93a8d6",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "435ab6cdab66",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "53603aabd2d4",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a67d5e8ed2e8",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3e71ee30cc0c",
+      "reason": "completed",
+      "text": "Address pattern issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cbc3259da8a3",
+      "reason": "completed",
+      "text": "Address relationship issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "be72e8b0c8d3",
+      "reason": "completed",
+      "text": "Address relationship issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0d8d0569fe30",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "41f3f4b700e7",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c5cfd3f996ee",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1ccaee67d1ba",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fc99fa260be8",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "18350def8b69",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "99ddb9e6e7bc",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cbaaa3dbca8f",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "550887f15c3d",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e3830ec5dc61",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "387689bf872f",
+      "reason": "completed",
+      "text": "Address suggestion issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2360c21c19db",
+      "reason": "completed",
+      "text": "Address observation issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6ae74c1e1509",
+      "reason": "completed",
+      "text": "Address observation issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8ab4af067f6e",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "71902dbd1287",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "af767876794e",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bb48f0a5b996",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8836ec9ee46c",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3b6510764710",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "47896778a9b6",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "75ca015bfa67",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0a3570d9a6a2",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "00c6e0c3c33b",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "75598fb0b6cb",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "75113b8bb983",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8aac80b8f1e5",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.944Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4b3e6b45afbb",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1285628fd32a",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b1bd5dd50c8b",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "521dcf780ec2",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f26bf9612d39",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cac60522219f",
+      "reason": "completed",
+      "text": "Address pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1c780f664d3a",
+      "reason": "completed",
+      "text": "Address pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fbd735535482",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2db342a0007b",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "94c4e49b1e3c",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "dbef4a5c90f6",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c836cca79cfe",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "599ea0d132a1",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d1e2f6b9e6f6",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8815f6c005b2",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "afcb485989bf",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3b75ffdb4d83",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2c2e4990f55c",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ed0961464fbb",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c124bd40b4d8",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a44643cd460f",
+      "reason": "completed",
+      "text": "Address observation issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "256d4731c00f",
+      "reason": "completed",
+      "text": "Address suggestion issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "29fb7fc49bb2",
+      "reason": "completed",
+      "text": "Address suggestion issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "00675d0a2e67",
+      "reason": "completed",
+      "text": "Address suggestion issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e80b467903a5",
+      "reason": "completed",
+      "text": "Address pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "46aaae60589f",
+      "reason": "completed",
+      "text": "Address pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "75e0bd6b432f",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "30b2889a35bd",
+      "reason": "completed",
+      "text": "Address observation issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a412074fc50d",
+      "reason": "completed",
+      "text": "Address observation issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1055fc8a3d97",
+      "reason": "completed",
+      "text": "Address observation issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ace504630038",
+      "reason": "completed",
+      "text": "Address observation issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8e1afee1274d",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "19e5fd90db78",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6d076775b051",
+      "reason": "completed",
+      "text": "Address suggestion issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "86237ba90ad7",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "01e8f53cc770",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f6eac0dd056f",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "86ec9000ac3e",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "54e1a5f6b858",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a87aa693d8a4",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b17d0ed875cc",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "58269e61c2c7",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7b97cd013cf4",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "12398526c48c",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d17af6e7d20c",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d66483b62c7f",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "643a8d124a0a",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "789d87bda596",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b7f5ee66f875",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "602a0a79dc47",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d6363b569119",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "76965087c616",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3b4373bd0c5a",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c57ccfdb2b03",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9b0769dfa7c6",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "43c713eeecc4",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f842d47bf869",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2f5a2317583e",
+      "reason": "completed",
+      "text": "Address suggestion issues (17 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "122af3d5b4b0",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a325d637b951",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b36f6c3bb1fd",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "78adf986399c",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f6dff706ce23",
+      "reason": "completed",
+      "text": "Address relationship issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a2490005d081",
+      "reason": "completed",
+      "text": "Address relationship issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "37f69cf164f3",
+      "reason": "completed",
+      "text": "Address relationship issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e29f77099f48",
+      "reason": "completed",
+      "text": "Address relationship issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "19911d86c497",
+      "reason": "completed",
+      "text": "Address relationship issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ba7c8ef3290f",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b3960a17b2f4",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c35efdca4a79",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "63fed6c8a33e",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2a9dc4791a9a",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e7b66ede1438",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9813480cb94c",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "07bd88843135",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ff9d7f9a04c7",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f2e65e134e1c",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "991032cd7eeb",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "68ae7881c0cd",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f53f9b0ec7df",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "09ff2877c8a6",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "567cfe71b026",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "dde73163705d",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e71b5db306a7",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ee7001d9b32e",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "606920a99dff",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d8d653a9da73",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "81833025b647",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "059050287ff4",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1cf705c81f12",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "57fed4cecaa2",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "92460785ab13",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7e1408ad7f5b",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5da393036ae4",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "66ab47514bd0",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e96afa4c201e",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9b62d0bee5a7",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "738207b076b2",
+      "reason": "completed",
+      "text": "Address suggestion issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5180d6350395",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "05bc846df47d",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ad5574e1f4e8",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0b662b5811dd",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7fe50817143d",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "375e34ebbccf",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4354f3832b88",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "21f7bfb45d77",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c66129ecc1b4",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "881dacd12b3e",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "036aeaef617d",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1f4a7b39f1be",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8ed94dfe014a",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "13fd061901e7",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5ad15ee433e3",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bb80537c389b",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "35a457cec161",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "510c28fd97a6",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "38d3a3b45b92",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "57a4cb6e2260",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "32b5987804b2",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4e93bb975f67",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6e5559efd4db",
+      "reason": "completed",
+      "text": "Address observation issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "103e669a4722",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "35bb9a25fdac",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cd1bf96738de",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4d09f085f8cb",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a47cc3bc13ac",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1d1e9b4c134c",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ffe7349f42ef",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7dd8c8bf5af1",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ff068b1e1d6d",
+      "reason": "completed",
+      "text": "Address observation issues (4 findings)",
+      "type": "observation",
+      "scope": "web-unit",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "06ce915d1488",
+      "reason": "completed",
+      "text": "Address observation issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c174b7aeec75",
+      "reason": "completed",
+      "text": "Address pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "62af66ede3dc",
+      "reason": "completed",
+      "text": "Address suggestion issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "972e40eb74f7",
+      "reason": "completed",
+      "text": "Address suggestion issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b87a61c49cb7",
+      "reason": "completed",
+      "text": "Address suggestion issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d141541bc728",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4fb517c551e0",
+      "reason": "completed",
+      "text": "Address pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2ddd730b6413",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "595c70dc1265",
+      "reason": "completed",
+      "text": "Address suggestion issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f616537d4483",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ffb8f9119678",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b244b317daa1",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "074110aabc81",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c11c699653bb",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bd13d6b8b363",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "21ff822c5c93",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "688cabfcafba",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "348dc8ce097a",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5a44f1e7ac1a",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "579d9979a8f0",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d5faf62b709f",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "aa5f954cf50b",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2e7c9d8d64aa",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ee56a3711efe",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "37b9badd46bc",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e3d20988da63",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5830c5fa3b45",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d3d9e382abad",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "006444345ff6",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c66bada5fc0e",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9d9326d83cd5",
+      "reason": "completed",
+      "text": "Address pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "317b407e9ccf",
+      "reason": "completed",
+      "text": "Address relationship issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a190cf531502",
+      "reason": "completed",
+      "text": "Address relationship issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f94ac756c97a",
+      "reason": "completed",
+      "text": "Address relationship issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8c888e8152ad",
+      "reason": "completed",
+      "text": "Address relationship issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0ce441204ba0",
+      "reason": "completed",
+      "text": "Address relationship issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5bad50ecd512",
+      "reason": "completed",
+      "text": "Address relationship issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3b926016b105",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c6c848388f87",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a43acaaeec8c",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "55921b8d7519",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "87682d1c08fc",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "81dafb8c63a9",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2f042755db06",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.945Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "953087bf666d",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f3a77e2ce571",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "82c843d75b18",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5b18afd1da56",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b0e8f7253875",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "621aaa2bc631",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0a0a74a51f98",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f7384fb36079",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5fa7593a5823",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "24c81d0a4ae3",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c9c71395465e",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5cd917c5a0d3",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "88626875a9b8",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "83ee828dc2c9",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f32b914b182d",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0cd979267c15",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d417caf71a83",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2bd688157363",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8d7c0536a927",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "149704313a8d",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5daf0c590952",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "641466862ff0",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "198edf65b815",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "882e9fe058f9",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "31557fd5442f",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5e7c8e9c41a7",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1321b6465ad0",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cafb56739ed2",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8c9b48fd4dfd",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b2476992b666",
+      "reason": "completed",
+      "text": "Address pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fce4becc15b2",
+      "reason": "completed",
+      "text": "Address pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "74648457d9fa",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3b3cf71f5fbb",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fce558fbff50",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "aedac4de60ca",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f141ef490056",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "701e4448a5bd",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fa11caaaab44",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d1210f627514",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e04778287976",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1f46c0c603eb",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7fd6b1624274",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "460a5af18f79",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3b4ee354b843",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "167bdff8eaad",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3a7c4a7768da",
+      "reason": "completed",
+      "text": "Address observation issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "10857b80a8cd",
+      "reason": "completed",
+      "text": "Address observation issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "066f7ee93d5d",
+      "reason": "completed",
+      "text": "Address observation issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d299ef6f2a45",
+      "reason": "completed",
+      "text": "Address observation issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d6880f504dff",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ae4991365be0",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b2a06544e28c",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "873608d723a9",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ea39bf00a30d",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7a681fa6f496",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "42ae98f205a3",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "18095305efa3",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "75b6ec3f9e9f",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e4777ae4df28",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "28be67313ba3",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ee35967a5af7",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "229a3233fc90",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "598f9cc4a793",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "28b6f2cdb596",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2b94c960c2ac",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "08b3b16243f5",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c099259ebea7",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "638da8d8eb92",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8c02d33b72bd",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4b8cf7025763",
+      "reason": "completed",
+      "text": "Address suggestion issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "aac0ffe7f4cb",
+      "reason": "completed",
+      "text": "Address pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "670e1786e5e6",
+      "reason": "completed",
+      "text": "Address pattern issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "91f3ba9527fb",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "80c032628054",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a9d09aa871be",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4c385be769f8",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fd877d96c76c",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4f61bee422c0",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4f237842f6a6",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a02102876b62",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c0cd4002b25a",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "486aefc7b2f8",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "85ba33ea7a17",
+      "reason": "completed",
+      "text": "Address observation issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "deb476e24485",
+      "reason": "completed",
+      "text": "Address observation issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e15f4c5c5eea",
+      "reason": "completed",
+      "text": "Address observation issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "81f14d1792f9",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "22ebf68d06c8",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8440e1643abe",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7881027a2283",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6e25829c2d85",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6d4994c690eb",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d9e01c33254c",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "81100f0c2ad4",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b5a4169707fe",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.946Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "189e27e180fb",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c3ae8106a27a",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a7fe5075571e",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7572486da148",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "82bf2ed3056f",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bafba9ede5e4",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cc6f75eba58f",
+      "reason": "completed",
+      "text": "Address suggestion issues (18 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "80f023e42335",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "99e8d8f3d1b1",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cf10522ba90c",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a57082612d3d",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3b5c75c6e4c4",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8379f75792a1",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "556f61db13bd",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "51b2745988d6",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e603cfd50c57",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "47bb2adbca67",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6a7bd78b5f68",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "92fd2ab9167c",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "71fd86c7463f",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "69246a4c8ecf",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4ee452497d78",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8ea08e97fe62",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5edecec53a4c",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "83a6811d43d9",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fe65659db6a5",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ef71664e96f9",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4ff6c6795022",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "52e6dec4844a",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f1a3cd8408d2",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "type": "observation",
+      "scope": "web-viewer",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7940e7f1d761",
+      "reason": "completed",
+      "text": "Address suggestion issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "786a936c16e8",
+      "reason": "completed",
+      "text": "Address suggestion issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "00cdc05a8ce0",
+      "reason": "completed",
+      "text": "Address suggestion issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ac0979e7c956",
+      "reason": "completed",
+      "text": "Address suggestion issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7662c342e2c4",
+      "reason": "completed",
+      "text": "Address suggestion issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "966d8ca2fa09",
+      "reason": "completed",
+      "text": "Address suggestion issues (6 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ff4921aaeef9",
+      "reason": "completed",
+      "text": "Address pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bf0bbc5c917a",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "63226b6ea8cb",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4fd9eca790e1",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d51d0b9c505a",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b2935e4ed8d4",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4f6929011170",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b1d3b5191525",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fe179e1b3243",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "04fb3637c10a",
+      "reason": "completed",
+      "text": "Address observation issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "49824dcea1fe",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8d9ad4565e5f",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "239482924bbc",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2c3a3804d0bb",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e5bb9518d382",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c6be9dd24810",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4bbd79bb45e7",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "48ea3b3630cc",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b2f43592fe3a",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2856c862678f",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "616edd5d8a62",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "732f0f52074b",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "905c396ac8bd",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "982599ce36eb",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "901d91d81f12",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "895e6b878da2",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "19c1ad1b29a7",
+      "reason": "completed",
+      "text": "Address suggestion issues (19 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8564f6acf3cb",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ee2ca067e5f8",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cd4c1157fae2",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "daa9d2ec7e97",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "977dd029558c",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8ada3da401e8",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2ddf9cf7267d",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bc29a9d226af",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d46bcd1a6b7f",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e61a6bcab7c6",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "68c9b4022e4d",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9944330e8199",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5313ca556589",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1746ad298183",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "af5bfc055ce0",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c35ebb9d343a",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9a2ff5b315ef",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "534f9b8f955f",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "677a1a686a64",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f768ef191031",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1e116e3cbbac",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d7c433f472b0",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e1b2a6bbc9a4",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "34b36fe49cbc",
+      "reason": "completed",
+      "text": "Address observation issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7b455a378c6c",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.947Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3e9060a10415",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cd6be08a2aab",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6a0a561762c5",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "af625a121f21",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "96d88f4b825c",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0824a2593a0a",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "65d315825789",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0b0e8cc8022f",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "916d2f723a91",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "772ac81280ad",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ce4395f3b141",
+      "reason": "completed",
+      "text": "Address move-file issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "382b05ecccd9",
+      "reason": "completed",
+      "text": "Address move-file issues (2 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f0411816a57a",
+      "reason": "completed",
+      "text": "Address pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a43400446d2f",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1ae7b18edbef",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4733d641cad2",
+      "reason": "completed",
+      "text": "Address relationship issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e33a14aa1eed",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "832e4110950a",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "156c17bb7e5f",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4271b7944403",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "588a159db330",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "450049312db7",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "922656338ac3",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d8e8ea6c6d53",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4946fabcfefc",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "88a1e80e7229",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (10 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "890fe8cb6543",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "820edf730287",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "99813053cadc",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "83d4b4a07c37",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1e4068b15886",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0ee84d415fb1",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "165824e25e51",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "33a07e0a78af",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1069426a019e",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9d31a45afa32",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b557b0108dcc",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7bf2111881fa",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0dd2f165fc91",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "71b6428a0b1b",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6a7c31cb26d0",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9e42018c58b5",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "461bafbba8b7",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "12a754b7a591",
+      "reason": "completed",
+      "text": "Address observation issues (21 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5ea31e2b521b",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1ac559d06ccb",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6be6b21b0426",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e184b4f86700",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6f084e70ad57",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "67d1b4795eb1",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4c19edda7e59",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "db07222b9f29",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3057929b34e5",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "75db1ac0cb90",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f55c52892ac4",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1e034bac71fb",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "43aa32278364",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7ccf0f7ae4af",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f02733e2940f",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3b80f4f24b11",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5673a69c2c4f",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b468246fde45",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "80bd4bfe8b63",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ad89377e9e4a",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "eac5732722d1",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d6830d859d61",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5da4ded7726c",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "57dddb86c3ea",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "dbdecb889d6c",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "035fede6ee11",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "26751f4d28e4",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "faf0116219c8",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4c6b5000aa97",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d52456d77c6e",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "32d40acf3fde",
+      "reason": "completed",
+      "text": "Address suggestion issues (32 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f1164f9f1f74",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f4eddff9634f",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.948Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5ac3f9e019cd",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b01dab3073f1",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "27d059da26b9",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cc33a9ac68ce",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8929f6380028",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "01251acb58a0",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8643b119cb8f",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8deb09880115",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f1e7246c53d7",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a297222dea3e",
+      "reason": "completed",
+      "text": "Address relationship issues (9 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3bfd85f165fa",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cdfa3853971c",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2f18bbc64e0f",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c284c0177152",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "09218307cfab",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6f5ed64b7bd1",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "42dd32d1f45a",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "208c6d908bc8",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1fc198ea00fa",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f124e1dcdd4c",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "26a8f24e4a75",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9f7a9777009f",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "aa08f6a130dc",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a2fc299a5673",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8606df0374f2",
+      "reason": "completed",
+      "text": "Address anti-pattern issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "af76cd90374b",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d0f7b7fa1bfd",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "66fc30260a75",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c19f228a98e7",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "33e6cff0b60f",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5c76957af521",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cd27c02503d0",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4c879c71052f",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "03adacaf6465",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e4cf6f218737",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f56727f7e15f",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b66e402c9320",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f1ed3521ea13",
+      "reason": "completed",
+      "text": "Address observation issues (16 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "573e02ce8d74",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4aa2bbf70298",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a866e1024bba",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4ea75d4d1a1f",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "52575192c32b",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "108fb775dc88",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "98f2a108c8eb",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "56e55a97e55c",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "61d2a8ae9fd0",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3c1162a16b3d",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "148dea0ee139",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "98e7d2f31b4e",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "16667c02fec6",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ed1c1ce36dd2",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8c17bb21ef0e",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "989a211c1f61",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "40be238e3f6d",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b1b611028e3f",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b524885149da",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b075e7d17252",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "12b5e695b791",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "be18d0664c32",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ebc55a463e0c",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8f6a5ec4ccd6",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f11e7cf215a4",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "014203ea40bc",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d72a107188d2",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ba1134919776",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.949Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "33bb2fe0ee11",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "147f544de9cb",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "320036fcc534",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8904a099dcf3",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5c8437500f35",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fd85ce3d6de6",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "86cdb165544e",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4da01a6fa27a",
+      "reason": "completed",
+      "text": "Address suggestion issues (36 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "eb9de8a7b18a",
+      "reason": "completed",
+      "text": "Address move-file issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "83aca7ce72d5",
+      "reason": "completed",
+      "text": "Address pattern issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c3c09d9b374e",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9bfc4ae43a89",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3c1982f876b6",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e31c2826694b",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "93bf236eb32a",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7afb6025a71e",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0dd901285f35",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "db75a187fabc",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0c9cc06433a8",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b46ac02dd933",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c9140f2f0077",
+      "reason": "completed",
+      "text": "Address relationship issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0b3d31f60053",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4d7e886e844d",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e3b0de66599e",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d92191121f00",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "038e7c47eda0",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b7aafb32430e",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d13c3581e280",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ae9459b0c0b8",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c6fe8c64cce1",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0a5b079a9ffb",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bcf451a26e4f",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e27fa84e3903",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "583238fda801",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1f2f40eef8a7",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "961a4ebcf212",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b85294289e41",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b1da5a46362d",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b44c366ac5e2",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f48f039ff3ab",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c436840db792",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7cb1fd16292b",
+      "reason": "completed",
+      "text": "Address suggestion issues (23 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "86a3bb1553ff",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e25169648b8e",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d88afcfdec56",
+      "reason": "completed",
+      "text": "Address pattern issues (3 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ece087b6b9c2",
+      "reason": "completed",
+      "text": "Address relationship issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fd3f3762ac4f",
+      "reason": "completed",
+      "text": "Address relationship issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "704fb4c91512",
+      "reason": "completed",
+      "text": "Address relationship issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d0e0d87a07cd",
+      "reason": "completed",
+      "text": "Address relationship issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9d7b1e0c215a",
+      "reason": "completed",
+      "text": "Address relationship issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f230eef96f74",
+      "reason": "completed",
+      "text": "Address relationship issues (8 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "af4bfad43fd8",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c6a4f3bd7c48",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bcb11b9d11e1",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9ac8809e3540",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a2e0f85c5839",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "343b69f9d5ee",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a38a0cf6e110",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ba638d262a4e",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.950Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c51f109e9b0d",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "da401c49774e",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a33ba8b4b183",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "724d41a7edef",
+      "reason": "completed",
+      "text": "Address observation issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f04d784f5c1e",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7fc8f4b6db3a",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e7b0a70e09e3",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c1ee50fee55b",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0c6e3f08dd67",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3ac6fc023278",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3cfb63fafbdd",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "41e84eb8ee6a",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a3242647c6aa",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "54d43104e933",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2c8bfd0ca570",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "29c647c299e6",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e5608695c013",
+      "reason": "completed",
+      "text": "Address suggestion issues (13 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6c3d8c068e94",
+      "reason": "completed",
+      "text": "Address move-file issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "eb40fc5cb023",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "baf3bf8b62dc",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d351b317af01",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "036deeb05a67",
+      "reason": "completed",
+      "text": "Address pattern issues (4 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "afb7e89e6ffa",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5e498ac5fad0",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "928d9bc73ba5",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6babdd7bb71a",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6ecb1369ebc9",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b2c085c197bf",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "75ba8d4af1e9",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "175b73583c85",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "37e2357058ca",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f12db548df75",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2422068b1752",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "57f4efc6c331",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d7fb7435f660",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5ece6cadcc98",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d88d467e9d62",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7709e93b65ba",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4fbf91bff419",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d5717b5508c3",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e3b652132a17",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e330886c53ca",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8d4bbe16ff67",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "82d1745235c8",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d6348f899565",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "52a0ea09a6fa",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "63fbd342a607",
+      "reason": "completed",
+      "text": "Address observation issues (14 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2ab4301c3797",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "54d93ed1090d",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ee95467386c7",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8952d7d9ecec",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9d2843ed0010",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9e8f385ee75b",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.951Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "47ecbc152064",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a8c89bab97e8",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c7d70579881f",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6cd0229d32dc",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "96284b6c4e09",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "19fb405cf820",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f5c5b5dea473",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f2755cddc94f",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6c91aeb0baf8",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "25838a898744",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "88b64f12b262",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0fa5e62a8f61",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "01a4ea6c65c6",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "37f04830a5dd",
+      "reason": "completed",
+      "text": "Address suggestion issues (20 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "350c5ca9be88",
+      "reason": "completed",
+      "text": "Address move-file issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8c26f561dd3c",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8271ecfc9541",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "89b6b9a3b7c1",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "47803b174b2a",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d31378e507a5",
+      "reason": "completed",
+      "text": "Address pattern issues (5 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f00b2010046c",
+      "reason": "completed",
+      "text": "Address relationship issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "733bfc78ac06",
+      "reason": "completed",
+      "text": "Address relationship issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0dc5cb407c1d",
+      "reason": "completed",
+      "text": "Address relationship issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5ef885a0c7d3",
+      "reason": "completed",
+      "text": "Address relationship issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "125f4cf99481",
+      "reason": "completed",
+      "text": "Address relationship issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d8ebe8e96bfd",
+      "reason": "completed",
+      "text": "Address relationship issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a310b01077cc",
+      "reason": "completed",
+      "text": "Address relationship issues (7 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "36dbcb87adc3",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "78f23cc32d00",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "972d5710805d",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "47040f6cbaf8",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f1732cc6ca0a",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5a27eb933e5e",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "922a3049e4ee",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cff19ffa1f91",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9c53b303684b",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f80cc9de0855",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6da45042b2a0",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "56b274d415b6",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bd97157d32a5",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8675644fce1f",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e5abd4928476",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "dc799be06402",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4bd69f32f988",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "91d0d314584e",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a1e1774aec7e",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5bb99d3645db",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b0dd9b6dd827",
+      "reason": "completed",
+      "text": "Address observation issues (26 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a691a46438c8",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.952Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "336ba02588fc",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7659d55ec09c",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "316a86586785",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "da9339e237b3",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "46055b68ba6a",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8fbf9555ac8c",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "366cd3df33cd",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "03ebf68e6ee8",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b2bfe0430d46",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2c9f01b7b6eb",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c71d10e31d0f",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d87542d60472",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a82a3dc283e4",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fc366bd9685c",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b2fef826474c",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "07f649dec0d3",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4a9be2ac56f7",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "efdf0d1033eb",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0d01cb9b9bcc",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "caadbf349d51",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9fe82e7eada4",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ed1b619ab7d7",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "81dc77116f61",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "83fce42aa736",
+      "reason": "completed",
+      "text": "Address suggestion issues (25 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "51444978b392",
+      "reason": "completed",
+      "text": "Address move-file issues (1 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8e7585ea7fe3",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1fc6497eb9e8",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b4deeffda2c1",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "da7e52535bac",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b97e0c99872f",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "87f2f18142ae",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "c643f71b20da",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a48989183a44",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3e326173fd00",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "52689fc47585",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1f955586e227",
+      "reason": "completed",
+      "text": "Address pattern issues (11 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4c24b2b79d01",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "77f344cbe30c",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "17bf38e16dd8",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e2bfed1ac431",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "773d26d2559c",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "7ee7e64ea9b5",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "cdc65ef51cfe",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "333f80f01905",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.953Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "90e1840f4fd0",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "510b1b93a28b",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e4e1e8afdcc5",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3ccadeec7659",
+      "reason": "completed",
+      "text": "Address relationship issues (12 findings)",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2ad43ef6f0af",
+      "reason": "completed",
+      "text": "Fix suggestion in sourcevision-2 (1 finding)",
+      "type": "suggestion",
+      "scope": "sourcevision-2",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "36620e61fa42",
+      "reason": "completed",
+      "text": "Fix suggestion in sourcevision-3 (1 finding)",
+      "type": "suggestion",
+      "scope": "sourcevision-3",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8024b2fa4d12",
+      "reason": "completed",
+      "text": "Fix move-file in web-viewer (1 finding)",
+      "type": "move-file",
+      "scope": "web-viewer",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "264b6245baa8",
+      "reason": "completed",
+      "text": "Fix anti-pattern in global (2 findings)",
+      "type": "anti-pattern",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e648f5e361f3",
+      "reason": "completed",
+      "text": "Fix anti-pattern in global (2 findings)",
+      "type": "anti-pattern",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-03T14:35:17.954Z",
+      "acknowledgedBy": "self-heal"
     }
   ]
 }

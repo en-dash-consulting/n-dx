@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtemp, cp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer as createNetServer } from "node:net";
+import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 
 const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");
@@ -40,13 +41,28 @@ function waitForServer(port: number, timeout = 5000): Promise<void> {
 
 describe("sourcevision serve (e2e)", () => {
   let tmpDir: string;
-  let serverProc: ChildProcess | null = null;
+  let serverProc: ManagedChild | null = null;
+
+  async function stopServer(): Promise<void> {
+    if (!serverProc) return;
+    const handle = serverProc;
+    serverProc = null;
+    await killWithFallback(handle, 2_000);
+    await handle.done;
+  }
+
+  function isPidRunning(pid: number | undefined): boolean {
+    if (pid === undefined) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   afterEach(async () => {
-    if (serverProc) {
-      serverProc.kill("SIGTERM");
-      serverProc = null;
-    }
+    await stopServer();
     if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -62,9 +78,10 @@ describe("sourcevision serve (e2e)", () => {
 
     // Start server on an OS-assigned free port
     const port = await getFreePort();
-    serverProc = spawn("node", [CLI_PATH, "serve", tmpDir, `--port=${port}`], {
+    serverProc = spawnManaged("node", [CLI_PATH, "serve", tmpDir, `--port=${port}`], {
       stdio: "pipe",
     });
+    const serverPid = serverProc.pid;
 
     await waitForServer(port);
 
@@ -88,5 +105,8 @@ describe("sourcevision serve (e2e)", () => {
     const inv = await invRes.json();
     expect(inv.files).toBeDefined();
     expect(inv.summary).toBeDefined();
+
+    await stopServer();
+    expect(isPidRunning(serverPid)).toBe(false);
   });
 });

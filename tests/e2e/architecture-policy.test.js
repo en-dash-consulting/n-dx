@@ -797,11 +797,14 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["cli-binary-shims", "Shim scripts with no internal imports; zero cohesion by design"],
-  ["project-status-hooks", "Small viewer zone (4 files); polling hooks with linear dependency chain"],
-  ["rex-chunked-review", "Small CLI pipeline zone; linear review pipeline with low internal edge count"],
-  ["rex-package-infrastructure", "Package config and metadata zone; no internal import structure"],
-  ["rex-task-verification", "Small utility zone; unrelated verification helpers grouped by Louvain"],
+  ["panel", "Small UI zone (3 files); execution-panel, reorganize-panel, rex-dashboard grouped by Louvain; metrics unreliable at this scale"],
+  ["refresh", "Small zone (3 files); performance throttle hook with paired test file; metrics unreliable at this scale"],
+  ["rex", "Mixed-type zone; config files, test files, and llms.txt with no internal import structure grouped by Louvain"],
+  ["rex-cli", "CLI satellite zone (27+ command files); high coupling to core by design; documented dual-fragility zone in CLAUDE.md"],
+  ["root", "Repository root files (.gitignore, LICENSE, config); no import structure by design"],
+  ["tick", "Small polling zone (7 files); tick-timer, batched-tick-dispatcher, tick-visibility-gate; approaching threshold"],
+  ["use", "Small hooks zone (3 files); polling and project-status hooks grouped by Louvain; metrics unreliable at this scale"],
+  ["web-unit", "Small performance zone (5 files); dom-update-gate, update-batcher, test helpers; metrics unreliable at this scale"],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {

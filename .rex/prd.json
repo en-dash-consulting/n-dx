@@ -19260,6 +19260,8 @@
       "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
+      "startedAt": "2026-04-02T17:55:36.327Z",
+      "completedAt": "2026-04-02T17:55:36.327Z",
       "mergedProposals": [
         {
           "proposalNodeKey": "p0:epic",
@@ -20890,9 +20892,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-02T17:55:36.327Z",
-      "completedAt": "2026-04-02T17:55:36.327Z"
+      ]
     },
     {
       "id": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
@@ -23541,6 +23541,289 @@
           ]
         }
       ]
+    },
+    {
+      "id": "690df65f-703a-4e94-8162-24e838f7f538",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-03T14:08:58.216Z",
+      "completedAt": "2026-04-03T14:08:58.216Z",
+      "children": [
+        {
+          "id": "b67648eb-e1a0-4420-89e0-2052b810ead4",
+          "title": "Child Process Cleanup and Exit Hygiene",
+          "status": "completed",
+          "level": "feature",
+          "description": "Ensure `n-dx` tears down all spawned child processes and lingering worker threads when commands complete, fail, or are interrupted so local machines are not left with orphaned SourceVision-related activity.",
+          "source": "smart-add",
+          "startedAt": "2026-04-03T14:08:58.077Z",
+          "completedAt": "2026-04-03T14:08:58.077Z",
+          "children": [
+            {
+              "id": "78ecaa15-4503-4f81-a368-355ced818762",
+              "title": "Implement unified child-process teardown for n-dx command lifecycles",
+              "status": "completed",
+              "level": "task",
+              "description": "Add a centralized cleanup path for `n-dx` and package-level runners that tracks spawned child processes and terminates them on normal exit, error exit, and signal-driven shutdown. The goal is to prevent orphaned SourceVision test workers and related subprocesses from persisting after command completion.",
+              "acceptanceCriteria": [
+                "All child processes spawned through `n-dx` orchestration are registered in a shared lifecycle tracker",
+                "When an `n-dx` command exits normally, the cleanup path sends termination to registered child processes and waits for shutdown before returning",
+                "When an `n-dx` command exits due to an error, the same cleanup path still runs and attempts termination for all tracked children",
+                "When the parent process receives `SIGINT` or `SIGTERM`, the cleanup path executes before final process exit",
+                "Processes that do not exit after a graceful termination attempt are force-killed after a bounded timeout"
+              ],
+              "priority": "critical",
+              "tags": [
+                "cli",
+                "process-management",
+                "sourcevision",
+                "stability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T13:53:38.847Z",
+              "completedAt": "2026-04-03T14:04:06.691Z"
+            },
+            {
+              "id": "d3618484-b8ab-4ed5-a162-7602873aa162",
+              "title": "Harden SourceVision test execution against lingering workers and orphaned threads",
+              "status": "completed",
+              "level": "task",
+              "description": "Audit the SourceVision test/runtime paths that can continue running after completion and make them participate in the same shutdown contract so nonstop unit-test activity does not linger on developer machines.",
+              "acceptanceCriteria": [
+                "SourceVision test-related subprocesses or workers are routed through the shared cleanup mechanism instead of unmanaged direct spawns",
+                "Known long-running or watch-like test helpers used by SourceVision are explicitly shut down when the parent workflow completes",
+                "No orphaned SourceVision-related child process remains after a representative test workflow finishes in a regression scenario",
+                "Failure paths during SourceVision test execution still trigger cleanup of already-started workers or subprocesses"
+              ],
+              "priority": "critical",
+              "tags": [
+                "sourcevision",
+                "tests",
+                "threads",
+                "process-management"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T13:48:52.972Z",
+              "completedAt": "2026-04-03T13:53:35.580Z"
+            },
+            {
+              "id": "94cad81d-4c83-4c9f-aac5-e97259687f24",
+              "title": "Add regression coverage for parent-exit cleanup and orphan prevention",
+              "status": "completed",
+              "level": "task",
+              "description": "Create automated coverage that proves `n-dx` does not leave child processes behind after successful runs, failures, or interrupted execution, with emphasis on the SourceVision scenarios currently causing lingering machine load.",
+              "acceptanceCriteria": [
+                "An automated regression test verifies child processes are terminated after a successful `n-dx` run",
+                "An automated regression test verifies child processes are terminated after an erroring `n-dx` run",
+                "An automated regression test verifies child processes are terminated after signal interruption of an active run",
+                "Test assertions explicitly fail if a spawned SourceVision-related process remains alive beyond the configured shutdown timeout"
+              ],
+              "priority": "high",
+              "tags": [
+                "testing",
+                "regression",
+                "cli",
+                "sourcevision"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T14:04:10.569Z",
+              "completedAt": "2026-04-03T14:08:57.865Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "95918257-d85b-49aa-88b2-2d865a7912c4",
+      "title": "Code Health: 5 findings across 4 zones",
+      "status": "completed",
+      "level": "epic",
+      "description": "Automated recommendations from SourceVision analysis. 4 zone+category groups covering 5 total findings.",
+      "priority": "high",
+      "source": "sourcevision",
+      "children": [
+        {
+          "id": "ff6c5a83-fbcb-4c16-8ef3-279c92f81249",
+          "title": "Fix suggestion in sourcevision-2 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-03T14:35:08.286Z",
+          "completedAt": "2026-04-03T14:35:08.286Z",
+          "children": [
+            {
+              "id": "80abb312-bf55-45c1-836b-a176715bddbf",
+              "title": "Fix suggestion in sourcevision-2: Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pi",
+              "status": "deferred",
+              "level": "task",
+              "description": "- Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-03T14:35:03.990Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "2ad43ef6f0af"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "2ad43ef6f0af"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "4e6c049d-1870-462a-9aa0-501b9932b122",
+          "title": "Fix suggestion in sourcevision-3 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-03T14:35:15.361Z",
+          "completedAt": "2026-04-03T14:35:15.361Z",
+          "children": [
+            {
+              "id": "d4bc1bc9-5b60-40fb-9719-9120ac718065",
+              "title": "Fix suggestion in sourcevision-3: Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pi",
+              "status": "deferred",
+              "level": "task",
+              "description": "- Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-03T14:35:10.827Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "36620e61fa42"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "36620e61fa42"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "f190d1c3-c8d9-47b9-a994-b5e1f4fe31a9",
+          "title": "Fix move-file in web-viewer (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-03T14:35:01.471Z",
+          "completedAt": "2026-04-03T14:35:01.471Z",
+          "children": [
+            {
+              "id": "81b1d6f0-2f8a-46e2-b195-473450489779",
+              "title": "Fix move-file in web-viewer: File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zon",
+              "status": "deferred",
+              "level": "task",
+              "description": "- File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-03T14:34:57.156Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "8024b2fa4d12"
+                ],
+                "category": "move-file",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "8024b2fa4d12"
+            ],
+            "category": "move-file",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "c4e93fb7-645d-495d-ade0-9bdff9cbb75c",
+          "title": "Fix anti-pattern in global (2 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts calls 41 unique functions — consider decomposing into smaller, focused functions\n- God function: runCI in packages/core/ci.js calls 39 unique functions — consider decomposing into smaller, focused functions",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-03T14:34:54.622Z",
+          "completedAt": "2026-04-03T14:34:54.622Z",
+          "children": [
+            {
+              "id": "c434442f-7856-4ed8-ba18-e9c664b22593",
+              "title": "Fix anti-pattern in global: God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts c (+1 more)",
+              "status": "deferred",
+              "level": "task",
+              "description": "- God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts calls 41 unique functions — consider decomposing into smaller, focused functions\n- God function: runCI in packages/core/ci.js calls 39 unique functions — consider decomposing into smaller, focused functions",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-03T14:34:50.151Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "264b6245baa8",
+                  "e648f5e361f3"
+                ],
+                "category": "anti-pattern",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "264b6245baa8",
+              "e648f5e361f3"
+            ],
+            "category": "anti-pattern",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        }
+      ],
+      "recommendationMeta": {
+        "findingCount": 5
+      },
+      "startedAt": "2026-04-03T14:35:15.499Z",
+      "completedAt": "2026-04-03T14:35:15.499Z"
     }
   ]
 }
