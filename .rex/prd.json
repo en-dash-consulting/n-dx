@@ -23644,6 +23644,7 @@
       "priority": "high",
       "source": "sourcevision",
       "startedAt": "2026-04-03T14:35:15.499Z",
+      "completedAt": "2026-04-03T19:28:35.406Z",
       "children": [
         {
           "id": "ff6c5a83-fbcb-4c16-8ef3-279c92f81249",
@@ -23822,8 +23823,7 @@
       ],
       "recommendationMeta": {
         "findingCount": 5
-      },
-      "completedAt": "2026-04-03T19:28:35.406Z"
+      }
     },
     {
       "id": "f8dfe9ab-671d-494d-9c20-84fbb79b37ee",
@@ -23970,6 +23970,73 @@
           ]
         }
       ]
+    },
+    {
+      "id": "bf7ac8f0-548f-4bfc-a6a9-63b4b5707ce3",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "b3e82a63-746a-474e-af59-947d8a0f0fb9",
+          "title": "CLI Version Command Surface",
+          "status": "completed",
+          "level": "feature",
+          "description": "Expose the installed n-dx version through standard top-level CLI flags so users can query version information without entering a subcommand.",
+          "source": "smart-add",
+          "startedAt": "2026-04-06T19:23:14.349Z",
+          "completedAt": "2026-04-06T19:23:14.349Z",
+          "children": [
+            {
+              "id": "4a9be3cc-25d6-4429-ae79-304f10d097fb",
+              "title": "Implement top-level version flag handling for ndx and n-dx",
+              "status": "completed",
+              "level": "task",
+              "description": "Add argument handling in the shared CLI entrypoint so invoking `ndx -v`, `ndx --version`, `n-dx -v`, or `n-dx --version` prints the current package version and exits successfully without triggering normal command parsing.",
+              "acceptanceCriteria": [
+                "Running `ndx -v` prints a single version string and exits with status code 0",
+                "Running `ndx --version` prints the same version output as `ndx -v`",
+                "Running `n-dx -v` and `n-dx --version` behave identically to `ndx` version flags",
+                "Version flag handling works from the top-level CLI without requiring a subcommand",
+                "Invoking the version flags does not start long-running services or execute unrelated command logic"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-06T18:47:31.857Z",
+              "completedAt": "2026-04-06T18:50:16.350Z"
+            },
+            {
+              "id": "74047536-342a-4358-b2ec-33e783786b2a",
+              "title": "Add regression coverage and help text for version flags",
+              "status": "completed",
+              "level": "task",
+              "description": "Update automated CLI tests and user-facing help output so the new version flags remain discoverable and do not regress when command parsing changes in the future.",
+              "acceptanceCriteria": [
+                "Automated tests cover both `-v` and `--version` at the top-level CLI entrypoint",
+                "Tests verify the command exits successfully and does not route into unrelated subcommand execution",
+                "CLI help output mentions `-v, --version` as supported top-level flags",
+                "The documented behavior matches the actual output format used by the CLI"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "testing",
+                "docs"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-06T19:19:59.169Z",
+              "completedAt": "2026-04-06T19:23:14.178Z"
+            }
+          ]
+        }
+      ],
+      "startedAt": "2026-04-06T19:23:14.471Z",
+      "completedAt": "2026-04-06T19:23:14.471Z"
     }
   ]
 }

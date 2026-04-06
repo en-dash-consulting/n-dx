@@ -1349,6 +1349,11 @@ try {
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
 
+  // Handle standard top-level version flags before normal command parsing.
+  if (command === "-v" || command === "--version") {
+    handleVersion(rest);
+  }
+
   // ── Per-command --help ──────────────────────────────────────────────────
   const hasHelp = rest.some((a) => a === "--help" || a === "-h");
   if (hasHelp && command && showCommandHelp(command)) {

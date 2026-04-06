@@ -1313,6 +1313,7 @@ export function formatMainHelp() {
   // ── Options ──
   lines.push(bold("OPTIONS"));
   lines.push(`  ${formatFlag("--quiet, -q")}           Suppress informational output`);
+  lines.push(`  ${formatFlag("-v, --version")}        Print the installed n-dx version`);
   lines.push("");
 
   // ── Usage ──
