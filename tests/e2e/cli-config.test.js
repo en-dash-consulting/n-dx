@@ -37,6 +37,8 @@ async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCod
 }
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
+const SHARED_CONFIG_PATH = (dir) => join(dir, ".n-dx.json");
+const LOCAL_CONFIG_PATH = (dir) => join(dir, ".n-dx.local.json");
 
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "config", ...args], {
@@ -548,12 +550,12 @@ describe("n-dx config", () => {
   // ── Claude configuration ─────────────────────────────────────────────────
 
   describe("claude config", () => {
-    it("sets claude.cli_path in .n-dx.json", async () => {
+    it("sets claude.cli_path in .n-dx.local.json", async () => {
       const output = run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
       expect(output).toContain("claude.cli_path = /usr/local/bin/claude");
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
       expect(ndxConfig.claude.cli_path).toBe("/usr/local/bin/claude");
     });
@@ -607,12 +609,12 @@ describe("n-dx config", () => {
       expect(output).toContain("/usr/local/bin/claude");
     });
 
-    it("creates .n-dx.json if it does not exist", async () => {
-      // No .n-dx.json exists yet
+    it("creates .n-dx.local.json if it does not exist", async () => {
+      // No .n-dx.local.json exists yet
       run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
       expect(ndxConfig.claude.cli_path).toBe("/usr/local/bin/claude");
     });
@@ -661,7 +663,7 @@ describe("n-dx config", () => {
       expect(output.trim()).toBe("/new/path");
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
       expect(ndxConfig.claude.cli_path).toBe("/new/path");
     });
@@ -943,7 +945,7 @@ describe("n-dx config", () => {
     it("does not restrict permissions when no api_key present", async () => {
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
 
-      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
+      const fileStat = await stat(LOCAL_CONFIG_PATH(tmpDir));
       const mode = fileStat.mode & 0o777;
       // Should not be 0o600 — default file permissions apply
       expect(mode).not.toBe(0o600);
@@ -952,13 +954,13 @@ describe("n-dx config", () => {
     it.skipIf(process.platform === "win32")("restricts permissions when api_key is added to existing config", async () => {
       // First set a non-sensitive value
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
-      const beforeStat = await stat(join(tmpDir, ".n-dx.json"));
+      const beforeStat = await stat(LOCAL_CONFIG_PATH(tmpDir));
       const beforeMode = beforeStat.mode & 0o777;
       expect(beforeMode).not.toBe(0o600);
 
       // Now add an API key
       run(["claude.api_key", "sk-ant-secure-key", tmpDir]);
-      const afterStat = await stat(join(tmpDir, ".n-dx.json"));
+      const afterStat = await stat(SHARED_CONFIG_PATH(tmpDir));
       const afterMode = afterStat.mode & 0o777;
       expect(afterMode).toBe(0o600);
     });
@@ -1021,10 +1023,7 @@ describe("n-dx config", () => {
       expect(stderr).toContain("Details:");
       expect(stderr).toContain(`Next step: run '${fakeCodex} login'`);
 
-      const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
-      );
-      expect(ndxConfig.llm.vendor).toBeUndefined();
+      await expect(readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8")).rejects.toThrow(/ENOENT/);
     });
 
     it("prints claude login guidance on claude auth preflight failure", async () => {
@@ -1040,10 +1039,7 @@ describe("n-dx config", () => {
       expect(stderr).toContain("Provider auth preflight failed for \"claude\"");
       expect(stderr).toContain(`Next step: run '${fakeClaude} login'`);
 
-      const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
-      );
-      expect(ndxConfig.llm.vendor).toBeUndefined();
+      await expect(readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8")).rejects.toThrow(/ENOENT/);
     });
   });
 

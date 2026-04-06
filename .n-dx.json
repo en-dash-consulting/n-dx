@@ -69,6 +69,7 @@
         "packages/web/src/server/routes-sourcevision.ts": "web-server",
         "packages/web/src/server/routes-static.ts": "web-server",
         "packages/web/src/server/routes-status.ts": "web-server",
+        "packages/web/src/server/routes-cli-timeout.ts": "web-server",
         "packages/web/src/server/routes-validation.ts": "web-server",
         "packages/web/src/server/routes-workflow.ts": "web-server",
         "packages/web/src/server/search-index.ts": "web-server",
