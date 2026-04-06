@@ -24037,6 +24037,96 @@
       ],
       "startedAt": "2026-04-06T19:23:14.471Z",
       "completedAt": "2026-04-06T19:23:14.471Z"
+    },
+    {
+      "id": "cc09612c-005f-4239-b0c9-3a7edfc6f538",
+      "title": "External Integrations",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "08464700-9955-4338-87b6-afea0646a6f8",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation",
+          "status": "pending",
+          "level": "feature",
+          "description": "Extend the existing PR validation pipeline with additive cross-platform execution stages that run the same n-dx install and smoke-command flow in MacOS and Windows containerized environments, then verify parity against each other and against the repository's existing static expected responses and exit codes.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d10a172b-4b1f-4da1-8736-ec9ae8e11b12",
+              "title": "Add MacOS pipeline stage for ndx install-and-run smoke validation",
+              "status": "pending",
+              "level": "task",
+              "description": "Introduce a new CI stage that starts the requested MacOS-based container environment, installs n-dx using the repository's supported setup path, runs the agreed smoke commands, and captures only deterministic outputs and exit codes needed for validation without changing existing command logic.",
+              "acceptanceCriteria": [
+                "Pipeline includes a distinct MacOS validation stage that runs after existing prerequisite setup and before final pipeline success is reported",
+                "The stage executes the documented install-and-run smoke script for n-dx using MacOS-appropriate commands",
+                "The stage records command exit codes and only the static response fields already considered deterministic by the current test contract",
+                "The stage does not assert on generated code, model-authored prose, or any other nondeterministic LLM output",
+                "A failure in any expected static response or exit code causes the MacOS stage to fail the pipeline with actionable diagnostics"
+              ],
+              "priority": "high",
+              "tags": [
+                "ci",
+                "pipeline",
+                "macos",
+                "cli",
+                "regression"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "1a72b5c1-bc52-42f6-8918-402065d6e324",
+              "title": "Add Windows pipeline stage for ndx install-and-run smoke validation",
+              "status": "pending",
+              "level": "task",
+              "description": "Introduce a second CI stage that starts the requested Windows-based container environment, runs the same install and smoke-command workflow using Windows-native commands, and captures deterministic outputs and exit codes using the same assertion scope as the MacOS stage.",
+              "acceptanceCriteria": [
+                "Pipeline includes a distinct Windows validation stage parallel to the MacOS validation stage",
+                "The stage executes the same logical install-and-run smoke flow as MacOS, translated to Windows command syntax where required",
+                "The Windows stage captures the same set of deterministic response fields and exit codes as the MacOS stage",
+                "The stage excludes assertions on generated code, model-generated prose, and any nondeterministic text output",
+                "A mismatch against expected static responses or exit codes causes the Windows stage to fail with platform-specific diagnostics"
+              ],
+              "priority": "high",
+              "tags": [
+                "ci",
+                "pipeline",
+                "windows",
+                "cli",
+                "regression"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "e1319df0-a11c-47c5-b4a2-840ea087160f",
+              "title": "Implement cross-platform parity assertions for deterministic CLI responses",
+              "status": "completed",
+              "level": "task",
+              "description": "Add an additive validation step that compares the MacOS and Windows smoke-run artifacts against each other and against the existing static expected responses and error codes, ensuring platform consistency without expanding the contract to nondeterministic model output.",
+              "acceptanceCriteria": [
+                "Pipeline collects normalized result artifacts from both MacOS and Windows stages in a format suitable for automated comparison",
+                "A parity check verifies that both platforms return matching deterministic responses and matching expected exit codes for the covered smoke commands",
+                "The assertion set is explicitly limited to known static responses and existing error codes already treated as stable by the test suite",
+                "The parity check ignores generated code diffs, model-produced text bodies, and other nondeterministic output fields",
+                "The new validation is additive only and does not require modification of existing production command logic to pass"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "parity",
+                "cross-platform",
+                "cli",
+                "test-harness"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-06T18:34:06.588Z",
+              "completedAt": "2026-04-06T18:39:35.822Z"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
