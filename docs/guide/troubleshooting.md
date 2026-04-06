@@ -54,6 +54,15 @@ codex login
 
 Check current config with `ndx config .`
 
+## Claude init / vendor preflight error codes
+
+When `ndx init --provider=claude .` or `ndx config llm.vendor claude .` fails before setup completes, use the emitted code to pick the right fix:
+
+- `NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED`: Claude Code is not installed or the configured executable does not exist. Install it with `npm install -g @anthropic-ai/claude-code`, then verify with `claude --version`.
+- `NDX_CLAUDE_PREFLIGHT_NOT_ON_PATH`: `ndx` was given a command name it cannot resolve from the current shell. Check `command -v <your-configured-command>`, fix `PATH`, or set `llm.claude.cli_path` to an absolute executable path.
+- `NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED`: Claude is installed but not authenticated. Run `claude login` and retry.
+- `NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED`: Claude appears present, but `ndx` could not launch a usable executable. Verify the exact binary `ndx` resolves with `command -v claude` or `ndx config llm.claude.cli_path`, then run that executable directly with `--version` before retrying.
+
 ## Dashboard shows blank PRD tree
 
 **Problem**: The Tasks view in the web dashboard shows nothing.
