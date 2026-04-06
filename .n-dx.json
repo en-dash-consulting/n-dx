@@ -48,6 +48,7 @@
         "packages/web/src/server/pr-markdown-refresh-diagnostics.ts": "web-server",
         "packages/web/src/server/prd-io.ts": "web-server",
         "packages/web/src/server/process-memory-tracker.ts": "web-server",
+        "packages/web/src/server/routes-cli-timeout.ts": "web-server",
         "packages/web/src/server/routes-adaptive.ts": "web-server",
         "packages/web/src/server/routes-config.ts": "web-server",
         "packages/web/src/server/routes-data.ts": "web-server",

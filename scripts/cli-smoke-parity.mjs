@@ -1,9 +1,9 @@
-import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { exec } from "../packages/llm-client/dist/public.js";
 import { CLI_PATH, setupRexDir } from "../tests/e2e/e2e-helpers.js";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -31,22 +31,16 @@ export function normalizeText(text, placeholders = []) {
   return normalized.replace(/[ \t]+\n/g, "\n").trim();
 }
 
-function runCli(args) {
-  try {
-    const stdout = execFileSync(process.execPath, [CLI_PATH, ...args], {
-      cwd: ROOT,
-      encoding: "utf-8",
-      stdio: "pipe",
-      timeout: 15000,
-    });
-    return { exitCode: 0, stdout, stderr: "" };
-  } catch (error) {
-    return {
-      exitCode: error.status ?? 1,
-      stdout: error.stdout || "",
-      stderr: error.stderr || "",
-    };
-  }
+async function runCli(args) {
+  const result = await exec(process.execPath, [CLI_PATH, ...args], {
+    cwd: ROOT,
+    timeout: 15000,
+  });
+  return {
+    exitCode: result.exitCode ?? 1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 async function withFixture(fixture, fn) {
@@ -200,7 +194,7 @@ export async function collectSmokeArtifact() {
         [tempDir, "<TMPDIR>"],
       ];
       const args = smokeCase.args({ tempDir });
-      const result = runCli(args);
+      const result = await runCli(args);
       const normalized = {
         id: smokeCase.id,
         args,
