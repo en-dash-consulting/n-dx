@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { CLI_ERROR_CODES } from "@n-dx/llm-client";
 import { CLIError, BudgetExceededError, formatCLIError, handleCLIError, requireRexDir } from "../../../src/cli/errors.js";
 
 describe("CLIError", () => {
@@ -16,6 +17,7 @@ describe("CLIError", () => {
     const err = new CLIError("something broke");
     expect(err.message).toBe("something broke");
     expect(err.suggestion).toBeUndefined();
+    expect(err.code).toBe(CLI_ERROR_CODES.GENERIC);
   });
 
   it("is an instance of Error", () => {
@@ -50,15 +52,15 @@ describe("BudgetExceededError", () => {
 
 describe("formatCLIError", () => {
   it("formats CLIError with suggestion", () => {
-    const err = new CLIError("File missing", "Run init first");
+    const err = new CLIError("File missing", "Run init first", CLI_ERROR_CODES.PRD_NOT_FOUND);
     const result = formatCLIError(err);
-    expect(result).toBe("Error: File missing\nHint: Run init first");
+    expect(result).toBe(`Error: [${CLI_ERROR_CODES.PRD_NOT_FOUND}] File missing\nHint: Run init first`);
   });
 
   it("formats CLIError without suggestion", () => {
     const err = new CLIError("Something failed");
     const result = formatCLIError(err);
-    expect(result).toBe("Error: Something failed");
+    expect(result).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] Something failed`);
   });
 
   it("never includes stack traces for Error instances", () => {
@@ -67,19 +69,20 @@ describe("formatCLIError", () => {
     expect(result).not.toContain("at ");
     expect(result).not.toContain(".ts:");
     expect(result).not.toContain(".js:");
-    expect(result).toBe("Error: kaboom");
+    expect(result).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] kaboom`);
   });
 
   it("handles non-Error values", () => {
-    expect(formatCLIError("string error")).toBe("Error: string error");
-    expect(formatCLIError(42)).toBe("Error: 42");
-    expect(formatCLIError(null)).toBe("Error: null");
-    expect(formatCLIError(undefined)).toBe("Error: undefined");
+    expect(formatCLIError("string error")).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] string error`);
+    expect(formatCLIError(42)).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] 42`);
+    expect(formatCLIError(null)).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] null`);
+    expect(formatCLIError(undefined)).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] undefined`);
   });
 
   it("matches ENOENT .rex pattern", () => {
     const err = new Error("ENOENT: no such file or directory, open '/tmp/.rex/prd.json'");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.NOT_INITIALIZED}]`);
     expect(result).toContain("Rex directory not found");
     expect(result).toContain("Hint:");
     expect(result).toContain("n-dx init");
@@ -88,6 +91,7 @@ describe("formatCLIError", () => {
   it("matches ENOENT prd.json pattern", () => {
     const err = new Error("ENOENT: no such file or directory, open 'prd.json'");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.PRD_NOT_FOUND}]`);
     expect(result).toContain("PRD file not found");
     expect(result).toContain("Hint:");
   });
@@ -95,6 +99,7 @@ describe("formatCLIError", () => {
   it("matches Invalid prd.json pattern", () => {
     const err = new Error("Invalid prd.json: missing required field 'schema'");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.INVALID_PRD}]`);
     expect(result).toContain("corrupted or has an invalid format");
     expect(result).toContain("Hint:");
   });
@@ -102,6 +107,7 @@ describe("formatCLIError", () => {
   it("matches EACCES pattern", () => {
     const err = new Error("EACCES: permission denied, open '/tmp/.rex/config.json'");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.PERMISSION_DENIED}]`);
     expect(result).toContain("Permission denied");
     expect(result).toContain("Hint:");
   });
@@ -109,6 +115,7 @@ describe("formatCLIError", () => {
   it("matches Unexpected token (JSON parse) pattern", () => {
     const err = new Error("Unexpected token } in JSON at position 42");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.JSON_PARSE_FAILED}]`);
     expect(result).toContain("parse JSON");
     expect(result).toContain("Hint:");
   });
@@ -116,6 +123,7 @@ describe("formatCLIError", () => {
   it("matches 'not found' pattern with original message", () => {
     const err = new Error('Item "abc-123" not found');
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.RESOURCE_NOT_FOUND}]`);
     expect(result).toContain('Item "abc-123" not found');
     expect(result).toContain("Hint:");
   });
@@ -123,7 +131,7 @@ describe("formatCLIError", () => {
   it("falls back to generic message for unknown errors", () => {
     const err = new Error("some weird internal error");
     const result = formatCLIError(err);
-    expect(result).toBe("Error: some weird internal error");
+    expect(result).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] some weird internal error`);
     expect(result).not.toContain("Hint:");
   });
 });
@@ -141,7 +149,7 @@ describe("handleCLIError", () => {
 
     handleCLIError(err);
 
-    expect(mockStderr).toHaveBeenCalledWith("Error: test error\nHint: try something");
+    expect(mockStderr).toHaveBeenCalledWith(`Error: [${CLI_ERROR_CODES.GENERIC}] test error\nHint: try something`);
     expect(mockExit).toHaveBeenCalledWith(1);
   });
 

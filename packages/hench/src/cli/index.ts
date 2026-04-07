@@ -24,7 +24,7 @@ import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireHenchDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { formatTypoSuggestion } from "../prd/llm-gateway.js";
+import { CLI_ERROR_CODES, formatTypoSuggestion } from "../prd/llm-gateway.js";
 
 function parseArgs(argv: string[]): {
   command: string | undefined;
@@ -153,6 +153,7 @@ async function main(): Promise<void> {
         throw new CLIError(
           `Unknown command: ${command}`,
           typoHint ?? "Run 'hench --help' to see available commands.",
+          CLI_ERROR_CODES.UNKNOWN_COMMAND,
         );
       }
     }

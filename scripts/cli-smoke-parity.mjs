@@ -6,6 +6,12 @@ import { execFile } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { CLI_PATH, setupRexDir } from "../tests/e2e/e2e-helpers.js";
 
+const CLI_ERROR_CODES = Object.freeze({
+  GENERIC: "NDX_CLI_GENERIC",
+  NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
+  UNKNOWN_COMMAND: "NDX_CLI_UNKNOWN_COMMAND",
+});
+
 const ROOT = join(import.meta.dirname, "..");
 const CORE_PACKAGE_JSON = JSON.parse(
   readFileSync(join(ROOT, "packages/core/package.json"), "utf-8"),
@@ -161,6 +167,27 @@ export function parseJsonPayload(text, smokeCaseId, streamLabel = "stdout") {
   }
 }
 
+export function extractErrorCode(text) {
+  const normalized = normalizeText(text);
+  const match = normalized.match(/^Error:\s+\[(NDX_CLI_[A-Z_]+)\]/m);
+  return match?.[1] ?? CLI_ERROR_CODES.GENERIC;
+}
+
+export function extractFailureMetadata(text) {
+  const normalized = normalizeText(text);
+  if (!normalized) {
+    return null;
+  }
+
+  const firstLine = normalized.split("\n", 1)[0] ?? "";
+  const detail = firstLine.replace(/^Error:\s+(?:\[(NDX_CLI_[A-Z_]+)\]\s+)?/, "").trim();
+
+  return {
+    code: extractErrorCode(normalized),
+    detail,
+  };
+}
+
 function createCliRunner(command = process.execPath, commandArgs = command === process.execPath ? [CLI_PATH] : []) {
   return async function runCli(args) {
     const result = await execCommand(command, [...commandArgs, ...args], {
@@ -230,6 +257,9 @@ async function collectCase(smokeCase, executeCli) {
       stdoutNormalized: normalizeText(result.stdout, placeholders),
       stderrNormalized: normalizeText(result.stderr, placeholders),
     };
+    const failure = normalized.exitCode === 0
+      ? undefined
+      : extractFailureMetadata(normalized.stderrNormalized);
     let comparable;
     try {
       comparable = smokeCase.comparable(normalized);
@@ -245,6 +275,7 @@ async function collectCase(smokeCase, executeCli) {
     }
     return {
       ...normalized,
+      ...(failure ? { failure } : {}),
       comparable,
     };
   });
@@ -296,10 +327,11 @@ export const SMOKE_CASES = [
     args: () => ["foobar"],
     expectedExitCode: 1,
     expected: {
-      stderrIncludes: ["Error: Unknown command: foobar", "Hint:"],
+      stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND,
+      stderrIncludes: ["Unknown command: foobar", "Hint:"],
     },
     comparable(result) {
-      return { stderr: result.stderrNormalized };
+      return { failure: extractFailureMetadata(result.stderrNormalized) };
     },
   },
   {
@@ -307,10 +339,11 @@ export const SMOKE_CASES = [
     args: () => ["statis"],
     expectedExitCode: 1,
     expected: {
-      stderrIncludes: ["Error: Unknown command: statis", "Did you mean", "status"],
+      stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND,
+      stderrIncludes: ["Unknown command: statis", "Did you mean", "status"],
     },
     comparable(result) {
-      return { stderr: result.stderrNormalized };
+      return { failure: extractFailureMetadata(result.stderrNormalized) };
     },
   },
   {
@@ -345,10 +378,11 @@ export const SMOKE_CASES = [
     args: ({ tempDir }) => ["status", tempDir],
     expectedExitCode: 1,
     expected: {
+      stderrCode: CLI_ERROR_CODES.NOT_INITIALIZED,
       stderrIncludes: ["Missing", ".rex", "Hint:", "ndx init"],
     },
     comparable(result) {
-      return { stderr: result.stderrNormalized };
+      return { failure: extractFailureMetadata(result.stderrNormalized) };
     },
   },
   {
@@ -487,6 +521,13 @@ function compareExpected(caseDefinition, collectedCase, artifactLabel) {
     }
   }
 
+  if (caseDefinition.expected.stderrCode !== undefined
+      && collectedCase.comparable.failure?.code !== caseDefinition.expected.stderrCode) {
+    issues.push(
+      `${artifactLabel}:${caseDefinition.id} stderr code ${collectedCase.comparable.failure?.code} != ${caseDefinition.expected.stderrCode}`,
+    );
+  }
+
   if (caseDefinition.expected.stdoutJson !== undefined) {
     const actual = collectedCase.comparable.stdoutJson;
     diffValues(
@@ -499,6 +540,23 @@ function compareExpected(caseDefinition, collectedCase, artifactLabel) {
   }
 
   return issues;
+}
+
+function projectComparableForParity(comparable) {
+  if (!comparable || typeof comparable !== "object") {
+    return comparable;
+  }
+
+  if (comparable.failure && typeof comparable.failure === "object") {
+    return {
+      ...comparable,
+      failure: {
+        code: comparable.failure.code ?? CLI_ERROR_CODES.GENERIC,
+      },
+    };
+  }
+
+  return comparable;
 }
 
 export function compareArtifacts(macArtifact, windowsArtifact) {
@@ -518,10 +576,24 @@ export function compareArtifacts(macArtifact, windowsArtifact) {
     issues.push(...compareExpected(smokeCase, macCase, "macos"));
     issues.push(...compareExpected(smokeCase, windowsCase, "windows"));
 
+    const macComparable = stableValue(projectComparableForParity(macCase.comparable));
+    const windowsComparable = stableValue(projectComparableForParity(windowsCase.comparable));
+
+    const macFailureCode = macComparable?.failure?.code;
+    const windowsFailureCode = windowsComparable?.failure?.code;
+    if (macFailureCode !== undefined || windowsFailureCode !== undefined) {
+      if (macFailureCode !== windowsFailureCode) {
+        issues.push(
+          `parity:${smokeCase.id} normalized error code mismatch (macos=${JSON.stringify(macFailureCode)} windows=${JSON.stringify(windowsFailureCode)})`,
+        );
+      }
+      continue;
+    }
+
     diffValues(
       `parity:${smokeCase.id}.comparable`,
-      stableValue(macCase.comparable),
-      stableValue(windowsCase.comparable),
+      macComparable,
+      windowsComparable,
       issues,
       { left: "macos", right: "windows" },
     );

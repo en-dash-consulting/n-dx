@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { CLI_ERROR_CODES } from "@n-dx/llm-client";
 import { CLIError, formatCLIError, handleCLIError, requireHenchDir, requireClaudeCLI } from "../../../src/cli/errors.js";
 import { TaskNotActionableError } from "../../../src/agent/planning/brief.js";
 
@@ -20,24 +21,25 @@ describe("CLIError", () => {
 
 describe("formatCLIError", () => {
   it("formats CLIError with suggestion", () => {
-    const err = new CLIError("File missing", "Run init first");
-    expect(formatCLIError(err)).toBe("Error: File missing\nHint: Run init first");
+    const err = new CLIError("File missing", "Run init first", CLI_ERROR_CODES.CONFIG_NOT_FOUND);
+    expect(formatCLIError(err)).toBe(`Error: [${CLI_ERROR_CODES.CONFIG_NOT_FOUND}] File missing\nHint: Run init first`);
   });
 
   it("never includes stack traces", () => {
     const err = new Error("kaboom");
     const result = formatCLIError(err);
     expect(result).not.toContain("at ");
-    expect(result).toBe("Error: kaboom");
+    expect(result).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] kaboom`);
   });
 
   it("handles non-Error values", () => {
-    expect(formatCLIError("string error")).toBe("Error: string error");
+    expect(formatCLIError("string error")).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] string error`);
   });
 
   it("matches ENOENT .hench pattern", () => {
     const err = new Error("ENOENT: no such file, open '/tmp/.hench/config.json'");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.NOT_INITIALIZED}]`);
     expect(result).toContain("Hench directory not found");
     expect(result).toContain("Hint:");
   });
@@ -45,6 +47,7 @@ describe("formatCLIError", () => {
   it("matches ENOENT .rex pattern", () => {
     const err = new Error("ENOENT: no such file, open '/tmp/.rex/prd.json'");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.NOT_INITIALIZED}]`);
     expect(result).toContain("Rex directory not found");
     expect(result).toContain("Hint:");
   });
@@ -52,6 +55,7 @@ describe("formatCLIError", () => {
   it("matches claude not found pattern", () => {
     const err = new Error("claude: not found");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.LLM_CLI_NOT_FOUND}]`);
     expect(result).toContain("Claude CLI not found");
     expect(result).toContain("Hint:");
   });
@@ -59,6 +63,7 @@ describe("formatCLIError", () => {
   it("matches ANTHROPIC_API_KEY pattern", () => {
     const err = new Error("Missing ANTHROPIC_API_KEY environment variable");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.API_KEY_MISSING}]`);
     expect(result).toContain("API key not configured");
     expect(result).toContain("Hint:");
   });
@@ -66,6 +71,7 @@ describe("formatCLIError", () => {
   it("matches Invalid hench config pattern", () => {
     const err = new Error("Invalid hench config: missing required field 'provider'");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.INVALID_CONFIGURATION}]`);
     expect(result).toContain("corrupted or has an invalid format");
     expect(result).toContain("Hint:");
     expect(result).toContain(".hench/config.json");
@@ -74,6 +80,7 @@ describe("formatCLIError", () => {
   it("matches Invalid run record pattern", () => {
     const err = new Error("Invalid run record abc-123: missing required field 'status'");
     const result = formatCLIError(err);
+    expect(result).toContain(`[${CLI_ERROR_CODES.INVALID_RUN_RECORD}]`);
     expect(result).toContain("Run record is corrupted");
     expect(result).toContain("Hint:");
     expect(result).toContain(".hench/runs/");
@@ -81,7 +88,7 @@ describe("formatCLIError", () => {
 
   it("falls back to generic message for unknown errors", () => {
     const err = new Error("some weird internal error");
-    expect(formatCLIError(err)).toBe("Error: some weird internal error");
+    expect(formatCLIError(err)).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] some weird internal error`);
   });
 
   it("formats TaskNotActionableError for completed tasks", () => {
@@ -121,7 +128,7 @@ describe("handleCLIError", () => {
 
     handleCLIError(new CLIError("test error", "try something"));
 
-    expect(mockStderr).toHaveBeenCalledWith("Error: test error\nHint: try something");
+    expect(mockStderr).toHaveBeenCalledWith(`Error: [${CLI_ERROR_CODES.GENERIC}] test error\nHint: try something`);
     expect(mockExit).toHaveBeenCalledWith(1);
   });
 });

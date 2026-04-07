@@ -27,7 +27,7 @@ import { cmdPrMarkdown } from "./commands/pr-markdown.js";
 import { cmdWorkspace } from "./commands/workspace.js";
 import { CLIError, handleCLIError, requireSvDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { formatTypoSuggestion } from "@n-dx/llm-client";
+import { CLI_ERROR_CODES, formatTypoSuggestion } from "@n-dx/llm-client";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -149,6 +149,7 @@ try {
       throw new CLIError(
         `Unknown command: ${command}`,
         typoHint ?? "Run 'sourcevision --help' to see available commands.",
+        CLI_ERROR_CODES.UNKNOWN_COMMAND,
       );
     }
   }

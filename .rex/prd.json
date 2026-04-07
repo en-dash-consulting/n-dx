@@ -24210,6 +24210,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-07T20:06:32.040Z",
+      "completedAt": "2026-04-07T20:06:32.040Z",
       "children": [
         {
           "id": "1dc42829-b53b-41f2-b05c-d987c79c7437",
@@ -24270,9 +24272,133 @@
             }
           ]
         }
+      ]
+    },
+    {
+      "id": "3fd50e03-9204-4495-9555-dd853950f97c",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "544adbc1-c439-4df0-98c1-0a0cb1686a06",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation Hardening",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T22:50:03.910Z",
+          "completedAt": "2026-04-07T22:50:03.910Z",
+          "children": [
+            {
+              "id": "5392be41-1f99-42d2-8f70-fe6185663517",
+              "title": "Define OS-agnostic CLI error code taxonomy",
+              "status": "completed",
+              "level": "task",
+              "description": "Introduce a stable set of unique error codes for comparable failure classes so macOS and Windows smoke runs can be matched by semantics instead of platform-specific text output.",
+              "acceptanceCriteria": [
+                "Each cross-platform-comparable CLI failure class has a unique, stable error code",
+                "The same logical failure produces the same error code on macOS and Windows",
+                "Human-readable error output includes the code alongside the existing diagnostic message",
+                "Unknown or uncategorized failures fall back to an explicit generic code path rather than omitting a code"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cli",
+                "cross-platform",
+                "diagnostics"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:37:10.572Z",
+              "completedAt": "2026-04-07T22:47:20.604Z"
+            },
+            {
+              "id": "b714bd5d-c003-423e-a367-e759ae74eba1",
+              "title": "Emit structured smoke artifacts with normalized error codes",
+              "status": "completed",
+              "level": "task",
+              "description": "Update the smoke-validation artifact generation so each run records machine-readable error codes and comparable failure metadata, enabling deterministic parity checks across operating systems.",
+              "acceptanceCriteria": [
+                "Smoke artifacts include normalized error code fields for failed command executions",
+                "Artifact schema distinguishes error code from platform-specific stderr or path details",
+                "Successful runs continue to emit artifacts without introducing placeholder failure codes",
+                "Artifact generation is covered by tests that validate schema shape for both success and failure cases"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "artifacts",
+                "cross-platform",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:47:23.170Z",
+              "completedAt": "2026-04-07T22:50:03.750Z"
+            }
+          ]
+        },
+        {
+          "id": "4ee969d6-cb9e-41c1-85ac-f79b3b6a6ac3",
+          "title": "Cross-Platform Failure Diagnostics",
+          "status": "completed",
+          "level": "feature",
+          "description": "Refocus smoke parity validation on standardized error semantics so failures remain easy to compare, diagnose, and fix regardless of operating system.",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T22:58:12.823Z",
+          "completedAt": "2026-04-07T22:58:12.823Z",
+          "children": [
+            {
+              "id": "0886fe61-3205-466f-a0ee-a3c098622fc1",
+              "title": "Refactor smoke parity checks to compare normalized error codes",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace direct artifact content comparison with parity logic that validates equivalent error codes and other OS-neutral fields, avoiding false mismatches caused by expected platform-specific output differences.",
+              "acceptanceCriteria": [
+                "CI parity checks fail when normalized error codes differ for the same smoke scenario",
+                "CI parity checks ignore expected OS-specific variations such as file paths, shell wording, and native process messages",
+                "Parity output clearly reports code mismatches with the corresponding scenario name",
+                "Existing macOS and Windows smoke jobs continue to run under the updated comparison flow"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cross-platform",
+                "validation",
+                "smoke-tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:50:06.438Z",
+              "completedAt": "2026-04-07T22:54:06.485Z"
+            },
+            {
+              "id": "47b55bf8-f68b-48c0-b7bb-c469ff552436",
+              "title": "Document error code meanings and remediation expectations",
+              "status": "completed",
+              "level": "task",
+              "description": "Provide a maintained reference for the new error codes so engineers can interpret smoke failures quickly and understand which issues are intended to compare across platforms.",
+              "acceptanceCriteria": [
+                "Documentation lists each exported cross-platform error code with its failure meaning",
+                "The docs explain which artifact fields are parity-critical versus OS-specific",
+                "Contributor guidance describes how to assign a code for newly introduced comparable failures",
+                "CI or test coverage fails if a newly emitted comparable error code is missing from the reference list"
+              ],
+              "priority": "high",
+              "tags": [
+                "docs",
+                "diagnostics",
+                "ci",
+                "developer-experience"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:54:09.031Z",
+              "completedAt": "2026-04-07T22:58:12.661Z"
+            }
+          ]
+        }
       ],
-      "startedAt": "2026-04-07T20:06:32.040Z",
-      "completedAt": "2026-04-07T20:06:32.040Z"
+      "startedAt": "2026-04-07T22:58:12.976Z",
+      "completedAt": "2026-04-07T22:58:12.976Z"
     }
   ]
 }

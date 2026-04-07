@@ -4,17 +4,24 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { run, runFail } from "./e2e-helpers.js";
 
+const CLI_ERROR_CODES = Object.freeze({
+  NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
+  UNKNOWN_COMMAND: "NDX_CLI_UNKNOWN_COMMAND",
+});
+
 describe("n-dx CLI error handling", () => {
   describe("unknown commands", () => {
     it("shows Error and Hint for unknown command", () => {
       const { stderr } = runFail(["foobar"]);
-      expect(stderr).toContain("Error: Unknown command: foobar");
+      expect(stderr).toContain(`[${CLI_ERROR_CODES.UNKNOWN_COMMAND}]`);
+      expect(stderr).toContain("Unknown command: foobar");
       expect(stderr).toContain("Hint:");
     });
 
     it("suggests similar command for typos", () => {
       const { stderr } = runFail(["statis"]);
-      expect(stderr).toContain("Error: Unknown command: statis");
+      expect(stderr).toContain(`[${CLI_ERROR_CODES.UNKNOWN_COMMAND}]`);
+      expect(stderr).toContain("Unknown command: statis");
       expect(stderr).toContain("Did you mean");
       expect(stderr).toContain("status");
     });
@@ -27,6 +34,7 @@ describe("n-dx CLI error handling", () => {
       tmp = mkdtempSync(join(tmpdir(), "ndx-err-test-"));
       try {
         const { stderr } = runFail(["status", tmp]);
+        expect(stderr).toContain(`[${CLI_ERROR_CODES.NOT_INITIALIZED}]`);
         expect(stderr).toContain("Error:");
         expect(stderr).toContain("Hint:");
         expect(stderr).toContain("ndx init");
@@ -39,6 +47,7 @@ describe("n-dx CLI error handling", () => {
       tmp = mkdtempSync(join(tmpdir(), "ndx-err-test-"));
       try {
         const { stderr } = runFail(["work", tmp]);
+        expect(stderr).toContain(`[${CLI_ERROR_CODES.NOT_INITIALIZED}]`);
         expect(stderr).toContain("Error:");
         expect(stderr).toContain("Hint:");
         expect(stderr).toContain("ndx init");
