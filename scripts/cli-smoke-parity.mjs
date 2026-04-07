@@ -48,7 +48,11 @@ function stripKnownRuntimeNoise(text) {
       /^\(node:\d+\) \[DEP0040\] DeprecationWarning: The `punycode` module is deprecated\. Please use a userland alternative instead\.\n?/gm,
       "",
     )
-    .replace(/^\(Use `node --trace-deprecation \.\.\.` to show where the warning was created\)\n?/gm, "");
+    .replace(/^\(Use `node --trace-deprecation \.\.\.` to show where the warning was created\)\n?/gm, "")
+    .replace(
+      /^\[child-lifecycle\] process group cleanup is not supported on this platform; falling back to direct child kill\n?/gm,
+      "",
+    );
 }
 
 class SmokeCollectionError extends Error {

@@ -161,6 +161,16 @@ describe("cli smoke parity helpers", () => {
     );
   });
 
+  it("strips known child lifecycle platform warnings before comparing output", () => {
+    const text = [
+      "[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill",
+      "0.2.1",
+      "",
+    ].join("\n");
+
+    expect(normalizeText(text)).toBe("0.2.1");
+  });
+
   it("extracts a JSON payload from warning-prefixed mixed stdout", () => {
     const text = [
       "Debugger attached.",
