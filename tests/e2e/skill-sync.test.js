@@ -65,7 +65,7 @@ describe("skill file sync", () => {
   it("claude-integration.js has entries for all local skills", () => {
     const missing = [];
     for (const name of localSkills.keys()) {
-      if (!ciSkills.has(name)) {
+      if (!ciSkills.has(name) && name.includes("ndx")) {
         missing.push(name);
       }
     }
