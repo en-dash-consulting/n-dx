@@ -22,6 +22,23 @@ async function flush() {
   }
 }
 
+/**
+ * Poll until an assertion passes or timeout is reached.
+ * Replaces fixed flush() counts that flake in slower CI environments.
+ */
+async function waitFor(fn: () => void, timeout = 2000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try {
+      fn();
+      return;
+    } catch {
+      await new Promise<void>((r) => setTimeout(r, 10));
+    }
+  }
+  fn(); // Final attempt — let it throw
+}
+
 function makeProposal(title = "Test Epic", featureCount = 1, taskCount = 1) {
   return {
     epic: { title, source: "test" },
@@ -184,13 +201,10 @@ describe("AnalyzePanel", () => {
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ proposals }), { status: 200 }));
 
     render(h(AnalyzePanel, { onPrdChanged: vi.fn() }), root);
-    // Extra flushes needed: the previous test leaves Preact in fake-timer mode
-    // and the first real-timer render needs additional cycles to settle.
-    await flush();
-    await flush();
-    await flush();
 
-    expect(root.textContent).toContain("Pending Epic");
+    await waitFor(() => {
+      expect(root.textContent).toContain("Pending Epic");
+    });
     vi.useFakeTimers();
   });
 
@@ -200,11 +214,10 @@ describe("AnalyzePanel", () => {
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ proposals }), { status: 200 }));
 
     render(h(AnalyzePanel, { onPrdChanged: vi.fn() }), root);
-    await flush();
-    await flush();
-    await flush();
 
-    expect(root.querySelector(".rex-analyze-selection")).not.toBeNull();
+    await waitFor(() => {
+      expect(root.querySelector(".rex-analyze-selection")).not.toBeNull();
+    });
     expect(root.textContent).toContain("2 of 2 selected");
 
     const selectAllBtn = root.querySelector<HTMLButtonElement>(".rex-analyze-select-btn");
