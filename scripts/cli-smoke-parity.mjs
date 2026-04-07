@@ -22,6 +22,20 @@ function stableItems(items = []) {
   }));
 }
 
+function stableValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stableValue(entry));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stableValue(value[key])]),
+    );
+  }
+  return value;
+}
+
 function stripKnownRuntimeNoise(text) {
   return text
     .replace(
@@ -29,6 +43,15 @@ function stripKnownRuntimeNoise(text) {
       "",
     )
     .replace(/^\(Use `node --trace-deprecation \.\.\.` to show where the warning was created\)\n?/gm, "");
+}
+
+class SmokeCollectionError extends Error {
+  constructor(stage, smokeCaseId, detail) {
+    super(`CLI smoke collect failed at ${stage} for ${smokeCaseId}: ${detail}`);
+    this.name = "SmokeCollectionError";
+    this.stage = stage;
+    this.smokeCaseId = smokeCaseId;
+  }
 }
 
 export function normalizeText(text, placeholders = []) {
@@ -40,6 +63,102 @@ export function normalizeText(text, placeholders = []) {
     normalized = normalized.split(String(source).replace(/\\/g, "/")).join(replacement);
   }
   return normalized.replace(/[ \t]+\n/g, "\n").trim();
+}
+
+function findJsonPayloadBounds(text) {
+  const start = text.search(/[{\[]/);
+  if (start === -1) {
+    return null;
+  }
+
+  const stack = [text[start]];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start + 1; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === "\"") {
+      inString = !inString;
+      continue;
+    }
+    if (inString) {
+      continue;
+    }
+
+    if (char === "{" || char === "[") {
+      stack.push(char);
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      const expected = char === "}" ? "{" : "[";
+      if (stack.at(-1) !== expected) {
+        return { start, end: index + 1, complete: false };
+      }
+      stack.pop();
+      if (stack.length === 0) {
+        return { start, end: index + 1, complete: true };
+      }
+    }
+  }
+
+  return { start, end: text.length, complete: false };
+}
+
+export function extractJsonPayload(text) {
+  const normalized = normalizeText(text);
+  const bounds = findJsonPayloadBounds(normalized);
+  if (!bounds) {
+    return { payload: "", normalized, hadNoise: normalized.length > 0 };
+  }
+
+  return {
+    payload: normalized.slice(bounds.start, bounds.end).trim(),
+    normalized,
+    hadNoise:
+      bounds.start > 0
+      || bounds.end < normalized.length
+      || normalized.slice(0, bounds.start).trim().length > 0
+      || normalized.slice(bounds.end).trim().length > 0,
+    complete: bounds.complete,
+  };
+}
+
+export function parseJsonPayload(text, smokeCaseId, streamLabel = "stdout") {
+  const { payload, normalized, complete } = extractJsonPayload(text);
+  if (!payload) {
+    throw new SmokeCollectionError(
+      "json-extract",
+      smokeCaseId,
+      `no JSON payload found in ${streamLabel}`,
+    );
+  }
+  if (!complete) {
+    throw new SmokeCollectionError(
+      "json-extract",
+      smokeCaseId,
+      `${streamLabel} ended before a complete JSON payload was emitted`,
+    );
+  }
+
+  try {
+    return JSON.parse(payload);
+  } catch (error) {
+    throw new SmokeCollectionError(
+      "json-parse",
+      smokeCaseId,
+      `${streamLabel} JSON payload could not be parsed: ${error.message}; normalized=${JSON.stringify(normalized)}`,
+    );
+  }
 }
 
 function createCliRunner(command = process.execPath, commandArgs = command === process.execPath ? [CLI_PATH] : []) {
@@ -74,9 +193,22 @@ async function collectCase(smokeCase, executeCli) {
       stdoutNormalized: normalizeText(result.stdout, placeholders),
       stderrNormalized: normalizeText(result.stderr, placeholders),
     };
+    let comparable;
+    try {
+      comparable = smokeCase.comparable(normalized);
+    } catch (error) {
+      if (error instanceof SmokeCollectionError) {
+        throw error;
+      }
+      throw new SmokeCollectionError(
+        "compare",
+        smokeCase.id,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
     return {
       ...normalized,
-      comparable: smokeCase.comparable(normalized),
+      comparable,
     };
   });
 }
@@ -91,6 +223,16 @@ async function withFixture(fixture, fn) {
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
+}
+
+function describeSmokeCase(smokeCase) {
+  return {
+    id: smokeCase.id,
+    fixture: smokeCase.fixture ?? "none",
+    args: smokeCase.args({ tempDir: "<TMPDIR>" }),
+    expectedExitCode: smokeCase.expectedExitCode,
+    expected: stableValue(smokeCase.expected),
+  };
 }
 
 export const SMOKE_CASES = [
@@ -109,7 +251,7 @@ export const SMOKE_CASES = [
     expectedExitCode: 0,
     expected: { stdoutJson: { version: CORE_PACKAGE_JSON.version } },
     comparable(result) {
-      return { stdoutJson: JSON.parse(result.stdoutNormalized) };
+      return { stdoutJson: parseJsonPayload(result.stdoutNormalized, "version-json") };
     },
   },
   {
@@ -211,7 +353,7 @@ export const SMOKE_CASES = [
       },
     },
     comparable(result) {
-      const parsed = JSON.parse(result.stdoutNormalized);
+      const parsed = parseJsonPayload(result.stdoutNormalized, "status-json");
       return {
         stdoutJson: {
           schema: parsed.schema,
@@ -232,10 +374,55 @@ export async function collectSmokeArtifact({ executeCli = runCli } = {}) {
 
   return {
     schemaVersion: "ndx/cli-smoke-parity/v1",
+    sequence: SMOKE_CASES.map((smokeCase) => describeSmokeCase(smokeCase)),
     platform: process.platform,
     nodeVersion: process.version,
     cases,
   };
+}
+
+function diffValues(path, expected, actual, issues, labels) {
+  const currentPath = path || "value";
+  if (JSON.stringify(expected) === JSON.stringify(actual)) {
+    return;
+  }
+
+  if (
+    expected
+    && actual
+    && typeof expected === "object"
+    && typeof actual === "object"
+    && !Array.isArray(expected)
+    && !Array.isArray(actual)
+  ) {
+    const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort();
+    for (const key of keys) {
+      diffValues(`${currentPath}.${key}`, expected[key], actual[key], issues, labels);
+    }
+    return;
+  }
+
+  issues.push(
+    `${currentPath} differs (${labels.left}=${JSON.stringify(expected)} ${labels.right}=${JSON.stringify(actual)})`,
+  );
+}
+
+function compareSequence(artifact, artifactLabel) {
+  const expectedSequence = SMOKE_CASES.map((smokeCase) => describeSmokeCase(smokeCase));
+  const issues = [];
+
+  if (!Array.isArray(artifact.sequence)) {
+    return [`${artifactLabel}:artifact missing canonical smoke sequence metadata`];
+  }
+
+  diffValues(
+    `${artifactLabel}:sequence`,
+    stableValue(expectedSequence),
+    stableValue(artifact.sequence),
+    issues,
+    { left: "expected", right: "actual" },
+  );
+  return issues;
 }
 
 function compareExpected(caseDefinition, collectedCase, artifactLabel) {
@@ -265,9 +452,13 @@ function compareExpected(caseDefinition, collectedCase, artifactLabel) {
 
   if (caseDefinition.expected.stdoutJson !== undefined) {
     const actual = collectedCase.comparable.stdoutJson;
-    if (JSON.stringify(actual) !== JSON.stringify(caseDefinition.expected.stdoutJson)) {
-      issues.push(`${artifactLabel}:${caseDefinition.id} JSON projection did not match expected stable contract`);
-    }
+    diffValues(
+      `${artifactLabel}:${caseDefinition.id}.stdoutJson`,
+      stableValue(caseDefinition.expected.stdoutJson),
+      stableValue(actual),
+      issues,
+      { left: "expected", right: "actual" },
+    );
   }
 
   return issues;
@@ -275,6 +466,9 @@ function compareExpected(caseDefinition, collectedCase, artifactLabel) {
 
 export function compareArtifacts(macArtifact, windowsArtifact) {
   const issues = [];
+  issues.push(...compareSequence(macArtifact, "macos"));
+  issues.push(...compareSequence(windowsArtifact, "windows"));
+
   for (const smokeCase of SMOKE_CASES) {
     const macCase = macArtifact.cases.find((entry) => entry.id === smokeCase.id);
     const windowsCase = windowsArtifact.cases.find((entry) => entry.id === smokeCase.id);
@@ -287,9 +481,13 @@ export function compareArtifacts(macArtifact, windowsArtifact) {
     issues.push(...compareExpected(smokeCase, macCase, "macos"));
     issues.push(...compareExpected(smokeCase, windowsCase, "windows"));
 
-    if (JSON.stringify(macCase.comparable) !== JSON.stringify(windowsCase.comparable)) {
-      issues.push(`parity mismatch for ${smokeCase.id}`);
-    }
+    diffValues(
+      `parity:${smokeCase.id}.comparable`,
+      stableValue(macCase.comparable),
+      stableValue(windowsCase.comparable),
+      issues,
+      { left: "macos", right: "windows" },
+    );
   }
   return issues;
 }

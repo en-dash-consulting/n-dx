@@ -24044,6 +24044,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-07T14:28:53.469Z",
+      "completedAt": "2026-04-07T14:28:53.469Z",
       "children": [
         {
           "id": "08464700-9955-4338-87b6-afea0646a6f8",
@@ -24132,9 +24134,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-07T14:28:53.469Z",
-      "completedAt": "2026-04-07T14:28:53.469Z"
+      ]
     },
     {
       "id": "95b432f8-c0df-446c-aab5-e639ccbf8ced",
@@ -24203,6 +24203,76 @@
           ]
         }
       ]
+    },
+    {
+      "id": "cfd5f0e3-1546-47ca-bac5-606d5411c530",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "1dc42829-b53b-41f2-b05c-d987c79c7437",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation Hardening",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T20:06:31.825Z",
+          "completedAt": "2026-04-07T20:06:31.825Z",
+          "children": [
+            {
+              "id": "d050ace2-ba93-4528-8370-98be3ac9348f",
+              "title": "Harden CLI smoke parity JSON collection for macOS and Windows runners",
+              "status": "completed",
+              "level": "task",
+              "description": "Fix the `scripts/cli-smoke-parity.mjs collect` flow so CI can reliably capture and parse `ndx` output even when Node emits deprecation warnings or platform-specific noise, preventing `Unexpected end of JSON input` failures in the macOS and Windows jobs.",
+              "acceptanceCriteria": [
+                "Running `node scripts/cli-smoke-parity.mjs collect --cli-command ndx --output <file>` on both macOS and Windows produces a valid JSON artifact with no parse failure",
+                "The collector ignores or safely isolates non-JSON warnings and stderr output so deprecation warnings do not corrupt the JSON payload",
+                "If the CLI output is incomplete or malformed, the script exits with a classified error message that identifies the failing stage instead of throwing a raw JSON parse exception",
+                "Regression coverage exists for warning-prefixed or mixed-stream output representative of the failing CI scenario"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cli",
+                "cross-platform",
+                "windows",
+                "macos"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T19:50:31.008Z",
+              "completedAt": "2026-04-07T19:53:21.439Z"
+            },
+            {
+              "id": "d01f7636-0eff-4d7c-b827-736bd7e1039d",
+              "title": "Stabilize repeatable parity verification across original macOS and Windows CI steps",
+              "status": "completed",
+              "level": "task",
+              "description": "Make the two OS smoke-check heads deterministic and repeatable by ensuring they execute the same canonical `ndx` validation steps, compare against the expected baseline behavior, and fail only on real parity regressions rather than runner-specific instability.",
+              "acceptanceCriteria": [
+                "The macOS and Windows CI jobs execute the same documented CLI smoke parity sequence and produce comparable output artifacts",
+                "Parity validation checks that the current responses match the established baseline/original expected steps for both OS jobs",
+                "At least one automated test or fixture-based validation covers repeat runs of the parity workflow and confirms stable output shape across executions",
+                "The CI pipeline completes successfully when outputs are equivalent and surfaces a clear diff when platform responses diverge"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "pipeline",
+                "parity",
+                "stability",
+                "cross-platform"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T20:02:13.961Z",
+              "completedAt": "2026-04-07T20:06:31.646Z"
+            }
+          ]
+        }
+      ],
+      "startedAt": "2026-04-07T20:06:32.040Z",
+      "completedAt": "2026-04-07T20:06:32.040Z"
     }
   ]
 }
