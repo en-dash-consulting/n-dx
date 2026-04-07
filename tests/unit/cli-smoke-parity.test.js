@@ -5,6 +5,7 @@ import {
   parseJsonPayload,
   compareArtifacts,
   collectSmokeArtifact,
+  shouldUseShellForCliCommand,
 } from "../../scripts/cli-smoke-parity.mjs";
 
 function createDeterministicSmokeRunner({ incompleteVersionJson = false, statusTitle = "Test Project" } = {}) {
@@ -93,6 +94,13 @@ function createDeterministicSmokeRunner({ incompleteVersionJson = false, statusT
 }
 
 describe("cli smoke parity helpers", () => {
+  it("uses shell semantics for Windows command shims only", () => {
+    expect(shouldUseShellForCliCommand("ndx.cmd", "win32")).toBe(true);
+    expect(shouldUseShellForCliCommand("C:/tools/ndx.BAT", "win32")).toBe(true);
+    expect(shouldUseShellForCliCommand("ndx.exe", "win32")).toBe(false);
+    expect(shouldUseShellForCliCommand("ndx", "darwin")).toBe(false);
+  });
+
   it("normalizes line endings, slashes, and known placeholder paths", () => {
     const text = "C:\\tmp\\case\\project\r\n/root/app/file.js  \r\n";
     const normalized = normalizeText(text, [

@@ -2,8 +2,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFile } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { exec } from "../packages/llm-client/dist/public.js";
 import { CLI_PATH, setupRexDir } from "../tests/e2e/e2e-helpers.js";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -163,10 +163,11 @@ export function parseJsonPayload(text, smokeCaseId, streamLabel = "stdout") {
 
 function createCliRunner(command = process.execPath, commandArgs = command === process.execPath ? [CLI_PATH] : []) {
   return async function runCli(args) {
-    const result = await exec(command, [...commandArgs, ...args], {
+    const result = await execCommand(command, [...commandArgs, ...args], {
       cwd: ROOT,
       timeout: 15000,
       env: process.env,
+      shell: shouldUseShellForCliCommand(command),
     });
     return {
       exitCode: result.exitCode ?? 1,
@@ -177,6 +178,42 @@ function createCliRunner(command = process.execPath, commandArgs = command === p
 }
 
 const runCli = createCliRunner();
+
+export function shouldUseShellForCliCommand(command, platform = process.platform) {
+  return platform === "win32" && /\.(cmd|bat)$/i.test(command);
+}
+
+function execCommand(command, args, options) {
+  const { cwd, timeout, env, shell = false } = options;
+
+  return new Promise((resolve) => {
+    execFile(command, args, {
+      cwd,
+      timeout,
+      env,
+      shell,
+      maxBuffer: 1024 * 1024,
+    }, (error, stdout, stderr) => {
+      const isTimeout = error
+        ? (error.code === "ETIMEDOUT") || error.killed === true
+        : false;
+
+      resolve({
+        stdout: (stdout ?? "").toString(),
+        stderr: (stderr ?? "").toString(),
+        exitCode:
+          error
+            ? (isTimeout
+              ? null
+              : typeof error.code === "number"
+                ? error.code
+                : 1)
+            : 0,
+        error: error ?? null,
+      });
+    });
+  });
+}
 
 async function collectCase(smokeCase, executeCli) {
   return withFixture(smokeCase.fixture, async (tempDir) => {
