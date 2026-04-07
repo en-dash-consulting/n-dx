@@ -23977,6 +23977,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-06T19:23:14.471Z",
+      "completedAt": "2026-04-06T19:23:14.471Z",
       "children": [
         {
           "id": "b3e82a63-746a-474e-af59-947d8a0f0fb9",
@@ -24034,29 +24036,29 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-06T19:23:14.471Z",
-      "completedAt": "2026-04-06T19:23:14.471Z"
+      ]
     },
     {
       "id": "cc09612c-005f-4239-b0c9-3a7edfc6f538",
       "title": "External Integrations",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "08464700-9955-4338-87b6-afea0646a6f8",
           "title": "PR Build Pipeline and Cross-Platform CLI Validation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Extend the existing PR validation pipeline with additive cross-platform execution stages that run the same n-dx install and smoke-command flow in MacOS and Windows containerized environments, then verify parity against each other and against the repository's existing static expected responses and exit codes.",
           "source": "smart-add",
+          "startedAt": "2026-04-07T14:28:53.235Z",
+          "completedAt": "2026-04-07T14:28:53.235Z",
           "children": [
             {
               "id": "d10a172b-4b1f-4da1-8736-ec9ae8e11b12",
               "title": "Add MacOS pipeline stage for ndx install-and-run smoke validation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Introduce a new CI stage that starts the requested MacOS-based container environment, installs n-dx using the repository's supported setup path, runs the agreed smoke commands, and captures only deterministic outputs and exit codes needed for validation without changing existing command logic.",
               "acceptanceCriteria": [
@@ -24074,12 +24076,14 @@
                 "cli",
                 "regression"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:22:19.737Z",
+              "completedAt": "2026-04-07T14:26:24.041Z"
             },
             {
               "id": "1a72b5c1-bc52-42f6-8918-402065d6e324",
               "title": "Add Windows pipeline stage for ndx install-and-run smoke validation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Introduce a second CI stage that starts the requested Windows-based container environment, runs the same install and smoke-command workflow using Windows-native commands, and captures deterministic outputs and exit codes using the same assertion scope as the MacOS stage.",
               "acceptanceCriteria": [
@@ -24097,7 +24101,9 @@
                 "cli",
                 "regression"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:26:24.720Z",
+              "completedAt": "2026-04-07T14:28:52.966Z"
             },
             {
               "id": "e1319df0-a11c-47c5-b4a2-840ea087160f",
@@ -24123,6 +24129,76 @@
               "source": "smart-add",
               "startedAt": "2026-04-06T18:34:06.588Z",
               "completedAt": "2026-04-06T18:39:35.822Z"
+            }
+          ]
+        }
+      ],
+      "startedAt": "2026-04-07T14:28:53.469Z",
+      "completedAt": "2026-04-07T14:28:53.469Z"
+    },
+    {
+      "id": "95b432f8-c0df-446c-aab5-e639ccbf8ced",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T14:21:28.188Z",
+      "completedAt": "2026-04-07T14:21:28.188Z",
+      "children": [
+        {
+          "id": "3257d8b1-30cc-4323-8f36-f724ed1052fc",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T14:21:27.955Z",
+          "completedAt": "2026-04-07T14:21:27.955Z",
+          "children": [
+            {
+              "id": "a306484a-e1e0-44a2-9740-70fc31efd9ef",
+              "title": "Diagnose smoke parity suite failure and capture reproducible error context",
+              "status": "completed",
+              "level": "task",
+              "description": "Reproduce the current smoke parity suite failure in a controlled environment, identify the exact failing assertion or command path, and document the concrete error signature so follow-up fixes target the real regression instead of symptoms.",
+              "acceptanceCriteria": [
+                "Smoke parity suite is executed in the affected environment and the failing test case is identified",
+                "The exact error message, failing command, and relevant platform/runtime context are captured in a reproducible issue note or test output artifact",
+                "The failure is classified into a concrete root-cause category such as CLI output drift, install/runtime issue, or environment-specific behavior",
+                "A deterministic reproduction path exists that another engineer can run without relying on tribal knowledge"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "smoke",
+                "parity",
+                "diagnostics"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:09:24.928Z",
+              "completedAt": "2026-04-07T14:13:30.097Z"
+            },
+            {
+              "id": "774bf7cb-f8e0-4b00-afa3-d0f63d10d5fe",
+              "title": "Implement targeted fix for smoke parity regression",
+              "status": "completed",
+              "level": "task",
+              "description": "Apply the minimal production or test-harness change needed to restore smoke parity suite stability while preserving the intended cross-platform CLI validation behavior.",
+              "acceptanceCriteria": [
+                "The identified failing smoke parity test passes locally in the previously affected environment",
+                "The fix preserves expected CLI behavior and does not mask the failure by weakening assertions without justification",
+                "Any changed snapshots, fixtures, or expected outputs are updated only if they reflect intended product behavior",
+                "Regression coverage is added or updated so the same failure mode is caught deterministically in future runs"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "smoke",
+                "parity",
+                "fix"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:16:17.833Z",
+              "completedAt": "2026-04-07T14:21:27.688Z"
             }
           ]
         }

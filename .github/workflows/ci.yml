@@ -82,6 +82,8 @@ jobs:
   smoke-macos:
     name: CLI Smoke (macOS)
     runs-on: macos-latest
+    needs:
+      - validate
     timeout-minutes: 20
 
     steps:
@@ -103,8 +105,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Install ndx from source checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/ndx-smoke-prefix"
+          echo "$RUNNER_TEMP/ndx-smoke-prefix/bin" >> "$GITHUB_PATH"
+          npm_config_prefix="$RUNNER_TEMP/ndx-smoke-prefix" npm link
+
       - name: Collect normalized smoke artifact
-        run: node scripts/cli-smoke-parity.mjs collect --output ndx-cli-smoke-macos.json
+        run: node scripts/cli-smoke-parity.mjs collect --cli-command ndx --output ndx-cli-smoke-macos.json
 
       - name: Upload smoke artifact
         uses: actions/upload-artifact@v4
@@ -115,6 +123,8 @@ jobs:
   smoke-windows:
     name: CLI Smoke (Windows)
     runs-on: windows-latest
+    needs:
+      - validate
     timeout-minutes: 20
 
     steps:
@@ -136,8 +146,17 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Install ndx from source checkout
+        shell: pwsh
+        run: |
+          $prefix = Join-Path $env:RUNNER_TEMP "ndx-smoke-prefix"
+          New-Item -ItemType Directory -Force -Path $prefix | Out-Null
+          Add-Content -Path $env:GITHUB_PATH -Value $prefix
+          $env:npm_config_prefix = $prefix
+          npm link
+
       - name: Collect normalized smoke artifact
-        run: node scripts/cli-smoke-parity.mjs collect --output ndx-cli-smoke-windows.json
+        run: node scripts/cli-smoke-parity.mjs collect --cli-command ndx.cmd --output ndx-cli-smoke-windows.json
 
       - name: Upload smoke artifact
         uses: actions/upload-artifact@v4

@@ -22,8 +22,19 @@ function stableItems(items = []) {
   }));
 }
 
+function stripKnownRuntimeNoise(text) {
+  return text
+    .replace(
+      /^\(node:\d+\) \[DEP0040\] DeprecationWarning: The `punycode` module is deprecated\. Please use a userland alternative instead\.\n?/gm,
+      "",
+    )
+    .replace(/^\(Use `node --trace-deprecation \.\.\.` to show where the warning was created\)\n?/gm, "");
+}
+
 export function normalizeText(text, placeholders = []) {
-  let normalized = String(text ?? "").replace(/\r\n/g, "\n").replace(/\\/g, "/");
+  let normalized = stripKnownRuntimeNoise(String(text ?? ""))
+    .replace(/\r\n/g, "\n")
+    .replace(/\\/g, "/");
   for (const [source, replacement] of placeholders) {
     if (!source) continue;
     normalized = normalized.split(String(source).replace(/\\/g, "/")).join(replacement);
@@ -31,16 +42,43 @@ export function normalizeText(text, placeholders = []) {
   return normalized.replace(/[ \t]+\n/g, "\n").trim();
 }
 
-async function runCli(args) {
-  const result = await exec(process.execPath, [CLI_PATH, ...args], {
-    cwd: ROOT,
-    timeout: 15000,
-  });
-  return {
-    exitCode: result.exitCode ?? 1,
-    stdout: result.stdout,
-    stderr: result.stderr,
+function createCliRunner(command = process.execPath, commandArgs = command === process.execPath ? [CLI_PATH] : []) {
+  return async function runCli(args) {
+    const result = await exec(command, [...commandArgs, ...args], {
+      cwd: ROOT,
+      timeout: 15000,
+      env: process.env,
+    });
+    return {
+      exitCode: result.exitCode ?? 1,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
   };
+}
+
+const runCli = createCliRunner();
+
+async function collectCase(smokeCase, executeCli) {
+  return withFixture(smokeCase.fixture, async (tempDir) => {
+    const placeholders = [
+      [ROOT, "<ROOT>"],
+      [tempDir, "<TMPDIR>"],
+    ];
+    const args = smokeCase.args({ tempDir });
+    const result = await executeCli(args);
+    const normalized = {
+      id: smokeCase.id,
+      args,
+      exitCode: result.exitCode,
+      stdoutNormalized: normalizeText(result.stdout, placeholders),
+      stderrNormalized: normalizeText(result.stderr, placeholders),
+    };
+    return {
+      ...normalized,
+      comparable: smokeCase.comparable(normalized),
+    };
+  });
 }
 
 async function withFixture(fixture, fn) {
@@ -185,28 +223,10 @@ export const SMOKE_CASES = [
   },
 ];
 
-export async function collectSmokeArtifact() {
+export async function collectSmokeArtifact({ executeCli = runCli } = {}) {
   const cases = [];
   for (const smokeCase of SMOKE_CASES) {
-    const entry = await withFixture(smokeCase.fixture, async (tempDir) => {
-      const placeholders = [
-        [ROOT, "<ROOT>"],
-        [tempDir, "<TMPDIR>"],
-      ];
-      const args = smokeCase.args({ tempDir });
-      const result = await runCli(args);
-      const normalized = {
-        id: smokeCase.id,
-        args,
-        exitCode: result.exitCode,
-        stdoutNormalized: normalizeText(result.stdout, placeholders),
-        stderrNormalized: normalizeText(result.stderr, placeholders),
-      };
-      return {
-        ...normalized,
-        comparable: smokeCase.comparable(normalized),
-      };
-    });
+    const entry = await collectCase(smokeCase, executeCli);
     cases.push(entry);
   }
 
@@ -281,7 +301,17 @@ async function main(argv) {
     if (outputIndex === -1 || !rest[outputIndex + 1]) {
       throw new Error("collect requires --output <path>");
     }
-    const artifact = await collectSmokeArtifact();
+    const cliCommandIndex = rest.indexOf("--cli-command");
+    const cliCommand = cliCommandIndex === -1 ? process.execPath : rest[cliCommandIndex + 1];
+    if (!cliCommand) {
+      throw new Error("collect requires a value for --cli-command");
+    }
+    const artifact = await collectSmokeArtifact({
+      executeCli: createCliRunner(
+        cliCommand,
+        cliCommand === process.execPath ? [CLI_PATH] : [],
+      ),
+    });
     writeFileSync(rest[outputIndex + 1], JSON.stringify(artifact, null, 2) + "\n", "utf-8");
     return;
   }
