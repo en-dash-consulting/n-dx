@@ -345,6 +345,16 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 
 Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `ndx start stop .` to stop.
 
+### Git workflow
+
+Local development uses `en-dash-consulting/n-dx-internal` (the `origin` remote) — all branches are created and pushed there. The public repo `en-dash-consulting/n-dx` (the `upstream` remote) only receives changes via cross-fork pull requests. Never push branches directly to upstream.
+
+```sh
+git push -u origin <branch>                          # push to n-dx-internal
+gh pr create --repo en-dash-consulting/n-dx \         # PR targets upstream
+  --head en-dash-consulting:<branch> --base main
+```
+
 ## Key Files
 
 | Path | Purpose |
