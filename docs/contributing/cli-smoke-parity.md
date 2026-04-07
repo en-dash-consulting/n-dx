@@ -3,8 +3,10 @@
 The macOS and Windows smoke jobs in [ci.yml](/Users/hal/Documents/VSCodeProjects/n-dx-1/.github/workflows/ci.yml) must run the same canonical `ndx` validation sequence by invoking:
 
 ```bash
-node scripts/cli-smoke-parity.mjs collect --cli-command <installed-ndx-command> --output <artifact-path>
+node scripts/cli-smoke-parity.mjs collect --output <artifact-path>
 ```
+
+`collect` defaults to running the source-checkout CLI entrypoint via the current Node executable. Use `--cli-command <command>` only when you explicitly need to exercise a separately installed CLI binary.
 
 The collector records the canonical sequence in each artifact under `sequence`. That sequence is the documented baseline used by CI parity comparison.
 
