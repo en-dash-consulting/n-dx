@@ -1170,6 +1170,8 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
   ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
+  // Core — lazy-loads Ink TUI to avoid loading React for non-init commands
+  ["packages/core/cli.js", "Lazy-loads Ink renderer for animated init UI (TTY only)"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies

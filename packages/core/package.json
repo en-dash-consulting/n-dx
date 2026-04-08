@@ -44,6 +44,7 @@
     "bin/",
     "cli.js",
     "cli-brand.js",
+    "cli-ink.js",
     "config.js",
     "ci.js",
     "web.js",
@@ -61,10 +62,13 @@
     "build": "echo '@n-dx/core: plain JS, no build needed'"
   },
   "dependencies": {
-    "@n-dx/rex": "workspace:*",
     "@n-dx/hench": "workspace:*",
-    "@n-dx/sourcevision": "workspace:*",
     "@n-dx/llm-client": "workspace:*",
-    "@n-dx/web": "workspace:*"
+    "@n-dx/rex": "workspace:*",
+    "@n-dx/sourcevision": "workspace:*",
+    "@n-dx/web": "workspace:*",
+    "htm": "^3.1.1",
+    "ink": "^6.8.0",
+    "react": "^19.2.4"
   }
 }
