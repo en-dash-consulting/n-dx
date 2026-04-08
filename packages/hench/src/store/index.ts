@@ -6,6 +6,8 @@ export {
   initConfig,
 } from "./config.js";
 
+export { persistRunLog } from "./run-log.js";
+
 export { saveRun, loadRun, listRuns } from "./runs.js";
 
 export { RunChangeDetector } from "./run-change-detector.js";
