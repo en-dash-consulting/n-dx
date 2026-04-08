@@ -73,6 +73,13 @@ import {
   formatOrchestratorCommandHelp,
 } from "./help.js";
 import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integration.js";
+import {
+  formatInitBanner,
+  formatPhaseStart,
+  formatPhaseDone,
+  formatPhaseFail,
+  formatRecap,
+} from "./cli-brand.js";
 import { runExport } from "./export.js";
 import {
   createChildProcessTracker,
@@ -269,8 +276,7 @@ function shouldShowInitBanner(providerFromFlag) {
 }
 
 function showInitBanner() {
-  console.log(INIT_BANNER_LINES.join("\n"));
-  console.log("");
+  console.log(formatInitBanner());
 }
 
 async function promptInitProvider() {
@@ -599,49 +605,74 @@ async function handleInit(rest) {
     exitWithCleanup(1);
   }
 
+  const quiet = flags.includes("--quiet") || flags.includes("-q");
+
   // Check pre-existing state for status reporting
   const svExists = existsSync(join(dir, ".sourcevision"));
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
 
-  // Run sub-inits with captured output
+  // ── Phase: sourcevision ───────────────────────────────────────────
+  if (!quiet) console.log(formatPhaseStart("sourcevision"));
   const svResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
-  const rexResult = await runInitCapture(tools.rex, ["init", ...flags, dir]);
-  const henchResult = await runInitCapture(tools.hench, ["init", ...flags, dir]);
-
-  // Check for failures
-  if (svResult.code !== 0 || rexResult.code !== 0 || henchResult.code !== 0) {
-    if (svResult.code !== 0) console.error(svResult.stderr || svResult.stdout);
-    if (rexResult.code !== 0) console.error(rexResult.stderr || rexResult.stdout);
-    if (henchResult.code !== 0) console.error(henchResult.stderr || henchResult.stdout);
+  if (svResult.code !== 0) {
+    if (!quiet) console.log(formatPhaseFail("sourcevision"));
+    console.error(svResult.stderr || svResult.stdout);
     exitWithCleanup(1);
   }
+  if (!quiet) console.log(formatPhaseDone("sourcevision", svExists ? "reused" : undefined));
+
+  // ── Phase: rex ────────────────────────────────────────────────────
+  if (!quiet) console.log(formatPhaseStart("rex"));
+  const rexResult = await runInitCapture(tools.rex, ["init", ...flags, dir]);
+  if (rexResult.code !== 0) {
+    if (!quiet) console.log(formatPhaseFail("rex"));
+    console.error(rexResult.stderr || rexResult.stdout);
+    exitWithCleanup(1);
+  }
+  if (!quiet) console.log(formatPhaseDone("rex", rexExists ? "reused" : undefined));
+
+  // ── Phase: hench ──────────────────────────────────────────────────
+  if (!quiet) console.log(formatPhaseStart("hench"));
+  const henchResult = await runInitCapture(tools.hench, ["init", ...flags, dir]);
+  if (henchResult.code !== 0) {
+    if (!quiet) console.log(formatPhaseFail("hench"));
+    console.error(henchResult.stderr || henchResult.stdout);
+    exitWithCleanup(1);
+  }
+  if (!quiet) console.log(formatPhaseDone("hench", henchExists ? "reused" : undefined));
 
   // Set provider (suppress output)
   const origLog = console.log;
   console.log = () => {};
   try { await runConfig(["llm.vendor", selectedProvider, dir]); } finally { console.log = origLog; }
 
-  // Claude Code integration
+  // ── Phase: Claude Code integration ────────────────────────────────
   let claudeSummary = "skipped";
   if (!noClaude) {
+    if (!quiet) console.log(formatPhaseStart("claude"));
     try {
       const result = setupClaudeIntegration(dir);
       claudeSummary = `${result.skills.written} skills, ${result.settings.total} permissions`;
+      if (!quiet) console.log(formatPhaseDone("claude", claudeSummary));
     } catch {
       claudeSummary = "skipped";
+      if (!quiet) console.log(formatPhaseDone("claude", "skipped"));
     }
   }
 
-  // Print unified summary
-  console.log("");
-  console.log("n-dx initialized");
-  console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
-  console.log(`  .rex/           ${rexExists ? "already exists (reused)" : "created"}`);
-  console.log(`  .hench/         ${henchExists ? "already exists (reused)" : "created"}`);
-  console.log(`  LLM provider    ${selectedProvider} (${providerSource})`);
-  console.log(`  Claude Code     ${claudeSummary}`);
-  console.log("");
+  // ── Recap ─────────────────────────────────────────────────────────
+  if (quiet) {
+    console.log("n-dx initialized");
+  } else {
+    console.log(formatRecap({
+      sourcevision: svExists ? "already exists (reused)" : "created",
+      rex: rexExists ? "already exists (reused)" : "created",
+      hench: henchExists ? "already exists (reused)" : "created",
+      provider: `${selectedProvider} (${providerSource})`,
+      claudeCode: claudeSummary,
+    }));
+  }
 
   exitWithCleanup(0);
 }
@@ -1311,12 +1342,7 @@ const tools = {
   web: resolveToolPath("packages/web"),
 };
 const SUPPORTED_PROVIDERS = ["codex", "claude"];
-const INIT_BANNER_LINES = [
-  "┌──────────────────────────────────────────────┐",
-  "│                   n-dx init                  │",
-  "│        Guided project setup is starting      │",
-  "└──────────────────────────────────────────────┘",
-];
+// Init banner lives in cli-brand.js (formatInitBanner)
 const signalHandlers = installTrackedChildProcessHandlers({
   tracker: childTracker,
   signals: ["SIGINT", "SIGTERM", "SIGHUP"],

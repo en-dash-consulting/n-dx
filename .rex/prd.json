@@ -20894,7 +20894,7 @@
         {
           "id": "ccbcaf61-4e36-4fb0-b965-be25520ae453",
           "title": "Immersive Init Experience with Dinosaur Theme & Branding",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Replace the current minimal init banner and dry sub-package output with a cohesive, personality-driven flow featuring a cute dinosaur ASCII mascot and strong \"En Dash DX\" / \"n-dx\" branding. Extend cli-brand.js as the single home for all brand assets (mascot art, phase messages, colors).",
           "acceptanceCriteria": [
@@ -20912,7 +20912,11 @@
             "branding",
             "cli"
           ],
-          "source": "conversation"
+          "source": "conversation",
+          "startedAt": "2026-04-08T04:29:31.235Z",
+          "completedAt": "2026-04-08T04:41:56.446Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Created cli-brand.js as single home for brand assets (mascot, phase messages, colors). Rewrote handleInit with themed phase messages, branded recap, NO_COLOR/quiet graceful degradation. 4 new tests added."
         },
         {
           "id": "dcf6018e-e658-4708-ae6e-1bd23431748f",

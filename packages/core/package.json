@@ -43,6 +43,7 @@
   "files": [
     "bin/",
     "cli.js",
+    "cli-brand.js",
     "config.js",
     "ci.js",
     "web.js",
