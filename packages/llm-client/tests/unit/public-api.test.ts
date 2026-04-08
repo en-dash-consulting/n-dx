@@ -160,6 +160,8 @@ import {
   colorWarn,
   colorInfo,
   colorDim,
+  STATUS_COLORS,
+  colorStatus,
   cmd,
   flag,
   sectionHeader,
@@ -463,6 +465,15 @@ describe("public API — help formatting exports", () => {
 
   it("exports colorDim as a function", () => {
     expect(typeof colorDim).toBe("function");
+  });
+
+  it("exports STATUS_COLORS as an object", () => {
+    expect(typeof STATUS_COLORS).toBe("object");
+    expect(STATUS_COLORS).not.toBeNull();
+  });
+
+  it("exports colorStatus as a function", () => {
+    expect(typeof colorStatus).toBe("function");
   });
 
   it("exports cmd as a function", () => {

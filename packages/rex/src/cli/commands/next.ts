@@ -3,17 +3,7 @@ import { resolveStore } from "../../store/index.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
-import { bold, yellow, red, cyan, dim } from "@n-dx/llm-client";
-
-function colorStatus(status: string): string {
-  switch (status) {
-    case "completed": return dim(status);
-    case "failing": return red(status);
-    case "in_progress": return cyan(status);
-    case "blocked": return yellow(status);
-    default: return status;
-  }
-}
+import { bold, yellow, red, dim, colorStatus } from "@n-dx/llm-client";
 
 function colorPriority(priority: string): string {
   switch (priority) {

@@ -14,6 +14,8 @@ import {
   colorWarn,
   colorInfo,
   colorDim,
+  STATUS_COLORS,
+  colorStatus,
   cmd,
   flag,
   sectionHeader,
@@ -583,6 +585,99 @@ describe("help-format", () => {
       process.env.NO_COLOR = "1";
       resetColorCache();
       expect(isColorEnabled()).toBe(false);
+    });
+  });
+
+  describe("STATUS_COLORS map", () => {
+    it("maps PRD status 'completed' to green", () => {
+      expect(STATUS_COLORS["completed"]).toBe(green);
+    });
+    it("maps PRD status 'in_progress' to cyan", () => {
+      expect(STATUS_COLORS["in_progress"]).toBe(cyan);
+    });
+    it("maps PRD status 'pending' to yellow", () => {
+      expect(STATUS_COLORS["pending"]).toBe(yellow);
+    });
+    it("maps PRD status 'blocked' to yellow", () => {
+      expect(STATUS_COLORS["blocked"]).toBe(yellow);
+    });
+    it("maps PRD status 'failing' to red", () => {
+      expect(STATUS_COLORS["failing"]).toBe(red);
+    });
+    it("maps PRD status 'deferred' to dim", () => {
+      expect(STATUS_COLORS["deferred"]).toBe(dim);
+    });
+    it("maps PRD status 'deleted' to dim", () => {
+      expect(STATUS_COLORS["deleted"]).toBe(dim);
+    });
+    it("maps hench run status 'running' to cyan", () => {
+      expect(STATUS_COLORS["running"]).toBe(cyan);
+    });
+    it("maps hench run status 'failed' to red", () => {
+      expect(STATUS_COLORS["failed"]).toBe(red);
+    });
+    it("maps hench run status 'timeout' to red", () => {
+      expect(STATUS_COLORS["timeout"]).toBe(red);
+    });
+    it("maps hench run status 'budget_exceeded' to red", () => {
+      expect(STATUS_COLORS["budget_exceeded"]).toBe(red);
+    });
+    it("maps log-level 'error' to red", () => {
+      expect(STATUS_COLORS["error"]).toBe(red);
+    });
+    it("maps log-level 'warning' to yellow", () => {
+      expect(STATUS_COLORS["warning"]).toBe(yellow);
+    });
+    it("maps log-level 'success' to green", () => {
+      expect(STATUS_COLORS["success"]).toBe(green);
+    });
+  });
+
+  describe("colorStatus (no-color mode)", () => {
+    // NO_COLOR is set in the outer beforeEach
+    it("returns plain status text for known statuses", () => {
+      expect(colorStatus("completed")).toBe("completed");
+      expect(colorStatus("failing")).toBe("failing");
+      expect(colorStatus("pending")).toBe("pending");
+    });
+    it("returns plain text for unknown status", () => {
+      expect(colorStatus("unknown_status")).toBe("unknown_status");
+    });
+    it("accepts optional display text override", () => {
+      expect(colorStatus("completed", "✓ done")).toBe("✓ done");
+    });
+  });
+
+  describe("colorStatus (forced color)", () => {
+    beforeEach(() => {
+      delete process.env.NO_COLOR;
+      process.env.FORCE_COLOR = "1";
+      resetColorCache();
+    });
+
+    it("colors 'completed' green", () => {
+      expect(colorStatus("completed")).toBe("\x1b[32mcompleted\x1b[39m");
+    });
+    it("colors 'in_progress' cyan", () => {
+      expect(colorStatus("in_progress")).toBe("\x1b[36min_progress\x1b[39m");
+    });
+    it("colors 'failing' red", () => {
+      expect(colorStatus("failing")).toBe("\x1b[31mfailing\x1b[39m");
+    });
+    it("colors 'pending' yellow", () => {
+      expect(colorStatus("pending")).toBe("\x1b[33mpending\x1b[39m");
+    });
+    it("colors 'blocked' yellow", () => {
+      expect(colorStatus("blocked")).toBe("\x1b[33mblocked\x1b[39m");
+    });
+    it("colors 'deferred' dim", () => {
+      expect(colorStatus("deferred")).toBe("\x1b[2mdeferred\x1b[22m");
+    });
+    it("returns plain text for unknown status", () => {
+      expect(colorStatus("something_new")).toBe("something_new");
+    });
+    it("applies color to optional display text", () => {
+      expect(colorStatus("completed", "✓ done")).toBe("\x1b[32m✓ done\x1b[39m");
     });
   });
 });

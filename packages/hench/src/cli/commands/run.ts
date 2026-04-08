@@ -12,7 +12,7 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, bold, cyan, green, red, yellow } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, bold, cyan, green, red, yellow, colorStatus } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -610,12 +610,7 @@ async function runOne(
   info(`\n${bold("=== Run Complete ===")}`);
   output(`Run ID: ${run.id}`);
   output(`Task: ${cyan(run.taskTitle)}`);
-  const coloredStatus =
-    run.status === "completed" ? green(run.status) :
-    (run.status === "failed" || run.status === "timeout" || run.status === "budget_exceeded") ? red(run.status) :
-    run.status === "running" ? cyan(run.status) :
-    run.status;
-  output(`Status: ${coloredStatus}`);
+  output(`Status: ${colorStatus(run.status)}`);
 
   // Duration
   if (run.startedAt && run.finishedAt) {

@@ -263,6 +263,9 @@ export {
   colorWarn,
   colorInfo,
   colorDim,
+  // Canonical status→color map (PRD statuses + log-levels)
+  STATUS_COLORS,
+  colorStatus,
   cmd,
   flag,
   sectionHeader,
