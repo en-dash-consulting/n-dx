@@ -24811,24 +24811,43 @@
             {
               "id": "ac656b7b-240c-45c4-b07f-5f6e8583daf9",
               "title": "Integrate quota log output into hench run console with quiet/JSON suppression",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "description": "Wire the formatter output into the hench run console output stream so the quota log line is printed between runs. Add suppression logic so the line is omitted when the `--quiet` flag is active or when output format is JSON. Write an integration test that exercises the yellow and red threshold boundaries end-to-end through the formatter and output path.",
+              "description": "Connect the Codex quota fetch result to the existing ANSI color-coded quota log formatter and integrate the formatted line into the hench run loop at the inter-run boundary. The output should be suppressed in quiet mode and omitted from structured JSON output, consistent with the suppression contract documented in the existing 'Integrate quota log output' task. This task covers the wiring layer only — the formatter and fetch adapter are handled by sibling tasks.",
               "acceptanceCriteria": [
                 "Log line is printed after each run showing remaining quota per provider/model",
                 "Log line is suppressed when `--quiet` flag is active",
                 "Log line is suppressed when output format is JSON",
                 "No log line is emitted if quota data is unavailable (graceful omission)",
-                "Integration test verifies the yellow and red thresholds trigger at correct boundaries through the full output path"
+                "Integration test verifies the yellow and red thresholds trigger at correct boundaries through the full output path",
+                "After each completed hench run, the quota percent-remaining line is printed to stdout before the next run begins",
+                "Output is suppressed when --quiet or --format=json flags are active",
+                "If the Codex quota fetch fails, the inter-run line prints a degraded indicator (e.g. 'quota: unavailable') rather than crashing the loop",
+                "An integration test verifies the quota line appears in normal mode and is absent in quiet/JSON modes",
+                "No quota fetch is attempted when the active vendor is not Codex"
               ],
-              "priority": "medium",
+              "priority": "high",
               "tags": [
                 "llm",
                 "quota",
                 "cli",
-                "hench"
+                "hench",
+                "codex"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T18:15:31.162Z",
+              "completedAt": "2026-04-08T18:29:09.274Z",
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:0:1",
+                  "proposalTitle": "Wire live Codex quota result into hench inter-run console output",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.7007639054666985,
+                  "mergedAt": "2026-04-08T18:15:19.864Z",
+                  "source": "smart-add"
+                }
+              ]
             }
           ]
         }
@@ -24843,6 +24862,161 @@
         "matchedItemStatus": "completed",
         "createdAt": "2026-04-08T16:18:20.755Z"
       }
+    },
+    {
+      "id": "877432ac-c7a2-45b2-ba6b-298e55a75be2",
+      "title": "LLM Integration",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "adf5e546-51d8-43e6-8f42-1be4331b01ea",
+          "title": "Between-Run API Quota Status Logging",
+          "status": "pending",
+          "level": "feature",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "208d645e-27e5-47bb-a1bf-db3e69d80361",
+              "title": "Implement Codex API quota fetch and normalize response to QuotaRemaining",
+              "status": "in_progress",
+              "level": "task",
+              "description": "Make a live HTTP request to the Codex (OpenAI) usage/quota endpoint between hench runs to retrieve the current consumption and hard limit for the authenticated account. Parse the response and map it to the existing QuotaRemaining typed interface so downstream formatters and log integrations receive a consistent shape regardless of provider. This is distinct from the budget-based percent calculation (which derives limits from configured values) — this task fetches real-time quota directly from the provider API.",
+              "acceptanceCriteria": [
+                "An HTTP call is made to the Codex quota or usage endpoint using the configured API key before each inter-run log line",
+                "The raw Codex response is parsed and mapped to the existing QuotaRemaining interface (tokens used, tokens limit, percent remaining)",
+                "A network or auth failure returns a typed error result rather than throwing, allowing the caller to degrade gracefully",
+                "The fetch function is unit-tested with mocked HTTP responses covering success, rate-limit, and auth-failure cases",
+                "No Codex-specific types leak past the adapter boundary — callers receive only QuotaRemaining or a typed error"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "codex",
+                "quota",
+                "api"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T18:39:57.135Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18ad839f-1985-40c4-9036-7a25180bb8e0",
+      "title": "CLI & Developer Tools",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "c513f257-7f0b-4bce-9bf5-82f5cc909ef0",
+          "title": "ANSI Color Output Across Rex, SourceVision, and Hench",
+          "status": "pending",
+          "level": "feature",
+          "description": "Add semantic ANSI color formatting to all CLI log output across rex, sourcevision, hench, and the ndx orchestrator, so operators can quickly distinguish statuses, results, and severity levels at a glance. Includes a shared utility layer with TTY detection and environment-flag support to ensure colors are never emitted in non-interactive or piped contexts.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "2faf9d58-2878-4e12-a9e3-b613591fd7bd",
+              "title": "Build shared ANSI color formatting utility with TTY and NO_COLOR support",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a shared color formatting module in the llm-client or core package that defines a semantic palette (success/completed, pending/in-progress, error/failure, warning, info/dim) and exposes lightweight helpers. The module must check process.stdout.isTTY and respect the NO_COLOR and FORCE_COLOR environment variables so that piped output, CI logs, and --json/--quiet modes receive plain text. This utility becomes the single color source-of-truth consumed by all packages.",
+              "acceptanceCriteria": [
+                "Module exposes named semantic color helpers (e.g. colorSuccess, colorError, colorPending, colorDim) rather than raw ANSI codes",
+                "Colors are disabled when process.stdout.isTTY is false",
+                "Colors are disabled when NO_COLOR env var is set (any non-empty value)",
+                "Colors are forced on when FORCE_COLOR env var is set",
+                "Module has unit tests covering TTY=false, NO_COLOR, FORCE_COLOR, and default TTY=true branches",
+                "Module is exported through the appropriate package public API or gateway"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "color",
+                "shared"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "0225e4e7-659e-40f3-917d-ee6b81515379",
+              "title": "Apply color formatting to rex CLI output",
+              "status": "completed",
+              "level": "task",
+              "description": "Wire the shared color utility into rex command output so that status trees, next-task selection, validate results, and add/proposal feedback use semantic colors. Completed items should render dimmed or in a success color; pending items in neutral or highlight color; errors and validation failures in red; warnings in yellow. Output from --format=json and --quiet flags must remain unaffected.",
+              "acceptanceCriteria": [
+                "rex status tree renders completed items in a distinct success/dim color and pending items in a neutral color",
+                "rex next output highlights the selected task title and its priority level with semantic colors",
+                "rex validate renders error-level findings in red, warning-level in yellow, and passing checks in green",
+                "rex add proposal review renders accept/skip/reject options with distinct colors",
+                "rex --format=json output contains no ANSI escape codes",
+                "rex --quiet output contains no ANSI escape codes",
+                "Colors are suppressed when stdout is not a TTY (e.g. piped to file)"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "cli",
+                "color"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T19:06:05.882Z",
+              "completedAt": "2026-04-08T19:13:22.896Z"
+            },
+            {
+              "id": "51364a6f-bb3e-4b55-8523-ed490367ec37",
+              "title": "Apply color formatting to sourcevision CLI output",
+              "status": "pending",
+              "level": "task",
+              "description": "Wire the shared color utility into sourcevision command output so that analyze progress, zone detection results, findings by severity, and next-steps output use semantic colors. Finding severity levels (anti-pattern, pattern, suggestion, observation) should map to distinct colors. Analysis pass headers should be visually distinct from finding detail lines.",
+              "acceptanceCriteria": [
+                "sourcevision analyze progress lines show phase headers in a distinct highlight color",
+                "Finding severity levels render with consistent colors: anti-pattern in red, pattern in yellow, suggestion in cyan, observation in dim",
+                "Zone summary output shows zone names and metrics with readable contrast",
+                "sourcevision validate pass/fail lines use green/red respectively",
+                "JSON and quiet output modes contain no ANSI escape codes",
+                "Colors are suppressed when stdout is not a TTY"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "cli",
+                "color"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "be167d08-8687-4ad6-a8cd-aeb929f8d838",
+              "title": "Apply color formatting to hench and ndx orchestrator output",
+              "status": "completed",
+              "level": "task",
+              "description": "Wire the shared color utility into hench run-loop output and the ndx orchestrator so that task selection headers, run status updates, completion summaries, and multi-package orchestration output are color-coded. Hench run start/end banners, per-iteration task labels, and error/timeout notices should each have distinct colors. ndx orchestration commands (plan, work, ci, status) should emit colored section headers and outcome lines.",
+              "acceptanceCriteria": [
+                "hench run start banner and task title render in a highlighted color",
+                "Per-iteration status lines (in_progress, completed, failed) use semantic colors matching the shared palette",
+                "hench run summary shows completed task count in green and failed count in red",
+                "ndx orchestration commands emit colored section headers that visually separate package output",
+                "Errors and failures across all ndx commands render in red with the error message clearly distinct from surrounding output",
+                "hench --quiet and --format=json suppress all ANSI codes",
+                "ndx color output is suppressed when stdout is not a TTY"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "ndx",
+                "cli",
+                "color"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T18:45:56.232Z",
+              "completedAt": "2026-04-08T18:59:19.653Z"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
