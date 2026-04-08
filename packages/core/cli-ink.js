@@ -184,7 +184,8 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
         claudeCode: claudeSummary,
       });
 
-      setTimeout(() => onComplete(0), 200);
+      // Let the dino keep walking while the user reads the recap
+      setTimeout(() => onComplete(0), 2000);
     })();
   }, []);
 
