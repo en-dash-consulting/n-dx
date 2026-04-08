@@ -14,13 +14,17 @@ import {
   createLLMClient,
   detectLLMAuthMode,
   ClaudeClientError,
+  NEWEST_MODELS,
+  resolveVendorModel,
 } from "@n-dx/llm-client";
 import type { TokenUsage } from "../schema/index.js";
 
 export { ClaudeClientError } from "@n-dx/llm-client";
 
-export const DEFAULT_MODEL = "claude-sonnet-4-6";
-export const DEFAULT_CODEX_MODEL = "gpt-5-codex";
+// Derived from the single canonical source in @n-dx/llm-client so that
+// updating a vendor's newest model requires only one edit.
+export const DEFAULT_MODEL = NEWEST_MODELS.claude;
+export const DEFAULT_CODEX_MODEL = NEWEST_MODELS.codex;
 
 // ── Module-level state ────────────────────────────────────────────────────────
 
@@ -33,11 +37,7 @@ function resolveVendor(): LLMVendor {
 
 function resolveModel(override?: string): string {
   if (override) return override;
-  const vendor = resolveVendor();
-  if (vendor === "codex") {
-    return _llmConfig?.codex?.model ?? DEFAULT_CODEX_MODEL;
-  }
-  return _llmConfig?.claude?.model ?? DEFAULT_MODEL;
+  return resolveVendorModel(resolveVendor(), _llmConfig ?? {});
 }
 
 /**
