@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { CLI_ERROR_CODES } from "@n-dx/llm-client";
@@ -187,7 +188,6 @@ describe("requireClaudeCLI", () => {
 
   it("does not throw when claude is available", () => {
     // This test only passes if claude is on PATH — skip otherwise
-    const { execFileSync } = require("node:child_process");
     let hasClaude = false;
     try {
       execFileSync("which", ["claude"], { stdio: "pipe" });
