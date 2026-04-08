@@ -92,6 +92,69 @@ describe("formatPauseMessage", () => {
   });
 });
 
+// ── no-actionable-tasks advisory block ───────────────────────────────────
+
+describe("formatNoActionableTasksWarning", () => {
+  afterEach(async () => {
+    setColorMode("clear");
+    await resetColor();
+  });
+
+  it("all three lines contain yellow ANSI code when color is forced", async () => {
+    setColorMode("force");
+    await resetColor();
+    const { formatNoActionableTasksWarning } = await import("../../../../src/cli/commands/run.js");
+    const lines = formatNoActionableTasksWarning("Build Features", 3);
+    for (const line of lines) {
+      expect(line).toContain(YELLOW);
+    }
+  });
+
+  it("all three lines are plain text (no ANSI) when NO_COLOR=1", async () => {
+    setColorMode("none");
+    await resetColor();
+    const { formatNoActionableTasksWarning } = await import("../../../../src/cli/commands/run.js");
+    const lines = formatNoActionableTasksWarning("Build Features", 3);
+    for (const line of lines) {
+      expect(line).not.toContain(ANSI_PREFIX);
+    }
+  });
+
+  it("first line contains the epic title", async () => {
+    setColorMode("clear");
+    await resetColor();
+    const { formatNoActionableTasksWarning } = await import("../../../../src/cli/commands/run.js");
+    const [line1] = formatNoActionableTasksWarning("My Epic Title", 5);
+    expect(line1).toContain("My Epic Title");
+  });
+
+  it("second line contains the blocked task count", async () => {
+    setColorMode("clear");
+    await resetColor();
+    const { formatNoActionableTasksWarning } = await import("../../../../src/cli/commands/run.js");
+    const [, line2] = formatNoActionableTasksWarning("Some Epic", 7);
+    expect(line2).toContain("7");
+    expect(line2).toContain("blocked or deferred");
+  });
+
+  it("third line contains the rex status hint", async () => {
+    setColorMode("clear");
+    await resetColor();
+    const { formatNoActionableTasksWarning } = await import("../../../../src/cli/commands/run.js");
+    const [, , line3] = formatNoActionableTasksWarning("Some Epic", 2);
+    expect(line3).toContain("rex status");
+    expect(line3).toContain("rex update");
+  });
+
+  it("returns exactly three lines", async () => {
+    setColorMode("clear");
+    await resetColor();
+    const { formatNoActionableTasksWarning } = await import("../../../../src/cli/commands/run.js");
+    const lines = formatNoActionableTasksWarning("Epic", 0);
+    expect(lines).toHaveLength(3);
+  });
+});
+
 // ── run-loop success / completion message ─────────────────────────────────
 
 describe("formatRunSuccessMessage", () => {

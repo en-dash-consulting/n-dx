@@ -12,7 +12,7 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, bold, cyan, green, red, yellow, colorStatus, colorSuccess, colorWarn } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -67,6 +67,20 @@ export function formatPauseMessage(pauseMs: number, target: "task" | "epic"): st
  */
 export function formatRunSuccessMessage(text: string): string {
   return colorSuccess(text);
+}
+
+/**
+ * Format a "no actionable tasks" advisory block for epic scope mode.
+ * All three lines are rendered in yellow (colorWarn) to signal an advisory
+ * state without alarming the user.
+ * Exported for testing — verifies semantic color helpers are applied.
+ */
+export function formatNoActionableTasksWarning(epicTitle: string, blockedCount: number): [string, string, string] {
+  return [
+    colorWarn(`\n⚠ Epic "${epicTitle}" has no actionable tasks.`),
+    colorWarn(`  ${blockedCount} task(s) are blocked or deferred.`),
+    colorWarn(`  Use 'rex status' to see task statuses, or update tasks with 'rex update <id> --status=pending'.`),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -763,9 +777,13 @@ export async function cmdRun(
       process.exit(0);
     }
     if (!scopeInfo.hasActionableTasks) {
-      output(`\n⚠ Epic "${scopeInfo.title}" has no actionable tasks.`);
-      output(`  ${scopeInfo.totalTasks - scopeInfo.completedTasks} task(s) are blocked or deferred.`);
-      output(`  Use 'rex status' to see task statuses, or update tasks with 'rex update <id> --status=pending'.`);
+      const [line1, line2, line3] = formatNoActionableTasksWarning(
+        scopeInfo.title,
+        scopeInfo.totalTasks - scopeInfo.completedTasks,
+      );
+      output(line1);
+      output(line2);
+      output(line3);
       process.exit(0);
     }
   }
@@ -880,7 +898,7 @@ async function runIterations(
     await emitQuotaLog();
 
     if (status === "error_transient") {
-      info(`\n${yellow(`Transient error on iteration ${i + 1}, continuing to next task...`)}`);
+      info(`\n${colorWarn(`Transient error on iteration ${i + 1}, continuing to next task...`)}`);
       continue;
     }
 
@@ -1010,7 +1028,7 @@ async function runLoop(
       }
 
       if (status === "error_transient") {
-        info(`\n${yellow("Transient error, continuing to next task...")}`);
+        info(`\n${colorWarn("Transient error, continuing to next task...")}`);
       }
 
       // Pause between tasks (interruptible)
@@ -1156,7 +1174,7 @@ async function runEpicByEpic(
       }
 
       if (!freshScope.hasActionableTasks) {
-        info(`⚠ Epic "${epic.title}" has no actionable tasks (${freshScope.totalTasks - freshScope.completedTasks} blocked/deferred).`);
+        info(colorWarn(`⚠ Epic "${epic.title}" has no actionable tasks (${freshScope.totalTasks - freshScope.completedTasks} blocked/deferred).`));
         summaries.push({
           id: epic.id,
           title: epic.title,
@@ -1237,7 +1255,7 @@ async function runEpicByEpic(
           break;
         }
         if (!updated.hasActionableTasks) {
-          info(`\n⚠ Epic "${epic.title}" has no more actionable tasks.`);
+          info(`\n${colorWarn(`⚠ Epic "${epic.title}" has no more actionable tasks.`)}`);
           break;
         }
 
