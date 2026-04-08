@@ -5,6 +5,12 @@
  * animation utilities. Any command that needs progress indication or
  * branded output should import from here.
  *
+ * ## Mascot design
+ *
+ * The raptor mascot is designed on a pixel grid and converted to Unicode
+ * quadrant characters (▘▝▖▗▌▐▀▄█▙▛▜▟▚▞) for 2×2 sub-character resolution.
+ * This gives crisp edges at any terminal font size.
+ *
  * @module n-dx/cli-brand
  */
 
@@ -55,94 +61,67 @@ const isTTY = () => !!(process.stdout && process.stdout.isTTY);
 export const BRAND_NAME = "En Dash DX";
 export const TOOL_NAME = "n-dx";
 
-// ── Mascot ─────────────────────────────────────────────────────────────
+// ── Mascot (pixel-grid quadrant art) ───────────────────────────────────
 
 /**
- * Compact pixel-art raptor (Chrome T-Rex inspired, not identical).
- * 5 body lines + 1 animated leg line = 6 total.
- *
- * The branded heading sits inline to the right of the dino at eye level,
- * keeping the entire banner under 7 lines.
+ * Pre-rendered mascot lines from a 28×22 pixel grid converted to Unicode
+ * quadrant block characters. 9 body lines + 2 leg-frame variants.
  */
-const BODY_LINES = [
-  { body: "    ▄███▄" },
-  { body: "   ██ ", eye: "◕", after: " █▌", heading: true },
-  { body: "   ▀████▀▀▄" },
-  { body: "  ▄████▀ ╶╴" },
-  { body: "  ████████" },
-  { body: "   ▀████▀" },
+const BODY = [
+  "       ▄▄▄▄",
+  "      ▐▛▜██▙",
+  "      ▐▙▟██▛",
+  "      ▟██▛",
+  "     ▟███▖",
+  " ▚▖▗▟████▌",
+  "  ▜██████▙▀",
+  "   ▜█████▀▘",
+  "    ▀▀▀▀",
 ];
 
-const LEG_FRAMES = [
-  "    █▌▝▀",
-  "   ▀▘ █▌",
+const LEGS = [
+  ["    ▐▛▝█", "    █  ▐▌"],
+  ["    █▘▝█", "   ▗▛  ▜▖"],
 ];
 
-function renderBodyLine(entry, headingText) {
-  let line;
-  if (entry.eye !== undefined) {
-    line = purple(entry.body) + entry.eye + purple(entry.after);
-  } else {
-    line = purple(entry.body);
-  }
-  if (headingText && entry.heading) {
-    line += "   " + headingText;
-  }
-  return line;
-}
-
-/** Static mascot string (no animation, for non-TTY or tests). */
+/** Static mascot string for non-TTY / test use. */
 export function getMascot() {
-  const lines = BODY_LINES.map((entry) => renderBodyLine(entry));
-  lines.push(purple(LEG_FRAMES[0]));
-  return lines.join("\n");
+  return [...BODY, ...LEGS[0]].map((l) => purple(l)).join("\n");
 }
 
-// ── Spinner / animated progress ────────────────────────────────────────
+// ── Spinner ────────────────────────────────────────────────────────────
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const SPINNER_INTERVAL_MS = 80;
+const TICK_MS = 80;
 
 /**
- * Create an animated spinner for standalone use (outside init).
- *
- * In a TTY, shows a braille animation that updates in-place.
- * In non-TTY (piped, CI), prints a static start line then a result line.
- *
- * @param {string} text - The message to show while spinning
+ * Standalone animated spinner (for commands other than init).
  */
 export function createSpinner(text) {
   let timer = null;
-  let frameIndex = 0;
+  let frame = 0;
 
   return {
     start() {
-      if (!isTTY()) {
-        console.log(`  ${dim("▸")} ${text}`);
-        return this;
-      }
-      const frame = purple(SPINNER_FRAMES[0]);
-      process.stdout.write(`  ${frame} ${text}`);
+      if (!isTTY()) { console.log(`  ${dim("▸")} ${text}`); return this; }
+      process.stdout.write(`  ${purple(SPINNER_FRAMES[0])} ${text}`);
       timer = setInterval(() => {
-        frameIndex = (frameIndex + 1) % SPINNER_FRAMES.length;
-        process.stdout.write(`\r\x1b[K  ${purple(SPINNER_FRAMES[frameIndex])} ${text}`);
-      }, SPINNER_INTERVAL_MS);
+        frame = (frame + 1) % SPINNER_FRAMES.length;
+        process.stdout.write(`\r\x1b[K  ${purple(SPINNER_FRAMES[frame])} ${text}`);
+      }, TICK_MS);
       return this;
     },
-
     success(msg, detail) {
       if (timer) { clearInterval(timer); timer = null; }
       if (isTTY()) process.stdout.write("\r\x1b[K");
-      const suffix = detail ? ` ${dim("(" + detail + ")")}` : "";
-      console.log(`  ${green("✓")} ${msg}${suffix}`);
+      const d = detail ? ` ${dim("(" + detail + ")")}` : "";
+      console.log(`  ${green("✓")} ${msg}${d}`);
     },
-
     fail(msg) {
       if (timer) { clearInterval(timer); timer = null; }
       if (isTTY()) process.stdout.write("\r\x1b[K");
       console.log(`  ${red("✗")} ${msg}`);
     },
-
     stop() {
       if (timer) { clearInterval(timer); timer = null; }
       if (isTTY()) process.stdout.write("\r\x1b[K");
@@ -161,104 +140,149 @@ export const INIT_PHASES = {
 
 // ── Animated init UI ───────────────────────────────────────────────────
 
+const DINO_LINES = BODY.length + LEGS[0].length; // 11
+const HEADING_LINE = 1; // blank line after dino for heading
+const HEADER_HEIGHT = DINO_LINES + 1 + 1 + 1; // dino + blank + heading + blank
+const WALK_SPEED = 4; // move every N ticks
+const LEG_SPEED = 3; // change legs every N steps
+
 /**
- * Create an animated init UI with walking dino mascot.
+ * Animated init UI with a walking dino header.
  *
- * In a TTY: the dino's legs alternate while phases run with braille spinners.
- * In non-TTY: static mascot, static phase lines (▸ start / ✓ done).
- *
- * Usage:
- *   const ui = createInitUI();
- *   ui.printBanner();
- *   ui.startPhase("sourcevision");
- *   await doWork();
- *   ui.endPhase("sourcevision");
- *   ui.printRecap(results);
+ * The dino walks back and forth in a fixed header region while phase
+ * spinners run in the progress area below. The animation runs continuously
+ * from banner display through all phases until the recap.
  */
 export function createInitUI() {
   const tty = isTTY();
-  let timer = null;
+  const termWidth = (process.stdout.columns || 80);
+  const maxDinoWidth = Math.max(...[...BODY, ...LEGS[0], ...LEGS[1]].map((l) => l.length));
+  const walkRange = Math.max(0, Math.min(termWidth - maxDinoWidth - 2, 30));
+
+  let dinoX = 0;
+  let direction = 1;
   let legFrame = 0;
   let spinnerFrame = 0;
-  let linesAfterBanner = 0;
+  let tickCount = 0;
+  let stepCount = 0;
+  let timer = null;
+  let progressLines = 0; // lines printed below the header
   let currentPhaseText = "";
+  let phaseActive = false;
 
-  // After printing the banner, the leg line is HEADING_LINES lines
-  // above the cursor. Each completed phase adds 1 line.
-  const HEADING_LINES = 1; // single blank line after mascot
-
-  function getLegOffset() {
-    return HEADING_LINES + linesAfterBanner + 1; // +1 for current spinner line
+  function dinoLines() {
+    return [...BODY, ...LEGS[legFrame]];
   }
 
-  function animateTick() {
-    legFrame = (legFrame + 1) % LEG_FRAMES.length;
+  function headingStr() {
+    return bold(purple(BRAND_NAME)) + "  " + dim(TOOL_NAME + " init");
+  }
+
+  /** Redraw the entire header region using cursor save/restore. */
+  function redrawHeader() {
+    const lines = dinoLines();
+    // Distance from cursor to top of header
+    const upBy = HEADER_HEIGHT + progressLines + (phaseActive ? 1 : 0);
+
+    process.stdout.write("\x1b7");                   // save cursor
+    process.stdout.write(`\x1b[${upBy}A`);           // move to top of header
+
+    for (let i = 0; i < lines.length; i++) {
+      process.stdout.write("\r\x1b[2K");             // clear line
+      process.stdout.write(" ".repeat(dinoX) + purple(lines[i]));
+      process.stdout.write("\x1b[1B");               // down one
+    }
+    // Blank line after dino
+    process.stdout.write("\r\x1b[2K");
+    process.stdout.write("\x1b[1B");
+    // Heading line (centered-ish, not moving with dino)
+    process.stdout.write("\r\x1b[2K");
+    process.stdout.write("  " + headingStr());
+    process.stdout.write("\x1b[1B");
+    // Blank line
+    process.stdout.write("\r\x1b[2K");
+
+    process.stdout.write("\x1b8");                   // restore cursor
+  }
+
+  function tick() {
+    tickCount++;
     spinnerFrame = (spinnerFrame + 1) % SPINNER_FRAMES.length;
 
-    // Redraw dino legs
-    const offset = getLegOffset();
-    process.stdout.write("\x1b7");                                       // save cursor
-    process.stdout.write(`\x1b[${offset}A`);                            // move up to leg line
-    process.stdout.write(`\r\x1b[2K${purple(LEG_FRAMES[legFrame])}`);   // redraw legs
-    process.stdout.write("\x1b8");                                       // restore cursor
+    // Walk the dino
+    if (tickCount % WALK_SPEED === 0) {
+      dinoX += direction;
+      stepCount++;
+      if (dinoX >= walkRange || dinoX <= 0) direction *= -1;
+      if (stepCount % LEG_SPEED === 0) legFrame = (legFrame + 1) % LEGS.length;
+    }
 
-    // Redraw spinner
-    const frame = purple(SPINNER_FRAMES[spinnerFrame]);
-    process.stdout.write(`\r\x1b[K  ${frame} ${currentPhaseText}`);
+    redrawHeader();
+
+    // Redraw spinner on current line
+    if (phaseActive) {
+      process.stdout.write(`\r\x1b[K  ${purple(SPINNER_FRAMES[spinnerFrame])} ${currentPhaseText}`);
+    }
   }
 
   return {
-    /**
-     * Print the mascot banner with inline heading.
-     * Contains "En Dash DX" and "n-dx init" for branding + test assertions.
-     */
     printBanner() {
-      const heading = bold(purple(BRAND_NAME)) + "  " + dim(TOOL_NAME + " init");
-      const lines = BODY_LINES.map((entry) => renderBodyLine(entry, entry.heading ? heading : null));
-      lines.push(purple(LEG_FRAMES[0]));
-      console.log(lines.join("\n"));
-      console.log(""); // blank line after mascot
-      linesAfterBanner = 0;
+      if (!tty) {
+        // Static fallback
+        console.log(getMascot());
+        console.log("");
+        console.log("  " + headingStr());
+        console.log("");
+        return;
+      }
+
+      // Print initial header
+      const lines = dinoLines();
+      for (const line of lines) {
+        console.log(purple(line));
+      }
+      console.log(""); // blank after dino
+      console.log("  " + headingStr());
+      console.log(""); // blank before progress
+
+      // Start animation
+      timer = setInterval(tick, TICK_MS);
     },
 
-    /** Start an animated phase spinner (dino walks while spinner runs). */
     startPhase(phaseName) {
       const phase = INIT_PHASES[phaseName];
       if (!phase) return;
       currentPhaseText = phase.spinner;
+      phaseActive = true;
 
       if (!tty) {
         console.log(`  ${dim("▸")} ${phase.spinner}`);
-        linesAfterBanner++;
+        progressLines++;
+        phaseActive = false;
         return;
       }
 
-      spinnerFrame = 0;
-      const frame = purple(SPINNER_FRAMES[0]);
-      process.stdout.write(`  ${frame} ${currentPhaseText}`);
-      timer = setInterval(animateTick, SPINNER_INTERVAL_MS);
+      // Write initial spinner frame
+      process.stdout.write(`  ${purple(SPINNER_FRAMES[spinnerFrame])} ${currentPhaseText}`);
     },
 
-    /** Complete the current phase with a success message. */
     endPhase(phaseName, detail) {
       const phase = INIT_PHASES[phaseName];
       if (!phase) return;
-      if (timer) { clearInterval(timer); timer = null; }
+      phaseActive = false;
       if (tty) process.stdout.write("\r\x1b[K");
-      const suffix = detail ? ` ${dim("(" + detail + ")")}` : "";
-      console.log(`  ${green("✓")} ${phase.success}${suffix}`);
-      linesAfterBanner++;
+      const d = detail ? ` ${dim("(" + detail + ")")}` : "";
+      console.log(`  ${green("✓")} ${phase.success}${d}`);
+      progressLines++;
     },
 
-    /** Mark the current phase as failed. */
     failPhase(phaseName) {
-      if (timer) { clearInterval(timer); timer = null; }
+      phaseActive = false;
       if (tty) process.stdout.write("\r\x1b[K");
       console.log(`  ${red("✗")} ${phaseName} failed`);
-      linesAfterBanner++;
+      progressLines++;
     },
 
-    /** Print the final recap panel. */
     printRecap(results) {
       const lines = [
         "",
@@ -276,41 +300,27 @@ export function createInitUI() {
       console.log(lines.join("\n"));
     },
 
-    /** Stop all animation (cleanup). */
     stop() {
       if (timer) { clearInterval(timer); timer = null; }
     },
   };
 }
 
-// ── Legacy formatters (for non-init commands or tests) ─────────────────
+// ── Legacy formatters (for non-init use or tests) ──────────────────────
 
-/** Branded init banner (static, for non-interactive / test use). */
 export function formatInitBanner() {
   const mascot = getMascot();
-  const heading = [
-    "",
-    `  ${bold(purple(BRAND_NAME))}`,
-    `  ${dim(TOOL_NAME + " init")}`,
-    "",
-  ].join("\n");
-  return mascot + "\n" + heading;
+  return mascot + "\n\n  " + bold(purple(BRAND_NAME)) + "\n  " + dim(TOOL_NAME + " init") + "\n";
 }
 
-/** Branded recap (static, for non-interactive / test use). */
 export function formatRecap(results) {
-  const lines = [
-    "",
-    `  ${green("◆")} ${bold("Project initialized!")}`,
-    "",
+  return [
+    "", `  ${green("◆")} ${bold("Project initialized!")}`, "",
     `  .sourcevision/  ${results.sourcevision}`,
     `  .rex/           ${results.rex}`,
     `  .hench/         ${results.hench}`,
     `  LLM provider    ${results.provider}`,
     `  Claude Code     ${results.claudeCode}`,
-    "",
-    `  ${dim("Next: " + TOOL_NAME + " plan . — analyze your codebase")}`,
-    "",
-  ];
-  return lines.join("\n");
+    "", `  ${dim("Next: " + TOOL_NAME + " plan . — analyze your codebase")}`, "",
+  ].join("\n");
 }
