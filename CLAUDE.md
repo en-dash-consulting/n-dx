@@ -222,6 +222,16 @@ pnpm test           # test all packages
 pnpm typecheck      # typecheck all packages
 ```
 
+### Pre-push CI preflight
+
+Before pushing, run `pnpm preflight` to mirror the full CI pipeline locally:
+
+```sh
+pnpm preflight      # build → typecheck → docs:build → pr-check → test → changeset check
+```
+
+This runs every step from `.github/workflows/ci.yml` in order and stops on first failure. **Always run this before declaring a branch ready to push** — partial checks (e.g. only `pnpm test`) miss issues like dead docs links or missing changesets that will fail CI.
+
 ## Command Aliases
 
 Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
