@@ -256,6 +256,13 @@ export {
   yellow,
   green,
   red,
+  // Status-semantic color helpers
+  colorSuccess,
+  colorError,
+  colorPending,
+  colorWarn,
+  colorInfo,
+  colorDim,
   cmd,
   flag,
   sectionHeader,

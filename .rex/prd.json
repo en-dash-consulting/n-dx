@@ -24869,6 +24869,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-08T19:28:20.429Z",
+      "completedAt": "2026-04-08T19:28:20.429Z",
       "children": [
         {
           "id": "adf5e546-51d8-43e6-8f42-1be4331b01ea",
@@ -24905,29 +24907,29 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-08T19:28:20.429Z",
-      "completedAt": "2026-04-08T19:28:20.429Z"
+      ]
     },
     {
       "id": "18ad839f-1985-40c4-9036-7a25180bb8e0",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "c513f257-7f0b-4bce-9bf5-82f5cc909ef0",
           "title": "ANSI Color Output Across Rex, SourceVision, and Hench",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Add semantic ANSI color formatting to all CLI log output across rex, sourcevision, hench, and the ndx orchestrator, so operators can quickly distinguish statuses, results, and severity levels at a glance. Includes a shared utility layer with TTY detection and environment-flag support to ensure colors are never emitted in non-interactive or piped contexts.",
           "source": "smart-add",
+          "startedAt": "2026-04-08T20:27:58.146Z",
+          "completedAt": "2026-04-08T20:27:58.146Z",
           "children": [
             {
               "id": "2faf9d58-2878-4e12-a9e3-b613591fd7bd",
               "title": "Build shared ANSI color formatting utility with TTY and NO_COLOR support",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a shared color formatting module in the llm-client or core package that defines a semantic palette (success/completed, pending/in-progress, error/failure, warning, info/dim) and exposes lightweight helpers. The module must check process.stdout.isTTY and respect the NO_COLOR and FORCE_COLOR environment variables so that piped output, CI logs, and --json/--quiet modes receive plain text. This utility becomes the single color source-of-truth consumed by all packages.",
               "acceptanceCriteria": [
@@ -24944,7 +24946,9 @@
                 "color",
                 "shared"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:21:44.163Z",
+              "completedAt": "2026-04-08T20:27:57.857Z"
             },
             {
               "id": "0225e4e7-659e-40f3-917d-ee6b81515379",
@@ -24974,7 +24978,7 @@
             {
               "id": "51364a6f-bb3e-4b55-8523-ed490367ec37",
               "title": "Apply color formatting to sourcevision CLI output",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Wire the shared color utility into sourcevision command output so that analyze progress, zone detection results, findings by severity, and next-steps output use semantic colors. Finding severity levels (anti-pattern, pattern, suggestion, observation) should map to distinct colors. Analysis pass headers should be visually distinct from finding detail lines.",
               "acceptanceCriteria": [
@@ -24991,7 +24995,9 @@
                 "cli",
                 "color"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:10:37.969Z",
+              "completedAt": "2026-04-08T20:21:01.846Z"
             },
             {
               "id": "be167d08-8687-4ad6-a8cd-aeb929f8d838",
@@ -25018,6 +25024,66 @@
               "source": "smart-add",
               "startedAt": "2026-04-08T18:45:56.232Z",
               "completedAt": "2026-04-08T18:59:19.653Z"
+            }
+          ]
+        }
+      ],
+      "startedAt": "2026-04-08T20:27:58.353Z",
+      "completedAt": "2026-04-08T20:27:58.353Z"
+    },
+    {
+      "id": "991a796e-b75b-4b3a-ba85-f6a494ec99cb",
+      "title": "CLI & Developer Tools",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "e7370225-ce8d-43e5-a1cc-2e4efb876d2e",
+          "title": "ANSI Color Output Across Rex, SourceVision, and Hench",
+          "status": "pending",
+          "level": "feature",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "50c4d2b6-d8e8-49dd-9c8a-ee66b0f9b89d",
+              "title": "Standardize semantic color conventions for status and log-level output across all CLI tools",
+              "status": "pending",
+              "level": "task",
+              "description": "Define a shared color vocabulary in the ANSI utility (e.g. green=completed/success, yellow=pending/warning, red=error/failed, cyan=info) and apply it consistently to every status badge, result summary line, and log-level label produced by rex, sourcevision, hench, and the ndx orchestrator. Without a shared convention, color is cosmetic rather than meaningful — the goal is that a user can parse the semantic state of output from any tool by color alone.",
+              "acceptanceCriteria": [
+                "A STATUS_COLORS or equivalent map is defined in the shared ANSI utility, mapping PRD status values and log levels to specific ANSI color codes",
+                "Rex, sourcevision, hench, and ndx orchestrator all use the same color for the same logical state (e.g. every 'completed' label is green regardless of which tool emits it)",
+                "Error lines across all tools share one color; info, success, and warning lines are each visually distinct and consistent",
+                "The color convention is documented with a code comment or a brief entry in CODEX.md"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "ux",
+                "color"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "83cafd67-4b87-4a64-a16f-936f0b78b775",
+              "title": "Add integration tests validating TTY-aware color emission and NO_COLOR suppression across all CLI tools",
+              "status": "pending",
+              "level": "task",
+              "description": "Without automated checks, color regressions (raw ANSI codes polluting piped JSON output, NO_COLOR being silently ignored, or colors absent in real TTY sessions) are invisible in CI. This task adds a test harness that spawns each CLI tool and asserts color code presence or absence based on the execution context.",
+              "acceptanceCriteria": [
+                "Tests spawn rex, sourcevision, hench, and ndx and assert ANSI escape codes are present when stdout is a TTY (or simulated TTY)",
+                "Tests assert ANSI codes are stripped when stdout is piped or when NO_COLOR=1 is set in the environment",
+                "Coverage includes at least one representative output per tool: rex status, sourcevision analyze summary, hench run summary, and ndx orchestrator log line",
+                "All tests pass in CI and are wired into the standard test suite via pnpm test"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "testing",
+                "color"
+              ],
+              "source": "smart-add"
             }
           ]
         }

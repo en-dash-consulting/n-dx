@@ -154,6 +154,12 @@ import {
   yellow,
   green,
   red,
+  colorSuccess,
+  colorError,
+  colorPending,
+  colorWarn,
+  colorInfo,
+  colorDim,
   cmd,
   flag,
   sectionHeader,
@@ -433,6 +439,30 @@ describe("public API — help formatting exports", () => {
 
   it("exports red as a function", () => {
     expect(typeof red).toBe("function");
+  });
+
+  it("exports colorSuccess as a function", () => {
+    expect(typeof colorSuccess).toBe("function");
+  });
+
+  it("exports colorError as a function", () => {
+    expect(typeof colorError).toBe("function");
+  });
+
+  it("exports colorPending as a function", () => {
+    expect(typeof colorPending).toBe("function");
+  });
+
+  it("exports colorWarn as a function", () => {
+    expect(typeof colorWarn).toBe("function");
+  });
+
+  it("exports colorInfo as a function", () => {
+    expect(typeof colorInfo).toBe("function");
+  });
+
+  it("exports colorDim as a function", () => {
+    expect(typeof colorDim).toBe("function");
   });
 
   it("exports cmd as a function", () => {

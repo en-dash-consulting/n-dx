@@ -6,6 +6,19 @@
  *
  * ## Color semantics
  *
+ * ### Status / severity (use these for CLI output)
+ *
+ * | Helper         | Color  | Meaning                        |
+ * |----------------|--------|--------------------------------|
+ * | colorSuccess   | Green  | completed / success            |
+ * | colorError     | Red    | failure / error                |
+ * | colorPending   | Yellow | in-progress / pending          |
+ * | colorWarn      | Yellow | warning                        |
+ * | colorInfo      | Cyan   | informational / secondary hint |
+ * | colorDim       | Dim    | muted / de-emphasised text     |
+ *
+ * ### Help formatting (use these for --help pages)
+ *
  * | Element           | Color  | Purpose                          |
  * |-------------------|--------|----------------------------------|
  * | Commands          | Cyan   | Executable names and subcommands |
@@ -100,6 +113,53 @@ export function green(text: string): string {
 /** Red text (errors, failures). */
 export function red(text: string): string {
   return ansi("31", text, "39");
+}
+
+// ── Status-semantic color helpers ───────────────────────────────────────
+
+/**
+ * Color helpers that express CLI output semantics rather than raw colors.
+ * Prefer these over the raw `green`, `red`, etc. helpers when the intent
+ * is to communicate status or severity.
+ *
+ * | Helper         | Meaning                        | Color  |
+ * |----------------|--------------------------------|--------|
+ * | colorSuccess   | completed / success            | green  |
+ * | colorError     | failure / error                | red    |
+ * | colorPending   | in-progress / pending          | yellow |
+ * | colorWarn      | warning                        | yellow |
+ * | colorInfo      | informational / secondary hint | cyan   |
+ * | colorDim       | muted / de-emphasised text     | dim    |
+ */
+
+/** Color a success or completed status (green). */
+export function colorSuccess(text: string): string {
+  return green(text);
+}
+
+/** Color an error or failure status (red). */
+export function colorError(text: string): string {
+  return red(text);
+}
+
+/** Color a pending or in-progress status (yellow). */
+export function colorPending(text: string): string {
+  return yellow(text);
+}
+
+/** Color a warning (yellow). */
+export function colorWarn(text: string): string {
+  return yellow(text);
+}
+
+/** Color an informational or secondary hint (cyan). */
+export function colorInfo(text: string): string {
+  return cyan(text);
+}
+
+/** Mute or de-emphasise text (dim). */
+export function colorDim(text: string): string {
+  return dim(text);
 }
 
 // ── Semantic formatters ─────────────────────────────────────────────────
