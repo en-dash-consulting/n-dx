@@ -608,9 +608,10 @@ async function handleInit(rest) {
   const useTUI = !quiet && process.stdout.isTTY;
 
   if (useTUI) {
+    let inkResult;
     try {
       const { renderInit } = await import("./cli-ink.js");
-      const result = await renderInit({
+      inkResult = await renderInit({
         dir,
         flags,
         provider: selectedProvider,
@@ -621,14 +622,16 @@ async function handleInit(rest) {
         runConfig,
         setupClaudeIntegration,
       });
-      if (result.code !== 0) {
-        if (result.error) console.error(result.error);
-        exitWithCleanup(1);
-      }
-      exitWithCleanup(0);
     } catch (err) {
       // Ink failed — fall through to static fallback
       console.error(err.message || err);
+    }
+    if (inkResult) {
+      if (inkResult.code !== 0) {
+        if (inkResult.error) console.error(inkResult.error);
+        exitWithCleanup(1);
+      }
+      exitWithCleanup(0);
     }
   }
 

@@ -135,24 +135,30 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
     started.current = true;
 
     (async () => {
+      // Yield to let Ink render between state updates
+      const tick = () => new Promise((r) => setTimeout(r, 0));
+
       const svExists = existsSync(join(dir, ".sourcevision"));
       const rexExists = existsSync(join(dir, ".rex"));
       const henchExists = existsSync(join(dir, ".hench"));
 
       // sourcevision
       setPhase("sourcevision", "active");
+      await tick();
       const sv = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
       if (sv.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, sv.stderr || sv.stdout); return; }
       setPhase("sourcevision", "done", svExists ? "reused" : undefined);
 
       // rex
       setPhase("rex", "active");
+      await tick();
       const rx = await runInitCapture(tools.rex, ["init", ...flags, dir]);
       if (rx.code !== 0) { setPhase("rex", "failed"); onComplete(1, rx.stderr || rx.stdout); return; }
       setPhase("rex", "done", rexExists ? "reused" : undefined);
 
       // hench
       setPhase("hench", "active");
+      await tick();
       const hx = await runInitCapture(tools.hench, ["init", ...flags, dir]);
       if (hx.code !== 0) { setPhase("hench", "failed"); onComplete(1, hx.stderr || hx.stdout); return; }
       setPhase("hench", "done", henchExists ? "reused" : undefined);
@@ -162,18 +168,19 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
       console.log = () => {};
       try { await runConfig(["llm.vendor", provider, dir]); } finally { console.log = origLog; }
 
-      // claude integration
+      // claude integration — sync and CPU-bound, so yield before/after
       let claudeSummary = "skipped";
       if (!noClaude) {
         setPhase("claude", "active");
+        await tick();
         try {
           const r = setupClaudeIntegration(dir);
           claudeSummary = `${r.skills.written} skills, ${r.settings.total} permissions`;
-          setPhase("claude", "done", claudeSummary);
         } catch {
-          claudeSummary = "skipped";
-          setPhase("claude", "done", "skipped");
+          /* skip */
         }
+        setPhase("claude", "done", claudeSummary === "skipped" ? "skipped" : claudeSummary);
+        await tick();
       }
 
       setRecap({
