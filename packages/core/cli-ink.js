@@ -12,6 +12,7 @@ import { render, Box, Text } from "ink";
 import { html } from "htm/react";
 import { existsSync } from "fs";
 import { join } from "path";
+import { Worker } from "worker_threads";
 import {
   BRAND_NAME,
   TOOL_NAME,
@@ -163,29 +164,42 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
       if (hx.code !== 0) { setPhase("hench", "failed"); onComplete(1, hx.stderr || hx.stdout); return; }
       setPhase("hench", "done", henchExists ? "reused" : undefined);
 
-      // Provider config and Claude integration are sync/CPU-bound.
-      // Run them via setImmediate so Ink gets real event-loop turns
-      // to keep the animation alive between each blocking chunk.
-      const yieldFrame = () => new Promise((r) => setImmediate(r));
-
-      // provider config (silent)
+      // provider config (silent — runs async but does sync file I/O)
       setPhase("claude", "active");
-      await yieldFrame();
       const origLog = console.log;
       console.log = () => {};
       try { await runConfig(["llm.vendor", provider, dir]); } finally { console.log = origLog; }
-      await yieldFrame();
 
-      // claude integration
+      // claude integration — run in worker thread to keep animation alive
       let claudeSummary = "skipped";
       if (!noClaude) {
         try {
-          const r = setupClaudeIntegration(dir);
-          claudeSummary = `${r.skills.written} skills, ${r.settings.total} permissions`;
+          claudeSummary = await new Promise((resolve) => {
+            const workerCode = `
+              const { parentPort, workerData } = require("worker_threads");
+              (async () => {
+                try {
+                  const { setupClaudeIntegration } = await import(workerData.modulePath);
+                  const r = setupClaudeIntegration(workerData.dir);
+                  parentPort.postMessage(r.skills.written + " skills, " + r.settings.total + " permissions");
+                } catch {
+                  parentPort.postMessage("skipped");
+                }
+              })();
+            `;
+            const w = new Worker(workerCode, {
+              eval: true,
+              workerData: {
+                dir,
+                modulePath: new URL("./claude-integration.js", import.meta.url).href,
+              },
+            });
+            w.on("message", resolve);
+            w.on("error", () => resolve("skipped"));
+          });
         } catch {
-          /* skip */
+          claudeSummary = "skipped";
         }
-        await yieldFrame();
       }
       setPhase("claude", "done", claudeSummary === "skipped" ? "skipped" : claudeSummary);
 
