@@ -76,6 +76,8 @@ export {
   // Semantic color helpers (prefer over raw primitives for status/severity)
   colorSuccess,
   colorWarn,
+  colorInfo,
+  colorDim,
   colorPending,
   // Canonical status→color map + helper (PRD statuses, run statuses, log-levels)
   STATUS_COLORS,

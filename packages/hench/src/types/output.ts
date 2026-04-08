@@ -20,7 +20,7 @@
 // Re-export shared foundation primitives.
 export { setQuiet, isQuiet, info, result } from "../prd/llm-gateway.js";
 
-import { isQuiet, bold, cyan, dim } from "../prd/llm-gateway.js";
+import { isQuiet, bold, cyan, dim, colorDim, colorWarn, colorInfo } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Streaming output — section headers and labelled lines for agent runs
@@ -54,8 +54,26 @@ export function subsection(title: string): void {
 }
 
 /**
+ * Color mapping for source-attribution prefix labels in stream output.
+ *
+ * - Tool:   dim/grey  — secondary, operational tag
+ * - Agent:  yellow    — primary agent voice
+ * - Vendor/model names (Codex, claude, …): cyan/blue — origin identifier
+ *
+ * Labels not listed here render without color.
+ * Color helpers are evaluated at call time, so TTY and NO_COLOR detection
+ * is honoured automatically via the shared llm-client isColorEnabled() logic.
+ */
+const STREAM_LABEL_COLORS: Readonly<Record<string, (text: string) => string>> = {
+  Tool:   colorDim,
+  Agent:  colorWarn,
+  Codex:  colorInfo,
+  claude: colorInfo,
+};
+
+/**
  * Print a labelled streaming line. Suppressed in quiet mode.
- * The label is right-padded for alignment.
+ * The label is right-padded for alignment and color-coded by source type.
  *
  *   [Agent]   Some agent text…
  *   [Tool]    read_file({"path":"…"})
@@ -63,8 +81,11 @@ export function subsection(title: string): void {
  */
 export function stream(label: string, text: string): void {
   if (isQuiet()) return;
-  const tag = `[${label}]`.padEnd(10);
-  console.log(`  ${tag} ${text}`);
+  const bracket = `[${label}]`;
+  const colorFn = STREAM_LABEL_COLORS[label];
+  const coloredBracket = colorFn ? colorFn(bracket) : bracket;
+  const padding = " ".repeat(Math.max(0, 10 - bracket.length));
+  console.log(`  ${coloredBracket}${padding} ${text}`);
 }
 
 /**
