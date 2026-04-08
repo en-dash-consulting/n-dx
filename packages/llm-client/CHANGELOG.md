@@ -1,5 +1,11 @@
 # @n-dx/llm-client
 
+## 0.2.2
+
+### Patch Changes
+
+- [#138](https://github.com/en-dash-consulting/n-dx/pull/138) [`deb1b73`](https://github.com/en-dash-consulting/n-dx/commit/deb1b731a25ae3b97e833ecff82b5fa5e9045bba) Thanks [@endash-shal](https://github.com/endash-shal)! - This change optimizes some code, adds timeouts and big fixes for major use cases. No new functionality is added.
+
 ## 0.2.1
 
 ## 0.2.0
