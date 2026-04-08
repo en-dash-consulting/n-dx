@@ -11,8 +11,9 @@ import { useState, useEffect, useRef } from "react";
 import { render, Box, Text } from "ink";
 import { html } from "htm/react";
 import { existsSync } from "fs";
-import { join } from "path";
-import { Worker } from "worker_threads";
+import { join, dirname } from "path";
+import { spawn } from "child_process";
+import { fileURLToPath } from "url";
 import {
   BRAND_NAME,
   TOOL_NAME,
@@ -20,6 +21,21 @@ import {
   LEGS,
   INIT_PHASES,
 } from "./cli-brand.js";
+
+// ── Subprocess helper (never blocks the main thread) ───────────────────
+
+/** Spawn a command and return a promise. If captureStdout, resolves with stdout string. */
+function spawnAsync(cmd, args, captureStdout = false) {
+  return new Promise((resolve) => {
+    let stdout = "";
+    const child = spawn(cmd, args, {
+      stdio: captureStdout ? ["ignore", "pipe", "ignore"] : "ignore",
+    });
+    if (captureStdout) child.stdout.on("data", (d) => { stdout += d; });
+    child.on("close", () => resolve(captureStdout ? stdout : undefined));
+    child.on("error", () => resolve(captureStdout ? "" : undefined));
+  });
+}
 
 // ── Spinner ────────────────────────────────────────────────────────────
 
@@ -117,7 +133,7 @@ function Recap({ sourcevision, rex, hench, provider, claudeCode }) {
 
 // ── Init app ───────────────────────────────────────────────────────────
 
-function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runInitCapture, runConfig, setupClaudeIntegration, onComplete }) {
+function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runInitCapture, onComplete }) {
   const [phases, setPhases] = useState([]);
   const [recap, setRecap] = useState(null);
   const started = useRef(false);
@@ -136,70 +152,56 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
     started.current = true;
 
     (async () => {
-      // Yield to let Ink render between state updates
-      const tick = () => new Promise((r) => setTimeout(r, 0));
-
       const svExists = existsSync(join(dir, ".sourcevision"));
       const rexExists = existsSync(join(dir, ".rex"));
       const henchExists = existsSync(join(dir, ".hench"));
 
       // sourcevision
       setPhase("sourcevision", "active");
-      await tick();
+
       const sv = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
       if (sv.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, sv.stderr || sv.stdout); return; }
       setPhase("sourcevision", "done", svExists ? "reused" : undefined);
 
       // rex
       setPhase("rex", "active");
-      await tick();
+
       const rx = await runInitCapture(tools.rex, ["init", ...flags, dir]);
       if (rx.code !== 0) { setPhase("rex", "failed"); onComplete(1, rx.stderr || rx.stdout); return; }
       setPhase("rex", "done", rexExists ? "reused" : undefined);
 
       // hench
       setPhase("hench", "active");
-      await tick();
+
       const hx = await runInitCapture(tools.hench, ["init", ...flags, dir]);
       if (hx.code !== 0) { setPhase("hench", "failed"); onComplete(1, hx.stderr || hx.stdout); return; }
       setPhase("hench", "done", henchExists ? "reused" : undefined);
 
-      // provider config (silent — runs async but does sync file I/O)
+      // All remaining work runs as child processes — sync file I/O in
+      // the main thread freezes Ink's animation no matter what yielding
+      // strategy we use. Subprocesses are truly non-blocking.
       setPhase("claude", "active");
-      const origLog = console.log;
-      console.log = () => {};
-      try { await runConfig(["llm.vendor", provider, dir]); } finally { console.log = origLog; }
 
-      // claude integration — run in worker thread to keep animation alive
+      const cliPath = join(dirname(fileURLToPath(import.meta.url)), "cli.js");
+
+      // provider config — spawn the CLI in a subprocess
+      await spawnAsync("node", [cliPath, "config", "llm.vendor", provider, dir]);
+
+      // claude integration — spawn an inline ESM script as a subprocess
       let claudeSummary = "skipped";
       if (!noClaude) {
+        const integrationUrl = new URL("./claude-integration.js", import.meta.url).href;
+        const script = [
+          `import{setupClaudeIntegration}from"${integrationUrl}";`,
+          `try{const r=setupClaudeIntegration(${JSON.stringify(dir)});`,
+          `process.stdout.write(JSON.stringify({s:r.skills.written,p:r.settings.total}))}`,
+          `catch{process.stdout.write("{}")}`,
+        ].join("");
+        const result = await spawnAsync("node", ["--input-type=module", "-e", script], true);
         try {
-          claudeSummary = await new Promise((resolve) => {
-            const workerCode = `
-              const { parentPort, workerData } = require("worker_threads");
-              (async () => {
-                try {
-                  const { setupClaudeIntegration } = await import(workerData.modulePath);
-                  const r = setupClaudeIntegration(workerData.dir);
-                  parentPort.postMessage(r.skills.written + " skills, " + r.settings.total + " permissions");
-                } catch {
-                  parentPort.postMessage("skipped");
-                }
-              })();
-            `;
-            const w = new Worker(workerCode, {
-              eval: true,
-              workerData: {
-                dir,
-                modulePath: new URL("./claude-integration.js", import.meta.url).href,
-              },
-            });
-            w.on("message", resolve);
-            w.on("error", () => resolve("skipped"));
-          });
-        } catch {
-          claudeSummary = "skipped";
-        }
+          const data = JSON.parse(result);
+          if (data.s !== undefined) claudeSummary = `${data.s} skills, ${data.p} permissions`;
+        } catch { /* keep skipped */ }
       }
       setPhase("claude", "done", claudeSummary === "skipped" ? "skipped" : claudeSummary);
 
