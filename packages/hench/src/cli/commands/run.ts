@@ -17,6 +17,7 @@ import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "..
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
 import { MemoryThrottle } from "../../process/memory-throttle.js";
+import { checkQuotaRemaining } from "../../quota/index.js";
 
 // ---------------------------------------------------------------------------
 // Schema compatibility
@@ -825,6 +826,9 @@ async function runIterations(
       epicId,
     );
 
+    // Check remaining quota/budget for active providers after each run.
+    await checkQuotaRemaining();
+
     if (status === "error_transient") {
       info(`\nTransient error on iteration ${i + 1}, continuing to next task...`);
       continue;
@@ -940,6 +944,9 @@ async function runLoop(
         }
         throw err;
       }
+
+      // Check remaining quota/budget for active providers after each run.
+      await checkQuotaRemaining();
 
       if (!shouldContinueLoop(status)) {
         // In loop mode, hard failures don't stop the loop — the stuck
@@ -1158,6 +1165,9 @@ async function runEpicByEpic(
           }
           throw err;
         }
+
+        // Check remaining quota/budget for active providers after each run.
+        await checkQuotaRemaining();
 
         if (status === "completed") {
           tasksCompleted++;
