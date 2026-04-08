@@ -207,6 +207,13 @@ export function formatRecap(results) {
     `  .hench/         ${results.hench}`,
     `  LLM provider    ${results.provider}`,
     `  Claude Code     ${results.claudeCode}`,
-    "", `  ${dim("Next: " + TOOL_NAME + " plan . — analyze your codebase")}`, "",
+    "",
+    `  ${dim("Next steps:")}`,
+    `  ${dim("  " + TOOL_NAME + " start .          spin up the dashboard + MCP servers")}`,
+    `  ${dim("  " + TOOL_NAME + ' add "feature"    add requirements to the PRD')}`,
+    `  ${dim("  " + TOOL_NAME + " work .           pick up a task and start building")}`,
+    "",
+    `  ${dim("Or open claude or codex to work with n-dx skills and MCP tools")}`,
+    "",
   ].join("\n");
 }

@@ -126,7 +126,12 @@ function Recap({ sourcevision, rex, hench, provider, claudeCode }) {
       <${Text}>  LLM provider    ${provider}<//>
       <${Text}>  Claude Code     ${claudeCode}<//>
       <${Text}> <//>
-      <${Text} dimColor>  Next: ${TOOL_NAME} plan . — analyze your codebase<//>
+      <${Text} dimColor>  Next steps:<//>
+      <${Text} dimColor>    ${TOOL_NAME} start .          spin up the dashboard + MCP servers<//>
+      <${Text} dimColor>    ${TOOL_NAME} add "feature"    add requirements to the PRD<//>
+      <${Text} dimColor>    ${TOOL_NAME} work .           pick up a task and start building<//>
+      <${Text}> <//>
+      <${Text} dimColor>  Or open <${Text} color="cyan">claude<//>  or <${Text} color="cyan">codex<//>  to work with n-dx skills and MCP tools<//>
     <//>
   `;
 }

@@ -282,7 +282,9 @@ describe("n-dx init provider selection", () => {
           },
         });
 
-        expect(output).toContain("n-dx plan");
+        expect(output).toContain("n-dx start");
+        expect(output).toContain("n-dx add");
+        expect(output).toContain("n-dx work");
       } finally {
         await rm(binDir, { recursive: true, force: true });
       }
