@@ -76,7 +76,7 @@ import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integr
 import {
   formatInitBanner,
   formatRecap,
-  createSpinner,
+  createInitUI,
   INIT_PHASES,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
@@ -274,9 +274,7 @@ function shouldShowInitBanner(providerFromFlag) {
   return providerFromFlag === undefined;
 }
 
-function showInitBanner() {
-  console.log(formatInitBanner());
-}
+// showInitBanner is now handled by createInitUI().printBanner()
 
 async function promptInitProvider() {
   const rl = createInterface({
@@ -589,8 +587,11 @@ async function handleInit(rest) {
   const quiet = flags.includes("--quiet") || flags.includes("-q");
 
   // Show mascot banner unless suppressed by --quiet or --provider (CI/scripted use)
-  if (!quiet && !providerFromFlag) {
-    showInitBanner();
+  // Create animated init UI (walking dino + phase spinners)
+  const ui = quiet ? null : createInitUI();
+
+  if (ui && !providerFromFlag) {
+    ui.printBanner();
   }
 
   if (providerFromFlag) {
@@ -615,42 +616,35 @@ async function handleInit(rest) {
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
 
-  // Helper: run an init phase with animated spinner.
-  // Returns the work result. On non-zero exit code, calls fail and exits.
-  async function initPhase(phaseName, work, { detail } = {}) {
-    const phase = INIT_PHASES[phaseName];
-    const spinner = quiet ? null : createSpinner(phase.spinner);
-    if (spinner) spinner.start();
-
-    const result = await work();
-
-    if (result && result.code !== undefined && result.code !== 0) {
-      if (spinner) spinner.fail(`${phaseName} failed`);
-      console.error(result.stderr || result.stdout);
-      exitWithCleanup(1);
-    }
-
-    if (spinner) spinner.success(phase.success, detail);
-    return result;
-  }
-
   // ── Phase: sourcevision ───────────────────────────────────────────
-  await initPhase("sourcevision",
-    () => runInitCapture(tools.sourcevision, ["init", ...flags, dir]),
-    { detail: svExists ? "reused" : undefined },
-  );
+  if (ui) ui.startPhase("sourcevision");
+  const svResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+  if (svResult.code !== 0) {
+    if (ui) ui.failPhase("sourcevision");
+    console.error(svResult.stderr || svResult.stdout);
+    exitWithCleanup(1);
+  }
+  if (ui) ui.endPhase("sourcevision", svExists ? "reused" : undefined);
 
   // ── Phase: rex ────────────────────────────────────────────────────
-  await initPhase("rex",
-    () => runInitCapture(tools.rex, ["init", ...flags, dir]),
-    { detail: rexExists ? "reused" : undefined },
-  );
+  if (ui) ui.startPhase("rex");
+  const rexResult = await runInitCapture(tools.rex, ["init", ...flags, dir]);
+  if (rexResult.code !== 0) {
+    if (ui) ui.failPhase("rex");
+    console.error(rexResult.stderr || rexResult.stdout);
+    exitWithCleanup(1);
+  }
+  if (ui) ui.endPhase("rex", rexExists ? "reused" : undefined);
 
   // ── Phase: hench ──────────────────────────────────────────────────
-  await initPhase("hench",
-    () => runInitCapture(tools.hench, ["init", ...flags, dir]),
-    { detail: henchExists ? "reused" : undefined },
-  );
+  if (ui) ui.startPhase("hench");
+  const henchResult = await runInitCapture(tools.hench, ["init", ...flags, dir]);
+  if (henchResult.code !== 0) {
+    if (ui) ui.failPhase("hench");
+    console.error(henchResult.stderr || henchResult.stdout);
+    exitWithCleanup(1);
+  }
+  if (ui) ui.endPhase("hench", henchExists ? "reused" : undefined);
 
   // Set provider (suppress output)
   const origLog = console.log;
@@ -660,29 +654,29 @@ async function handleInit(rest) {
   // ── Phase: Claude Code integration ────────────────────────────────
   let claudeSummary = "skipped";
   if (!noClaude) {
-    const spinner = quiet ? null : createSpinner(INIT_PHASES.claude.spinner);
-    if (spinner) spinner.start();
+    if (ui) ui.startPhase("claude");
     try {
       const result = setupClaudeIntegration(dir);
       claudeSummary = `${result.skills.written} skills, ${result.settings.total} permissions`;
-      if (spinner) spinner.success(INIT_PHASES.claude.success, claudeSummary);
+      if (ui) ui.endPhase("claude", claudeSummary);
     } catch {
       claudeSummary = "skipped";
-      if (spinner) spinner.success(INIT_PHASES.claude.success, "skipped");
+      if (ui) ui.endPhase("claude", "skipped");
     }
   }
 
   // ── Recap ─────────────────────────────────────────────────────────
-  if (quiet) {
-    console.log("n-dx initialized");
-  } else {
-    console.log(formatRecap({
+  if (ui) {
+    ui.stop();
+    ui.printRecap({
       sourcevision: svExists ? "already exists (reused)" : "created",
       rex: rexExists ? "already exists (reused)" : "created",
       hench: henchExists ? "already exists (reused)" : "created",
       provider: `${selectedProvider} (${providerSource})`,
       claudeCode: claudeSummary,
-    }));
+    });
+  } else {
+    console.log("n-dx initialized");
   }
 
   exitWithCleanup(0);
