@@ -61,18 +61,72 @@ const isTTY = () => !!(process.stdout && process.stdout.isTTY);
 export const BRAND_NAME = "En Dash DX";
 export const TOOL_NAME = "n-dx";
 
-// ── Mascot (pixel-grid quadrant art) ───────────────────────────────────
+// ── Mascot (shaded half-block pixel art) ───────────────────────────────
 
 /**
- * Pre-rendered mascot lines from a 28×22 pixel grid converted to Unicode
- * quadrant block characters. 9 body lines + 2 leg-frame variants.
+ * Shaded T-Rex mascot using the half-block fg/bg color technique.
+ * Each character cell = 2 vertical pixels. ▀ uses foreground for the top
+ * pixel and background for the bottom, giving true-color shading.
+ *
+ * Palette: 0=transparent, 1=body (bright purple), 2=outline (dark purple), 3=eye (white)
  */
-/**
- * Pixel-art T-Rex mascot. Designed on a 24×16 pixel grid, converted to
- * Unicode quadrant block characters for 2×2 sub-character resolution.
- * 8 body lines + 1 animated leg line = 9 total.
- */
-export const BODY = [
+
+const DINO_BODY_PIXELS = `000000000000022222200000
+000000000000211111120000
+000000000000211111120000
+000000000002111111112000
+000000000002131111112000
+000000000002111111120000
+000000000021111112200000
+000000000211111120000000
+000000002111111200000000
+000000021111111120000000
+022000211111111120000000
+002202111111111112000000
+000211111111111111021000
+000021111111111111200000
+000002111111111112000000
+000000211111111200000000`;
+
+const DINO_LEGS = [
+  `000000002111012100000000
+000000021100001210000000`,
+  `000000001210012100000000
+000000001210001210000000`,
+];
+
+// True-color ANSI codes for the shaded palette
+const FG = { 1: "\x1b[38;2;180;80;255m", 2: "\x1b[38;2;100;30;160m", 3: "\x1b[38;2;255;255;255m" };
+const BG = { 1: "\x1b[48;2;180;80;255m", 2: "\x1b[48;2;100;30;160m" };
+const RS = "\x1b[0m";
+
+function halfBlock(top, bot) {
+  if (!top && !bot) return " ";
+  if (top === bot) return (FG[top] || "") + "█" + RS;
+  if (!top) return (FG[bot] || "") + "▄" + RS;
+  if (!bot) return (FG[top] || "") + "▀" + RS;
+  return (FG[top] || "") + (BG[bot] || "") + "▀" + RS;
+}
+
+function pixelsToLines(pixelStr) {
+  const g = pixelStr.trim().split("\n").map((r) => [...r].map(Number));
+  const lines = [];
+  for (let y = 0; y < g.length; y += 2) {
+    let s = "";
+    for (let x = 0; x < (g[0]?.length || 0); x++) {
+      s += halfBlock(g[y]?.[x] || 0, g[y + 1]?.[x] || 0);
+    }
+    lines.push(s);
+  }
+  return lines;
+}
+
+// Pre-render body and leg frames at module load
+export const BODY = pixelsToLines(DINO_BODY_PIXELS);
+export const LEGS = DINO_LEGS.map((l) => pixelsToLines(l));
+
+/** Monochrome fallback for non-TTY (no true-color). Uses simple purple ANSI. */
+const QUADRANT_BODY = [
   "       ▗████",
   "       ▐▙▄██",
   "       ▟██▛▝",
@@ -82,15 +136,11 @@ export const BODY = [
   "   ▜█████▀▘",
   "    ▜██▀",
 ];
+const QUADRANT_LEGS = [["    ▟▘ ▜▖"], ["    █  ▜▖"]];
 
-export const LEGS = [
-  ["    ▟▘ ▜▖"],
-  ["    █  ▜▖"],
-];
-
-/** Static mascot string for non-TTY / test use. */
+/** Static mascot string for non-TTY / test use (monochrome quadrant fallback). */
 export function getMascot() {
-  return [...BODY, ...LEGS[0]].map((l) => purple(l)).join("\n");
+  return [...QUADRANT_BODY, ...QUADRANT_LEGS[0]].map((l) => purple(l)).join("\n");
 }
 
 // ── Spinner ────────────────────────────────────────────────────────────
