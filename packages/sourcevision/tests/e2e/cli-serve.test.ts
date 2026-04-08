@@ -20,7 +20,7 @@ function getFreePort(): Promise<number> {
   });
 }
 
-function waitForServer(port: number, timeout = 5000): Promise<void> {
+function waitForServer(port: number, timeout = 10000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = () => {

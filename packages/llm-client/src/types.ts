@@ -97,6 +97,30 @@ export class ClaudeClientError extends Error {
   }
 }
 
+export const CLI_ERROR_CODES = {
+  API_KEY_MISSING: "NDX_CLI_API_KEY_MISSING",
+  BUDGET_EXCEEDED: "NDX_CLI_BUDGET_EXCEEDED",
+  CONCURRENCY_LIMIT: "NDX_CLI_CONCURRENCY_LIMIT",
+  CONFIG_NOT_FOUND: "NDX_CLI_CONFIG_NOT_FOUND",
+  DIRECTORY_NOT_FOUND: "NDX_CLI_DIRECTORY_NOT_FOUND",
+  EPIC_NOT_FOUND: "NDX_CLI_EPIC_NOT_FOUND",
+  GENERIC: "NDX_CLI_GENERIC",
+  INVALID_CONFIGURATION: "NDX_CLI_INVALID_CONFIGURATION",
+  INVALID_PRD: "NDX_CLI_INVALID_PRD",
+  INVALID_RUN_RECORD: "NDX_CLI_INVALID_RUN_RECORD",
+  JSON_PARSE_FAILED: "NDX_CLI_JSON_PARSE_FAILED",
+  LLM_CLI_NOT_FOUND: "NDX_CLI_LLM_CLI_NOT_FOUND",
+  MEMORY_THRESHOLD: "NDX_CLI_MEMORY_THRESHOLD",
+  NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
+  PERMISSION_DENIED: "NDX_CLI_PERMISSION_DENIED",
+  PRD_NOT_FOUND: "NDX_CLI_PRD_NOT_FOUND",
+  RESOURCE_NOT_FOUND: "NDX_CLI_RESOURCE_NOT_FOUND",
+  SOURCEVISION_MANIFEST_NOT_FOUND: "NDX_CLI_SOURCEVISION_MANIFEST_NOT_FOUND",
+  UNKNOWN_COMMAND: "NDX_CLI_UNKNOWN_COMMAND",
+} as const;
+
+export type CLIErrorCode = typeof CLI_ERROR_CODES[keyof typeof CLI_ERROR_CODES];
+
 /**
  * Base CLI error class for domain packages.
  *
@@ -108,11 +132,18 @@ export class ClaudeClientError extends Error {
 export class CLIError extends ClaudeClientError {
   /** Actionable hint shown to the user (e.g. "Run 'n-dx init' ..."). */
   readonly suggestion?: string;
+  /** Stable machine-readable code for cross-platform CLI failures. */
+  readonly code: CLIErrorCode;
 
-  constructor(message: string, suggestion?: string) {
+  constructor(
+    message: string,
+    suggestion?: string,
+    code: CLIErrorCode = CLI_ERROR_CODES.GENERIC,
+  ) {
     super(message, "cli", false);
     this.name = "CLIError";
     this.suggestion = suggestion;
+    this.code = code;
   }
 }
 

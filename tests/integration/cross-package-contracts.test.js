@@ -579,7 +579,7 @@ describe("gateway export auto-detection", () => {
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "loadProjectOverrides", "mergeWithOverrides", "toCanonicalJSON",
         "setQuiet", "isQuiet", "info", "result", "formatHelp", "formatTypoSuggestion",
-        "CLIError", "ClaudeClientError",
+        "CLIError", "ClaudeClientError", "CLI_ERROR_CODES",
         "exec", "execStdout", "execShellCmd", "getCurrentHead", "getCurrentBranch",
         "isExecutableOnPath", "spawnTool", "spawnManaged", "ProcessPool", "ProcessLimitError",
         "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "formatUsage"],

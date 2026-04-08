@@ -7,7 +7,11 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CLIError as BaseCLIError } from "@n-dx/llm-client";
+import {
+  CLI_ERROR_CODES,
+  CLIError as BaseCLIError,
+  type CLIErrorCode,
+} from "@n-dx/llm-client";
 import { REX_DIR } from "./commands/constants.js";
 
 /**
@@ -17,8 +21,8 @@ import { REX_DIR } from "./commands/constants.js";
  * so `instanceof ClaudeClientError` checks work across the entire error hierarchy.
  */
 export class CLIError extends BaseCLIError {
-  constructor(message: string, suggestion?: string) {
-    super(message, suggestion);
+  constructor(message: string, suggestion?: string, code?: CLIErrorCode) {
+    super(message, suggestion, code);
     this.name = "CLIError";
   }
 }
@@ -34,6 +38,7 @@ export class BudgetExceededError extends CLIError {
     super(
       `Budget exceeded:\n  ${warnings.join("\n  ")}`,
       "Adjust budget with: n-dx config rex.budget.tokens <value> or rex.budget.cost <value>",
+      CLI_ERROR_CODES.BUDGET_EXCEEDED,
     );
     this.name = "BudgetExceededError";
   }
@@ -41,50 +46,66 @@ export class BudgetExceededError extends CLIError {
 
 /**
  * Known error patterns mapped to user-friendly messages and suggestions.
- * Each entry: [regex to match, user-friendly message, suggestion].
+ * Each entry: [regex to match, stable code, user-friendly message, suggestion].
  */
-const ERROR_HINTS: Array<[RegExp, string, string]> = [
+const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
   [
     /ENOENT.*\.rex/,
+    CLI_ERROR_CODES.NOT_INITIALIZED,
     "Rex directory not found.",
     "Run 'n-dx init' to set up the project.",
   ],
   [
     /ENOENT.*prd\.json/,
+    CLI_ERROR_CODES.PRD_NOT_FOUND,
     "PRD file not found.",
     "Run 'n-dx init' to create the initial PRD.",
   ],
   [
     /ENOENT.*config\.json/,
+    CLI_ERROR_CODES.CONFIG_NOT_FOUND,
     "Configuration file not found.",
     "Run 'n-dx init' to create default configuration.",
   ],
   [
     /Invalid prd\.json/,
+    CLI_ERROR_CODES.INVALID_PRD,
     "PRD file is corrupted or has an invalid format.",
     "Check .rex/prd.json for syntax errors, or re-initialize with 'n-dx init'.",
   ],
   [
     /Invalid config\.json/,
+    CLI_ERROR_CODES.INVALID_CONFIGURATION,
     "Configuration file is corrupted.",
     "Check .rex/config.json for syntax errors, or re-initialize with 'n-dx init'.",
   ],
   [
     /EACCES/,
+    CLI_ERROR_CODES.PERMISSION_DENIED,
     "Permission denied.",
     "Check file permissions for the .rex/ directory.",
   ],
   [
     /Unexpected token/,
+    CLI_ERROR_CODES.JSON_PARSE_FAILED,
     "Failed to parse JSON file.",
     "Check for syntax errors in the file, or re-initialize with 'n-dx init'.",
   ],
   [
     /not found/i,
+    CLI_ERROR_CODES.RESOURCE_NOT_FOUND,
     "",  // Use original message
     "Check the ID or path and try again.",
   ],
 ];
+
+function renderCLIError(code: CLIErrorCode, message: string, suggestion?: string): string {
+  let formatted = `Error: [${code}] ${message}`;
+  if (suggestion) {
+    formatted += `\nHint: ${suggestion}`;
+  }
+  return formatted;
+}
 
 /**
  * Format an error for CLI output. Returns lines to print to stderr.
@@ -93,25 +114,21 @@ const ERROR_HINTS: Array<[RegExp, string, string]> = [
 export function formatCLIError(err: unknown): string {
   // CLIError — already user-friendly
   if (err instanceof CLIError) {
-    let msg = `Error: ${err.message}`;
-    if (err.suggestion) {
-      msg += `\nHint: ${err.suggestion}`;
-    }
-    return msg;
+    return renderCLIError(err.code, err.message, err.suggestion);
   }
 
   const message = err instanceof Error ? err.message : String(err);
 
   // Check for known patterns
-  for (const [pattern, friendly, suggestion] of ERROR_HINTS) {
+  for (const [pattern, code, friendly, suggestion] of ERROR_HINTS) {
     if (pattern.test(message)) {
       const displayMsg = friendly || message;
-      return `Error: ${displayMsg}\nHint: ${suggestion}`;
+      return renderCLIError(code, displayMsg, suggestion);
     }
   }
 
   // Generic fallback — show the message, never the stack
-  return `Error: ${message}`;
+  return renderCLIError(CLI_ERROR_CODES.GENERIC, message);
 }
 
 /**
@@ -137,6 +154,7 @@ export function requireRexDir(dir: string): void {
     throw new CLIError(
       `Rex directory not found in ${dir}`,
       "Run 'n-dx init' to set up the project, or 'rex init' if using rex standalone.",
+      CLI_ERROR_CODES.NOT_INITIALIZED,
     );
   }
 }

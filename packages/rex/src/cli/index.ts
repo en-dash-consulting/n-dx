@@ -6,7 +6,7 @@ import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireRexDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { formatTypoSuggestion } from "@n-dx/llm-client";
+import { CLI_ERROR_CODES, formatTypoSuggestion } from "@n-dx/llm-client";
 import { isItemLevel } from "../schema/index.js";
 import { join } from "node:path";
 
@@ -471,6 +471,7 @@ async function dispatchCommand(
       throw new CLIError(
         `Unknown command: ${command}`,
         typoHint ?? "Run 'rex --help' to see available commands.",
+        CLI_ERROR_CODES.UNKNOWN_COMMAND,
       );
     }
   }

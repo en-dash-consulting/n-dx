@@ -58,6 +58,11 @@ import {
   validateRefreshCompletion,
   rollbackRefreshState,
 } from "./refresh-validate.js";
+
+const CLI_ERROR_CODES = Object.freeze({
+  NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
+  UNKNOWN_COMMAND: "NDX_CLI_UNKNOWN_COMMAND",
+});
 import {
   formatTypoSuggestion,
   getOrchestratorCommands,
@@ -322,7 +327,7 @@ function readLLMVendor(dir) {
 function requireInit(dir, dirs) {
   const missing = dirs.filter((d) => !existsSync(join(dir, d)));
   if (missing.length > 0) {
-    console.error(`Error: Missing ${missing.join(", ")} in ${dir}`);
+    console.error(`Error: [${CLI_ERROR_CODES.NOT_INITIALIZED}] Missing ${missing.join(", ")} in ${dir}`);
     console.error(`Hint: Run 'ndx init ${dir === process.cwd() ? "" : dir}' to set up the project.`.trimEnd());
     exitWithCleanup(1);
   }
@@ -1276,7 +1281,7 @@ function handleHelp(rest) {
 function handleUnknownCommand(command) {
   const allCommands = [...getOrchestratorCommands(), "help"];
   const typoHint = formatTypoSuggestion(command, allCommands, "ndx ");
-  console.error(`Error: Unknown command: ${command}`);
+  console.error(`Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: ${command}`);
   if (typoHint) {
     console.error(`Hint: ${typoHint}`);
   } else {
