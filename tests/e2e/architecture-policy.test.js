@@ -798,15 +798,11 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["panel", "Small UI zone (3 files); execution-panel, reorganize-panel, rex-dashboard grouped by Louvain; metrics unreliable at this scale"],
-  ["refresh", "Small zone (3 files); performance throttle hook with paired test file; metrics unreliable at this scale"],
-  ["rex", "Mixed-type zone; config files, test files, and llms.txt with no internal import structure grouped by Louvain"],
-  ["rex-cli", "CLI satellite zone (27+ command files); high coupling to core by design; documented dual-fragility zone in CLAUDE.md"],
-  ["root", "Repository root files (.gitignore, LICENSE, config); no import structure by design"],
-  ["server-domain-gateway", "Gateway-heavy web server zone; route handlers, caches, metrics, and MCP/rex integration are intentionally co-located and currently produce low cohesion in generated SourceVision metrics"],
-  ["tick", "Small polling zone (7 files); tick-timer, batched-tick-dispatcher, tick-visibility-gate; approaching threshold"],
-  ["use", "Small hooks zone (3 files); polling and project-status hooks grouped by Louvain; metrics unreliable at this scale"],
-  ["web-unit", "Small performance zone (5 files); dom-update-gate, update-batcher, test helpers; metrics unreliable at this scale"],
+  ["cli-binary-shims", "Binary shim files (package.json bin entries); no internal import structure by design"],
+  ["project-status-hooks", "Small hooks zone; polling and project-status hooks grouped by Louvain; metrics unreliable at this scale"],
+  ["rex-chunked-review", "CLI satellite zone; documented dual-fragility zone in CLAUDE.md; cohesion 0.36 approaching threshold"],
+  ["rex-package-infrastructure", "Package infrastructure files (config, build); no internal import structure by design"],
+  ["rex-task-verification", "Task verification zone; low cohesion due to heterogeneous verification concerns grouped by Louvain"],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {

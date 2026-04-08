@@ -213,6 +213,13 @@ async function flushAndExit(code = 0) {
     exitPromise = (async () => {
       signalHandlers.dispose();
       await childTracker.cleanup();
+      // Drain stdout/stderr before exiting so piped output isn't truncated
+      await new Promise((resolve) => {
+        const done = () => { if (--pending === 0) resolve(); };
+        let pending = 2;
+        if (process.stdout.writableFinished) done(); else process.stdout.end(done);
+        if (process.stderr.writableFinished) done(); else process.stderr.end(done);
+      });
       process.exit(code);
     })();
   }
