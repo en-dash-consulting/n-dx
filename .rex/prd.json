@@ -25040,21 +25040,25 @@
     {
       "id": "991a796e-b75b-4b3a-ba85-f6a494ec99cb",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-08T21:08:10.991Z",
+      "completedAt": "2026-04-08T21:08:10.991Z",
       "children": [
         {
           "id": "e7370225-ce8d-43e5-a1cc-2e4efb876d2e",
           "title": "ANSI Color Output Across Rex, SourceVision, and Hench",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
+          "startedAt": "2026-04-08T21:08:10.870Z",
+          "completedAt": "2026-04-08T21:08:10.870Z",
           "children": [
             {
               "id": "50c4d2b6-d8e8-49dd-9c8a-ee66b0f9b89d",
               "title": "Standardize semantic color conventions for status and log-level output across all CLI tools",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Define a shared color vocabulary in the ANSI utility (e.g. green=completed/success, yellow=pending/warning, red=error/failed, cyan=info) and apply it consistently to every status badge, result summary line, and log-level label produced by rex, sourcevision, hench, and the ndx orchestrator. Without a shared convention, color is cosmetic rather than meaningful — the goal is that a user can parse the semantic state of output from any tool by color alone.",
               "acceptanceCriteria": [
@@ -25069,7 +25073,9 @@
                 "ux",
                 "color"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:57:32.922Z",
+              "completedAt": "2026-04-08T21:08:10.700Z"
             },
             {
               "id": "83cafd67-4b87-4a64-a16f-936f0b78b775",
@@ -25092,6 +25098,274 @@
               "source": "smart-add",
               "startedAt": "2026-04-08T20:46:49.195Z",
               "completedAt": "2026-04-08T20:57:04.128Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b38af51b-d290-4b8e-a5c4-a8a77ae2e70d",
+      "title": "Hench",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "d1d0627e-dc69-4f84-b68b-512bef332fdb",
+          "title": "Hench Run-Loop Visual Output Refinements",
+          "status": "pending",
+          "level": "feature",
+          "description": "Apply consistent semantic color conventions and styled separators to hench's run-loop console output, making task completion states, inter-task pause intervals, and loop-iteration boundaries immediately legible when scanning long run transcripts.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "c5ba3c69-5738-421f-8648-76956e36b869",
+              "title": "Apply semantic success and pause colors to hench run-loop status messages",
+              "status": "pending",
+              "level": "task",
+              "description": "Color-code the two recurring run-loop progress messages using the established STATUS_COLORS / llm-client color helpers. The run-success line ('All tasks complete' or equivalent) should render in green to confirm a clean exit; the inter-task pause line ('Pausing ...ms before next task...') should render in yellow to signal a transient wait state. Both messages must honour TTY detection and NO_COLOR.",
+              "acceptanceCriteria": [
+                "The run-success message is rendered with colorSuccess (green) when stdout is a TTY and NO_COLOR is unset",
+                "The inter-task pause message is rendered with colorWarn or colorPending (yellow) under the same conditions",
+                "Both messages render as unstyled plain text when NO_COLOR=1 or stdout is not a TTY",
+                "No new color primitives are introduced — existing helpers from @n-dx/llm-client (colorSuccess, colorWarn, colorPending) are reused",
+                "An integration or e2e assertion verifies the correct ANSI codes appear in TTY mode and are absent under NO_COLOR"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "color",
+                "ux"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff",
+              "title": "Add pink loop-iteration separator line to hench run output",
+              "status": "pending",
+              "level": "task",
+              "description": "Print a horizontal separator line in pink/magenta at each loop-iteration boundary (after run-complete) to visually distinguish loop boundaries from individual agent-turn separators. The separator width should match the existing agent-turn separator so the transcript is consistently structured. This makes it easy to scan which work happened in which iteration of a multi-loop hench run.",
+              "acceptanceCriteria": [
+                "A separator line is emitted after each loop-iteration boundary in hench run output",
+                "The separator renders in pink/magenta (colorPink or nearest STATUS_COLORS equivalent) in TTY contexts",
+                "The separator character width is consistent with the existing agent-turn separator line",
+                "The separator is fully suppressed (no characters, no newline artifact) when NO_COLOR=1 or stdout is not a TTY",
+                "An integration or e2e test verifies separator presence in TTY mode and full suppression under NO_COLOR"
+              ],
+              "priority": "low",
+              "tags": [
+                "hench",
+                "cli",
+                "color",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dd338f09-ae53-4c57-95f5-58b4e982090e",
+      "title": "Hench",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "8f175c2d-6868-4687-a7e5-355e78f785f1",
+          "title": "Rex Run Rolling Log Display and Persistent Log Files",
+          "status": "pending",
+          "level": "feature",
+          "description": "Limit live console output during rex runs to a rolling 10-line grey window while capturing the full run output to a timestamped file in .run-logs/, which is excluded from git.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "b86e2af1-19c7-43ee-90a1-c82ce7038fae",
+              "title": "Implement rolling 10-line grey output window for rex run console",
+              "status": "pending",
+              "level": "task",
+              "description": "Replace unbounded stdout streaming during rex/hench runs with a rolling buffer that renders only the most recent 10 lines. Lines should be rendered in grey/dim using the ANSI color helpers already present in llm-client. The window should overwrite previous lines in-place via cursor control when stdout is a TTY, and fall back to plain streaming when it is not.",
+              "acceptanceCriteria": [
+                "Console shows at most 10 lines of run output at any time during a rex run",
+                "Each displayed line is rendered in grey/dim via the existing colorDim ANSI helper",
+                "When a new line arrives, the oldest visible line is evicted from the window",
+                "Full output is not discarded — it is captured for log file persistence",
+                "Rolling overwrite is only applied when stdout is a TTY; non-TTY and NO_COLOR environments receive plain streaming output"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "output"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "b892e543-006f-402f-ae07-e359c1229a81",
+              "title": "Persist full rex run log to .run-logs/ and add directory to .gitignore",
+              "status": "pending",
+              "level": "task",
+              "description": "Capture the complete output of each rex/hench run to a timestamped log file under .run-logs/ at the project root. The directory should be created automatically on first use. Each run must produce a distinct file (named by timestamp or run ID) so logs from concurrent or sequential runs do not collide. .run-logs/ must be added to the repository .gitignore.",
+              "acceptanceCriteria": [
+                ".run-logs/ is created automatically before the first log write if it does not exist",
+                "Each rex run produces a distinct file in .run-logs/ named with a timestamp or run ID",
+                "Log files contain the complete unbuffered run output, including lines not shown in the rolling window",
+                ".run-logs/ is present in .gitignore after the first run (appended if missing)",
+                "The log file path is printed to the user at run completion so they can locate it"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "logging",
+                "persistence"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "62f4a08a-7130-4b91-a8dc-ea5f37ab7d89",
+      "title": "Dependency Health & Module Modernization",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "f6c36dec-764a-4a56-adc7-cb11e66890c9",
+          "title": "Deprecated npm Dependency Audit and Remediation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Identify and replace deprecated or end-of-life npm packages across all monorepo package.json files. Covers direct and transitive dependencies flagged by pnpm audit, npm deprecation notices, and packages with published successors.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "cd67dfc1-0053-43fd-8e4f-1722d6b6a982",
+              "title": "Audit and remediate deprecated npm dependencies across all monorepo packages",
+              "status": "completed",
+              "level": "task",
+              "description": "Run pnpm audit and inspect each package.json for npm packages marked as deprecated, unmaintained, or superseded across packages/core, packages/rex, packages/hench, packages/sourcevision, packages/llm-client, and packages/web. Produce a prioritized remediation list distinguishing direct from transitive hits and flagging CVEs, then execute: upgrade packages with semver-compatible replacements, swap deprecated packages for their published successors, and update all call sites where replacement APIs have changed. Verify the full test suite passes after each replacement.",
+              "acceptanceCriteria": [
+                "pnpm audit output reviewed and all deprecation notices catalogued across all six packages",
+                "Each deprecated direct dependency has either been replaced or has a documented justification for deferral",
+                "Transitive-only deprecations are noted separately with no action required unless they surface a CVE",
+                "No direct dependency in any package.json resolves to an npm-deprecated package",
+                "pnpm audit reports zero high/critical advisories after upgrades",
+                "Full monorepo test suite (pnpm test) passes with no new failures introduced by replacements",
+                "Any breaking API changes in upgraded packages are handled at all call sites within the monorepo"
+              ],
+              "priority": "high",
+              "tags": [
+                "dependencies",
+                "audit",
+                "upgrade",
+                "security"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T22:08:34.925Z",
+              "completedAt": "2026-04-08T22:59:35.957Z"
+            }
+          ],
+          "startedAt": "2026-04-08T22:59:36.242Z",
+          "completedAt": "2026-04-08T22:59:36.242Z"
+        },
+        {
+          "id": "5117fd5f-ca53-4095-8228-f210bfe9eefe",
+          "title": "Stale Import Path and Deprecated Node.js API Cleanup",
+          "status": "pending",
+          "level": "feature",
+          "description": "Scan the codebase for imports referencing moved or renamed internal modules, deprecated Node.js built-in APIs, and outdated TypeScript path patterns, then apply all targeted fixes across all packages.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "96780413-6007-4eb0-8550-a118e3d9a8c2",
+              "title": "Scan and fix stale import paths, deprecated Node.js APIs, and outdated module references across packages",
+              "status": "pending",
+              "level": "task",
+              "description": "Use static analysis (grep, tsc --noEmit, sourcevision import graph) to enumerate: imports pointing to moved or renamed files, uses of deprecated Node.js built-in APIs (fs.exists, url.parse, etc.), and any CommonJS require() calls in ESM-targeted files. Then apply all fixes: update import paths to current locations, replace deprecated APIs with modern equivalents (e.g. url.parse → new URL(), fs.exists → fs.access), and convert stray require() to ESM imports. Confirm tsc --noEmit and pnpm test pass cleanly after all changes.",
+              "acceptanceCriteria": [
+                "All TS compiler errors related to unresolved or mismatched module paths are enumerated before any changes are made",
+                "grep scan for known deprecated Node.js API patterns completes and all findings are documented with file, line, current usage, and recommended fix",
+                "Any require() calls in ESM-target files are identified and converted",
+                "tsc --noEmit reports no new module-resolution or deprecated-API errors after changes",
+                "No remaining uses of documented deprecated Node.js APIs in production source files",
+                "pnpm test passes with no regressions introduced by the import path changes",
+                "sourcevision analyze import graph shows no broken or dangling edges for changed files"
+              ],
+              "priority": "medium",
+              "tags": [
+                "imports",
+                "node",
+                "typescript",
+                "audit",
+                "refactor"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b7b7e0b3-4cb6-450f-a88d-7a28a7afa249",
+      "title": "Hench",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "1b15f101-807e-4372-8ba2-23e99f10860b",
+          "title": "Hench Run-Loop Visual Output Refinements",
+          "status": "pending",
+          "level": "feature",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "48ee8da4-56b6-4201-ae86-5e9372b45543",
+              "title": "Color-code [Tool], [Agent], and vendor prefix labels in hench run output",
+              "status": "pending",
+              "level": "task",
+              "description": "Hench run console output includes source-attribution prefix markers such as [Tool], [Agent], and vendor/model identifiers (e.g. [claude], [codex]). These prefixes should be color-coded to let users visually scan and distinguish message origins at a glance: [Tool] in grey/dim, [Agent] in yellow, and vendor/model labels in blue. The existing semantic color helpers in llm-client (colorDim, colorWarn, colorInfo) should be used so TTY and NO_COLOR behavior is already handled.",
+              "acceptanceCriteria": [
+                "[Tool] prefix renders in grey/dim ANSI color when stdout is a TTY",
+                "[Agent] prefix renders in yellow ANSI color when stdout is a TTY",
+                "Vendor/model labels (e.g. [claude], [codex]) render in blue ANSI color when stdout is a TTY",
+                "All three prefix types render without any ANSI codes when NO_COLOR is set or stdout is not a TTY",
+                "Color wrapping delegates to existing semantic helpers in llm-client — no new color utility code is introduced"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "color",
+                "ux"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "418753a7-1d86-446e-a5c7-aeedc63b1ec1",
+              "title": "Apply yellow coloring to help notes and warning messages in hench CLI output",
+              "status": "pending",
+              "level": "task",
+              "description": "Help notes (usage hints, guidance prompts) and warning messages emitted by hench should render in yellow to signal caution or informational guidance without alarming the user. This aligns these message categories with the established semantic convention where yellow (colorWarn) represents advisory information, making them visually distinct from success (green) and error (red) output.",
+              "acceptanceCriteria": [
+                "Help notes (guidance hints, usage prompts) render in yellow when stdout is a TTY",
+                "Warning messages render in yellow when stdout is a TTY",
+                "Yellow is applied via the existing colorWarn semantic helper — no ad-hoc ANSI codes",
+                "No color is emitted when NO_COLOR is set or stdout is not a TTY",
+                "At least one hench command (e.g. hench run with an out-of-quota warning) demonstrates the colored output in a manual smoke test"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "color",
+                "ux"
+              ],
+              "source": "smart-add"
             }
           ]
         }
