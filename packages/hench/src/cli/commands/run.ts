@@ -10,14 +10,14 @@ import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/bri
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
-import { info, result as output } from "../output.js";
+import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { printVendorModelHeader, resolveModel } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
 import { MemoryThrottle } from "../../process/memory-throttle.js";
-import { checkQuotaRemaining } from "../../quota/index.js";
+import { checkQuotaRemaining, formatQuotaLog } from "../../quota/index.js";
 
 // ---------------------------------------------------------------------------
 // Schema compatibility
@@ -223,6 +223,33 @@ export function loopPause(ms: number, signal?: AbortSignal): Promise<void> {
       signal.addEventListener("abort", onAbort, { once: true });
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Quota log helper (exported for testing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch remaining quota and emit ANSI-colored log lines at the inter-run
+ * boundary.
+ *
+ * - If `checkQuotaRemaining()` returns data, each entry is formatted and
+ *   emitted via `info()`, which suppresses output in quiet/JSON mode.
+ * - If the fetch throws, a single degraded indicator is emitted instead
+ *   of crashing the loop.
+ * - An empty result (no quota data available) produces no output.
+ */
+export async function emitQuotaLog(): Promise<void> {
+  let quotas: Awaited<ReturnType<typeof checkQuotaRemaining>>;
+  try {
+    quotas = await checkQuotaRemaining();
+  } catch {
+    info("quota: unavailable");
+    return;
+  }
+  for (const line of formatQuotaLog(quotas)) {
+    info(line);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -661,6 +688,10 @@ export async function cmdRun(
     lastModel: lastRunModel ? resolveModel(lastRunModel) : undefined,
   });
 
+  // Suppress all informational output (including quota lines) in JSON mode,
+  // consistent with how --quiet suppresses info() output.
+  if (flags.format === "json") setQuiet(true);
+
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
   const review = flags.review === "true";
@@ -826,8 +857,8 @@ async function runIterations(
       epicId,
     );
 
-    // Check remaining quota/budget for active providers after each run.
-    await checkQuotaRemaining();
+    // Emit quota log line(s) at the inter-run boundary.
+    await emitQuotaLog();
 
     if (status === "error_transient") {
       info(`\nTransient error on iteration ${i + 1}, continuing to next task...`);
@@ -945,8 +976,8 @@ async function runLoop(
         throw err;
       }
 
-      // Check remaining quota/budget for active providers after each run.
-      await checkQuotaRemaining();
+      // Emit quota log line(s) at the inter-run boundary.
+      await emitQuotaLog();
 
       if (!shouldContinueLoop(status)) {
         // In loop mode, hard failures don't stop the loop — the stuck
@@ -1166,8 +1197,8 @@ async function runEpicByEpic(
           throw err;
         }
 
-        // Check remaining quota/budget for active providers after each run.
-        await checkQuotaRemaining();
+        // Emit quota log line(s) at the inter-run boundary.
+        await emitQuotaLog();
 
         if (status === "completed") {
           tasksCompleted++;
