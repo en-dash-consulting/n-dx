@@ -608,23 +608,28 @@ async function handleInit(rest) {
   const useTUI = !quiet && process.stdout.isTTY;
 
   if (useTUI) {
-    const { renderInit } = await import("./cli-ink.js");
-    const result = await renderInit({
-      dir,
-      flags,
-      provider: selectedProvider,
-      providerSource,
-      noClaude,
-      tools,
-      runInitCapture,
-      runConfig,
-      setupClaudeIntegration,
-    });
-    if (result.code !== 0) {
-      if (result.error) console.error(result.error);
-      exitWithCleanup(1);
+    try {
+      const { renderInit } = await import("./cli-ink.js");
+      const result = await renderInit({
+        dir,
+        flags,
+        provider: selectedProvider,
+        providerSource,
+        noClaude,
+        tools,
+        runInitCapture,
+        runConfig,
+        setupClaudeIntegration,
+      });
+      if (result.code !== 0) {
+        if (result.error) console.error(result.error);
+        exitWithCleanup(1);
+      }
+      exitWithCleanup(0);
+    } catch (err) {
+      // Ink failed — fall through to static fallback
+      console.error(err.message || err);
     }
-    exitWithCleanup(0);
   }
 
   // ── Static fallback (non-TTY or --quiet) ──────────────────────────
