@@ -156,11 +156,14 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
       const rexExists = existsSync(join(dir, ".rex"));
       const henchExists = existsSync(join(dir, ".hench"));
 
-      // sourcevision
+      // sourcevision init + fast analysis (no LLM enrichment)
       setPhase("sourcevision", "active");
 
       const sv = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
       if (sv.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, sv.stderr || sv.stdout); return; }
+      // Run the programmatic analysis pipeline (inventory, imports, zones, components)
+      const svAnalyze = await runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
+      if (svAnalyze.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, svAnalyze.stderr || svAnalyze.stdout); return; }
       setPhase("sourcevision", "done", svExists ? "reused — .sourcevision/ already present" : undefined);
 
       // rex

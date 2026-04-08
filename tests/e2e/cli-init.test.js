@@ -258,7 +258,7 @@ describe("n-dx init provider selection", () => {
           },
         });
 
-        expect(output).toContain("Sniffing out your codebase...");
+        expect(output).toContain("Mapping your codebase...");
         expect(output).toContain("Codebase mapped");
         expect(output).toContain("Setting up the task den...");
         expect(output).toContain("Task den ready");

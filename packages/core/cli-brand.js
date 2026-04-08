@@ -186,7 +186,7 @@ export function createSpinner(text) {
 // ── Init phase messages ────────────────────────────────────────────────
 
 export const INIT_PHASES = {
-  sourcevision: { spinner: "Sniffing out your codebase...", success: "Codebase mapped" },
+  sourcevision: { spinner: "Mapping your codebase...",      success: "Codebase mapped" },
   rex:          { spinner: "Setting up the task den...",    success: "Task den ready" },
   hench:        { spinner: "Waking the agent...",           success: "Agent standing by" },
   claude:       { spinner: "Teaching Claude new tricks...", success: "Skills installed" },

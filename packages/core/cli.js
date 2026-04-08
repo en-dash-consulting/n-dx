@@ -662,7 +662,11 @@ async function handleInit(rest) {
   }
 
   await staticPhase("sourcevision",
-    () => runInitCapture(tools.sourcevision, ["init", ...flags, dir]),
+    async () => {
+      const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+      if (initResult.code !== 0) return initResult;
+      return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
+    },
     svExists ? "reused — .sourcevision/ already present" : undefined);
   await staticPhase("rex",
     () => runInitCapture(tools.rex, ["init", ...flags, dir]),
