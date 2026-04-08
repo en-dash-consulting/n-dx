@@ -131,7 +131,7 @@ function Recap({ sourcevision, rex, hench, provider, claudeCode }) {
       <${Text} dimColor>    ${TOOL_NAME} add "feature"    add requirements to the PRD<//>
       <${Text} dimColor>    ${TOOL_NAME} work .           pick up a task and start building<//>
       <${Text}> <//>
-      <${Text} dimColor>  Or open <${Text} color="cyan">claude<//>  or <${Text} color="cyan">codex<//>  to work with n-dx skills and MCP tools<//>
+      <${Text} dimColor>  Or open <${Text} color="cyan">claude<//>  or <${Text} color="cyan">codex<//>  and try <${Text} color="cyan">/ndx-plan<//>  to get started<//>
     <//>
   `;
 }
