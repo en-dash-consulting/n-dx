@@ -24866,21 +24866,23 @@
     {
       "id": "877432ac-c7a2-45b2-ba6b-298e55a75be2",
       "title": "LLM Integration",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "adf5e546-51d8-43e6-8f42-1be4331b01ea",
           "title": "Between-Run API Quota Status Logging",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
+          "startedAt": "2026-04-08T19:28:19.691Z",
+          "completedAt": "2026-04-08T19:28:19.691Z",
           "children": [
             {
               "id": "208d645e-27e5-47bb-a1bf-db3e69d80361",
               "title": "Implement Codex API quota fetch and normalize response to QuotaRemaining",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Make a live HTTP request to the Codex (OpenAI) usage/quota endpoint between hench runs to retrieve the current consumption and hard limit for the authenticated account. Parse the response and map it to the existing QuotaRemaining typed interface so downstream formatters and log integrations receive a consistent shape regardless of provider. This is distinct from the budget-based percent calculation (which derives limits from configured values) — this task fetches real-time quota directly from the provider API.",
               "acceptanceCriteria": [
@@ -24898,11 +24900,14 @@
                 "api"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-08T18:39:57.135Z"
+              "startedAt": "2026-04-08T18:39:57.135Z",
+              "completedAt": "2026-04-08T19:28:19.337Z"
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-08T19:28:20.429Z",
+      "completedAt": "2026-04-08T19:28:20.429Z"
     },
     {
       "id": "18ad839f-1985-40c4-9036-7a25180bb8e0",
