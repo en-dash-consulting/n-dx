@@ -64,6 +64,9 @@ export type { VendorModelHeaderOptions } from "@n-dx/llm-client";
 // ---- CLI help formatting ----------------------------------------------------
 export { formatHelp, formatTypoSuggestion } from "@n-dx/llm-client";
 
+// ---- CLI color formatting ---------------------------------------------------
+export { isColorEnabled, bold, dim, cyan, yellow, green, red } from "@n-dx/llm-client";
+
 // ---- CLI error classes ------------------------------------------------------
 export { CLIError, ClaudeClientError, CLI_ERROR_CODES } from "@n-dx/llm-client";
 export type { CLIErrorCode } from "@n-dx/llm-client";

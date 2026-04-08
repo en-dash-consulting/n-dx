@@ -12,7 +12,7 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, bold, cyan, green, red, yellow } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -607,10 +607,15 @@ async function runOne(
 
   const { run } = result;
 
-  info("\n=== Run Complete ===");
+  info(`\n${bold("=== Run Complete ===")}`);
   output(`Run ID: ${run.id}`);
-  output(`Task: ${run.taskTitle}`);
-  output(`Status: ${run.status}`);
+  output(`Task: ${cyan(run.taskTitle)}`);
+  const coloredStatus =
+    run.status === "completed" ? green(run.status) :
+    (run.status === "failed" || run.status === "timeout" || run.status === "budget_exceeded") ? red(run.status) :
+    run.status === "in_progress" ? cyan(run.status) :
+    run.status;
+  output(`Status: ${coloredStatus}`);
 
   // Duration
   if (run.startedAt && run.finishedAt) {
@@ -640,7 +645,8 @@ async function runOne(
     const scope = postTests.targetedFiles.length > 0
       ? `${postTests.targetedFiles.length} targeted file(s)`
       : "full suite";
-    info(`Post-task tests: ${postTests.passed ? "passed" : "FAILED"} (${scope}, ${postTests.durationMs ?? 0}ms)`);
+    const testResult = postTests.passed ? green("passed") : red("FAILED");
+    info(`Post-task tests: ${testResult} (${scope}, ${postTests.durationMs ?? 0}ms)`);
   }
 
   // Change classification
@@ -650,7 +656,7 @@ async function runOne(
     info(`\nSummary: ${run.summary}`);
   }
   if (run.error) {
-    output(`\nError: ${run.error}`);
+    output(`\n${red("Error:")} ${run.error}`);
   }
 
   return { status: run.status };
@@ -837,7 +843,7 @@ async function runIterations(
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
     if (iterations > 1) {
-      info(`\n=== Iteration ${i + 1}/${iterations} ===`);
+      info(`\n${bold(`=== Iteration ${i + 1}/${iterations} ===`)}`);
     }
 
     // For autoselected iterations, skip stuck tasks
@@ -861,12 +867,12 @@ async function runIterations(
     await emitQuotaLog();
 
     if (status === "error_transient") {
-      info(`\nTransient error on iteration ${i + 1}, continuing to next task...`);
+      info(`\n${yellow(`Transient error on iteration ${i + 1}, continuing to next task...`)}`);
       continue;
     }
 
     if (status === "failed" || status === "timeout" || status === "budget_exceeded") {
-      info(`\nStopping after ${i + 1} iteration(s) due to ${status} status.`);
+      info(`\n${red(`Stopping after ${i + 1} iteration(s) due to ${status} status.`)}`);
       break;
     }
 
@@ -926,7 +932,7 @@ async function runLoop(
       }
 
       completed++;
-      info(`\n=== Loop iteration ${completed} ===`);
+      info(`\n${bold(`=== Loop iteration ${completed} ===`)}`);
 
       // Show queue status if there are pending tasks
       if (queue) logQueueStatus(queue);
@@ -982,7 +988,7 @@ async function runLoop(
       if (!shouldContinueLoop(status)) {
         // In loop mode, hard failures don't stop the loop — the stuck
         // task will be detected and skipped on the next iteration.
-        info(`\nTask failed (${status}), will skip if stuck on next iteration...`);
+        info(`\n${red(`Task failed (${status}), will skip if stuck on next iteration...`)}`);
       }
 
       if (dryRun) {
@@ -991,7 +997,7 @@ async function runLoop(
       }
 
       if (status === "error_transient") {
-        info("\nTransient error, continuing to next task...");
+        info(`\n${yellow("Transient error, continuing to next task...")}`);
       }
 
       // Pause between tasks (interruptible)
@@ -1117,15 +1123,15 @@ async function runEpicByEpic(
 
       const epic = actionableEpics[epicIdx];
 
-      info(`\n${"═".repeat(60)}`);
-      info(`Epic ${epicIdx + 1}/${actionableEpics.length}: ${epic.title}`);
-      info(`${"═".repeat(60)}`);
+      info(`\n${cyan("═".repeat(60))}`);
+      info(bold(`Epic ${epicIdx + 1}/${actionableEpics.length}: ${epic.title}`));
+      info(cyan("═".repeat(60)));
 
       // Re-check epic scope (tasks may have changed from prior epic's work)
       const freshScope = await getEpicScopeInfo(store, epic.id);
 
       if (freshScope.isComplete) {
-        info(`✓ Epic "${epic.title}" is already complete.`);
+        info(green(`✓ Epic "${epic.title}" is already complete.`));
         summaries.push({
           id: epic.id,
           title: epic.title,
@@ -1214,7 +1220,7 @@ async function runEpicByEpic(
         // Re-check epic scope after each task
         const updated = await getEpicScopeInfo(store, epic.id);
         if (updated.isComplete) {
-          info(`\n✓ Epic "${epic.title}" is now complete!`);
+          info(`\n${green(`✓ Epic "${epic.title}" is now complete!`)}`);
           break;
         }
         if (!updated.hasActionableTasks) {
@@ -1263,9 +1269,9 @@ async function runEpicByEpic(
  * Print a summary table of epic-by-epic execution results.
  */
 export function printEpicByEpicSummary(summaries: EpicRunSummary[]): void {
-  info(`\n${"═".repeat(60)}`);
-  info("Epic-by-Epic Execution Summary");
-  info(`${"═".repeat(60)}`);
+  info(`\n${cyan("═".repeat(60))}`);
+  info(bold("Epic-by-Epic Execution Summary"));
+  info(cyan("═".repeat(60)));
 
   let totalCompleted = 0;
   let totalFailed = 0;
@@ -1279,7 +1285,7 @@ export function printEpicByEpicSummary(summaries: EpicRunSummary[]): void {
       "?";
 
     const stats = s.tasksCompleted > 0 || s.tasksFailed > 0
-      ? ` (${s.tasksCompleted} done, ${s.tasksFailed} failed)`
+      ? ` (${green(String(s.tasksCompleted))} done, ${red(String(s.tasksFailed))} failed)`
       : "";
 
     output(`  ${icon} ${s.title} — ${s.outcome}${stats}`);
@@ -1288,5 +1294,5 @@ export function printEpicByEpicSummary(summaries: EpicRunSummary[]): void {
   }
 
   const epicsDone = summaries.filter((s) => s.outcome === "completed").length;
-  output(`\nEpics: ${epicsDone}/${summaries.length} completed | Tasks: ${totalCompleted} done, ${totalFailed} failed`);
+  output(`\nEpics: ${epicsDone}/${summaries.length} completed | Tasks: ${green(String(totalCompleted))} done, ${red(String(totalFailed))} failed`);
 }

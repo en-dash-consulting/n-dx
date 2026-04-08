@@ -20,7 +20,7 @@
 // Re-export shared foundation primitives.
 export { setQuiet, isQuiet, info, result } from "../prd/llm-gateway.js";
 
-import { isQuiet } from "../prd/llm-gateway.js";
+import { isQuiet, bold, cyan, dim } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Streaming output — section headers and labelled lines for agent runs
@@ -38,7 +38,7 @@ const SECTION_WIDTH = 60;
 export function section(title: string): void {
   if (isQuiet()) return;
   const rule = "═".repeat(SECTION_WIDTH);
-  console.log(`\n${rule}\n❯ ${title}\n${rule}`);
+  console.log(`\n${cyan(rule)}\n${bold(`❯ ${title}`)}\n${cyan(rule)}`);
 }
 
 /**
@@ -50,7 +50,7 @@ export function subsection(title: string): void {
   if (isQuiet()) return;
   const prefix = `── ${title} `;
   const pad = Math.max(0, SECTION_WIDTH - prefix.length);
-  console.log(`\n${prefix}${"─".repeat(pad)}`);
+  console.log(`\n${bold(prefix)}${dim("─".repeat(pad))}`);
 }
 
 /**
@@ -73,5 +73,5 @@ export function stream(label: string, text: string): void {
  */
 export function detail(text: string): void {
   if (isQuiet()) return;
-  console.log(`           ${text}`);
+  console.log(dim(`           ${text}`));
 }

@@ -86,9 +86,9 @@ import {
 } from "./child-lifecycle.js";
 // Foundation-tier import — @n-dx/llm-client process utilities are explicitly
 // permitted for direct import by all tiers (gateway-rules.json: "other tiers
-// may import directly"). This narrow import provides process-level configuration
-// only; no domain logic crosses the tier boundary.
-import { suppressKnownDeprecations } from "@n-dx/llm-client";
+// may import directly"). This import provides process-level configuration
+// and shared color utilities.
+import { suppressKnownDeprecations, bold, cyan, green, red, yellow, dim } from "@n-dx/llm-client";
 
 suppressKnownDeprecations();
 
@@ -182,16 +182,17 @@ const ERROR_HINTS = [
  */
 function formatError(err) {
   const message = err instanceof Error ? err.message : String(err);
+  const errorLabel = red("Error:");
   // If the error already has a suggestion (e.g. from a CLIError-like object), use it
   if (err && err.suggestion) {
-    return `Error: ${message}\nHint: ${err.suggestion}`;
+    return `${errorLabel} ${message}\nHint: ${err.suggestion}`;
   }
   for (const [pattern, suggestion] of ERROR_HINTS) {
     if (pattern.test(message)) {
-      return `Error: ${message}\nHint: ${suggestion}`;
+      return `${errorLabel} ${message}\nHint: ${suggestion}`;
     }
   }
-  return `Error: ${message}`;
+  return `${errorLabel} ${message}`;
 }
 
 class ExitRequest extends Error {
@@ -433,32 +434,33 @@ const REFRESH_STEP_ORDER = {
 const WEB_PORT_FILE = ".n-dx-web.port";
 
 function printRefreshStepTransition(kind, status, detail) {
+  const prefix = `${cyan("[refresh]")} ${bold(kind)} ->`;
   if (status === "skipped") {
-    console.log(`Refresh step: ${kind} -> skipped (${detail})`);
+    console.log(`${prefix} ${dim(`skipped (${detail})`)}`);
     return;
   }
   if (status === "failed") {
-    console.log(`Refresh step: ${kind} -> failed (${detail})`);
+    console.log(`${prefix} ${red(`failed (${detail})`)}`);
     return;
   }
-  console.log(`Refresh step: ${kind} -> ${status}`);
+  console.log(`${prefix} ${status}`);
 }
 
 function printRefreshStepSummary(stepStatuses) {
   const combined = [...stepStatuses]
     .sort((a, b) => (REFRESH_STEP_ORDER[a.kind] ?? 99) - (REFRESH_STEP_ORDER[b.kind] ?? 99));
 
-  console.log("Refresh step summary:");
+  console.log(bold("Refresh step summary:"));
   for (const step of combined) {
     if (step.status === "succeeded") {
-      console.log(`- ${step.kind}: succeeded`);
+      console.log(`- ${step.kind}: ${green("succeeded")}`);
       continue;
     }
     if (step.status === "failed") {
-      console.log(`- ${step.kind}: failed (${step.detail})`);
+      console.log(`- ${step.kind}: ${red(`failed (${step.detail})`)}`);
       continue;
     }
-    console.log(`- ${step.kind}: skipped (${step.detail})`);
+    console.log(`- ${step.kind}: ${dim(`skipped (${step.detail})`)}`);
   }
 }
 
@@ -832,14 +834,15 @@ async function handleRefresh(rest) {
     requireInit(dir, [".sourcevision"]);
   }
 
+  const rfTag = cyan("[refresh]");
   const stepCount = plan.steps.length;
-  console.log(`[refresh] starting — ${stepCount} step${stepCount === 1 ? "" : "s"} planned`);
+  console.log(`${rfTag} starting — ${bold(String(stepCount))} step${stepCount === 1 ? "" : "s"} planned`);
 
   // Snapshot current sourcevision state for potential rollback on failure.
   const snapshot = await snapshotRefreshState(dir, plan);
   if (snapshot.fileCount > 0) {
     console.log(
-      `[refresh] state snapshot captured (${snapshot.fileCount} file${snapshot.fileCount === 1 ? "" : "s"})`,
+      `${rfTag} state snapshot captured (${snapshot.fileCount} file${snapshot.fileCount === 1 ? "" : "s"})`,
     );
   }
 
@@ -847,17 +850,17 @@ async function handleRefresh(rest) {
   async function performRollback() {
     if (snapshot.fileCount === 0) return;
     console.log(
-      `[refresh] rollback — restoring pre-refresh state (${snapshot.fileCount} file${snapshot.fileCount === 1 ? "" : "s"})`,
+      `${rfTag} ${yellow("rollback")} — restoring pre-refresh state (${snapshot.fileCount} file${snapshot.fileCount === 1 ? "" : "s"})`,
     );
     const result = await rollbackRefreshState(snapshot);
     if (result.restored > 0) {
       console.log(
-        `[refresh] rollback complete — ${result.restored} file${result.restored === 1 ? "" : "s"} restored`,
+        `${rfTag} rollback complete — ${green(`${result.restored} file${result.restored === 1 ? "" : "s"} restored`)}`,
       );
     }
     if (result.failed > 0) {
       console.error(
-        `[refresh] rollback partial — ${result.failed} file${result.failed === 1 ? "" : "s"} could not be restored`,
+        `${rfTag} ${red(`rollback partial — ${result.failed} file${result.failed === 1 ? "" : "s"} could not be restored`)}`,
       );
       for (const err of result.errors) {
         console.error(`  ${err}`);
@@ -895,10 +898,10 @@ async function handleRefresh(rest) {
   }
 
   // Validate all step outputs before marking the operation complete.
-  console.log(`[refresh] validating — confirming all outputs are present`);
+  console.log(`${rfTag} validating — confirming all outputs are present`);
   const validation = validateRefreshCompletion(dir, plan);
   if (!validation.valid) {
-    console.error(`[refresh] validation failed — outputs incomplete or invalid:`);
+    console.error(`${rfTag} ${red("validation failed")} — outputs incomplete or invalid:`);
     for (const issue of validation.issues) {
       console.error(`  ${issue}`);
     }
@@ -908,7 +911,7 @@ async function handleRefresh(rest) {
   }
 
   printRefreshStepSummary(stepStatuses);
-  console.log(`[refresh] completed — all outputs validated`);
+  console.log(`${rfTag} ${green("completed")} — all outputs validated`);
   const reload = await signalLiveReload(dir);
   console.log(reload.message);
   exitWithCleanup(0);
@@ -1109,15 +1112,16 @@ async function handleSelfHeal(rest) {
   const includeStructural = rest.includes("--include-structural");
   const structuralFlag = includeStructural ? [] : ["--exclude-structural"];
 
-  console.log(`[self-heal] starting ${iterCount} iteration${iterCount === 1 ? "" : "s"}${includeStructural ? "" : " (excluding structural findings)"}`);
+  const shTag = cyan("[self-heal]");
+  console.log(`${shTag} starting ${bold(String(iterCount))} iteration${iterCount === 1 ? "" : "s"}${includeStructural ? "" : dim(" (excluding structural findings)")}`);
 
   let prevFindingCount = Infinity;
   let baselineHealth = readCodeHealthMetrics(dir);
 
   for (let i = 1; i <= iterCount; i++) {
-    console.log(`\n[self-heal] ── iteration ${i}/${iterCount} ──\n`);
+    console.log(`\n${shTag} ${bold(`── iteration ${i}/${iterCount} ──`)}\n`);
 
-    console.log("[self-heal] step 1/5: sourcevision analyze --deep --full");
+    console.log(`${shTag} step 1/5: sourcevision analyze --deep --full`);
     await runOrDie(tools.sourcevision, ["analyze", "--deep", "--full", dir]);
 
     // Regression guard: compare file-level code health metrics to baseline
@@ -1129,41 +1133,41 @@ async function handleSelfHeal(rest) {
       const totalAfter = currentHealth.circularDeps + currentHealth.codeFindingCount + currentHealth.unusedExports;
 
       if (circularDelta > 0) {
-        console.log(`\n[self-heal] REGRESSION DETECTED after iteration ${i}:`);
+        console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
         console.log(`  circular deps: ${baselineHealth.circularDeps} → ${currentHealth.circularDeps} (+${circularDelta})`);
         console.log(`  code findings: ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
-        console.log(`  Aborting self-heal — new circular dependencies introduced.`);
+        console.log(`  ${red("Aborting self-heal — new circular dependencies introduced.")}`);
         break;
       }
 
       if (totalAfter > totalBefore) {
-        console.log(`\n[self-heal] REGRESSION DETECTED after iteration ${i}:`);
+        console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
         console.log(`  code health issues: ${totalBefore} → ${totalAfter} (+${totalAfter - totalBefore})`);
         console.log(`    circular deps:  ${baselineHealth.circularDeps} → ${currentHealth.circularDeps}`);
         console.log(`    code findings:  ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
         console.log(`    unused exports: ${baselineHealth.unusedExports} → ${currentHealth.unusedExports}`);
-        console.log(`  Aborting self-heal — code health degraded instead of improving.`);
+        console.log(`  ${red("Aborting self-heal — code health degraded instead of improving.")}`);
         break;
       }
 
       // Log zone metrics for information (not used as termination signals)
       const zoneInfo = readZoneMetrics(dir);
       const zoneStr = zoneInfo ? `, zones: ${zoneInfo.zoneCount} (cohesion ${zoneInfo.weightedCohesion})` : "";
-      console.log(`[self-heal] code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
+      console.log(`${shTag} code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
     }
     // Update baseline for next iteration
     if (currentHealth) baselineHealth = currentHealth;
 
-    console.log("\n[self-heal] step 2/5: rex recommend --actionable-only");
+    console.log(`\n${shTag} step 2/5: rex recommend --actionable-only`);
     await runOrDie(tools.rex, ["recommend", "--actionable-only", ...structuralFlag, dir]);
 
-    console.log("\n[self-heal] step 3/5: rex recommend --actionable-only --accept");
+    console.log(`\n${shTag} step 3/5: rex recommend --actionable-only --accept`);
     await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", ...structuralFlag, dir]);
 
-    console.log("\n[self-heal] step 4/5: hench run --auto --loop --self-heal");
+    console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal`);
     await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", dir]);
 
-    console.log("\n[self-heal] step 5/5: acknowledge completed findings");
+    console.log(`\n${shTag} step 5/5: acknowledge completed findings`);
     await runOrDie(tools.rex, ["recommend", "--acknowledge-completed", dir]);
 
     // Check progress: count remaining findings (same filter as accept step)
@@ -1174,14 +1178,14 @@ async function handleSelfHeal(rest) {
         const currentCount = remaining.filter(r => r.level === "task").reduce((sum, r) => sum + (r.meta?.findingCount ?? 0), 0);
 
         if (currentCount === 0) {
-          console.log(`\n[self-heal] all findings resolved after iteration ${i}.`);
+          console.log(`\n${shTag} ${green("all findings resolved")} after iteration ${i}.`);
           break;
         }
         if (currentCount >= prevFindingCount) {
-          console.log(`\n[self-heal] no improvement after iteration ${i} (${currentCount} findings remaining). Stopping.`);
+          console.log(`\n${shTag} ${yellow(`no improvement after iteration ${i} (${currentCount} findings remaining). Stopping.`)}`);
           break;
         }
-        console.log(`\n[self-heal] ${currentCount} findings remaining (was ${prevFindingCount === Infinity ? "unknown" : prevFindingCount}).`);
+        console.log(`\n${shTag} ${currentCount} findings remaining (was ${prevFindingCount === Infinity ? "unknown" : prevFindingCount}).`);
         prevFindingCount = currentCount;
       } catch {
         // JSON parse failed — continue without progress tracking
@@ -1189,7 +1193,7 @@ async function handleSelfHeal(rest) {
     }
   }
 
-  console.log(`\n[self-heal] completed`);
+  console.log(`\n${shTag} ${green("completed")}`);
   exitWithCleanup(0);
 }
 

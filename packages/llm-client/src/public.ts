@@ -254,6 +254,8 @@ export {
   dim,
   cyan,
   yellow,
+  green,
+  red,
   cmd,
   flag,
   sectionHeader,

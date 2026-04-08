@@ -92,6 +92,16 @@ export function yellow(text: string): string {
   return ansi("33", text, "39");
 }
 
+/** Green text (success, completed). */
+export function green(text: string): string {
+  return ansi("32", text, "39");
+}
+
+/** Red text (errors, failures). */
+export function red(text: string): string {
+  return ansi("31", text, "39");
+}
+
 // ── Semantic formatters ─────────────────────────────────────────────────
 
 /** Format a command name (cyan). */

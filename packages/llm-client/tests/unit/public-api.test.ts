@@ -152,6 +152,8 @@ import {
   dim,
   cyan,
   yellow,
+  green,
+  red,
   cmd,
   flag,
   sectionHeader,
@@ -423,6 +425,14 @@ describe("public API — help formatting exports", () => {
 
   it("exports yellow as a function", () => {
     expect(typeof yellow).toBe("function");
+  });
+
+  it("exports green as a function", () => {
+    expect(typeof green).toBe("function");
+  });
+
+  it("exports red as a function", () => {
+    expect(typeof red).toBe("function");
   });
 
   it("exports cmd as a function", () => {

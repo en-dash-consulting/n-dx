@@ -6,6 +6,8 @@ import {
   dim,
   cyan,
   yellow,
+  green,
+  red,
   cmd,
   flag,
   sectionHeader,
@@ -76,6 +78,14 @@ describe("help-format", () => {
     it("yellow returns plain text", () => {
       expect(yellow("hello")).toBe("hello");
     });
+
+    it("green returns plain text", () => {
+      expect(green("hello")).toBe("hello");
+    });
+
+    it("red returns plain text", () => {
+      expect(red("hello")).toBe("hello");
+    });
   });
 
   describe("ANSI helpers (forced color)", () => {
@@ -99,6 +109,14 @@ describe("help-format", () => {
 
     it("yellow wraps in ANSI yellow", () => {
       expect(yellow("hello")).toBe("\x1b[33mhello\x1b[39m");
+    });
+
+    it("green wraps in ANSI green", () => {
+      expect(green("hello")).toBe("\x1b[32mhello\x1b[39m");
+    });
+
+    it("red wraps in ANSI red", () => {
+      expect(red("hello")).toBe("\x1b[31mhello\x1b[39m");
     });
   });
 
