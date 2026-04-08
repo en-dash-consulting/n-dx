@@ -25121,7 +25121,7 @@
             {
               "id": "c5ba3c69-5738-421f-8648-76956e36b869",
               "title": "Apply semantic success and pause colors to hench run-loop status messages",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Color-code the two recurring run-loop progress messages using the established STATUS_COLORS / llm-client color helpers. The run-success line ('All tasks complete' or equivalent) should render in green to confirm a clean exit; the inter-task pause line ('Pausing ...ms before next task...') should render in yellow to signal a transient wait state. Both messages must honour TTY detection and NO_COLOR.",
               "acceptanceCriteria": [
@@ -25138,7 +25138,9 @@
                 "color",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:01:23.109Z",
+              "completedAt": "2026-04-08T23:07:44.151Z"
             },
             {
               "id": "62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff",
@@ -25241,6 +25243,8 @@
           "level": "feature",
           "description": "Identify and replace deprecated or end-of-life npm packages across all monorepo package.json files. Covers direct and transitive dependencies flagged by pnpm audit, npm deprecation notices, and packages with published successors.",
           "source": "smart-add",
+          "startedAt": "2026-04-08T22:59:36.242Z",
+          "completedAt": "2026-04-08T22:59:36.242Z",
           "children": [
             {
               "id": "cd67dfc1-0053-43fd-8e4f-1722d6b6a982",
@@ -25268,9 +25272,7 @@
               "startedAt": "2026-04-08T22:08:34.925Z",
               "completedAt": "2026-04-08T22:59:35.957Z"
             }
-          ],
-          "startedAt": "2026-04-08T22:59:36.242Z",
-          "completedAt": "2026-04-08T22:59:36.242Z"
+          ]
         },
         {
           "id": "5117fd5f-ca53-4095-8228-f210bfe9eefe",

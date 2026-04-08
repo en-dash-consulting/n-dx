@@ -12,7 +12,7 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, bold, cyan, green, red, yellow, colorStatus } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, bold, cyan, green, red, yellow, colorStatus, colorSuccess, colorWarn } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -49,6 +49,24 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
   return `${minutes}m ${remaining}s`;
+}
+
+/**
+ * Format an inter-task or inter-epic pause notification.
+ * Rendered in yellow (colorWarn) to signal a transient wait state.
+ * Exported for testing — verifies semantic color helpers are applied.
+ */
+export function formatPauseMessage(pauseMs: number, target: "task" | "epic"): string {
+  return colorWarn(`Pausing ${pauseMs}ms before next ${target}...`);
+}
+
+/**
+ * Format a run-loop completion message.
+ * Rendered in green (colorSuccess) to confirm a clean exit.
+ * Exported for testing — verifies semantic color helpers are applied.
+ */
+export function formatRunSuccessMessage(text: string): string {
+  return colorSuccess(text);
 }
 
 // ---------------------------------------------------------------------------
@@ -741,7 +759,7 @@ export async function cmdRun(
 
     // Check for completion or no actionable tasks
     if (scopeInfo.isComplete) {
-      output(`\n✓ All tasks in epic "${scopeInfo.title}" are complete.`);
+      output(`\n${formatRunSuccessMessage(`✓ All tasks in epic "${scopeInfo.title}" are complete.`)}`);
       process.exit(0);
     }
     if (!scopeInfo.hasActionableTasks) {
@@ -997,7 +1015,7 @@ async function runLoop(
 
       // Pause between tasks (interruptible)
       if (!stopping && pauseMs > 0) {
-        info(`\nPausing ${pauseMs}ms before next task...`);
+        info(`\n${formatPauseMessage(pauseMs, "task")}`);
         await loopPause(pauseMs, ac.signal);
       }
     }
@@ -1091,7 +1109,7 @@ async function runEpicByEpic(
     // Filter to epics that need work
     const actionableEpics = allEpics.filter((e) => !e.isComplete);
     if (actionableEpics.length === 0) {
-      output("✓ All epics are complete.");
+      output(formatRunSuccessMessage("✓ All epics are complete."));
       return;
     }
 
@@ -1225,7 +1243,7 @@ async function runEpicByEpic(
 
         // Pause between tasks (interruptible)
         if (!stopping && pauseMs > 0) {
-          info(`\nPausing ${pauseMs}ms before next task...`);
+          info(`\n${formatPauseMessage(pauseMs, "task")}`);
           await loopPause(pauseMs, ac.signal);
         }
       }
@@ -1248,7 +1266,7 @@ async function runEpicByEpic(
 
       // Pause between epics (interruptible)
       if (!stopping && epicIdx < actionableEpics.length - 1 && pauseMs > 0) {
-        info(`\nPausing ${pauseMs}ms before next epic...`);
+        info(`\n${formatPauseMessage(pauseMs, "epic")}`);
         await loopPause(pauseMs, ac.signal);
       }
     }

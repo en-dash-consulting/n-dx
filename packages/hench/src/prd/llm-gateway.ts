@@ -67,7 +67,16 @@ export { formatHelp, formatTypoSuggestion } from "@n-dx/llm-client";
 // ---- CLI color formatting ---------------------------------------------------
 export {
   isColorEnabled,
-  bold, dim, cyan, yellow, green, red,
+  bold,
+  dim,
+  cyan,
+  yellow,
+  green,
+  red,
+  // Semantic color helpers (prefer over raw primitives for status/severity)
+  colorSuccess,
+  colorWarn,
+  colorPending,
   // Canonical status→color map + helper (PRD statuses, run statuses, log-levels)
   STATUS_COLORS,
   colorStatus,
