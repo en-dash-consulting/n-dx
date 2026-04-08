@@ -613,7 +613,7 @@ async function runOne(
   const coloredStatus =
     run.status === "completed" ? green(run.status) :
     (run.status === "failed" || run.status === "timeout" || run.status === "budget_exceeded") ? red(run.status) :
-    run.status === "in_progress" ? cyan(run.status) :
+    run.status === "running" ? cyan(run.status) :
     run.status;
   output(`Status: ${coloredStatus}`);
 
