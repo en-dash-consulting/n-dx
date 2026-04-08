@@ -24106,6 +24106,511 @@
           ]
         }
       ]
+    },
+    {
+      "id": "cc09612c-005f-4239-b0c9-3a7edfc6f538",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T14:28:53.469Z",
+      "completedAt": "2026-04-07T14:28:53.469Z",
+      "children": [
+        {
+          "id": "08464700-9955-4338-87b6-afea0646a6f8",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Extend the existing PR validation pipeline with additive cross-platform execution stages that run the same n-dx install and smoke-command flow in MacOS and Windows containerized environments, then verify parity against each other and against the repository's existing static expected responses and exit codes.",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T14:28:53.235Z",
+          "completedAt": "2026-04-07T14:28:53.235Z",
+          "children": [
+            {
+              "id": "d10a172b-4b1f-4da1-8736-ec9ae8e11b12",
+              "title": "Add MacOS pipeline stage for ndx install-and-run smoke validation",
+              "status": "completed",
+              "level": "task",
+              "description": "Introduce a new CI stage that starts the requested MacOS-based container environment, installs n-dx using the repository's supported setup path, runs the agreed smoke commands, and captures only deterministic outputs and exit codes needed for validation without changing existing command logic.",
+              "acceptanceCriteria": [
+                "Pipeline includes a distinct MacOS validation stage that runs after existing prerequisite setup and before final pipeline success is reported",
+                "The stage executes the documented install-and-run smoke script for n-dx using MacOS-appropriate commands",
+                "The stage records command exit codes and only the static response fields already considered deterministic by the current test contract",
+                "The stage does not assert on generated code, model-authored prose, or any other nondeterministic LLM output",
+                "A failure in any expected static response or exit code causes the MacOS stage to fail the pipeline with actionable diagnostics"
+              ],
+              "priority": "high",
+              "tags": [
+                "ci",
+                "pipeline",
+                "macos",
+                "cli",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:22:19.737Z",
+              "completedAt": "2026-04-07T14:26:24.041Z"
+            },
+            {
+              "id": "1a72b5c1-bc52-42f6-8918-402065d6e324",
+              "title": "Add Windows pipeline stage for ndx install-and-run smoke validation",
+              "status": "completed",
+              "level": "task",
+              "description": "Introduce a second CI stage that starts the requested Windows-based container environment, runs the same install and smoke-command workflow using Windows-native commands, and captures deterministic outputs and exit codes using the same assertion scope as the MacOS stage.",
+              "acceptanceCriteria": [
+                "Pipeline includes a distinct Windows validation stage parallel to the MacOS validation stage",
+                "The stage executes the same logical install-and-run smoke flow as MacOS, translated to Windows command syntax where required",
+                "The Windows stage captures the same set of deterministic response fields and exit codes as the MacOS stage",
+                "The stage excludes assertions on generated code, model-generated prose, and any nondeterministic text output",
+                "A mismatch against expected static responses or exit codes causes the Windows stage to fail with platform-specific diagnostics"
+              ],
+              "priority": "high",
+              "tags": [
+                "ci",
+                "pipeline",
+                "windows",
+                "cli",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:26:24.720Z",
+              "completedAt": "2026-04-07T14:28:52.966Z"
+            },
+            {
+              "id": "e1319df0-a11c-47c5-b4a2-840ea087160f",
+              "title": "Implement cross-platform parity assertions for deterministic CLI responses",
+              "status": "completed",
+              "level": "task",
+              "description": "Add an additive validation step that compares the MacOS and Windows smoke-run artifacts against each other and against the existing static expected responses and error codes, ensuring platform consistency without expanding the contract to nondeterministic model output.",
+              "acceptanceCriteria": [
+                "Pipeline collects normalized result artifacts from both MacOS and Windows stages in a format suitable for automated comparison",
+                "A parity check verifies that both platforms return matching deterministic responses and matching expected exit codes for the covered smoke commands",
+                "The assertion set is explicitly limited to known static responses and existing error codes already treated as stable by the test suite",
+                "The parity check ignores generated code diffs, model-produced text bodies, and other nondeterministic output fields",
+                "The new validation is additive only and does not require modification of existing production command logic to pass"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "parity",
+                "cross-platform",
+                "cli",
+                "test-harness"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-06T18:34:06.588Z",
+              "completedAt": "2026-04-06T18:39:35.822Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "95b432f8-c0df-446c-aab5-e639ccbf8ced",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T14:21:28.188Z",
+      "completedAt": "2026-04-07T14:21:28.188Z",
+      "children": [
+        {
+          "id": "3257d8b1-30cc-4323-8f36-f724ed1052fc",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T14:21:27.955Z",
+          "completedAt": "2026-04-07T14:21:27.955Z",
+          "children": [
+            {
+              "id": "a306484a-e1e0-44a2-9740-70fc31efd9ef",
+              "title": "Diagnose smoke parity suite failure and capture reproducible error context",
+              "status": "completed",
+              "level": "task",
+              "description": "Reproduce the current smoke parity suite failure in a controlled environment, identify the exact failing assertion or command path, and document the concrete error signature so follow-up fixes target the real regression instead of symptoms.",
+              "acceptanceCriteria": [
+                "Smoke parity suite is executed in the affected environment and the failing test case is identified",
+                "The exact error message, failing command, and relevant platform/runtime context are captured in a reproducible issue note or test output artifact",
+                "The failure is classified into a concrete root-cause category such as CLI output drift, install/runtime issue, or environment-specific behavior",
+                "A deterministic reproduction path exists that another engineer can run without relying on tribal knowledge"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "smoke",
+                "parity",
+                "diagnostics"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:09:24.928Z",
+              "completedAt": "2026-04-07T14:13:30.097Z"
+            },
+            {
+              "id": "774bf7cb-f8e0-4b00-afa3-d0f63d10d5fe",
+              "title": "Implement targeted fix for smoke parity regression",
+              "status": "completed",
+              "level": "task",
+              "description": "Apply the minimal production or test-harness change needed to restore smoke parity suite stability while preserving the intended cross-platform CLI validation behavior.",
+              "acceptanceCriteria": [
+                "The identified failing smoke parity test passes locally in the previously affected environment",
+                "The fix preserves expected CLI behavior and does not mask the failure by weakening assertions without justification",
+                "Any changed snapshots, fixtures, or expected outputs are updated only if they reflect intended product behavior",
+                "Regression coverage is added or updated so the same failure mode is caught deterministically in future runs"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "smoke",
+                "parity",
+                "fix"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:16:17.833Z",
+              "completedAt": "2026-04-07T14:21:27.688Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cfd5f0e3-1546-47ca-bac5-606d5411c530",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T20:06:32.040Z",
+      "completedAt": "2026-04-07T20:06:32.040Z",
+      "children": [
+        {
+          "id": "1dc42829-b53b-41f2-b05c-d987c79c7437",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation Hardening",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T20:06:31.825Z",
+          "completedAt": "2026-04-07T20:06:31.825Z",
+          "children": [
+            {
+              "id": "d050ace2-ba93-4528-8370-98be3ac9348f",
+              "title": "Harden CLI smoke parity JSON collection for macOS and Windows runners",
+              "status": "completed",
+              "level": "task",
+              "description": "Fix the `scripts/cli-smoke-parity.mjs collect` flow so CI can reliably capture and parse `ndx` output even when Node emits deprecation warnings or platform-specific noise, preventing `Unexpected end of JSON input` failures in the macOS and Windows jobs.",
+              "acceptanceCriteria": [
+                "Running `node scripts/cli-smoke-parity.mjs collect --cli-command ndx --output <file>` on both macOS and Windows produces a valid JSON artifact with no parse failure",
+                "The collector ignores or safely isolates non-JSON warnings and stderr output so deprecation warnings do not corrupt the JSON payload",
+                "If the CLI output is incomplete or malformed, the script exits with a classified error message that identifies the failing stage instead of throwing a raw JSON parse exception",
+                "Regression coverage exists for warning-prefixed or mixed-stream output representative of the failing CI scenario"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cli",
+                "cross-platform",
+                "windows",
+                "macos"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T19:50:31.008Z",
+              "completedAt": "2026-04-07T19:53:21.439Z"
+            },
+            {
+              "id": "d01f7636-0eff-4d7c-b827-736bd7e1039d",
+              "title": "Stabilize repeatable parity verification across original macOS and Windows CI steps",
+              "status": "completed",
+              "level": "task",
+              "description": "Make the two OS smoke-check heads deterministic and repeatable by ensuring they execute the same canonical `ndx` validation steps, compare against the expected baseline behavior, and fail only on real parity regressions rather than runner-specific instability.",
+              "acceptanceCriteria": [
+                "The macOS and Windows CI jobs execute the same documented CLI smoke parity sequence and produce comparable output artifacts",
+                "Parity validation checks that the current responses match the established baseline/original expected steps for both OS jobs",
+                "At least one automated test or fixture-based validation covers repeat runs of the parity workflow and confirms stable output shape across executions",
+                "The CI pipeline completes successfully when outputs are equivalent and surfaces a clear diff when platform responses diverge"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "pipeline",
+                "parity",
+                "stability",
+                "cross-platform"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T20:02:13.961Z",
+              "completedAt": "2026-04-07T20:06:31.646Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3fd50e03-9204-4495-9555-dd853950f97c",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T22:58:12.976Z",
+      "completedAt": "2026-04-07T22:58:12.976Z",
+      "children": [
+        {
+          "id": "544adbc1-c439-4df0-98c1-0a0cb1686a06",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation Hardening",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T22:50:03.910Z",
+          "completedAt": "2026-04-07T22:50:03.910Z",
+          "children": [
+            {
+              "id": "5392be41-1f99-42d2-8f70-fe6185663517",
+              "title": "Define OS-agnostic CLI error code taxonomy",
+              "status": "completed",
+              "level": "task",
+              "description": "Introduce a stable set of unique error codes for comparable failure classes so macOS and Windows smoke runs can be matched by semantics instead of platform-specific text output.",
+              "acceptanceCriteria": [
+                "Each cross-platform-comparable CLI failure class has a unique, stable error code",
+                "The same logical failure produces the same error code on macOS and Windows",
+                "Human-readable error output includes the code alongside the existing diagnostic message",
+                "Unknown or uncategorized failures fall back to an explicit generic code path rather than omitting a code"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cli",
+                "cross-platform",
+                "diagnostics"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:37:10.572Z",
+              "completedAt": "2026-04-07T22:47:20.604Z"
+            },
+            {
+              "id": "b714bd5d-c003-423e-a367-e759ae74eba1",
+              "title": "Emit structured smoke artifacts with normalized error codes",
+              "status": "completed",
+              "level": "task",
+              "description": "Update the smoke-validation artifact generation so each run records machine-readable error codes and comparable failure metadata, enabling deterministic parity checks across operating systems.",
+              "acceptanceCriteria": [
+                "Smoke artifacts include normalized error code fields for failed command executions",
+                "Artifact schema distinguishes error code from platform-specific stderr or path details",
+                "Successful runs continue to emit artifacts without introducing placeholder failure codes",
+                "Artifact generation is covered by tests that validate schema shape for both success and failure cases"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "artifacts",
+                "cross-platform",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:47:23.170Z",
+              "completedAt": "2026-04-07T22:50:03.750Z"
+            }
+          ]
+        },
+        {
+          "id": "4ee969d6-cb9e-41c1-85ac-f79b3b6a6ac3",
+          "title": "Cross-Platform Failure Diagnostics",
+          "status": "completed",
+          "level": "feature",
+          "description": "Refocus smoke parity validation on standardized error semantics so failures remain easy to compare, diagnose, and fix regardless of operating system.",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T22:58:12.823Z",
+          "completedAt": "2026-04-07T22:58:12.823Z",
+          "children": [
+            {
+              "id": "0886fe61-3205-466f-a0ee-a3c098622fc1",
+              "title": "Refactor smoke parity checks to compare normalized error codes",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace direct artifact content comparison with parity logic that validates equivalent error codes and other OS-neutral fields, avoiding false mismatches caused by expected platform-specific output differences.",
+              "acceptanceCriteria": [
+                "CI parity checks fail when normalized error codes differ for the same smoke scenario",
+                "CI parity checks ignore expected OS-specific variations such as file paths, shell wording, and native process messages",
+                "Parity output clearly reports code mismatches with the corresponding scenario name",
+                "Existing macOS and Windows smoke jobs continue to run under the updated comparison flow"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cross-platform",
+                "validation",
+                "smoke-tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:50:06.438Z",
+              "completedAt": "2026-04-07T22:54:06.485Z"
+            },
+            {
+              "id": "47b55bf8-f68b-48c0-b7bb-c469ff552436",
+              "title": "Document error code meanings and remediation expectations",
+              "status": "completed",
+              "level": "task",
+              "description": "Provide a maintained reference for the new error codes so engineers can interpret smoke failures quickly and understand which issues are intended to compare across platforms.",
+              "acceptanceCriteria": [
+                "Documentation lists each exported cross-platform error code with its failure meaning",
+                "The docs explain which artifact fields are parity-critical versus OS-specific",
+                "Contributor guidance describes how to assign a code for newly introduced comparable failures",
+                "CI or test coverage fails if a newly emitted comparable error code is missing from the reference list"
+              ],
+              "priority": "high",
+              "tags": [
+                "docs",
+                "diagnostics",
+                "ci",
+                "developer-experience"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:54:09.031Z",
+              "completedAt": "2026-04-07T22:58:12.661Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e58f1fb0-d3c3-48f2-9cfd-aff59b1419f4",
+      "title": "LLM Integration",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "e4b6edfe-b8e0-4b6a-87d6-b0a79cca4eeb",
+          "title": "Consistent Vendor and Model Resolution Across Commands",
+          "status": "pending",
+          "level": "feature",
+          "description": "Ensure a single, authoritative vendor/model resolution path is used across all ndx commands — including reasoning/thinking calls and standard API calls — so that no command silently diverges from the configured or defaulted model. Default resolution should produce the newest available model for the active vendor when no explicit model is configured.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d9eaeb4f-6fb4-4ead-b644-4bc2d99ba4d6",
+              "title": "Implement centralized vendor/model resolver with newest-model default",
+              "status": "completed",
+              "level": "task",
+              "description": "Create a single resolver in llm-gateway (or llm-client) that, given a vendor, returns the canonical model to use. The resolver must consult .n-dx.json / hench config first, then fall back to a hardcoded 'newest model' constant per vendor. All call sites that currently hard-code or independently derive a model string must be updated to call this resolver instead, including reasoning/extended-thinking invocations so that those calls stay in sync with standard API calls.",
+              "acceptanceCriteria": [
+                "A single exported function (e.g. resolveModel(vendor, config)) returns the correct model string for all supported vendors",
+                "The 'newest model' fallback constant per vendor is defined in one place and can be updated in a single edit",
+                "Reasoning/thinking invocations and standard API call sites both call the same resolver — no duplicated model derivation logic remains",
+                "Unit tests assert the resolver returns the correct model for configured, unconfigured, and unknown-vendor inputs"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "config",
+                "foundation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T13:33:23.136Z",
+              "completedAt": "2026-04-08T13:52:42.313Z"
+            },
+            {
+              "id": "abcddab7-0602-4fb4-9f69-5a4101b41a73",
+              "title": "Propagate resolved vendor/model uniformly to all LLM call sites",
+              "status": "completed",
+              "level": "task",
+              "description": "Audit every location in rex, hench, and sourcevision where an LLM call is constructed and ensure each one uses the centralized resolver rather than a local default or inline constant. This includes calls made during analyze, plan, work, recommend, and any background reasoning passes. The goal is that changing the configured model in .n-dx.json produces identical behavior change across every command without per-package patches.",
+              "acceptanceCriteria": [
+                "No LLM call site outside the resolver contains a hard-coded model string or independent fallback logic",
+                "Running ndx analyze, ndx plan, ndx work, and ndx recommend with a non-default model config all use the overridden model — verified by log or output inspection",
+                "Integration test confirms that changing the model in config before running two different commands yields the same model in both commands' token usage records",
+                "Grep for hard-coded model strings in packages/rex, packages/hench, packages/sourcevision returns zero production-code hits after this task"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "consistency",
+                "refactor"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T13:55:08.183Z",
+              "completedAt": "2026-04-08T14:03:17.530Z"
+            },
+            {
+              "id": "08f6d0b0-9462-494e-adf9-2830113caede",
+              "title": "Surface active vendor and model in ndx console output",
+              "status": "pending",
+              "level": "task",
+              "description": "Display the resolved vendor and model at the start of every ndx command that performs LLM calls, so operators can confirm what is being used without inspecting config files. The output should show the vendor name, resolved model ID, and whether the model was explicitly configured or defaulted. This replaces any existing ad-hoc model logging and provides a consistent prefix line across commands.",
+              "acceptanceCriteria": [
+                "All ndx commands that invoke an LLM (analyze, plan, work, recommend, add) print a single line at command start showing vendor, model ID, and source (configured | default)",
+                "The line is omitted in --quiet / --format=json modes to avoid breaking machine-readable output",
+                "If the resolved model differs from a previously cached model stored in a run artifact, a warning is emitted (e.g. 'model changed since last run')",
+                "E2E test asserts the vendor/model header is present in CLI stdout for at least one command in each package"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "ux",
+                "cli"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d67a2aaf-4515-4bcc-b35b-e3f8191d3a86",
+      "title": "CLI & Developer Tools",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "9aaa6f12-199e-4737-9b0e-737a76ed23fc",
+          "title": "Suppress DEP0040 punycode Deprecation Warning in CLI Output",
+          "status": "pending",
+          "level": "feature",
+          "description": "The CLI emits a noisy Node.js deprecation warning (DEP0040) about the built-in punycode module on every invocation. This clutters output and degrades the CLI's professional appearance. The fix involves tracing which dependency introduces punycode, updating or replacing it, and adding a fallback suppression at the CLI entry point if the transitive source cannot be cleanly replaced.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "1a926c58-e25d-417b-96ef-0694ac9153e8",
+              "title": "Trace and eliminate the DEP0040 punycode deprecation source",
+              "status": "pending",
+              "level": "task",
+              "description": "Identify which direct or transitive dependency triggers the 'The punycode module is deprecated' warning (DEP0040) at runtime. Use `node --trace-deprecation` or audit `node_modules` to pinpoint the culprit package, then either upgrade it to a version that uses the `punycode` userland package, replace it with an equivalent dependency, or patch the import path to the userland alternative. Confirm the warning is eliminated across all CLI entry points (ndx, rex, hench, sv).",
+              "acceptanceCriteria": [
+                "Running any ndx/rex/hench/sv command produces no DEP0040 punycode deprecation line in stdout or stderr",
+                "The root dependency introducing punycode is identified and documented in the commit or PR description",
+                "If a dependency upgrade is made, the full test suite passes without regressions",
+                "No use of process.noDeprecation or --no-deprecation flags as the sole fix (root cause must be addressed)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "dx",
+                "node"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "81c3499f-0526-4dd4-8979-e273596a01bd",
+              "title": "Add CLI startup deprecation filter as a belt-and-suspenders guard",
+              "status": "pending",
+              "level": "task",
+              "description": "Even after the root-cause fix, future dependency upgrades could reintroduce DEP0040 or similar deprecation noise. Add a targeted process-level warning filter at the CLI entry points (packages/core cli.js, and any package bin entry points) that silences known Node.js built-in deprecation codes (DEP0040 at minimum) without broadly suppressing all warnings. Include a CI assertion that no unfiltered deprecation lines appear in standard CLI smoke output.",
+              "acceptanceCriteria": [
+                "A narrow warning filter targeting DEP0040 (and any other known-noisy built-in deprecations) is applied before CLI argument parsing begins",
+                "The filter does not suppress application-level or user-generated warnings — only Node.js built-in deprecation codes in the allowlist",
+                "A CI smoke test asserts that stdout and stderr from `ndx --version` contain no 'DeprecationWarning' lines",
+                "Filter logic is co-located in a single shared module imported by all CLI entry points, not duplicated per-binary"
+              ],
+              "priority": "low",
+              "tags": [
+                "cli",
+                "dx",
+                "node",
+                "ci"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
