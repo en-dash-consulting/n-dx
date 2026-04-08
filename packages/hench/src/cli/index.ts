@@ -26,6 +26,8 @@ import { CLIError, handleCLIError, requireHenchDir } from "./errors.js";
 import { setQuiet } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "../prd/llm-gateway.js";
 
+suppressKnownDeprecations();
+
 function parseArgs(argv: string[]): {
   command: string | undefined;
   positional: string[];
@@ -162,5 +164,4 @@ async function main(): Promise<void> {
   }
 }
 
-suppressKnownDeprecations();
 main();

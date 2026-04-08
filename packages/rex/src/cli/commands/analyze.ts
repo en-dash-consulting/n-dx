@@ -38,8 +38,9 @@ import type { PRDItem, PRDDocument, AnalyzeTokenUsage, LoEConfig } from "../../s
 import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
-import { printVendorModelHeader } from "@n-dx/llm-client";
+import { printVendorModelHeader, resolveVendorModel } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
+import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
 
 const PENDING_FILE = "pending-proposals.json";
 /**
@@ -65,16 +66,11 @@ function resolveAnalyzeTokenEventMetadata(
     return { vendor, model: explicitModel };
   }
 
-  if (vendor === "codex") {
+  if (vendor === "codex" || vendor === "claude") {
     return {
       vendor,
-      model: normalizeProviderMetadata(llmConfig.codex?.model) ?? DEFAULT_CODEX_MODEL,
-    };
-  }
-  if (vendor === "claude") {
-    return {
-      vendor,
-      model: normalizeProviderMetadata(llmConfig.claude?.model) ?? DEFAULT_MODEL,
+      model: normalizeProviderMetadata(resolveVendorModel(vendor, llmConfig))
+        ?? (vendor === "codex" ? DEFAULT_CODEX_MODEL : DEFAULT_MODEL),
     };
   }
 
@@ -406,7 +402,9 @@ async function resolveModel(dir: string, flagModel?: string): Promise<string | u
       const rexDir = join(dir, REX_DIR);
       const store = await resolveStore(rexDir);
       const config = await store.loadConfig();
-      if (config.model) return config.model;
+      const vendor = getLLMVendor() ?? "claude";
+      const model = resolveVendorCompatibleRexModel(vendor, config.model);
+      if (model) return model;
     } catch {
       // Config unreadable — fall through to default
     }

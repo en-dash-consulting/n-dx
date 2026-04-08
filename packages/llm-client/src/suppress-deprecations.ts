@@ -46,6 +46,8 @@ const SILENCED_DEPRECATION_CODES = new Set<string>([
   "DEP0040",
 ]);
 
+const FILTER_INSTALLED = Symbol.for("n-dx.suppressKnownDeprecations.installed");
+
 /**
  * Install a process-level filter that suppresses known Node.js built-in
  * deprecation warnings without affecting application or user-generated warnings.
@@ -56,6 +58,10 @@ const SILENCED_DEPRECATION_CODES = new Set<string>([
  * re-wrap the already-filtered function.
  */
 export function suppressKnownDeprecations(): void {
+  if ((process as typeof process & { [FILTER_INSTALLED]?: boolean })[FILTER_INSTALLED]) {
+    return;
+  }
+
   const original = process.emitWarning;
 
   process.emitWarning = (function filteredEmitWarning(
@@ -94,4 +100,6 @@ export function suppressKnownDeprecations(): void {
     // All other warnings pass through without modification
     Reflect.apply(original, process, [warning, typeOrOptions, code, ctor]);
   }) as typeof process.emitWarning;
+
+  (process as typeof process & { [FILTER_INSTALLED]?: boolean })[FILTER_INSTALLED] = true;
 }

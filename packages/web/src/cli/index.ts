@@ -8,8 +8,11 @@
  */
 
 import { resolve } from "node:path";
+import { suppressKnownDeprecations } from "@n-dx/llm-client";
 import { startServer } from "../server/start.js";
 import type { ViewerScope } from "../server/types.js";
+
+suppressKnownDeprecations();
 
 const VALID_SCOPES = new Set<ViewerScope>(["sourcevision", "rex", "hench"]);
 

@@ -24561,17 +24561,21 @@
     {
       "id": "d67a2aaf-4515-4bcc-b35b-e3f8191d3a86",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-08T15:36:35.368Z",
+      "completedAt": "2026-04-08T15:36:35.368Z",
       "children": [
         {
           "id": "9aaa6f12-199e-4737-9b0e-737a76ed23fc",
           "title": "Suppress DEP0040 punycode Deprecation Warning in CLI Output",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The CLI emits a noisy Node.js deprecation warning (DEP0040) about the built-in punycode module on every invocation. This clutters output and degrades the CLI's professional appearance. The fix involves tracing which dependency introduces punycode, updating or replacing it, and adding a fallback suppression at the CLI entry point if the transitive source cannot be cleanly replaced.",
           "source": "smart-add",
+          "startedAt": "2026-04-08T15:36:34.920Z",
+          "completedAt": "2026-04-08T15:36:34.920Z",
           "children": [
             {
               "id": "1a926c58-e25d-417b-96ef-0694ac9153e8",
@@ -24598,7 +24602,7 @@
             {
               "id": "81c3499f-0526-4dd4-8979-e273596a01bd",
               "title": "Add CLI startup deprecation filter as a belt-and-suspenders guard",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Even after the root-cause fix, future dependency upgrades could reintroduce DEP0040 or similar deprecation noise. Add a targeted process-level warning filter at the CLI entry points (packages/core cli.js, and any package bin entry points) that silences known Node.js built-in deprecation codes (DEP0040 at minimum) without broadly suppressing all warnings. Include a CI assertion that no unfiltered deprecation lines appear in standard CLI smoke output.",
               "acceptanceCriteria": [
@@ -24615,11 +24619,228 @@
                 "ci"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-08T14:55:52.778Z"
+              "startedAt": "2026-04-08T14:55:52.778Z",
+              "completedAt": "2026-04-08T15:36:34.581Z"
             }
           ]
         }
       ]
+    },
+    {
+      "id": "b93b7019-394a-4c1b-880f-cc1bab04421c",
+      "title": "LLM Integration",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T15:52:18.555Z",
+      "completedAt": "2026-04-08T15:52:18.555Z",
+      "children": [
+        {
+          "id": "d1438d1e-9233-4fff-a6d9-6a218d5d50bc",
+          "title": "Rex Command Vendor-Model Binding Regression Fix",
+          "status": "completed",
+          "level": "feature",
+          "description": "When `ndx config llm.vendor codex` is set, rex CLI commands (analyze, recommend, add, etc.) should resolve and use GPT-family models rather than falling back to Claude defaults. The centralized resolver exists but rex call sites may not be reading vendor config correctly or may be bypassing the resolver.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T15:52:18.334Z",
+          "completedAt": "2026-04-08T15:52:18.334Z",
+          "children": [
+            {
+              "id": "633f588d-040d-4187-94a0-84e5e1892e30",
+              "title": "Audit rex LLM call sites for vendor/model resolver gaps",
+              "status": "completed",
+              "level": "task",
+              "description": "Trace every rex command that invokes an LLM (analyze, recommend, add, reorganize, prune) and verify each one routes through the centralized vendor/model resolver introduced in the prior feature. Identify any call sites that hardcode a model string, skip resolver invocation, or fail to forward the resolved vendor to the API client. Produce a list of specific files and lines requiring fixes.",
+              "acceptanceCriteria": [
+                "All rex LLM call sites are enumerated with their current model-resolution path documented",
+                "Any call site that does not use the centralized resolver is flagged with the specific bypass mechanism",
+                "Audit findings match the behavior observed when running `ndx config llm.vendor codex` followed by a rex analyze command"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "llm",
+                "model-resolution"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T15:25:34.896Z",
+              "completedAt": "2026-04-08T15:30:34.783Z",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:abcddab7-0602-4fb4-9f69-5a4101b41a73",
+                "matchedItemId": "abcddab7-0602-4fb4-9f69-5a4101b41a73",
+                "matchedItemTitle": "Propagate resolved vendor/model uniformly to all LLM call sites",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-04-08T15:25:20.127Z"
+              }
+            },
+            {
+              "id": "f0c313d6-0218-4020-98c8-68034346c23a",
+              "title": "Fix rex commands to use resolved GPT model when vendor is codex",
+              "status": "completed",
+              "level": "task",
+              "description": "Based on the audit, update all rex LLM call sites so they invoke the centralized vendor/model resolver and forward the resulting model identifier to the llm-client API call. When the configured vendor is `codex`, the resolver must return a GPT-family model (e.g. `gpt-4o`) rather than a Claude model. This fix must go through `hench/src/prd/llm-gateway.ts` if rex is called from hench, or through rex's own config-reading path for direct rex CLI invocations.",
+              "acceptanceCriteria": [
+                "Running `ndx config llm.vendor codex && rex analyze .` sends requests to a GPT model, not a Claude model",
+                "Running `ndx config llm.vendor claude && rex analyze .` sends requests to a Claude model",
+                "No rex command hardcodes a model string outside of the centralized resolver",
+                "ndx console output surfaces the active vendor and model for rex commands (consistent with prior surface-vendor-model feature)",
+                "Existing rex unit and integration tests pass after the fix"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "llm",
+                "model-resolution",
+                "codex"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T15:36:38.309Z",
+              "completedAt": "2026-04-08T15:46:53.379Z"
+            },
+            {
+              "id": "0270df79-5844-45ea-8bd9-da2df2ae8a26",
+              "title": "Add regression tests for vendor-scoped model selection in rex commands",
+              "status": "completed",
+              "level": "task",
+              "description": "Add integration tests that exercise at least one rex LLM command (e.g. rex analyze) with each supported vendor config value and assert that the outbound API call uses a model string consistent with that vendor. Tests should mock the llm-client API boundary so they run without real API credentials.",
+              "acceptanceCriteria": [
+                "A test with vendor=codex asserts the resolved model is a GPT-family identifier",
+                "A test with vendor=claude asserts the resolved model is a Claude-family identifier",
+                "Tests run as part of `pnpm test` without network access",
+                "Tests fail if a call site bypasses the resolver and uses a hardcoded model"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "llm",
+                "testing",
+                "model-resolution"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T15:46:56.318Z",
+              "completedAt": "2026-04-08T15:52:18.043Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e6bbdd09-5653-44a2-a494-9eab083fd5f0",
+      "title": "LLM Integration",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "642df761-d076-4309-bd5c-edba76604dfd",
+          "title": "Between-Run API Quota Status Logging",
+          "status": "pending",
+          "level": "feature",
+          "description": "After each hench run completes, check remaining API quota or configured budget headroom for Claude and Codex providers and report it to the user in the run log with color-coded warnings at threshold boundaries.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "af8ede6d-f8ff-4460-9816-34ed51c3fa7d",
+              "title": "Define typed quota result interface and identify invocation point in hench run loop",
+              "status": "completed",
+              "level": "task",
+              "description": "Establish the TypeScript interface for the quota-remaining result object and locate the correct insertion point in the hench multi-run loop where the check should fire — after each run completes and before the next begins. No calculation logic yet; this task is scoped to type definition and wiring the call site so the follow-on implementation task has a stable contract to fill in.",
+              "acceptanceCriteria": [
+                "A named TypeScript interface or type alias (e.g., `QuotaRemaining`) is defined with at minimum `vendor: string`, `model: string`, and `percentRemaining: number` fields",
+                "The invocation point in the hench multi-run loop is identified and a stub call (returning an empty array) is inserted so the wiring compiles and tests can reference the hook",
+                "The stub is placed such that it fires after each run completes and before the next one begins in multi-run loops",
+                "No run is blocked and no error is thrown when the stub returns an empty array"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "quota",
+                "hench"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T16:37:10.891Z",
+              "completedAt": "2026-04-08T16:44:10.332Z"
+            },
+            {
+              "id": "41169580-92d1-4032-b5ee-60ef39f13c52",
+              "title": "Implement budget-based percent-remaining calculation for active providers",
+              "status": "pending",
+              "level": "task",
+              "description": "Fill in the quota check logic introduced by the previous task. Query accumulated spend vs. configured weekly budget for each active provider (Claude, Codex) using the existing token usage tracking infrastructure and/or provider-reported rate-limit headers captured during the run. Compute percent remaining per provider/model and return the typed result array. Degrade silently when quota data is unavailable or budget is not configured.",
+              "acceptanceCriteria": [
+                "Returns percent-remaining for each active provider (claude, codex) based on configured weekly budget and accumulated spend",
+                "Falls back gracefully — no error thrown, no run blocked — when quota data is unavailable or budget is not configured",
+                "Result conforms to the typed interface defined in the preceding task",
+                "Unit tests cover: normal output with expected percentages, missing config fallback returning empty array, zero-spend edge case returning 100%"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "quota",
+                "hench"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "4fbde3c0-c586-45c1-9309-fab162520b05",
+              "title": "Implement ANSI color-coded quota log formatter",
+              "status": "pending",
+              "level": "task",
+              "description": "Write a pure formatting function that accepts the typed quota-remaining array and returns a human-readable string (or array of strings) with ANSI color codes applied per threshold: red (ANSI 31) when percent remaining is below 5%, yellow (ANSI 33) when between 5% and 10%, and default terminal color otherwise. The formatter should return an empty result when the input array is empty so callers can skip output with a simple length check.",
+              "acceptanceCriteria": [
+                "Text is rendered yellow (ANSI 33) when percent remaining is >= 5% and < 10%",
+                "Text is rendered red (ANSI 31) when percent remaining is < 5%",
+                "Text uses default terminal color when percent remaining is >= 10%",
+                "Formatter returns empty output (empty string or empty array) when the quota-remaining input is empty",
+                "Output format includes provider/model and percent value (e.g., 'Claude: 8% remaining')"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "quota",
+                "cli",
+                "hench"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "ac656b7b-240c-45c4-b07f-5f6e8583daf9",
+              "title": "Integrate quota log output into hench run console with quiet/JSON suppression",
+              "status": "pending",
+              "level": "task",
+              "description": "Wire the formatter output into the hench run console output stream so the quota log line is printed between runs. Add suppression logic so the line is omitted when the `--quiet` flag is active or when output format is JSON. Write an integration test that exercises the yellow and red threshold boundaries end-to-end through the formatter and output path.",
+              "acceptanceCriteria": [
+                "Log line is printed after each run showing remaining quota per provider/model",
+                "Log line is suppressed when `--quiet` flag is active",
+                "Log line is suppressed when output format is JSON",
+                "No log line is emitted if quota data is unavailable (graceful omission)",
+                "Integration test verifies the yellow and red thresholds trigger at correct boundaries through the full output path"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "quota",
+                "cli",
+                "hench"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ],
+      "overrideMarker": {
+        "type": "duplicate_guard_override",
+        "reason": "exact_title",
+        "reasonRef": "exact_title:7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
+        "matchedItemId": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
+        "matchedItemTitle": "LLM Integration",
+        "matchedItemLevel": "epic",
+        "matchedItemStatus": "completed",
+        "createdAt": "2026-04-08T16:18:20.755Z"
+      }
     }
   ]
 }

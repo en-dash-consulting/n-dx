@@ -45,8 +45,8 @@ function resolveVendor(): LLMVendor {
   return _llmConfig?.vendor ?? "claude";
 }
 
-function resolveModel(model?: string): string {
-  if (model) return model;
+export function resolveConfiguredModel(model?: string): string {
+  if (model?.trim()) return model;
   return resolveVendorModel(resolveVendor(), _llmConfig ?? {});
 }
 
@@ -127,10 +127,11 @@ function getClient(): ClaudeClient {
  * underlying client provider.
  *
  * @param prompt  The prompt to send to Claude
- * @param model   The model to use (e.g., "claude-sonnet-4-20250514")
+ * @param model   Optional model override. When omitted, resolves from the
+ *                active vendor via the centralized vendor/model resolver.
  * @param claudeConfig  Optional config override (creates a one-off client)
  */
-export async function spawnClaude(prompt: string, model: string, claudeConfig?: ClaudeConfig): Promise<ClaudeResult> {
+export async function spawnClaude(prompt: string, model?: string, claudeConfig?: ClaudeConfig): Promise<ClaudeResult> {
   // When an explicit config is passed, create a one-off client for it
   // instead of using the module-level client.
   const client = claudeConfig
@@ -143,7 +144,7 @@ export async function spawnClaude(prompt: string, model: string, claudeConfig?: 
     })
     : getClient();
 
-  const result = await client.complete({ prompt, model: resolveModel(model) });
+  const result = await client.complete({ prompt, model: resolveConfiguredModel(model) });
   return {
     text: result.text,
     tokenUsage: result.tokenUsage,

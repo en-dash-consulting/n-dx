@@ -27,7 +27,6 @@ import {
   TASK_QUALITY_RULES,
   ANTI_PATTERNS,
   OUTPUT_INSTRUCTION,
-  DEFAULT_MODEL,
   MAX_RETRIES,
 } from "./reason.js";
 import { validateModificationRequest } from "./validate-modification.js";
@@ -35,7 +34,7 @@ import { validateModificationRequest } from "./validate-modification.js";
 // ── Types ──
 
 export interface ModifyProposalOptions {
-  /** Model override (defaults to DEFAULT_MODEL). */
+  /** Optional model override. */
   model?: string;
   /** Project directory for loading project context. */
   dir?: string;
@@ -196,7 +195,6 @@ export async function modifyProposals(
     }
   }
 
-  const model = options.model ?? DEFAULT_MODEL;
   const maxRetries = options.maxRetries ?? MAX_RETRIES;
   const tokenUsage = emptyAnalyzeTokenUsage();
 
@@ -219,7 +217,7 @@ export async function modifyProposals(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = await spawnClaude(prompt, model);
+      const result = await spawnClaude(prompt, options.model);
       accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
       const modified = parseProposalResponse(result.text);

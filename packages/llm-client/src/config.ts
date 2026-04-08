@@ -21,7 +21,7 @@ const PROJECT_CONFIG_FILE = ".n-dx.json";
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-4-6",
-  codex: "gpt-5-codex",
+  codex: "gpt-5",
 };
 
 /**

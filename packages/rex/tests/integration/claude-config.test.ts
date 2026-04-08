@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadClaudeConfig, resolveCliPath, resolveApiKey } from "../../src/store/project-config.js";
 import type { ClaudeConfig } from "../../src/store/project-config.js";
-import { setClaudeConfig, setClaudeClient, getAuthMode } from "../../src/analyze/reason.js";
+import { setClaudeConfig, setClaudeClient, setLLMConfig, getAuthMode, spawnClaude } from "../../src/analyze/reason.js";
 
 describe("Claude config inheritance (rex)", () => {
   let tmpDir: string;
@@ -19,6 +19,7 @@ describe("Claude config inheritance (rex)", () => {
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
     // Reset module-level state
+    setLLMConfig({});
     setClaudeConfig({});
   });
 
@@ -228,6 +229,32 @@ describe("Claude config inheritance (rex)", () => {
       };
       setClaudeClient(mockClient);
       expect(getAuthMode()).toBe("cli");
+    });
+
+    it("resolves a GPT-family model when vendor is codex", async () => {
+      const complete = vi.fn().mockResolvedValue({
+        text: "test",
+        tokenUsage: { input: 0, output: 0 },
+      });
+      setLLMConfig({ vendor: "codex", codex: { model: "gpt-4o" } });
+      setClaudeClient({ mode: "cli", complete });
+
+      await spawnClaude("prompt");
+
+      expect(complete).toHaveBeenCalledWith({ prompt: "prompt", model: "gpt-4o" });
+    });
+
+    it("resolves a Claude-family model when vendor is claude", async () => {
+      const complete = vi.fn().mockResolvedValue({
+        text: "test",
+        tokenUsage: { input: 0, output: 0 },
+      });
+      setLLMConfig({ vendor: "claude", claude: { model: "sonnet" } });
+      setClaudeClient({ mode: "api", complete });
+
+      await spawnClaude("prompt");
+
+      expect(complete).toHaveBeenCalledWith({ prompt: "prompt", model: "claude-sonnet-4-6" });
     });
   });
 });

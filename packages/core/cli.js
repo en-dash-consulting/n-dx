@@ -90,6 +90,8 @@ import {
 // only; no domain logic crosses the tier boundary.
 import { suppressKnownDeprecations } from "@n-dx/llm-client";
 
+suppressKnownDeprecations();
+
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
 
@@ -1401,8 +1403,6 @@ process.on("unhandledRejection", (err) => {
 });
 
 // ── Main dispatch ────────────────────────────────────────────────────────────
-
-suppressKnownDeprecations();
 
 try {
   await main();

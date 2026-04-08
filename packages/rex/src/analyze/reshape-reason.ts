@@ -23,7 +23,6 @@ import {
   readProjectContext,
   emptyAnalyzeTokenUsage,
   accumulateTokenUsage,
-  DEFAULT_MODEL,
 } from "./reason.js";
 
 // ── Zod schemas for LLM response validation ──
@@ -208,7 +207,6 @@ export async function reasonForReshape(
   items: PRDItem[],
   options: ReshapeReasonOptions = {},
 ): Promise<ReshapeReasonResult> {
-  const model = options.model ?? DEFAULT_MODEL;
   const tokenUsage = emptyAnalyzeTokenUsage();
 
   const prdSummary = summarizePRD(items);
@@ -235,7 +233,7 @@ export async function reasonForReshape(
     RESHAPE_FEW_SHOT,
   ].filter(Boolean).join("\n");
 
-  const result = await spawnClaude(prompt, model);
+  const result = await spawnClaude(prompt, options.model);
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const proposals = parseReshapeResponse(result.text);

@@ -15,7 +15,7 @@ import type { Proposal, ProposalTask, ProposalFeature } from "./propose.js";
 import type { ReasonResult, ClaudeResult } from "./reason.js";
 import {
   spawnClaude,
-  DEFAULT_MODEL,
+  resolveConfiguredModel,
   extractJson,
   repairTruncatedJson,
   emptyAnalyzeTokenUsage,
@@ -169,7 +169,7 @@ export async function decomposeTask(
 
   const result: ClaudeResult = await spawnClaude(
     prompt,
-    model ?? DEFAULT_MODEL,
+    model,
   );
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
@@ -282,7 +282,7 @@ export async function applyDecompositionPass(
     loeConfig?.taskThresholdWeeks ?? LOE_DEFAULTS.taskThresholdWeeks;
   const maxDepth =
     loeConfig?.maxDecompositionDepth ?? LOE_DEFAULTS.maxDecompositionDepth;
-  const resolvedModel = model ?? DEFAULT_MODEL;
+  const resolvedModel = resolveConfiguredModel(model);
 
   const tokenUsage = emptyAnalyzeTokenUsage();
   const decomposed: DecomposedTask[] = [];

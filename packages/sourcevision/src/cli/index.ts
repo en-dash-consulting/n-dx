@@ -29,6 +29,8 @@ import { CLIError, handleCLIError, requireSvDir } from "./errors.js";
 import { setQuiet } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "@n-dx/llm-client";
 
+suppressKnownDeprecations();
+
 const args = process.argv.slice(2);
 const command = args[0];
 
@@ -73,8 +75,6 @@ async function cmdMcp(dir: string): Promise<void> {
 
 // Commands that require .sourcevision/ to exist
 const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "pr-markdown", "mcp"]);
-
-suppressKnownDeprecations();
 
 try {
   // Show help: per-command help when --help/-h is given with a command,

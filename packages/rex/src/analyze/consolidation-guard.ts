@@ -14,7 +14,6 @@ import { LOE_DEFAULTS } from "../schema/index.js";
 import type { Proposal } from "./propose.js";
 import {
   spawnClaude,
-  DEFAULT_MODEL,
   parseProposalResponse,
   emptyAnalyzeTokenUsage,
   accumulateTokenUsage,
@@ -137,7 +136,7 @@ export async function applyConsolidationGuard(
     originalTaskCount,
   );
 
-  const result = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
+  const result = await spawnClaude(prompt, model);
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const consolidated = parseProposalResponse(result.text);

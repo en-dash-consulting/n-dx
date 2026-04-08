@@ -10,6 +10,8 @@ import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from
 import { isItemLevel } from "../schema/index.js";
 import { join } from "node:path";
 
+suppressKnownDeprecations();
+
 /** Post-write health warning — lazy-loaded to avoid startup cost. */
 async function postWriteHealthWarning(dir: string, isJson: boolean): Promise<void> {
   try {
@@ -501,5 +503,4 @@ async function main(): Promise<void> {
   }
 }
 
-suppressKnownDeprecations();
 main();
