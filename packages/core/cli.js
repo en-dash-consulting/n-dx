@@ -75,10 +75,9 @@ import {
 import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integration.js";
 import {
   formatInitBanner,
-  formatPhaseStart,
-  formatPhaseDone,
-  formatPhaseFail,
   formatRecap,
+  createSpinner,
+  INIT_PHASES,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
 import {
@@ -616,35 +615,42 @@ async function handleInit(rest) {
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
 
-  // ── Phase: sourcevision ───────────────────────────────────────────
-  if (!quiet) console.log(formatPhaseStart("sourcevision"));
-  const svResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
-  if (svResult.code !== 0) {
-    if (!quiet) console.log(formatPhaseFail("sourcevision"));
-    console.error(svResult.stderr || svResult.stdout);
-    exitWithCleanup(1);
+  // Helper: run an init phase with animated spinner.
+  // Returns the work result. On non-zero exit code, calls fail and exits.
+  async function initPhase(phaseName, work, { detail } = {}) {
+    const phase = INIT_PHASES[phaseName];
+    const spinner = quiet ? null : createSpinner(phase.spinner);
+    if (spinner) spinner.start();
+
+    const result = await work();
+
+    if (result && result.code !== undefined && result.code !== 0) {
+      if (spinner) spinner.fail(`${phaseName} failed`);
+      console.error(result.stderr || result.stdout);
+      exitWithCleanup(1);
+    }
+
+    if (spinner) spinner.success(phase.success, detail);
+    return result;
   }
-  if (!quiet) console.log(formatPhaseDone("sourcevision", svExists ? "reused" : undefined));
+
+  // ── Phase: sourcevision ───────────────────────────────────────────
+  await initPhase("sourcevision",
+    () => runInitCapture(tools.sourcevision, ["init", ...flags, dir]),
+    { detail: svExists ? "reused" : undefined },
+  );
 
   // ── Phase: rex ────────────────────────────────────────────────────
-  if (!quiet) console.log(formatPhaseStart("rex"));
-  const rexResult = await runInitCapture(tools.rex, ["init", ...flags, dir]);
-  if (rexResult.code !== 0) {
-    if (!quiet) console.log(formatPhaseFail("rex"));
-    console.error(rexResult.stderr || rexResult.stdout);
-    exitWithCleanup(1);
-  }
-  if (!quiet) console.log(formatPhaseDone("rex", rexExists ? "reused" : undefined));
+  await initPhase("rex",
+    () => runInitCapture(tools.rex, ["init", ...flags, dir]),
+    { detail: rexExists ? "reused" : undefined },
+  );
 
   // ── Phase: hench ──────────────────────────────────────────────────
-  if (!quiet) console.log(formatPhaseStart("hench"));
-  const henchResult = await runInitCapture(tools.hench, ["init", ...flags, dir]);
-  if (henchResult.code !== 0) {
-    if (!quiet) console.log(formatPhaseFail("hench"));
-    console.error(henchResult.stderr || henchResult.stdout);
-    exitWithCleanup(1);
-  }
-  if (!quiet) console.log(formatPhaseDone("hench", henchExists ? "reused" : undefined));
+  await initPhase("hench",
+    () => runInitCapture(tools.hench, ["init", ...flags, dir]),
+    { detail: henchExists ? "reused" : undefined },
+  );
 
   // Set provider (suppress output)
   const origLog = console.log;
@@ -654,14 +660,15 @@ async function handleInit(rest) {
   // ── Phase: Claude Code integration ────────────────────────────────
   let claudeSummary = "skipped";
   if (!noClaude) {
-    if (!quiet) console.log(formatPhaseStart("claude"));
+    const spinner = quiet ? null : createSpinner(INIT_PHASES.claude.spinner);
+    if (spinner) spinner.start();
     try {
       const result = setupClaudeIntegration(dir);
       claudeSummary = `${result.skills.written} skills, ${result.settings.total} permissions`;
-      if (!quiet) console.log(formatPhaseDone("claude", claudeSummary));
+      if (spinner) spinner.success(INIT_PHASES.claude.success, claudeSummary);
     } catch {
       claudeSummary = "skipped";
-      if (!quiet) console.log(formatPhaseDone("claude", "skipped"));
+      if (spinner) spinner.success(INIT_PHASES.claude.success, "skipped");
     }
   }
 

@@ -1,8 +1,9 @@
 /**
- * Brand assets for the n-dx CLI.
+ * Brand assets and animated CLI UI for the n-dx toolkit.
  *
- * Single home for mascot art, phase messages, colors, and formatted output.
- * Owns its own color detection to stay self-contained.
+ * Single home for mascot art, phase messages, colors, and the reusable
+ * spinner utility. Any command that needs progress indication or branded
+ * output should import from here.
  *
  * @module n-dx/cli-brand
  */
@@ -43,31 +44,118 @@ function ansi(code, text, reset) {
 
 export function purple(text) { return ansi("35", text, "39"); }
 export function green(text) { return ansi("32", text, "39"); }
+export function red(text) { return ansi("31", text, "39"); }
 export function bold(text) { return ansi("1", text, "22"); }
 export function dim(text) { return ansi("2", text, "22"); }
 
-// ── Brand constants ────────��───────────────────────────────────────────
+// ── Brand constants ────────────────────────────────────────────────────
 
 export const BRAND_NAME = "En Dash DX";
 export const TOOL_NAME = "n-dx";
 
 // ── Mascot ─────────────────────────────────────────────────────────────
 
-const MASCOT_RAW = [
-  "            __    ",
-  "           / _)   ",
-  "    .-^^^-/ /     ",
-  "  _/       /      ",
-  " /  (  |  (|      ",
-  "(__.-|_|--|_|     ",
+/**
+ * Pixel-art raptor mascot using Unicode block characters (█ ▀ ▄ ▌ ▐ etc.)
+ * for crisp rendering in monospace terminals. The eye (◕) is left uncolored
+ * so it pops against the purple body.
+ *
+ * Each entry is either a single string (fully colored) or [before, eye, after]
+ * segments so the eye character stays default color for contrast.
+ */
+const MASCOT_LINES = [
+  ["           ▄████▄"],
+  ["          ██ ", "◕", " ███▌"],
+  ["          ███▄███▀"],
+  ["           ▀███"],
+  ["         ▄▄██▀"],
+  ["    ▄▄ ▄█████╶╴"],
+  ["    ████████████"],
+  ["    ▀██████▀▀ █▌"],
+  ["     █████████▀"],
+  ["      ▀▀████▀"],
+  ["        █▌▐█"],
+  ["        ▀▘▝▀"],
 ];
 
-/** Mascot art lines, colored purple when color is supported. */
+/** Mascot art string, colored purple when color is supported. */
 export function getMascot() {
-  return MASCOT_RAW.map((line) => purple(line));
+  return MASCOT_LINES.map((segments) => {
+    if (segments.length === 1) return purple(segments[0]);
+    // Eye segment stays uncolored for contrast
+    return purple(segments[0]) + segments[1] + purple(segments[2]);
+  }).join("\n");
 }
 
-// ── Init phase messages ──────��─────────────────────────────────────────
+// ── Spinner / animated progress ────────────────────────────────────────
+
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER_INTERVAL_MS = 80;
+
+/**
+ * Create an animated spinner for long-running operations.
+ *
+ * In a TTY, shows a braille animation that updates in-place.
+ * In non-TTY (piped, CI), prints a static start line then a result line.
+ *
+ * Usage:
+ *   const spinner = createSpinner("Analyzing codebase...");
+ *   spinner.start();
+ *   // ... do async work ...
+ *   spinner.success("Analysis complete");
+ *
+ * @param {string} text - The message to show while spinning
+ * @returns {{ start(): this, success(msg: string, detail?: string): void, fail(msg: string): void, stop(): void }}
+ */
+export function createSpinner(text) {
+  const isTTY = !!(process.stdout && process.stdout.isTTY);
+  let timer = null;
+  let frameIndex = 0;
+
+  function clearLine() {
+    process.stdout.write("\r\x1b[K");
+  }
+
+  function render() {
+    const frame = purple(SPINNER_FRAMES[frameIndex]);
+    process.stdout.write(`\r\x1b[K  ${frame} ${text}`);
+  }
+
+  return {
+    start() {
+      if (!isTTY) {
+        console.log(`  ${dim("▸")} ${text}`);
+        return this;
+      }
+      render();
+      timer = setInterval(() => {
+        frameIndex = (frameIndex + 1) % SPINNER_FRAMES.length;
+        render();
+      }, SPINNER_INTERVAL_MS);
+      return this;
+    },
+
+    success(msg, detail) {
+      if (timer) { clearInterval(timer); timer = null; }
+      if (isTTY) clearLine();
+      const suffix = detail ? ` ${dim("(" + detail + ")")}` : "";
+      console.log(`  ${green("✓")} ${msg}${suffix}`);
+    },
+
+    fail(msg) {
+      if (timer) { clearInterval(timer); timer = null; }
+      if (isTTY) clearLine();
+      console.log(`  ${red("✗")} ${msg}`);
+    },
+
+    stop() {
+      if (timer) { clearInterval(timer); timer = null; }
+      if (isTTY) clearLine();
+    },
+  };
+}
+
+// ── Init phase messages ────────────────────────────────────────────────
 
 export const INIT_PHASES = {
   sourcevision: { spinner: "Sniffing out your codebase...", success: "Codebase mapped" },
@@ -76,41 +164,21 @@ export const INIT_PHASES = {
   claude:       { spinner: "Teaching Claude new tricks...", success: "Skills installed" },
 };
 
-// ── Formatted output builders ────��─────────────────────────────────────
+// ── Formatted output builders ──────────────────────────────────────────
 
 /**
  * Branded init banner: mascot + heading.
  * Contains "n-dx init" for backward-compatible test assertions.
  */
 export function formatInitBanner() {
-  const mascotLines = getMascot();
+  const mascot = getMascot();
   const heading = [
     "",
     `  ${bold(purple(BRAND_NAME))}`,
     `  ${dim(TOOL_NAME + " init")}`,
     "",
-  ];
-  return [...mascotLines, ...heading].join("\n");
-}
-
-/** Phase start line: "  ▸ Sniffing out your codebase..." */
-export function formatPhaseStart(phaseName) {
-  const phase = INIT_PHASES[phaseName];
-  if (!phase) return "";
-  return `  ${dim("▸")} ${phase.spinner}`;
-}
-
-/** Phase done line: "  ✓ Codebase mapped" (with optional detail). */
-export function formatPhaseDone(phaseName, detail) {
-  const phase = INIT_PHASES[phaseName];
-  if (!phase) return "";
-  const msg = detail ? `${phase.success} ${dim("(" + detail + ")")}` : phase.success;
-  return `  ${green("✓")} ${msg}`;
-}
-
-/** Phase fail line: "  ✗ sourcevision failed" */
-export function formatPhaseFail(phaseName) {
-  return `  ${ansi("31", "✗", "39")} ${phaseName} failed`;
+  ].join("\n");
+  return mascot + "\n" + heading;
 }
 
 /**
