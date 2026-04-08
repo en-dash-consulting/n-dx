@@ -10,6 +10,7 @@
  */
 
 export type { QuotaRemaining } from "./types.js";
+export { formatQuotaLog } from "./format.js";
 
 /**
  * Check remaining API quota / configured budget for all active providers.
