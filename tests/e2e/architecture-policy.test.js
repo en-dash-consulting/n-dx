@@ -41,6 +41,7 @@ const ALLOWED = new Set([
   "packages/core/bin/hench.js",
   "packages/core/bin/sourcevision.js",
   "packages/core/cli.js",
+  "packages/core/cli-ink.js",
   "packages/core/ci.js",
   "packages/core/web.js",
   "packages/core/config.js",
@@ -798,11 +799,14 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["cli-binary-shims", "Binary shim files (package.json bin entries); no internal import structure by design"],
+  ["health", "Small zone; health-check utilities grouped by Louvain; metrics unreliable at this scale"],
+  ["polling", "Small zone; polling hooks grouped by Louvain; metrics unreliable at this scale"],
   ["project-status-hooks", "Small hooks zone; polling and project-status hooks grouped by Louvain; metrics unreliable at this scale"],
-  ["rex-chunked-review", "CLI satellite zone; documented dual-fragility zone in CLAUDE.md; cohesion 0.36 approaching threshold"],
-  ["rex-package-infrastructure", "Package infrastructure files (config, build); no internal import structure by design"],
-  ["rex-task-verification", "Task verification zone; low cohesion due to heterogeneous verification concerns grouped by Louvain"],
+  ["refresh", "Small zone; refresh utilities grouped by Louvain; metrics unreliable at this scale"],
+  ["rex-chunked-review", "CLI satellite zone; documented dual-fragility zone in CLAUDE.md; cohesion approaching threshold"],
+  ["rex-recommend", "CLI command zone; heterogeneous recommendation concerns grouped by Louvain"],
+  ["web-2", "Small zone; Louvain-detected web utility cluster; metrics unreliable at this scale"],
+  ["web-unit", "Small performance zone; dom-update-gate, update-batcher, test helpers; metrics unreliable at this scale"],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
