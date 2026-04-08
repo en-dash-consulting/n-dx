@@ -82,7 +82,7 @@ export {
 } from "@n-dx/llm-client";
 
 // ---- Model resolution -------------------------------------------------------
-export { resolveModel } from "@n-dx/llm-client";
+export { resolveModel, resolveVendorModel, NEWEST_MODELS } from "@n-dx/llm-client";
 
 // ---- Usage formatting -------------------------------------------------------
 export { formatUsage } from "@n-dx/llm-client";

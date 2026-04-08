@@ -93,6 +93,8 @@ import {
   resolveApiKey,
   resolveCliPath,
   resolveModel,
+  resolveVendorModel,
+  NEWEST_MODELS,
   // token-usage.ts
   parseApiTokenUsage,
   parseCliTokenUsage,
@@ -204,6 +206,17 @@ describe("public API — function exports", () => {
 
   it("exports resolveModel as a function", () => {
     expect(typeof resolveModel).toBe("function");
+  });
+
+  it("exports resolveVendorModel as a function", () => {
+    expect(typeof resolveVendorModel).toBe("function");
+  });
+
+  it("exports NEWEST_MODELS as an object with claude and codex keys", () => {
+    expect(typeof NEWEST_MODELS).toBe("object");
+    expect(NEWEST_MODELS).not.toBeNull();
+    expect(typeof NEWEST_MODELS.claude).toBe("string");
+    expect(typeof NEWEST_MODELS.codex).toBe("string");
   });
 
   it("exports parseApiTokenUsage as a function", () => {

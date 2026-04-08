@@ -18,6 +18,7 @@ import {
   resolveVendorCliPath,
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
+import { resolveVendorModel } from "../../prd/llm-gateway.js";
 import {
   prepareBrief,
   executeDryRun,
@@ -37,7 +38,6 @@ export interface CliLoopResult {
 }
 
 const MAX_SUMMARY_LENGTH = 500;
-const DEFAULT_CODEX_MODEL = "gpt-5-codex";
 
 const TRANSIENT_PATTERNS = [
   /\b500\b/,
@@ -122,12 +122,11 @@ interface TokenEventMetadata {
 function resolveCliEventModel(
   vendor: LLMVendor,
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
-  configuredModel: string,
+  _configuredModel: string,
   modelOverride?: string,
 ): string {
   if (modelOverride) return modelOverride;
-  if (vendor === "codex") return llmConfig.codex?.model ?? DEFAULT_CODEX_MODEL;
-  return llmConfig.claude?.model ?? configuredModel;
+  return resolveVendorModel(vendor, llmConfig);
 }
 
 function addTokenUsage(

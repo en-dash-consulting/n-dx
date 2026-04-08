@@ -147,6 +147,8 @@ export {
   resolveApiKey,
   resolveCliPath,
   resolveModel,
+  resolveVendorModel,
+  NEWEST_MODELS,
 } from "./config.js";
 
 // Token usage parsing

@@ -22,9 +22,8 @@ import type {
 import {
   createLLMClient,
   detectLLMAuthMode,
+  resolveVendorModel,
 } from "@n-dx/llm-client";
-
-import { DEFAULT_MODEL, DEFAULT_CODEX_MODEL } from "./analyze-shared.js";
 import type { ClaudeResult } from "./analyze-shared.js";
 
 // ── Module-level LLM state ──
@@ -48,11 +47,7 @@ function resolveVendor(): LLMVendor {
 
 function resolveModel(model?: string): string {
   if (model) return model;
-  const vendor = resolveVendor();
-  if (vendor === "codex") {
-    return _llmConfig?.codex?.model ?? DEFAULT_CODEX_MODEL;
-  }
-  return _llmConfig?.claude?.model ?? DEFAULT_MODEL;
+  return resolveVendorModel(resolveVendor(), _llmConfig ?? {});
 }
 
 // ── Public configuration API ──

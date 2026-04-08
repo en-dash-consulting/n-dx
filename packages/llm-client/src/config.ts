@@ -8,15 +8,28 @@
 import { join } from "node:path";
 import { readFile, access } from "node:fs/promises";
 import type { ClaudeConfig } from "./types.js";
+import type { LLMVendor, LLMConfig } from "./llm-types.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
+
+/**
+ * Canonical 'newest model' per vendor.
+ *
+ * This is the single place to update when a vendor releases a new model.
+ * All call sites that need a default model string derive it from here
+ * via `resolveVendorModel()`.
+ */
+export const NEWEST_MODELS: Record<LLMVendor, string> = {
+  claude: "claude-sonnet-4-6",
+  codex: "gpt-5-codex",
+};
 
 /**
  * Map of shorthand model aliases to full Anthropic API model IDs.
  * The Claude CLI resolves these internally, but the API requires full IDs.
  */
 const MODEL_ALIASES: Record<string, string> = {
-  sonnet: "claude-sonnet-4-6",
+  sonnet: NEWEST_MODELS.claude,
   opus: "claude-opus-4-20250514",
   haiku: "claude-haiku-4-20250414",
 };
@@ -30,6 +43,37 @@ const MODEL_ALIASES: Record<string, string> = {
  */
 export function resolveModel(model: string): string {
   return MODEL_ALIASES[model] ?? model;
+}
+
+/**
+ * Resolve the canonical model string for a given vendor, consulting the
+ * project config first and falling back to the newest model for that vendor.
+ *
+ * This is the single authoritative resolver for vendor/model selection. Use
+ * this instead of hardcoding or independently deriving model strings.
+ *
+ * Resolution order:
+ * 1. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
+ * 2. Newest model fallback from `NEWEST_MODELS`
+ *
+ * For Claude, the result is also passed through `resolveModel()` so that
+ * shorthand aliases (e.g. "sonnet") are expanded to full API model IDs.
+ *
+ * @param vendor  The LLM vendor ("claude" | "codex").
+ * @param config  Optional `LLMConfig` loaded from `.n-dx.json`.
+ * @returns       A fully-qualified model string ready for use in API calls.
+ */
+export function resolveVendorModel(vendor: LLMVendor, config?: LLMConfig): string {
+  if (vendor === "claude") {
+    const raw = config?.claude?.model ?? NEWEST_MODELS.claude;
+    return resolveModel(raw);
+  }
+  if (vendor === "codex") {
+    return config?.codex?.model ?? NEWEST_MODELS.codex;
+  }
+  // Unknown vendor: return whatever is registered, or empty string as a
+  // safe sentinel (callers should not reach this branch in practice).
+  return (NEWEST_MODELS as Record<string, string>)[vendor] ?? "";
 }
 
 /**
