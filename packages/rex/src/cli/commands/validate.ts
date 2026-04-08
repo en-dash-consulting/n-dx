@@ -11,6 +11,7 @@ import {
 import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
+import { green, yellow, red } from "@n-dx/llm-client";
 import type { PRDDocument } from "../../schema/index.js";
 import type { PromptFn } from "./validate-interactive.js";
 
@@ -211,11 +212,16 @@ export async function cmdValidate(
   // ── Text output ────────────────────────────────────────────────────────────
   for (const check of checks) {
     const isWarn = !check.pass && check.severity === "warn";
-    const icon = check.pass ? "✓" : isWarn ? "⚠" : "✗";
+    const icon = check.pass
+      ? green("✓")
+      : isWarn
+        ? yellow("⚠")
+        : red("✗");
     result(`${icon} ${check.name}`);
     if (!check.pass) {
       for (const err of check.errors) {
-        result(`    ${err}`);
+        const formattedErr = isWarn ? yellow(`    ${err}`) : red(`    ${err}`);
+        result(formattedErr);
       }
     }
   }
@@ -258,9 +264,9 @@ export async function cmdValidate(
 
   info("");
   if (allPass) {
-    result("All checks passed.");
+    result(green("All checks passed."));
   } else {
-    result("Validation failed.");
+    result(red("Validation failed."));
     process.exit(1);
   }
 }

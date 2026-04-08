@@ -38,7 +38,7 @@ import type { PRDItem, PRDDocument, AnalyzeTokenUsage, LoEConfig } from "../../s
 import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveVendorModel } from "@n-dx/llm-client";
+import { printVendorModelHeader, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
 
@@ -112,15 +112,15 @@ async function hasRexDir(dir: string): Promise<boolean> {
 function formatProposals(proposals: Proposal[], thresholdWeeks?: number): string {
   const lines: string[] = [];
   for (const p of proposals) {
-    lines.push(`[epic] ${p.epic.title} (from: ${p.epic.source})`);
+    lines.push(`${cyan("[epic]")} ${p.epic.title} ${dim(`(from: ${p.epic.source})`)}`);
     for (const f of p.features) {
-      lines.push(`  [feature] ${f.title} (from: ${f.source})`);
+      lines.push(`  ${yellow("[feature]")} ${f.title} ${dim(`(from: ${f.source})`)}`);
       for (const t of f.tasks) {
         const pri = t.priority ? ` [${t.priority}]` : "";
         if (t.decomposition) {
           const loeLabel = t.loe !== undefined ? `${t.loe}w` : "?";
           const thresholdLabel = `${t.decomposition.thresholdWeeks}w`;
-          lines.push(`    [task] ${t.title}${pri} ⚡ decomposed (LoE: ${loeLabel} > ${thresholdLabel} threshold)`);
+          lines.push(`    ${dim("[task]")} ${t.title}${pri} ⚡ decomposed (LoE: ${loeLabel} > ${thresholdLabel} threshold)`);
           for (const child of t.decomposition.children) {
             const childPri = child.priority ? ` [${child.priority}]` : "";
             const childLoe = formatTaskLoE(child, thresholdWeeks);
@@ -130,7 +130,7 @@ function formatProposals(proposals: Proposal[], thresholdWeeks?: number): string
           }
         } else {
           const loe = formatTaskLoE(t, thresholdWeeks);
-          lines.push(`    [task] ${t.title}${pri}${loe} (from: ${t.sourceFile})`);
+          lines.push(`    ${dim("[task]")} ${t.title}${pri}${loe} ${dim(`(from: ${t.sourceFile})`)}`);
           const rationale = formatTaskLoERationale(t, "      ");
           if (rationale) lines.push(rationale);
         }
