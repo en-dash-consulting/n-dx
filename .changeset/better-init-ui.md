@@ -1,5 +1,5 @@
 ---
-"@n-dx/core": minor
+"@n-dx/core": patch
 ---
 
 Immersive animated init experience with Ink TUI framework
