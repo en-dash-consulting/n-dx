@@ -663,13 +663,13 @@ async function handleInit(rest) {
 
   await staticPhase("sourcevision",
     () => runInitCapture(tools.sourcevision, ["init", ...flags, dir]),
-    svExists ? "reused" : undefined);
+    svExists ? "reused — .sourcevision/ already present" : undefined);
   await staticPhase("rex",
     () => runInitCapture(tools.rex, ["init", ...flags, dir]),
-    rexExists ? "reused" : undefined);
+    rexExists ? "reused — .rex/ already present" : undefined);
   await staticPhase("hench",
     () => runInitCapture(tools.hench, ["init", ...flags, dir]),
-    henchExists ? "reused" : undefined);
+    henchExists ? "reused — .hench/ already present" : undefined);
 
   const origLog = console.log;
   console.log = () => {};

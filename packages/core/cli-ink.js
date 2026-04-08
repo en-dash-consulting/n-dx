@@ -161,21 +161,21 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
 
       const sv = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
       if (sv.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, sv.stderr || sv.stdout); return; }
-      setPhase("sourcevision", "done", svExists ? "reused" : undefined);
+      setPhase("sourcevision", "done", svExists ? "reused — .sourcevision/ already present" : undefined);
 
       // rex
       setPhase("rex", "active");
 
       const rx = await runInitCapture(tools.rex, ["init", ...flags, dir]);
       if (rx.code !== 0) { setPhase("rex", "failed"); onComplete(1, rx.stderr || rx.stdout); return; }
-      setPhase("rex", "done", rexExists ? "reused" : undefined);
+      setPhase("rex", "done", rexExists ? "reused — .rex/ already present" : undefined);
 
       // hench
       setPhase("hench", "active");
 
       const hx = await runInitCapture(tools.hench, ["init", ...flags, dir]);
       if (hx.code !== 0) { setPhase("hench", "failed"); onComplete(1, hx.stderr || hx.stdout); return; }
-      setPhase("hench", "done", henchExists ? "reused" : undefined);
+      setPhase("hench", "done", henchExists ? "reused — .hench/ already present" : undefined);
 
       // All remaining work runs as child processes — sync file I/O in
       // the main thread freezes Ink's animation no matter what yielding
