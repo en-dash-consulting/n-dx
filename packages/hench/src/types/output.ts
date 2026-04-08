@@ -15,12 +15,135 @@
  * - Final result identifiers (e.g. run IDs, status)
  *
  * Informational messages (progress, hints, summaries) are suppressed.
+ *
+ * ## Rolling window (TTY mode)
+ *
+ * When stdout is a real TTY and color is enabled, stream() and detail()
+ * render output through a rolling 10-line grey window that overwrites
+ * previous lines in-place via ANSI cursor control. This keeps the terminal
+ * clean during long agent runs.
+ *
+ * In non-TTY or NO_COLOR environments the rolling window is bypassed and
+ * each line is printed directly via console.log(), matching prior behaviour.
+ *
+ * Full output (raw text, no ANSI) is always captured in _capturedLines for
+ * log-file persistence by the sibling log-persistence subsystem.
  */
 
 // Re-export shared foundation primitives.
 export { setQuiet, isQuiet, info, result } from "../prd/llm-gateway.js";
 
-import { isQuiet, bold, cyan, dim, colorDim, colorWarn, colorInfo } from "../prd/llm-gateway.js";
+import { isQuiet, bold, cyan, dim, colorDim, colorWarn, colorInfo, isColorEnabled } from "../prd/llm-gateway.js";
+
+// ---------------------------------------------------------------------------
+// Rolling window state
+// ---------------------------------------------------------------------------
+
+const ROLLING_WINDOW_SIZE = 10;
+
+/** Formatted (ANSI-coloured) lines currently visible in the rolling window. */
+const _windowLines: string[] = [];
+
+/** Number of lines we last rendered to the terminal via stdout.write. */
+let _linesRendered = 0;
+
+/** Full plain-text capture of every stream/detail line emitted this run. */
+const _capturedLines: string[] = [];
+
+/**
+ * Override hook for tests — null means use process.stdout.isTTY.
+ * @internal
+ */
+let _ttyOverride: boolean | null = null;
+
+/**
+ * Override TTY detection for unit tests. Pass null to restore runtime behaviour.
+ * Also resets the window display state since the mode may have changed.
+ * @internal
+ */
+export function _overrideTTY(value: boolean | null): void {
+  _ttyOverride = value;
+  resetRollingWindow();
+}
+
+/**
+ * Whether rolling-window mode is active.
+ * Requires a real TTY (cursor control needs one) AND colour support enabled
+ * (NO_COLOR=1 implies non-interactive scripting — skip the window).
+ */
+function isRollingMode(): boolean {
+  const isTTY = _ttyOverride !== null ? _ttyOverride : Boolean(process.stdout.isTTY);
+  return isTTY && isColorEnabled();
+}
+
+/**
+ * Truncate a formatted line so it fits within the terminal column width.
+ * Long lines would wrap and break the cursor-up arithmetic.
+ * ANSI codes are stripped before measuring visible length, then the raw
+ * string is sliced proportionally (crude but safe for the rolling use case).
+ */
+function _truncateForTerminal(line: string): string {
+  const cols = (process.stdout.columns ?? 120) - 2;
+  const visible = line.replace(/\x1b\[[0-9;]*m/g, "");
+  if (visible.length <= cols) return line;
+  return line.slice(0, cols - 1) + "…";
+}
+
+/**
+ * Redraw all lines in the rolling window in-place.
+ * Moves the cursor up by the number of previously rendered lines, then
+ * clears and rewrites each line.
+ */
+function _redrawWindow(): void {
+  if (_linesRendered > 0) {
+    process.stdout.write(`\x1b[${_linesRendered}A`); // move cursor up N lines
+  }
+  for (const line of _windowLines) {
+    process.stdout.write(`\x1b[2K${_truncateForTerminal(line)}\n`); // clear + write
+  }
+  _linesRendered = _windowLines.length;
+}
+
+/**
+ * Append a new line to the rolling window buffer and redraw.
+ * @param displayLine  ANSI-formatted line for terminal display.
+ * @param rawLine      Plain-text line for log capture (no ANSI codes).
+ */
+function _pushWindowLine(displayLine: string, rawLine: string): void {
+  _capturedLines.push(rawLine);
+  if (_windowLines.length >= ROLLING_WINDOW_SIZE) {
+    _windowLines.shift(); // evict the oldest visible line
+  }
+  _windowLines.push(displayLine);
+  _redrawWindow();
+}
+
+/**
+ * Reset the rolling window display state.
+ * Call at the start of each run section (e.g. at each section() header) so
+ * the new section begins with an empty window.
+ * Does NOT reset the captured-lines buffer — that accumulates across sections.
+ */
+export function resetRollingWindow(): void {
+  _windowLines.length = 0;
+  _linesRendered = 0;
+}
+
+/**
+ * Return all plain-text lines captured by stream() and detail() since the
+ * last resetCapturedLines() call. Used by the log-persistence subsystem.
+ */
+export function getCapturedLines(): readonly string[] {
+  return _capturedLines;
+}
+
+/**
+ * Clear the captured lines buffer. Call after the run log has been written
+ * to disk to release memory.
+ */
+export function resetCapturedLines(): void {
+  _capturedLines.length = 0;
+}
 
 // ---------------------------------------------------------------------------
 // Streaming output — section headers and labelled lines for agent runs
@@ -30,6 +153,7 @@ const SECTION_WIDTH = 60;
 
 /**
  * Print a major section header. Suppressed in quiet mode.
+ * Also resets the rolling window so each new section/task starts fresh.
  *
  *   ══════════════════════════════════════════════════════════════
  *   ❯ Section Title
@@ -38,6 +162,9 @@ const SECTION_WIDTH = 60;
 export function section(title: string): void {
   if (isQuiet()) return;
   const rule = "═".repeat(SECTION_WIDTH);
+  // Start each section with an empty rolling window so the new task's output
+  // doesn't bleed into the previous task's last-10-line display.
+  resetRollingWindow();
   console.log(`\n${cyan(rule)}\n${bold(`❯ ${title}`)}\n${cyan(rule)}`);
 }
 
@@ -75,6 +202,12 @@ const STREAM_LABEL_COLORS: Readonly<Record<string, (text: string) => string>> = 
  * Print a labelled streaming line. Suppressed in quiet mode.
  * The label is right-padded for alignment and color-coded by source type.
  *
+ * In rolling-window mode (TTY + color enabled): the line is rendered in
+ * grey/dim via colorDim and pushed into the 10-line in-place window.
+ *
+ * In non-TTY or NO_COLOR mode: the line is printed directly via console.log
+ * preserving the existing label-color behaviour.
+ *
  *   [Agent]   Some agent text…
  *   [Tool]    read_file({"path":"…"})
  *   [Result]  contents of file…
@@ -85,14 +218,34 @@ export function stream(label: string, text: string): void {
   const colorFn = STREAM_LABEL_COLORS[label];
   const coloredBracket = colorFn ? colorFn(bracket) : bracket;
   const padding = " ".repeat(Math.max(0, 10 - bracket.length));
-  console.log(`  ${coloredBracket}${padding} ${text}`);
+  const rawLine = `  ${bracket}${padding} ${text}`;
+
+  if (isRollingMode()) {
+    // Wrap the entire formatted line in colorDim so the rolling window
+    // reads as a uniform grey band, indicating "live streaming in progress".
+    const displayLine = colorDim(`  ${coloredBracket}${padding} ${text}`);
+    _pushWindowLine(displayLine, rawLine);
+  } else {
+    console.log(`  ${coloredBracket}${padding} ${text}`);
+    _capturedLines.push(rawLine);
+  }
 }
 
 /**
  * Print a dim/secondary detail line. Suppressed in quiet mode.
  * Useful for metadata like timing, token counts, retry info.
+ *
+ * In rolling-window mode: pushed into the 10-line in-place window.
+ * In non-TTY or NO_COLOR mode: printed directly via console.log.
  */
 export function detail(text: string): void {
   if (isQuiet()) return;
-  console.log(dim(`           ${text}`));
+  const indented = `           ${text}`;
+
+  if (isRollingMode()) {
+    _pushWindowLine(colorDim(indented), indented);
+  } else {
+    console.log(dim(indented));
+    _capturedLines.push(indented);
+  }
 }

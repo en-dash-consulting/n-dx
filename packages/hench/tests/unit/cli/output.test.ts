@@ -1,5 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { setQuiet, isQuiet, info, result, section, subsection, stream, detail } from "../../../src/cli/output.js";
+import {
+  setQuiet,
+  isQuiet,
+  info,
+  result,
+  section,
+  subsection,
+  stream,
+  detail,
+  resetRollingWindow,
+  getCapturedLines,
+  resetCapturedLines,
+} from "../../../src/cli/output.js";
+// _overrideTTY is internal — import directly from the source module
+import { _overrideTTY } from "../../../src/types/output.js";
 
 // ANSI escape codes asserted in the label-color tests below
 const DIM    = "\x1b[2m";
@@ -267,5 +281,257 @@ describe("stream() label color mapping", () => {
     // Strip all ANSI codes from the colored version and compare visible text
     const stripped = coloredOutput.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toBe(plainOutput);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rolling window — TTY in-place rendering and capture
+// ---------------------------------------------------------------------------
+
+describe("rolling window", () => {
+  let writeSpy: ReturnType<typeof vi.spyOn>;
+
+  async function enableRolling(): Promise<void> {
+    // Force color so isColorEnabled() returns true, then override TTY
+    process.env.FORCE_COLOR = "1";
+    const { resetColorCache } = await import("@n-dx/llm-client");
+    resetColorCache();
+    _overrideTTY(true);
+  }
+
+  async function disableRolling(): Promise<void> {
+    _overrideTTY(null);
+    delete process.env.FORCE_COLOR;
+    delete process.env.NO_COLOR;
+    const { resetColorCache } = await import("@n-dx/llm-client");
+    resetColorCache();
+    resetRollingWindow();
+    resetCapturedLines();
+  }
+
+  beforeEach(async () => {
+    writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    setQuiet(false);
+    await enableRolling();
+  });
+
+  afterEach(async () => {
+    writeSpy.mockRestore();
+    await disableRolling();
+    setQuiet(false);
+  });
+
+  // ── TTY mode: stream() uses process.stdout.write, not console.log ─────────
+
+  it("stream() uses process.stdout.write in TTY mode instead of console.log", () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    stream("Agent", "hello");
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(writeSpy).toHaveBeenCalled();
+    logSpy.mockRestore();
+  });
+
+  it("detail() uses process.stdout.write in TTY mode instead of console.log", () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    detail("timing info");
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(writeSpy).toHaveBeenCalled();
+    logSpy.mockRestore();
+  });
+
+  // ── Content is rendered with colorDim wrapping ────────────────────────────
+
+  it("stream() wraps the displayed line in colorDim (dim ANSI) in rolling mode", () => {
+    stream("Result", "some output");
+    const written = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    // The dim ANSI code should appear around the line content
+    expect(written).toContain(DIM);
+  });
+
+  it("detail() wraps the displayed line in colorDim in rolling mode", () => {
+    detail("1234ms elapsed");
+    const written = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(written).toContain(DIM);
+  });
+
+  // ── Capture: all lines go to getCapturedLines() ───────────────────────────
+
+  it("stream() captures plain-text lines regardless of rolling mode", async () => {
+    resetCapturedLines();
+    stream("Agent", "line 1");
+    stream("Tool", "line 2");
+    const captured = getCapturedLines();
+    expect(captured).toHaveLength(2);
+    expect(captured[0]).toContain("[Agent]");
+    expect(captured[0]).toContain("line 1");
+    expect(captured[0]).not.toContain(ANSI_PREFIX); // raw, no ANSI
+    expect(captured[1]).toContain("[Tool]");
+    expect(captured[1]).toContain("line 2");
+  });
+
+  it("detail() captures plain-text lines regardless of rolling mode", async () => {
+    resetCapturedLines();
+    detail("elapsed: 100ms");
+    const captured = getCapturedLines();
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toContain("elapsed: 100ms");
+    expect(captured[0]).not.toContain(ANSI_PREFIX);
+  });
+
+  // ── Window eviction: oldest line is evicted after 10 ─────────────────────
+
+  it("window holds at most 10 lines and evicts the oldest", () => {
+    resetRollingWindow();
+    resetCapturedLines();
+    for (let i = 1; i <= 12; i++) {
+      stream("Agent", `line ${i}`);
+    }
+    // All 12 lines captured
+    expect(getCapturedLines()).toHaveLength(12);
+
+    // The window itself only keeps the last 10.
+    // We verify by checking the stdout.write calls: the last redraw should
+    // contain lines 3–12 but not lines 1 or 2.
+    const allWritten = writeSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(allWritten).toContain("line 12");
+    expect(allWritten).toContain("line 11");
+    // Lines 1 and 2 should have been evicted from the window — the last
+    // redraw writes 10 lines starting from line 3.
+    // Find the LAST occurrence of "line 1" vs "line 2" to confirm eviction.
+    // After 12 lines, the window contains lines 3-12, so "line 1" and
+    // "line 2" do not appear in the final 10-line redraw.
+    // We check by scanning the content after the 11th redraw boundary.
+    // Simpler: verify captured has 12 but window only redraws 10 lines on
+    // the final call (the cursor-up escape precedes 10 line-clear writes).
+    const cursorUpCalls = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[") && s.endsWith("A"));
+    // After the window fills (>10 lines), cursor-up should reference 10 lines
+    const lastCursorUp = cursorUpCalls[cursorUpCalls.length - 1];
+    expect(lastCursorUp).toBe("\x1b[10A");
+  });
+
+  // ── resetRollingWindow() clears display state but not capture ────────────
+
+  it("resetRollingWindow() clears the window state but preserves captured lines", () => {
+    resetCapturedLines();
+    stream("Agent", "before reset");
+    expect(getCapturedLines()).toHaveLength(1);
+
+    resetRollingWindow();
+    // After reset, next redraw starts from a fresh window (no cursor-up on first line)
+    writeSpy.mockClear();
+    stream("Agent", "after reset");
+
+    const writes = writeSpy.mock.calls.map((c) => String(c[0]));
+    // No cursor-up escape because _linesRendered was 0 after reset
+    const hasCursorUp = writes.some((s) => s.startsWith("\x1b[") && s.endsWith("A"));
+    expect(hasCursorUp).toBe(false);
+
+    // Captured lines still accumulate (not cleared by resetRollingWindow)
+    expect(getCapturedLines()).toHaveLength(2);
+  });
+
+  // ── resetCapturedLines() clears the capture buffer ───────────────────────
+
+  it("resetCapturedLines() empties the captured buffer", () => {
+    resetCapturedLines();
+    stream("Agent", "a");
+    stream("Tool", "b");
+    expect(getCapturedLines()).toHaveLength(2);
+    resetCapturedLines();
+    expect(getCapturedLines()).toHaveLength(0);
+  });
+
+  // ── section() resets the rolling window ──────────────────────────────────
+
+  it("section() resets the rolling window so next stream() starts fresh", () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    stream("Agent", "pre-section line");
+    writeSpy.mockClear();
+
+    section("New Task");
+
+    // After section(), the window is cleared (_linesRendered = 0).
+    // The next stream() call should NOT emit a cursor-up escape.
+    writeSpy.mockClear();
+    stream("Agent", "post-section line");
+    const writes = writeSpy.mock.calls.map((c) => String(c[0]));
+    const hasCursorUp = writes.some((s) => s.startsWith("\x1b[") && s.endsWith("A"));
+    expect(hasCursorUp).toBe(false);
+
+    logSpy.mockRestore();
+  });
+
+  // ── Non-TTY fallback: _overrideTTY(false) uses console.log ───────────────
+
+  it("falls back to console.log when TTY is disabled", async () => {
+    _overrideTTY(false);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    writeSpy.mockClear();
+
+    stream("Agent", "non-tty line");
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(writeSpy).not.toHaveBeenCalled();
+
+    logSpy.mockRestore();
+    _overrideTTY(true); // restore for afterEach
+  });
+
+  // ── Quiet mode suppresses rolling window output ───────────────────────────
+
+  it("stream() is suppressed by quiet mode even in rolling mode", () => {
+    setQuiet(true);
+    writeSpy.mockClear();
+    stream("Agent", "should not appear");
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCapturedLines() in non-TTY mode (plain streaming path)
+// ---------------------------------------------------------------------------
+
+describe("getCapturedLines() in non-TTY mode", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    setQuiet(false);
+    resetRollingWindow();
+    resetCapturedLines();
+    // Ensure rolling mode is OFF (no TTY override, default env)
+    _overrideTTY(false);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    _overrideTTY(null);
+    delete process.env.FORCE_COLOR;
+    delete process.env.NO_COLOR;
+    const { resetColorCache } = await import("@n-dx/llm-client");
+    resetColorCache();
+    resetCapturedLines();
+    setQuiet(false);
+  });
+
+  it("stream() captures plain-text lines in non-TTY mode", () => {
+    stream("Agent", "hello");
+    stream("Tool", "read_file(...)");
+    const captured = getCapturedLines();
+    expect(captured).toHaveLength(2);
+    expect(captured[0]).toContain("[Agent]");
+    expect(captured[1]).toContain("[Tool]");
+  });
+
+  it("detail() captures plain-text lines in non-TTY mode", () => {
+    detail("50ms");
+    const captured = getCapturedLines();
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toContain("50ms");
+  });
+
+  it("captured lines contain no ANSI codes in non-TTY mode", () => {
+    stream("Agent", "clean text");
+    const captured = getCapturedLines();
+    expect(captured[0]).not.toContain(ANSI_PREFIX);
   });
 });
