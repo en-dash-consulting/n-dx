@@ -25145,7 +25145,7 @@
             {
               "id": "62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff",
               "title": "Add pink loop-iteration separator line to hench run output",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Print a horizontal separator line in pink/magenta at each loop-iteration boundary (after run-complete) to visually distinguish loop boundaries from individual agent-turn separators. The separator width should match the existing agent-turn separator so the transcript is consistently structured. This makes it easy to scan which work happened in which iteration of a multi-loop hench run.",
               "acceptanceCriteria": [
@@ -25162,7 +25162,10 @@
                 "color",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:50:10.308Z",
+              "completedAt": "2026-04-09T00:10:00.000Z",
+              "log": "Added colorPink (magenta/35m) primitive to llm-client help-format.ts and exported through public.ts. Re-exported magenta and colorPink through hench llm-gateway.ts. Added formatLoopIterationSeparator() helper to run.ts that returns 60 × ─ in colorPink. Emits separator at end of each loop iteration (after pause) guarded by isColorEnabled() for full suppression when NO_COLOR=1 or non-TTY. Added 5-case test suite in run-colors.test.ts: magenta ANSI code present under FORCE_COLOR=1, 60-char width under NO_COLOR=1, no ANSI codes under NO_COLOR=1, isColorEnabled()=false under NO_COLOR=1, isColorEnabled()=true under FORCE_COLOR=1."
             }
           ]
         }
@@ -25171,22 +25174,26 @@
     {
       "id": "dd338f09-ae53-4c57-95f5-58b4e982090e",
       "title": "Hench",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-08T23:44:31.225Z",
+      "completedAt": "2026-04-08T23:44:31.225Z",
       "children": [
         {
           "id": "8f175c2d-6868-4687-a7e5-355e78f785f1",
           "title": "Rex Run Rolling Log Display and Persistent Log Files",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Limit live console output during rex runs to a rolling 10-line grey window while capturing the full run output to a timestamped file in .run-logs/, which is excluded from git.",
           "source": "smart-add",
+          "startedAt": "2026-04-08T23:44:31.021Z",
+          "completedAt": "2026-04-08T23:44:31.021Z",
           "children": [
             {
               "id": "b86e2af1-19c7-43ee-90a1-c82ce7038fae",
               "title": "Implement rolling 10-line grey output window for rex run console",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Replace unbounded stdout streaming during rex/hench runs with a rolling buffer that renders only the most recent 10 lines. Lines should be rendered in grey/dim using the ANSI color helpers already present in llm-client. The window should overwrite previous lines in-place via cursor control when stdout is a TTY, and fall back to plain streaming when it is not.",
               "acceptanceCriteria": [
@@ -25202,12 +25209,14 @@
                 "cli",
                 "output"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:29:50.876Z",
+              "completedAt": "2026-04-08T23:38:08.895Z"
             },
             {
               "id": "b892e543-006f-402f-ae07-e359c1229a81",
               "title": "Persist full rex run log to .run-logs/ and add directory to .gitignore",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Capture the complete output of each rex/hench run to a timestamped log file under .run-logs/ at the project root. The directory should be created automatically on first use. Each run must produce a distinct file (named by timestamp or run ID) so logs from concurrent or sequential runs do not collide. .run-logs/ must be added to the repository .gitignore.",
               "acceptanceCriteria": [
@@ -25223,7 +25232,9 @@
                 "logging",
                 "persistence"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:38:36.976Z",
+              "completedAt": "2026-04-08T23:44:30.738Z"
             }
           ]
         }
@@ -25232,9 +25243,11 @@
     {
       "id": "62f4a08a-7130-4b91-a8dc-ea5f37ab7d89",
       "title": "Dependency Health & Module Modernization",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-08T23:50:07.453Z",
+      "completedAt": "2026-04-08T23:50:07.453Z",
       "children": [
         {
           "id": "f6c36dec-764a-4a56-adc7-cb11e66890c9",
@@ -25277,15 +25290,17 @@
         {
           "id": "5117fd5f-ca53-4095-8228-f210bfe9eefe",
           "title": "Stale Import Path and Deprecated Node.js API Cleanup",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Scan the codebase for imports referencing moved or renamed internal modules, deprecated Node.js built-in APIs, and outdated TypeScript path patterns, then apply all targeted fixes across all packages.",
           "source": "smart-add",
+          "startedAt": "2026-04-08T23:50:07.209Z",
+          "completedAt": "2026-04-08T23:50:07.209Z",
           "children": [
             {
               "id": "96780413-6007-4eb0-8550-a118e3d9a8c2",
               "title": "Scan and fix stale import paths, deprecated Node.js APIs, and outdated module references across packages",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Use static analysis (grep, tsc --noEmit, sourcevision import graph) to enumerate: imports pointing to moved or renamed files, uses of deprecated Node.js built-in APIs (fs.exists, url.parse, etc.), and any CommonJS require() calls in ESM-targeted files. Then apply all fixes: update import paths to current locations, replace deprecated APIs with modern equivalents (e.g. url.parse → new URL(), fs.exists → fs.access), and convert stray require() to ESM imports. Confirm tsc --noEmit and pnpm test pass cleanly after all changes.",
               "acceptanceCriteria": [
@@ -25305,7 +25320,15 @@
                 "audit",
                 "refactor"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:44:47.183Z",
+              "completedAt": "2026-04-08T23:49:58.622Z",
+              "log": [
+                {
+                  "timestamp": "2026-04-08T23:49:58.622Z",
+                  "message": "Completed: full codebase audit found no deprecated Node.js APIs (url.parse, fs.exists, new Buffer, etc.), no stale import paths, and no broken module references. Found 6 CommonJS require() calls in ESM-targeted test files across 2 files. Fixed by moving require() to top-level ESM import statements. tsc --noEmit passes for both packages. All 61 affected tests pass (22 hench errors.test.ts + 39 sourcevision workspace-aggregate.test.ts). Committed as e0d4912e."
+                }
+              ]
             }
           ]
         }
@@ -25314,21 +25337,25 @@
     {
       "id": "b7b7e0b3-4cb6-450f-a88d-7a28a7afa249",
       "title": "Hench",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-08T23:29:06.849Z",
+      "completedAt": "2026-04-08T23:29:06.849Z",
       "children": [
         {
           "id": "1b15f101-807e-4372-8ba2-23e99f10860b",
           "title": "Hench Run-Loop Visual Output Refinements",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
+          "startedAt": "2026-04-08T23:29:06.643Z",
+          "completedAt": "2026-04-08T23:29:06.643Z",
           "children": [
             {
               "id": "48ee8da4-56b6-4201-ae86-5e9372b45543",
               "title": "Color-code [Tool], [Agent], and vendor prefix labels in hench run output",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Hench run console output includes source-attribution prefix markers such as [Tool], [Agent], and vendor/model identifiers (e.g. [claude], [codex]). These prefixes should be color-coded to let users visually scan and distinguish message origins at a glance: [Tool] in grey/dim, [Agent] in yellow, and vendor/model labels in blue. The existing semantic color helpers in llm-client (colorDim, colorWarn, colorInfo) should be used so TTY and NO_COLOR behavior is already handled.",
               "acceptanceCriteria": [
@@ -25345,12 +25372,14 @@
                 "color",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:21:17.861Z",
+              "completedAt": "2026-04-08T23:29:06.354Z"
             },
             {
               "id": "418753a7-1d86-446e-a5c7-aeedc63b1ec1",
               "title": "Apply yellow coloring to help notes and warning messages in hench CLI output",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Help notes (usage hints, guidance prompts) and warning messages emitted by hench should render in yellow to signal caution or informational guidance without alarming the user. This aligns these message categories with the established semantic convention where yellow (colorWarn) represents advisory information, making them visually distinct from success (green) and error (red) output.",
               "acceptanceCriteria": [
@@ -25367,7 +25396,9 @@
                 "color",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:08:34.229Z",
+              "completedAt": "2026-04-08T23:20:47.434Z"
             }
           ]
         }

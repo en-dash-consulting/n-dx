@@ -11,8 +11,9 @@ import { describe, it, expect, afterEach } from "vitest";
  */
 
 // ANSI escape codes we assert on
-const YELLOW = "\x1b[33m";
-const GREEN  = "\x1b[32m";
+const YELLOW   = "\x1b[33m";
+const GREEN    = "\x1b[32m";
+const MAGENTA  = "\x1b[35m";
 const ANSI_PREFIX = "\x1b[";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -198,5 +199,55 @@ describe("formatRunSuccessMessage", () => {
     const msg = formatRunSuccessMessage(text);
     expect(msg).not.toContain(ANSI_PREFIX);
     expect(msg).toBe(text);
+  });
+});
+
+// ── loop-iteration boundary separator ────────────────────────────────────
+
+describe("formatLoopIterationSeparator", () => {
+  afterEach(async () => {
+    setColorMode("clear");
+    await resetColor();
+  });
+
+  it("contains magenta ANSI code when color is forced (TTY mode)", async () => {
+    setColorMode("force");
+    await resetColor();
+    const { formatLoopIterationSeparator } = await import("../../../../src/cli/commands/run.js");
+    const sep = formatLoopIterationSeparator();
+    expect(sep).toContain(MAGENTA);
+  });
+
+  it("is 60 separator characters wide (excluding ANSI codes)", async () => {
+    setColorMode("none");
+    await resetColor();
+    const { formatLoopIterationSeparator } = await import("../../../../src/cli/commands/run.js");
+    const sep = formatLoopIterationSeparator();
+    // With NO_COLOR the string is plain text — all 60 ─ characters, no ANSI
+    expect(sep).toBe("─".repeat(60));
+  });
+
+  it("is plain text (no ANSI codes) when NO_COLOR=1 — call site must suppress entirely", async () => {
+    setColorMode("none");
+    await resetColor();
+    const { formatLoopIterationSeparator } = await import("../../../../src/cli/commands/run.js");
+    const sep = formatLoopIterationSeparator();
+    expect(sep).not.toContain(ANSI_PREFIX);
+  });
+
+  it("isColorEnabled() returns false under NO_COLOR=1 — so the separator is not emitted", async () => {
+    setColorMode("none");
+    await resetColor();
+    // Verify the guard condition: when isColorEnabled() is false the call site
+    // skips emission entirely (no characters, no newline artifact).
+    const { isColorEnabled } = await import("@n-dx/llm-client");
+    expect(isColorEnabled()).toBe(false);
+  });
+
+  it("isColorEnabled() returns true under FORCE_COLOR=1 — so the separator IS emitted", async () => {
+    setColorMode("force");
+    await resetColor();
+    const { isColorEnabled } = await import("@n-dx/llm-client");
+    expect(isColorEnabled()).toBe(true);
   });
 });

@@ -12,7 +12,7 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -67,6 +67,22 @@ export function formatPauseMessage(pauseMs: number, target: "task" | "epic"): st
  */
 export function formatRunSuccessMessage(text: string): string {
   return colorSuccess(text);
+}
+
+/**
+ * Format a loop-iteration boundary separator line.
+ *
+ * Rendered in pink/magenta (colorPink) to visually distinguish loop-iteration
+ * boundaries from the cyan ═══ agent-turn section separators.  Width matches
+ * SECTION_WIDTH (60 chars) for visual consistency with the rest of the
+ * transcript.
+ *
+ * Fully suppressed (returns plain text that callers skip via NO_COLOR / !isTTY
+ * checks in colorPink) when color is disabled.
+ * Exported for testing — verifies colorPink is applied and suppression works.
+ */
+export function formatLoopIterationSeparator(): string {
+  return colorPink("─".repeat(60));
 }
 
 /**
@@ -1035,6 +1051,15 @@ async function runLoop(
       if (!stopping && pauseMs > 0) {
         info(`\n${formatPauseMessage(pauseMs, "task")}`);
         await loopPause(pauseMs, ac.signal);
+      }
+
+      // Emit a pink separator at each loop-iteration boundary so long
+      // transcripts are easy to scan.  Suppressed entirely when color is
+      // disabled (NO_COLOR=1 or non-TTY without FORCE_COLOR) — no plain-text
+      // fallback, because a bare ─── line would add noise without the colour
+      // distinction that makes it useful.
+      if (isColorEnabled()) {
+        info(`\n${formatLoopIterationSeparator()}`);
       }
     }
   } finally {

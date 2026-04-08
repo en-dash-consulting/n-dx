@@ -115,6 +115,11 @@ export function red(text: string): string {
   return ansi("31", text, "39");
 }
 
+/** Magenta text (loop-iteration boundaries, decorative separators). */
+export function magenta(text: string): string {
+  return ansi("35", text, "39");
+}
+
 // ── Status-semantic color helpers ───────────────────────────────────────
 
 /**
@@ -122,14 +127,15 @@ export function red(text: string): string {
  * Prefer these over the raw `green`, `red`, etc. helpers when the intent
  * is to communicate status or severity.
  *
- * | Helper         | Meaning                        | Color  |
- * |----------------|--------------------------------|--------|
- * | colorSuccess   | completed / success            | green  |
- * | colorError     | failure / error                | red    |
- * | colorPending   | in-progress / pending          | yellow |
- * | colorWarn      | warning                        | yellow |
- * | colorInfo      | informational / secondary hint | cyan   |
- * | colorDim       | muted / de-emphasised text     | dim    |
+ * | Helper         | Meaning                        | Color   |
+ * |----------------|--------------------------------|---------|
+ * | colorSuccess   | completed / success            | green   |
+ * | colorError     | failure / error                | red     |
+ * | colorPending   | in-progress / pending          | yellow  |
+ * | colorWarn      | warning                        | yellow  |
+ * | colorInfo      | informational / secondary hint | cyan    |
+ * | colorDim       | muted / de-emphasised text     | dim     |
+ * | colorPink      | loop-iteration boundary        | magenta |
  */
 
 /** Color a success or completed status (green). */
@@ -160,6 +166,11 @@ export function colorInfo(text: string): string {
 /** Mute or de-emphasise text (dim). */
 export function colorDim(text: string): string {
   return dim(text);
+}
+
+/** Color a loop-iteration boundary separator (magenta/pink). */
+export function colorPink(text: string): string {
+  return magenta(text);
 }
 
 // ── PRD status + log-level color map ────────────────────────────────────

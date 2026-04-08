@@ -256,6 +256,7 @@ export {
   yellow,
   green,
   red,
+  magenta,
   // Status-semantic color helpers
   colorSuccess,
   colorError,
@@ -263,6 +264,7 @@ export {
   colorWarn,
   colorInfo,
   colorDim,
+  colorPink,
   // Canonical status→color map (PRD statuses + log-levels)
   STATUS_COLORS,
   colorStatus,
