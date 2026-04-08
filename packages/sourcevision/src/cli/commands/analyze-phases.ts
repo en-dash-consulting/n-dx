@@ -29,10 +29,10 @@ import type { CallGraph, Classifications, ImportEdge, Inventory } from "../../sc
 import { readManifest, writeManifest, updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
 import { detectSubAnalyses, buildSubAnalysisRefs } from "../../analyzers/workspace.js";
 import { info } from "../output.js";
+import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
 import { createSnapshot, computeDeltas, loadLatestReport, saveReport, formatDeltaReport } from "../../analyzers/convergence.js";
 import type { ConvergenceReport } from "../../analyzers/convergence.js";
 import type { AnalyzeTokenUsage } from "../../schema/index.js";
-import { loadProjectOverrides } from "@n-dx/llm-client";
 
 // ── Shared context passed between phases ─────────────────────────────
 
@@ -74,7 +74,7 @@ function accumulateFromAggregate(target: AnalyzeTokenUsage, source: AnalyzeToken
 // ── Phase 1: Inventory ───────────────────────────────────────────────
 
 export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
-  info("[phase 1] Inventory...");
+  info(`${bold(cyan("[phase 1]"))} Inventory...`);
   updateManifestModule(ctx.absDir, "inventory", "running");
 
   try {
@@ -110,9 +110,9 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
     if (stats) {
       const parts = [`${stats.cached} cached`, `${stats.changed} changed`, `${stats.added} new`, `${stats.deleted} deleted`];
       if (stats.touched > 0) parts.push(`${stats.touched} touched`);
-      info(`  ${ctx.inventoryResult.files.length} files (${parts.join(", ")}) → ${outPath}`);
+      info(`  ${bold(String(ctx.inventoryResult.files.length))} files (${parts.join(", ")}) → ${dim(outPath)}`);
     } else {
-      info(`  ${ctx.inventoryResult.files.length} files cataloged → ${outPath}`);
+      info(`  ${bold(String(ctx.inventoryResult.files.length))} files cataloged → ${dim(outPath)}`);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -129,7 +129,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     throw new PhasePrerequsiteError(2, "imports", "inventory.json — run phase 1 first");
   }
 
-  info("[phase 2] Imports...");
+  info(`${bold(cyan("[phase 2]"))} Imports...`);
   updateManifestModule(ctx.absDir, "imports", "running");
 
   try {
@@ -147,7 +147,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     const outPath = join(ctx.svDir, DATA_FILES.imports);
     writeFileSync(outPath, toCanonicalJSON(imports));
     updateManifestModule(ctx.absDir, "imports", "complete");
-    info(`  ${imports.summary.totalEdges} edges, ${imports.summary.totalExternal} external → ${outPath}`);
+    info(`  ${bold(String(imports.summary.totalEdges))} edges, ${bold(String(imports.summary.totalExternal))} external → ${dim(outPath)}`);
   } catch (err) {
     if (err instanceof PhasePrerequsiteError) throw err;
     const msg = err instanceof Error ? err.message : String(err);
@@ -165,7 +165,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
     throw new PhasePrerequsiteError(3, "classifications", "inventory.json and imports.json — run phases 1-2 first");
   }
 
-  info("[phase 3] Classifications...");
+  info(`${bold(cyan("[phase 3]"))} Classifications...`);
   updateManifestModule(ctx.absDir, "classifications", "running");
 
   try {
@@ -195,11 +195,11 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
 
     // LLM enrichment (skip in --fast mode)
     if (!ctx.fastMode && classifications.summary.totalUnclassified > 0) {
-      info(`  ${classifications.summary.totalClassified} classified, ${classifications.summary.totalUnclassified} unclassified — enriching with LLM...`);
+      info(`  ${bold(String(classifications.summary.totalClassified))} classified, ${bold(String(classifications.summary.totalUnclassified))} unclassified — ${cyan("enriching with LLM...")}`)
       const llmResult = await enrichClassificationsWithLLM(classifications, inventory, importsData);
       if (llmResult.updatedFiles.length > 0) {
         classifications = mergeClassificationResults(classifications, llmResult.updatedFiles);
-        info(`  LLM classified ${llmResult.updatedFiles.length} additional files`);
+        info(`  ${cyan("LLM classified")} ${bold(String(llmResult.updatedFiles.length))} additional files`);
       }
       accumulateFromAggregate(ctx.tokenUsage, llmResult.tokenUsage);
     }
@@ -207,7 +207,7 @@ export async function runClassificationsPhase(ctx: AnalyzeContext): Promise<void
     const outPath = join(ctx.svDir, DATA_FILES.classifications);
     writeFileSync(outPath, toCanonicalJSON(classifications));
     updateManifestModule(ctx.absDir, "classifications", "complete");
-    info(`  ${classifications.summary.totalClassified} classified, ${classifications.summary.totalUnclassified} unclassified → ${outPath}`);
+    info(`  ${bold(String(classifications.summary.totalClassified))} classified, ${bold(String(classifications.summary.totalUnclassified))} unclassified → ${dim(outPath)}`);
   } catch (err) {
     if (err instanceof PhasePrerequsiteError) throw err;
     const msg = err instanceof Error ? err.message : String(err);
@@ -249,7 +249,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     throw new PhasePrerequsiteError(4, "zones", "inventory.json and imports.json — run phases 1-2 first");
   }
 
-  info("[phase 4] Zones...");
+  info(`${bold(cyan("[phase 4]"))} Zones...`);
   updateManifestModule(ctx.absDir, "zones", "running");
 
   const enrich = !ctx.fastMode;
@@ -258,9 +258,9 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
 
   if (enrich) {
     const modeLabel = perZone ? " (per-zone mode)" : "";
-    info(`  Enriching zones${modeLabel}...`);
+    info(`  ${cyan(`Enriching zones${modeLabel}...`)}`);
   } else {
-    info("  Structural analysis only (skipping AI enrichment)");
+    info(`  ${dim("Structural analysis only (skipping AI enrichment)")}`);
   }
 
   try {
@@ -270,7 +270,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     // Detect pre-analyzed subdirectories
     const subAnalyses = detectSubAnalyses(ctx.absDir);
     if (subAnalyses.length > 0) {
-      info(`  Found ${subAnalyses.length} sub-analysis: ${subAnalyses.map((s) => s.prefix).join(", ")}`);
+      info(`  ${dim(`Found ${subAnalyses.length} sub-analysis: ${subAnalyses.map((s) => s.prefix).join(", ")}`)}`);
     }
 
     // Load classifications for archetype labels in enrichment prompts
@@ -280,7 +280,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     const hints = loadHints(ctx.svDir);
 
     const onReset = (fromPass: number, toPass: number) => {
-      info(`  Detected changes, resetting from Pass ${fromPass} to Pass ${toPass}`);
+      info(`  ${yellow(`Detected changes, resetting from Pass ${fromPass} to Pass ${toPass}`)}`);
     };
 
     // Load zone pins from .n-dx.json
@@ -292,10 +292,10 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
       : undefined;
     const pinCount = Object.keys(zonePins).length;
     if (pinCount > 0) {
-      info(`  Applying ${pinCount} zone pin(s) from .n-dx.json`);
+      info(`  ${dim(`Applying ${pinCount} zone pin(s) from .n-dx.json`)}`);
     }
     if (smallZoneMergeThreshold !== undefined) {
-      info(`  Using zone merge threshold ${smallZoneMergeThreshold} from .n-dx.json`);
+      info(`  ${dim(`Using zone merge threshold ${smallZoneMergeThreshold} from .n-dx.json`)}`);
     }
 
     let zonesResult = await analyzeZones(inventory, importsData, {
@@ -317,7 +317,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
       const passesNeeded = targetPass - currentPass;
 
       for (let p = 0; p < passesNeeded; p++) {
-        info(`\n[phase 4] Enrichment pass ${currentPass + p + 2}...`);
+        info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${currentPass + p + 2}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
           zonePins: Object.keys(zonePins).length > 0 ? zonePins : undefined,
@@ -340,7 +340,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     }
 
     updateManifestModule(ctx.absDir, "zones", "complete");
-    info(`  ${zones.zones.length} zones, ${zones.crossings.length} crossings, ${zones.unzoned.length} unzoned → ${outPath}`);
+    info(`  ${bold(String(zones.zones.length))} zones, ${bold(String(zones.crossings.length))} crossings, ${bold(String(zones.unzoned.length))} unzoned → ${dim(outPath)}`);
 
     // ── Convergence tracking ──
     try {
@@ -387,8 +387,20 @@ function loadFileArchetypes(svDir: string): Map<string, string | null> | undefin
   }
 }
 
+/** Color a finding type label by semantic severity. */
+function colorFindingType(type: string): string {
+  switch (type) {
+    case "anti-pattern": return red(type);
+    case "pattern":      return yellow(type);
+    case "suggestion":   return cyan(type);
+    case "observation":  return dim(type);
+    default:             return dim(type);
+  }
+}
+
 function reportZoneInsights(zones: any): void {
-  const totalFindings = zones.findings?.length ?? 0;
+  const findings: any[] = zones.findings ?? [];
+  const totalFindings = findings.length;
   const totalInsights =
     (zones.insights?.length ?? 0) +
     zones.zones.reduce((s: number, z: any) => s + (z.insights?.length ?? 0), 0);
@@ -398,16 +410,28 @@ function reportZoneInsights(zones: any): void {
         ? ` (enrichment pass ${zones.enrichmentPass})`
         : " (structural only)"
       : "";
-    info(`  ${totalFindings} findings, ${totalInsights} insights${passLabel}`);
+    info(`  ${bold(String(totalFindings))} findings, ${bold(String(totalInsights))} insights${passLabel}`);
+
+    // Show top findings with severity-colored type labels (anti-pattern first)
+    const severityOrder: Record<string, number> = { "anti-pattern": 0, "suggestion": 1, "pattern": 2, "observation": 3 };
+    const topFindings = [...findings]
+      .sort((a: any, b: any) => (severityOrder[a.type] ?? 4) - (severityOrder[b.type] ?? 4))
+      .slice(0, 3);
+    for (const f of topFindings) {
+      info(`    · [${colorFindingType(f.type)}] ${f.text}`);
+    }
+    if (findings.length > 3) {
+      info(`    ${dim(`... and ${findings.length - 3} more in zones.json`)}`);
+    }
   } else if (totalInsights > 0) {
-    info(`  ${totalInsights} insights${zones.enrichmentPass ? ` (enrichment pass ${zones.enrichmentPass})` : ""}`);
+    info(`  ${bold(String(totalInsights))} insights${zones.enrichmentPass ? ` (enrichment pass ${zones.enrichmentPass})` : ""}`);
   }
   if (zones.insights && zones.insights.length > 0) {
     for (const insight of zones.insights.slice(0, 5)) {
       info(`    · ${insight}`);
     }
     if (zones.insights.length > 5) {
-      info(`    ... and ${zones.insights.length - 5} more in zones.json`);
+      info(`    ${dim(`... and ${zones.insights.length - 5} more in zones.json`)}`);
     }
   }
 }
@@ -421,7 +445,7 @@ export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
     throw new PhasePrerequsiteError(5, "components", "inventory.json and imports.json — run phases 1-2 first");
   }
 
-  info("[phase 5] Components...");
+  info(`${bold(cyan("[phase 5]"))} Components...`);
   updateManifestModule(ctx.absDir, "components", "running");
 
   try {
@@ -440,7 +464,7 @@ export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
     const outPath = join(ctx.svDir, DATA_FILES.components);
     writeFileSync(outPath, toCanonicalJSON(components));
     updateManifestModule(ctx.absDir, "components", "complete");
-    info(`  ${components.summary.totalComponents} components, ${components.summary.totalRouteModules} route modules, ${components.summary.totalUsageEdges} usage edges → ${outPath}`);
+    info(`  ${bold(String(components.summary.totalComponents))} components, ${bold(String(components.summary.totalRouteModules))} route modules, ${bold(String(components.summary.totalUsageEdges))} usage edges → ${dim(outPath)}`);
   } catch (err) {
     if (err instanceof PhasePrerequsiteError) throw err;
     const msg = err instanceof Error ? err.message : String(err);
@@ -458,7 +482,7 @@ export async function runCallGraphPhase(ctx: AnalyzeContext): Promise<void> {
     throw new PhasePrerequsiteError(6, "callgraph", "inventory.json and imports.json — run phases 1-2 first");
   }
 
-  info("[phase 6] Call graph...");
+  info(`${bold(cyan("[phase 6]"))} Call graph...`);
   updateManifestModule(ctx.absDir, "callgraph", "running");
 
   try {
@@ -477,7 +501,7 @@ export async function runCallGraphPhase(ctx: AnalyzeContext): Promise<void> {
     const outPath = join(ctx.svDir, DATA_FILES.callGraph);
     writeFileSync(outPath, toCanonicalJSON(callGraph));
     updateManifestModule(ctx.absDir, "callgraph", "complete");
-    info(`  ${callGraph.summary.totalFunctions} functions, ${callGraph.summary.totalCalls} calls, ${callGraph.summary.filesWithCalls} files → ${outPath}`);
+    info(`  ${bold(String(callGraph.summary.totalFunctions))} functions, ${bold(String(callGraph.summary.totalCalls))} calls, ${bold(String(callGraph.summary.filesWithCalls))} files → ${dim(outPath)}`);
 
     // Load classifications if available for archetype-based findings
     const classificationsData: Classifications | undefined = loadPreviousData(
@@ -572,10 +596,10 @@ function enrichZonesWithCallGraph(
 
     writeFileSync(zonesPath, toCanonicalJSON(zonesData));
     const findingCount = callGraphFindings.length;
-    info(`  Enriched zones.json with call graph statistics${findingCount > 0 ? ` and ${findingCount} finding${findingCount !== 1 ? "s" : ""}` : ""}`);
+    info(`  ${green("Enriched")} zones.json with call graph statistics${findingCount > 0 ? ` and ${bold(String(findingCount))} finding${findingCount !== 1 ? "s" : ""}` : ""}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`  Warning: call graph zone enrichment failed: ${msg}`);
+    console.error(`  ${yellow("Warning:")} call graph zone enrichment failed: ${msg}`);
   }
 }
 

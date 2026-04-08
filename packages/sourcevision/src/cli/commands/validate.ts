@@ -11,6 +11,7 @@ import {
 } from "../../schema/index.js";
 import { DATA_FILES } from "../../schema/data-files.js";
 import { info, result } from "../output.js";
+import { green, red, dim } from "@n-dx/llm-client";
 
 export function cmdValidate(dir: string): void {
   const svDir = join(resolve(dir), SV_DIR);
@@ -39,7 +40,7 @@ export function cmdValidate(dir: string): void {
   for (const mod of modules) {
     const filePath = join(svDir, mod.file);
     if (!existsSync(filePath)) {
-      info(`  [skip] ${mod.file} — not found`);
+      info(`  ${dim("[skip]")} ${dim(mod.file)} — not found`);
       continue;
     }
 
@@ -49,22 +50,22 @@ export function cmdValidate(dir: string): void {
       const check = mod.validate(data);
 
       if (check.ok) {
-        result(`  [pass] ${mod.file}`);
+        result(`  ${green("[pass]")} ${mod.file}`);
       } else {
-        result(`  [fail] ${mod.file}`);
-        result(`         ${JSON.stringify(check.errors, null, 2)}`);
+        result(`  ${red("[fail]")} ${mod.file}`);
+        result(`         ${dim(JSON.stringify(check.errors, null, 2))}`);
         allValid = false;
       }
     } catch (err) {
-      result(`  [fail] ${mod.file} — ${err instanceof Error ? err.message : err}`);
+      result(`  ${red("[fail]")} ${mod.file} — ${err instanceof Error ? err.message : err}`);
       allValid = false;
     }
   }
 
   if (allValid) {
-    result("\nAll modules valid.");
+    result(`\n${green("All modules valid.")}`);
   } else {
-    result("\nValidation failed for one or more modules.");
+    result(`\n${red("Validation failed for one or more modules.")}`);
     process.exit(1);
   }
 }
