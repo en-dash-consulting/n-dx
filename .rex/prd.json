@@ -24472,17 +24472,19 @@
     {
       "id": "e58f1fb0-d3c3-48f2-9cfd-aff59b1419f4",
       "title": "LLM Integration",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "e4b6edfe-b8e0-4b6a-87d6-b0a79cca4eeb",
           "title": "Consistent Vendor and Model Resolution Across Commands",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Ensure a single, authoritative vendor/model resolution path is used across all ndx commands — including reasoning/thinking calls and standard API calls — so that no command silently diverges from the configured or defaulted model. Default resolution should produce the newest available model for the active vendor when no explicit model is configured.",
           "source": "smart-add",
+          "startedAt": "2026-04-08T14:47:55.036Z",
+          "completedAt": "2026-04-08T14:47:55.036Z",
           "children": [
             {
               "id": "d9eaeb4f-6fb4-4ead-b644-4bc2d99ba4d6",
@@ -24531,7 +24533,7 @@
             {
               "id": "08f6d0b0-9462-494e-adf9-2830113caede",
               "title": "Surface active vendor and model in ndx console output",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Display the resolved vendor and model at the start of every ndx command that performs LLM calls, so operators can confirm what is being used without inspecting config files. The output should show the vendor name, resolved model ID, and whether the model was explicitly configured or defaulted. This replaces any existing ad-hoc model logging and provides a consistent prefix line across commands.",
               "acceptanceCriteria": [
@@ -24547,11 +24549,14 @@
                 "cli"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-08T14:03:48.313Z"
+              "startedAt": "2026-04-08T14:03:48.313Z",
+              "completedAt": "2026-04-08T14:47:54.864Z"
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-08T14:47:55.155Z",
+      "completedAt": "2026-04-08T14:47:55.155Z"
     },
     {
       "id": "d67a2aaf-4515-4bcc-b35b-e3f8191d3a86",
