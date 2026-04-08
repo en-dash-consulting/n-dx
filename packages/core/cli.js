@@ -587,6 +587,13 @@ async function handleInit(rest) {
   let selectedProvider;
   let providerSource;
 
+  const quiet = flags.includes("--quiet") || flags.includes("-q");
+
+  // Show mascot banner unless suppressed by --quiet or --provider (CI/scripted use)
+  if (!quiet && !providerFromFlag) {
+    showInitBanner();
+  }
+
   if (providerFromFlag) {
     selectedProvider = providerFromFlag;
     providerSource = "from --provider flag";
@@ -594,8 +601,7 @@ async function handleInit(rest) {
     selectedProvider = existingVendor;
     providerSource = "from existing config";
   } else {
-    // First run — show banner and prompt
-    showInitBanner();
+    // First run — prompt for provider
     selectedProvider = await promptInitProvider();
     providerSource = "selected";
   }
@@ -604,8 +610,6 @@ async function handleInit(rest) {
     console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
     exitWithCleanup(1);
   }
-
-  const quiet = flags.includes("--quiet") || flags.includes("-q");
 
   // Check pre-existing state for status reporting
   const svExists = existsSync(join(dir, ".sourcevision"));

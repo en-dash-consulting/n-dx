@@ -80,6 +80,7 @@ describe("n-dx init provider selection", () => {
           PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
         },
       });
+      expect(output).toContain("En Dash DX");
       expect(output).toContain("n-dx init");
       expect(output.indexOf("n-dx init")).toBeLessThan(output.indexOf("Select active LLM provider:"));
       expect(output).toContain("Select active LLM provider:");
@@ -158,8 +159,8 @@ describe("n-dx init provider selection", () => {
       });
 
       expect(output).toMatch(/LLM provider\s+codex|llm\.vendor = codex/);
-      // Banner box should be suppressed; "n-dx initialized" summary is fine
-      expect(output).not.toContain("Guided project setup");
+      // Banner/mascot should be suppressed when --provider is used (CI/scripted)
+      expect(output).not.toContain("En Dash DX");
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }
