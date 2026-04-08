@@ -163,25 +163,31 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
       if (hx.code !== 0) { setPhase("hench", "failed"); onComplete(1, hx.stderr || hx.stdout); return; }
       setPhase("hench", "done", henchExists ? "reused" : undefined);
 
+      // Provider config and Claude integration are sync/CPU-bound.
+      // Run them via setImmediate so Ink gets real event-loop turns
+      // to keep the animation alive between each blocking chunk.
+      const yieldFrame = () => new Promise((r) => setImmediate(r));
+
       // provider config (silent)
+      setPhase("claude", "active");
+      await yieldFrame();
       const origLog = console.log;
       console.log = () => {};
       try { await runConfig(["llm.vendor", provider, dir]); } finally { console.log = origLog; }
+      await yieldFrame();
 
-      // claude integration — sync and CPU-bound, so yield before/after
+      // claude integration
       let claudeSummary = "skipped";
       if (!noClaude) {
-        setPhase("claude", "active");
-        await tick();
         try {
           const r = setupClaudeIntegration(dir);
           claudeSummary = `${r.skills.written} skills, ${r.settings.total} permissions`;
         } catch {
           /* skip */
         }
-        setPhase("claude", "done", claudeSummary === "skipped" ? "skipped" : claudeSummary);
-        await tick();
+        await yieldFrame();
       }
+      setPhase("claude", "done", claudeSummary === "skipped" ? "skipped" : claudeSummary);
 
       setRecap({
         sourcevision: svExists ? "already exists (reused)" : "created",
