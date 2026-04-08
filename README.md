@@ -11,10 +11,7 @@ AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks a
 ## Quick Start
 
 ```sh
-npm i -g @n-dx/core         # install from npm
-# — or —
-pnpm install && pnpm build  # build from source
-npm link                    # register CLI globally
+pnpm add -g @n-dx/core      # install from npm
 
 ndx init .                  # initialize project (.sourcevision/.rex/.hench)
 ndx config llm.vendor claude .
@@ -227,13 +224,32 @@ Guard settings are loaded once per agent run and cannot be modified mid-executio
 
 See the [hench README](packages/hench#security) for the full configuration reference.
 
-## Development
+## Contributing
+
+### Build from source
+
+```sh
+git clone https://github.com/en-dash-consulting/n-dx.git
+cd n-dx
+pnpm install && pnpm build
+cd packages/core && pnpm link --global  # register CLI globally
+```
+
+When developing locally, link from `packages/core` (not the monorepo root) so the global package name matches the published `@n-dx/core`. Use `pnpm ls -g` to verify.
+
+### Build & test
 
 ```sh
 pnpm build          # build all packages
 pnpm test           # test all packages
 pnpm typecheck      # typecheck all packages
 ```
+
+### Issue triage
+
+The `/triage` skill in Claude Code prioritizes and reprioritizes GitHub issues against strategic goals. See `.claude/skills/triage/` for the goals matrix and process.
+
+### Resources
 
 See [PACKAGE_GUIDELINES.md](PACKAGE_GUIDELINES.md) for package conventions, gateway patterns, and dependency hierarchy. See [TESTING.md](TESTING.md) for test tier requirements.
 
