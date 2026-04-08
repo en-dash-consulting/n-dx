@@ -24733,6 +24733,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-08T20:46:18.361Z",
+      "completedAt": "2026-04-08T20:46:18.361Z",
       "children": [
         {
           "id": "642df761-d076-4309-bd5c-edba76604dfd",
@@ -24865,9 +24867,7 @@
         "matchedItemLevel": "epic",
         "matchedItemStatus": "completed",
         "createdAt": "2026-04-08T16:18:20.755Z"
-      },
-      "startedAt": "2026-04-08T20:46:18.361Z",
-      "completedAt": "2026-04-08T20:46:18.361Z"
+      }
     },
     {
       "id": "877432ac-c7a2-45b2-ba6b-298e55a75be2",
@@ -25074,7 +25074,7 @@
             {
               "id": "83cafd67-4b87-4a64-a16f-936f0b78b775",
               "title": "Add integration tests validating TTY-aware color emission and NO_COLOR suppression across all CLI tools",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Without automated checks, color regressions (raw ANSI codes polluting piped JSON output, NO_COLOR being silently ignored, or colors absent in real TTY sessions) are invisible in CI. This task adds a test harness that spawns each CLI tool and asserts color code presence or absence based on the execution context.",
               "acceptanceCriteria": [
@@ -25089,7 +25089,9 @@
                 "testing",
                 "color"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:46:49.195Z",
+              "completedAt": "2026-04-08T20:57:04.128Z"
             }
           ]
         }
