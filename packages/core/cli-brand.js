@@ -67,17 +67,25 @@ export const TOOL_NAME = "n-dx";
  * Pre-rendered mascot lines from a 28×22 pixel grid converted to Unicode
  * quadrant block characters. 9 body lines + 2 leg-frame variants.
  */
+/**
+ * Pixel-art T-Rex mascot. Designed on a 24×16 pixel grid, converted to
+ * Unicode quadrant block characters for 2×2 sub-character resolution.
+ * 8 body lines + 1 animated leg line = 9 total.
+ */
 export const BODY = [
-  "  ▗███▖",
-  "  ▐▙██▛",
-  " ▗███▙",
-  "▝▟████▖▖",
-  " ▝███▛",
+  "       ▗████",
+  "       ▐▙▄██",
+  "       ▟██▛▝",
+  "      ▟███▖",
+  " ▜▄ ▗▟████▌",
+  "  ▜███████▟▘",
+  "   ▜█████▀▘",
+  "    ▜██▀",
 ];
 
 export const LEGS = [
-  ["  ▟▘▝▙"],
-  ["  █ ▝▙"],
+  ["    ▟▘ ▜▖"],
+  ["    █  ▜▖"],
 ];
 
 /** Static mascot string for non-TTY / test use. */
