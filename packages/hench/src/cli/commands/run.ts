@@ -12,6 +12,7 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
+import { printVendorModelHeader, resolveModel } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -650,6 +651,14 @@ export async function cmdRun(
   const rexDir = join(dir, config.rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
+
+  // Surface vendor/model at command start for operator visibility.
+  // Reads the most recent run artifact (if any) to detect model changes.
+  const recentRuns = await listRuns(henchDir, 1);
+  const lastRunModel = recentRuns[0]?.model;
+  printVendorModelHeader(llmVendor, llmConfig, {
+    lastModel: lastRunModel ? resolveModel(lastRunModel) : undefined,
+  });
 
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";

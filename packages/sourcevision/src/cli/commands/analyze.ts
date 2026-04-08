@@ -13,7 +13,7 @@ import { toCanonicalJSON } from "../../util/sort.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { emptyAnalyzeTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
-import { loadLLMConfig } from "@n-dx/llm-client";
+import { loadLLMConfig, printVendorModelHeader } from "@n-dx/llm-client";
 import type { RiskJustificationEntry } from "../../schema/v1.js";
 import type { ZoneType } from "../../analyzers/risk-scoring.js";
 import { detectSubAnalyses } from "../../analyzers/workspace.js";
@@ -111,7 +111,9 @@ async function initAndLoadLLMConfig(absDir: string): Promise<{
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
   const vendor = getLLMVendor();
-  if (vendor) info(`Using ${vendor} for enrichment.`);
+  if (vendor) {
+    printVendorModelHeader(vendor, llmConfig);
+  }
   if (getAuthMode() === "api") info("Using direct API authentication.");
 
   return { svDir, llmConfig };

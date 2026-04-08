@@ -227,7 +227,14 @@ export {
   isQuiet,
   info,
   result,
+  warn,
 } from "./output.js";
+
+// Vendor/model header (surfaces active vendor+model at command start)
+export {
+  printVendorModelHeader,
+} from "./vendor-header.js";
+export type { VendorModelHeaderOptions } from "./vendor-header.js";
 
 // CLI typo correction
 export {

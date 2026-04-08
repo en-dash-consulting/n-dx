@@ -1,6 +1,6 @@
 {
   "llm": {
-    "vendor": "codex"
+    "vendor": "claude"
   },
   "sourcevision": {
     "zones": {

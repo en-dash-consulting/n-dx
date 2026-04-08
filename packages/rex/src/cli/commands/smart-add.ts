@@ -32,6 +32,7 @@ import {
 } from "./smart-add-duplicates.js";
 import type { ProposalDuplicateMatch } from "./smart-add-duplicates.js";
 import type { LLMVendor } from "@n-dx/llm-client";
+import { printVendorModelHeader } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 
 const PENDING_FILE = "pending-smart-proposals.json";
@@ -1139,14 +1140,17 @@ async function initializeSmartAddLLM(dir: string, format?: string): Promise<void
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
 
-  if (format === "json") return;
   const vendor = getLLMVendor();
-  if (vendor) info(`Using ${vendor} for reasoning.`);
   llmDebug(`resolved vendor=${vendor ?? "unknown"} configDir=${rexConfigDir}`);
-  const authMode = getAuthMode();
-  llmDebug(`resolved authMode=${authMode ?? "unknown"}`);
-  if (authMode === "api") {
-    info("Using direct API authentication.");
+  if (vendor) {
+    printVendorModelHeader(vendor, llmConfig, { format });
+  }
+  if (format !== "json") {
+    const authMode = getAuthMode();
+    llmDebug(`resolved authMode=${authMode ?? "unknown"}`);
+    if (authMode === "api") {
+      info("Using direct API authentication.");
+    }
   }
 }
 

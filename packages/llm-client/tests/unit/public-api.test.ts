@@ -69,6 +69,8 @@ import type {
   UsageDefinition,
   // provider-registry.ts
   ProviderFactory,
+  // vendor-header.ts
+  VendorModelHeaderOptions,
 } from "../../src/public.js";
 
 // Value imports (present at runtime; used directly in assertions below).
@@ -137,6 +139,8 @@ import {
   isQuiet,
   info,
   result,
+  // vendor-header.ts
+  printVendorModelHeader,
   // suggest.ts
   editDistance,
   suggestCommands,
@@ -375,6 +379,10 @@ describe("public API — utility exports", () => {
 
   it("exports result as a function", () => {
     expect(typeof result).toBe("function");
+  });
+
+  it("exports printVendorModelHeader as a function", () => {
+    expect(typeof printVendorModelHeader).toBe("function");
   });
 
   it("exports editDistance as a function", () => {

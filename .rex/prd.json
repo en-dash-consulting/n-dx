@@ -24531,7 +24531,7 @@
             {
               "id": "08f6d0b0-9462-494e-adf9-2830113caede",
               "title": "Surface active vendor and model in ndx console output",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Display the resolved vendor and model at the start of every ndx command that performs LLM calls, so operators can confirm what is being used without inspecting config files. The output should show the vendor name, resolved model ID, and whether the model was explicitly configured or defaulted. This replaces any existing ad-hoc model logging and provides a consistent prefix line across commands.",
               "acceptanceCriteria": [
@@ -24546,7 +24546,8 @@
                 "ux",
                 "cli"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T14:03:48.313Z"
             }
           ]
         }

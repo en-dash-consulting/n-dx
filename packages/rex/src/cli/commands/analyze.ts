@@ -38,6 +38,7 @@ import type { PRDItem, PRDDocument, AnalyzeTokenUsage, LoEConfig } from "../../s
 import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
+import { printVendorModelHeader } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 
 const PENDING_FILE = "pending-proposals.json";
@@ -381,12 +382,16 @@ async function initLLMClients(
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
 
-  if (!noLlm && format !== "json") {
+  if (!noLlm) {
     const vendor = getLLMVendor();
-    if (vendor) info(`Using ${vendor} for reasoning.`);
-    const authMode = getAuthMode();
-    if (authMode === "api") {
-      info("Using direct API authentication.");
+    if (vendor) {
+      printVendorModelHeader(vendor, llmConfig, { format });
+    }
+    if (format !== "json") {
+      const authMode = getAuthMode();
+      if (authMode === "api") {
+        info("Using direct API authentication.");
+      }
     }
   }
 
