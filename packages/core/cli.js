@@ -84,6 +84,11 @@ import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
 } from "./child-lifecycle.js";
+// Foundation-tier import — @n-dx/llm-client process utilities are explicitly
+// permitted for direct import by all tiers (gateway-rules.json: "other tiers
+// may import directly"). This narrow import provides process-level configuration
+// only; no domain logic crosses the tier boundary.
+import { suppressKnownDeprecations } from "@n-dx/llm-client";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -1396,6 +1401,8 @@ process.on("unhandledRejection", (err) => {
 });
 
 // ── Main dispatch ────────────────────────────────────────────────────────────
+
+suppressKnownDeprecations();
 
 try {
   await main();

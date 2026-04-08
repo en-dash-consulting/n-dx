@@ -24,7 +24,7 @@ import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireHenchDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { CLI_ERROR_CODES, formatTypoSuggestion } from "../prd/llm-gateway.js";
+import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "../prd/llm-gateway.js";
 
 function parseArgs(argv: string[]): {
   command: string | undefined;
@@ -162,4 +162,5 @@ async function main(): Promise<void> {
   }
 }
 
+suppressKnownDeprecations();
 main();

@@ -243,6 +243,9 @@ export {
   formatTypoSuggestion,
 } from "./suggest.js";
 
+// Deprecation warning filter (CLI entry points)
+export { suppressKnownDeprecations } from "./suppress-deprecations.js";
+
 // CLI help formatting
 export {
   isColorEnabled,

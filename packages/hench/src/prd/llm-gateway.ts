@@ -54,6 +54,9 @@ export { toCanonicalJSON } from "@n-dx/llm-client";
 // ---- CLI output control -----------------------------------------------------
 export { setQuiet, isQuiet, info, result, warn } from "@n-dx/llm-client";
 
+// ---- Deprecation filter (CLI entry points) ----------------------------------
+export { suppressKnownDeprecations } from "@n-dx/llm-client";
+
 // ---- Vendor/model header ----------------------------------------------------
 export { printVendorModelHeader } from "@n-dx/llm-client";
 export type { VendorModelHeaderOptions } from "@n-dx/llm-client";
