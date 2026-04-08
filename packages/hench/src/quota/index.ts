@@ -6,10 +6,15 @@
  *
  * ## Provider coverage
  *
+ * Claude (Anthropic): budget-based — reads the configured weekly token budget
+ * from .n-dx.json (tokenUsage.weeklyBudget) and accumulated spend from
+ * .hench/runs/*.json for the current ISO week.  Active when a weekly budget
+ * is configured; silently skipped otherwise.
+ *
  * Codex (OpenAI): fetches real-time quota from the OpenAI billing API when
  * OPENAI_API_KEY (or llm.codex.api_key in .n-dx.json) is configured.
  *
- * On any fetch failure the provider is silently skipped so the caller's
+ * On any failure either provider is silently skipped so the caller's
  * inter-run loop is never interrupted by quota-check errors.
  */
 
@@ -22,9 +27,13 @@ export type {
   FetchCodexQuotaOptions,
 } from "./codex-quota.js";
 export { fetchCodexQuota } from "./codex-quota.js";
+export type { ClaudeQuotaResult, FetchClaudeQuotaOptions } from "./claude-quota.js";
+export { fetchClaudeQuota } from "./claude-quota.js";
 
 import { fetchCodexQuota } from "./codex-quota.js";
-import { loadLLMConfig, NEWEST_MODELS, resolveVendorModel } from "../prd/llm-gateway.js";
+import { fetchClaudeQuota } from "./claude-quota.js";
+import { loadLLMConfig, resolveVendorModel } from "../prd/llm-gateway.js";
+import type { LLMConfig } from "../prd/llm-gateway.js";
 import type { QuotaRemaining } from "./types.js";
 
 /**
@@ -37,6 +46,9 @@ import type { QuotaRemaining } from "./types.js";
  *
  * ## Provider resolution
  *
+ * Claude: attempted unconditionally (no API key required); returns data only
+ * when a weekly token budget is configured in .n-dx.json.
+ *
  * Codex: attempted when OPENAI_API_KEY is set or llm.codex.api_key appears
  * in .n-dx.json (read from process.cwd()).  Failures are silently discarded
  * to preserve inter-run loop continuity.
@@ -46,28 +58,42 @@ import type { QuotaRemaining } from "./types.js";
 export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
   const results: QuotaRemaining[] = [];
 
-  // ── Codex (OpenAI) ──────────────────────────────────────────────────────
-  const apiKey = process.env["OPENAI_API_KEY"];
-  let codexApiKey: string | undefined = apiKey;
-  let codexModel: string = NEWEST_MODELS.codex;
-
+  // Load LLM config once — shared between both provider sections.
+  let llmConfig: LLMConfig = {};
   try {
-    const llmConfig = await loadLLMConfig(process.cwd());
-    if (llmConfig.codex?.api_key) {
-      codexApiKey = llmConfig.codex.api_key;
-    }
-    codexModel = resolveVendorModel("codex", llmConfig);
+    llmConfig = await loadLLMConfig(process.cwd());
   } catch {
-    // Config load failure is non-fatal — fall back to env var and default model.
+    // Config load failure is non-fatal — each provider falls back gracefully.
   }
 
-  if (codexApiKey) {
-    const codexResult = await fetchCodexQuota({ apiKey: codexApiKey, model: codexModel });
-    if (codexResult.ok) {
-      results.push(codexResult.quota);
+  // ── Claude (Anthropic) ──────────────────────────────────────────────────────
+  // Budget-based: reads .n-dx.json weeklyBudget + .hench/runs/ accumulated spend.
+  // fetchClaudeQuota returns ok:false when no budget is configured — silent skip.
+  {
+    const claudeModel = resolveVendorModel("claude", llmConfig);
+    const claudeResult = fetchClaudeQuota({
+      projectDir: process.cwd(),
+      model: claudeModel,
+    });
+    if (claudeResult.ok) {
+      results.push(claudeResult.quota);
     }
-    // On failure: silently skip — the inter-run loop must never be interrupted
-    // by quota-check errors.
+  }
+
+  // ── Codex (OpenAI) ──────────────────────────────────────────────────────────
+  // Real-time: queries the OpenAI billing API when an API key is available.
+  {
+    const codexApiKey = llmConfig.codex?.api_key ?? process.env["OPENAI_API_KEY"];
+    const codexModel = resolveVendorModel("codex", llmConfig);
+
+    if (codexApiKey) {
+      const codexResult = await fetchCodexQuota({ apiKey: codexApiKey, model: codexModel });
+      if (codexResult.ok) {
+        results.push(codexResult.quota);
+      }
+      // On failure: silently skip — the inter-run loop must never be interrupted
+      // by quota-check errors.
+    }
   }
 
   return results;

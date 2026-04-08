@@ -24730,17 +24730,19 @@
     {
       "id": "e6bbdd09-5653-44a2-a494-9eab083fd5f0",
       "title": "LLM Integration",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "642df761-d076-4309-bd5c-edba76604dfd",
           "title": "Between-Run API Quota Status Logging",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "After each hench run completes, check remaining API quota or configured budget headroom for Claude and Codex providers and report it to the user in the run log with color-coded warnings at threshold boundaries.",
           "source": "smart-add",
+          "startedAt": "2026-04-08T20:46:18.155Z",
+          "completedAt": "2026-04-08T20:46:18.155Z",
           "children": [
             {
               "id": "af8ede6d-f8ff-4460-9816-34ed51c3fa7d",
@@ -24767,7 +24769,7 @@
             {
               "id": "41169580-92d1-4032-b5ee-60ef39f13c52",
               "title": "Implement budget-based percent-remaining calculation for active providers",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Fill in the quota check logic introduced by the previous task. Query accumulated spend vs. configured weekly budget for each active provider (Claude, Codex) using the existing token usage tracking infrastructure and/or provider-reported rate-limit headers captured during the run. Compute percent remaining per provider/model and return the typed result array. Degrade silently when quota data is unavailable or budget is not configured.",
               "acceptanceCriteria": [
@@ -24782,7 +24784,9 @@
                 "quota",
                 "hench"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:28:30.708Z",
+              "completedAt": "2026-04-08T20:46:17.870Z"
             },
             {
               "id": "4fbde3c0-c586-45c1-9309-fab162520b05",
@@ -24861,7 +24865,9 @@
         "matchedItemLevel": "epic",
         "matchedItemStatus": "completed",
         "createdAt": "2026-04-08T16:18:20.755Z"
-      }
+      },
+      "startedAt": "2026-04-08T20:46:18.361Z",
+      "completedAt": "2026-04-08T20:46:18.361Z"
     },
     {
       "id": "877432ac-c7a2-45b2-ba6b-298e55a75be2",
@@ -24915,6 +24921,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-08T20:27:58.353Z",
+      "completedAt": "2026-04-08T20:27:58.353Z",
       "children": [
         {
           "id": "c513f257-7f0b-4bce-9bf5-82f5cc909ef0",
@@ -25027,9 +25035,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-08T20:27:58.353Z",
-      "completedAt": "2026-04-08T20:27:58.353Z"
+      ]
     },
     {
       "id": "991a796e-b75b-4b3a-ba85-f6a494ec99cb",
