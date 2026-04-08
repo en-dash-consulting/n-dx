@@ -213,7 +213,7 @@ export function formatRecap(results) {
     `  ${dim("  " + TOOL_NAME + ' add "feature"    add requirements to the PRD')}`,
     `  ${dim("  " + TOOL_NAME + " work .           pick up a task and start building")}`,
     "",
-    `  ${dim("Or open claude or codex and try /ndx-plan to get started")}`,
+    `  ${dim("Or open claude or codex and try /ndx-status or /ndx-capture to get started")}`,
     "",
   ].join("\n");
 }
