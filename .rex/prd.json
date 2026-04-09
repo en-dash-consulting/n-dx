@@ -25778,17 +25778,21 @@
     {
       "id": "5f15fa5d-0d68-4911-bbb0-6fa0d6c0cead",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-09T18:32:06.608Z",
+      "completedAt": "2026-04-09T18:32:06.608Z",
       "children": [
         {
           "id": "eb21a965-6d17-4ee7-b6bd-0f1e6d07ff33",
           "title": "ANSI Color Reset Consistency in Tool Output",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Tool output lines using blue (and potentially other) ANSI colors do not emit a reset code at the end of the line, causing the color to bleed into subsequent terminal output. This is a correctness issue in the color formatting layer — every colorized segment must close with a reset so downstream text renders in the default terminal color.",
           "source": "smart-add",
+          "startedAt": "2026-04-09T18:32:06.317Z",
+          "completedAt": "2026-04-09T18:32:06.317Z",
           "children": [
             {
               "id": "5f17b7af-ba00-43a6-8c6c-dcd5c8bf1d00",
@@ -25816,7 +25820,7 @@
             {
               "id": "dbb2f5ef-4e60-431a-9e9f-8ade8f2eba28",
               "title": "Add regression tests for ANSI color reset and line-boundary consistency",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Add targeted tests that assert colorized CLI output strings always contain a reset code at the end of each colored segment. Tests should cover the shared color utility and at least one representative output path from each CLI tool (rex, hench, sourcevision). Prevents future contributors from reintroducing missing resets when adding new color usage.",
               "acceptanceCriteria": [
@@ -25833,7 +25837,8 @@
                 "test"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-09T18:14:03.723Z"
+              "startedAt": "2026-04-09T18:14:03.723Z",
+              "completedAt": "2026-04-09T18:32:06.024Z"
             }
           ]
         }
