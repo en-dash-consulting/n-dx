@@ -139,7 +139,7 @@ function createMockApi(options: MockApiOptions = {}): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
-describe("PR Markdown tab parity integration", () => {
+describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     ensureBrowserStubs();

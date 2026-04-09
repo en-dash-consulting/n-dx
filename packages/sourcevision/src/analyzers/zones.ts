@@ -240,15 +240,17 @@ function addStabilityEdges(
 // ── Zone identity preservation ───────────────────────────────────────────────
 
 /** Default minimum file overlap ratio to inherit previous zone identity.
- * Uses directional overlap (fraction of previous zone's files in the new zone)
- * rather than Jaccard, so zones that grow by absorbing new files still match. */
+ * Requires strong overlap from both the previous and new zone perspectives so
+ * a large merged zone cannot inherit the identity of a tiny prior zone it
+ * happens to fully contain. */
 const ZONE_OVERLAP_THRESHOLD = 0.5;
 
 /**
  * Preserve previous zone IDs and names when a new zone has high file overlap
  * with a previous zone. Uses a greedy best-match approach: for each new zone,
- * find the previous zone with the highest Jaccard overlap; if it exceeds the
- * threshold, inherit the previous ID/name/description.
+ * find the previous zone with the strongest reciprocal overlap; if both the
+ * previous-zone retention and new-zone retention exceed the threshold, inherit
+ * the previous ID/name/description.
  *
  * This prevents the LLM from inventing new names for zones whose file
  * membership barely changed — the #1 source of zone identity instability.
@@ -276,14 +278,16 @@ export function preservePreviousZoneIdentity(
     for (const prev of prevFileSets) {
       if (usedPrevIds.has(prev.zone.id)) continue;
 
-      // Directional overlap: what fraction of the previous zone's files
-      // appear in this new zone. This handles zones that grow (absorb files)
-      // better than Jaccard, which penalizes size differences.
+      // Require strong overlap in both directions. This still allows modest
+      // growth or shrinkage, but avoids renaming a large merged zone after a
+      // tiny predecessor that happens to be fully contained within it.
       let intersection = 0;
       for (const f of prev.files) {
         if (newFiles.has(f)) intersection++;
       }
-      const overlap = prev.files.size > 0 ? intersection / prev.files.size : 0;
+      const prevOverlap = prev.files.size > 0 ? intersection / prev.files.size : 0;
+      const newOverlap = newFiles.size > 0 ? intersection / newFiles.size : 0;
+      const overlap = Math.min(prevOverlap, newOverlap);
 
       if (overlap >= threshold && (!bestMatch || overlap > bestMatch.overlap)) {
         bestMatch = { zone: prev.zone, overlap };

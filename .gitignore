@@ -27,3 +27,5 @@ docs/.vitepress/cache/
 scripts/HENCH_CALLGRAPH_FINDINGS.md
 
 .github/issues/
+
+*.local.json

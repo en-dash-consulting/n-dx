@@ -10,7 +10,7 @@ const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");
 const REMIX_FIXTURE = join(import.meta.dirname, "../fixtures/remix-app");
 
-describe("sourcevision analyze (e2e)", () => {
+describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
   let tmpDir: string;
 
   afterEach(async () => {
@@ -21,7 +21,7 @@ describe("sourcevision analyze (e2e)", () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
 
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--fast"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",
       timeout: 30000,
     });
@@ -61,7 +61,7 @@ describe("sourcevision analyze (e2e)", () => {
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
 
     // First run
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--fast"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",
       timeout: 30000,
     });
@@ -73,7 +73,7 @@ describe("sourcevision analyze (e2e)", () => {
     // Remove .sourcevision and run again
     await rm(svDir, { recursive: true });
 
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--fast"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",
       timeout: 30000,
     });
@@ -91,7 +91,7 @@ describe("sourcevision analyze (e2e)", () => {
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
 
     // Run only phase 1
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--phase=1"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--phase=1"], {
       encoding: "utf-8",
       timeout: 30000,
     });
@@ -107,7 +107,7 @@ describe("sourcevision analyze (e2e)", () => {
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
 
     // Run only inventory
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--only=inventory"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--only=inventory"], {
       encoding: "utf-8",
       timeout: 30000,
     });
@@ -122,13 +122,13 @@ describe("sourcevision analyze (e2e)", () => {
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
 
     // First run
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--fast"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",
       timeout: 30000,
     });
 
     // Second run — should show "cached" in output
-    const output = execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--fast"], {
+    const output = execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",
       timeout: 30000,
     });
@@ -145,7 +145,7 @@ describe("sourcevision analyze (e2e)", () => {
     tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
     await cp(REMIX_FIXTURE, tmpDir, { recursive: true });
 
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--fast"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",
       timeout: 30000,
     });

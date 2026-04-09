@@ -33,5 +33,6 @@ Welcome to the n-dx documentation. Use the sidebar or links below to navigate.
 ## Contributing
 
 - [Testing Conventions](/contributing/testing) — Test tiers and policies
+- [Shared Unit Test Consolidation Baseline](/contributing/shared-unit-test-consolidation-baseline) — Test-only scope and before-change inventory for helper extraction
 - [Package Guidelines](/contributing/package-guidelines) — Package standards
 - [Enforcement Map](/contributing/enforcement) — Architectural rule enforcement

@@ -8,7 +8,14 @@
  *   n-dx config --json [dir]             Output as JSON
  */
 
-import { readFile, writeFile, access, constants, chmod, stat } from "node:fs/promises";
+import {
+  readFile,
+  writeFile,
+  access,
+  constants,
+  chmod,
+  stat,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -39,7 +46,13 @@ const PACKAGES = {
  * Sections stored in .n-dx.json rather than package config files.
  * These are cross-cutting settings that apply to all packages.
  */
-const PROJECT_SECTIONS = new Set(["claude", "llm", "web", "features", "sourcevision"]);
+const PROJECT_SECTIONS = new Set([
+  "claude",
+  "llm",
+  "web",
+  "features",
+  "sourcevision",
+]);
 
 /**
  * Valid values for the top-level `language` field in .n-dx.json.
@@ -63,6 +76,15 @@ async function loadJSON(path) {
   return JSON.parse(raw);
 }
 
+async function loadOptionalJSON(path) {
+  if (!(await fileExists(path))) return {};
+  try {
+    return await loadJSON(path);
+  } catch {
+    return {};
+  }
+}
+
 async function saveJSON(path, data) {
   await writeFile(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
@@ -75,7 +97,8 @@ async function saveProjectJSON(path, data) {
   await saveJSON(path, data);
   const hasSensitiveData =
     (data?.claude?.api_key && typeof data.claude.api_key === "string") ||
-    (data?.llm?.claude?.api_key && typeof data.llm.claude.api_key === "string") ||
+    (data?.llm?.claude?.api_key &&
+      typeof data.llm.claude.api_key === "string") ||
     (data?.llm?.codex?.api_key && typeof data.llm.codex.api_key === "string");
   if (hasSensitiveData) {
     await chmod(path, 0o600);
@@ -111,14 +134,29 @@ function deepMerge(target, source) {
  * Load the project-level .n-dx.json config from the project root.
  * Returns an empty object if the file doesn't exist or is invalid.
  */
-async function loadProjectConfig(dir) {
-  const configPath = join(dir, PROJECT_CONFIG_FILE);
-  if (!(await fileExists(configPath))) return {};
-  try {
-    return await loadJSON(configPath);
-  } catch {
-    return {};
-  }
+async function loadProjectConfigFile(dir, fileName) {
+  return loadOptionalJSON(join(dir, fileName));
+}
+
+async function loadProjectConfigLayers(dir) {
+  const shared = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
+  const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
+  return {
+    shared,
+    local,
+    merged: deepMerge(shared, local),
+  };
+}
+
+export async function loadProjectConfig(dir) {
+  const { merged } = await loadProjectConfigLayers(dir);
+  return merged;
+}
+
+function isLocalProjectSetting(pkg, settingPath) {
+  if (pkg === "claude") return settingPath === "cli_path";
+  if (pkg === "llm") return settingPath.endsWith(".cli_path");
+  return false;
 }
 
 /**
@@ -227,15 +265,14 @@ async function validateCliPath(value) {
   } catch {
     throw new Error(
       `File not found: ${value}\n` +
-        "  Provide an absolute path to the Claude Code CLI binary."
+        "  Provide an absolute path to the Claude Code CLI binary.",
     );
   }
   try {
     await access(value, constants.X_OK);
   } catch {
     throw new Error(
-      `File is not executable: ${value}\n` +
-        "  Run: chmod +x " + value
+      `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
     );
   }
 }
@@ -274,8 +311,7 @@ async function validateCodexCliPath(value) {
     await access(value, constants.X_OK);
   } catch {
     throw new Error(
-      `File is not executable: ${value}\n` +
-        "  Run: chmod +x " + value,
+      `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
     );
   }
 }
@@ -288,7 +324,7 @@ function validateApiKey(value) {
   if (typeof value !== "string" || !value.startsWith("sk-ant-")) {
     throw new Error(
       `Invalid API key format. Anthropic keys start with "sk-ant-".\n` +
-        "  Get your key at: https://console.anthropic.com/settings/keys"
+        "  Get your key at: https://console.anthropic.com/settings/keys",
     );
   }
 }
@@ -303,7 +339,10 @@ function validateApiKey(value) {
  */
 async function testApiConnection(apiKey, endpoint, model) {
   try {
-    const baseUrl = (endpoint || "https://api.anthropic.com").replace(/\/+$/, "");
+    const baseUrl = (endpoint || "https://api.anthropic.com").replace(
+      /\/+$/,
+      "",
+    );
     const res = await fetch(`${baseUrl}/v1/messages`, {
       method: "POST",
       headers: {
@@ -357,14 +396,14 @@ function validateApiEndpoint(value) {
     const url = new URL(value);
     if (!["http:", "https:"].includes(url.protocol)) {
       throw new Error(
-        `Invalid protocol "${url.protocol}". Use http:// or https://.`
+        `Invalid protocol "${url.protocol}". Use http:// or https://.`,
       );
     }
   } catch (err) {
     if (err.message.startsWith("Invalid protocol")) throw err;
     throw new Error(
       `Invalid URL: "${value}"\n` +
-        "  Provide a valid HTTP(S) URL (e.g., https://api.anthropic.com)."
+        "  Provide a valid HTTP(S) URL (e.g., https://api.anthropic.com).",
     );
   }
 }
@@ -396,9 +435,10 @@ function testCliPath(cliPath) {
   } catch (err) {
     return {
       ok: false,
-      error: err.code === "ENOENT"
-        ? `File not found: ${cliPath}`
-        : `Failed to run: ${err.message}`,
+      error:
+        err.code === "ENOENT"
+          ? `File not found: ${cliPath}`
+          : `Failed to run: ${err.message}`,
     };
   }
 }
@@ -448,23 +488,15 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
     const binary = llmConfig?.codex?.cli_path || "codex";
     return {
       binary,
-      args: [
-        "exec",
-        "--skip-git-repo-check",
-        "Reply with exactly: ok",
-      ],
+      args: ["exec", "--skip-git-repo-check", "Reply with exactly: ok"],
     };
   }
 
-  const binary = llmConfig?.claude?.cli_path || legacyClaudeConfig?.cli_path || "claude";
+  const binary =
+    llmConfig?.claude?.cli_path || legacyClaudeConfig?.cli_path || "claude";
   return {
     binary,
-    args: [
-      "-p",
-      "Reply with exactly: ok",
-      "--output-format",
-      "json",
-    ],
+    args: ["-p", "Reply with exactly: ok", "--output-format", "json"],
   };
 }
 
@@ -473,7 +505,11 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
  * Returns an object instead of throwing so callers can branch deterministically.
  */
 function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
-  const { binary, args } = getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig);
+  const { binary, args } = getVendorAuthPreflightCommand(
+    vendor,
+    llmConfig,
+    legacyClaudeConfig,
+  );
   try {
     execFileSync(binary, args, {
       encoding: "utf-8",
@@ -483,20 +519,34 @@ function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
     });
     return { ok: true, binary, args };
   } catch (err) {
-    const stderr = typeof err?.stderr === "string"
-      ? err.stderr
-      : Buffer.isBuffer(err?.stderr) ? err.stderr.toString("utf-8") : "";
-    const stdout = typeof err?.stdout === "string"
-      ? err.stdout
-      : Buffer.isBuffer(err?.stdout) ? err.stdout.toString("utf-8") : "";
+    const stderr =
+      typeof err?.stderr === "string"
+        ? err.stderr
+        : Buffer.isBuffer(err?.stderr)
+          ? err.stderr.toString("utf-8")
+          : "";
+    const stdout =
+      typeof err?.stdout === "string"
+        ? err.stdout
+        : Buffer.isBuffer(err?.stdout)
+          ? err.stdout.toString("utf-8")
+          : "";
     const combined = stderr || stdout || err?.message || "";
     // Claude Code refuses to run nested inside another Claude Code session.
     // This error means the binary is present and the user is authenticated.
-    if (combined.includes("cannot be launched inside another Claude Code session")) {
+    if (
+      combined.includes("cannot be launched inside another Claude Code session")
+    ) {
       return { ok: true, binary, args };
     }
     const detail = combined.trim() || "unknown error";
-    return { ok: false, binary, args, detail };
+    return {
+      ok: false,
+      binary,
+      args,
+      detail,
+      errorCode: typeof err?.code === "string" ? err.code : undefined,
+    };
   }
 }
 
@@ -504,8 +554,136 @@ function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
  * Return the exact login command for the selected provider.
  */
 function getVendorLoginCommand(vendor, llmConfig, legacyClaudeConfig) {
-  const { binary } = getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig);
+  const { binary } = getVendorAuthPreflightCommand(
+    vendor,
+    llmConfig,
+    legacyClaudeConfig,
+  );
   return `${binary} login`;
+}
+
+function isBareCommand(binary) {
+  return (
+    typeof binary === "string" &&
+    binary.length > 0 &&
+    !binary.includes("/") &&
+    !binary.includes("\\")
+  );
+}
+
+function hasClaudeAuthenticatedEvidence(detailLower) {
+  return [
+    "already authenticated",
+    "already logged in",
+    "logged in as",
+    "authenticated as",
+    "personal account authenticated",
+    "enterprise account authenticated",
+  ].some((phrase) => detailLower.includes(phrase));
+}
+
+function hasClaudeAuthRequiredEvidence(detailLower) {
+  return (
+    detailLower.includes("please login") ||
+    detailLower.includes("not logged in") ||
+    detailLower.includes("login required")
+  );
+}
+
+function formatClaudePreflightFailure(preflight) {
+  const detail = preflight.detail || "unknown error";
+  const detailLower = detail.toLowerCase();
+  const binary = preflight.binary;
+  const retryCommand = "ndx config llm.vendor claude";
+
+  if (preflight.errorCode === "ENOENT" || detail.includes("ENOENT")) {
+    if (binary === "claude" || !isBareCommand(binary)) {
+      return {
+        code: "NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED",
+        lines: [
+          "Install the Claude Code CLI before selecting Claude for this project.",
+          "Install command: npm install -g @anthropic-ai/claude-code",
+          `Verify installation: ${binary === "claude" ? "claude" : binary} --version`,
+          `Retry after installation: ${retryCommand}`,
+        ],
+      };
+    }
+
+    return {
+      code: "NDX_CLAUDE_PREFLIGHT_NOT_ON_PATH",
+      lines: [
+        "Verify what ndx can resolve from this shell and fix PATH resolution before retrying.",
+        `Check PATH resolution: command -v ${binary}`,
+        `If the binary exists elsewhere, either update PATH or set 'n-dx config llm.claude.cli_path /absolute/path/to/claude'.`,
+        `Retry after fixing PATH: ${retryCommand}`,
+      ],
+    };
+  }
+
+  if (hasClaudeAuthenticatedEvidence(detailLower)) {
+    return {
+      code: "NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED",
+      lines: [
+        "Claude appears to be installed, but ndx could not launch a usable executable from this environment.",
+        `Verify the executable ndx can launch: '${binary} --version'`,
+        `If that succeeds, run the same binary directly with the preflight arguments and confirm it works outside ndx.`,
+        "If ndx is resolving the wrong executable, update PATH or set 'n-dx config llm.claude.cli_path /absolute/path/to/claude'.",
+        `Retry after fixing the executable resolution: ${retryCommand}`,
+      ],
+    };
+  }
+
+  if (hasClaudeAuthRequiredEvidence(detailLower)) {
+    return {
+      code: "NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED",
+      lines: [
+        `Next step: run '${getVendorLoginCommand("claude", { claude: { cli_path: binary } })}', then retry '${retryCommand}'.`,
+      ],
+    };
+  }
+
+  return {
+    code: "NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED",
+    lines: [
+      "Claude appears to be installed, but ndx could not launch a usable executable from this environment.",
+      `Verify the executable ndx can launch: '${binary} --version'`,
+      `If that succeeds, run the same binary directly with the preflight arguments and confirm it works outside ndx.`,
+      "If ndx is resolving the wrong executable, update PATH or set 'n-dx config llm.claude.cli_path /absolute/path/to/claude'.",
+      `Retry after fixing the executable resolution: ${retryCommand}`,
+    ],
+  };
+}
+
+function printVendorPreflightFailure(
+  vendor,
+  preflight,
+  llmConfig,
+  legacyClaudeConfig,
+) {
+  console.error(
+    `Provider auth preflight failed for "${vendor}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
+  );
+  if (preflight.detail) {
+    console.error(`Details: ${preflight.detail}`);
+  }
+
+  if (vendor !== "claude") {
+    const loginCommand = getVendorLoginCommand(
+      vendor,
+      llmConfig,
+      legacyClaudeConfig,
+    );
+    console.error(
+      `Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${vendor}'.`,
+    );
+    return;
+  }
+
+  const classified = formatClaudePreflightFailure(preflight);
+  console.error(`[${classified.code}]`);
+  for (const line of classified.lines) {
+    console.error(line);
+  }
 }
 
 // ── Display ──────────────────────────────────────────────────────────────────
@@ -524,11 +702,7 @@ function flattenConfig(obj, prefix = "") {
   const entries = [];
   for (const [key, value] of Object.entries(obj)) {
     const path = prefix ? `${prefix}.${key}` : key;
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value)
-    ) {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       entries.push(...flattenConfig(value, path));
     } else {
       entries.push({ path, value });
@@ -598,11 +772,12 @@ Hench guard settings (security boundaries):
 Sourcevision manifest (.sourcevision/manifest.json):
   sourcevision.*           (read-only, generated by analysis)
 
-Claude settings (.n-dx.json — shared across all packages):
+Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
   claude.cli_path          string    Path to Claude Code CLI binary (optional)
                                     When set, hench uses this path instead of looking
                                     for "claude" on PATH. Validated: must exist and be
                                     executable. Use --force to skip validation.
+                                    Stored in .n-dx.local.json.
   claude.api_key           string    Anthropic API key (optional)
                                     When set, packages use this key instead of reading
                                     from the ANTHROPIC_API_KEY environment variable.
@@ -620,17 +795,25 @@ Claude settings (.n-dx.json — shared across all packages):
                                     Examples: claude-sonnet-4-6, claude-opus-4-20250514
                                     Default: claude-sonnet-4-6
 
-LLM vendor settings (.n-dx.json — preferred for multi-vendor setup):
+LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendor setup):
   llm.vendor               string    Active LLM vendor: "claude" or "codex"
                                     Required for multi-vendor workflows.
   llm.claude.cli_path      string    Claude CLI path (optional; validated executable)
+                                    Stored in .n-dx.local.json.
   llm.claude.api_key       string    Claude API key (optional)
   llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
   llm.claude.model         string    Claude default model (optional)
   llm.codex.cli_path       string    Codex CLI path (optional; validated executable)
+                                    Stored in .n-dx.local.json.
   llm.codex.api_key        string    Codex API key (optional)
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
   llm.codex.model          string    Codex default model (optional)
+
+Claude preflight error codes:
+  NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED  Claude CLI is not installed; install it before retrying
+  NDX_CLAUDE_PREFLIGHT_NOT_ON_PATH    Configured Claude command is not resolvable on PATH
+  NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED  Claude CLI is present but needs authentication
+  NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED  Claude appears authenticated/installed, but ndx cannot launch a usable executable
 
 Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.rex.showTokenBudget      boolean   Show token budget on task items (default: false)
@@ -825,7 +1008,9 @@ async function loadAllConfigs(dir) {
 async function handleTestConnection(configs) {
   const claudeConfig = configs.claude;
   if (!claudeConfig) {
-    console.error("No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.");
+    console.error(
+      "No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.",
+    );
     process.exit(1);
   }
 
@@ -841,7 +1026,9 @@ async function handleTestConnection(configs) {
     );
     if (result.ok) {
       const endpoint = claudeConfig.api_endpoint || "https://api.anthropic.com";
-      console.log(`Testing API key... ✓ API key is valid (endpoint: ${endpoint}).`);
+      console.log(
+        `Testing API key... ✓ API key is valid (endpoint: ${endpoint}).`,
+      );
     } else {
       console.error("Testing API key... ✗ " + result.error);
       hasFailure = true;
@@ -852,7 +1039,9 @@ async function handleTestConnection(configs) {
     tested = true;
     const result = testCliPath(claudeConfig.cli_path);
     if (result.ok) {
-      console.log("Testing CLI path... ✓ " + (result.version || "CLI is available."));
+      console.log(
+        "Testing CLI path... ✓ " + (result.version || "CLI is available."),
+      );
     } else {
       console.error("Testing CLI path... ✗ " + result.error);
       hasFailure = true;
@@ -871,10 +1060,23 @@ async function handleTestConnection(configs) {
 // ── SET mode handlers ────────────────────────────────────────────────────────
 
 /** Coerce and validate a value for a project-level section key. */
-async function coerceAndValidateProjectValue(pkg, settingPath, valueArg, keyArg, configs, flags) {
+async function coerceAndValidateProjectValue(
+  pkg,
+  settingPath,
+  valueArg,
+  keyArg,
+  configs,
+  flags,
+) {
   const existing = getByPath(configs[pkg], settingPath);
-  if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
-    console.error(`Cannot set "${keyArg}" — it's an object. Set individual keys instead.`);
+  if (
+    typeof existing === "object" &&
+    existing !== null &&
+    !Array.isArray(existing)
+  ) {
+    console.error(
+      `Cannot set "${keyArg}" — it's an object. Set individual keys instead.`,
+    );
     process.exit(1);
   }
 
@@ -887,7 +1089,12 @@ async function coerceAndValidateProjectValue(pkg, settingPath, valueArg, keyArg,
   }
 
   // Validate section-specific settings (skip with --force)
-  const validators = pkg === "claude" ? CLAUDE_VALIDATORS : pkg === "llm" ? LLM_VALIDATORS : null;
+  const validators =
+    pkg === "claude"
+      ? CLAUDE_VALIDATORS
+      : pkg === "llm"
+        ? LLM_VALIDATORS
+        : null;
   if (validators && validators[settingPath] && flags.force !== "true") {
     try {
       await validators[settingPath](coerced);
@@ -903,29 +1110,50 @@ async function coerceAndValidateProjectValue(pkg, settingPath, valueArg, keyArg,
 
 /** Run vendor auth preflight when setting llm.vendor. */
 function runLLMVendorPreflight(coerced, configs) {
-  const currentLLM = configs.llm && typeof configs.llm === "object" ? configs.llm : {};
+  const currentLLM =
+    configs.llm && typeof configs.llm === "object" ? configs.llm : {};
   const llmForPreflight = { ...currentLLM, vendor: coerced };
-  const legacyClaude = configs.claude && typeof configs.claude === "object" ? configs.claude : undefined;
+  const legacyClaude =
+    configs.claude && typeof configs.claude === "object"
+      ? configs.claude
+      : undefined;
 
-  const preflight = runVendorAuthPreflight(coerced, llmForPreflight, legacyClaude);
+  const preflight = runVendorAuthPreflight(
+    coerced,
+    llmForPreflight,
+    legacyClaude,
+  );
   if (!preflight.ok) {
-    const loginCommand = getVendorLoginCommand(coerced, llmForPreflight, legacyClaude);
-    console.error(
-      `Provider auth preflight failed for "${coerced}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
+    printVendorPreflightFailure(
+      coerced,
+      preflight,
+      llmForPreflight,
+      legacyClaude,
     );
-    if (preflight.detail) {
-      console.error(`Details: ${preflight.detail}`);
-    }
-    console.error(`Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${coerced}'.`);
     process.exit(1);
   }
 }
 
 /** Handle SET mode for a project-level section (claude, llm, web, features). */
-async function handleSetProjectSection(dir, pkg, settingPath, keyArg, valueArg, configs, flags) {
+async function handleSetProjectSection(
+  dir,
+  pkg,
+  settingPath,
+  keyArg,
+  valueArg,
+  configs,
+  flags,
+) {
   if (!configs[pkg]) configs[pkg] = {};
 
-  const coerced = await coerceAndValidateProjectValue(pkg, settingPath, valueArg, keyArg, configs, flags);
+  const coerced = await coerceAndValidateProjectValue(
+    pkg,
+    settingPath,
+    valueArg,
+    keyArg,
+    configs,
+    flags,
+  );
 
   // Vendor auth preflight for llm.vendor
   if (pkg === "llm" && settingPath === "vendor") {
@@ -974,7 +1202,15 @@ async function handleSetProjectSection(dir, pkg, settingPath, keyArg, valueArg, 
 }
 
 /** Handle SET mode for a package config (rex, hench). */
-async function handleSetPackageConfig(dir, pkg, settingPath, keyArg, valueArg, configs, rawConfigs) {
+async function handleSetPackageConfig(
+  dir,
+  pkg,
+  settingPath,
+  keyArg,
+  valueArg,
+  configs,
+  rawConfigs,
+) {
   if (!PACKAGES[pkg]) {
     console.error(
       `Unknown package "${pkg}". Available: ${[...Object.keys(PACKAGES), ...PROJECT_SECTIONS].join(", ")}`,
@@ -983,12 +1219,16 @@ async function handleSetPackageConfig(dir, pkg, settingPath, keyArg, valueArg, c
   }
 
   if (pkg === "sourcevision") {
-    console.error("Sourcevision manifest is read-only (generated by analysis).");
+    console.error(
+      "Sourcevision manifest is read-only (generated by analysis).",
+    );
     process.exit(1);
   }
 
   if (!configs[pkg]) {
-    console.error(`Package "${pkg}" is not initialized. Run 'n-dx init' first.`);
+    console.error(
+      `Package "${pkg}" is not initialized. Run 'n-dx init' first.`,
+    );
     process.exit(1);
   }
 
@@ -1003,8 +1243,14 @@ async function handleSetPackageConfig(dir, pkg, settingPath, keyArg, valueArg, c
   }
 
   const existing = getByPath(configs[pkg], settingPath);
-  if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
-    console.error(`Cannot set "${keyArg}" — it's an object. Set individual keys instead.`);
+  if (
+    typeof existing === "object" &&
+    existing !== null &&
+    !Array.isArray(existing)
+  ) {
+    console.error(
+      `Cannot set "${keyArg}" — it's an object. Set individual keys instead.`,
+    );
     process.exit(1);
   }
 
@@ -1047,7 +1293,9 @@ function handleGet(keyArg, configs, flags) {
     const pkg = keyArg;
     if (!configs[pkg]) {
       if (PROJECT_SECTIONS.has(pkg)) {
-        console.error(`No ${pkg} configuration set. Use 'n-dx config ${pkg}.<key> <value>' to add settings.`);
+        console.error(
+          `No ${pkg} configuration set. Use 'n-dx config ${pkg}.<key> <value>' to add settings.`,
+        );
       } else {
         console.error(`Package "${pkg}" is not initialized or has no config.`);
       }
@@ -1154,7 +1402,7 @@ export async function runConfig(args) {
         process.exit(1);
       }
       const configPath = join(dir, PROJECT_CONFIG_FILE);
-      const current = await loadProjectConfig(dir);
+      const current = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
       current.language = valueArg;
       await saveProjectJSON(configPath, current);
       console.log(`language = ${valueArg}`);
@@ -1163,7 +1411,9 @@ export async function runConfig(args) {
 
     const dotIdx = keyArg.indexOf(".");
     if (dotIdx === -1) {
-      console.error(`Invalid key "${keyArg}". Use dot notation: <package>.<setting>`);
+      console.error(
+        `Invalid key "${keyArg}". Use dot notation: <package>.<setting>`,
+      );
       process.exit(1);
     }
 
@@ -1171,9 +1421,25 @@ export async function runConfig(args) {
     const settingPath = keyArg.slice(dotIdx + 1);
 
     if (PROJECT_SECTIONS.has(pkg)) {
-      await handleSetProjectSection(dir, pkg, settingPath, keyArg, valueArg, configs, flags);
+      await handleSetProjectSection(
+        dir,
+        pkg,
+        settingPath,
+        keyArg,
+        valueArg,
+        configs,
+        flags,
+      );
     } else {
-      await handleSetPackageConfig(dir, pkg, settingPath, keyArg, valueArg, configs, rawConfigs);
+      await handleSetPackageConfig(
+        dir,
+        pkg,
+        settingPath,
+        keyArg,
+        valueArg,
+        configs,
+        rawConfigs,
+      );
     }
     return;
   }

@@ -9,9 +9,7 @@ PRD management and implementation workflow CLI. Rex maintains a structured produ
 ## Install
 
 ```bash
-npm install -g rex
-# or link locally
-npm link
+pnpm add -g @n-dx/core
 ```
 
 ## Quick start

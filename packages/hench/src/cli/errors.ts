@@ -17,8 +17,10 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+  CLI_ERROR_CODES,
   CLIError as BaseCLIError,
   ClaudeClientError,
+  type CLIErrorCode,
   PROJECT_DIRS,
   isExecutableOnPath,
   classifyVendorError,
@@ -35,8 +37,8 @@ const HENCH_DIR = PROJECT_DIRS.HENCH;
  * so `instanceof ClaudeClientError` checks work across the entire error hierarchy.
  */
 export class CLIError extends BaseCLIError {
-  constructor(message: string, suggestion?: string) {
-    super(message, suggestion);
+  constructor(message: string, suggestion?: string, code?: CLIErrorCode) {
+    super(message, suggestion, code);
     this.name = "CLIError";
   }
 }
@@ -58,6 +60,7 @@ export class EpicNotFoundError extends CLIError {
     super(
       `Epic not found: "${searchTerm}"`,
       `Use an epic ID or title from the PRD.${epicList}`,
+      CLI_ERROR_CODES.EPIC_NOT_FOUND,
     );
     this.name = "EpicNotFoundError";
     this.searchTerm = searchTerm;
@@ -67,15 +70,16 @@ export class EpicNotFoundError extends CLIError {
 
 /**
  * Known error patterns mapped to user-friendly messages and suggestions.
- * Each entry: [regex to match, user-friendly message, suggestion].
+ * Each entry: [regex to match, stable code, user-friendly message, suggestion].
  *
  * These patterns cover operational errors (file system, config, binary lookup)
  * from both Claude and Codex vendors. For semantic error classification
  * (auth, rate-limit, timeout), use {@link classifyVendorError} instead.
  */
-const ERROR_HINTS: Array<[RegExp, string, string]> = [
+const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
   [
     /System memory usage.*exceeds rejection threshold/,
+    CLI_ERROR_CODES.MEMORY_THRESHOLD,
     "",  // Use original message (already user-friendly)
     "Close other applications to free memory.\n" +
     "       To adjust thresholds: hench config guard.memoryThrottle.rejectThreshold <number>\n" +
@@ -83,74 +87,95 @@ const ERROR_HINTS: Array<[RegExp, string, string]> = [
   ],
   [
     /Concurrent process limit reached/,
+    CLI_ERROR_CODES.CONCURRENCY_LIMIT,
     "",  // Use original message (already user-friendly)
     "Active hench processes will release their locks when they finish.\n" +
     "       To change the limit: hench config guard.maxConcurrentProcesses <number>",
   ],
   [
     /ENOENT.*\.hench/,
+    CLI_ERROR_CODES.NOT_INITIALIZED,
     "Hench directory not found.",
     "Run 'n-dx init' to set up the project.",
   ],
   [
     /ENOENT.*\.rex/,
+    CLI_ERROR_CODES.NOT_INITIALIZED,
     "Rex directory not found.",
     "Run 'n-dx init' to set up the project.",
   ],
   [
     /ENOENT.*config\.json/,
+    CLI_ERROR_CODES.CONFIG_NOT_FOUND,
     "Configuration file not found.",
     "Run 'n-dx init' to create default configuration.",
   ],
   [
     /Invalid hench config|Invalid config\.json/,
+    CLI_ERROR_CODES.INVALID_CONFIGURATION,
     "Configuration file is corrupted or has an invalid format.",
     "Check .hench/config.json for syntax errors, or re-initialize with 'n-dx init'.",
   ],
   [
     /Invalid run record/,
+    CLI_ERROR_CODES.INVALID_RUN_RECORD,
     "Run record is corrupted or has an invalid format.",
     "The run data in .hench/runs/ may be damaged. Check the file for syntax errors.",
   ],
   [
     /EACCES/,
+    CLI_ERROR_CODES.PERMISSION_DENIED,
     "Permission denied.",
     "Check file permissions for the .hench/ directory.",
   ],
   [
     /Unexpected token/,
+    CLI_ERROR_CODES.JSON_PARSE_FAILED,
     "Failed to parse JSON file.",
     "Check for syntax errors in the file, or re-initialize with 'n-dx init'.",
   ],
   // Claude CLI
   [
     /claude.*not found|ENOENT.*claude/i,
+    CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
     "Claude CLI not found.",
     "Install it with: npm install -g @anthropic-ai/claude-code\n       Or switch to the API provider: n-dx config hench.provider api",
   ],
   [
     /ANTHROPIC_API_KEY/,
+    CLI_ERROR_CODES.API_KEY_MISSING,
     "Anthropic API key not configured.",
     "Set it via 'n-dx config claude.api_key <key>', the ANTHROPIC_API_KEY environment variable, or use 'n-dx config hench.provider cli' for Claude CLI mode.",
   ],
   // Codex CLI
   [
     /codex.*not found|ENOENT.*codex/i,
+    CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
     "Codex CLI not found.",
     "Install Codex CLI and/or set a custom path: n-dx config llm.codex.cli_path /path/to/codex",
   ],
   [
     /OPENAI_API_KEY/,
+    CLI_ERROR_CODES.API_KEY_MISSING,
     "OpenAI API key not configured.",
     "Set it via 'n-dx config llm.codex.api_key <key>' or the OPENAI_API_KEY environment variable.",
   ],
   // Generic not-found (must come after vendor-specific patterns)
   [
     /not found/i,
+    CLI_ERROR_CODES.RESOURCE_NOT_FOUND,
     "",  // Use original message
     "Check the ID or path and try again.",
   ],
 ];
+
+function renderCLIError(code: CLIErrorCode, message: string, suggestion?: string): string {
+  let formatted = `Error: [${code}] ${message}`;
+  if (suggestion) {
+    formatted += `\nHint: ${suggestion}`;
+  }
+  return formatted;
+}
 
 /**
  * Per-category user-facing suggestions keyed by {@link FailureCategory}.
@@ -187,11 +212,10 @@ export function formatCLIError(err: unknown): string {
   // CLIError hierarchy — catches both hench CLIError and TaskNotActionableError
   // (which extends foundation CLIError from @n-dx/llm-client)
   if (err instanceof BaseCLIError) {
-    let msg = `Error: ${err.message}`;
-    if (err.suggestion) {
-      msg += `\nHint: ${err.suggestion}`;
-    }
-    return msg;
+    const code = "code" in err && typeof err.code === "string"
+      ? err.code as CLIErrorCode
+      : CLI_ERROR_CODES.GENERIC;
+    return renderCLIError(code, err.message, err.suggestion);
   }
 
   // ClaudeClientError (from Claude/Codex providers) — classify into taxonomy
@@ -209,15 +233,15 @@ export function formatCLIError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
 
   // Check for known patterns
-  for (const [pattern, friendly, suggestion] of ERROR_HINTS) {
+  for (const [pattern, code, friendly, suggestion] of ERROR_HINTS) {
     if (pattern.test(message)) {
       const displayMsg = friendly || message;
-      return `Error: ${displayMsg}\nHint: ${suggestion}`;
+      return renderCLIError(code, displayMsg, suggestion);
     }
   }
 
   // Generic fallback — show the message, never the stack
-  return `Error: ${message}`;
+  return renderCLIError(CLI_ERROR_CODES.GENERIC, message);
 }
 
 /**
@@ -265,6 +289,7 @@ export function requireLLMCLI(vendor: "claude" | "codex", customPath?: string): 
       throw new CLIError(
         `${vendor === "codex" ? "Codex" : "Claude"} CLI not found at configured path: ${customPath}`,
         installHint,
+        CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
       );
     }
     return;
@@ -274,6 +299,7 @@ export function requireLLMCLI(vendor: "claude" | "codex", customPath?: string): 
     throw new CLIError(
       `${vendor === "codex" ? "Codex" : "Claude"} CLI not found.`,
       installHint,
+      CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
     );
   }
 }
@@ -287,6 +313,7 @@ export function requireHenchDir(dir: string): void {
     throw new CLIError(
       `Hench directory not found in ${dir}`,
       "Run 'n-dx init' to set up the project, or 'hench init' if using hench standalone.",
+      CLI_ERROR_CODES.NOT_INITIALIZED,
     );
   }
 }

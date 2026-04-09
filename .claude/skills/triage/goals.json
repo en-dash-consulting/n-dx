@@ -1,0 +1,47 @@
+{
+  "project": {
+    "owner": "en-dash-consulting",
+    "repo": "n-dx",
+    "project_number": 3
+  },
+  "priority_levels": ["P0", "P1", "P2"],
+  "strategic_goals": [
+    {
+      "theme": "user-onboarding",
+      "weight": 10,
+      "description": "First-run experience, project setup, init flow, guided walkthroughs",
+      "keywords": ["init", "setup", "install", "onboarding", "first run", "getting started", "new user", "guided", "bootstrap", "quickstart"]
+    },
+    {
+      "theme": "reliability",
+      "weight": 8,
+      "description": "Bugs, crashes, error handling, broken workflows, regressions",
+      "keywords": ["bug", "crash", "error", "failing", "broken", "regression", "loop", "spin", "hang", "timeout", "silent", "stuck"]
+    },
+    {
+      "theme": "developer-experience",
+      "weight": 6,
+      "description": "CLI usability, documentation, discoverability, clear feedback",
+      "keywords": ["CLI", "docs", "documentation", "help", "discovery", "confus", "clarity", "troubleshoot", "UX", "usability", "feedback", "progress"]
+    },
+    {
+      "theme": "autonomous-execution",
+      "weight": 5,
+      "description": "Hench agent quality, auto mode, self-heal, token efficiency",
+      "keywords": ["hench", "auto", "agent", "self-heal", "work", "token", "execution", "autonomous", "iterate"]
+    },
+    {
+      "theme": "platform-support",
+      "weight": 4,
+      "description": "Windows support, cross-platform compatibility",
+      "keywords": ["windows", "cross-platform", "path", "spawn", "EINVAL", "platform"]
+    }
+  ],
+  "label_weights": {
+    "bug": 3,
+    "enhancement": 1,
+    "documentation": 2,
+    "good first issue": 0,
+    "question": 1
+  }
+}

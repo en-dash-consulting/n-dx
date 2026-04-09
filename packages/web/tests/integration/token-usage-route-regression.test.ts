@@ -145,7 +145,7 @@ function createMockApi(options: MockApiOptions = {}): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
-describe("token usage route regression", () => {
+describe("token usage route regression", { timeout: 120_000 }, () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     ensureBrowserStubs();

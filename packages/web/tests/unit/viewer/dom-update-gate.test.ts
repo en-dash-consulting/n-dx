@@ -18,69 +18,37 @@ import {
   startTabVisibilityMonitor,
   resetTabVisibility,
 } from "../../../src/viewer/polling/tab-visibility.js";
+import {
+  createRafController,
+  installTestRaf,
+  setDocumentVisibility,
+  simulateVisibilityChange,
+} from "../../helpers/visibility-test-support.js";
 
 // ─── RAF mock ─────────────────────────────────────────────────────────────────
 
-let rafCallbacks: Array<(time: number) => void> = [];
-let rafIdCounter = 0;
-
-function mockRAF(cb: (time: number) => void): number {
-  rafCallbacks.push(cb);
-  return ++rafIdCounter;
-}
-
-function mockCancelRAF(_id: number): void {
-  // For simplicity, clear all pending (tests use single RAF at a time)
-}
-
-/** Fire all pending RAF callbacks, simulating one animation frame. */
-function flushRAF(): void {
-  const cbs = rafCallbacks;
-  rafCallbacks = [];
-  for (const cb of cbs) {
-    cb(performance.now());
-  }
-}
+const rafController = createRafController();
+const flushRAF = () => rafController.flush();
 
 // ─── Visibility helpers ────────────────────────────────────────────────────────
 
 let originalVisibilityState: string;
 
-function simulateVisibilityChange(state: "visible" | "hidden"): void {
-  Object.defineProperty(document, "visibilityState", {
-    value: state,
-    writable: true,
-    configurable: true,
-  });
-  document.dispatchEvent(new Event("visibilitychange"));
-}
-
 // ─── Setup / Teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.useFakeTimers();
-  rafCallbacks = [];
-  rafIdCounter = 0;
-  vi.stubGlobal("requestAnimationFrame", mockRAF);
-  vi.stubGlobal("cancelAnimationFrame", mockCancelRAF);
+  installTestRaf(rafController);
   originalVisibilityState = document.visibilityState;
   // Default to visible for consistent test behavior
-  Object.defineProperty(document, "visibilityState", {
-    value: "visible",
-    writable: true,
-    configurable: true,
-  });
+  setDocumentVisibility("visible");
   resetTabVisibility();
   startTabVisibilityMonitor();
 });
 
 afterEach(() => {
   resetTabVisibility();
-  Object.defineProperty(document, "visibilityState", {
-    value: originalVisibilityState,
-    writable: true,
-    configurable: true,
-  });
+  setDocumentVisibility(originalVisibilityState);
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
@@ -243,7 +211,7 @@ describe("gate suspension on tab hide", () => {
     // Setter should NOT have been called (no RAF, no render)
     expect(setter).not.toHaveBeenCalled();
     // RAFs should not be requested
-    expect(rafCallbacks.length).toBe(0);
+    expect(rafController.getPendingCount()).toBe(0);
 
     gate.dispose();
     batcher.dispose();
@@ -268,7 +236,7 @@ describe("gate suspension on tab hide", () => {
   });
 
   it("prevents unnecessary RAF scheduling when tab is hidden", () => {
-    const rafSpy = vi.fn(mockRAF);
+    const rafSpy = vi.fn((cb: (time: number) => void) => rafController.requestAnimationFrame(cb));
     vi.stubGlobal("requestAnimationFrame", rafSpy);
 
     const batcher = createUpdateBatcher();

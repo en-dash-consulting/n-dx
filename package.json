@@ -23,7 +23,8 @@
     "release": "changeset publish",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "preflight": "node scripts/preflight.mjs"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.6.0",

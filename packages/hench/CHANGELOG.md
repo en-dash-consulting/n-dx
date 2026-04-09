@@ -1,5 +1,13 @@
 # @n-dx/hench
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [[`deb1b73`](https://github.com/en-dash-consulting/n-dx/commit/deb1b731a25ae3b97e833ecff82b5fa5e9045bba)]:
+  - @n-dx/llm-client@0.2.2
+  - @n-dx/rex@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

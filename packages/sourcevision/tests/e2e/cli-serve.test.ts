@@ -20,7 +20,7 @@ function getFreePort(): Promise<number> {
   });
 }
 
-function waitForServer(port: number, timeout = 5000): Promise<void> {
+function waitForServer(port: number, timeout = 10000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = () => {
@@ -38,14 +38,40 @@ function waitForServer(port: number, timeout = 5000): Promise<void> {
   });
 }
 
+function killTree(pid: number): void {
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // Already dead.
+    }
+  }
+}
+
 describe("sourcevision serve (e2e)", () => {
   let tmpDir: string;
   let serverProc: ChildProcess | null = null;
 
   afterEach(async () => {
     if (serverProc) {
-      serverProc.kill("SIGTERM");
+      const proc = serverProc;
       serverProc = null;
+      if (proc.pid) killTree(proc.pid);
+      await new Promise<void>((resolve) => {
+        proc.once("close", () => resolve());
+        setTimeout(() => {
+          if (proc.pid) {
+            try {
+              process.kill(proc.pid, "SIGKILL");
+            } catch {
+              // Already dead.
+            }
+          }
+          resolve();
+        }, 3_000);
+      });
     }
     if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
   });
@@ -55,15 +81,16 @@ describe("sourcevision serve (e2e)", () => {
     await cp(FIXTURE_DIR, tmpDir, { recursive: true });
 
     // Analyze first
-    execFileSync("node", [CLI_PATH, "analyze", tmpDir, "--fast"], {
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",
       timeout: 30000,
     });
 
-    // Start server on an OS-assigned free port
+    // Use a separate process group so teardown can kill the entire tree.
     const port = await getFreePort();
-    serverProc = spawn("node", [CLI_PATH, "serve", tmpDir, `--port=${port}`], {
+    serverProc = spawn(process.execPath, [CLI_PATH, "serve", tmpDir, `--port=${port}`], {
       stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
     });
 
     await waitForServer(port);

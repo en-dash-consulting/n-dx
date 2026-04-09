@@ -287,14 +287,21 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     const svZoneOverrides = await loadProjectOverrides(ctx.svDir, "sourcevision");
     const zonesConfig = (svZoneOverrides as Record<string, unknown>).zones as Record<string, unknown> | undefined;
     const zonePins = (zonesConfig?.pins ?? {}) as Record<string, string>;
+    const smallZoneMergeThreshold = typeof zonesConfig?.mergeThreshold === "number"
+      ? zonesConfig.mergeThreshold
+      : undefined;
     const pinCount = Object.keys(zonePins).length;
     if (pinCount > 0) {
       info(`  Applying ${pinCount} zone pin(s) from .n-dx.json`);
+    }
+    if (smallZoneMergeThreshold !== undefined) {
+      info(`  Using zone merge threshold ${smallZoneMergeThreshold} from .n-dx.json`);
     }
 
     let zonesResult = await analyzeZones(inventory, importsData, {
       enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset, hints,
       zonePins: pinCount > 0 ? zonePins : undefined,
+      smallZoneMergeThreshold,
     });
     let zones = zonesResult.zones;
     if (zonesResult.tokenUsage) {
@@ -314,6 +321,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
           zonePins: Object.keys(zonePins).length > 0 ? zonePins : undefined,
+          smallZoneMergeThreshold,
           reuseStructure: true,
         });
         zones = zonesResult.zones;

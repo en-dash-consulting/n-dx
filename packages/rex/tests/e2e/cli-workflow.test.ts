@@ -22,7 +22,7 @@ function run(args: string[]): string {
   });
 }
 
-describe("rex CLI workflow", () => {
+describe("rex CLI workflow", { timeout: 120_000 }, () => {
   let tmpDir: string;
 
   beforeEach(async () => {

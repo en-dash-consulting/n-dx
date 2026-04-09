@@ -65,6 +65,7 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "hench-templates":     { product: "hench",        label: "Templates",       productLabel: "Hench" },
   "hench-optimization":  { product: "hench",        label: "Optimization",    productLabel: "Hench" },
   "feature-toggles":     { product: "rex",          label: "Feature Flags",   productLabel: "Settings" },
+  "cli-timeouts":        { product: "global",       label: "CLI Timeouts",    productLabel: "Settings" },
 };
 
 // ---------------------------------------------------------------------------

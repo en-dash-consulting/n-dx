@@ -11,3 +11,4 @@
 export { NotionConfigView } from "./notion-config.js";
 export { IntegrationConfigView } from "./integration-config.js";
 export { FeatureTogglesView } from "./feature-toggles.js";
+export { CliTimeoutsView } from "./cli-timeout.js";

@@ -41,6 +41,7 @@ const ALLOWED = new Set([
   "packages/core/bin/hench.js",
   "packages/core/bin/sourcevision.js",
   "packages/core/cli.js",
+  "packages/core/cli-ink.js",
   "packages/core/ci.js",
   "packages/core/web.js",
   "packages/core/config.js",
@@ -48,6 +49,7 @@ const ALLOWED = new Set([
   "pr-check.js",
   // Development scripts
   "packages/web/dev.js",
+  "scripts/cli-smoke-parity.mjs",
   // Process monitoring — needs raw execFile for system commands (vm_stat, sysctl)
   "packages/hench/src/process/memory-monitor.ts",
   // Git operations — need execFileSync for git CLI calls
@@ -801,11 +803,14 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["cli-binary-shims", "Shim scripts with no internal imports; zero cohesion by design"],
-  ["project-status-hooks", "Small viewer zone (4 files); polling hooks with linear dependency chain"],
-  ["rex-chunked-review", "Small CLI pipeline zone; linear review pipeline with low internal edge count"],
-  ["rex-package-infrastructure", "Package config and metadata zone; no internal import structure"],
-  ["rex-task-verification", "Small utility zone; unrelated verification helpers grouped by Louvain"],
+  ["health", "Small zone; health-check utilities grouped by Louvain; metrics unreliable at this scale"],
+  ["polling", "Small zone; polling hooks grouped by Louvain; metrics unreliable at this scale"],
+  ["project-status-hooks", "Small hooks zone; polling and project-status hooks grouped by Louvain; metrics unreliable at this scale"],
+  ["refresh", "Small zone; refresh utilities grouped by Louvain; metrics unreliable at this scale"],
+  ["rex-chunked-review", "CLI satellite zone; documented dual-fragility zone in CLAUDE.md; cohesion approaching threshold"],
+  ["rex-recommend", "CLI command zone; heterogeneous recommendation concerns grouped by Louvain"],
+  ["web-2", "Small zone; Louvain-detected web utility cluster; metrics unreliable at this scale"],
+  ["web-unit", "Small performance zone; dom-update-gate, update-batcher, test helpers; metrics unreliable at this scale"],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
@@ -1173,6 +1178,8 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
   ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
+  // Core — lazy-loads Ink TUI to avoid loading React for non-init commands
+  ["packages/core/cli.js", "Lazy-loads Ink renderer for animated init UI (TTY only)"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies

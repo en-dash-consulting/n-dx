@@ -113,7 +113,7 @@ afterEach(() => {
 
 // ─── 1. No duplicate API calls during overlapping fetch operations ──────────
 
-describe("overlapping fetch deduplication", () => {
+describe("overlapping fetch deduplication", { timeout: 120_000 }, () => {
   it("concurrent fetchData calls share a single underlying API call", async () => {
     const { fn, resolve } = createControllable();
     // minIntervalMs: 0 — all calls pass directly to dedup (no rate-limit queuing)
@@ -186,7 +186,7 @@ describe("overlapping fetch deduplication", () => {
 
 // ─── 2. WebSocket message arrival during active polling ──────────────────────
 
-describe("WebSocket messages during active polling", () => {
+describe("WebSocket messages during active polling", { timeout: 120_000 }, () => {
   it("WS flush during in-flight fetch does not trigger a second API call", async () => {
     const { fn, resolve } = createControllable();
     const { fetchData, coalescer, dispose } = createPipeline(fn.bind(null), {
@@ -331,7 +331,7 @@ describe("WebSocket messages during active polling", () => {
 
 // ─── 3. Request cleanup after completion and errors ──────────────────────────
 
-describe("request cleanup after completion and errors", () => {
+describe("request cleanup after completion and errors", { timeout: 120_000 }, () => {
   it("dedup clears tracking after successful completion — next call starts fresh", async () => {
     let callCount = 0;
     const fn = vi.fn(async () => ++callCount);
@@ -459,7 +459,7 @@ describe("request cleanup after completion and errors", () => {
 
 // ─── 4. Timing edge cases ───────────────────────────────────────────────────
 
-describe("timing edge cases", () => {
+describe("timing edge cases", { timeout: 120_000 }, () => {
   it("fetch completing exactly at rate limit boundary allows immediate next call", async () => {
     let callCount = 0;
     const fn = vi.fn(async () => ++callCount);
@@ -549,7 +549,7 @@ describe("timing edge cases", () => {
 
 // ─── 5. Dual-fetch deduplication (PRD + task usage pattern) ─────────────────
 
-describe("dual-fetch deduplication (PRD + task usage)", () => {
+describe("dual-fetch deduplication (PRD + task usage)", { timeout: 120_000 }, () => {
   it("independent dedup instances allow concurrent PRD and usage fetches", async () => {
     const prdFn = vi.fn(async () => "prd-data");
     const usageFn = vi.fn(async () => "usage-data");

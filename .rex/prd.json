@@ -19260,7 +19260,18 @@
       "status": "pending",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
-      "startedAt": "2026-04-02T03:23:53.067Z",
+      "startedAt": "2026-04-02T17:55:36.327Z",
+      "mergedProposals": [
+        {
+          "proposalNodeKey": "p0:epic",
+          "proposalTitle": "CLI & Developer Tools / Test Infrastructure",
+          "proposalKind": "epic",
+          "reason": "semantic_title",
+          "score": 0.95,
+          "mergedAt": "2026-04-02T16:40:24.655Z",
+          "source": "smart-add"
+        }
+      ],
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20536,7 +20547,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "completed",
+          "status": "deferred",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
@@ -20551,50 +20562,439 @@
             "dx"
           ],
           "source": "conversation — hit when Steve's Windows cli_path in .n-dx.json broke ndx init on macOS",
-          "startedAt": "2026-04-02T03:07:34.316Z",
-          "completedAt": "2026-04-02T03:23:52.875Z",
-          "resolutionType": "code-change",
-          "resolutionDetail": "Implemented .n-dx.local.json support across the full config stack: config.js (orchestration), llm-client (foundation), and cli.js (init). Machine-specific keys (cli_path variants) auto-route to local file. Deep merge with local wins. 22 new tests, all passing."
+          "startedAt": "2026-04-02T17:55:34.698Z"
         },
         {
-          "id": "4f37d348-3703-4d99-96ce-1f48b2da8a7c",
+          "id": "f9b208b6-43d9-44d3-a1cf-518e956aabd5",
+          "title": "Shared Unit Test Utilities",
+          "status": "completed",
+          "level": "feature",
+          "description": "Reduce duplication across unit tests by consolidating repeated constants and helper functions into test-only shared utilities without changing production code or altering test coverage.",
+          "source": "smart-add",
+          "startedAt": "2026-04-02T17:55:31.910Z",
+          "completedAt": "2026-04-02T17:55:31.910Z",
+          "children": [
+            {
+              "id": "7ed4c848-e4be-4f6e-b495-5d70a9457fec",
+              "title": "Inventory duplicated unit-test constants across suites",
+              "status": "deferred",
+              "level": "task",
+              "description": "Review unit test files to identify repeated constants that appear in more than four files and record where they are used so consolidation candidates are explicitly defined.",
+              "acceptanceCriteria": [
+                "A concrete inventory exists for duplicated constants used in more than four unit test files",
+                "The inventory excludes constants that are unique to a single suite or tightly coupled to one test file"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "maintainability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:55:20.914Z"
+            },
+            {
+              "id": "40d16bdb-e1a6-4619-b52d-163811e82156",
+              "title": "Catalog reusable helper-function patterns in unit tests",
+              "status": "completed",
+              "level": "task",
+              "description": "Identify helper functions reused across multiple unit test files and define which patterns should be moved versus which should remain local to a suite.",
+              "acceptanceCriteria": [
+                "A concrete inventory exists for duplicated helper functions used in more than four unit test files",
+                "The inventory excludes helpers that are unique to a single suite or tightly coupled to one test file"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "maintainability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:37:03.736Z",
+              "completedAt": "2026-04-02T17:42:24.806Z"
+            },
+            {
+              "id": "794b70a1-8956-4afe-bdf4-38def2e397b7",
+              "title": "Define a test-only consolidation baseline and scope",
+              "status": "completed",
+              "level": "task",
+              "description": "Establish the refactor scope by documenting where shared utilities will live under test-only paths and by capturing the pre-change test inventory for later comparison.",
+              "acceptanceCriteria": [
+                "The proposed shared utilities are located only under test-only paths and do not require production file changes",
+                "A before-change baseline of total test file count and total test case count is captured for comparison after refactoring"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "maintainability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:52:10.687Z",
+              "completedAt": "2026-04-02T17:55:18.042Z"
+            },
+            {
+              "id": "71e079b5-bffc-4424-aa42-9ce682f7befc",
+              "title": "Create shared test-only utility modules for duplicated setup code",
+              "status": "completed",
+              "level": "task",
+              "description": "Move the repeated constants and setup helpers identified during the audit into reusable test-only modules without changing any production files.",
+              "acceptanceCriteria": [
+                "Repeated constants and helper functions identified in the audit are moved into shared test-only modules",
+                "Only test files and newly added test helper files are modified for this refactor"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "deduplication"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:42:27.637Z",
+              "completedAt": "2026-04-02T17:52:07.821Z"
+            },
+            {
+              "id": "9311f36a-e0e4-4275-90f7-badca8d60ee6",
+              "title": "Update unit test callers to use shared utilities",
+              "status": "deferred",
+              "level": "task",
+              "description": "Refactor existing unit test files to consume the new shared helpers and constants while preserving existing assertions, names, and suite intent.",
+              "acceptanceCriteria": [
+                "No assertions, test names, or suite coverage are removed as part of the consolidation",
+                "The number of discovered tests before and after the refactor is identical"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "deduplication"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:55:26.079Z"
+            },
+            {
+              "id": "4094dafb-78c0-462f-bc09-dd5a630762bb",
+              "title": "Validate behavioral equivalence after test utility extraction",
+              "status": "deferred",
+              "level": "task",
+              "description": "Run the refactored unit suites and compare outcomes against the pre-refactor baseline to confirm that the shared utility extraction did not alter behavior or coverage.",
+              "acceptanceCriteria": [
+                "Unit tests continue to execute with behavior equivalent to the pre-refactor baseline",
+                "The number of discovered tests before and after the refactor is identical"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "unit",
+                "refactor",
+                "deduplication"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:55:30.232Z"
+            }
+          ]
+        },
+        {
+          "id": "0fb7be48-74a2-495d-a184-dced4d6d2d87",
+          "title": "Timeout Guardrails for Hanging Tests",
+          "status": "completed",
+          "level": "feature",
+          "description": "Prevent indefinite hangs in long-running tests by applying explicit timeout limits to suites that can block CI or local validation.",
+          "source": "smart-add",
+          "startedAt": "2026-04-02T17:37:00.910Z",
+          "completedAt": "2026-04-02T17:37:00.910Z",
+          "children": [
+            {
+              "id": "1f2d2024-1223-40c6-bfde-66f52c150d4e",
+              "title": "Review test suites for observable hang-risk patterns",
+              "status": "completed",
+              "level": "task",
+              "description": "Inspect unit, integration, and end-to-end tests for process spawning, server lifecycle handling, retry loops, polling, or external waits that could cause indefinite execution.",
+              "acceptanceCriteria": [
+                "Tests with realistic hang risk are identified using observable patterns such as process spawning, server lifecycle handling, or retry loops",
+                "The identified set covers all current long-running and externally coordinated test suites"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "reliability",
+                "timeouts",
+                "ci"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:33:05.465Z",
+              "completedAt": "2026-04-02T17:37:00.616Z"
+            },
+            {
+              "id": "1052726c-5e00-4305-873f-3d98ca6bcd5d",
+              "title": "Document timeout strategies for at-risk suites",
+              "status": "completed",
+              "level": "task",
+              "description": "Define whether each at-risk suite should use per-test or per-suite timeout handling and explicitly exclude suites that are already deterministically bounded.",
+              "acceptanceCriteria": [
+                "Each identified suite has a documented timeout strategy at the test or suite level",
+                "Tests that are already deterministically bounded are not given redundant timeout wrappers without cause"
+              ],
+              "priority": "high",
+              "tags": [
+                "tests",
+                "reliability",
+                "timeouts",
+                "ci"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:29:56.913Z",
+              "completedAt": "2026-04-02T17:33:02.617Z"
+            },
+            {
+              "id": "55d8280d-4b05-4109-99da-f803b8330b1a",
+              "title": "Configure explicit timeouts on identified hanging-test candidates",
+              "status": "completed",
+              "level": "task",
+              "description": "Apply explicit timeout settings to every at-risk test or suite so that hangs fail within a bounded window of 120 seconds or less.",
+              "acceptanceCriteria": [
+                "Every identified at-risk test or suite has an explicit timeout configured at or below 120 seconds",
+                "Timeout configuration changes are limited to test files or test-only setup files"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "timeouts",
+                "vitest",
+                "stability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T16:40:48.635Z",
+              "completedAt": "2026-04-02T16:45:50.275Z"
+            },
+            {
+              "id": "f792fbaf-1a66-4a2f-955e-1e812bc6badb",
+              "title": "Verify timeout failures surface as standard Vitest errors",
+              "status": "completed",
+              "level": "task",
+              "description": "Confirm that timeout enforcement causes normal Vitest failures rather than leaving orphaned background work, and ensure unaffected fast tests remain stable.",
+              "acceptanceCriteria": [
+                "Timeout failures produce a standard Vitest failure instead of leaving orphaned hangs",
+                "Existing fast-running tests retain their current behavior and do not become less deterministic after timeout changes"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "timeouts",
+                "vitest",
+                "stability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T16:45:50.920Z",
+              "completedAt": "2026-04-02T16:50:00.410Z"
+            }
+          ]
+        },
+        {
+          "id": "982f45e5-cb5f-41be-84a3-3736378247c9",
+          "title": "Full-Suite Red-to-Green Verification",
+          "status": "completed",
+          "level": "feature",
+          "description": "Restore full test pass status across the project while preserving the integrity of the test refactor and avoiding test edits that merely mask real failures.",
+          "source": "smart-add",
+          "startedAt": "2026-04-02T17:19:13.841Z",
+          "completedAt": "2026-04-02T17:19:13.841Z",
+          "children": [
+            {
+              "id": "cf78aa03-deb6-44b0-bc79-f1fb5c30b891",
+              "title": "Group failing suites by shared production-side root cause",
+              "status": "completed",
+              "level": "task",
+              "description": "Analyze current failures and cluster them by the underlying application, CLI, configuration, or architectural issue rather than by individual failing assertions.",
+              "acceptanceCriteria": [
+                "Current failures are grouped by root cause rather than by individual assertion",
+                "Each failure group clearly identifies whether the fix belongs in application code, configuration, or environment setup"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "triage",
+                "regression",
+                "quality"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T16:50:01.088Z",
+              "completedAt": "2026-04-02T16:56:47.408Z"
+            },
+            {
+              "id": "c097f90b-722b-41b3-9777-492db05e50da",
+              "title": "Separate legitimate timeout work from red-to-green defect fixes",
+              "status": "completed",
+              "level": "task",
+              "description": "Document which failures require implementation or configuration fixes and distinguish those from timeout guardrails so test edits are not used to hide real regressions.",
+              "acceptanceCriteria": [
+                "No test file change is proposed solely to make an existing failing test pass",
+                "The diagnosis explicitly separates legitimate timeout additions from red-to-green production fixes"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "triage",
+                "regression",
+                "quality"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:15:47.631Z",
+              "completedAt": "2026-04-02T17:19:13.578Z"
+            },
+            {
+              "id": "7a0ed21e-ffe1-46a5-8110-728fd7e6e768",
+              "title": "Implement root-cause fixes in production or configuration code",
+              "status": "completed",
+              "level": "task",
+              "description": "Apply fixes only in the application, CLI, configuration, or environment setup areas identified during diagnosis so failing tests are resolved at their actual source.",
+              "acceptanceCriteria": [
+                "No test file is modified for the sole purpose of forcing previously failing tests to pass",
+                "Any production or config changes made to fix failures are limited to the actual root-cause areas identified during diagnosis"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "verification",
+                "ci",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T16:56:48.061Z",
+              "completedAt": "2026-04-02T17:06:58.274Z"
+            },
+            {
+              "id": "ece5c797-5a9d-4272-96f9-1fceffde9204",
+              "title": "Run project-wide test commands and compare against baseline coverage",
+              "status": "deferred",
+              "level": "task",
+              "description": "Validate the completed fixes by running both required test commands and confirming that the total executed test count still matches the pre-refactor baseline.",
+              "acceptanceCriteria": [
+                "Running `vitest run` completes successfully with all tests passing",
+                "Running `pnpm -r run test` completes successfully with all package tests passing",
+                "The total number of executed tests matches the pre-refactor baseline"
+              ],
+              "priority": "critical",
+              "tags": [
+                "tests",
+                "verification",
+                "ci",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-02T17:06:58.905Z"
+            }
+          ]
+        },
+        {
+          "id": "ccbcaf61-4e36-4fb0-b965-be25520ae453",
+          "title": "Immersive Init Experience with Dinosaur Theme & Branding",
+          "status": "completed",
+          "level": "feature",
+          "description": "Replace the current minimal init banner and dry sub-package output with a cohesive, personality-driven flow featuring a cute dinosaur ASCII mascot and strong \"En Dash DX\" / \"n-dx\" branding. Extend cli-brand.js as the single home for all brand assets (mascot art, phase messages, colors).",
+          "acceptanceCriteria": [
+            "Cute dinosaur ASCII mascot (~8-12 lines) displayed in purple brand color at init start",
+            "Branded banner showing 'En Dash DX' as full name and 'n-dx' as tool identifier",
+            "Themed narrative spinner text for each init phase (e.g., 'sniffing out your codebase...' for sourcevision)",
+            "Themed success messages on phase completion",
+            "Branded recap panel with dinosaur celebration at end of init",
+            "cli-brand.js is the single home for all brand assets (mascot art, phase messages, colors)",
+            "Graceful degradation: no-color (NO_COLOR env), non-TTY, and --quiet mode all work correctly"
+          ],
+          "priority": "high",
+          "tags": [
+            "ux",
+            "branding",
+            "cli"
+          ],
+          "source": "conversation",
+          "startedAt": "2026-04-08T04:29:31.235Z",
+          "completedAt": "2026-04-08T04:41:56.446Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Created cli-brand.js as single home for brand assets (mascot, phase messages, colors). Rewrote handleInit with themed phase messages, branded recap, NO_COLOR/quiet graceful degradation. 4 new tests added."
+        },
+        {
+          "id": "dcf6018e-e658-4708-ae6e-1bd23431748f",
+          "title": "Auto-Update Detection from npm Registry",
+          "status": "pending",
+          "level": "feature",
+          "description": "Automatically detect when a newer version of n-dx is available on the npm registry and notify the user non-intrusively after command output. Cache the check with a 24-hour TTL to avoid repeated network calls.",
+          "acceptanceCriteria": [
+            "On any ndx command, check npm registry for latest @n-dx/core version",
+            "Cache the check result with a 24-hour TTL (e.g., in .n-dx.json or temp file)",
+            "Display a single non-blocking line after command output when update is available",
+            "Never block or delay command execution for the registry check",
+            "Respect quiet mode (suppress notice when --quiet)"
+          ],
+          "priority": "medium",
+          "tags": [
+            "cli",
+            "ux"
+          ],
+          "source": "conversation"
+        },
+        {
+          "id": "013bc11c-ec20-4ac2-8463-9c17adf31fe4",
+          "title": "Auto Re-Init Detection for Stale Projects",
+          "status": "pending",
+          "level": "feature",
+          "description": "Detect when a project's n-dx setup is stale or incomplete and suggest re-initialization. Check for missing directories, schema version mismatches, and missing config keys from newer versions.",
+          "acceptanceCriteria": [
+            "On command invocation, check for missing .sourcevision/, .rex/, .hench/ directories",
+            "Detect schema version mismatch in manifest.json or prd.json",
+            "Detect missing required config keys added in newer versions",
+            "Display a suggestion like 'Project was initialized with n-dx X.Y — run ndx init to update'",
+            "Respect quiet mode"
+          ],
+          "priority": "medium",
+          "tags": [
+            "cli",
+            "ux"
+          ],
+          "source": "conversation",
+          "blockedBy": [
+            "dcf6018e-e658-4708-ae6e-1bd23431748f"
+          ]
+        },
+        {
+          "id": "6da267b9-d888-42e2-aecb-9b112f60ed84",
           "title": "Fix MCP server re-registration during ndx init",
           "status": "pending",
           "level": "feature",
           "priority": "high",
           "children": [
             {
-              "id": "bd75121d-0741-4061-a469-03a51794bcd0",
+              "id": "fa0a2b37-5288-42aa-8b20-1b2ad6beb0fb",
               "title": "Remove existing MCP server before re-adding in registerMcpServers",
-              "status": "in_progress",
+              "status": "pending",
               "level": "task",
-              "description": "In packages/core/claude-integration.js, the registerMcpServers() function (line 163) runs 'claude mcp add <name>' but fails when the server already exists (exit code 1: 'MCP server <name> already exists in local config'). Fix: inside the for loop at line 174, before the existing execSync that runs 'claude mcp add', add a try/catch block that runs 'claude mcp remove <name>' with stdio:ignore and a 5s timeout, ignoring any errors (the server may not exist on first init). This makes init idempotent — running it multiple times always succeeds.",
-              "priority": "high",
-              "startedAt": "2026-04-09T19:34:25.276Z"
+              "priority": "high"
             },
             {
-              "id": "a09a3b1d-9e0c-4c77-91ba-d5708b04221b",
+              "id": "838b5702-f1cd-4839-a882-d2b135176d0a",
               "title": "Capture and surface MCP registration error details in init summary",
               "status": "pending",
               "level": "task",
-              "description": "In packages/core/claude-integration.js registerMcpServers(), the catch block at line 182 swallows errors silently — it pushes { ok: false } with no reason. Fix: capture the error object in the catch clause, extract stderr or the error message, and include it in the results array (e.g. { name, transport: 'stdio', ok: false, error: msg }). Then in packages/core/assistant-integration.js formatVendorArtifacts() (around line 175), when displaying failed MCP servers, append the error reason so the user sees actionable diagnostics instead of just 'failed to register rex, sourcevision'.",
               "priority": "medium"
             },
             {
-              "id": "4d6d884d-ccfe-4120-bdb9-880866524b6a",
+              "id": "1809164d-c3be-4c8b-95c0-d8d29d2c87c1",
               "title": "Add test coverage for idempotent MCP registration",
               "status": "pending",
               "level": "task",
-              "description": "Add or extend tests in tests/e2e/cli-init.test.js (or a new test file) to verify that: (1) running ndx init twice succeeds without MCP registration errors, (2) the MCP servers are properly registered after init (check claude mcp list output includes rex and sourcevision with stdio transport), (3) if claude CLI is not available the init still completes gracefully. Use the existing test patterns in the e2e test suite.",
               "priority": "medium"
             },
             {
-              "id": "af7e16dc-ae4d-42e3-ab00-e86523d919ed",
+              "id": "a9963fc8-717c-4d96-ab05-e4332cc42d65",
               "title": "De-emphasize non-selected vendor in init summary output",
               "status": "pending",
               "level": "task",
-              "priority": "medium",
-              "description": "When the user selects codex as their LLM vendor, the init summary still prominently displays 'Claude Code integration:' with full artifact details, making it look like something went wrong with their codex selection. Fix: in packages/core/assistant-integration.js formatInitReport() (line 119), detect which vendor was selected as the active LLM provider (pass it as an option or read from config) and visually distinguish the primary vendor from secondary assistant surfaces. Options: (1) collapse non-selected vendor to a single compact line like 'Claude Code: synced (6 skills, 2 MCP servers)', (2) reorder so the selected vendor appears first, (3) add a dim/parenthetical note like '(editor integration)' to clarify why the non-selected vendor is being provisioned. The key insight: assistant surface provisioning is independent of LLM vendor selection, but the current output doesn't communicate that distinction."
+              "priority": "medium"
             }
           ]
         }
@@ -23249,1621 +23649,496 @@
       ]
     },
     {
-      "id": "eeb9eaa6-ec5f-4fad-8b4e-342c6e2abc79",
-      "title": "Codex Workflow Parity",
+      "id": "690df65f-703a-4e94-8162-24e838f7f538",
+      "title": "CLI & Developer Tools",
       "status": "completed",
       "level": "epic",
-      "description": "Implement assistant-surface parity plus baseline runtime guardrails so Codex can participate in the n-dx workflow with first-class project artifacts, shared workflow skills, MCP configuration, and a consistent execution contract instead of relying on the current Claude-only outer-layer setup.\\n\\nExecution sources for this epic:\\n- docs/analysis/claude-codex-runtime-identity-discovery.md\\n- docs/process/codex-workflow-parity-plan.md when present on the branch\\n- docs/analysis/codex-workflow-parity-audit.md when present on the branch\\n\\nIf the plan or audit docs are absent, the epic and task descriptions in .rex/prd.json are the implementation contract for this branch.\\n\\nScope:\\n- canonical vendor-neutral assistant asset layer\\n- Codex project artifact generation (AGENTS.md, .agents/skills, .codex/config.toml)\\n- assistant-neutral init orchestration\\n- documentation and startup/help parity\\n- baseline runtime identity guardrails for prompt delivery, sandbox and approval policy, event normalization, diagnostics, and failure taxonomy\\n- regression tests that prevent Claude/Codex workflow drift\\n\\nNon-goals for this epic:\\n- identical assistant prose or code edits across vendors\\n- full Claude/Codex runtime equivalence beyond the defined workflow contract\\n- API-mode parity for Codex in the first implementation pass",
-      "priority": "critical",
-      "startedAt": "2026-04-02T03:06:10.916Z",
-      "completedAt": "2026-04-02T03:06:10.916Z",
+      "source": "smart-add",
+      "startedAt": "2026-04-03T14:08:58.216Z",
+      "completedAt": "2026-04-03T14:08:58.216Z",
       "children": [
         {
-          "id": "ca1e2dc0-1903-4927-b66c-76685d839456",
-          "title": "Canonical Assistant Asset Layer",
+          "id": "b67648eb-e1a0-4420-89e0-2052b810ead4",
+          "title": "Child Process Cleanup and Exit Hygiene",
           "status": "completed",
           "level": "feature",
-          "description": "Create one vendor-neutral source of truth for n-dx workflow skills and assistant integration metadata, then render Claude and Codex artifacts from that shared source.\\n\\nThis feature should land before Codex artifact generation, runtime instruction-loading alignment, and most assistant-facing documentation updates so later work can reuse one canonical asset pipeline.\\n\\nDeliverables:\\n- assistant asset source directory for shared workflow skills\\n- manifest or registry describing skills, MCP servers, and assistant-specific metadata\\n- removal of parallel hand-maintained skill definitions as the canonical source",
-          "priority": "critical",
-          "startedAt": "2026-03-31T19:10:29.512Z",
-          "completedAt": "2026-03-31T19:10:29.512Z",
+          "description": "Ensure `n-dx` tears down all spawned child processes and lingering worker threads when commands complete, fail, or are interrupted so local machines are not left with orphaned SourceVision-related activity.",
+          "source": "smart-add",
+          "startedAt": "2026-04-03T14:08:58.077Z",
+          "completedAt": "2026-04-03T14:08:58.077Z",
           "children": [
             {
-              "id": "9470f4e3-8ec9-49de-bf20-632b64d9b4a3",
-              "title": "Create vendor-neutral assistant asset source directory",
+              "id": "78ecaa15-4503-4f81-a368-355ced818762",
+              "title": "Implement unified child-process teardown for n-dx command lifecycles",
               "status": "completed",
               "level": "task",
-              "description": "Introduce a canonical assistant asset location, likely assistant-assets/, that stores the shared n-dx workflow skill bodies once.\n\nThe source must be suitable for both Claude and Codex output generation and should cover the existing ndx-plan, ndx-status, ndx-capture, ndx-zone, ndx-work, ndx-config, ndx-reshape, ndx-pr-description, and ndx-feedback workflows.",
+              "description": "Add a centralized cleanup path for `n-dx` and package-level runners that tracks spawned child processes and terminates them on normal exit, error exit, and signal-driven shutdown. The goal is to prevent orphaned SourceVision test workers and related subprocesses from persisting after command completion.",
+              "acceptanceCriteria": [
+                "All child processes spawned through `n-dx` orchestration are registered in a shared lifecycle tracker",
+                "When an `n-dx` command exits normally, the cleanup path sends termination to registered child processes and waits for shutdown before returning",
+                "When an `n-dx` command exits due to an error, the same cleanup path still runs and attempts termination for all tracked children",
+                "When the parent process receives `SIGINT` or `SIGTERM`, the cleanup path executes before final process exit",
+                "Processes that do not exit after a graceful termination attempt are force-killed after a bounded timeout"
+              ],
               "priority": "critical",
-              "startedAt": "2026-03-31T15:54:46.985Z",
-              "completedAt": "2026-03-31T16:20:55.804Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created assistant-assets/ directory with 8 skill body .md files, registry.json, and index.js module. Refactored claude-integration.js to import from the canonical source. Updated skill-sync.test.js for three-way validation (16 tests, all passing). All 471 e2e tests pass."
+              "tags": [
+                "cli",
+                "process-management",
+                "sourcevision",
+                "stability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T13:53:38.847Z",
+              "completedAt": "2026-04-03T14:04:06.691Z"
             },
             {
-              "id": "7bd0e002-d1a7-4aaa-82a1-30fdad108618",
-              "title": "Define assistant asset manifest and render contract",
+              "id": "d3618484-b8ab-4ed5-a162-7602873aa162",
+              "title": "Harden SourceVision test execution against lingering workers and orphaned threads",
               "status": "completed",
               "level": "task",
-              "description": "Add a manifest that enumerates shared workflow skills, assistant delivery targets, MCP server descriptors, and any assistant-specific metadata wrappers.\n\nKeep vendor adapters thin so the manifest defines shared meaning while Claude/Codex writers only adapt file locations and wrappers.",
-              "priority": "high",
-              "blockedBy": [
-                "9470f4e3-8ec9-49de-bf20-632b64d9b4a3"
+              "description": "Audit the SourceVision test/runtime paths that can continue running after completion and make them participate in the same shutdown contract so nonstop unit-test activity does not linger on developer machines.",
+              "acceptanceCriteria": [
+                "SourceVision test-related subprocesses or workers are routed through the shared cleanup mechanism instead of unmanaged direct spawns",
+                "Known long-running or watch-like test helpers used by SourceVision are explicitly shut down when the parent workflow completes",
+                "No orphaned SourceVision-related child process remains after a representative test workflow finishes in a regression scenario",
+                "Failure paths during SourceVision test execution still trigger cleanup of already-started workers or subprocesses"
               ],
-              "startedAt": "2026-03-31T17:47:50.508Z",
-              "completedAt": "2026-03-31T18:15:08.026Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created assistant-assets/manifest.json with three sections: skills (migrated from registry.json), mcpServers (rex + sourcevision with read/write tool categorization), and vendors (claude + codex delivery targets). Updated index.js with vendor-neutral render contract API (getManifest, getMcpServers, getVendorTarget, getToolIds, renderSkill, renderAllSkills) plus backward-compatible aliases. Refactored claude-integration.js to derive AUTO_APPROVED_TOOLS and MCP registration from the manifest. Expanded skill-sync.test.js from 16 to 61 tests covering manifest structure, render contract, tool ID derivation, and backward compatibility."
-            },
-            {
-              "id": "79659c41-7011-4c68-a3ba-98f534029bb0",
-              "title": "Replace Claude-specific skill duplication with generated outputs",
-              "status": "completed",
-              "level": "task",
-              "description": "Stop treating claude-integration.js and .claude/skills as separate sources of truth.\n\nUpdate the generation path so Claude artifacts are emitted from the canonical asset source and future Codex artifacts use the same shared content.",
-              "priority": "high",
-              "blockedBy": [
-                "7bd0e002-d1a7-4aaa-82a1-30fdad108618"
-              ],
-              "startedAt": "2026-03-31T18:34:28.720Z",
-              "completedAt": "2026-03-31T19:10:28.978Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added writeVendorSkills() to assistant-assets/index.js as the canonical generation function for all vendors. Refactored claude-integration.js to delegate skill writing to writeVendorSkills(\"claude\", dir) instead of rendering and writing independently. Removed .claude/skills/ from git tracking (gitignored — they are now generated outputs). Updated skill-sync tests to validate writeVendorSkills for both claude and codex vendors in a temp directory. Tests expanded from 61 to 74."
-            }
-          ]
-        },
-        {
-          "id": "28f44611-7113-49be-8d66-8b9d5d49fe6d",
-          "title": "Codex Project Artifact Generation",
-          "status": "completed",
-          "level": "feature",
-          "description": "Generate the project-local artifacts Codex needs to follow n-dx workflows without manual per-repo setup.\n\nPrimary deliverables:\n- AGENTS.md\n- .agents/skills/<name>/SKILL.md\n- .codex/config.toml with Rex and SourceVision MCP servers",
-          "priority": "critical",
-          "startedAt": "2026-03-31T22:17:01.156Z",
-          "completedAt": "2026-03-31T22:17:01.156Z",
-          "children": [
-            {
-              "id": "6b1b809b-8a37-4f44-b433-0ed111deaef5",
-              "title": "Generate AGENTS.md during ndx init",
-              "status": "completed",
-              "level": "task",
-              "description": "Emit a project-local AGENTS.md that explains the n-dx workflow, lists available generated skills, and tells Codex when to use Rex and SourceVision MCP capabilities.\n\nThe content should be generated from the shared assistant asset layer rather than hand-maintained independently.",
               "priority": "critical",
-              "blockedBy": [
-                "7bd0e002-d1a7-4aaa-82a1-30fdad108618",
-                "3f98efc4-382d-431a-a1e0-64ca91ac7b57"
+              "tags": [
+                "sourcevision",
+                "tests",
+                "threads",
+                "process-management"
               ],
-              "startedAt": "2026-03-31T21:44:51.442Z",
-              "completedAt": "2026-03-31T21:51:51.511Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added renderAgentsMd() to assistant-assets/index.js that generates AGENTS.md content from the manifest (skills, MCP servers, tool classifications). Integrated writeAgentsMd() into codex-integration.js and the setupCodexIntegration() flow. Updated cli.js init summary. Added 18 tests covering content generation, file writing, idempotency, source validation, and CLI integration. All 38 codex-integration tests pass."
+              "source": "smart-add",
+              "startedAt": "2026-04-03T13:48:52.972Z",
+              "completedAt": "2026-04-03T13:53:35.580Z"
             },
             {
-              "id": "ceb4b95d-4c78-45eb-bb40-5604a10180ac",
-              "title": "Generate .agents skill directories for Codex",
+              "id": "94cad81d-4c83-4c9f-aac5-e97259687f24",
+              "title": "Add regression coverage for parent-exit cleanup and orphan prevention",
               "status": "completed",
               "level": "task",
-              "description": "During init, create one generated .agents/skills/<name>/SKILL.md directory per shared n-dx workflow skill.\n\nThe emitted content should stay structurally aligned with the Claude-delivered skills while using the Codex repository-local skill layout.",
-              "priority": "critical",
-              "blockedBy": [
-                "7bd0e002-d1a7-4aaa-82a1-30fdad108618",
-                "3f98efc4-382d-431a-a1e0-64ca91ac7b57"
+              "description": "Create automated coverage that proves `n-dx` does not leave child processes behind after successful runs, failures, or interrupted execution, with emphasis on the SourceVision scenarios currently causing lingering machine load.",
+              "acceptanceCriteria": [
+                "An automated regression test verifies child processes are terminated after a successful `n-dx` run",
+                "An automated regression test verifies child processes are terminated after an erroring `n-dx` run",
+                "An automated regression test verifies child processes are terminated after signal interruption of an active run",
+                "Test assertions explicitly fail if a spawned SourceVision-related process remains alive beyond the configured shutdown timeout"
               ],
-              "startedAt": "2026-03-31T21:33:27.366Z",
-              "completedAt": "2026-03-31T21:43:14.448Z",
-              "resolutionType": "acknowledgment",
-              "resolutionDetail": "The .agents/skills/<name>/SKILL.md generation was already implemented in commit 4ade57bc as part of the .codex/config.toml task. codex-integration.js calls writeVendorSkills(\"codex\", dir) which writes all 8 skills (ndx-plan, ndx-status, ndx-capture, ndx-zone, ndx-work, ndx-config, ndx-reshape, ndx-feedback) to .agents/skills/<name>/SKILL.md in plain markdown format (no YAML frontmatter). Fixed the cross-package-contracts test that was left out of sync (3 new llm-gateway exports). All 271 relevant tests pass (94 codex-integration + 74 skill-sync + 177 cross-package-contracts)."
-            },
-            {
-              "id": "73346263-26ca-4499-8fe8-a3bcb689435d",
-              "title": "Generate .codex/config.toml MCP definitions",
-              "status": "completed",
-              "level": "task",
-              "description": "Generate project-local Codex MCP server definitions for Rex and SourceVision.\n\nThe first implementation should prefer stdio transport because it matches current Claude-side init behavior and avoids fixed-port drift. HTTP transport can remain documented as a later/manual option.",
-              "priority": "critical",
-              "blockedBy": [
-                "3f98efc4-382d-431a-a1e0-64ca91ac7b57"
-              ],
-              "startedAt": "2026-03-31T21:21:04.602Z",
-              "completedAt": "2026-03-31T21:31:21.198Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Generated .codex/config.toml with stdio MCP server definitions during ndx init. Added renderCodexConfigToml() to assistant-assets/index.js, created codex-integration.js module, integrated into cli.js with --no-codex flag support, and wrote 20 tests covering TOML rendering, integration output, source validation, and CLI flag behavior."
-            },
-            {
-              "id": "c9f700ec-3ca9-4516-a4e7-5ed4d493740d",
-              "title": "Validate Codex artifact generation in init tests",
-              "status": "completed",
-              "level": "task",
-              "description": "Add automated checks that ndx init writes AGENTS.md, generated .agents skills, and .codex/config.toml in a stable format.\n\nTests should protect against path drift, missing skills, and malformed MCP definitions.",
               "priority": "high",
-              "blockedBy": [
-                "6b1b809b-8a37-4f44-b433-0ed111deaef5",
-                "ceb4b95d-4c78-45eb-bb40-5604a10180ac",
-                "73346263-26ca-4499-8fe8-a3bcb689435d"
+              "tags": [
+                "testing",
+                "regression",
+                "cli",
+                "sourcevision"
               ],
-              "startedAt": "2026-03-31T22:10:07.529Z",
-              "completedAt": "2026-03-31T22:17:00.543Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added codex-artifact-validation.test.js with 39 tests covering path drift protection, skill completeness, config.toml structural validity, AGENTS.md format stability, cross-artifact consistency, and artifact regeneration stability."
-            }
-          ]
-        },
-        {
-          "id": "63be7d6a-273f-4099-9c15-3f297d144037",
-          "title": "Assistant-Neutral Init Orchestration",
-          "status": "completed",
-          "level": "feature",
-          "description": "Refactor init orchestration so assistant setup is no longer Claude-only and can provision both Claude and Codex consistently from the orchestration layer.\\n\\nThis feature depends on the canonical asset and artifact-generation work having clear writers and target file contracts. Keep the orchestration changes in cli/orchestration code rather than moving assistant concerns into Rex or SourceVision domain packages.\\n\\nDone when ndx init can provision the intended assistant surfaces deterministically and report what was generated without Claude-specific branching dominating the flow.",
-          "priority": "critical",
-          "startedAt": "2026-04-01T03:19:34.478Z",
-          "completedAt": "2026-04-01T03:19:34.478Z",
-          "children": [
-            {
-              "id": "93b1bf7d-d985-4123-b7a1-fb58fdb6115d",
-              "title": "Replace setupClaudeIntegration with assistant-neutral setup orchestration",
-              "status": "completed",
-              "level": "task",
-              "description": "Introduce an assistant-neutral orchestration entry point, such as setupAssistantIntegrations, that provisions supported assistant surfaces without coupling ndx init to Claude-specific logic.\n\nThe refactor must preserve current behavior for Claude while making Codex a first-class setup target.",
-              "priority": "critical",
-              "blockedBy": [
-                "79659c41-7011-4c68-a3ba-98f534029bb0",
-                "6b1b809b-8a37-4f44-b433-0ed111deaef5",
-                "ceb4b95d-4c78-45eb-bb40-5604a10180ac",
-                "73346263-26ca-4499-8fe8-a3bcb689435d"
-              ],
-              "startedAt": "2026-03-31T21:58:06.593Z",
-              "completedAt": "2026-03-31T22:05:34.738Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Introduced assistant-integration.js with vendor registry pattern; cli.js now calls setupAssistantIntegrations() instead of vendor-specific setup functions directly"
-            },
-            {
-              "id": "312a5f34-98fa-4a1c-825c-71846026acab",
-              "title": "Add assistant-specific init flags and summary reporting",
-              "status": "completed",
-              "level": "task",
-              "description": "Extend init UX to report assistant provisioning separately from llm.vendor and add configuration toggles such as --no-codex alongside backward-compatible Claude options.\n\nThe init summary should make it obvious which assistant artifacts were provisioned for the repo.",
-              "priority": "high",
-              "blockedBy": [
-                "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
-              ],
-              "startedAt": "2026-04-01T01:25:20.198Z",
-              "completedAt": "2026-04-01T02:38:13.775Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Enhanced formatInitReport with verbose per-artifact detail, added --claude-only/--codex-only/--assistants= flags, updated help text, added 18 tests"
-            },
-            {
-              "id": "b18f544f-3d53-4616-9d85-469d51412f6a",
-              "title": "Preserve backward-compatible Claude setup behavior during parity rollout",
-              "status": "completed",
-              "level": "task",
-              "description": "Keep existing Claude onboarding intact while the shared assistant setup path is introduced.\n\nAny migration of generated assets or flags must avoid breaking current users and should include compatibility handling where needed.",
-              "priority": "high",
-              "blockedBy": [
-                "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
-              ],
-              "startedAt": "2026-04-01T02:53:59.450Z",
-              "completedAt": "2026-04-01T03:19:34.194Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added re-init surface detection to handleInit that narrows default assistant provisioning based on existing project surfaces, preventing Claude-only users from unexpectedly receiving Codex artifacts on upgrade. Deprecated printClaudeSetupSummary and printCodexSetupSummary. Added 14 tests."
-            }
-          ]
-        },
-        {
-          "id": "2f835373-3459-4337-b6e8-f849f830fac8",
-          "title": "Documentation and Startup Parity",
-          "status": "completed",
-          "level": "feature",
-          "description": "Repair docs, startup text, and user guidance so Codex is described as a supported workflow surface instead of an afterthought.\n\nThis should cover README/help text, guide docs, MCP setup docs, and server startup banners.",
-          "priority": "high",
-          "startedAt": "2026-04-02T02:43:45.365Z",
-          "completedAt": "2026-04-02T02:43:45.365Z",
-          "children": [
-            {
-              "id": "aa6fe37f-470a-4358-ad89-2a7ceaf485b9",
-              "title": "Update public docs for Claude and Codex workflow setup",
-              "status": "completed",
-              "level": "task",
-              "description": "Update README.md and guide documentation to explain how repos are provisioned for both Claude and Codex, including where generated assistant artifacts live and how users start working from each surface.",
-              "priority": "high",
-              "blockedBy": [
-                "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
-              ],
-              "startedAt": "2026-04-01T18:49:58.957Z",
-              "completedAt": "2026-04-01T18:56:46.101Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Updated 8 documentation files to explain dual-assistant (Claude + Codex) provisioning, artifact locations, MCP setup by assistant, init flags, and tool name conventions."
-            },
-            {
-              "id": "6d93d8fd-b72b-4d34-9313-9154236f17fc",
-              "title": "Correct MCP tool-name and transport documentation",
-              "status": "completed",
-              "level": "task",
-              "description": "Bring MCP docs in line with the current tool names and transports actually exposed by the Rex and SourceVision MCP servers.\n\nThis repair should happen as part of the Codex rollout so new assistant docs do not encode stale names.",
-              "priority": "high",
-              "blockedBy": [
-                "73346263-26ca-4499-8fe8-a3bcb689435d"
-              ],
-              "startedAt": "2026-04-01T18:59:16.072Z",
-              "completedAt": "2026-04-01T19:08:04.447Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Replaced stale rex_*/sv_* MCP tool names with current names (get_prd_status, get_next_task, etc.) across README.md, CLAUDE.md, docs/packages/rex.md, docs/guide/mcp.md. Added MCP tools section to docs/packages/sourcevision.md. Updated language to be assistant-neutral (Claude + Codex)."
-            },
-            {
-              "id": "f51c83b1-af4f-407d-bf7d-715ae8c9026f",
-              "title": "Align startup banners and guidance with assistant parity",
-              "status": "completed",
-              "level": "task",
-              "description": "Update startup text, help output, and repo guidance so they no longer imply that Claude is the only first-class assistant path.\\n\\nThe implementation should explicitly define the intended roles of AGENTS.md, CODEX.md, and CLAUDE.md so future init and docs work cannot drift: AGENTS.md as the canonical shared guidance surface, CLAUDE.md as the Claude-facing bridge or import surface, and CODEX.md only if the project chooses to keep a compatibility layer.",
-              "priority": "medium",
-              "blockedBy": [
-                "93b1bf7d-d985-4123-b7a1-fb58fdb6115d"
-              ],
-              "startedAt": "2026-04-02T02:31:13.601Z",
-              "completedAt": "2026-04-02T02:43:45.072Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Updated 9 files to replace Claude-only language with assistant-neutral framing in startup banners, project guidance, README, and docs. Added Assistant Instruction Files section defining roles of AGENTS.md, CLAUDE.md, and .codex/config.toml."
-            }
-          ]
-        },
-        {
-          "id": "5d591638-a1e1-46e3-a87c-99af6a62f41b",
-          "title": "Workflow Parity Regression Coverage",
-          "status": "completed",
-          "level": "feature",
-          "description": "Add tests that prevent workflow drift between generated Claude and Codex assets, init outputs, and assistant-facing docs.\\n\\nThis coverage should expand after the canonical asset layer and runtime-identity guardrails are wired so the tests can lock both artifact parity and the shared execution contract.\\n\\nRequired coverage areas:\\n- generated skill and instruction asset parity\\n- Codex MCP config and init output contracts\\n- runtime event, diagnostics, and failure-taxonomy normalization\\n- fresh-project smoke paths that prove Codex can act as a first-class execution surface",
-          "priority": "high",
-          "startedAt": "2026-04-02T02:51:35.065Z",
-          "completedAt": "2026-04-02T02:51:35.065Z",
-          "children": [
-            {
-              "id": "3b49da9b-e11f-4ac3-b337-448a7db46893",
-              "title": "Add dual-vendor skill sync tests from canonical assets",
-              "status": "completed",
-              "level": "task",
-              "description": "Add coverage that verifies the canonical assistant asset source renders the expected Claude and Codex outputs.\n\nThis should replace the current Claude-only sync assumption with dual-vendor contract checks.",
-              "priority": "high",
-              "blockedBy": [
-                "79659c41-7011-4c68-a3ba-98f534029bb0",
-                "ceb4b95d-4c78-45eb-bb40-5604a10180ac"
-              ],
-              "startedAt": "2026-04-01T19:19:26.658Z",
-              "completedAt": "2026-04-01T19:42:02.872Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Replaced Claude-only integration source check in skill-sync.test.js with dual-vendor validation covering both claude-integration.js and codex-integration.js canonical delegation, cross-vendor body identity, and render idempotency."
-            },
-            {
-              "id": "625a955a-57b9-49f8-b155-dc747502192b",
-              "title": "Add Codex config generation and MCP contract tests",
-              "status": "completed",
-              "level": "task",
-              "description": "Verify that generated .codex/config.toml entries reference the correct stdio commands, arguments, and stable project-local paths.\n\nReuse existing MCP transport tests where possible instead of reimplementing server protocol coverage.",
-              "priority": "high",
-              "blockedBy": [
-                "73346263-26ca-4499-8fe8-a3bcb689435d"
-              ],
-              "startedAt": "2026-04-01T19:09:11.233Z",
-              "completedAt": "2026-04-01T19:14:40.694Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added tests/e2e/codex-mcp-contract.test.js with 19 tests covering: entrypoint existence, path locality (project-local not global npm), command structure, stdio MCP server lifecycle (spawns both rex and sourcevision with exact config.toml commands), tool list parity with manifest, bare tool names verification, and config.toml path stability across regeneration."
-            },
-            {
-              "id": "8242a482-67d2-4dd4-a4c3-22e7b6dbb430",
-              "title": "Add docs and help smoke coverage for assistant parity",
-              "status": "completed",
-              "level": "task",
-              "description": "Add smoke checks that help text, init guidance, and startup output mention both supported assistant paths and do not regress back to Claude-only wording.",
-              "priority": "medium",
-              "blockedBy": [
-                "aa6fe37f-470a-4358-ad89-2a7ceaf485b9",
-                "f51c83b1-af4f-407d-bf7d-715ae8c9026f"
-              ],
-              "startedAt": "2026-04-02T02:44:25.490Z",
-              "completedAt": "2026-04-02T02:51:34.690Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added tests/e2e/assistant-parity-smoke.test.js with 30 smoke tests covering help text, init guidance, startup banner, and project documentation parity between Claude and Codex assistant paths."
-            }
-          ]
-        },
-        {
-          "id": "31ecca8c-cb59-4caf-9385-e233af284ed5",
-          "title": "Parity Scope Lock and Runtime Boundary",
-          "status": "completed",
-          "level": "feature",
-          "description": "Capture the rollout decisions that keep this implementation focused on assistant-surface parity plus the baseline runtime guardrails required for consistent execution, while documenting deeper equivalence work that is intentionally deferred.\\n\\nThis feature exists to keep the execution work aligned with the plan and prevent scope from drifting into vendor-identical outputs, full API-mode symmetry, or deeper runtime normalization that is not required for the baseline workflow contract.",
-          "priority": "medium",
-          "startedAt": "2026-04-02T03:06:10.774Z",
-          "completedAt": "2026-04-02T03:06:10.774Z",
-          "children": [
-            {
-              "id": "3f98efc4-382d-431a-a1e0-64ca91ac7b57",
-              "title": "Lock initial Codex transport and artifact decisions",
-              "status": "completed",
-              "level": "task",
-              "description": "Finalize and document the first-pass decisions for stdio versus HTTP MCP transport, AGENTS.md ownership, generated skill locations, and init defaults so implementation work can proceed without repeated replanning.",
-              "priority": "medium",
-              "startedAt": "2026-03-31T19:16:45.499Z",
-              "completedAt": "2026-03-31T19:27:13.725Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created docs/process/codex-transport-artifact-decisions.md locking 7 first-pass decisions: (1) stdio MCP transport for Codex init, (2) AGENTS.md as generated canonical shared guidance, (3) .agents/skills/{name}/SKILL.md for Codex skills (plain wrapper, no prefix), (4) provision both assistants by default during init, (5) .codex/config.toml scoped to MCP server definitions only, (6) CLAUDE.md remains Claude-facing with future @AGENTS.md import, (7) CODEX.md becomes compatibility artifact. Each decision includes rationale, deferred items, and downstream task implications."
-            },
-            {
-              "id": "15ae7442-fc6b-4c35-9c62-4f222e591dc3",
-              "title": "Document deferred runtime parity follow-up work",
-              "status": "completed",
-              "level": "task",
-              "description": "Record the Claude/Codex runtime differences that still remain after the baseline guardrails in this epic land, including API-mode gaps, deeper multi-turn observability differences, and any vendor capability mismatches that do not block the shared workflow contract.\\n\\nThis task should make the post-epic boundary explicit so future work can target true residual gaps instead of reopening questions that the runtime-identity feature already resolved.",
-              "priority": "medium",
-              "blockedBy": [
-                "3f98efc4-382d-431a-a1e0-64ca91ac7b57",
-                "547ba5e2-b5cf-47d8-a608-eaef28398411"
-              ],
-              "startedAt": "2026-04-02T02:55:03.208Z",
-              "completedAt": "2026-04-02T03:06:10.603Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created docs/process/deferred-runtime-parity.md documenting the post-epic boundary between what the Codex Workflow Parity epic delivered and what remains deferred. The document covers: (1) What was delivered — 11-row summary of assistant-surface parity + runtime contract types, (2) 7 residual execution-level gaps with impact assessment (runtime contract types not yet wired, API-mode Claude-only, CLI loop monolith, Claude-native tool defs, no run diagnostics, multi-turn observability differences, no integration-level contract tests), (3) 14 deferred artifact/config decisions from the transport decisions doc, (4) Phase 2 reference linking to the 6-epic implementation plan, (5) Boundary rules — 7 resolved areas (do not reopen) and 8 open areas (target in future work), (6) 7 non-blocking vendor capability mismatches that the workflow contract does not attempt to eliminate."
-            },
-            {
-              "id": "7b017860-5bff-4a50-a096-44d0031ebed6",
-              "title": "Wire blockedBy dependency edges for Codex Workflow Parity task ordering",
-              "status": "completed",
-              "level": "task",
-              "priority": "critical",
-              "startedAt": "2026-03-31T16:23:03.488Z",
-              "completedAt": "2026-03-31T17:28:39.484Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Wired 34 blockedBy dependency edges across 24 tasks in the Codex Workflow Parity epic. DAG validated with zero cycles, 5 execution layers. get_next_task now respects ordering."
-            }
-          ]
-        },
-        {
-          "id": "1ef0be83-c7a2-4ff9-a9e5-d6fe044284e0",
-          "title": "Runtime Identity Guardrails",
-          "status": "completed",
-          "level": "feature",
-          "description": "Define and enforce the minimum cross-vendor runtime contract so Claude and Codex are interchangeable at the workflow level even when model outputs differ. Source of truth: docs/analysis/claude-codex-runtime-identity-discovery.md. Deliverables: one normalized runtime policy and prompt/event contract, a hardened Codex CLI path that prefers structured automation output, shared instruction-loading rules across AGENTS.md/CODEX.md/CLAUDE.md, and smoke coverage proving the same guardrails and completion semantics on both vendors.",
-          "priority": "critical",
-          "startedAt": "2026-04-01T01:24:40.906Z",
-          "completedAt": "2026-04-01T01:24:40.906Z",
-          "children": [
-            {
-              "id": "547ba5e2-b5cf-47d8-a608-eaef28398411",
-              "title": "Define a normalized Claude/Codex runtime contract",
-              "status": "completed",
-              "level": "task",
-              "description": "Create a shared runtime contract module that defines the prompt envelope, sandbox and approval policy object, normalized event schema, and shared failure categories for both vendors. Initial touchpoints should include packages/hench/src/agent/lifecycle/, packages/hench/src/cli/commands/run.ts, and packages/llm-client/src/types.ts. Done when vendor wrappers compile from one contract instead of embedding ad hoc defaults.",
-              "priority": "critical",
-              "blockedBy": [
-                "3f98efc4-382d-431a-a1e0-64ca91ac7b57"
-              ],
-              "startedAt": "2026-03-31T20:14:31.262Z",
-              "completedAt": "2026-03-31T20:49:48.832Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created packages/llm-client/src/runtime-contract.ts defining the normalized Claude/Codex runtime contract with 4 areas: (1) PromptEnvelope with named sections and assemblePrompt() for vendor-neutral prompt delivery, (2) ExecutionPolicy with SandboxMode/ApprovalPolicy replacing ad hoc --full-auto and --allowed-tools patterns, (3) RuntimeEvent schema with vendor-neutral event types for consistent run classification, (4) FailureCategory taxonomy with mapping helpers bridging legacy ErrorReason and hench run failure strings. 48 unit tests. Exported through llm-client public.ts and hench llm-gateway.ts. All architecture, domain isolation, and contract tests pass (275+441+1431 tests)."
-            },
-            {
-              "id": "99fe140a-103d-43bd-bcbd-eb8690eb3e17",
-              "title": "Normalize Codex CLI execution flags and structured output handling",
-              "status": "completed",
-              "level": "task",
-              "description": "Refactor the Codex execution path in packages/hench/src/agent/lifecycle/cli-loop.ts and packages/llm-client/src/codex-cli-provider.ts to prefer official machine-readable Codex output, set sandbox and approval intent explicitly, and treat heuristic stdout normalization as a compatibility fallback only. Done when Codex runs can be mapped into the same internal lifecycle states that Claude stream-json events already support.",
-              "priority": "critical",
-              "blockedBy": [
-                "547ba5e2-b5cf-47d8-a608-eaef28398411"
-              ],
-              "startedAt": "2026-03-31T20:58:55.417Z",
-              "completedAt": "2026-03-31T21:18:45.412Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Normalized the Codex CLI execution path to prefer structured machine-readable output and explicit policy flags. Changes: (1) codex-cli-provider.ts: added compileCodexPolicyFlags(), mapSandboxToCodexFlag(), mapApprovalToCodexFlag() that compile ExecutionPolicy into Codex --sandbox and --approval-policy flags, replacing the --full-auto preset alias. (2) cli-loop.ts: added processCodexJsonLine() — a structured JSONL event parser for codex exec --json output that maps Codex events into the same CliRunResult shape Claude's processStreamLine() produces (message, function_call, function_call_output, error, summary/completion events). Refactored spawnCodex() to use explicit policy flags, --json flag, and structured event parsing with heuristic normalizeCodexResponse() demoted to compatibility fallback only. (3) Gateway exports: compileCodexPolicyFlags, mapSandboxToCodexFlag, mapApprovalToCodexFlag exported through llm-client public.ts and hench llm-gateway.ts. (4) Tests: 12 new policy compilation tests in llm-client, 19 new structured event parser tests in hench, 3 new public API assertions. All architecture (47), domain-isolation (54), cross-package-contracts (174+), llm-client (456), and hench (1450) tests pass."
-            },
-            {
-              "id": "67c0ada9-003e-48fe-9a0d-e822d66e2e11",
-              "title": "Align Claude/Codex instruction loading around shared project guidance",
-              "status": "completed",
-              "level": "task",
-              "description": "Wire runtime instruction loading so Codex, Claude, and repo-generated assistant assets resolve back to the same workflow guidance instead of drifting by surface. Coordinate the asset and init work so AGENTS.md is the canonical shared guidance, CLAUDE.md imports or mirrors that guidance as the Claude-facing surface, and CODEX.md is either retired or kept only as an explicit compatibility layer. Done when both vendors start runs from equivalent repo instructions.",
-              "priority": "high",
-              "blockedBy": [
-                "547ba5e2-b5cf-47d8-a608-eaef28398411",
-                "79659c41-7011-4c68-a3ba-98f534029bb0"
-              ],
-              "startedAt": "2026-03-31T22:17:50.808Z",
-              "completedAt": "2026-03-31T23:35:23.557Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Extracted shared project guidance into assistant-assets/project-guidance.md as canonical source. Both CLAUDE.md and AGENTS.md are now auto-generated during ndx init from the same template. CODEX.md retired; unique content preserved in template files. 41 new tests verify shared guidance equivalence."
-            },
-            {
-              "id": "cebf61e0-2fc9-41d1-8970-932f0539d0d2",
-              "title": "Normalize token diagnostics and failure taxonomy across vendors",
-              "status": "completed",
-              "level": "task",
-              "description": "Unify token-usage mapping and failure classification across Claude and Codex in packages/hench/src/agent/lifecycle/token-usage.ts, packages/hench/src/cli/errors.ts, and packages/llm-client/src/token-usage.ts. Missing usage data must surface as an explicit degraded diagnostic instead of a silent zero-value success path, and vendor-specific raw errors must map into one shared user-facing taxonomy.",
-              "priority": "high",
-              "blockedBy": [
-                "547ba5e2-b5cf-47d8-a608-eaef28398411"
-              ],
-              "startedAt": "2026-03-31T23:36:05.340Z",
-              "completedAt": "2026-04-01T00:59:06.271Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Unified token-usage mapping and failure classification across Claude and Codex. Added diagnostic-aware parsing variants (TokenParseResult with TokenDiagnosticStatus) to llm-client. Replaced Codex-specific CodexUsageDiagnostic with vendor-neutral TokenDiagnosticStatus. Added classifyVendorError() and failureCategoryLabel() for shared error taxonomy. Updated hench CLI error formatting to use category labels and per-category hints. 49 new tests across both packages."
-            },
-            {
-              "id": "8a2f9f66-8210-436b-b7ac-bce8cad8ef13",
-              "title": "Add cross-vendor baseline runtime fixtures and smoke tests",
-              "status": "completed",
-              "level": "task",
-              "description": "Add fixtures and smoke coverage that prove Claude and Codex runs share the same prompt sections, MCP availability, permission envelope, normalized event schema, failure classification, and completion gates. This should include unit coverage in packages/hench plus at least one fresh-project init-to-run smoke path so Codex can be validated as a first-class execution surface.",
-              "priority": "high",
-              "blockedBy": [
-                "99fe140a-103d-43bd-bcbd-eb8690eb3e17",
-                "67c0ada9-003e-48fe-9a0d-e822d66e2e11",
-                "cebf61e0-2fc9-41d1-8970-932f0539d0d2"
-              ],
-              "startedAt": "2026-04-01T00:59:42.066Z",
-              "completedAt": "2026-04-01T01:24:40.637Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added 92 tests (72 unit + 20 integration) across 3 files proving cross-vendor runtime parity for all 8 contract areas: prompt sections, execution policy, permission envelope, event schema, failure classification, token diagnostics, completion gates, and runtime diagnostics."
+              "source": "smart-add",
+              "startedAt": "2026-04-03T14:04:10.569Z",
+              "completedAt": "2026-04-03T14:08:57.865Z"
             }
           ]
         }
       ]
     },
     {
-      "id": "7f2fbdca-f2ad-457b-99cb-cc128a1a5665",
-      "title": "Vendor-Normalized Hench Execution (Phase 2)",
+      "id": "95918257-d85b-49aa-88b2-2d865a7912c4",
+      "title": "Code Health: 5 findings across 4 zones",
       "status": "completed",
       "level": "epic",
-      "description": "Make the hench agent execution process produce consistent, observable behavior regardless of which LLM vendor (Claude, Codex, or future providers) is selected. Extracts vendor-specific code into adapter modules, adopts the PromptEnvelope and RuntimeEvent types from Phase 1, adds run diagnostics, and codifies cross-vendor parity as automated contract tests. See docs/architecture/phase2-vendor-normalization.md for the full plan.",
-      "priority": "critical",
-      "tags": [
-        "phase-2",
-        "vendor-normalization",
-        "hench"
-      ],
-      "source": "docs/architecture/phase2-vendor-normalization.md",
-      "startedAt": "2026-04-03T04:18:31.209Z",
-      "completedAt": "2026-04-03T21:02:19.572Z",
-      "children": [
-        {
-          "id": "da21807f-fc7b-4680-bd13-253c0ac9fd17",
-          "title": "Cross-Vendor Contract Test Suite",
-          "status": "completed",
-          "level": "feature",
-          "description": "Codify the runtime identity contract as automated tests BEFORE any refactoring begins. Establishes the regression baseline that every subsequent epic is validated against. Without this, adapter extraction has no automated gate for the Claude path. Tests initially validate existing code paths directly — they don't require the adapter interface to exist yet.",
-          "acceptanceCriteria": [
-            "Contract test suite covers adapter interface, prompt parity, run record parity, and E2E smoke",
-            "Both vendors produce the same RuntimeEvent schema for equivalent scenarios",
-            "Both vendors map errors to the same FailureCategory",
-            "Run records from both vendors contain comparable diagnostic data",
-            "All tests pass against existing (pre-refactor) code paths"
-          ],
-          "priority": "critical",
-          "tags": [
-            "phase-2",
-            "contract-tests",
-            "regression-baseline"
-          ],
-          "startedAt": "2026-04-02T15:53:54.659Z",
-          "completedAt": "2026-04-02T15:53:54.659Z",
-          "children": [
-            {
-              "id": "0609ab37-cee4-45ec-8e87-24646f86d23f",
-              "title": "Adapter contract tests",
-              "status": "completed",
-              "level": "task",
-              "description": "Create packages/hench/tests/unit/vendor-adapter-contract.test.ts. Assert both adapters implement the full VendorAdapter interface. Feed identical mock events to both adapters, assert RuntimeEvent output shape matches. Feed identical error strings, assert FailureCategory matches. Initially tests validate existing code paths directly (buildClaudeCliArgs, processStreamLine, processCodexJsonLine, classifyVendorError).",
-              "acceptanceCriteria": [
-                "vendor-adapter-contract.test.ts exists with passing tests",
-                "Both vendors' parse functions tested with identical mock events",
-                "RuntimeEvent output shape assertions for both vendors",
-                "FailureCategory mapping assertions for both vendors",
-                "Snapshot baselines capture exact Claude CLI args and token totals"
-              ],
-              "priority": "critical",
-              "tags": [
-                "phase-2",
-                "contract-tests"
-              ],
-              "startedAt": "2026-04-02T03:38:59.959Z",
-              "completedAt": "2026-04-02T04:01:22.166Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created vendor-adapter-contract.test.ts with 60 passing tests covering parse function parity, RuntimeEvent shape, FailureCategory mapping, CLI arg snapshots, policy flag snapshots, token total snapshots, and full multi-event sequence parity. Exported buildClaudeCliArgs for testing."
-            },
-            {
-              "id": "b5ff0dd8-5a10-4bd4-8db1-b98812e6c05b",
-              "title": "Prompt parity tests",
-              "status": "completed",
-              "level": "task",
-              "description": "Assert both adapters receive the same PromptEnvelope sections for a given task. Assert instruction files (CLAUDE.md, AGENTS.md) derive from the same source and contain equivalent workflow content. Builds on existing instruction-alignment.test.js but adds section-level granularity.",
-              "acceptanceCriteria": [
-                "Both vendors receive identical prompt section names for the same task",
-                "Instruction file content equivalence validated at section level",
-                "Test captures baseline prompt output for regression comparison"
-              ],
-              "priority": "high",
-              "tags": [
-                "phase-2",
-                "contract-tests",
-                "prompt-parity"
-              ],
-              "startedAt": "2026-04-02T15:11:07.062Z",
-              "completedAt": "2026-04-02T15:22:46.217Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created 56 prompt parity tests across 2 files: packages/hench/tests/unit/agent/prompt-parity.test.ts (20 tests) and tests/e2e/prompt-section-parity.test.js (36 tests)."
-            },
-            {
-              "id": "18b7bd14-b952-474d-88d2-f058ce2db3c6",
-              "title": "Run record parity tests",
-              "status": "completed",
-              "level": "task",
-              "description": "Assert run records from both vendors contain diagnostics field. Assert token usage fields are populated or explicitly marked as unavailable (no silent zeros). Assert both vendors produce the same RunStatus for equivalent outcomes.",
-              "acceptanceCriteria": [
-                "Run record schema assertions for both vendors",
-                "Token usage fields validated (populated or explicitly unavailable)",
-                "RunStatus equivalence for matching outcomes",
-                "No silent zeros in token fields"
-              ],
-              "priority": "high",
-              "tags": [
-                "phase-2",
-                "contract-tests",
-                "run-records"
-              ],
-              "startedAt": "2026-04-02T15:26:55.102Z",
-              "completedAt": "2026-04-02T15:53:54.474Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added diagnosticStatus to TurnTokenUsage, RunDiagnostics to RunRecord, updated Zod schemas, wired diagnostic capture in stream processors, and created 31 parity tests covering all acceptance criteria."
-            },
-            {
-              "id": "93568386-9120-41fd-84d6-3fe1f7b36642",
-              "title": "E2E smoke tests for cross-vendor parity",
-              "status": "completed",
-              "level": "task",
-              "description": "Add E2E test: fresh project init → hench run with Claude CLI → verify run record shape. Add E2E test: fresh project init → hench run with Codex CLI → verify run record shape. Assert both E2E runs produce structurally identical run records (modulo vendor/model fields).",
-              "acceptanceCriteria": [
-                "E2E test for Claude CLI run record shape passes",
-                "E2E test for Codex CLI run record shape passes",
-                "Structural identity assertion between both vendors' run records",
-                "Only vendor/model fields allowed to differ"
-              ],
-              "priority": "high",
-              "tags": [
-                "phase-2",
-                "contract-tests",
-                "e2e"
-              ],
-              "startedAt": "2026-04-02T04:04:31.371Z",
-              "completedAt": "2026-04-02T04:13:47.220Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created packages/hench/tests/e2e/cross-vendor-run-record-smoke.test.ts with 11 tests across 3 describe blocks validating full run record lifecycle parity between Claude and Codex vendors."
-            }
-          ]
-        },
-        {
-          "id": "357ef25f-c555-4e60-8258-c79bcfd23a6f",
-          "title": "Vendor Adapter Extraction",
-          "status": "completed",
-          "level": "feature",
-          "description": "Extract vendor-specific code from cli-loop.ts (1200+ lines) into self-contained adapter modules. Define VendorAdapter interface, extract ClaudeCliAdapter and CodexCliAdapter, refactor cli-loop.ts to use adapter-based dispatch. Highest-risk refactor in Phase 2 — physically moves Claude CLI functions into new modules. Must be done with contract tests (Feature 6) as the regression safety net.",
-          "acceptanceCriteria": [
-            "VendorAdapter interface defined with buildSpawnConfig, parseEvent, classifyError, vendor, parseMode",
-            "ClaudeCliAdapter extracted with all Claude-specific functions from cli-loop.ts",
-            "CodexCliAdapter extracted with all Codex-specific functions from cli-loop.ts",
-            "cli-loop.ts uses adapter-based dispatch instead of if/else vendor branching",
-            "Existing E2E tests pass without behavioral changes",
-            "cli-loop.ts reduced by ~600 lines (vendor-specific code moved to adapters)"
-          ],
-          "priority": "critical",
-          "tags": [
-            "phase-2",
-            "adapter-extraction",
-            "hench"
-          ],
-          "blockedBy": [
-            "da21807f-fc7b-4680-bd13-253c0ac9fd17"
-          ],
-          "startedAt": "2026-04-02T22:17:07.298Z",
-          "completedAt": "2026-04-02T22:17:07.298Z",
-          "children": [
-            {
-              "id": "5b7cde87-7c99-4ca9-8f66-00ba26a50b70",
-              "title": "Define VendorAdapter interface and SpawnConfig type",
-              "status": "completed",
-              "level": "task",
-              "description": "Define VendorAdapter interface in packages/hench/src/agent/lifecycle/vendor-adapter.ts with: buildSpawnConfig(envelope, policy, model) → SpawnConfig; parseEvent(line, turn, metadata) → RuntimeEvent | null; classifyError(err) → FailureCategory; readonly vendor: LLMVendor; readonly parseMode: string. Define SpawnConfig type (binary, args, env, stdinContent, cwd). Export through hench's internal barrel.",
-              "acceptanceCriteria": [
-                "VendorAdapter interface defined in vendor-adapter.ts",
-                "SpawnConfig type defined with binary, args, env, stdinContent, cwd",
-                "Types exported through hench's internal barrel",
-                "Interface uses existing types from runtime-contract.ts (RuntimeEvent, FailureCategory, PromptEnvelope, ExecutionPolicy)"
-              ],
-              "priority": "critical",
-              "tags": [
-                "phase-2",
-                "adapter-extraction",
-                "interface"
-              ],
-              "startedAt": "2026-04-02T16:01:39.498Z",
-              "completedAt": "2026-04-02T16:06:55.724Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Defined VendorAdapter interface and SpawnConfig type in packages/hench/src/agent/lifecycle/vendor-adapter.ts. VendorAdapter has 4 methods/properties (buildSpawnConfig, parseEvent, classifyError, vendor, parseMode). SpawnConfig has 5 fields (binary, args, env, stdinContent, cwd). Types exported through agent barrel. 27 tests covering type shape, composability, and both vendor patterns."
-            },
-            {
-              "id": "b321915a-9f3f-418c-9ddc-5f0c50d0bc10",
-              "title": "Extract ClaudeCliAdapter",
-              "status": "completed",
-              "level": "task",
-              "description": "Move buildClaudeCliArgs(), processStreamLine(), and spawnClaude() subprocess config into packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts. Implement VendorAdapter interface: buildSpawnConfig() wraps buildClaudeCliArgs, parseEvent() produces RuntimeEvent objects from stream-json, classifyError() delegates to classifyVendorError(). Add unit tests for Claude adapter in isolation. CRITICAL: snapshot test capturing exact args array before extraction, assert byte-identical after.",
-              "acceptanceCriteria": [
-                "claude-cli-adapter.ts implements VendorAdapter",
-                "buildClaudeCliArgs logic moved from cli-loop.ts",
-                "processStreamLine logic moved and wrapped as parseEvent()",
-                "spawnClaude config wrapped as buildSpawnConfig()",
-                "classifyError delegates to classifyVendorError()",
-                "Snapshot test: exact args array identical to pre-extraction baseline",
-                "Unit tests pass in isolation"
-              ],
-              "priority": "critical",
-              "tags": [
-                "phase-2",
-                "adapter-extraction",
-                "claude"
-              ],
-              "blockedBy": [
-                "5b7cde87-7c99-4ca9-8f66-00ba26a50b70"
-              ],
-              "startedAt": "2026-04-02T16:20:00.263Z",
-              "completedAt": "2026-04-02T16:27:17.904Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Extracted ClaudeCliAdapter into packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts implementing VendorAdapter interface. 48 unit tests with snapshot parity assertions. All 1745 hench tests pass."
-            },
-            {
-              "id": "18aa02a2-e4d6-4fac-a0db-b7d68c96d01e",
-              "title": "Extract CodexCliAdapter",
-              "status": "completed",
-              "level": "task",
-              "description": "Move spawnCodex(), processCodexJsonLine(), normalizeCodexResponse(), and compileCodexPolicyFlags() into packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts. Implement VendorAdapter interface: buildSpawnConfig() compiles ExecutionPolicy to Codex flags, parseEvent() produces RuntimeEvent from JSONL with heuristic fallback, classifyError() delegates to classifyVendorError(). Add unit tests for Codex adapter in isolation.",
-              "acceptanceCriteria": [
-                "codex-cli-adapter.ts implements VendorAdapter",
-                "All Codex-specific functions moved from cli-loop.ts",
-                "buildSpawnConfig compiles ExecutionPolicy to Codex flags",
-                "parseEvent produces RuntimeEvent from JSONL with heuristic fallback",
-                "classifyError delegates to classifyVendorError()",
-                "Unit tests pass in isolation"
-              ],
-              "priority": "critical",
-              "tags": [
-                "phase-2",
-                "adapter-extraction",
-                "codex"
-              ],
-              "blockedBy": [
-                "5b7cde87-7c99-4ca9-8f66-00ba26a50b70"
-              ],
-              "startedAt": "2026-04-02T16:27:49.963Z",
-              "completedAt": "2026-04-02T16:41:39.255Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created codex-cli-adapter.ts implementing VendorAdapter interface with buildSpawnConfig, parseEvent (structured JSONL + heuristic fallback), and classifyError. 62 unit tests pass in isolation."
-            },
-            {
-              "id": "2f1b47d2-da25-425e-bfd0-d94b9a500201",
-              "title": "Refactor cli-loop.ts to use adapter-based dispatch",
-              "status": "completed",
-              "level": "task",
-              "description": "Replace dispatchVendorSpawn() with adapter-based dispatch. Create resolveVendorAdapter(vendor: LLMVendor): VendorAdapter factory. Refactor the main loop to call adapter.buildSpawnConfig() → spawn → adapter.parseEvent() per line. Remove vendor-specific functions from cli-loop.ts (now in adapter modules). Verify existing E2E tests pass without behavioral changes.",
-              "acceptanceCriteria": [
-                "dispatchVendorSpawn() replaced with adapter-based dispatch",
-                "resolveVendorAdapter factory created",
-                "Main loop uses adapter.buildSpawnConfig() and adapter.parseEvent()",
-                "Vendor-specific functions removed from cli-loop.ts",
-                "cli-loop.ts reduced by ~600 lines",
-                "All existing E2E tests pass",
-                "pnpm test green across all packages"
-              ],
-              "priority": "critical",
-              "tags": [
-                "phase-2",
-                "adapter-extraction",
-                "refactor"
-              ],
-              "blockedBy": [
-                "b321915a-9f3f-418c-9ddc-5f0c50d0bc10",
-                "18aa02a2-e4d6-4fac-a0db-b7d68c96d01e"
-              ],
-              "startedAt": "2026-04-02T21:08:14.695Z",
-              "completedAt": "2026-04-02T22:17:07.118Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Refactored cli-loop.ts to use adapter-based dispatch. Replaced spawnClaude/spawnCodex/dispatchVendorSpawn with generic spawnWithAdapter() using VendorAdapter pattern. Created resolveVendorAdapter factory, event-accumulator.ts for legacy parsers, applyRuntimeEvent bridge. cli-loop.ts reduced from 1418→884 lines (-534). All 1807 hench tests pass."
-            }
-          ]
-        },
-        {
-          "id": "07b75236-2a3c-4725-8d95-929dc6b74754",
-          "title": "Prompt Envelope Adoption",
-          "status": "completed",
-          "level": "feature",
-          "description": "Use the existing PromptEnvelope type throughout prompt construction so both vendors receive tagged, traceable prompt sections. Refactor planning/prompt.ts to produce PromptEnvelope instead of flat strings. Each vendor adapter translates the envelope to native delivery format. Sections are logged for diagnostics. Low risk — output should be identical strings with tagged metadata.",
-          "acceptanceCriteria": [
-            "prompt.ts produces PromptEnvelope instead of flat strings",
-            "Each section tagged with canonical name (system, workflow, brief, files, validation, completion)",
-            "Both adapters use assemblePrompt() in buildSpawnConfig()",
-            "Prompt section names and sizes logged in run diagnostics",
-            "Byte-identical prompt output compared to pre-refactor baseline"
-          ],
-          "priority": "high",
-          "tags": [
-            "phase-2",
-            "prompt-envelope",
-            "hench"
-          ],
-          "blockedBy": [
-            "357ef25f-c555-4e60-8258-c79bcfd23a6f"
-          ],
-          "startedAt": "2026-04-02T23:45:50.169Z",
-          "completedAt": "2026-04-02T23:45:50.169Z",
-          "children": [
-            {
-              "id": "5c298011-399d-496d-95c2-93bc40864e64",
-              "title": "Refactor prompt construction to produce PromptEnvelope",
-              "status": "completed",
-              "level": "task",
-              "description": "Update packages/hench/src/agent/planning/prompt.ts to produce PromptEnvelope instead of flat strings. Tag each section with its canonical name (system, workflow, brief, files, validation, completion). Update packages/hench/src/agent/planning/brief.ts to contribute sections to the envelope. CRITICAL: capture exact system prompt strings for 3+ representative tasks before the change, assert byte-identical output after.",
-              "acceptanceCriteria": [
-                "prompt.ts produces PromptEnvelope with tagged sections",
-                "brief.ts contributes sections to the envelope",
-                "Regression test: byte-identical prompt output for representative tasks",
-                "Section names: system, workflow, brief, files, validation, completion"
-              ],
-              "priority": "high",
-              "tags": [
-                "phase-2",
-                "prompt-envelope"
-              ],
-              "startedAt": "2026-04-02T22:52:42.697Z",
-              "completedAt": "2026-04-02T23:15:23.489Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Refactored prompt construction to produce PromptEnvelope with tagged sections. Added buildPromptEnvelope to prompt.ts, buildBriefSections to brief.ts, updated shared.ts and cli-loop.ts to use the envelope. 32 regression tests verify byte-identical output."
-            },
-            {
-              "id": "851ce775-c477-4b30-bfb2-14af614cead8",
-              "title": "Vendor-specific prompt delivery via adapters",
-              "status": "completed",
-              "level": "task",
-              "description": "ClaudeCliAdapter.buildSpawnConfig() uses assemblePrompt() to split system/task. CodexCliAdapter.buildSpawnConfig() uses assemblePrompt() and formats as SYSTEM:\\n...\\nTASK:\\n... Log prompt section names and sizes in run diagnostics.",
-              "acceptanceCriteria": [
-                "Claude adapter uses assemblePrompt() for system/task split",
-                "Codex adapter formats with SYSTEM/TASK headers",
-                "Prompt section names and sizes logged in run diagnostics"
-              ],
-              "priority": "high",
-              "tags": [
-                "phase-2",
-                "prompt-envelope",
-                "adapters"
-              ],
-              "blockedBy": [
-                "5c298011-399d-496d-95c2-93bc40864e64"
-              ],
-              "startedAt": "2026-04-02T23:16:07.442Z",
-              "completedAt": "2026-04-02T23:36:24.882Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added prompt section diagnostics to vendor adapter delivery. Both adapters already used assemblePrompt() correctly; added PromptSectionDiagnostic type, extraction/logging utilities, and wired into cli-loop.ts. 7 files changed, 513 insertions. All 1957 hench tests pass (87 files), build and typecheck clean."
-            },
-            {
-              "id": "5409318d-45df-4709-9283-c0cef15c4fd3",
-              "title": "Prompt envelope parity tests",
-              "status": "completed",
-              "level": "task",
-              "description": "Assert both adapters receive identical section names for the same task. Assert section content is equivalent (not just present). Assert no vendor receives sections the other doesn't.",
-              "acceptanceCriteria": [
-                "Both adapters receive identical section names",
-                "Section content equivalence validated",
-                "No vendor receives exclusive sections"
-              ],
-              "priority": "high",
-              "tags": [
-                "phase-2",
-                "prompt-envelope",
-                "tests"
-              ],
-              "blockedBy": [
-                "851ce775-c477-4b30-bfb2-14af614cead8"
-              ],
-              "startedAt": "2026-04-02T23:41:44.713Z",
-              "completedAt": "2026-04-03T03:20:02.507Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "34 parity tests already existed (written by prior interrupted hench run, committed in 5ce6c524). Verified all pass: AC1 (7 tests, identical section names across 6 envelope shapes + ordering), AC2 (13 tests, byte-identical content, canonical reference, policy/model invariance), AC3 (12 tests, no exclusive sections, correct channel routing, empty filtering, non-canonical names), plus 2 symmetry proof tests. Full hench suite: 2031/2031 pass, typecheck clean."
-            }
-          ]
-        },
-        {
-          "id": "a1e10c77-5187-49b8-9b50-a5403f9fef94",
-          "title": "Unified Event Pipeline",
-          "status": "completed",
-          "level": "feature",
-          "description": "Make all run evaluation operate on RuntimeEvent streams instead of ad hoc CliRunResult shapes. Create EventAccumulator that collects RuntimeEvent[] and derives token usage, tool calls, assistant text, completion summary, and failure details. Wire into CLI loop, update spin detection and budget checks. Feature-flag gated (config.useEventPipeline). Keep CliRunResult as backward-compat bridge during migration.",
-          "acceptanceCriteria": [
-            "EventAccumulator class created and tested",
-            "CLI loop feeds adapter.parseEvent() output into accumulator",
-            "Spin detection operates on RuntimeEvent stream",
-            "Token budget checking uses accumulator totals",
-            "toCliRunResult() backward-compat bridge works",
-            "Feature-flag gated: config.useEventPipeline",
-            "Run records contain equivalent data post-migration"
-          ],
-          "priority": "high",
-          "tags": [
-            "phase-2",
-            "event-pipeline",
-            "hench",
-            "flag-gated"
-          ],
-          "blockedBy": [
-            "357ef25f-c555-4e60-8258-c79bcfd23a6f"
-          ],
-          "startedAt": "2026-04-03T02:40:43.714Z",
-          "completedAt": "2026-04-03T02:40:43.714Z",
-          "children": [
-            {
-              "id": "e8e087e8-5a02-40c1-b6dc-ce42fcb08b19",
-              "title": "Create EventAccumulator",
-              "status": "completed",
-              "level": "task",
-              "description": "Create packages/hench/src/agent/lifecycle/event-accumulator.ts. Implement EventAccumulator class that collects RuntimeEvent[] and derives: total token usage (with diagnostic status), tool call count and list, assistant message text, completion summary, failure details. Add toCliRunResult() method for backward compatibility during migration. Add unit tests.",
-              "acceptanceCriteria": [
-                "EventAccumulator class in event-accumulator.ts",
-                "Derives token usage, tool calls, text, completion, failures from RuntimeEvent[]",
-                "toCliRunResult() produces backward-compatible CliRunResult",
-                "Unit tests cover all derivation paths"
-              ],
-              "priority": "high",
-              "tags": [
-                "phase-2",
-                "event-pipeline"
-              ],
-              "startedAt": "2026-04-02T22:20:18.802Z",
-              "completedAt": "2026-04-02T22:35:17.201Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "EventAccumulator class created in event-accumulator.ts with full RuntimeEvent[] derivation (token usage with diagnostics, tool calls with pairing, assistant text, completion summary, failure details). toCliRunResult() backward-compat bridge included. Barrel-exported from agent/index.ts. 53 unit tests cover all derivation paths. All 1860 tests pass."
-            },
-            {
-              "id": "f257df67-5470-4661-ac03-b0f74a994ae3",
-              "title": "Wire event pipeline into CLI loop",
-              "status": "completed",
-              "level": "task",
-              "description": "Replace inline result accumulation with EventAccumulator. Feed adapter.parseEvent() output directly into accumulator. Update spin detection to operate on RuntimeEvent stream. Update token budget checking to use accumulator totals. Verify run records contain equivalent data post-migration. Gate behind config.useEventPipeline flag.",
-              "acceptanceCriteria": [
-                "Inline accumulation replaced with EventAccumulator",
-                "adapter.parseEvent() feeds into accumulator",
-                "Spin detection uses RuntimeEvent stream",
-                "Budget checking uses accumulator totals",
-                "Feature-flag gated: config.useEventPipeline",
-                "Run records equivalent pre/post migration"
-              ],
-              "priority": "high",
-              "tags": [
-                "phase-2",
-                "event-pipeline",
-                "flag-gated"
-              ],
-              "blockedBy": [
-                "e8e087e8-5a02-40c1-b6dc-ce42fcb08b19"
-              ],
-              "startedAt": "2026-04-02T22:36:12.759Z",
-              "completedAt": "2026-04-02T22:48:12.444Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Wired EventAccumulator into CLI loop behind config.useEventPipeline flag. When enabled: adapter.parseEvent() feeds accumulator, spin detection/budget checking operate on RuntimeEvent stream, SpawnResult derived from accumulator. 4 files changed (877 insertions, 67 deletions), 40 new tests."
-            },
-            {
-              "id": "0fbbf86f-5ffa-483a-bedd-2dc97793fb7d",
-              "title": "Event persistence in run records",
-              "status": "completed",
-              "level": "task",
-              "description": "Add optional events: RuntimeEvent[] field to RunRecord schema (v1 additive — no migration needed). Store events when verbose/debug mode is enabled. Add hench show --events run-id subcommand for debugging.",
-              "acceptanceCriteria": [
-                "Optional events field on RunRecord schema",
-                "Events stored in verbose/debug mode",
-                "hench show --events displays event stream for a run"
-              ],
-              "priority": "medium",
-              "tags": [
-                "phase-2",
-                "event-pipeline",
-                "persistence"
-              ],
-              "blockedBy": [
-                "f257df67-5470-4661-ac03-b0f74a994ae3"
-              ],
-              "startedAt": "2026-04-03T02:27:57.505Z",
-              "completedAt": "2026-04-03T02:40:43.540Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added PersistedRuntimeEvent type and events field to RunRecord schema. Events stored when useEventPipeline is active. Added hench show --events subcommand. 31 tests passing."
-            }
-          ]
-        },
-        {
-          "id": "bcfd200e-0c19-4306-ba43-efd2d25b5dd0",
-          "title": "API Provider Generalization",
-          "status": "completed",
-          "level": "feature",
-          "description": "Remove the Claude-only gate from the API execution path (loop.ts) and enable registry-based provider resolution. Generalize agentLoop() to accept any LLMProvider from ProviderRegistry. Define vendor-neutral tool schema. Feature-flag gated (config.useRegistryProvider). Stretch: add OpenAI API adapter. Highest Claude-path impact — execute last.",
-          "acceptanceCriteria": [
-            "Claude-only vendor check in loop.ts replaced with ProviderRegistry.getActiveProvider()",
-            "initApiResources() accepts any LLMProvider",
-            "Vendor-neutral tool schema defined in llm-client",
-            "Feature-flag gated: config.useRegistryProvider",
-            "Integration test verifies Claude API loop produces identical results",
-            "hench run --provider=api works with Claude API key"
-          ],
-          "priority": "medium",
-          "tags": [
-            "phase-2",
-            "api-generalization",
-            "hench",
-            "flag-gated",
-            "stretch"
-          ],
-          "blockedBy": [
-            "357ef25f-c555-4e60-8258-c79bcfd23a6f"
-          ],
-          "startedAt": "2026-04-03T04:09:19.127Z",
-          "completedAt": "2026-04-03T04:09:19.127Z",
-          "children": [
-            {
-              "id": "9df5dd83-8bd7-4104-809e-ae99831cd88f",
-              "title": "Generalize agentLoop for registry-based provider resolution",
-              "status": "completed",
-              "level": "task",
-              "description": "Replace the Claude vendor check in loop.ts with ProviderRegistry.getActiveProvider(). Refactor initApiResources() to accept any LLMProvider. Gate behind config.useRegistryProvider flag (default false). Add integration test verifying Claude API loop produces identical results before and after.",
-              "acceptanceCriteria": [
-                "Claude vendor check replaced with ProviderRegistry resolution",
-                "initApiResources accepts any LLMProvider",
-                "Feature-flag: config.useRegistryProvider (default false)",
-                "Integration test: identical Claude API results pre/post"
-              ],
-              "priority": "medium",
-              "tags": [
-                "phase-2",
-                "api-generalization",
-                "flag-gated"
-              ],
-              "startedAt": "2026-04-03T02:59:56.194Z",
-              "completedAt": "2026-04-03T03:13:45.881Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Replaced hardcoded Claude vendor check with ProviderRegistry resolution. initApiResources() now accepts any LLMProvider. Feature-gated via config.useRegistryProvider (default false). 9 integration tests verify parity."
-            },
-            {
-              "id": "ea9bc425-60cc-4bb6-95ca-2362465cca84",
-              "title": "Define vendor-neutral tool schema",
-              "status": "completed",
-              "level": "task",
-              "description": "Define a vendor-neutral tool schema type in packages/llm-client/src/tool-schema.ts. Add compilation functions: toAnthropicToolDef(), toOpenAiToolDef(). Refactor TOOL_DEFINITIONS in hench to use the neutral format. Both CLI adapters and API providers compile from the same source.",
-              "acceptanceCriteria": [
-                "Vendor-neutral tool schema type in tool-schema.ts",
-                "toAnthropicToolDef() and toOpenAiToolDef() compilation functions",
-                "TOOL_DEFINITIONS uses neutral format",
-                "Both adapters and API providers compile from same source"
-              ],
-              "priority": "medium",
-              "tags": [
-                "phase-2",
-                "api-generalization",
-                "tool-schema"
-              ],
-              "startedAt": "2026-04-03T02:47:08.263Z",
-              "completedAt": "2026-04-03T02:58:54.548Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Defined vendor-neutral ToolDefinition type in tool-schema.ts. Added toAnthropicToolDef() and toOpenAiToolDef() compilation functions. Refactored TOOL_DEFINITIONS in hench dispatch.ts to use neutral format with backward-compatible compiled export. All 30 new tests + 2022 hench tests + 286 architecture tests pass."
-            },
-            {
-              "id": "94233ff5-fbf9-4d0c-813c-457c9161ccea",
-              "title": "OpenAI API adapter (stretch)",
-              "status": "completed",
-              "level": "task",
-              "description": "Add OpenAiApiProvider implementing LLMProvider in packages/llm-client/src/openai-api-provider.ts. Register in ProviderRegistry with vendor \"codex\" + mode \"api\". Implement complete() and stream() for tool-use loop. Add auth detection for OPENAI_API_KEY. STRETCH GOAL — lower priority than all other Phase 2 work.",
-              "acceptanceCriteria": [
-                "OpenAiApiProvider implements LLMProvider",
-                "Registered in ProviderRegistry",
-                "complete() and stream() implemented",
-                "OPENAI_API_KEY auth detection works",
-                "hench run --provider=api --vendor=codex works"
-              ],
-              "priority": "low",
-              "tags": [
-                "phase-2",
-                "api-generalization",
-                "stretch",
-                "openai"
-              ],
-              "blockedBy": [
-                "9df5dd83-8bd7-4104-809e-ae99831cd88f",
-                "ea9bc425-60cc-4bb6-95ca-2362465cca84"
-              ],
-              "startedAt": "2026-04-03T03:56:48.311Z",
-              "completedAt": "2026-04-03T04:09:18.948Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Implemented OpenAiApiProvider with complete(), stream(), validateAuth(), and OPENAI_API_KEY auth detection. Registered in ProviderRegistry with dual-mode codex factory (API when key available, CLI fallback). 48 new tests, all passing."
-            }
-          ]
-        },
-        {
-          "id": "94d3911c-5f9a-48ea-a906-499d3e1b48c3",
-          "title": "Run Diagnostics & Observability",
-          "status": "completed",
-          "level": "feature",
-          "description": "Every run produces structured RuntimeDiagnostics that make the vendor contract floor observable. Add diagnostics field to RunRecord schema (additive, no migration). Collect at run start/end in shared.ts. Surface in hench show output and web dashboard. Low risk — additive schema change only.",
-          "acceptanceCriteria": [
-            "RuntimeDiagnostics field added to RunRecord schema (optional, additive)",
-            "Diagnostics collected at run start in initRunRecord()",
-            "Diagnostics updated at run end with final token status and parse mode",
-            "hench show displays diagnostics",
-            "Dashboard run detail view surfaces vendor diagnostics",
-            "Old run records without diagnostics field remain valid"
-          ],
-          "priority": "medium",
-          "tags": [
-            "phase-2",
-            "diagnostics",
-            "observability",
-            "hench"
-          ],
-          "blockedBy": [
-            "a1e10c77-5187-49b8-9b50-a5403f9fef94"
-          ],
-          "startedAt": "2026-04-03T04:18:31.082Z",
-          "completedAt": "2026-04-03T04:18:31.082Z",
-          "children": [
-            {
-              "id": "1e041757-f9d8-455e-88bd-8fd1b8566b55",
-              "title": "Diagnostics collection in run lifecycle",
-              "status": "completed",
-              "level": "task",
-              "description": "Add diagnostics: RuntimeDiagnostics field to RunRecord schema. Collect diagnostics at run start in shared.ts initRunRecord() — vendor, model, sandbox, approvals, parseMode. Update diagnostics at run end with final token status. Include diagnostics in hench show output.",
-              "acceptanceCriteria": [
-                "RuntimeDiagnostics field on RunRecord (optional, additive)",
-                "Diagnostics captured at run start and updated at run end",
-                "hench show displays diagnostics snapshot",
-                "Old records without field remain valid"
-              ],
-              "priority": "medium",
-              "tags": [
-                "phase-2",
-                "diagnostics"
-              ],
-              "startedAt": "2026-04-03T03:20:44.069Z",
-              "completedAt": "2026-04-03T03:41:39.908Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added runtime diagnostics to RunRecord lifecycle: vendor/sandbox/approvals captured at init, tokenDiagnosticStatus derived at finalization, displayed in hench show output. 19 new tests, all 2050 hench tests passing."
-            },
-            {
-              "id": "3a6c9338-ca59-4619-ba93-c4cabb597799",
-              "title": "Dashboard integration for vendor diagnostics",
-              "status": "completed",
-              "level": "task",
-              "description": "Surface vendor diagnostics in the web dashboard run detail view. Add vendor/model filtering to run history views. Show token diagnostic status indicators (complete/partial/unavailable).",
-              "acceptanceCriteria": [
-                "Dashboard run detail shows vendor diagnostics",
-                "Run history filterable by vendor/model",
-                "Token diagnostic status indicators displayed"
-              ],
-              "priority": "low",
-              "tags": [
-                "phase-2",
-                "diagnostics",
-                "dashboard"
-              ],
-              "blockedBy": [
-                "1e041757-f9d8-455e-88bd-8fd1b8566b55"
-              ],
-              "startedAt": "2026-04-03T04:10:34.035Z",
-              "completedAt": "2026-04-03T04:18:30.906Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added vendor diagnostics to dashboard run detail view, vendor/model filtering to run history, and token diagnostic status indicators"
-            }
-          ]
-        },
-        {
-          "id": "6f50341a-b049-46b5-8d0b-893c774a0390",
-          "title": "Remove legacy re-exports from cli-loop.ts and update test imports",
-          "status": "completed",
-          "level": "task",
-          "description": "cli-loop.ts re-exports ~8 functions/types (processStreamLine, processCodexJsonLine, buildClaudeCliArgs, buildAllowedTools, normalizeCodexResponse, CliRunResult, TokenEventMetadata, ClaudeCliInput, NormalizedCodexToolEvent, NormalizedCodexResponse) from their new canonical homes in event-accumulator.ts and the adapter modules. These re-exports exist solely for test backward compatibility — no production code or public API depends on them. Remove the re-export block (lines ~67-81) and update the 9 test files to import directly from the canonical module locations.",
-          "acceptanceCriteria": [
-            "Re-export block removed from cli-loop.ts",
-            "All 9 test files import from canonical adapter/accumulator modules instead of cli-loop.ts",
-            "No remaining imports of these functions through cli-loop.ts in the codebase",
-            "All existing tests pass without modification to test logic"
-          ],
-          "priority": "low",
-          "tags": [
-            "hench",
-            "cleanup"
-          ],
-          "startedAt": "2026-04-03T20:47:55.994Z",
-          "completedAt": "2026-04-03T21:02:19.405Z",
-          "resolutionType": "code-change",
-          "resolutionDetail": "Removed backward-compatibility re-export block from cli-loop.ts and updated 10 test files to import from canonical locations (event-accumulator.ts, claude-cli-adapter.ts, codex-cli-adapter.ts). All 2050 tests pass, typecheck clean."
-        }
-      ]
-    },
-    {
-      "id": "8273b9d3-ae67-402a-80bf-3112fdf331fd",
-      "title": "Init LLM Provider & Model Selection",
-      "status": "completed",
-      "level": "epic",
-      "description": "Make ndx init configure the active LLM in one guided flow: choose vendor first, then choose a vendor-specific model using a keyboard-driven terminal selector. Persist to .n-dx.json under llm.&lt;vendor&gt;.model. Supports both interactive and flag-driven non-interactive flows. Reference: docs/architecture/init-llm-provider-model-selection.md",
+      "description": "Automated recommendations from SourceVision analysis. 4 zone+category groups covering 5 total findings.",
       "priority": "high",
-      "tags": [
-        "codex-integration",
-        "init",
-        "ux",
-        "config"
-      ],
-      "startedAt": "2026-04-03T21:56:37.802Z",
-      "completedAt": "2026-04-03T21:56:37.802Z",
+      "source": "sourcevision",
+      "startedAt": "2026-04-03T14:35:15.499Z",
+      "completedAt": "2026-04-03T19:28:35.406Z",
       "children": [
         {
-          "id": "b7fb2054-06e0-4292-9afd-162fa5ff4693",
-          "title": "LLM Init Flow Extraction",
+          "id": "ff6c5a83-fbcb-4c16-8ef3-279c92f81249",
+          "title": "Fix suggestion in sourcevision-2 (1 finding)",
           "status": "completed",
           "level": "feature",
-          "description": "Extract LLM selection logic from packages/core/cli.js into a dedicated orchestration module (packages/core/init-llm.js). Parse LLM-related init flags, read existing config, resolve whether prompting is needed, and return a normalized selection object with provider, model, and source metadata.",
+          "description": "- Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
           "priority": "high",
-          "tags": [
-            "core",
-            "refactor"
-          ],
-          "startedAt": "2026-04-03T15:14:45.502Z",
-          "completedAt": "2026-04-03T15:14:45.502Z",
+          "source": "sourcevision",
+          "startedAt": "2026-04-03T14:35:08.286Z",
+          "completedAt": "2026-04-03T14:35:08.286Z",
           "children": [
             {
-              "id": "cffae36a-48cb-4fe0-8cac-728fc842e752",
-              "title": "Create packages/core/init-llm.js module",
-              "status": "completed",
+              "id": "80abb312-bf55-45c1-836b-a176715bddbf",
+              "title": "Fix suggestion in sourcevision-2: Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pi",
+              "status": "deferred",
               "level": "task",
-              "description": "Create a new orchestration-tier module at packages/core/init-llm.js. This module owns the LLM selection flow: parsing LLM-related init flags, reading existing LLM config from .n-dx.json, resolving whether interactive prompting is needed, running provider/model selection, and returning a normalized selection object { provider, model, providerSource, modelSource }.",
-              "acceptanceCriteria": [
-                "init-llm.js exists in packages/core/",
-                "Module exports resolveInitLLMSelection() and promptLLMSelection()",
-                "Does not import from @n-dx/llm-client or other package internals (orchestration-tier constraint)",
-                "Returns normalized selection object with provider, model, providerSource, modelSource fields"
-              ],
+              "description": "- Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
-              "startedAt": "2026-04-03T07:17:36.665Z",
-              "completedAt": "2026-04-03T07:30:41.894Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added promptLLMSelection() export to init-llm.js with injectable prompt callbacks, default readline provider prompt, and 14 unit tests"
-            },
-            {
-              "id": "20de7477-6b75-4ff4-b8d4-3827974f59da",
-              "title": "Move promptInitProvider() out of cli.js into init-llm.js",
-              "status": "completed",
-              "level": "task",
-              "description": "Extract the existing promptInitProvider() function from packages/core/cli.js into init-llm.js. Update handleInit() in cli.js to call the new module. Ensure the existing provider selection behavior is preserved during extraction before any UX changes.",
-              "acceptanceCriteria": [
-                "promptInitProvider() removed from cli.js",
-                "handleInit() calls init-llm.js for LLM selection",
-                "Existing numeric provider selection still works after extraction (no UX change yet)",
-                "No regression in tests/e2e/cli-init.test.js"
-              ],
-              "priority": "high",
-              "startedAt": "2026-04-03T15:09:31.329Z",
-              "completedAt": "2026-04-03T15:14:45.319Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Extracted promptInitProvider() from cli.js into init-llm.js. handleInit() now calls resolveInitLLMSelection() + promptLLMSelection() for provider selection. Removed dead shouldShowInitBanner() and local SUPPORTED_PROVIDERS constant. All 52 tests pass (20 e2e + 32 unit)."
-            },
-            {
-              "id": "7984dc78-a5ef-4b66-9eae-cd040063ea2b",
-              "title": "Add resolveInitLLMSelection() helper with flag/config/prompt precedence",
-              "status": "completed",
-              "level": "task",
-              "description": "Implement the resolution logic that determines whether to prompt or use existing values. Precedence: explicit CLI flags > existing project config > interactive prompt > runtime default fallback. For re-init: skip LLM prompt if both vendor and model are already configured; prompt only for missing model if vendor exists but model is absent.",
-              "acceptanceCriteria": [
-                "Flags take precedence over existing config",
-                "Existing config skips prompting when both vendor and model are set",
-                "Missing model triggers model-only prompt when vendor is already set",
-                "Non-TTY environments skip prompts and use defaults/flags"
-              ],
-              "priority": "high",
-              "startedAt": "2026-04-03T07:05:50.944Z",
-              "completedAt": "2026-04-03T07:16:09.290Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created packages/core/init-llm.js with resolveInitLLMSelection() pure decision helper. 18 unit tests in tests/unit/init-llm.test.js cover all acceptance criteria."
+              "source": "sourcevision",
+              "startedAt": "2026-04-03T14:35:03.990Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "2ad43ef6f0af"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
             }
-          ]
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "2ad43ef6f0af"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
         },
         {
-          "id": "855fc750-3dd1-4a27-b1a6-76e840e16fc8",
-          "title": "Interactive Select UI",
+          "id": "4e6c049d-1870-462a-9aa0-501b9932b122",
+          "title": "Fix suggestion in sourcevision-3 (1 finding)",
           "status": "completed",
           "level": "feature",
-          "description": "Replace the numeric text-entry provider prompt with a keyboard-driven terminal selector (enquirer). Add a vendor-specific model selection step after provider selection. Arrow keys navigate, Enter confirms, Esc/Ctrl+C cancels.",
+          "description": "- Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
           "priority": "high",
-          "tags": [
-            "core",
-            "ux"
-          ],
-          "blockedBy": [
-            "b7fb2054-06e0-4292-9afd-162fa5ff4693"
-          ],
-          "startedAt": "2026-04-03T17:27:41.947Z",
-          "completedAt": "2026-04-03T17:27:41.947Z",
+          "source": "sourcevision",
+          "startedAt": "2026-04-03T14:35:15.361Z",
+          "completedAt": "2026-04-03T14:35:15.361Z",
           "children": [
             {
-              "id": "a6a6ebf1-a0ba-4b28-920b-124c40310467",
-              "title": "Add enquirer dependency to packages/core",
-              "status": "completed",
+              "id": "d4bc1bc9-5b60-40fb-9719-9120ac718065",
+              "title": "Fix suggestion in sourcevision-3: Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pi",
+              "status": "deferred",
               "level": "task",
-              "description": "Add enquirer as a direct dependency of packages/core. This replaces raw readline/promises usage for interactive prompts. Keep a small fallback path for non-TTY and test environments that bypasses the interactive prompt.",
-              "acceptanceCriteria": [
-                "enquirer listed in packages/core/package.json dependencies",
-                "Non-TTY environments do not attempt interactive prompts",
-                "config.js does not depend on enquirer"
-              ],
+              "description": "- Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
-              "startedAt": "2026-04-03T15:16:08.279Z",
-              "completedAt": "2026-04-03T15:32:52.628Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added enquirer ^2.4.1 to packages/core/package.json dependencies. Added isInteractiveTerminal() utility to init-llm.js for TTY detection. Added init-llm.js to published files list. config.js has no enquirer dependency (enforced by existing architecture test)."
-            },
-            {
-              "id": "afb5f9cb-5df5-47ad-b76d-d2f4f63edc81",
-              "title": "Replace numeric provider prompt with keyboard-driven select",
-              "status": "completed",
-              "level": "task",
-              "description": "Replace the existing numeric '1) codex 2) claude' prompt with an enquirer Select prompt. Arrow keys navigate, Enter confirms. Display vendor names with friendly labels. Vertical select is the baseline; horizontal tab-style is acceptable if the library supports it cleanly.",
-              "acceptanceCriteria": [
-                "Provider selection uses arrow-key navigation, not numeric text entry",
-                "Both 'codex' and 'claude' appear as selectable options",
-                "Enter confirms selection",
-                "Selected provider is passed to the next stage (model selection)"
-              ],
-              "priority": "high",
-              "startedAt": "2026-04-03T15:47:33.651Z",
-              "completedAt": "2026-04-03T15:54:38.499Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Replaced readline numeric prompt with enquirer Select for provider selection. Updated cli.js to use real isTTY. Added PROVIDER_LABELS, updated e2e tests and architecture-policy docs."
-            },
-            {
-              "id": "34c6db6f-bd50-4590-84c3-0974a8cd9cf0",
-              "title": "Add vendor-specific model selection prompt",
-              "status": "completed",
-              "level": "task",
-              "description": "After provider selection, display a second Select prompt showing the curated model list for the chosen vendor. Show friendly labels (e.g. 'Claude Sonnet 4.6') while persisting canonical model IDs (e.g. 'claude-sonnet-4-6'). Mark recommended models visually. The model list is sourced from the local model catalog.",
-              "acceptanceCriteria": [
-                "Model prompt appears after provider selection",
-                "Shows vendor-specific model list from catalog",
-                "Recommended model is visually marked and pre-selected",
-                "Persists canonical model ID, not display label"
-              ],
-              "priority": "high",
-              "startedAt": "2026-04-03T15:35:56.308Z",
-              "completedAt": "2026-04-03T15:45:35.594Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Created llm-model-catalog.js with curated vendor model lists. Updated init-llm.js to replace placeholder defaultPromptModel with enquirer-based Select prompt (TTY) or auto-select recommended model (non-TTY). Added 17 unit tests including contract tests for recommended model alignment with runtime defaults."
-            },
-            {
-              "id": "9221af2a-52b1-468d-95d0-73b8d760f1ee",
-              "title": "Handle cancel/escape cleanly in interactive prompts",
-              "status": "completed",
-              "level": "task",
-              "description": "Esc or Ctrl+C during provider or model selection should cancel the LLM configuration stage gracefully without crashing init. If cancelled, skip LLM config and continue with existing config or defaults. Print a clear message indicating LLM configuration was skipped.",
-              "acceptanceCriteria": [
-                "Esc/Ctrl+C does not crash the init process",
-                "Cancellation prints a skip message",
-                "Init continues with remaining stages after cancellation",
-                "No partial config is written on cancellation"
-              ],
-              "priority": "medium",
-              "startedAt": "2026-04-03T16:58:51.386Z",
-              "completedAt": "2026-04-03T17:31:08.516Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Task was already implemented in commit 40ae586a. Reconciling status — all acceptance criteria verified, tests pass."
+              "source": "sourcevision",
+              "startedAt": "2026-04-03T14:35:10.827Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "36620e61fa42"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
             }
-          ]
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "36620e61fa42"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
         },
         {
-          "id": "c2ba412c-92cb-43e3-a259-297168f99696",
-          "title": "Model Catalog & Config Persistence",
+          "id": "f190d1c3-c8d9-47b9-a994-b5e1f4fe31a9",
+          "title": "Fix move-file in web-viewer (1 finding)",
           "status": "completed",
           "level": "feature",
-          "description": "Add a local curated model catalog in packages/core/llm-model-catalog.js. Map each vendor to model choices with recommended defaults and display labels. Persist selected model via runConfig() to .n-dx.json under llm.&lt;vendor&gt;.model. Update init summary output to display both provider and model.",
+          "description": "- File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
           "priority": "high",
-          "tags": [
-            "core",
-            "config"
-          ],
-          "blockedBy": [
-            "b7fb2054-06e0-4292-9afd-162fa5ff4693"
-          ],
-          "startedAt": "2026-04-03T17:37:20.510Z",
-          "completedAt": "2026-04-03T17:37:20.510Z",
+          "source": "sourcevision",
+          "startedAt": "2026-04-03T14:35:01.471Z",
+          "completedAt": "2026-04-03T14:35:01.471Z",
           "children": [
             {
-              "id": "4ed5ffca-9c76-422d-8a2d-2dfd41f735d0",
-              "title": "Create packages/core/llm-model-catalog.js",
-              "status": "completed",
+              "id": "81b1d6f0-2f8a-46e2-b195-473450489779",
+              "title": "Fix move-file in web-viewer: File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zon",
+              "status": "deferred",
               "level": "task",
-              "description": "Create a static local model catalog at packages/core/llm-model-catalog.js. Export LLM_MODEL_CATALOG mapping each vendor to an array of { id, label, description?, recommended } entries. Claude: claude-sonnet-4-6 (recommended), claude-opus-4-20250514, claude-haiku-4-20250414. Codex: gpt-5-codex (recommended). The catalog intentionally duplicates a small amount of model metadata — contract tests guard against drift.",
-              "acceptanceCriteria": [
-                "llm-model-catalog.js exists in packages/core/",
-                "Exports LLM_MODEL_CATALOG with vendor-keyed model arrays",
-                "Each model entry has id, label, and recommended fields",
-                "Claude has at least 3 models, Codex has at least 1",
-                "Exactly one model per vendor is marked recommended: true"
-              ],
+              "description": "- File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
               "priority": "high",
-              "startedAt": "2026-04-03T15:57:49.051Z",
-              "completedAt": "2026-04-03T16:08:34.506Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "llm-model-catalog.js already existed from prior session. Added explicit recommended: false to non-recommended models to satisfy AC3 (\"each model entry has id, label, and recommended fields\"). Updated JSDoc to mark recommended as required. Strengthened unit test to assert typeof recommended === \"boolean\" on every entry."
-            },
-            {
-              "id": "86b700c8-96e1-4bac-ad05-17dbfac5bf80",
-              "title": "Persist selected model via runConfig()",
-              "status": "completed",
-              "level": "task",
-              "description": "After LLM selection completes, persist using runConfig() in order: (1) llm.vendor, (2) llm.&lt;vendor&gt;.model. This reuses existing validation and auth preflight. If provider preflight fails, do not write the model key. Do not write to .codex/config.toml, .claude/settings.local.json, or .hench/config.json — model config lives exclusively in .n-dx.json.",
-              "acceptanceCriteria": [
-                "Model persisted to .n-dx.json under llm.<vendor>.model",
-                "Uses runConfig() for writes, not direct JSON manipulation",
-                "Vendor is written before model",
-                "Model is not written if provider preflight fails",
-                "No model config written to .codex/config.toml or .hench/config.json"
-              ],
-              "priority": "high",
-              "startedAt": "2026-04-03T16:09:37.008Z",
-              "completedAt": "2026-04-03T16:28:22.248Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Implemented model persistence via runConfig() in handleInit(). Added extractInitModel(), stripInitModelFlag(), readLLMModel() helpers. Wired --model= flag and existing config model into resolveInitLLMSelection. Added 6 e2e tests covering all acceptance criteria."
-            },
-            {
-              "id": "fb7099f7-8561-465a-aa1d-3a49653719ae",
-              "title": "Update init summary to display both provider and model",
-              "status": "completed",
-              "level": "task",
-              "description": "Update the init summary output to show the LLM configuration section with both provider and model. Example: 'LLM configuration / Provider: codex / Model: gpt-5-codex'. Show source metadata (selected, flag, existing) if useful for debugging.",
-              "acceptanceCriteria": [
-                "Init summary shows 'Provider' and 'Model' lines",
-                "Values match what was persisted to .n-dx.json",
-                "Summary appears in both interactive and flag-driven flows"
-              ],
-              "priority": "medium",
-              "startedAt": "2026-04-03T17:32:41.346Z",
-              "completedAt": "2026-04-03T17:37:20.310Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Updated init summary to show structured LLM configuration section with both Provider and Model lines, including source metadata. Added 4 new e2e tests, updated 4 existing tests."
+              "source": "sourcevision",
+              "startedAt": "2026-04-03T14:34:57.156Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "8024b2fa4d12"
+                ],
+                "category": "move-file",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
             }
-          ]
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "8024b2fa4d12"
+            ],
+            "category": "move-file",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
         },
         {
-          "id": "1a037921-5f73-48f2-8400-bc46122071a4",
-          "title": "Flag-Based Non-Interactive Configuration",
+          "id": "c4e93fb7-645d-495d-ade0-9bdff9cbb75c",
+          "title": "Fix anti-pattern in global (2 findings)",
           "status": "completed",
           "level": "feature",
-          "description": "Add CLI flags for fully non-interactive LLM configuration: --model=&lt;id&gt;, --claude-model=&lt;id&gt;, --codex-model=&lt;id&gt;. Validate incompatible combinations (e.g. --provider=codex --claude-model=X). Flag precedence: explicit flags > existing config > interactive prompt > runtime default.",
-          "priority": "medium",
-          "tags": [
-            "core",
-            "cli"
-          ],
-          "blockedBy": [
-            "c2ba412c-92cb-43e3-a259-297168f99696"
-          ],
-          "startedAt": "2026-04-03T21:18:32.569Z",
-          "completedAt": "2026-04-03T21:18:32.569Z",
-          "children": [
-            {
-              "id": "42ea107c-f26d-4b6f-9cb8-a38bff1fcbfd",
-              "title": "Add --model flag to ndx init",
-              "status": "completed",
-              "level": "task",
-              "description": "Add --model=&lt;id&gt; flag to ndx init that sets the model for the active vendor. When combined with --provider, enables fully non-interactive LLM configuration. The model ID must exist in the vendor's catalog or be accepted as a custom override.",
-              "acceptanceCriteria": [
-                "--model flag accepted by ndx init",
-                "Flag value persisted to llm.<vendor>.model in .n-dx.json",
-                "Skips interactive model prompt when flag is provided",
-                "Works in combination with --provider flag for full non-interactive flow"
-              ],
-              "priority": "medium",
-              "startedAt": "2026-04-03T20:13:10.414Z",
-              "completedAt": "2026-04-03T20:27:36.282Z",
-              "resolutionType": "acknowledgment",
-              "resolutionDetail": "The --model flag is already fully implemented across all layers: flag parsing (extractInitModel), resolution logic (resolveInitLLMSelection), config persistence (runConfig), and summary display. 62 unit tests and 39 E2E tests cover all acceptance criteria and pass."
-            },
-            {
-              "id": "b9396311-d898-473d-9874-0dc45eb7b34d",
-              "title": "Add --claude-model and --codex-model convenience flags",
-              "status": "completed",
-              "level": "task",
-              "description": "Add vendor-specific convenience flags: --claude-model=&lt;id&gt; and --codex-model=&lt;id&gt;. These set the model for a specific vendor regardless of which vendor is active. Useful for CI scripts that configure both vendors.",
-              "acceptanceCriteria": [
-                "--claude-model sets llm.claude.model in .n-dx.json",
-                "--codex-model sets llm.codex.model in .n-dx.json",
-                "Flags work independently of --provider selection"
-              ],
-              "priority": "low",
-              "startedAt": "2026-04-03T21:03:03.143Z",
-              "completedAt": "2026-04-03T21:18:32.385Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added --claude-model and --codex-model as independent convenience flags. Removed cross-vendor validation restrictions so flags work independently of --provider. Added independent persistence so each vendor-specific model writes to its own config section."
-            },
-            {
-              "id": "23918a29-07c1-4e85-be71-e737d3a3a165",
-              "title": "Validate incompatible flag combinations",
-              "status": "completed",
-              "level": "task",
-              "description": "Detect and reject incompatible flag combinations with clear error messages. Example: --provider=codex --claude-model=X should fail with 'Cannot set --claude-model when --provider is codex. Use --codex-model instead.' Also validate that --model values exist in the vendor's catalog (warn but allow custom IDs).",
-              "acceptanceCriteria": [
-                "Incompatible provider+model flag combos produce clear error and exit non-zero",
-                "Unknown model IDs produce a warning but do not block init",
-                "Error messages suggest the correct flag to use"
-              ],
-              "priority": "medium",
-              "startedAt": "2026-04-03T20:28:07.802Z",
-              "completedAt": "2026-04-03T20:47:15.073Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added validateInitFlags() function to init-llm.js, --claude-model/--codex-model flag extraction to cli.js, wired validation into handleInit, added help text entries, 21 unit tests + 10 E2E tests."
-            }
-          ]
-        },
-        {
-          "id": "3a53d6cb-e0aa-41b1-ba49-1137ac01aa3e",
-          "title": "Docs & Help Text Updates",
-          "status": "completed",
-          "level": "feature",
-          "description": "Update help.js with new init flags (--model, --claude-model, --codex-model). Update docs/guide/configuration.md with model selection documentation. Document that .codex/config.toml remains MCP-only and model config lives in .n-dx.json.",
-          "priority": "medium",
-          "tags": [
-            "docs"
-          ],
-          "blockedBy": [
-            "1a037921-5f73-48f2-8400-bc46122071a4"
-          ],
-          "startedAt": "2026-04-03T21:56:37.682Z",
-          "completedAt": "2026-04-03T21:56:37.682Z",
-          "children": [
-            {
-              "id": "2154cb61-604e-4182-8a4e-91f8de0528e0",
-              "title": "Update packages/core/help.js with new init flags",
-              "status": "completed",
-              "level": "task",
-              "description": "Add documentation for --model, --claude-model, and --codex-model flags to the ndx init help text in packages/core/help.js. Include brief descriptions and examples.",
-              "acceptanceCriteria": [
-                "ndx init --help shows --model, --claude-model, --codex-model flags",
-                "Each flag has a brief description",
-                "Help text includes at least one usage example"
-              ],
-              "priority": "medium",
-              "startedAt": "2026-04-03T21:38:41.007Z",
-              "completedAt": "2026-04-03T21:49:28.352Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added model flag examples (--model, --claude-model, --codex-model, combined) and search keywords to help.js init command"
-            },
-            {
-              "id": "dd074270-381e-4ab4-8220-9ec833d99124",
-              "title": "Update docs/guide/configuration.md with model selection docs",
-              "status": "completed",
-              "level": "task",
-              "description": "Document the new LLM model selection in docs/guide/configuration.md. Cover: interactive flow description, available model options per vendor, flag-based configuration, .n-dx.json config keys (llm.vendor, llm.&lt;vendor&gt;.model), and the explicit note that .codex/config.toml remains MCP-only.",
-              "acceptanceCriteria": [
-                "configuration.md documents the interactive LLM selection flow",
-                "Documents all three flags (--model, --claude-model, --codex-model)",
-                "Documents .n-dx.json config keys for LLM settings",
-                "States that .codex/config.toml remains MCP-only"
-              ],
-              "priority": "medium",
-              "startedAt": "2026-04-03T21:34:07.319Z",
-              "completedAt": "2026-04-03T21:38:12.064Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added LLM model selection documentation to docs/guide/configuration.md covering interactive flow, model catalog, flag-based config, .n-dx.json keys, and .codex/config.toml MCP-only note."
-            },
-            {
-              "id": "ef73798b-7988-4761-97c6-345ffd680b02",
-              "title": "Update assistant instruction files via ndx init regeneration",
-              "status": "completed",
-              "level": "task",
-              "description": "After implementation, regenerate CLAUDE.md and AGENTS.md via ndx init to reflect new init flow documentation. Ensure the command reference in both files includes the new --model flags for ndx init.",
-              "acceptanceCriteria": [
-                "CLAUDE.md and AGENTS.md reflect new ndx init flags after regeneration",
-                "No manual edits to generated files — changes flow through assistant-assets/"
-              ],
-              "priority": "low",
-              "startedAt": "2026-04-03T21:49:57.125Z",
-              "completedAt": "2026-04-03T21:56:37.498Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Updated project-guidance.md with new init --model flags and .n-dx.json LLM config keys. Regenerated CLAUDE.md and AGENTS.md from the shared source of truth — no manual edits to generated files."
-            }
-          ]
-        },
-        {
-          "id": "47e5bd38-51ee-4251-a578-1ffa70a762df",
-          "title": "Test Coverage Expansion",
-          "status": "completed",
-          "level": "feature",
-          "description": "Expand E2E, config, and contract tests for the new LLM init flow. Cover interactive selection, flag-driven paths, re-init behavior, model config keys, invalid flag combos, and catalog-runtime default alignment contracts.",
+          "description": "- God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts calls 41 unique functions — consider decomposing into smaller, focused functions\n- God function: runCI in packages/core/ci.js calls 39 unique functions — consider decomposing into smaller, focused functions",
           "priority": "high",
-          "tags": [
-            "testing"
-          ],
-          "blockedBy": [
-            "b7fb2054-06e0-4292-9afd-162fa5ff4693",
-            "855fc750-3dd1-4a27-b1a6-76e840e16fc8",
-            "c2ba412c-92cb-43e3-a259-297168f99696"
-          ],
-          "startedAt": "2026-04-03T18:37:59.299Z",
-          "completedAt": "2026-04-03T18:37:59.299Z",
+          "source": "sourcevision",
+          "startedAt": "2026-04-03T14:34:54.622Z",
+          "completedAt": "2026-04-03T14:34:54.622Z",
           "children": [
             {
-              "id": "b2dcd7f1-6886-4cbd-9ee4-c7148d352f2e",
-              "title": "Update tests/e2e/cli-init.test.js for interactive LLM selection",
+              "id": "c434442f-7856-4ed8-ba18-e9c664b22593",
+              "title": "Fix anti-pattern in global: God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts c (+1 more)",
+              "status": "deferred",
+              "level": "task",
+              "description": "- God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts calls 41 unique functions — consider decomposing into smaller, focused functions\n- God function: runCI in packages/core/ci.js calls 39 unique functions — consider decomposing into smaller, focused functions",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-03T14:34:50.151Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "264b6245baa8",
+                  "e648f5e361f3"
+                ],
+                "category": "anti-pattern",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "264b6245baa8",
+              "e648f5e361f3"
+            ],
+            "category": "anti-pattern",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        }
+      ],
+      "recommendationMeta": {
+        "findingCount": 5
+      }
+    },
+    {
+      "id": "f8dfe9ab-671d-494d-9c20-84fbb79b37ee",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-03T19:06:50.606Z",
+      "completedAt": "2026-04-03T19:20:03.350Z",
+      "children": [
+        {
+          "id": "8abe3c45-9434-4862-aeee-0f56f107d130",
+          "title": "Runtime Process and Thread Lifecycle Enforcement",
+          "status": "completed",
+          "level": "feature",
+          "description": "Ensure that no worker threads or child processes are left behind during normal n-dx operation — not just at exit. Covers the full command lifecycle: spawn, execution, and teardown for all CLI entry points.",
+          "source": "smart-add",
+          "startedAt": "2026-04-03T18:50:24.588Z",
+          "completedAt": "2026-04-03T18:50:24.588Z",
+          "children": [
+            {
+              "id": "b1dc5843-120b-4151-933c-82fdead1faf3",
+              "title": "Audit and enforce worker thread cleanup across all CLI entry points",
               "status": "completed",
               "level": "task",
-              "description": "Add E2E test coverage for: interactive vendor selection via select prompt, interactive model selection after provider selection, --provider + --model no-prompt path, re-init with existing vendor/model skips prompt, re-init with vendor but missing model prompts only for model, init summary includes both provider and model.",
+              "description": "Review every spawn and worker-thread creation site in cli.js, ci.js, web.js, and config.js. Ensure all threads are explicitly joined or terminated before the parent process exits. Identify any code paths (errors, cancellations, SIGINT) where threads escape the cleanup gate.",
               "acceptanceCriteria": [
-                "Tests cover flag-driven init (--provider + --model)",
-                "Tests cover re-init skip behavior when config is complete",
-                "Tests cover re-init model-only prompt when model is missing",
-                "Tests verify init summary output includes provider and model",
-                "All existing cli-init tests still pass"
+                "All worker thread creation sites in orchestration scripts are catalogued",
+                "Each creation site has a corresponding explicit teardown path for success, error, and signal cases",
+                "Running `ndx analyze` and `ndx work` leaves zero lingering node threads as verified by process inspection",
+                "A new regression test verifies thread count returns to baseline after each CLI command completes"
               ],
               "priority": "high",
-              "startedAt": "2026-04-03T17:59:09.225Z",
-              "completedAt": "2026-04-03T18:08:12.062Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added 9 new E2E tests to cli-init.test.js covering re-init config reuse and flag-driven model selection. All 39 tests pass (30 existing + 9 new)."
+              "tags": [
+                "process-lifecycle",
+                "cli",
+                "reliability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T18:34:48.270Z",
+              "completedAt": "2026-04-03T18:42:49.486Z"
             },
             {
-              "id": "69f7c8ae-6e0f-4bc7-ae17-1813972f9be0",
-              "title": "Update tests/e2e/cli-config.test.js for model config keys",
+              "id": "4e870c51-cd43-47a2-89f2-02e8e4f3ce57",
+              "title": "Implement orphan process detection and cleanup for spawned subcommands",
               "status": "completed",
               "level": "task",
-              "description": "Add config test coverage for: llm.codex.model and llm.claude.model read/write, invalid flag combinations producing errors, legacy Claude sync when llm.claude.model is set. Ensure tests/e2e/codex-artifact-validation.test.js remains green without modifications to .codex/config.toml.",
+              "description": "Add a process-group-aware cleanup layer so that any child processes spawned during a CLI run (e.g., sourcevision analyze, hench run) are tracked and forcibly reaped if they outlive their parent command. Extend the existing graceful shutdown to cover abnormal termination paths.",
               "acceptanceCriteria": [
-                "Tests verify llm.codex.model persists correctly",
-                "Tests verify llm.claude.model persists correctly",
-                "Tests verify invalid flag combos exit non-zero with error message",
-                "codex-artifact-validation.test.js passes unchanged"
+                "All child processes are registered in a process registry at spawn time",
+                "On parent exit (clean, SIGINT, or unhandled exception), all registered children are sent SIGTERM then SIGKILL after a grace period",
+                "A test simulates a mid-run SIGINT and confirms no orphan processes remain after 5 seconds",
+                "The registry is a no-op in environments where process groups are not supported (Windows CI) — no crash, just a warning log"
               ],
               "priority": "high",
-              "startedAt": "2026-04-03T17:53:31.405Z",
-              "completedAt": "2026-04-03T17:58:31.854Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Added 27 new e2e tests covering llm.codex.model, llm.claude.model, legacy claude sync, and invalid config value rejection"
-            },
+              "tags": [
+                "process-lifecycle",
+                "cli",
+                "reliability"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T18:42:52.392Z",
+              "completedAt": "2026-04-03T18:50:24.323Z"
+            }
+          ]
+        },
+        {
+          "id": "888de653-60ad-43bf-843c-a859341d22a3",
+          "title": "Configurable CLI Operation Timeouts",
+          "status": "completed",
+          "level": "feature",
+          "description": "Introduce a per-command timeout system with a long, safe default so a single stalled process cannot hang the CLI indefinitely. Expose the timeout threshold as a first-class config key editable from both the CLI config command and the web settings UI.",
+          "source": "smart-add",
+          "startedAt": "2026-04-03T19:06:50.409Z",
+          "completedAt": "2026-04-03T19:06:50.409Z",
+          "children": [
             {
-              "id": "484197df-12dd-4c38-ad4f-5204b7a4c0a1",
-              "title": "Add contract tests for catalog-runtime default alignment",
+              "id": "d8f5d40d-a68f-4da7-8c97-63e5513ff034",
+              "title": "Implement default long timeout with per-command override support",
               "status": "completed",
               "level": "task",
-              "description": "Add contract tests asserting: core recommended Claude model matches the shared Claude default (claude-sonnet-4-6), core recommended Codex model matches gpt-5-codex. This guards against catalog drift between init UX and runtime defaults in packages/llm-client.",
+              "description": "Add a timeout enforcement layer around the main execution path of each CLI command. The default timeout should be long enough for real workloads (e.g., 30 minutes) but terminate and surface an actionable error if exceeded. Support per-command overrides so commands like `ndx work` can use a different threshold than `ndx analyze`.",
               "acceptanceCriteria": [
-                "Contract test asserts recommended Claude model equals claude-sonnet-4-6",
-                "Contract test asserts recommended Codex model equals gpt-5-codex",
-                "Test fails clearly if catalog or runtime default changes without the other"
+                "All CLI commands respect a `cli.timeoutMs` config key; default is 1800000ms (30 minutes)",
+                "When a command exceeds its timeout, it exits with a non-zero code and prints a clear message naming the command and elapsed time",
+                "Per-command overrides (`cli.timeouts.analyze`, `cli.timeouts.work`, etc.) take precedence over the global default",
+                "A unit test verifies timeout enforcement fires at the configured threshold using a mock timer"
               ],
               "priority": "high",
-              "startedAt": "2026-04-03T17:37:57.546Z",
-              "completedAt": "2026-04-03T17:46:35.929Z",
-              "resolutionType": "code-change",
-              "resolutionDetail": "Exported DEFAULT_CLAUDE_MODEL and DEFAULT_CODEX_MODEL from @n-dx/llm-client, created tests/e2e/catalog-runtime-contract.test.js with 6 contract tests cross-referencing the catalog recommended models against runtime defaults."
+              "tags": [
+                "cli",
+                "timeout",
+                "config"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T18:50:27.384Z",
+              "completedAt": "2026-04-03T18:58:23.179Z"
             },
             {
-              "id": "733f8230-e8a2-4a02-bb30-ded6af3d1fee",
-              "title": "Add unit tests for selection resolver and model catalog",
-              "status": "completed",
+              "id": "4b559467-5391-4612-ab7d-27b71daac4dc",
+              "title": "Expose timeout configuration in .n-dx.json schema and ndx config command",
+              "status": "deferred",
               "level": "task",
-              "description": "Add focused unit tests for resolveInitLLMSelection() covering: all precedence levels (flags > config > prompt > default), edge cases (missing vendor, missing model, non-TTY), and the model catalog structure (each vendor has exactly one recommended model, all entries have required fields).",
+              "description": "Add `cli.timeoutMs` and `cli.timeouts.*` keys to the .n-dx.json config schema with documentation, validation, and support through `ndx config get/set`. Ensure `ndx config --help` describes the timeout keys and their defaults.",
               "acceptanceCriteria": [
-                "Unit tests cover all 4 precedence levels for resolution",
-                "Tests verify non-TTY fallback behavior",
-                "Tests validate catalog structure (one recommended per vendor, required fields present)",
-                "Tests cover partial config scenarios (vendor set, model missing)"
+                "`ndx config set cli.timeoutMs 3600000` persists the value to .n-dx.json and is read at next command invocation",
+                "`ndx config get cli.timeoutMs` prints the current value with its default noted if unset",
+                "The config schema validation rejects non-numeric or negative values with a descriptive error",
+                "`ndx config --help` lists all timeout-related keys with their defaults and descriptions",
+                "A unit test covers schema validation for valid, zero, and negative timeout values"
               ],
               "priority": "medium",
-              "startedAt": "2026-04-03T18:10:25.025Z",
-              "completedAt": "2026-04-03T20:20:51.795Z",
-              "resolutionType": "acknowledgment",
-              "resolutionDetail": "All 62 unit tests in tests/unit/init-llm.test.js already cover every acceptance criterion: 4 precedence levels (flags>config>prompt>default), non-TTY fallback (4 dedicated tests + isInteractiveTerminal 5 tests), catalog structure (7 tests including exactly-one-recommended and required fields), and partial config scenarios (3 missing-model tests + 3 edge cases). Tests pass cleanly — no new code required."
+              "tags": [
+                "cli",
+                "config",
+                "timeout"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T19:06:47.150Z"
+            },
+            {
+              "id": "1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
+              "title": "Add timeout configuration panel to web settings UI",
+              "status": "deferred",
+              "level": "task",
+              "description": "Surface the CLI timeout settings in the n-dx web dashboard settings panel so users can view and update timeouts without touching the CLI. The panel should show the current global default and any per-command overrides, with save/reset controls that write back to .n-dx.json via the existing config API.",
+              "acceptanceCriteria": [
+                "The settings UI includes a 'CLI Timeouts' section showing the global timeout and any active per-command overrides",
+                "Editing and saving a timeout value calls the config API and persists to .n-dx.json",
+                "A reset button restores a field to its default value",
+                "Invalid inputs (non-numeric, negative) are rejected client-side with an inline error before submission",
+                "The settings panel reflects external config changes on next page load (no stale cache)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "web-ui",
+                "config",
+                "timeout",
+                "settings"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-03T18:58:26.092Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bf7ac8f0-548f-4bfc-a6a9-63b4b5707ce3",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-06T19:23:14.471Z",
+      "completedAt": "2026-04-06T19:23:14.471Z",
+      "children": [
+        {
+          "id": "b3e82a63-746a-474e-af59-947d8a0f0fb9",
+          "title": "CLI Version Command Surface",
+          "status": "completed",
+          "level": "feature",
+          "description": "Expose the installed n-dx version through standard top-level CLI flags so users can query version information without entering a subcommand.",
+          "source": "smart-add",
+          "startedAt": "2026-04-06T19:23:14.349Z",
+          "completedAt": "2026-04-06T19:23:14.349Z",
+          "children": [
+            {
+              "id": "4a9be3cc-25d6-4429-ae79-304f10d097fb",
+              "title": "Implement top-level version flag handling for ndx and n-dx",
+              "status": "completed",
+              "level": "task",
+              "description": "Add argument handling in the shared CLI entrypoint so invoking `ndx -v`, `ndx --version`, `n-dx -v`, or `n-dx --version` prints the current package version and exits successfully without triggering normal command parsing.",
+              "acceptanceCriteria": [
+                "Running `ndx -v` prints a single version string and exits with status code 0",
+                "Running `ndx --version` prints the same version output as `ndx -v`",
+                "Running `n-dx -v` and `n-dx --version` behave identically to `ndx` version flags",
+                "Version flag handling works from the top-level CLI without requiring a subcommand",
+                "Invoking the version flags does not start long-running services or execute unrelated command logic"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-06T18:47:31.857Z",
+              "completedAt": "2026-04-06T18:50:16.350Z"
+            },
+            {
+              "id": "74047536-342a-4358-b2ec-33e783786b2a",
+              "title": "Add regression coverage and help text for version flags",
+              "status": "completed",
+              "level": "task",
+              "description": "Update automated CLI tests and user-facing help output so the new version flags remain discoverable and do not regress when command parsing changes in the future.",
+              "acceptanceCriteria": [
+                "Automated tests cover both `-v` and `--version` at the top-level CLI entrypoint",
+                "Tests verify the command exits successfully and does not route into unrelated subcommand execution",
+                "CLI help output mentions `-v, --version` as supported top-level flags",
+                "The documented behavior matches the actual output format used by the CLI"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "testing",
+                "docs"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-06T19:19:59.169Z",
+              "completedAt": "2026-04-06T19:23:14.178Z"
             }
           ]
         }

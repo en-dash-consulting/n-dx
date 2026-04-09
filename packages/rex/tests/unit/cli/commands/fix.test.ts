@@ -4,17 +4,10 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import { cmdFix } from "../../../../src/cli/commands/fix.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
-
-function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
-}
+import { writeConfig, writePRD } from "../../../helpers/rex-dir-test-support.js";
 
 function readPRD(dir: string): PRDDocument {
   return JSON.parse(readFileSync(join(dir, ".rex", "prd.json"), "utf-8"));
-}
-
-function writeConfig(dir: string, config: Record<string, unknown>): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
 }
 
 const VALID_CONFIG = {

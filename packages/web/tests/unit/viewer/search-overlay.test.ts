@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { h, render } from "preact";
+import { h } from "preact";
 import { act } from "preact/test-utils";
 
 // ── Module under test ─────────────────────────────────────────────────────
@@ -9,20 +9,9 @@ import {
   SearchOverlay,
   useSearchOverlay,
 } from "../../../src/viewer/components/search-overlay.js";
+import { cleanupRenderedDiv, renderToDiv } from "../../helpers/preact-test-support.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-
-function renderToDiv(vnode: ReturnType<typeof h>) {
-  const root = document.createElement("div");
-  document.body.appendChild(root);
-  render(vnode, root);
-  return root;
-}
-
-function cleanup(root: HTMLDivElement) {
-  render(null, root);
-  root.remove();
-}
 
 function pressKey(key: string, opts: Partial<KeyboardEventInit> = {}) {
   document.dispatchEvent(
@@ -43,7 +32,7 @@ describe("SearchOverlay", () => {
   });
 
   afterEach(() => {
-    if (root) cleanup(root);
+    if (root) cleanupRenderedDiv(root);
   });
 
   // ── Visibility ──────────────────────────────────────────────────
@@ -385,7 +374,7 @@ describe("useSearchOverlay", () => {
   });
 
   afterEach(() => {
-    if (root) cleanup(root);
+    if (root) cleanupRenderedDiv(root);
   });
 
   it("opens on Ctrl+K", () => {

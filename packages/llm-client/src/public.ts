@@ -126,11 +126,12 @@ export type {
   ClaudeClientOptions,
   CompletionRequest,
   CompletionResult,
+  CLIErrorCode,
   ErrorReason,
   ClaudeClient,
 } from "./types.js";
 
-export { ClaudeClientError, CLIError } from "./types.js";
+export { ClaudeClientError, CLIError, CLI_ERROR_CODES } from "./types.js";
 
 // Vendor-neutral config + client factories
 export { loadLLMConfig } from "./llm-config.js";

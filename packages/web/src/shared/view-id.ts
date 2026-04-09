@@ -27,4 +27,5 @@ export type ViewId =
   | "hench-config"
   | "hench-templates"
   | "hench-optimization"
-  | "feature-toggles";
+  | "feature-toggles"
+  | "cli-timeouts";

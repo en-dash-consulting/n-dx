@@ -37,6 +37,8 @@ async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCod
 }
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
+const SHARED_CONFIG_PATH = (dir) => join(dir, ".n-dx.json");
+const LOCAL_CONFIG_PATH = (dir) => join(dir, ".n-dx.local.json");
 
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "config", ...args], {
@@ -553,7 +555,7 @@ describe("n-dx config", () => {
       expect(output).toContain("claude.cli_path = /usr/local/bin/claude");
 
       const localConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"),
+        await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
       expect(localConfig.claude.cli_path).toBe("/usr/local/bin/claude");
     });
@@ -612,7 +614,7 @@ describe("n-dx config", () => {
       run(["claude.api_key", "sk-ant-test-key", tmpDir]);
 
       const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+        await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
       expect(ndxConfig.claude.api_key).toBe("sk-ant-test-key");
     });
@@ -662,7 +664,7 @@ describe("n-dx config", () => {
 
       // cli_path is machine-local, so it's in .n-dx.local.json
       const localConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"),
+        await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
       expect(localConfig.claude.cli_path).toBe("/new/path");
     });
@@ -945,7 +947,7 @@ describe("n-dx config", () => {
       // cli_path now writes to .n-dx.local.json — use a non-machine-local key
       run(["claude.model", "claude-sonnet-4-6", tmpDir]);
 
-      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
+      const fileStat = await stat(LOCAL_CONFIG_PATH(tmpDir));
       const mode = fileStat.mode & 0o777;
       // Should not be 0o600 — default file permissions apply
       expect(mode).not.toBe(0o600);
@@ -960,7 +962,7 @@ describe("n-dx config", () => {
 
       // Now add an API key
       run(["claude.api_key", "sk-ant-secure-key", tmpDir]);
-      const afterStat = await stat(join(tmpDir, ".n-dx.json"));
+      const afterStat = await stat(SHARED_CONFIG_PATH(tmpDir));
       const afterMode = afterStat.mode & 0o777;
       expect(afterMode).toBe(0o600);
     });

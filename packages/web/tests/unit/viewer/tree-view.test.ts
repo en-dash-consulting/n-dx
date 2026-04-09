@@ -1,15 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { h, render } from "preact";
+import { h } from "preact";
 import { TreeView, type TreeNode } from "../../../src/viewer/components/data-display/tree-view.js";
+import { renderToDiv } from "../../helpers/preact-test-support.js";
 
 describe("TreeView", () => {
-  function renderToDiv(vnode: ReturnType<typeof h>) {
-    const root = document.createElement("div");
-    render(vnode, root);
-    return root;
-  }
-
   const nodes: TreeNode[] = [
     {
       id: "root",

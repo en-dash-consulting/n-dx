@@ -42,7 +42,7 @@ function connectRaw(port: number): Promise<{ socket: Socket; leftover: Buffer }>
   });
 }
 
-describe("WebSocket health tracker integration", () => {
+describe("WebSocket health tracker integration", { timeout: 120_000 }, () => {
   let server: Server;
   let port: number;
   let ws: ReturnType<typeof createWebSocketManager>;

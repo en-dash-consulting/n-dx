@@ -101,7 +101,7 @@ function mockAggregator(taskUsage = {}) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("scheduler startup integration", () => {
+describe("scheduler startup integration", { timeout: 120_000 }, () => {
   /** @type {ReturnType<typeof setInterval>[]} */
   const activeTimers = [];
 

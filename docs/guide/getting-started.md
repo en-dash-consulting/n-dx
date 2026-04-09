@@ -3,19 +3,10 @@
 ## Installation
 
 ```sh
-npm i -g @n-dx/core
+pnpm add -g @n-dx/core
 ```
 
-Or build from source:
-
-```sh
-git clone https://github.com/en-dash-consulting/n-dx.git
-cd n-dx
-pnpm install && pnpm build
-npm link
-```
-
-After installing, `ndx` (or `n-dx`) is available as the primary command. See the [Quickstart](./quickstart) for a 5-minute walkthrough.
+After installing, `ndx` (or `n-dx`) is available as the primary command. See the [Quickstart](./quickstart) for a 5-minute walkthrough. To build from source, see [Contributing](https://github.com/en-dash-consulting/n-dx#contributing).
 
 ## Initialize a Project
 

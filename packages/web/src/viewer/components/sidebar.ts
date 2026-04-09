@@ -57,6 +57,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
   { type: "section", label: "SETTINGS" },
   { type: "item", id: "feature-toggles", icon: "\u2699", label: "Feature Flags", minPass: 0 },
+  { type: "item", id: "cli-timeouts", icon: "\u23F1", label: "CLI Timeouts", minPass: 0 },
 ];
 
 /** Group flat NAV_ENTRIES into sections with their items */

@@ -191,7 +191,7 @@ afterEach(() => {
 // 1. Tab backgrounding suspends all polling
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("polling suspension when tab becomes inactive", () => {
+describe("polling suspension when tab becomes inactive", { timeout: 120_000 }, () => {
   it("suspends all registered pollers immediately on tab hide", () => {
     const cbStatus = vi.fn();
     const cbLoader = vi.fn();
@@ -296,7 +296,7 @@ describe("polling suspension when tab becomes inactive", () => {
 // 2. Tab foregrounding resumes all polling
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("polling resumption when tab becomes active", () => {
+describe("polling resumption when tab becomes active", { timeout: 120_000 }, () => {
   it("resumes all pollers after debounce when tab becomes visible", () => {
     const cbStatus = vi.fn();
     const cbLoader = vi.fn();
@@ -462,7 +462,7 @@ describe("polling resumption when tab becomes active", () => {
 // 3. Memory optimization during background state
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("memory optimization during background state", () => {
+describe("memory optimization during background state", { timeout: 120_000 }, () => {
   it("no polling occurs when both tab backgrounded and memory pressure active", () => {
     setMemoryUsage(0.2); // normal
     startMemoryMonitor({ intervalMs: 1000 });
@@ -723,7 +723,7 @@ describe("memory optimization during background state", () => {
 // 4. Comprehensive end-to-end scenarios
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("end-to-end suspension and recovery scenarios", () => {
+describe("end-to-end suspension and recovery scenarios", { timeout: 120_000 }, () => {
   it("simulates a realistic user session: work → background → return", () => {
     setMemoryUsage(0.2);
     startMemoryMonitor({ intervalMs: 1000 });

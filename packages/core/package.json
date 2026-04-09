@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/core",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publishConfig": {
     "access": "public"
   },
@@ -43,6 +43,8 @@
   "files": [
     "bin/",
     "cli.js",
+    "cli-brand.js",
+    "cli-ink.js",
     "config.js",
     "ci.js",
     "web.js",
@@ -54,17 +56,22 @@
     "claude-integration.js",
     "refresh-validate.js",
     "init-llm.js",
-    "llm-model-catalog.js"
+    "llm-model-catalog.js",
+    "child-lifecycle.js",
+    "cli-timeout.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"
   },
   "dependencies": {
-    "@n-dx/rex": "workspace:*",
     "@n-dx/hench": "workspace:*",
-    "@n-dx/sourcevision": "workspace:*",
     "@n-dx/llm-client": "workspace:*",
+    "@n-dx/rex": "workspace:*",
+    "@n-dx/sourcevision": "workspace:*",
     "@n-dx/web": "workspace:*",
-    "enquirer": "^2.4.1"
+    "enquirer": "^2.4.1",
+    "htm": "^3.1.1",
+    "ink": "^6.8.0",
+    "react": "^19.2.4"
   }
 }

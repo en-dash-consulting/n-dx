@@ -58,7 +58,8 @@ export { setQuiet, isQuiet, info, result } from "@n-dx/llm-client";
 export { formatHelp, formatTypoSuggestion } from "@n-dx/llm-client";
 
 // ---- CLI error classes ------------------------------------------------------
-export { CLIError, ClaudeClientError } from "@n-dx/llm-client";
+export { CLIError, ClaudeClientError, CLI_ERROR_CODES } from "@n-dx/llm-client";
+export type { CLIErrorCode } from "@n-dx/llm-client";
 
 // ---- Process execution ------------------------------------------------------
 export {

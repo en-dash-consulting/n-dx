@@ -417,6 +417,28 @@ describe("spawnManaged", () => {
     vi.useRealTimers();
   });
 
+  it("clears SIGKILL escalation when child exits after timeout", async () => {
+    vi.useFakeTimers();
+    const child = createMockChild() as ReturnType<typeof createMockChild> & {
+      kill: ReturnType<typeof vi.fn>;
+    };
+    child.kill = vi.fn().mockReturnValue(true);
+    mockSpawn.mockReturnValue(child as never);
+
+    const handle = spawnManaged("node", ["slow.js"], { timeout: 5000 });
+
+    vi.advanceTimersByTime(5000);
+    const result = await handle.done;
+    expect(result.exitCode).toBeNull();
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    child.emit("close", 0);
+    vi.advanceTimersByTime(5000);
+    expect(child.kill).not.toHaveBeenCalledWith("SIGKILL");
+
+    vi.useRealTimers();
+  });
+
   it("clears timeout when child exits before deadline", async () => {
     vi.useFakeTimers();
     const child = createMockChild() as ReturnType<typeof createMockChild> & {
@@ -454,6 +476,28 @@ describe("spawnTool timeout", () => {
     const result = await promise;
     expect(result.exitCode).toBeNull();
     expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    vi.useRealTimers();
+  });
+
+  it("clears SIGKILL escalation when child exits after timeout", async () => {
+    vi.useFakeTimers();
+    const child = createMockChild() as ReturnType<typeof createMockChild> & {
+      kill: ReturnType<typeof vi.fn>;
+    };
+    child.kill = vi.fn().mockReturnValue(true);
+    mockSpawn.mockReturnValue(child as never);
+
+    const promise = spawnTool("node", ["slow.js"], { timeout: 3000 });
+
+    vi.advanceTimersByTime(3000);
+    const result = await promise;
+    expect(result.exitCode).toBeNull();
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+    child.emit("close", 0);
+    vi.advanceTimersByTime(5000);
+    expect(child.kill).not.toHaveBeenCalledWith("SIGKILL");
 
     vi.useRealTimers();
   });
