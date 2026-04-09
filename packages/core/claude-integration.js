@@ -173,12 +173,14 @@ function registerMcpServers(dir) {
   // Register each MCP server defined in the manifest via stdio transport
   for (const [name, descriptor] of Object.entries(servers)) {
     const bin = resolveSubPackageCli(descriptor.package, descriptor.npmName);
-    // Remove existing registration first to make init idempotent —
-    // `claude mcp add` fails if the server already exists.
-    try {
-      execSync(`claude mcp remove ${name}`, { stdio: "ignore", timeout: 5_000 });
-    } catch {
-      // Server may not exist yet — that's fine on first init.
+    // Remove existing registration(s) first to make init idempotent —
+    // `claude mcp add` fails if the server already exists in any scope.
+    for (const scope of ["local", "project", "user"]) {
+      try {
+        execSync(`claude mcp remove --scope ${scope} ${name}`, { stdio: "ignore", timeout: 5_000 });
+      } catch {
+        // Server may not exist in this scope — continue cleanup.
+      }
     }
     try {
       execSync(
