@@ -95,6 +95,11 @@ import {
   formatUpdateNotice,
   shouldSuppressNotice,
 } from "./update-check.js";
+import {
+  checkProjectStaleness,
+  formatStalenessNotice,
+  shouldSuppressStaleness,
+} from "./staleness-check.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -106,6 +111,12 @@ const MONOREPO_ROOT = resolve(__dir, "../..");
 const _coreVersion = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8")).version;
 let _updateResult;
 checkForUpdate(_coreVersion).then((r) => { _updateResult = r ?? null; }).catch(() => { _updateResult = null; });
+
+// ── Staleness check (deferred) ───────────────────────────────────────────────
+// The staleness check is synchronous (reads local JSON files only — no network
+// I/O) so it runs lazily once the project directory is known, inside main().
+// The result is checked at exit alongside the update notice.
+let _stalenessResult;
 
 /** Map monorepo directory names to npm package names. */
 const PKG_NAMES = {
@@ -829,6 +840,19 @@ async function handleInit(rest) {
     } finally {
       console.log = origLog;
     }
+  }
+
+  // Stamp the init version into .n-dx.json for staleness detection.
+  // Best-effort: failure is silently ignored.
+  try {
+    const ndxConfigPath = join(dir, ".n-dx.json");
+    const ndxData = existsSync(ndxConfigPath)
+      ? JSON.parse(readFileSync(ndxConfigPath, "utf-8"))
+      : {};
+    ndxData._initVersion = _coreVersion;
+    writeFileSync(ndxConfigPath, JSON.stringify(ndxData, null, 2) + "\n", "utf-8");
+  } catch {
+    // Silently ignore — staleness notice will degrade gracefully
   }
 
   // Assistant integrations (vendor-neutral dispatch)
@@ -1559,12 +1583,24 @@ try {
   await flushAndExit(0);
 } catch (err) {
   if (err instanceof ExitRequest) {
+    const cliArgs = process.argv.slice(2);
+
+    // Show staleness notice after command output, before exit.
+    // _stalenessResult is populated synchronously inside main() once the
+    // project directory is known.
+    if (
+      _stalenessResult?.isStale &&
+      !shouldSuppressStaleness(cliArgs, err.code)
+    ) {
+      console.log(dim(formatStalenessNotice(_stalenessResult, _coreVersion)));
+    }
+
     // Show update notice after command output, before exit.
     // _updateResult is populated asynchronously by the fire-and-forget check
     // started at module load.  If it hasn't resolved yet, we skip silently.
     if (
       _updateResult?.updateAvailable &&
-      !shouldSuppressNotice(process.argv.slice(2), err.code)
+      !shouldSuppressNotice(cliArgs, err.code)
     ) {
       console.log(dim(formatUpdateNotice(_updateResult.latestVersion, _updateResult.currentVersion)));
     }
@@ -1595,6 +1631,15 @@ async function main() {
   const dir = resolveDir(rest);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+
+  // ── Staleness check (synchronous, local files only) ─────────────────────
+  // Run once per invocation against the resolved project directory.
+  // The result is evaluated at exit alongside the update notice.
+  try {
+    _stalenessResult = checkProjectStaleness(dir);
+  } catch {
+    _stalenessResult = null;
+  }
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {
