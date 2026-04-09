@@ -85,6 +85,7 @@ import {
   installTrackedChildProcessHandlers,
 } from "./child-lifecycle.js";
 import { getUpdateNotice } from "./update-check.js";
+import { getStaleNotice } from "./stale-check.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 
@@ -1452,6 +1453,19 @@ async function main() {
   const dir = resolveDir(rest);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+
+  // ── Stale-project notice ──────────────────────────────────────────────────
+  // On any command other than init/help/version/config, check whether the
+  // project setup is incomplete or out-of-date and warn the user.
+  // Mirrors the update-notice pattern: TTY + non-quiet only, non-blocking.
+  if (process.stdout.isTTY && command) {
+    const isQuiet = process.argv.some((a) => a === "--quiet" || a === "-q");
+    const SKIP_STALE_CHECK = new Set(["init", "help", "version", "config"]);
+    if (!isQuiet && !SKIP_STALE_CHECK.has(command)) {
+      const staleNotice = getStaleNotice(dir);
+      if (staleNotice) process.stdout.write(staleNotice + "\n");
+    }
+  }
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {
