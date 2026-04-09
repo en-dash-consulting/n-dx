@@ -114,18 +114,26 @@ export function setupAssistantIntegrations(dir, enabled = {}) {
  *
  * @param {Record<string, { summary: string, label: string, skipped?: boolean, detail?: object }>} results
  *   The return value of `setupAssistantIntegrations()`.
- * @param {{ verbose?: boolean }} [opts]
+ * @param {{ verbose?: boolean, activeVendor?: string }} [opts]
+ *   `activeVendor` — the LLM vendor the user selected (e.g. "claude").
+ *   When set, non-active vendors are shown in compact single-line form
+ *   even in verbose mode, keeping the summary focused on the chosen
+ *   assistant surface.
  * @returns {string[]}
  */
 export function formatInitReport(results, opts = {}) {
   const verbose = opts.verbose !== false;
+  const activeVendor = opts.activeVendor;
   const lines = ["  Assistant surfaces:"];
 
   for (const [vendor, result] of Object.entries(results)) {
     const label = (result.label ?? "unknown").padEnd(14);
 
-    if (result.skipped || !verbose || !result.detail) {
-      // Compact single-line form (skipped vendors or non-verbose mode)
+    // De-emphasize non-active vendors: compact single-line even in verbose mode.
+    const isNonActive = activeVendor && vendor !== activeVendor;
+
+    if (result.skipped || !verbose || !result.detail || isNonActive) {
+      // Compact single-line form (skipped vendors, non-verbose mode, or non-active vendor)
       lines.push(`    ${label}${result.summary}`);
       if (result.error) {
         lines.push(`      reason: ${result.error}`);

@@ -312,6 +312,112 @@ describe("formatInitReport", () => {
   });
 });
 
+// ── formatInitReport() activeVendor de-emphasis ──────────────────────────────
+
+describe("formatInitReport activeVendor de-emphasis", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "ndx-init-report-active-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("shows verbose detail for active vendor only", () => {
+    const results = setupAssistantIntegrations(tmpDir);
+    const lines = formatInitReport(results, { activeVendor: "claude" });
+    const joined = lines.join("\n");
+    // Active vendor (Claude) gets verbose artifact detail
+    expect(joined).toContain("CLAUDE.md written");
+    expect(joined).toMatch(/\.claude\/skills\/.*skill/);
+    // Non-active vendor (Codex) should NOT have artifact detail lines
+    expect(joined).not.toContain("AGENTS.md written");
+    expect(joined).not.toContain(".agents/skills/");
+    expect(joined).not.toContain(".codex/config.toml");
+  });
+
+  it("de-emphasizes Claude when Codex is the active vendor", () => {
+    const results = setupAssistantIntegrations(tmpDir);
+    const lines = formatInitReport(results, { activeVendor: "codex" });
+    const joined = lines.join("\n");
+    // Active vendor (Codex) gets verbose artifact detail
+    expect(joined).toContain("AGENTS.md written");
+    expect(joined).toMatch(/\.codex\/config\.toml/);
+    // Non-active vendor (Claude) should NOT have artifact detail lines
+    expect(joined).not.toContain("CLAUDE.md written");
+    expect(joined).not.toContain(".claude/skills/");
+    expect(joined).not.toContain(".claude/settings");
+  });
+
+  it("non-active vendor still shows compact summary line", () => {
+    const results = setupAssistantIntegrations(tmpDir);
+    const lines = formatInitReport(results, { activeVendor: "claude" });
+    const joined = lines.join("\n");
+    // Both vendor labels should appear
+    expect(joined).toContain("Claude Code");
+    expect(joined).toContain("Codex");
+    // Codex summary line should be present (compact form)
+    expect(joined).toMatch(/Codex\s+AGENTS\.md/);
+  });
+
+  it("produces fewer lines than without activeVendor", () => {
+    const results = setupAssistantIntegrations(tmpDir);
+    const withoutActive = formatInitReport(results);
+    const withActive = formatInitReport(results, { activeVendor: "claude" });
+    expect(withActive.length).toBeLessThan(withoutActive.length);
+  });
+
+  it("omitting activeVendor shows verbose detail for all vendors", () => {
+    const results = setupAssistantIntegrations(tmpDir);
+    const lines = formatInitReport(results);
+    const joined = lines.join("\n");
+    // Both vendors get verbose detail
+    expect(joined).toContain("CLAUDE.md written");
+    expect(joined).toContain("AGENTS.md written");
+  });
+
+  it("still shows error reason on non-active vendor when present", () => {
+    const results = {
+      claude: {
+        summary: "skipped (setup failed)",
+        label: "Claude Code",
+        skipped: true,
+        error: "ENOENT: no such file or directory",
+      },
+      codex: {
+        summary: "AGENTS.md, 2 skills, 2 MCP servers",
+        label: "Codex",
+        skipped: false,
+        detail: {
+          agents: { written: true },
+          skills: { written: 2 },
+          config: { written: true, serverCount: 2 },
+        },
+      },
+    };
+    const lines = formatInitReport(results, { activeVendor: "codex" });
+    const joined = lines.join("\n");
+    // Skipped vendor should still show error reason even when non-active
+    expect(joined).toContain("reason: ENOENT: no such file or directory");
+  });
+});
+
+// ── cli.js passes activeVendor to formatInitReport ───────────────────────────
+
+describe("cli.js passes activeVendor to formatInitReport", () => {
+  const src = readFileSync(join(ROOT, "packages/core/cli.js"), "utf-8");
+
+  it("passes activeVendor option to formatInitReport", () => {
+    expect(src).toContain("activeVendor:");
+  });
+
+  it("uses selectedProvider as the activeVendor", () => {
+    expect(src).toMatch(/formatInitReport\(assistantResults,\s*\{[^}]*activeVendor:\s*selectedProvider/);
+  });
+});
+
 // ── formatInitReport() error detail surfacing ────────────────────────────────
 
 describe("formatInitReport error surfacing", () => {
@@ -436,7 +542,7 @@ describe("cli.js uses assistant-neutral orchestration", () => {
   });
 
   it("uses formatInitReport for the init summary", () => {
-    expect(src).toContain("formatInitReport(assistantResults)");
+    expect(src).toContain("formatInitReport(assistantResults,");
   });
 });
 

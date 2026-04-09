@@ -841,7 +841,7 @@ async function handleInit(rest) {
       console.log("    Model         not set");
     }
   }
-  for (const line of formatInitReport(assistantResults)) {
+  for (const line of formatInitReport(assistantResults, { activeVendor: selectedProvider })) {
     console.log(line);
   }
   console.log("");
