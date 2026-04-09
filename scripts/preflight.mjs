@@ -15,7 +15,7 @@
  *   6. changeset presence check
  */
 
-import { execSync } from "child_process";
+import { spawnTool } from "../packages/llm-client/dist/public.js";
 
 const steps = [
   { name: "build",     cmd: "pnpm build" },
@@ -30,7 +30,15 @@ let failed = false;
 for (const { name, cmd } of steps) {
   process.stdout.write(`\n── ${name} ──\n`);
   try {
-    execSync(cmd, { stdio: "inherit", timeout: 600_000 });
+    const [tool, ...args] = cmd.split(" ");
+    const result = await spawnTool(tool, args, {
+      cwd: process.cwd(),
+      stdio: "inherit",
+      timeout: 600_000,
+    });
+    if (result.exitCode !== 0) {
+      throw new Error(`${cmd} exited with code ${result.exitCode}`);
+    }
     console.log(`  ✓ ${name}`);
   } catch {
     console.error(`  ✗ ${name} FAILED`);

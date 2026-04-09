@@ -84,11 +84,6 @@ import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
 } from "./child-lifecycle.js";
-// Foundation-tier import — @n-dx/llm-client process utilities are explicitly
-// permitted for direct import by all tiers (gateway-rules.json: "other tiers
-// may import directly"). This import provides process-level configuration
-// and shared color utilities.
-import { suppressKnownDeprecations, bold, cyan, green, red, yellow, dim } from "@n-dx/llm-client";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
 
@@ -106,6 +101,89 @@ const PKG_NAMES = {
 };
 
 const _require = createRequire(import.meta.url);
+
+const SILENCED_DEPRECATION_CODES = new Set(["DEP0040"]);
+const FILTER_INSTALLED = Symbol.for("n-dx.core.suppressKnownDeprecations.installed");
+
+function suppressKnownDeprecations() {
+  if (process[FILTER_INSTALLED]) {
+    return;
+  }
+
+  const original = process.emitWarning;
+  process.emitWarning = function filteredEmitWarning(warning, typeOrOptions, code, ctor) {
+    let effectiveCode;
+    let effectiveType;
+
+    if (typeOrOptions && typeof typeOrOptions === "object") {
+      effectiveCode = typeOrOptions.code;
+      effectiveType = typeOrOptions.type;
+    } else {
+      effectiveType = typeof typeOrOptions === "string" ? typeOrOptions : undefined;
+      effectiveCode = code;
+    }
+
+    if (
+      effectiveType === "DeprecationWarning" &&
+      effectiveCode !== undefined &&
+      SILENCED_DEPRECATION_CODES.has(effectiveCode)
+    ) {
+      return;
+    }
+
+    Reflect.apply(original, process, [warning, typeOrOptions, code, ctor]);
+  };
+
+  process[FILTER_INSTALLED] = true;
+}
+
+let colorEnabled = null;
+
+function supportsColor() {
+  if (process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0") {
+    return true;
+  }
+  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
+    return false;
+  }
+  return Boolean(process.stdout && process.stdout.isTTY);
+}
+
+function isColorEnabled() {
+  if (colorEnabled === null) {
+    colorEnabled = supportsColor();
+  }
+  return colorEnabled;
+}
+
+function ansi(code, text, reset) {
+  if (!isColorEnabled()) return text;
+  return `\x1b[${code}m${text}\x1b[${reset}m`;
+}
+
+function bold(text) {
+  return ansi("1", text, "22");
+}
+
+function dim(text) {
+  return ansi("2", text, "22");
+}
+
+function cyan(text) {
+  return ansi("36", text, "39");
+}
+
+function yellow(text) {
+  return ansi("33", text, "39");
+}
+
+function green(text) {
+  return ansi("32", text, "39");
+}
+
+function red(text) {
+  return ansi("31", text, "39");
+}
 
 /**
  * Resolve a package's CLI entry point.
