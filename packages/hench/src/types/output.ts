@@ -105,16 +105,25 @@ function _redrawWindow(): void {
 }
 
 /**
- * Append a new line to the rolling window buffer and redraw.
- * @param displayLine  ANSI-formatted line for terminal display.
- * @param rawLine      Plain-text line for log capture (no ANSI codes).
+ * Append a new message to the rolling window buffer and redraw.
+ *
+ * Messages are split on embedded newlines so each physical terminal row is
+ * a separate entry in _windowLines. A message with N newlines occupies N+1
+ * visual rows and counts that way toward the ROLLING_WINDOW_SIZE cap.
+ *
+ * @param displayLine  ANSI-formatted text (may contain \n) for terminal display.
+ * @param rawLine      Plain-text text (may contain \n) for log capture.
  */
 function _pushWindowLine(displayLine: string, rawLine: string): void {
-  _capturedLines.push(rawLine);
-  if (_windowLines.length >= ROLLING_WINDOW_SIZE) {
-    _windowLines.shift(); // evict the oldest visible line
+  const rawPhysical = rawLine.split("\n");
+  const displayPhysical = displayLine.split("\n");
+  for (let i = 0; i < rawPhysical.length; i++) {
+    _capturedLines.push(rawPhysical[i] ?? "");
+    if (_windowLines.length >= ROLLING_WINDOW_SIZE) {
+      _windowLines.shift(); // evict the oldest visible row
+    }
+    _windowLines.push(displayPhysical[i] ?? "");
   }
-  _windowLines.push(displayLine);
   _redrawWindow();
 }
 

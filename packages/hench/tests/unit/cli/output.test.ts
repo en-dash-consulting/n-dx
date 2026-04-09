@@ -486,6 +486,65 @@ describe("rolling window", () => {
     stream("Agent", "should not appear");
     expect(writeSpy).not.toHaveBeenCalled();
   });
+
+  // ── Multi-line messages: visual line counting ─────────────────────────────
+
+  it("a message with 2 embedded newlines occupies 3 visual rows (N+1 rule)", () => {
+    resetRollingWindow();
+    writeSpy.mockClear();
+    stream("Agent", "row1\nrow2\nrow3");
+    // _redrawWindow writes one \x1b[2K+content per window entry.
+    // With 3 physical lines, we expect 3 clear+write calls.
+    const lineWrites = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[2K"));
+    expect(lineWrites).toHaveLength(3);
+    // _linesRendered should be 3; the next stream() cursor-up reflects that.
+    writeSpy.mockClear();
+    stream("Agent", "next");
+    const cursorUps = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[") && s.endsWith("A"));
+    expect(cursorUps[0]).toBe("\x1b[3A");
+  });
+
+  it("multi-line message is capped so window never exceeds 10 visual rows", () => {
+    resetRollingWindow();
+    resetCapturedLines();
+    // Push 8 single-line messages, then 1 message with 5 lines (total attempt: 13 rows).
+    for (let i = 0; i < 8; i++) stream("Agent", `single ${i}`);
+    stream("Agent", "ml1\nml2\nml3\nml4\nml5");
+    // Window must cap at 10 rows; cursor-up on the next write must be ≤ 10.
+    writeSpy.mockClear();
+    stream("Agent", "probe");
+    const cursorUps = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[") && s.endsWith("A"));
+    const rowCount = parseInt(cursorUps[0].slice(2, -1), 10);
+    expect(rowCount).toBeLessThanOrEqual(10);
+  });
+
+  it("single-line-only runs produce identical cursor-up values as before the fix", () => {
+    resetRollingWindow();
+    writeSpy.mockClear();
+    // Push 12 single-line messages. Window fills at 10; last cursor-up = 10A.
+    for (let i = 1; i <= 12; i++) stream("Agent", `line ${i}`);
+    const cursorUps = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[") && s.endsWith("A"));
+    const lastCursorUp = cursorUps[cursorUps.length - 1];
+    expect(lastCursorUp).toBe("\x1b[10A");
+  });
+
+  it("multi-line message captured as one raw entry per physical line", () => {
+    resetCapturedLines();
+    stream("Agent", "line1\nline2\nline3");
+    const captured = getCapturedLines();
+    expect(captured).toHaveLength(3);
+    expect(captured[0]).toContain("line1");
+    expect(captured[1]).toBe("line2");
+    expect(captured[2]).toBe("line3");
+  });
 });
 
 // ---------------------------------------------------------------------------

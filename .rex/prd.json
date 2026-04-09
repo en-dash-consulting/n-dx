@@ -25473,6 +25473,118 @@
           ]
         }
       ]
+    },
+    {
+      "id": "b63b4ea4-2086-4b63-8f73-81cb86865618",
+      "title": "Hench",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "f5ccc9cc-ad9f-4e44-9f4a-98c43b2f8de3",
+          "title": "Hench Run-Loop Visual Output Refinements",
+          "status": "pending",
+          "level": "feature",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "0b9042e1-523e-4fab-aca4-1d89bbb0c6f3",
+              "title": "Fix rolling window to count visual lines instead of message entries",
+              "status": "completed",
+              "level": "task",
+              "description": "The current rolling 10-line window tracks the number of messages rather than the number of rendered lines. When a single message contains embedded newlines (e.g. tool output, JSON blocks, multi-line agent responses), each message may occupy 2–10+ terminal rows, causing the scroll region to overflow well beyond 10 visible lines. The fix must split each queued message on newlines before counting, so the window always displays at most 10 terminal rows regardless of message structure.",
+              "acceptanceCriteria": [
+                "A message containing N embedded newlines counts as N+1 lines toward the 10-line cap",
+                "The visible output region never exceeds 10 lines when any combination of single- and multi-line messages is present",
+                "Single-line-only runs behave identically to before the fix",
+                "A multi-line tool response that alone exceeds 10 lines is truncated or capped so the window stays within bounds",
+                "The ANSI cursor-reposition logic correctly erases the prior frame before redrawing when multi-line messages change the row count"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "cli",
+                "output",
+                "bugfix"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T13:55:23.150Z",
+              "completedAt": "2026-04-09T13:58:42.608Z"
+            },
+            {
+              "id": "cd39ee5e-585e-49a2-85a1-3b2b77b8f87e",
+              "title": "Add regression tests for multi-line scroll window behavior",
+              "status": "pending",
+              "level": "task",
+              "description": "No automated tests currently assert that the rolling window stays within its 10-line bound when multi-line content is injected. Add unit tests that feed synthetic multi-line messages into the window renderer and assert the rendered output line count, plus an integration smoke test that pipes a hench run with known multi-line tool output and counts the terminal rows emitted.",
+              "acceptanceCriteria": [
+                "Unit test: feeding a 4-line message followed by 3 single-line messages produces exactly 7 rendered lines",
+                "Unit test: a single message with 15 newlines is capped/truncated to fit within the 10-line bound",
+                "Unit test: mixed single- and multi-line messages never produce a rendered frame exceeding 10 lines",
+                "Integration test: a hench dry-run that emits known multi-line output passes the 10-line cap assertion"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "testing",
+                "regression"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ec3d96fd-86fd-43d3-845a-418c50058849",
+      "title": "Hench",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "f505bbac-616d-43fd-8b5f-33aac47cb79f",
+          "title": "Hench Run-Loop Visual Output Refinements",
+          "status": "pending",
+          "level": "feature",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "67886370-b75c-4e7a-ad8c-2a66b4f281a9",
+              "title": "Apply cyan color to agent text and task separator line in hench run output",
+              "status": "pending",
+              "level": "task",
+              "description": "Color the agent narrative text (lines emitted by the agent during a run) and the '_____ Task _____' separator line in cyan. No other existing color assignments should change — this is a targeted addition to the existing semantic color scheme established for hench run-loop output.",
+              "acceptanceCriteria": [
+                "Agent text lines rendered during a hench run are colored cyan in TTY output",
+                "The '_____ Task _____' separator line is colored cyan in TTY output",
+                "All other existing color assignments (pink loop separator, yellow warnings, label prefixes, etc.) are unchanged",
+                "Cyan is suppressed when NO_COLOR is set or output is not a TTY, consistent with existing color suppression behavior",
+                "Existing color integration tests pass without modification"
+              ],
+              "priority": "low",
+              "tags": [
+                "hench",
+                "cli",
+                "color"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff",
+                "matchedItemId": "62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff",
+                "matchedItemTitle": "Add pink loop-iteration separator line to hench run output",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-04-09T13:55:05.624Z"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
