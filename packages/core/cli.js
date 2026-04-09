@@ -77,6 +77,7 @@ import {
   formatRecap,
   createSpinner,
   INIT_PHASES,
+  dim,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
 import {
@@ -89,9 +90,22 @@ import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
 } from "./child-lifecycle.js";
+import {
+  checkForUpdate,
+  formatUpdateNotice,
+  shouldSuppressNotice,
+} from "./update-check.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
+
+// ── Update check (fire-and-forget) ───────────────────────────────────────────
+// Read the current version synchronously (package.json is tiny) and fire the
+// registry check immediately.  The result is captured via .then() and checked
+// synchronously at exit — zero additional delay to any command.
+const _coreVersion = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8")).version;
+let _updateResult;
+checkForUpdate(_coreVersion).then((r) => { _updateResult = r ?? null; }).catch(() => { _updateResult = null; });
 
 /** Map monorepo directory names to npm package names. */
 const PKG_NAMES = {
@@ -1547,6 +1561,15 @@ try {
   await flushAndExit(0);
 } catch (err) {
   if (err instanceof ExitRequest) {
+    // Show update notice after command output, before exit.
+    // _updateResult is populated asynchronously by the fire-and-forget check
+    // started at module load.  If it hasn't resolved yet, we skip silently.
+    if (
+      _updateResult?.updateAvailable &&
+      !shouldSuppressNotice(process.argv.slice(2), err.code)
+    ) {
+      console.log(dim(formatUpdateNotice(_updateResult.latestVersion, _updateResult.currentVersion)));
+    }
     await flushAndExit(err.code);
   } else {
     console.error(formatError(err));
