@@ -1,0 +1,245 @@
+/**
+ * MCP registration idempotency tests — verifies that `registerMcpServers()`
+ * in claude-integration.js safely handles re-registration by removing existing
+ * servers from all scopes before adding.
+ *
+ * Complements:
+ *   - assistant-integration.test.js — orchestration-level idempotency
+ *   - mcp-transport.test.js — HTTP transport protocol compliance
+ *   - codex-mcp-contract.test.js — Codex stdio MCP contract
+ *
+ * This file focuses on the **registration lifecycle**:
+ *   1. Source-level: removal-before-add pattern covers all three scopes
+ *   2. Source-level: every manifest server gets the idempotent treatment
+ *   3. Behavioral: MCP result shape contract (with and without claude CLI)
+ *   4. Behavioral: running setupClaudeIntegration twice is safe
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { setupClaudeIntegration } from "../../packages/core/claude-integration.js";
+import { getMcpServers } from "../../assistant-assets/index.js";
+
+const ROOT = resolve(import.meta.dirname, "../..");
+const SRC = readFileSync(join(ROOT, "packages/core/claude-integration.js"), "utf-8");
+const servers = getMcpServers();
+const serverNames = Object.keys(servers);
+
+// ── Source-level: idempotent removal pattern ─────────────────────────────────
+
+describe("registerMcpServers idempotent removal pattern (source)", () => {
+  it("removes from all three Claude scopes before adding", () => {
+    // The function must remove from local, project, and user scopes
+    expect(SRC).toContain('"local"');
+    expect(SRC).toContain('"project"');
+    expect(SRC).toContain('"user"');
+  });
+
+  it("iterates removal across scopes in a loop", () => {
+    // Should use a loop over scopes rather than three separate commands
+    expect(SRC).toMatch(/for\s*\(\s*const\s+\w+\s+of\s+\[.*"local".*"project".*"user".*\]/);
+  });
+
+  it("calls claude mcp remove with --scope flag", () => {
+    expect(SRC).toMatch(/claude mcp remove --scope/);
+  });
+
+  it("execSync add call appears after execSync remove call in registerMcpServers", () => {
+    // Extract the function body and match execSync calls specifically
+    // (not comments which also mention the command strings).
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    // Match the actual execSync invocations, not comment references
+    const removeMatch = fnBody.match(/execSync\(\s*`claude mcp remove/);
+    const addMatch = fnBody.match(/execSync\(\s*\n?\s*`claude mcp add/);
+    expect(removeMatch).not.toBeNull();
+    expect(addMatch).not.toBeNull();
+    expect(addMatch.index).toBeGreaterThan(removeMatch.index);
+  });
+
+  it("suppresses removal errors (server may not exist in a scope)", () => {
+    // The removal loop must catch errors — a server may not exist in every scope
+    // Extract the removal loop block and verify it contains a try-catch
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    // Count try blocks — at least one for the removal loop and one for the add
+    const tryCount = (fnBody.match(/\btry\s*\{/g) || []).length;
+    expect(tryCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("removal uses stdio: 'ignore' to suppress output", () => {
+    // Removal should not leak output to the terminal
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    // Both remove and add calls should use stdio: "ignore"
+    const ignoreCount = (fnBody.match(/stdio:\s*"ignore"/g) || []).length;
+    // At least 2: one in the removal try, one in the add try
+    expect(ignoreCount).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ── Source-level: manifest coverage ──────────────────────────────────────────
+
+describe("registerMcpServers processes all manifest servers", () => {
+  it("iterates over getMcpServers() entries", () => {
+    expect(SRC).toMatch(/getMcpServers\(\)/);
+    expect(SRC).toMatch(/Object\.entries\(servers\)/);
+  });
+
+  it("manifest defines at least rex and sourcevision servers", () => {
+    expect(serverNames).toContain("rex");
+    expect(serverNames).toContain("sourcevision");
+    expect(serverNames.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("each manifest server has the required descriptor fields", () => {
+    for (const [name, descriptor] of Object.entries(servers)) {
+      expect(descriptor).toHaveProperty("package");
+      expect(descriptor).toHaveProperty("npmName");
+      expect(descriptor).toHaveProperty("mcpCommand");
+      expect(typeof descriptor.package).toBe("string");
+      expect(typeof descriptor.npmName).toBe("string");
+      expect(typeof descriptor.mcpCommand).toBe("string");
+    }
+  });
+});
+
+// ── Behavioral: MCP result shape ─────────────────────────────────────────────
+
+describe("registerMcpServers result shape", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "ndx-mcp-reg-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("detail.mcp is always defined", () => {
+    const result = setupClaudeIntegration(tmpDir);
+    expect(result).toHaveProperty("mcp");
+    expect(result.mcp).toBeDefined();
+  });
+
+  it("detail.mcp.registered is a boolean", () => {
+    const result = setupClaudeIntegration(tmpDir);
+    expect(typeof result.mcp.registered).toBe("boolean");
+  });
+
+  it("when claude CLI is absent, returns registered: false with reason", () => {
+    const result = setupClaudeIntegration(tmpDir);
+    // In CI/test environments without claude CLI installed, this path is hit.
+    // If claude IS available, the servers array will be populated instead.
+    if (!result.mcp.registered) {
+      expect(result.mcp.reason).toBe("claude CLI not found");
+      expect(result.mcp.servers).toBeUndefined();
+    } else {
+      // claude CLI is available — verify servers array
+      expect(Array.isArray(result.mcp.servers)).toBe(true);
+      expect(result.mcp.servers.length).toBe(serverNames.length);
+    }
+  });
+
+  it("when registered, each server entry has name, transport, and ok fields", () => {
+    const result = setupClaudeIntegration(tmpDir);
+    if (!result.mcp.registered) return; // skip when CLI is absent
+    for (const entry of result.mcp.servers) {
+      expect(entry).toHaveProperty("name");
+      expect(entry).toHaveProperty("transport");
+      expect(entry).toHaveProperty("ok");
+      expect(typeof entry.name).toBe("string");
+      expect(entry.transport).toBe("stdio");
+      expect(typeof entry.ok).toBe("boolean");
+    }
+  });
+
+  it("when registered, server names match manifest entries", () => {
+    const result = setupClaudeIntegration(tmpDir);
+    if (!result.mcp.registered) return;
+    const registeredNames = result.mcp.servers.map((s) => s.name).sort();
+    expect(registeredNames).toEqual([...serverNames].sort());
+  });
+});
+
+// ── Behavioral: idempotent integration ───────────────────────────────────────
+
+describe("setupClaudeIntegration is idempotent", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "ndx-mcp-idempotent-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("running twice does not throw", () => {
+    setupClaudeIntegration(tmpDir);
+    expect(() => setupClaudeIntegration(tmpDir)).not.toThrow();
+  });
+
+  it("running twice produces identical MCP result structure", () => {
+    const first = setupClaudeIntegration(tmpDir);
+    const second = setupClaudeIntegration(tmpDir);
+    expect(first.mcp.registered).toBe(second.mcp.registered);
+    if (first.mcp.registered) {
+      expect(first.mcp.servers.length).toBe(second.mcp.servers.length);
+      for (let i = 0; i < first.mcp.servers.length; i++) {
+        expect(first.mcp.servers[i].name).toBe(second.mcp.servers[i].name);
+        expect(first.mcp.servers[i].transport).toBe(second.mcp.servers[i].transport);
+        expect(first.mcp.servers[i].ok).toBe(second.mcp.servers[i].ok);
+      }
+    } else {
+      expect(first.mcp.reason).toBe(second.mcp.reason);
+    }
+  });
+
+  it("running twice produces identical settings result", () => {
+    const first = setupClaudeIntegration(tmpDir);
+    const second = setupClaudeIntegration(tmpDir);
+    // Second run should add 0 new permissions (all already present)
+    expect(second.settings.added).toBe(0);
+    expect(second.settings.total).toBe(first.settings.total);
+  });
+
+  it("running twice produces identical skills result", () => {
+    const first = setupClaudeIntegration(tmpDir);
+    const second = setupClaudeIntegration(tmpDir);
+    expect(first.skills.written).toBe(second.skills.written);
+  });
+
+  it("running twice produces identical instructions result", () => {
+    const first = setupClaudeIntegration(tmpDir);
+    const second = setupClaudeIntegration(tmpDir);
+    expect(first.instructions.written).toBe(second.instructions.written);
+  });
+});
+
+// ── Source-level: hasClaudeCli guard ─────────────────────────────────────────
+
+describe("registerMcpServers guard: hasClaudeCli", () => {
+  it("checks for claude CLI before attempting registration", () => {
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    expect(fnBody).toContain("hasClaudeCli()");
+  });
+
+  it("returns early with reason when claude CLI is absent", () => {
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    expect(fnBody).toContain("claude CLI not found");
+    expect(fnBody).toContain("registered: false");
+  });
+
+  it("hasClaudeCli uses execSync with timeout", () => {
+    const fnStart = SRC.indexOf("function hasClaudeCli");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\n}", fnStart) + 2);
+    expect(fnBody).toContain("claude --version");
+    expect(fnBody).toContain("timeout");
+  });
+});
