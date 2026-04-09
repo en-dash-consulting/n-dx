@@ -319,6 +319,42 @@ async function acceptProposals(
   }
 }
 
+/**
+ * Output flow trace for `ndx plan` / `rex analyze`:
+ *
+ * [sourcevision analyze subprocess — already finished when rex starts]
+ *   Phases 1–6 each print progress via info()
+ *   "Done." ← last sourcevision output; console.log, no buffering
+ *
+ * [orchestration: cli.js handlePlan spawns rex analyze — ~50–200 ms, no output]
+ *
+ * [rex analyze — this function]
+ *   initLLMClients  → prints vendor/model header + auth note  ← first rex output
+ *   resolveModel    → reads .rex/config.json                  ← silent, ~5 ms
+ *   runBudgetPreflight → reads PRD, may print warnings        ← usually silent
+ *   loadExistingItems  → reads .rex/prd.json                  ← silent, ~10–100 ms
+ *   generateProposals → runScannerMode:
+ *     parallel scans (scanTests, scanDocs, scanSourceVision,
+ *                     scanPackageJson, scanGoMod)              ← silent GAP #1
+ *                                                                dominant cost: 500 ms–10 s
+ *     "Scanning project…" spinner                             ← spinner covers gap #1
+ *     deduplicateScanResults + reconcile                      ← silent, ~10–50 ms
+ *     "Building proposals…" spinner (LLM call)               ← spinner covers LLM wait
+ *     "Proposals refined by LLM."
+ *     "Scanned: X test files, …"
+ *     "Found: N proposals (K new, …)"
+ *   postProcessProposals:
+ *     "Checking proposal granularity…" spinner (LLM call)
+ *     "Checking task sizes…" spinner (LLM call)
+ *   displayAndReviewProposals → prints proposal tree
+ *   logUsageAndCache → "Token usage: …"
+ *   handleAcceptance → acceptance prompt or summary
+ *
+ * Stdout notes:
+ *   All info() calls use console.log → synchronous write, no user-space buffering.
+ *   Spinners write to process.stderr (ora) — separate fd, never interleaved with stdout.
+ *   --quiet suppresses all info() and spinners; --format=json suppresses spinners.
+ */
 export async function cmdAnalyze(
   dir: string,
   flags: Record<string, string>,
@@ -700,6 +736,10 @@ async function runScannerMode(
 ): Promise<ScannerResult> {
   const { lite, noLlm, model, accept, formatJson } = opts;
   const scanOpts = { lite };
+
+  // GAP #1: parallel file-system scans + reconcile — dominant silent cost (500 ms–10 s+
+  // depending on codebase size). Spinner covers this gap; suppressed in --format=json.
+  const scanSpin = formatJson ? null : startSpinner("Scanning project…");
   const [testResults, docResults, svScan, pkgResults, goModResults] = await Promise.all([
     scanTests(dir, scanOpts),
     scanDocs(dir, scanOpts),
@@ -723,6 +763,7 @@ async function runScannerMode(
     existing,
     { detectUpdates: existing.length > 0 },
   );
+  scanSpin?.stop();
 
   let proposals: Proposal[];
   let tokenUsage = emptyAnalyzeTokenUsage();

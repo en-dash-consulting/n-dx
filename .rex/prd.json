@@ -25710,22 +25710,24 @@
     {
       "id": "df0b312f-6a01-48f7-87ca-cefd3a1cd29f",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "fea07c28-af09-4696-9999-18eb37be4fc6",
           "title": "ndx plan Post-LLM Progress Feedback",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "After `ndx plan` prints 'Done.' and 'Vendor: ...' (which marks the end of the LLM response stream), the process appears to stall with no visible output while it processes the response and builds proposals. Users cannot distinguish a working pipeline from a hung process.",
           "source": "smart-add",
+          "startedAt": "2026-04-09T17:58:55.309Z",
+          "completedAt": "2026-04-09T17:58:55.309Z",
           "children": [
             {
               "id": "b3bdcdb5-1bed-46be-8190-56b022fa5787",
               "title": "Trace ndx plan output flow and identify the silent gap after 'Done.'",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Instrument the ndx plan execution path — from the LLM response completion signal through proposal parsing, merging, and final output — to identify exactly where output is suppressed. Determine whether the gap is in sourcevision analyze post-processing, rex analyze proposal building, or the orchestration layer between the two spawned commands.",
               "acceptanceCriteria": [
@@ -25739,12 +25741,14 @@
                 "ndx-plan",
                 "dx"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:53:51.610Z",
+              "completedAt": "2026-04-09T17:58:55.134Z"
             },
             {
               "id": "8f3ffe22-c031-4b7a-97e4-c4895439d6ea",
               "title": "Add spinner and stage labels to ndx plan output between LLM response and proposal display",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Insert a progress indicator (spinner or step label) immediately after the 'Done.' / 'Vendor: ...' lines so users know the process is still active. The indicator should cover at minimum the proposal-building and proposal-display phases. It must be suppressed in --quiet / JSON modes and must not interfere with the existing 'Done.' and 'Vendor: ...' output.",
               "acceptanceCriteria": [
@@ -25762,7 +25766,71 @@
                 "ux"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-09T17:48:22.321Z"
+              "startedAt": "2026-04-09T17:48:22.321Z",
+              "completedAt": "2026-04-09T17:53:31.645Z"
+            }
+          ]
+        }
+      ],
+      "startedAt": "2026-04-09T17:58:55.447Z",
+      "completedAt": "2026-04-09T17:58:55.447Z"
+    },
+    {
+      "id": "5f15fa5d-0d68-4911-bbb0-6fa0d6c0cead",
+      "title": "CLI & Developer Tools",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "eb21a965-6d17-4ee7-b6bd-0f1e6d07ff33",
+          "title": "ANSI Color Reset Consistency in Tool Output",
+          "status": "pending",
+          "level": "feature",
+          "description": "Tool output lines using blue (and potentially other) ANSI colors do not emit a reset code at the end of the line, causing the color to bleed into subsequent terminal output. This is a correctness issue in the color formatting layer — every colorized segment must close with a reset so downstream text renders in the default terminal color.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "5f17b7af-ba00-43a6-8c6c-dcd5c8bf1d00",
+              "title": "Audit and fix missing ANSI reset codes in tool and CLI output lines",
+              "status": "pending",
+              "level": "task",
+              "description": "Identify all call sites in the CLI output pipeline where blue (and other) ANSI color codes are applied without a trailing reset sequence. The primary symptom is that text after a colored tool-output line inherits the blue color. Fix each site to ensure every colorized string ends with the ANSI reset code (`\\x1b[0m`), including multi-line and wrapped tool output. Cover rex, hench, sourcevision, and the ndx orchestrator.",
+              "acceptanceCriteria": [
+                "No terminal line colored blue (or any other ANSI color) bleeds color onto the next output line",
+                "All colorized output strings end with the ANSI reset sequence",
+                "Color formatting utility enforces reset-on-close so callers cannot emit a color without a paired reset",
+                "Verified across rex, hench, sourcevision, and ndx orchestrator output paths"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "ansi",
+                "color",
+                "bug"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "dbb2f5ef-4e60-431a-9e9f-8ade8f2eba28",
+              "title": "Add regression tests for ANSI color reset and line-boundary consistency",
+              "status": "pending",
+              "level": "task",
+              "description": "Add targeted tests that assert colorized CLI output strings always contain a reset code at the end of each colored segment. Tests should cover the shared color utility and at least one representative output path from each CLI tool (rex, hench, sourcevision). Prevents future contributors from reintroducing missing resets when adding new color usage.",
+              "acceptanceCriteria": [
+                "Unit tests assert that every string returned by the color utility ends with the ANSI reset sequence",
+                "At least one integration-level test per CLI tool verifies no color bleed across output lines in TTY mode",
+                "Tests fail if a colorized string is returned without a trailing reset",
+                "NO_COLOR and non-TTY paths are also covered (no ANSI codes emitted at all)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "ansi",
+                "color",
+                "test"
+              ],
+              "source": "smart-add"
             }
           ]
         }
