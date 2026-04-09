@@ -221,6 +221,37 @@ describe("stream() label color mapping", () => {
     expect(output).toContain("[Agent]");
   });
 
+  // ── [Agent] text body → colorInfo (cyan) ─────────────────────────────────
+
+  it("[Agent] text body contains cyan ANSI code when color is forced", async () => {
+    setColorMode("force");
+    await resetColor();
+    stream("Agent", "Some agent narrative");
+    const output = spy.mock.calls[0][0] as string;
+    expect(output).toContain(CYAN);
+    expect(output).toContain("Some agent narrative");
+  });
+
+  it("[Agent] text body is plain text (no ANSI) when NO_COLOR=1", async () => {
+    setColorMode("none");
+    await resetColor();
+    stream("Agent", "Some agent narrative");
+    const output = spy.mock.calls[0][0] as string;
+    expect(output).not.toContain(ANSI_PREFIX);
+    expect(output).toContain("Some agent narrative");
+  });
+
+  it("[Tool] text body has no cyan code even when color is forced (only label colored)", async () => {
+    setColorMode("force");
+    await resetColor();
+    stream("Tool", "read_file(path)");
+    const output = spy.mock.calls[0][0] as string;
+    expect(output).toContain(DIM); // label color
+    // text body after the bracket should not contain cyan
+    const afterBracket = output.split("[Tool]")[1] ?? "";
+    expect(afterBracket).not.toContain(CYAN);
+  });
+
   // ── vendor labels → colorInfo (cyan/blue) ────────────────────────────────
 
   it("[Codex] vendor label contains cyan ANSI code when color is forced", async () => {
@@ -281,6 +312,44 @@ describe("stream() label color mapping", () => {
     // Strip all ANSI codes from the colored version and compare visible text
     const stripped = coloredOutput.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toBe(plainOutput);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// subsection() color — cyan on TTY, plain on NO_COLOR
+// ---------------------------------------------------------------------------
+
+describe("subsection() color", () => {
+  let subSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    subSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    setQuiet(false);
+  });
+
+  afterEach(async () => {
+    subSpy.mockRestore();
+    setColorMode("clear");
+    await resetColor();
+    setQuiet(false);
+  });
+
+  it("contains cyan ANSI code when color is forced", async () => {
+    setColorMode("force");
+    await resetColor();
+    subsection("Task");
+    const output = subSpy.mock.calls[0][0] as string;
+    expect(output).toContain(CYAN);
+    expect(output).toContain("Task");
+  });
+
+  it("is plain text (no ANSI) when NO_COLOR=1", async () => {
+    setColorMode("none");
+    await resetColor();
+    subsection("Task");
+    const output = subSpy.mock.calls[0][0] as string;
+    expect(output).not.toContain(ANSI_PREFIX);
+    expect(output).toContain("── Task ");
   });
 });
 

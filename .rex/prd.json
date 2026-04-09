@@ -25423,22 +25423,26 @@
     {
       "id": "a9cadabc-15ef-4340-bdfb-0d0db1f0de54",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-09T15:06:38.669Z",
+      "completedAt": "2026-04-09T15:06:38.669Z",
       "children": [
         {
           "id": "453e030c-021c-4f41-a39f-eb7804e356b4",
           "title": "Dinosaur ASCII Art Proportions Fix",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The dinosaur rendered in the `ndx init` banner does not accurately represent the Rex-F.png mascot image used in marketing and branding. This feature corrects the ASCII art to match the proportions and silhouette of the reference image.",
           "source": "smart-add",
+          "startedAt": "2026-04-09T15:06:38.369Z",
+          "completedAt": "2026-04-09T15:06:38.369Z",
           "children": [
             {
               "id": "ef198516-592b-473a-8a8f-e0c7a0b12bc1",
               "title": "Redesign ndx init ASCII dinosaur to match Rex-F.png proportions",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The current ASCII art dinosaur in the ndx init banner has incorrect body proportions relative to the Rex-F.png reference image (packages/rex/Rex-F.png). Audit the reference image, identify the key proportion mismatches (head size, tail length, leg stance, overall silhouette), and redraw the ASCII art character to closely follow the reference. The fix should be applied to whichever module renders the init banner output.",
               "acceptanceCriteria": [
@@ -25454,7 +25458,9 @@
                 "branding",
                 "init"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-09T14:44:42.925Z",
+              "completedAt": "2026-04-09T15:06:38.081Z"
             },
             {
               "id": "7a7249e7-1a6b-4e09-bf2c-73a4cea7d4de",
@@ -25569,7 +25575,7 @@
             {
               "id": "67886370-b75c-4e7a-ad8c-2a66b4f281a9",
               "title": "Apply cyan color to agent text and task separator line in hench run output",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Color the agent narrative text (lines emitted by the agent during a run) and the '_____ Task _____' separator line in cyan. No other existing color assignments should change — this is a targeted addition to the existing semantic color scheme established for hench run-loop output.",
               "acceptanceCriteria": [
@@ -25595,7 +25601,8 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-04-09T13:55:05.624Z"
-              }
+              },
+              "startedAt": "2026-04-09T15:07:06.601Z"
             }
           ]
         }

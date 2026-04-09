@@ -186,7 +186,7 @@ export function subsection(title: string): void {
   if (isQuiet()) return;
   const prefix = `── ${title} `;
   const pad = Math.max(0, SECTION_WIDTH - prefix.length);
-  console.log(`\n${bold(prefix)}${dim("─".repeat(pad))}`);
+  console.log(`\n${cyan(bold(prefix))}${cyan(dim("─".repeat(pad)))}`);
 }
 
 /**
@@ -208,6 +208,18 @@ const STREAM_LABEL_COLORS: Readonly<Record<string, (text: string) => string>> = 
 };
 
 /**
+ * Color mapping for the message body (text portion) in stream output.
+ *
+ * - Agent: cyan — agent narrative text distinguishes itself from tool noise
+ *
+ * Labels not listed here receive no body color.
+ * Raw text is always captured in _capturedLines without ANSI codes.
+ */
+const STREAM_TEXT_COLORS: Readonly<Record<string, (text: string) => string>> = {
+  Agent: colorInfo,
+};
+
+/**
  * Print a labelled streaming line. Suppressed in quiet mode.
  * The label is right-padded for alignment and color-coded by source type.
  *
@@ -226,16 +238,18 @@ export function stream(label: string, text: string): void {
   const bracket = `[${label}]`;
   const colorFn = STREAM_LABEL_COLORS[label];
   const coloredBracket = colorFn ? colorFn(bracket) : bracket;
+  const textColorFn = STREAM_TEXT_COLORS[label];
+  const coloredText = textColorFn ? textColorFn(text) : text;
   const padding = " ".repeat(Math.max(0, 10 - bracket.length));
   const rawLine = `  ${bracket}${padding} ${text}`;
 
   if (isRollingMode()) {
     // Wrap the entire formatted line in colorDim so the rolling window
     // reads as a uniform grey band, indicating "live streaming in progress".
-    const displayLine = colorDim(`  ${coloredBracket}${padding} ${text}`);
+    const displayLine = colorDim(`  ${coloredBracket}${padding} ${coloredText}`);
     _pushWindowLine(displayLine, rawLine);
   } else {
-    console.log(`  ${coloredBracket}${padding} ${text}`);
+    console.log(`  ${coloredBracket}${padding} ${coloredText}`);
     _capturedLines.push(rawLine);
   }
 }
