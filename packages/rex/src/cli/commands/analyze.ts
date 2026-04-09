@@ -6,7 +6,7 @@ import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
-import { info, warn, result } from "../output.js";
+import { info, warn, result, startSpinner } from "../output.js";
 import {
   preflightBudgetCheck,
   formatBudgetWarnings,
@@ -580,7 +580,9 @@ async function postProcessProposals(
   const loeConfig = await loadLoEConfig(dir, noLlm);
 
   // Consolidation guard: reduce over-granular LLM output
+  const guardSpin = startSpinner("Checking proposal granularity…");
   const guardResult = await applyConsolidationGuard(proposals, loeConfig, model);
+  guardSpin.stop();
   if (guardResult.triggered) {
     proposals = guardResult.proposals;
     accumulateTokenUsage(tokenUsage, guardResult.tokenUsage);
@@ -595,7 +597,9 @@ async function postProcessProposals(
   }
 
   // LoE decomposition: break down oversized tasks
+  const decomposeSpin = startSpinner("Checking task sizes…");
   const decompositionResult = await applyDecompositionPass(proposals, loeConfig, model);
+  decomposeSpin.stop();
   if (decompositionResult.decomposed.length > 0) {
     proposals = decompositionResult.proposals;
     accumulateTokenUsage(tokenUsage, decompositionResult.tokenUsage);
@@ -724,14 +728,17 @@ async function runScannerMode(
   let tokenUsage = emptyAnalyzeTokenUsage();
 
   if (!noLlm) {
+    const spin = formatJson ? null : startSpinner("Building proposals…");
     try {
       const reasonResult = await reasonFromScanResults(newResults, existing, { dir, model });
       proposals = reasonResult.proposals;
       tokenUsage = reasonResult.tokenUsage;
+      spin?.stop();
       if (!formatJson) {
         info("Proposals refined by LLM.");
       }
     } catch {
+      spin?.stop();
       proposals = buildProposals(newResults);
     }
   } else {

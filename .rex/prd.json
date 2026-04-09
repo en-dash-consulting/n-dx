@@ -25616,22 +25616,26 @@
     {
       "id": "624c6516-0082-4328-89f3-d1e0cb5aeb10",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-09T17:48:19.740Z",
+      "completedAt": "2026-04-09T17:48:19.740Z",
       "children": [
         {
           "id": "6db5328c-2df6-437a-80a1-771fa55401a5",
           "title": "Dinosaur Animation Frame Sequence Correction",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The ndx init dinosaur animation sequence is incorrect. Rex-F.png must be the canonical first frame, and each subsequent animation frame must be derived from the closest available reference image to Rex-F.png rather than being independently invented.",
           "source": "smart-add",
+          "startedAt": "2026-04-09T17:48:19.524Z",
+          "completedAt": "2026-04-09T17:48:19.524Z",
           "children": [
             {
               "id": "536c72d7-d8d3-410b-8710-67e24e330690",
               "title": "Audit current animation frames against Rex-F.png and identify divergences",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Render each current ASCII animation frame side-by-side with Rex-F.png to document exactly where the existing sequence diverges from the reference. Identify which frames are misaligned in proportions, pose, or character anatomy. Produce a written frame-by-frame audit that will drive the subsequent correction work.",
               "acceptanceCriteria": [
@@ -25646,7 +25650,8 @@
                 "ascii-art"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-09T17:45:21.352Z"
+              "startedAt": "2026-04-09T17:45:21.352Z",
+              "completedAt": "2026-04-09T17:48:19.354Z"
             },
             {
               "id": "42b353ce-031b-4c72-bca3-64983608a8fb",
@@ -25739,7 +25744,7 @@
             {
               "id": "8f3ffe22-c031-4b7a-97e4-c4895439d6ea",
               "title": "Add spinner and stage labels to ndx plan output between LLM response and proposal display",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Insert a progress indicator (spinner or step label) immediately after the 'Done.' / 'Vendor: ...' lines so users know the process is still active. The indicator should cover at minimum the proposal-building and proposal-display phases. It must be suppressed in --quiet / JSON modes and must not interfere with the existing 'Done.' and 'Vendor: ...' output.",
               "acceptanceCriteria": [
@@ -25756,7 +25761,8 @@
                 "dx",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:48:22.321Z"
             }
           ]
         }
