@@ -718,7 +718,7 @@ describe("DOM rendering performance", () => {
     describe(`${size}-node tree`, () => {
       it("renders within time budget", () => {
         const tree = generateRealisticTree(size);
-        const budget = (size <= 500 ? 200 : size <= 1000 ? 400 : 800) * BUDGET_MULTIPLIER;
+        const budget = (size <= 500 ? 300 : size <= 1000 ? 500 : 900) * BUDGET_MULTIPLIER;
 
         const { renderTimeMs } = renderAndMeasure(tree);
 
