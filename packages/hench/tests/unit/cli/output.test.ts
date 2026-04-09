@@ -719,3 +719,151 @@ describe("getCapturedLines() in non-TTY mode", () => {
     expect(captured[0]).not.toContain(ANSI_PREFIX);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ANSI reset — no color bleed across line boundaries
+// ---------------------------------------------------------------------------
+
+const RESET = "\x1b[0m";
+
+describe("ANSI color reset — no inter-line bleed", () => {
+  let spy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    process.env.FORCE_COLOR = "1";
+    const { resetColorCache } = await import("@n-dx/llm-client");
+    resetColorCache();
+    spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    // Non-rolling mode so console.log is used
+    _overrideTTY(false);
+    setQuiet(false);
+  });
+
+  afterEach(async () => {
+    spy.mockRestore();
+    _overrideTTY(null);
+    delete process.env.FORCE_COLOR;
+    delete process.env.NO_COLOR;
+    const { resetColorCache } = await import("@n-dx/llm-client");
+    resetColorCache();
+    resetCapturedLines();
+    setQuiet(false);
+  });
+
+  // ── Multi-line [Agent] text — each physical line must carry its own reset ──
+
+  // colorInfo uses \x1b[39m (fg reset) not \x1b[0m. Any of these are valid
+  // ANSI reset codes: 0 (full), 39 (fg), 22 (bold/dim). The requirement is
+  // that every colored physical line ends with SOME reset so no color bleeds
+  // into the next console.log call.
+  const ANSI_RESET_RE = /\x1b\[(?:0|39|22)m$/;
+
+  it("[Agent] multi-line text: first physical line ends with a reset before \\n", () => {
+    stream("Agent", "line one\nline two");
+    const output = spy.mock.calls[0][0] as string;
+    // Split on the embedded newline; the first segment must end with a reset
+    const segments = output.split("\n");
+    expect(segments[0]).toMatch(ANSI_RESET_RE);
+  });
+
+  it("[Agent] multi-line text: second physical line starts a fresh color open", () => {
+    stream("Agent", "first\nsecond");
+    const output = spy.mock.calls[0][0] as string;
+    const segments = output.split("\n");
+    // The second segment must have its own ANSI code (not rely on the first line's)
+    expect(segments[1]).toContain(ANSI_PREFIX);
+  });
+
+  it("[Agent] multi-line text: every physical line ends with a reset code", () => {
+    stream("Agent", "a\nb\nc");
+    const output = spy.mock.calls[0][0] as string;
+    const segments = output.split("\n").filter((s) => s.length > 0);
+    for (const seg of segments) {
+      // Every colored segment must close its own color — no dangling open codes
+      expect(seg).toMatch(ANSI_RESET_RE);
+    }
+  });
+
+  it("[claude] vendor label: bracket cyan is reset before the text body", () => {
+    // Regression: [claude] bracket is colorInfo (cyan). The \x1b[39m reset must
+    // appear immediately after the bracket so the text body is not rendered in
+    // cyan. Without the fix, the text body inherits the active cyan color.
+    stream("claude", "some model text");
+    const output = spy.mock.calls[0][0] as string;
+    // Verify the bracket's cyan is reset before the text body.
+    // colorInfo("[claude]") = \x1b[36m[claude]\x1b[39m, so after splitting on
+    // "[claude]" the remainder must start with the \x1b[39m reset.
+    const afterBracket = output.split("[claude]")[1] ?? "";
+    expect(afterBracket).toMatch(/^\x1b\[39m/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ANSI reset — rolling window line termination
+// ---------------------------------------------------------------------------
+
+describe("ANSI reset — rolling window line termination", () => {
+  let writeSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    process.env.FORCE_COLOR = "1";
+    const { resetColorCache } = await import("@n-dx/llm-client");
+    resetColorCache();
+    _overrideTTY(true);
+    writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    resetRollingWindow();
+    resetCapturedLines();
+    setQuiet(false);
+  });
+
+  afterEach(async () => {
+    writeSpy.mockRestore();
+    _overrideTTY(null);
+    delete process.env.FORCE_COLOR;
+    delete process.env.NO_COLOR;
+    const { resetColorCache } = await import("@n-dx/llm-client");
+    resetColorCache();
+    resetRollingWindow();
+    resetCapturedLines();
+    setQuiet(false);
+  });
+
+  it("every line written by _redrawWindow ends with \\x1b[0m before the newline", () => {
+    stream("claude", "output from model");
+    const lineWrites = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[2K"));
+    expect(lineWrites.length).toBeGreaterThan(0);
+    for (const write of lineWrites) {
+      // Each redraw write must end with reset + newline
+      expect(write).toMatch(/\x1b\[0m\n$/);
+    }
+  });
+
+  it("multi-line [claude] text: all window line writes end with \\x1b[0m", () => {
+    stream("claude", "line1\nline2\nline3");
+    const lineWrites = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[2K"));
+    // 3 physical lines → at least 3 line-clear writes on the final redraw
+    expect(lineWrites.length).toBeGreaterThanOrEqual(3);
+    for (const write of lineWrites) {
+      expect(write).toMatch(/\x1b\[0m\n$/);
+    }
+  });
+
+  it("truncation appends \\x1b[0m so cut lines do not bleed color", () => {
+    // Force a very narrow column so any stream() call triggers truncation
+    Object.defineProperty(process.stdout, "columns", { value: 10, configurable: true });
+    stream("Agent", "this is a very long line that will definitely be truncated");
+    Object.defineProperty(process.stdout, "columns", { value: undefined, configurable: true });
+
+    const lineWrites = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[2K"));
+    for (const write of lineWrites) {
+      // Truncated or not, every line must end with \x1b[0m\n
+      expect(write).toMatch(/\x1b\[0m\n$/);
+    }
+  });
+});

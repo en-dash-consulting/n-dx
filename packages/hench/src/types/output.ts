@@ -79,14 +79,35 @@ function isRollingMode(): boolean {
 /**
  * Truncate a formatted line so it fits within the terminal column width.
  * Long lines would wrap and break the cursor-up arithmetic.
- * ANSI codes are stripped before measuring visible length, then the raw
- * string is sliced proportionally (crude but safe for the rolling use case).
+ *
+ * Counts visible characters (skipping ANSI escape codes) to find the exact
+ * cut point, then appends \x1b[0m so no ANSI state leaks past the truncated
+ * output into the next terminal line.
  */
 function _truncateForTerminal(line: string): string {
   const cols = (process.stdout.columns ?? 120) - 2;
   const visible = line.replace(/\x1b\[[0-9;]*m/g, "");
   if (visible.length <= cols) return line;
-  return line.slice(0, cols - 1) + "…";
+
+  // Walk the raw string counting only visible characters so the cut point is
+  // accurate even when the string contains many ANSI escape sequences.
+  const ANSI_RE = /\x1b\[[0-9;]*m/g;
+  let visibleCount = 0;
+  let rawIndex = 0;
+
+  while (rawIndex < line.length && visibleCount < cols - 1) {
+    ANSI_RE.lastIndex = rawIndex;
+    const match = ANSI_RE.exec(line);
+    if (match && match.index === rawIndex) {
+      rawIndex += match[0].length; // skip over ANSI escape (not visible)
+    } else {
+      visibleCount++;
+      rawIndex++;
+    }
+  }
+
+  // Always close any open ANSI sequences so no color state bleeds past this line.
+  return line.slice(0, rawIndex) + "…\x1b[0m";
 }
 
 /**
@@ -99,7 +120,14 @@ function _redrawWindow(): void {
     process.stdout.write(`\x1b[${_linesRendered}A`); // move cursor up N lines
   }
   for (const line of _windowLines) {
-    process.stdout.write(`\x1b[2K${_truncateForTerminal(line)}\n`); // clear + write
+    // \x1b[0m before \n ensures ANSI state is fully reset after every line.
+    // This prevents color from bleeding into the next window line or into any
+    // output that follows the window frame (e.g. section() headers printed via
+    // console.log). This is belt-and-suspenders for lines that already close
+    // their own color codes, and the only safety net for lines that were split
+    // from a multi-line colorDim-wrapped string whose reset code landed on the
+    // last physical segment only.
+    process.stdout.write(`\x1b[2K${_truncateForTerminal(line)}\x1b[0m\n`); // clear + write
   }
   _linesRendered = _windowLines.length;
 }
@@ -239,7 +267,14 @@ export function stream(label: string, text: string): void {
   const colorFn = STREAM_LABEL_COLORS[label];
   const coloredBracket = colorFn ? colorFn(bracket) : bracket;
   const textColorFn = STREAM_TEXT_COLORS[label];
-  const coloredText = textColorFn ? textColorFn(text) : text;
+  // Apply text color per physical line so each line carries its own complete
+  // open+close ANSI pair. Wrapping the whole multi-line string in a single
+  // color call leaves the color code open across embedded newlines, causing
+  // every subsequent line to inherit the color until the single closing code
+  // is reached at the very end of the string.
+  const coloredText = textColorFn
+    ? text.split("\n").map(textColorFn).join("\n")
+    : text;
   const padding = " ".repeat(Math.max(0, 10 - bracket.length));
   const rawLine = `  ${bracket}${padding} ${text}`;
 

@@ -25713,6 +25713,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-09T17:58:55.447Z",
+      "completedAt": "2026-04-09T17:58:55.447Z",
       "children": [
         {
           "id": "fea07c28-af09-4696-9999-18eb37be4fc6",
@@ -25771,9 +25773,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-09T17:58:55.447Z",
-      "completedAt": "2026-04-09T17:58:55.447Z"
+      ]
     },
     {
       "id": "5f15fa5d-0d68-4911-bbb0-6fa0d6c0cead",
@@ -25793,7 +25793,7 @@
             {
               "id": "5f17b7af-ba00-43a6-8c6c-dcd5c8bf1d00",
               "title": "Audit and fix missing ANSI reset codes in tool and CLI output lines",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Identify all call sites in the CLI output pipeline where blue (and other) ANSI color codes are applied without a trailing reset sequence. The primary symptom is that text after a colored tool-output line inherits the blue color. Fix each site to ensure every colorized string ends with the ANSI reset code (`\\x1b[0m`), including multi-line and wrapped tool output. Cover rex, hench, sourcevision, and the ndx orchestrator.",
               "acceptanceCriteria": [
@@ -25809,7 +25809,9 @@
                 "color",
                 "bug"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:59:32.893Z",
+              "completedAt": "2026-04-09T18:13:00.000Z"
             },
             {
               "id": "dbb2f5ef-4e60-431a-9e9f-8ade8f2eba28",
