@@ -19257,7 +19257,7 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-04-02T17:55:36.327Z",
@@ -20950,7 +20950,7 @@
         {
           "id": "013bc11c-ec20-4ac2-8463-9c17adf31fe4",
           "title": "Auto Re-Init Detection for Stale Projects",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Detect when a project's n-dx setup is stale or incomplete and suggest re-initialization. Check for missing directories, schema version mismatches, and missing config keys from newer versions.",
           "acceptanceCriteria": [
@@ -20968,9 +20968,12 @@
           "source": "conversation",
           "blockedBy": [
             "dcf6018e-e658-4708-ae6e-1bd23431748f"
-          ]
+          ],
+          "startedAt": "2026-04-09T14:24:17.627Z",
+          "completedAt": "2026-04-09T14:26:25.267Z"
         }
-      ]
+      ],
+      "completedAt": "2026-04-09T14:26:25.556Z"
     },
     {
       "id": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
