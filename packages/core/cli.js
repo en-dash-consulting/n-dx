@@ -89,6 +89,7 @@ import {
 // may import directly"). This import provides process-level configuration
 // and shared color utilities.
 import { suppressKnownDeprecations, bold, cyan, green, red, yellow, dim } from "@n-dx/llm-client";
+import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 
 suppressKnownDeprecations();
 
@@ -206,6 +207,15 @@ const childTracker = createChildProcessTracker({ processGroups: true });
 let exitPromise = null;
 
 /**
+ * Background update-check promise started early in main(). flushAndExit()
+ * races it against a short timeout to display the notice without delaying exit.
+ */
+let pendingUpdateCheck = null;
+
+/** True when the user passed --quiet / -q — update notice is suppressed. */
+let updateCheckQuiet = false;
+
+/**
  * On POSIX systems, spawn each child with `detached: true` so it becomes the
  * leader of a new process group.  This lets the process-group-aware tracker
  * kill grandchildren (spawned by the child) by signalling `-pgid` instead of
@@ -227,6 +237,24 @@ async function flushAndExit(code = 0) {
     exitPromise = (async () => {
       signalHandlers.dispose();
       await childTracker.cleanup();
+
+      // Show update notice when a newer version is available.
+      // Race against 500 ms so a slow or firewalled network never delays exit.
+      // Written to stderr so JSON stdout output stays machine-parseable.
+      if (code === 0 && !updateCheckQuiet && pendingUpdateCheck) {
+        try {
+          const updateInfo = await Promise.race([
+            pendingUpdateCheck,
+            new Promise((r) => setTimeout(() => r(null), 500)),
+          ]);
+          if (updateInfo) {
+            process.stderr.write(formatUpdateNotice(updateInfo) + "\n");
+          }
+        } catch {
+          // Never block exit for update-check errors.
+        }
+      }
+
       // Drain stdout/stderr before exiting so piped output isn't truncated
       await new Promise((resolve) => {
         const done = () => { if (--pending === 0) resolve(); };
@@ -1422,6 +1450,22 @@ try {
 
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
+
+  // ── Update check (non-blocking) ─────────────────────────────────────────
+  // Detect quiet mode early so the notice can be suppressed if needed.
+  // The check runs as a background Promise concurrently with command
+  // execution; flushAndExit() races it against a 500 ms timeout.
+  updateCheckQuiet = rest.some((a) => a === "--quiet" || a === "-q");
+  if (!updateCheckQuiet) {
+    try {
+      const { version: currentVersion } = JSON.parse(
+        readFileSync(join(__dir, "package.json"), "utf-8"),
+      );
+      pendingUpdateCheck = startUpdateCheck({ currentVersion });
+    } catch {
+      // Non-fatal — update check skipped if we can't read our own version.
+    }
+  }
 
   // Handle standard top-level version flags before normal command parsing.
   if (command === "-v" || command === "--version") {

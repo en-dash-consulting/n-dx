@@ -20921,7 +20921,7 @@
         {
           "id": "dcf6018e-e658-4708-ae6e-1bd23431748f",
           "title": "Auto-Update Detection from npm Registry",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Automatically detect when a newer version of n-dx is available on the npm registry and notify the user non-intrusively after command output. Cache the check with a 24-hour TTL to avoid repeated network calls.",
           "acceptanceCriteria": [
@@ -20936,7 +20936,16 @@
             "cli",
             "ux"
           ],
-          "source": "conversation"
+          "source": "conversation",
+          "startedAt": "2026-04-09T13:39:49.171Z",
+          "completedAt": "2026-04-09T13:50:20.353Z",
+          "log": [
+            {
+              "timestamp": "2026-04-09T13:50:20.353Z",
+              "type": "task_completed",
+              "message": "Implemented auto-update detection from npm registry.\n\n## What was done\n\n**New file: packages/core/update-check.js**\n- Fetches latest @n-dx/core version from npm registry (https://registry.npmjs.org/@n-dx/core/latest)\n- Caches result with 24-hour TTL in OS temp dir (n-dx-update-check.json)\n- Never throws — all errors silently swallowed so network failures never crash CLI\n- Exports: startUpdateCheck({ currentVersion }), formatUpdateNotice({ current, latest }), CACHE_TTL_MS\n- 3-second fetch timeout to avoid blocking on slow/firewalled networks\n\n**Modified: packages/core/cli.js**\n- Imports startUpdateCheck + formatUpdateNotice from ./update-check.js\n- Module-level pendingUpdateCheck promise + updateCheckQuiet flag\n- main() detects --quiet/-q early and starts background update check\n- flushAndExit() races the check promise against 500ms timeout; prints notice to stderr on success (code 0)\n- Notice goes to stderr so JSON stdout output stays machine-parseable\n\n**New file: tests/unit/update-check.test.js**\n- 18 tests covering: registry fetch success/failure, cache hit/miss/expiry, malformed cache, version comparisons (major/minor/patch), cache writes, formatUpdateNotice output\n\n**Fixed pre-existing failure: tests/unit/cli-smoke-parity.test.js**\n- Updated hardcoded version 0.2.1 -> 0.2.2 to match current package.json version\n\n**Modified: packages/core/package.json**\n- Added update-check.js to files array so it's included in npm publish\n\n## Decisions\n- Used OS tmpdir for cache (not .n-dx.json) — avoids polluting versioned config, works without knowing project dir\n- Writes to stderr not stdout — keeps JSON output clean for scripting\n- 500ms race timeout in flushAndExit — caps any post-command delay\n- Quiet flag check is global (process.argv) so it works for all commands\n\n## Test coverage\n124 unit tests pass. 27 CLI contract/version e2e tests pass. Pre-existing architecture policy failures unchanged."
+            }
+          ]
         },
         {
           "id": "013bc11c-ec20-4ac2-8463-9c17adf31fe4",
@@ -25399,6 +25408,67 @@
               "source": "smart-add",
               "startedAt": "2026-04-08T23:08:34.229Z",
               "completedAt": "2026-04-08T23:20:47.434Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a9cadabc-15ef-4340-bdfb-0d0db1f0de54",
+      "title": "CLI & Developer Tools",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "453e030c-021c-4f41-a39f-eb7804e356b4",
+          "title": "Dinosaur ASCII Art Proportions Fix",
+          "status": "pending",
+          "level": "feature",
+          "description": "The dinosaur rendered in the `ndx init` banner does not accurately represent the Rex-F.png mascot image used in marketing and branding. This feature corrects the ASCII art to match the proportions and silhouette of the reference image.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "ef198516-592b-473a-8a8f-e0c7a0b12bc1",
+              "title": "Redesign ndx init ASCII dinosaur to match Rex-F.png proportions",
+              "status": "pending",
+              "level": "task",
+              "description": "The current ASCII art dinosaur in the ndx init banner has incorrect body proportions relative to the Rex-F.png reference image (packages/rex/Rex-F.png). Audit the reference image, identify the key proportion mismatches (head size, tail length, leg stance, overall silhouette), and redraw the ASCII art character to closely follow the reference. The fix should be applied to whichever module renders the init banner output.",
+              "acceptanceCriteria": [
+                "The new ASCII art is visually compared against Rex-F.png and the proportions are judged as substantially more accurate (head-to-body ratio, tail curve, leg placement)",
+                "The ASCII art renders without line-wrapping at standard 80-column terminal width",
+                "The ASCII art renders correctly with and without ANSI color codes (i.e., no invisible characters disrupting column alignment)",
+                "Running `ndx init` in a clean temp directory displays the updated dinosaur",
+                "No existing snapshot or integration test is broken by the change; any affected test is updated to reflect the new art"
+              ],
+              "priority": "low",
+              "tags": [
+                "cli",
+                "branding",
+                "init"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "7a7249e7-1a6b-4e09-bf2c-73a4cea7d4de",
+              "title": "Add visual regression snapshot for ndx init dinosaur output",
+              "status": "pending",
+              "level": "task",
+              "description": "Without a captured baseline, future changes can silently re-break the dinosaur's proportions. Add a lightweight snapshot test that captures the raw ASCII art string so that any character-level change is caught and requires explicit review. This test should sit alongside the existing init integration tests.",
+              "acceptanceCriteria": [
+                "A snapshot test exists that captures the ASCII art string produced during ndx init",
+                "The snapshot test fails if any character in the dinosaur art is changed without a deliberate snapshot update",
+                "The snapshot file is committed alongside the test and reflects the corrected art from the companion redesign task",
+                "The test runs as part of `pnpm test` without requiring a live Claude API or network call"
+              ],
+              "priority": "low",
+              "tags": [
+                "cli",
+                "testing",
+                "init",
+                "branding"
+              ],
+              "source": "smart-add"
             }
           ]
         }

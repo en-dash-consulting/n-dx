@@ -36,20 +36,20 @@ function createDeterministicSmokeRunner({ incompleteVersionJson = false, statusT
     const key = JSON.stringify(args);
     switch (key) {
       case JSON.stringify(["version"]):
-        return { exitCode: 0, stdout: "0.2.1\n", stderr: "" };
+        return { exitCode: 0, stdout: "0.2.2\n", stderr: "" };
       case JSON.stringify(["version", "--json"]):
         return {
           exitCode: 0,
           stdout: incompleteVersionJson
             ? [
               "Debugger attached.",
-              "{\"version\":\"0.2.1\"",
+              "{\"version\":\"0.2.2\"",
             ].join("\n")
             : [
               "Debugger attached.",
               "(node:12345) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
               "(Use `node --trace-deprecation ...` to show where the warning was created)",
-              "{\"version\":\"0.2.1\"}",
+              "{\"version\":\"0.2.2\"}",
               "Waiting for the debugger to disconnect...",
             ].join("\n"),
           stderr: "",
@@ -164,11 +164,11 @@ describe("cli smoke parity helpers", () => {
   it("strips known child lifecycle platform warnings before comparing output", () => {
     const text = [
       "[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill",
-      "0.2.1",
+      "0.2.2",
       "",
     ].join("\n");
 
-    expect(normalizeText(text)).toBe("0.2.1");
+    expect(normalizeText(text)).toBe("0.2.2");
   });
 
   it("extracts a JSON payload from warning-prefixed mixed stdout", () => {
@@ -176,17 +176,17 @@ describe("cli smoke parity helpers", () => {
       "Debugger attached.",
       "(node:12345) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
       "(Use `node --trace-deprecation ...` to show where the warning was created)",
-      "{\"version\":\"0.2.1\"}",
+      "{\"version\":\"0.2.2\"}",
       "Waiting for the debugger to disconnect...",
     ].join("\n");
 
     expect(extractJsonPayload(text)).toEqual({
-      payload: "{\"version\":\"0.2.1\"}",
-      normalized: "Debugger attached.\n{\"version\":\"0.2.1\"}\nWaiting for the debugger to disconnect...",
+      payload: "{\"version\":\"0.2.2\"}",
+      normalized: "Debugger attached.\n{\"version\":\"0.2.2\"}\nWaiting for the debugger to disconnect...",
       hadNoise: true,
       complete: true,
     });
-    expect(parseJsonPayload(text, "version-json")).toEqual({ version: "0.2.1" });
+    expect(parseJsonPayload(text, "version-json")).toEqual({ version: "0.2.2" });
   });
 
   it("extracts stable CLI error codes from formatted stderr output", () => {
@@ -228,16 +228,16 @@ describe("cli smoke parity helpers", () => {
         {
           id: "version-text",
           exitCode: 0,
-          stdoutNormalized: "0.2.1",
+          stdoutNormalized: "0.2.2",
           stderrNormalized: "",
-          comparable: { stdout: "0.2.1", stderr: "" },
+          comparable: { stdout: "0.2.2", stderr: "" },
         },
         {
           id: "version-json",
           exitCode: 0,
-          stdoutNormalized: "{\"version\":\"0.2.1\"}",
+          stdoutNormalized: "{\"version\":\"0.2.2\"}",
           stderrNormalized: "",
-          comparable: { stdoutJson: { version: "0.2.1" } },
+          comparable: { stdoutJson: { version: "0.2.2" } },
         },
         {
           id: "unknown-command",
@@ -354,16 +354,16 @@ describe("cli smoke parity helpers", () => {
           fixture: "none",
           args: ["version"],
           expectedExitCode: 0,
-          expected: { stdoutExact: "0.2.1" },
+          expected: { stdoutExact: "0.2.2" },
         },
       ],
       cases: [
         {
           id: "version-text",
           exitCode: 0,
-          stdoutNormalized: "0.2.1",
+          stdoutNormalized: "0.2.2",
           stderrNormalized: "",
-          comparable: { stdout: "0.2.1", stderr: "" },
+          comparable: { stdout: "0.2.2", stderr: "" },
         },
       ],
     };
@@ -374,7 +374,7 @@ describe("cli smoke parity helpers", () => {
           fixture: "none",
           args: ["version"],
           expectedExitCode: 0,
-          expected: { stdoutExact: "0.2.1" },
+          expected: { stdoutExact: "0.2.2" },
         },
       ],
       cases: [
@@ -460,16 +460,16 @@ describe("cli smoke parity helpers", () => {
         {
           id: "version-text",
           exitCode: 0,
-          stdoutNormalized: "0.2.1",
+          stdoutNormalized: "0.2.2",
           stderrNormalized: "",
-          comparable: { stdout: "0.2.1", stderr: "" },
+          comparable: { stdout: "0.2.2", stderr: "" },
         },
         {
           id: "version-json",
           exitCode: 0,
-          stdoutNormalized: "{\"version\":\"0.2.1\"}",
+          stdoutNormalized: "{\"version\":\"0.2.2\"}",
           stderrNormalized: "",
-          comparable: { stdoutJson: { version: "0.2.1" } },
+          comparable: { stdoutJson: { version: "0.2.2" } },
         },
         {
           id: "unknown-command",
@@ -595,16 +595,16 @@ describe("cli smoke parity helpers", () => {
         {
           id: "version-text",
           exitCode: 0,
-          stdoutNormalized: "0.2.1",
+          stdoutNormalized: "0.2.2",
           stderrNormalized: "",
-          comparable: { stdout: "0.2.1", stderr: "" },
+          comparable: { stdout: "0.2.2", stderr: "" },
         },
         {
           id: "version-json",
           exitCode: 0,
-          stdoutNormalized: "{\"version\":\"0.2.1\"}",
+          stdoutNormalized: "{\"version\":\"0.2.2\"}",
           stderrNormalized: "",
-          comparable: { stdoutJson: { version: "0.2.1" } },
+          comparable: { stdoutJson: { version: "0.2.2" } },
         },
         {
           id: "unknown-command",
@@ -735,7 +735,7 @@ describe("cli smoke parity helpers", () => {
     const typoCase = artifact.cases.find((entry) => entry.id === "typo-suggestion");
     const versionTextCase = artifact.cases.find((entry) => entry.id === "version-text");
 
-    expect(versionJsonCase.comparable).toEqual({ stdoutJson: { version: "0.2.1" } });
+    expect(versionJsonCase.comparable).toEqual({ stdoutJson: { version: "0.2.2" } });
     expect(statusJsonCase.comparable).toEqual({
       stdoutJson: {
         schema: "rex/v1",
@@ -789,14 +789,14 @@ describe("cli smoke parity helpers", () => {
         fixture: "none",
         args: ["version"],
         expectedExitCode: 0,
-        expected: { stdoutExact: "0.2.1" },
+        expected: { stdoutExact: "0.2.2" },
       },
       {
         id: "version-json",
         fixture: "none",
         args: ["version", "--json"],
         expectedExitCode: 0,
-        expected: { stdoutJson: { version: "0.2.1" } },
+        expected: { stdoutJson: { version: "0.2.2" } },
       },
       {
         id: "unknown-command",
