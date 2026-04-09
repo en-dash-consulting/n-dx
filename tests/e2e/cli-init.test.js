@@ -140,7 +140,7 @@ describe("n-dx init provider selection", () => {
     expect(result.stderr).toContain("Init cancelled: no provider selected");
   });
 
-  it("suppresses init banner in non-interactive mode", async () => {
+  it("shows init banner in non-interactive mode", async () => {
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-noninteractive-"));
     try {
       await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
@@ -154,8 +154,8 @@ describe("n-dx init provider selection", () => {
 
       expect(output).toContain("LLM configuration");
       expect(output).toMatch(/Provider\s+codex/);
-      // Banner box should be suppressed; "n-dx initialized" summary is fine
-      expect(output).not.toContain("Guided project setup");
+      // Banner (trex mascot) should always appear, even in non-interactive mode
+      expect(output).toContain("n-dx init");
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }

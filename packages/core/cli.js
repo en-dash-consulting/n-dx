@@ -762,9 +762,7 @@ async function handleInit(rest) {
     isTTY: process.stdin.isTTY === true,
   });
 
-  if (resolution.needsProviderPrompt) {
-    showInitBanner();
-  }
+  showInitBanner();
 
   const selection = await promptLLMSelection(resolution);
   const selectedProvider = selection.provider;
