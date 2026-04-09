@@ -19257,11 +19257,10 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "completed",
+      "status": "pending",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-04-02T03:23:53.067Z",
-      "completedAt": "2026-04-02T03:23:53.067Z",
       "children": [
         {
           "id": "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83",
@@ -20556,6 +20555,48 @@
           "completedAt": "2026-04-02T03:23:52.875Z",
           "resolutionType": "code-change",
           "resolutionDetail": "Implemented .n-dx.local.json support across the full config stack: config.js (orchestration), llm-client (foundation), and cli.js (init). Machine-specific keys (cli_path variants) auto-route to local file. Deep merge with local wins. 22 new tests, all passing."
+        },
+        {
+          "id": "4f37d348-3703-4d99-96ce-1f48b2da8a7c",
+          "title": "Fix MCP server re-registration during ndx init",
+          "status": "pending",
+          "level": "feature",
+          "priority": "high",
+          "children": [
+            {
+              "id": "bd75121d-0741-4061-a469-03a51794bcd0",
+              "title": "Remove existing MCP server before re-adding in registerMcpServers",
+              "status": "in_progress",
+              "level": "task",
+              "description": "In packages/core/claude-integration.js, the registerMcpServers() function (line 163) runs 'claude mcp add <name>' but fails when the server already exists (exit code 1: 'MCP server <name> already exists in local config'). Fix: inside the for loop at line 174, before the existing execSync that runs 'claude mcp add', add a try/catch block that runs 'claude mcp remove <name>' with stdio:ignore and a 5s timeout, ignoring any errors (the server may not exist on first init). This makes init idempotent — running it multiple times always succeeds.",
+              "priority": "high",
+              "startedAt": "2026-04-09T19:34:25.276Z"
+            },
+            {
+              "id": "a09a3b1d-9e0c-4c77-91ba-d5708b04221b",
+              "title": "Capture and surface MCP registration error details in init summary",
+              "status": "pending",
+              "level": "task",
+              "description": "In packages/core/claude-integration.js registerMcpServers(), the catch block at line 182 swallows errors silently — it pushes { ok: false } with no reason. Fix: capture the error object in the catch clause, extract stderr or the error message, and include it in the results array (e.g. { name, transport: 'stdio', ok: false, error: msg }). Then in packages/core/assistant-integration.js formatVendorArtifacts() (around line 175), when displaying failed MCP servers, append the error reason so the user sees actionable diagnostics instead of just 'failed to register rex, sourcevision'.",
+              "priority": "medium"
+            },
+            {
+              "id": "4d6d884d-ccfe-4120-bdb9-880866524b6a",
+              "title": "Add test coverage for idempotent MCP registration",
+              "status": "pending",
+              "level": "task",
+              "description": "Add or extend tests in tests/e2e/cli-init.test.js (or a new test file) to verify that: (1) running ndx init twice succeeds without MCP registration errors, (2) the MCP servers are properly registered after init (check claude mcp list output includes rex and sourcevision with stdio transport), (3) if claude CLI is not available the init still completes gracefully. Use the existing test patterns in the e2e test suite.",
+              "priority": "medium"
+            },
+            {
+              "id": "af7e16dc-ae4d-42e3-ab00-e86523d919ed",
+              "title": "De-emphasize non-selected vendor in init summary output",
+              "status": "pending",
+              "level": "task",
+              "priority": "medium",
+              "description": "When the user selects codex as their LLM vendor, the init summary still prominently displays 'Claude Code integration:' with full artifact details, making it look like something went wrong with their codex selection. Fix: in packages/core/assistant-integration.js formatInitReport() (line 119), detect which vendor was selected as the active LLM provider (pass it as an option or read from config) and visually distinguish the primary vendor from secondary assistant surfaces. Options: (1) collapse non-selected vendor to a single compact line like 'Claude Code: synced (6 skills, 2 MCP servers)', (2) reorder so the selected vendor appears first, (3) add a dim/parenthetical note like '(editor integration)' to clarify why the non-selected vendor is being provisioned. The key insight: assistant surface provisioning is independent of LLM vendor selection, but the current output doesn't communicate that distinction."
+            }
+          ]
         }
       ]
     },
