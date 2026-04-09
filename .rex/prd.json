@@ -19261,6 +19261,7 @@
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-04-02T17:55:36.327Z",
+      "completedAt": "2026-04-09T14:26:25.556Z",
       "mergedProposals": [
         {
           "proposalNodeKey": "p0:epic",
@@ -20972,8 +20973,7 @@
           "startedAt": "2026-04-09T14:24:17.627Z",
           "completedAt": "2026-04-09T14:26:25.267Z"
         }
-      ],
-      "completedAt": "2026-04-09T14:26:25.556Z"
+      ]
     },
     {
       "id": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
@@ -25125,7 +25125,7 @@
         {
           "id": "d1d0627e-dc69-4f84-b68b-512bef332fdb",
           "title": "Hench Run-Loop Visual Output Refinements",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Apply consistent semantic color conventions and styled separators to hench's run-loop console output, making task completion states, inter-task pause intervals, and loop-iteration boundaries immediately legible when scanning long run transcripts.",
           "source": "smart-add",
@@ -25179,7 +25179,9 @@
               "completedAt": "2026-04-09T00:10:00.000Z",
               "log": "Added colorPink (magenta/35m) primitive to llm-client help-format.ts and exported through public.ts. Re-exported magenta and colorPink through hench llm-gateway.ts. Added formatLoopIterationSeparator() helper to run.ts that returns 60 × ─ in colorPink. Emits separator at end of each loop iteration (after pause) guarded by isColorEnabled() for full suppression when NO_COLOR=1 or non-TTY. Added 5-case test suite in run-colors.test.ts: magenta ANSI code present under FORCE_COLOR=1, 60-char width under NO_COLOR=1, no ANSI codes under NO_COLOR=1, isColorEnabled()=false under NO_COLOR=1, isColorEnabled()=true under FORCE_COLOR=1."
             }
-          ]
+          ],
+          "startedAt": "2026-04-09T14:32:47.496Z",
+          "completedAt": "2026-04-09T14:36:24.994Z"
         }
       ]
     },
@@ -25480,16 +25482,20 @@
     {
       "id": "b63b4ea4-2086-4b63-8f73-81cb86865618",
       "title": "Hench",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-09T14:32:25.600Z",
+      "completedAt": "2026-04-09T14:32:25.600Z",
       "children": [
         {
           "id": "f5ccc9cc-ad9f-4e44-9f4a-98c43b2f8de3",
           "title": "Hench Run-Loop Visual Output Refinements",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
+          "startedAt": "2026-04-09T14:32:25.306Z",
+          "completedAt": "2026-04-09T14:32:25.306Z",
           "children": [
             {
               "id": "0b9042e1-523e-4fab-aca4-1d89bbb0c6f3",
@@ -25518,7 +25524,7 @@
             {
               "id": "cd39ee5e-585e-49a2-85a1-3b2b77b8f87e",
               "title": "Add regression tests for multi-line scroll window behavior",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "No automated tests currently assert that the rolling window stays within its 10-line bound when multi-line content is injected. Add unit tests that feed synthetic multi-line messages into the window renderer and assert the rendered output line count, plus an integration smoke test that pipes a hench run with known multi-line tool output and counts the terminal rows emitted.",
               "acceptanceCriteria": [
@@ -25534,7 +25540,9 @@
                 "testing",
                 "regression"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-09T14:26:45.181Z",
+              "completedAt": "2026-04-09T14:32:25.014Z"
             }
           ]
         }
