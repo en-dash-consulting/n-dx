@@ -25118,9 +25118,11 @@
     {
       "id": "b38af51b-d290-4b8e-a5c4-a8a77ae2e70d",
       "title": "Hench",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-09T14:36:55.652Z",
+      "completedAt": "2026-04-09T14:36:55.652Z",
       "children": [
         {
           "id": "d1d0627e-dc69-4f84-b68b-512bef332fdb",
@@ -25129,6 +25131,8 @@
           "level": "feature",
           "description": "Apply consistent semantic color conventions and styled separators to hench's run-loop console output, making task completion states, inter-task pause intervals, and loop-iteration boundaries immediately legible when scanning long run transcripts.",
           "source": "smart-add",
+          "startedAt": "2026-04-09T14:32:47.496Z",
+          "completedAt": "2026-04-09T14:36:24.994Z",
           "children": [
             {
               "id": "c5ba3c69-5738-421f-8648-76956e36b869",
@@ -25179,9 +25183,7 @@
               "completedAt": "2026-04-09T00:10:00.000Z",
               "log": "Added colorPink (magenta/35m) primitive to llm-client help-format.ts and exported through public.ts. Re-exported magenta and colorPink through hench llm-gateway.ts. Added formatLoopIterationSeparator() helper to run.ts that returns 60 × ─ in colorPink. Emits separator at end of each loop iteration (after pause) guarded by isColorEnabled() for full suppression when NO_COLOR=1 or non-TTY. Added 5-case test suite in run-colors.test.ts: magenta ANSI code present under FORCE_COLOR=1, 60-char width under NO_COLOR=1, no ANSI codes under NO_COLOR=1, isColorEnabled()=false under NO_COLOR=1, isColorEnabled()=true under FORCE_COLOR=1."
             }
-          ],
-          "startedAt": "2026-04-09T14:32:47.496Z",
-          "completedAt": "2026-04-09T14:36:24.994Z"
+          ]
         }
       ]
     },
@@ -25457,7 +25459,7 @@
             {
               "id": "7a7249e7-1a6b-4e09-bf2c-73a4cea7d4de",
               "title": "Add visual regression snapshot for ndx init dinosaur output",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Without a captured baseline, future changes can silently re-break the dinosaur's proportions. Add a lightweight snapshot test that captures the raw ASCII art string so that any character-level change is caught and requires explicit review. This test should sit alongside the existing init integration tests.",
               "acceptanceCriteria": [
@@ -25473,7 +25475,9 @@
                 "init",
                 "branding"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-09T14:37:54.893Z",
+              "completedAt": "2026-04-09T14:43:13.397Z"
             }
           ]
         }
