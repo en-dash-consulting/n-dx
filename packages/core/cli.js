@@ -35,7 +35,7 @@
  */
 
 import { spawn } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -90,6 +90,7 @@ import {
 // and shared color utilities.
 import { suppressKnownDeprecations, bold, cyan, green, red, yellow, dim } from "@n-dx/llm-client";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
+import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
 
 suppressKnownDeprecations();
 
@@ -216,6 +217,26 @@ let pendingUpdateCheck = null;
 let updateCheckQuiet = false;
 
 /**
+ * Stale-check result set before command dispatch.
+ * null = check not run (init/help/version commands, or quiet mode).
+ * @type {import("./stale-check.js").StaleDetail[] | null}
+ */
+let staleCheckResult = null;
+
+/**
+ * The n-dx version recorded in .n-dx.json at last init, if available.
+ * Used to display "initialized with n-dx X.Y" in the staleness notice.
+ * @type {string | null}
+ */
+let staleCheckInitVersion = null;
+
+/**
+ * Commands that skip the stale check — either they have no project context
+ * (help, version) or they are about to fix staleness (init).
+ */
+const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version"]);
+
+/**
  * On POSIX systems, spawn each child with `detached: true` so it becomes the
  * leader of a new process group.  This lets the process-group-aware tracker
  * kill grandchildren (spawned by the child) by signalling `-pgid` instead of
@@ -252,6 +273,18 @@ async function flushAndExit(code = 0) {
           }
         } catch {
           // Never block exit for update-check errors.
+        }
+      }
+
+      // Show staleness notice when the project setup is incomplete or outdated.
+      // Written to stderr so JSON stdout output stays machine-parseable.
+      if (code === 0 && !updateCheckQuiet && staleCheckResult && staleCheckResult.length > 0) {
+        try {
+          process.stderr.write(
+            formatStalenessNotice(staleCheckResult, { initVersion: staleCheckInitVersion }) + "\n",
+          );
+        } catch {
+          // Never block exit for stale-check display errors.
         }
       }
 
@@ -363,6 +396,29 @@ function readLLMVendor(dir) {
     return vendor === "claude" || vendor === "codex" ? vendor : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Record the current @n-dx/core version in .n-dx.json as `_initVersion`.
+ * Called at the end of `ndx init` so subsequent stale-check runs can
+ * report which version the project was initialized with.
+ * Errors are silently ignored — this is best-effort metadata.
+ *
+ * @param {string} dir  Project root directory.
+ * @param {string} version  Current @n-dx/core version string.
+ */
+function recordInitVersion(dir, version) {
+  const configPath = join(dir, ".n-dx.json");
+  try {
+    let data = {};
+    if (existsSync(configPath)) {
+      try { data = JSON.parse(readFileSync(configPath, "utf-8")); } catch { /* ignore */ }
+    }
+    data._initVersion = version;
+    writeFileSync(configPath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+  } catch {
+    // Non-fatal — failure to record version doesn't affect init outcome.
   }
 }
 
@@ -668,6 +724,10 @@ async function handleInit(rest) {
         if (inkResult.error) console.error(inkResult.error);
         exitWithCleanup(1);
       }
+      try {
+        const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+        recordInitVersion(dir, version);
+      } catch { /* non-fatal */ }
       exitWithCleanup(0);
     }
   }
@@ -723,6 +783,12 @@ async function handleInit(rest) {
       claudeSummary = `${result.skills.written} skills, ${result.settings.total} permissions`;
     } catch { /* skip */ }
   }
+
+  // Record the current n-dx version so future stale-check runs can report it.
+  try {
+    const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+    recordInitVersion(dir, version);
+  } catch { /* non-fatal */ }
 
   if (quiet) {
     console.log("n-dx initialized");
@@ -1484,6 +1550,25 @@ async function main() {
   const dir = resolveDir(rest);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+
+  // ── Stale-project detection (synchronous) ───────────────────────────────
+  // Run before command dispatch so the notice can be shown after output.
+  // Skipped for init (about to fix staleness), help, version, and quiet mode.
+  if (!updateCheckQuiet && command && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp) {
+    try {
+      staleCheckResult = checkProjectStaleness(dir);
+      // Read the recorded init version from .n-dx.json for the notice message.
+      try {
+        const ndxConfig = join(dir, ".n-dx.json");
+        if (existsSync(ndxConfig)) {
+          const cfg = JSON.parse(readFileSync(ndxConfig, "utf-8"));
+          staleCheckInitVersion = typeof cfg._initVersion === "string" ? cfg._initVersion : null;
+        }
+      } catch { /* ignore */ }
+    } catch {
+      // Non-fatal — stale check failure never blocks command execution.
+    }
+  }
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {
