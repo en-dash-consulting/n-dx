@@ -126,7 +126,7 @@ ndx hench <command> [args]
 ndx sourcevision <command> [args]
 ndx sv <command> [args]           # alias for sourcevision
 
-# Standalone binaries (also available after pnpm link --global)
+# Standalone binaries (also available after npm link)
 rex <command> [args]
 hench <command> [args]
 sourcevision <command> [args]

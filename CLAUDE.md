@@ -222,16 +222,6 @@ pnpm typecheck      # typecheck all packages
 
 Re-run `ndx init` to regenerate all instruction files after changes to `assistant-assets/`.
 
-### Pre-push CI preflight
-
-Before pushing, run `pnpm preflight` to mirror the full CI pipeline locally:
-
-```sh
-pnpm preflight      # build → typecheck → docs:build → pr-check → test → changeset check
-```
-
-This runs every step from `.github/workflows/ci.yml` in order and stops on first failure. **Always run this before declaring a branch ready to push** — partial checks (e.g. only `pnpm test`) miss issues like dead docs links or missing changesets that will fail CI.
-
 ## Command Aliases
 
 Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
@@ -271,7 +261,7 @@ ndx hench <command> [args]
 ndx sourcevision <command> [args]
 ndx sv <command> [args]           # alias for sourcevision
 
-# Standalone binaries (also available after pnpm link --global)
+# Standalone binaries (also available after npm link)
 rex <command> [args]
 hench <command> [args]
 sourcevision <command> [args]
@@ -374,16 +364,6 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 6. `ndx status .` — check progress
 
 Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `ndx start stop .` to stop.
-
-### Git workflow
-
-Local development uses `en-dash-consulting/n-dx-internal` (the `origin` remote) — all branches are created and pushed there. The public repo `en-dash-consulting/n-dx` (the `upstream` remote) only receives changes via cross-fork pull requests. Never push branches directly to upstream.
-
-```sh
-git push -u origin <branch>                          # push to n-dx-internal
-gh pr create --repo en-dash-consulting/n-dx \         # PR targets upstream
-  --head en-dash-consulting:<branch> --base main
-```
 
 ## Key Files
 

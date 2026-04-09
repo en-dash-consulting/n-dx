@@ -19257,10 +19257,11 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-04-02T17:55:36.327Z",
+      "completedAt": "2026-04-09T21:58:12.523Z",
       "mergedProposals": [
         {
           "proposalNodeKey": "p0:epic",
@@ -20921,7 +20922,7 @@
         {
           "id": "dcf6018e-e658-4708-ae6e-1bd23431748f",
           "title": "Auto-Update Detection from npm Registry",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Automatically detect when a newer version of n-dx is available on the npm registry and notify the user non-intrusively after command output. Cache the check with a 24-hour TTL to avoid repeated network calls.",
           "acceptanceCriteria": [
@@ -20936,12 +20937,14 @@
             "cli",
             "ux"
           ],
-          "source": "conversation"
+          "source": "conversation",
+          "startedAt": "2026-04-09T21:20:35.164Z",
+          "completedAt": "2026-04-09T21:37:39.977Z"
         },
         {
           "id": "013bc11c-ec20-4ac2-8463-9c17adf31fe4",
           "title": "Auto Re-Init Detection for Stale Projects",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Detect when a project's n-dx setup is stale or incomplete and suggest re-initialization. Check for missing directories, schema version mismatches, and missing config keys from newer versions.",
           "acceptanceCriteria": [
@@ -20959,42 +20962,66 @@
           "source": "conversation",
           "blockedBy": [
             "dcf6018e-e658-4708-ae6e-1bd23431748f"
-          ]
+          ],
+          "startedAt": "2026-04-09T21:44:44.254Z",
+          "completedAt": "2026-04-09T21:58:12.050Z"
         },
         {
           "id": "6da267b9-d888-42e2-aecb-9b112f60ed84",
           "title": "Fix MCP server re-registration during ndx init",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "priority": "high",
+          "startedAt": "2026-04-09T21:10:06.271Z",
+          "completedAt": "2026-04-09T21:43:39.667Z",
           "children": [
             {
               "id": "fa0a2b37-5288-42aa-8b20-1b2ad6beb0fb",
               "title": "Remove existing MCP server before re-adding in registerMcpServers",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "priority": "high"
+              "priority": "high",
+              "startedAt": "2026-04-09T20:14:34.193Z",
+              "completedAt": "2026-04-09T20:37:10.425Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Upgraded registerMcpServers to remove MCP servers from all three scopes (local, project, user) before re-adding, making ndx init fully idempotent."
             },
             {
               "id": "838b5702-f1cd-4839-a882-d2b135176d0a",
               "title": "Capture and surface MCP registration error details in init summary",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-04-09T20:51:37.145Z",
+              "completedAt": "2026-04-09T21:00:28.547Z"
             },
             {
               "id": "1809164d-c3be-4c8b-95c0-d8d29d2c87c1",
               "title": "Add test coverage for idempotent MCP registration",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-04-09T20:44:05.570Z",
+              "completedAt": "2026-04-09T20:50:08.538Z"
             },
             {
               "id": "a9963fc8-717c-4d96-ab05-e4332cc42d65",
               "title": "De-emphasize non-selected vendor in init summary output",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "priority": "medium"
+              "priority": "medium",
+              "startedAt": "2026-04-09T21:01:10.969Z",
+              "completedAt": "2026-04-09T21:09:31.766Z"
+            },
+            {
+              "id": "2f718148-1812-4472-99bb-56b0396057a8",
+              "title": "Show trex mascot banner on every ndx init invocation",
+              "status": "completed",
+              "level": "task",
+              "description": "In packages/core/cli.js, the showInitBanner() call (line 752) is gated behind 'if (resolution.needsProviderPrompt)', meaning the trex mascot banner from cli-brand.js only appears on first-time init when no provider is configured. Move the showInitBanner() call outside the conditional so it runs unconditionally at the start of handleInit(), before the LLM selection flow. The banner is defined in packages/core/cli-brand.js formatInitBanner() and renders the pixel-art trex mascot.",
+              "priority": "medium",
+              "startedAt": "2026-04-09T21:38:43.676Z",
+              "completedAt": "2026-04-09T21:43:39.451Z"
             }
           ]
         }
