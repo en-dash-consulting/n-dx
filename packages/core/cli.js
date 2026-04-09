@@ -87,8 +87,6 @@ import {
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
 
-suppressKnownDeprecations();
-
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
 
@@ -184,6 +182,8 @@ function green(text) {
 function red(text) {
   return ansi("31", text, "39");
 }
+
+suppressKnownDeprecations();
 
 /**
  * Resolve a package's CLI entry point.
