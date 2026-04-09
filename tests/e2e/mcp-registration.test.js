@@ -73,10 +73,16 @@ describe("registerMcpServers idempotent removal pattern (source)", () => {
     // Removal should not leak output to the terminal
     const fnStart = SRC.indexOf("function registerMcpServers");
     const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
-    // Both remove and add calls should use stdio: "ignore"
+    // Removal calls use stdio: "ignore" (at least 1 for the remove loop)
     const ignoreCount = (fnBody.match(/stdio:\s*"ignore"/g) || []).length;
-    // At least 2: one in the removal try, one in the add try
-    expect(ignoreCount).toBeGreaterThanOrEqual(2);
+    expect(ignoreCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("add command uses stdio: 'pipe' to capture error details", () => {
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    // The add call uses stdio: "pipe" so stderr is available on failure
+    expect(fnBody).toMatch(/claude mcp add[\s\S]*?stdio:\s*"pipe"/);
   });
 });
 
@@ -217,6 +223,79 @@ describe("setupClaudeIntegration is idempotent", () => {
     const first = setupClaudeIntegration(tmpDir);
     const second = setupClaudeIntegration(tmpDir);
     expect(first.instructions.written).toBe(second.instructions.written);
+  });
+});
+
+// ── Source-level: error detail capture ────────────────────────────────────────
+
+describe("registerMcpServers error detail capture (source)", () => {
+  it("uses stdio: 'pipe' for the add command to capture stderr", () => {
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    // The add call should use stdio: "pipe" to capture stderr on failure
+    expect(fnBody).toMatch(/claude mcp add[\s\S]*?stdio:\s*"pipe"/);
+  });
+
+  it("catches the error object in the add call", () => {
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    // Should catch the error as a named variable, not a bare catch
+    expect(fnBody).toMatch(/\}\s*catch\s*\(\s*\w+\s*\)/);
+  });
+
+  it("includes an error field in the result when add fails", () => {
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    // The failed result should include an error property
+    expect(fnBody).toMatch(/ok:\s*false,\s*error:/);
+  });
+
+  it("defines extractExecError helper for error message extraction", () => {
+    expect(SRC).toContain("function extractExecError");
+  });
+
+  it("extractExecError prefers stderr over error.message", () => {
+    const fnStart = SRC.indexOf("function extractExecError");
+    const fnEnd = SRC.indexOf("\n}", fnStart);
+    const fnBody = SRC.slice(fnStart, fnEnd + 2);
+    // stderr check should come before message check
+    const stderrIdx = fnBody.indexOf("err.stderr");
+    const messageIdx = fnBody.indexOf("err.message");
+    expect(stderrIdx).toBeLessThan(messageIdx);
+  });
+});
+
+// ── Behavioral: error field in result shape ──────────────────────────────────
+
+describe("registerMcpServers error field in result", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "ndx-mcp-err-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("failed server entries include a string error field", () => {
+    const result = setupClaudeIntegration(tmpDir);
+    if (!result.mcp.registered) return; // skip when CLI absent
+    const failed = result.mcp.servers.filter((s) => !s.ok);
+    for (const entry of failed) {
+      expect(entry).toHaveProperty("error");
+      expect(typeof entry.error).toBe("string");
+      expect(entry.error.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("successful server entries do not have an error field", () => {
+    const result = setupClaudeIntegration(tmpDir);
+    if (!result.mcp.registered) return;
+    const ok = result.mcp.servers.filter((s) => s.ok);
+    for (const entry of ok) {
+      expect(entry.error).toBeUndefined();
+    }
   });
 });
 

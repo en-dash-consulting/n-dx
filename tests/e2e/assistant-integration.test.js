@@ -312,6 +312,104 @@ describe("formatInitReport", () => {
   });
 });
 
+// ── formatInitReport() error detail surfacing ────────────────────────────────
+
+describe("formatInitReport error surfacing", () => {
+  it("shows vendor-level error reason when setup fails", () => {
+    const results = {
+      claude: {
+        summary: "skipped (setup failed)",
+        label: "Claude Code",
+        skipped: true,
+        error: "ENOENT: no such file or directory",
+      },
+    };
+    const lines = formatInitReport(results);
+    const joined = lines.join("\n");
+    expect(joined).toContain("skipped (setup failed)");
+    expect(joined).toContain("reason: ENOENT: no such file or directory");
+  });
+
+  it("does not show reason line when skipped vendor has no error", () => {
+    const results = {
+      claude: {
+        summary: "skipped (--no-claude)",
+        label: "Claude Code",
+        skipped: true,
+      },
+    };
+    const lines = formatInitReport(results);
+    const joined = lines.join("\n");
+    expect(joined).not.toContain("reason:");
+  });
+
+  it("includes MCP server error details in verbose artifact lines", () => {
+    const results = {
+      claude: {
+        summary: "CLAUDE.md, 12 skills, 18 permissions",
+        label: "Claude Code",
+        skipped: false,
+        detail: {
+          instructions: { written: true },
+          skills: { written: 12 },
+          settings: { added: 0, total: 18 },
+          mcp: {
+            registered: true,
+            servers: [
+              { name: "rex", transport: "stdio", ok: false, error: "server already exists" },
+              { name: "sourcevision", transport: "stdio", ok: false, error: "binary not found" },
+            ],
+          },
+        },
+      },
+    };
+    const lines = formatInitReport(results);
+    const joined = lines.join("\n");
+    expect(joined).toContain("rex (server already exists)");
+    expect(joined).toContain("sourcevision (binary not found)");
+  });
+
+  it("shows only names for failed servers without error details", () => {
+    const results = {
+      claude: {
+        summary: "CLAUDE.md, 12 skills, 18 permissions",
+        label: "Claude Code",
+        skipped: false,
+        detail: {
+          instructions: { written: true },
+          skills: { written: 12 },
+          settings: { added: 0, total: 18 },
+          mcp: {
+            registered: true,
+            servers: [
+              { name: "rex", transport: "stdio", ok: false },
+            ],
+          },
+        },
+      },
+    };
+    const lines = formatInitReport(results);
+    const joined = lines.join("\n");
+    expect(joined).toContain("MCP servers — failed: rex");
+    // No parenthetical detail
+    expect(joined).not.toContain("rex (");
+  });
+});
+
+// ── setupAssistantIntegrations() error capture ────────────────────────────────
+
+describe("setupAssistantIntegrations error capture (source)", () => {
+  const src = readFileSync(join(ROOT, "packages/core/assistant-integration.js"), "utf-8");
+
+  it("catches setup errors as a named variable", () => {
+    expect(src).toMatch(/\}\s*catch\s*\(\s*\w+\s*\)/);
+  });
+
+  it("includes error field in the failure result", () => {
+    expect(src).toMatch(/error:\s*\w+\.message/);
+  });
+});
+
 // ── cli.js uses assistant-integration.js ────────────────────────────────────
 
 describe("cli.js uses assistant-neutral orchestration", () => {

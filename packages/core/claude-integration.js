@@ -157,6 +157,25 @@ function writeClaudeMd(dir) {
 // ── MCP registration ──────────────────────────────────────────────────────────
 
 /**
+ * Extract a concise, human-readable error message from an execSync failure.
+ *
+ * Prefers stderr (the most informative source for CLI failures), then falls
+ * back to the first line of the exception message.
+ */
+function extractExecError(err) {
+  if (err.stderr && err.stderr.length > 0) {
+    const msg = err.stderr.toString().trim();
+    // Return first non-empty line — avoids multi-line stack traces
+    const firstLine = msg.split("\n").find((l) => l.trim()) || msg;
+    return firstLine;
+  }
+  if (err.message) {
+    return err.message.split("\n")[0];
+  }
+  return "unknown error";
+}
+
+/**
  * Register MCP servers with Claude Code CLI (best-effort).
  * Prefers HTTP transport if the web server is running, falls back to stdio.
  */
@@ -185,11 +204,11 @@ function registerMcpServers(dir) {
     try {
       execSync(
         `claude mcp add ${name} -- node "${bin}" ${descriptor.mcpCommand} "${absDir}"`,
-        { stdio: "ignore", timeout: 10_000 },
+        { stdio: "pipe", timeout: 10_000 },
       );
       results.push({ name, transport: "stdio", ok: true });
-    } catch {
-      results.push({ name, transport: "stdio", ok: false });
+    } catch (e) {
+      results.push({ name, transport: "stdio", ok: false, error: extractExecError(e) });
     }
   }
 
@@ -262,7 +281,10 @@ export function printClaudeSetupSummary(result) {
       console.log(`  MCP servers: registered ${ok.map((s) => s.name).join(", ")} (${ok[0].transport})`);
     }
     if (failed.length > 0) {
-      console.log(`  MCP servers: failed to register ${failed.map((s) => s.name).join(", ")}`);
+      const detail = failed
+        .map((s) => (s.error ? `${s.name} (${s.error})` : s.name))
+        .join(", ");
+      console.log(`  MCP servers: failed to register ${detail}`);
     }
   }
 }

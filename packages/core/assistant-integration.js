@@ -88,11 +88,12 @@ export function setupAssistantIntegrations(dir, enabled = {}) {
         detail,
         skipped: false,
       };
-    } catch {
+    } catch (e) {
       results[vendor] = {
         summary: "skipped (setup failed)",
         label: entry.label,
         skipped: true,
+        error: e.message || String(e),
       };
     }
   }
@@ -126,6 +127,9 @@ export function formatInitReport(results, opts = {}) {
     if (result.skipped || !verbose || !result.detail) {
       // Compact single-line form (skipped vendors or non-verbose mode)
       lines.push(`    ${label}${result.summary}`);
+      if (result.error) {
+        lines.push(`      reason: ${result.error}`);
+      }
       continue;
     }
 
@@ -173,7 +177,10 @@ function formatVendorArtifacts(vendor, detail) {
           lines.push(`MCP servers — ${ok.map((s) => s.name).join(", ")} (${ok[0].transport})`);
         }
         if (failed.length > 0) {
-          lines.push(`MCP servers — failed: ${failed.map((s) => s.name).join(", ")}`);
+          const failDetail = failed
+            .map((s) => (s.error ? `${s.name} (${s.error})` : s.name))
+            .join(", ");
+          lines.push(`MCP servers — failed: ${failDetail}`);
         }
       }
     }
