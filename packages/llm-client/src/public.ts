@@ -234,6 +234,18 @@ export {
   formatTypoSuggestion,
 } from "./suggest.js";
 
+// Verbosity-aware prompt renderer
+export {
+  renderPrompt,
+  applyCompactStyle,
+  estimateTokenCount,
+} from "./prompt-renderer.js";
+
+export type {
+  PromptVerbosity,
+  PromptRenderOptions,
+} from "./prompt-renderer.js";
+
 // CLI help formatting
 export {
   isColorEnabled,

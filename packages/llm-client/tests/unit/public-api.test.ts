@@ -69,10 +69,17 @@ import type {
   UsageDefinition,
   // provider-registry.ts
   ProviderFactory,
+  // prompt-renderer.ts
+  PromptVerbosity,
+  PromptRenderOptions,
 } from "../../src/public.js";
 
 // Value imports (present at runtime; used directly in assertions below).
 import {
+  // prompt-renderer.ts
+  renderPrompt,
+  applyCompactStyle,
+  estimateTokenCount,
   // types.ts — error classes
   ClaudeClientError,
   CLIError,
@@ -430,6 +437,40 @@ describe("public API — help formatting exports", () => {
 
   it("exports formatUsage as a function", () => {
     expect(typeof formatUsage).toBe("function");
+  });
+});
+
+// ── Prompt renderer exports ────────────────────────────────────────────────
+
+describe("public API — prompt renderer exports", () => {
+  it("exports renderPrompt as a function", () => {
+    expect(typeof renderPrompt).toBe("function");
+  });
+
+  it("exports applyCompactStyle as a function", () => {
+    expect(typeof applyCompactStyle).toBe("function");
+  });
+
+  it("exports estimateTokenCount as a function", () => {
+    expect(typeof estimateTokenCount).toBe("function");
+  });
+
+  it("renderPrompt is callable with compact verbosity", () => {
+    const result = renderPrompt("Hello {{name}}.", {
+      verbosity: "compact" satisfies PromptVerbosity,
+      params: { name: "world" },
+    });
+    expect(result).toBe("Hello world.");
+  });
+
+  it("renderPrompt is callable with verbose verbosity", () => {
+    const result = renderPrompt("Hello.", { verbosity: "verbose" satisfies PromptVerbosity });
+    expect(result).toBe("Hello.");
+  });
+
+  it("PromptRenderOptions type is usable", () => {
+    const opts: PromptRenderOptions = { verbosity: "compact", params: { x: "1" } };
+    expect(opts.verbosity).toBe("compact");
   });
 });
 
