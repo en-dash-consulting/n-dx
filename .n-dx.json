@@ -103,5 +103,6 @@
         "web-build-tooling": "infrastructure"
       }
     }
-  }
+  },
+  "_initVersion": "0.2.2"
 }

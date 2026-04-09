@@ -25561,21 +25561,25 @@
     {
       "id": "ec3d96fd-86fd-43d3-845a-418c50058849",
       "title": "Hench",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-09T15:15:23.076Z",
+      "completedAt": "2026-04-09T15:15:23.076Z",
       "children": [
         {
           "id": "f505bbac-616d-43fd-8b5f-33aac47cb79f",
           "title": "Hench Run-Loop Visual Output Refinements",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
+          "startedAt": "2026-04-09T15:15:22.844Z",
+          "completedAt": "2026-04-09T15:15:22.844Z",
           "children": [
             {
               "id": "67886370-b75c-4e7a-ad8c-2a66b4f281a9",
               "title": "Apply cyan color to agent text and task separator line in hench run output",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Color the agent narrative text (lines emitted by the agent during a run) and the '_____ Task _____' separator line in cyan. No other existing color assignments should change — this is a targeted addition to the existing semantic color scheme established for hench run-loop output.",
               "acceptanceCriteria": [
@@ -25592,6 +25596,8 @@
                 "color"
               ],
               "source": "smart-add",
+              "startedAt": "2026-04-09T15:07:06.601Z",
+              "completedAt": "2026-04-09T15:15:22.555Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "content_overlap",
@@ -25601,8 +25607,85 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-04-09T13:55:05.624Z"
-              },
-              "startedAt": "2026-04-09T15:07:06.601Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "624c6516-0082-4328-89f3-d1e0cb5aeb10",
+      "title": "CLI & Developer Tools",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "6db5328c-2df6-437a-80a1-771fa55401a5",
+          "title": "Dinosaur Animation Frame Sequence Correction",
+          "status": "pending",
+          "level": "feature",
+          "description": "The ndx init dinosaur animation sequence is incorrect. Rex-F.png must be the canonical first frame, and each subsequent animation frame must be derived from the closest available reference image to Rex-F.png rather than being independently invented.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "536c72d7-d8d3-410b-8710-67e24e330690",
+              "title": "Audit current animation frames against Rex-F.png and identify divergences",
+              "status": "pending",
+              "level": "task",
+              "description": "Render each current ASCII animation frame side-by-side with Rex-F.png to document exactly where the existing sequence diverges from the reference. Identify which frames are misaligned in proportions, pose, or character anatomy. Produce a written frame-by-frame audit that will drive the subsequent correction work.",
+              "acceptanceCriteria": [
+                "Every current animation frame is compared against Rex-F.png and differences are documented",
+                "Audit output identifies which frames require redrawing vs minor adjustment",
+                "Audit is committed as a markdown or inline comment artifact so future contributors can reference it"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "animation",
+                "ascii-art"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "42b353ce-031b-4c72-bca3-64983608a8fb",
+              "title": "Establish Rex-F.png as the canonical first animation frame",
+              "status": "in_progress",
+              "level": "task",
+              "description": "Redraw the first ASCII animation frame so it faithfully represents Rex-F.png's proportions, silhouette, and key anatomical landmarks (head, body, tail, limbs). The existing snapshot test must be updated to reflect the corrected frame. This is the reference anchor all subsequent frames are measured against.",
+              "acceptanceCriteria": [
+                "Frame 0 of the animation matches Rex-F.png proportions as verified by visual inspection",
+                "Existing snapshot test for the dinosaur ASCII art is updated to match the corrected frame 0",
+                "No other animation frames are changed in this task"
+              ],
+              "priority": "critical",
+              "tags": [
+                "cli",
+                "animation",
+                "ascii-art"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T15:39:17.409Z"
+            },
+            {
+              "id": "3788d2a4-0d5d-410b-81e6-0854bceb1510",
+              "title": "Source subsequent animation frames from nearest reference images and update sequence",
+              "status": "pending",
+              "level": "task",
+              "description": "Locate reference images in the repository (e.g. packages/rex/) that are most visually similar to Rex-F.png in pose progression, then use them as the basis for each remaining animation frame. For any frame with no close reference image, derive the pose by interpolating logically from Rex-F.png rather than reinventing the character. Update the animation array in code with the corrected frame sequence and update or add snapshot tests covering the full sequence.",
+              "acceptanceCriteria": [
+                "Each subsequent animation frame traces back to a specific reference image or a documented interpolation decision from Rex-F.png",
+                "The full animation sequence plays without regressing back to old incorrect frames",
+                "Snapshot tests cover all animation frames and pass",
+                "A comment in the animation source lists the reference image (filename or 'interpolated from Rex-F.png') used for each frame"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "animation",
+                "ascii-art"
+              ],
+              "source": "smart-add"
             }
           ]
         }

@@ -89,10 +89,12 @@ const DINO_BODY_PIXELS = `000000002222222200000000
 000000021111200000000000`;
 
 const DINO_LEGS = [
+  // Frame 0 — reference: packages/rex/Rex-F.png (canonical frame; legs spread, feet lifted mid-stride — ▀ at tips)
   `000000021100002110000000
 000000021000002100000000`,
-  `000000002121000000000000
-000000002121000000000000`,
+  // Frame 1 — reference: packages/rex/Rex.png (stride phase 2; same leg positions, feet planted on ground — ▄ at tips)
+  `000000021000002100000000
+000000021100002110000000`,
 ];
 
 // True-color ANSI codes for the shaded palette
@@ -136,12 +138,26 @@ const QUADRANT_BODY = [
   " ▝▜███████████▘",
   "   ▝▜███▘  ▜██▀",
 ];
+// Frame 0 — reference: packages/rex/Rex-F.png (legs in stride, feet mid-air — ▐▌ open form)
+// Frame 1 — reference: packages/rex/Rex.png (left leg fully planted — █ solid; right leg in stride)
 const QUADRANT_LEGS = [["      ▐▌    ▐▌"], ["      █     ▐▌"]];
 
 /** Static mascot string for non-TTY / test use (monochrome quadrant fallback). */
 export function getMascot() {
   return [...QUADRANT_BODY, ...QUADRANT_LEGS[0]].map((l) => purple(l)).join("\n");
 }
+
+/**
+ * All animation frames of the mascot (monochrome quadrant fallback).
+ * Frame index corresponds to QUADRANT_LEGS index.
+ */
+export function getMascotFrames() {
+  return QUADRANT_LEGS.map((legs) =>
+    [...QUADRANT_BODY, ...legs].map((l) => purple(l)).join("\n"),
+  );
+}
+
+export { QUADRANT_LEGS };
 
 // ── Spinner ────────────────────────────────────────────────────────────
 

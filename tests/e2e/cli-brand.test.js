@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { getMascot, resetColorCache } from "../../packages/core/cli-brand.js";
+import { getMascot, getMascotFrames, resetColorCache } from "../../packages/core/cli-brand.js";
 
 describe("ndx init dinosaur ASCII art", () => {
   let savedNoColor;
@@ -37,6 +37,37 @@ describe("ndx init dinosaur ASCII art", () => {
  ▝▜███████████▘
    ▝▜███▘  ▜██▀
       ▐▌    ▐▌"
+`);
+  });
+
+  it("all animation frames match committed snapshots", () => {
+    const frames = getMascotFrames();
+    expect(frames).toHaveLength(2);
+
+    // Frame 0 — reference: packages/rex/Rex-F.png (feet lifted, ▐▌ open form)
+    expect(frames[0]).toMatchInlineSnapshot(`
+"          ▗████▖
+         ▗████▜▝
+         ▟████▛▘
+        ▟█████▌
+ ▜▖  ▗▟████████▌
+ ▐████████████▛▘
+ ▝▜███████████▘
+   ▝▜███▘  ▜██▀
+      ▐▌    ▐▌"
+`);
+
+    // Frame 1 — reference: packages/rex/Rex.png (left leg planted █, right leg in stride ▐▌)
+    expect(frames[1]).toMatchInlineSnapshot(`
+"          ▗████▖
+         ▗████▜▝
+         ▟████▛▘
+        ▟█████▌
+ ▜▖  ▗▟████████▌
+ ▐████████████▛▘
+ ▝▜███████████▘
+   ▝▜███▘  ▜██▀
+      █     ▐▌"
 `);
   });
 });

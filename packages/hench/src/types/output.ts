@@ -244,9 +244,13 @@ export function stream(label: string, text: string): void {
   const rawLine = `  ${bracket}${padding} ${text}`;
 
   if (isRollingMode()) {
-    // Wrap the entire formatted line in colorDim so the rolling window
-    // reads as a uniform grey band, indicating "live streaming in progress".
-    const displayLine = colorDim(`  ${coloredBracket}${padding} ${coloredText}`);
+    // Agent lines keep their normal colors (yellow bracket, cyan body) so agent
+    // voice remains readable during live streaming. Other labels are dimmed to
+    // form the muted grey background band for tool noise.
+    const displayLine =
+      label === "Agent"
+        ? `  ${coloredBracket}${padding} ${coloredText}`
+        : colorDim(`  ${coloredBracket}${padding} ${coloredText}`);
     _pushWindowLine(displayLine, rawLine);
   } else {
     console.log(`  ${coloredBracket}${padding} ${coloredText}`);
