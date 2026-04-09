@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const isWin = process.platform === "win32";
 
@@ -46,6 +46,26 @@ function run(args, opts = {}) {
     timeout: 10000,
     ...opts,
   });
+}
+
+/**
+ * Run a config command and return both stdout and stderr.
+ * Unlike `run`, this does not throw on non-zero exit codes — callers
+ * should check `result.status` if they care about the exit code.
+ *
+ * @param {string[]} args
+ * @returns {{ stdout: string; stderr: string; status: number }}
+ */
+function runCaptureBoth(args) {
+  const result = spawnSync("node", [CLI_PATH, "config", ...args], {
+    encoding: "utf-8",
+    timeout: 10000,
+  });
+  return {
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+    status: result.status ?? 0,
+  };
 }
 
 function runFail(args) {
@@ -1131,6 +1151,66 @@ describe("n-dx config", () => {
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  // ── Prompts verbosity config ──────────────────────────────────────────────
+
+  describe("prompts.verbosity config", () => {
+    it("sets prompts.verbosity to verbose in .n-dx.json", async () => {
+      const result = runCaptureBoth(["prompts.verbosity", "verbose", tmpDir]);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("prompts.verbosity = verbose");
+
+      const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(ndxConfig.prompts.verbosity).toBe("verbose");
+    });
+
+    it("prints token-cost warning to stderr when switching to verbose", () => {
+      const result = runCaptureBoth(["prompts.verbosity", "verbose", tmpDir]);
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain("20\u201340%");
+      expect(result.stderr).toContain("more tokens");
+    });
+
+    it("token-cost warning mentions compact as recommended", () => {
+      const result = runCaptureBoth(["prompts.verbosity", "verbose", tmpDir]);
+      expect(result.stderr).toContain("compact");
+      expect(result.stderr).toContain("recommended");
+    });
+
+    it("does not print warning when setting to compact", () => {
+      // First switch to verbose to produce the warning
+      runCaptureBoth(["prompts.verbosity", "verbose", tmpDir]);
+      // Then revert to compact — no warning expected
+      const result = runCaptureBoth(["prompts.verbosity", "compact", tmpDir]);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("prompts.verbosity = compact");
+      expect(result.stderr).not.toContain("more tokens");
+    });
+
+    it("sets prompts.verbosity to compact without a warning", async () => {
+      const result = runCaptureBoth(["prompts.verbosity", "compact", tmpDir]);
+      expect(result.status).toBe(0);
+      const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(ndxConfig.prompts.verbosity).toBe("compact");
+      expect(result.stderr).not.toContain("more tokens");
+    });
+
+    it("rejects invalid verbosity values", () => {
+      const stderr = runFail(["prompts.verbosity", "ultra", tmpDir]);
+      expect(stderr).toContain("Invalid verbosity");
+    });
+
+    it("reads verbosity after setting it", () => {
+      runCaptureBoth(["prompts.verbosity", "verbose", tmpDir]);
+      const output = run(["prompts.verbosity", tmpDir]);
+      expect(output.trim()).toBe("verbose");
+    });
+
+    it("documents prompts.verbosity in --help output", () => {
+      const output = run(["--help"]);
+      expect(output).toContain("prompts.verbosity");
     });
   });
 });

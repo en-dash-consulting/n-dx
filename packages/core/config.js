@@ -1161,6 +1161,15 @@ async function handleSetProjectSection(
   }
 
   await saveProjectJSON(configPath, current);
+
+  // Token-cost warning when enabling verbose prompts
+  if (pkg === "prompts" && settingPath === "verbosity" && coerced === "verbose") {
+    console.warn(
+      "⚠  Warning: verbose prompts use 20–40% more tokens per run than compact (the default).\n" +
+      "   Compact is recommended for cost control. To switch back: ndx config prompts.verbosity compact",
+    );
+  }
+
   console.log(`${keyArg} = ${formatValue(coerced)}`);
 }
 

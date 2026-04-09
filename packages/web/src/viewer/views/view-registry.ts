@@ -52,6 +52,7 @@ import {
   IntegrationConfigView,
   FeatureTogglesView,
   CliTimeoutsView,
+  PromptVerbosityView,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -148,6 +149,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "cli-timeouts": () =>
     h(CliTimeoutsView, null),
+
+  "prompt-verbosity": () =>
+    h(PromptVerbosityView, null),
 };
 
 /** Render the view identified by `view` using props from `ctx`. */
@@ -166,7 +170,7 @@ const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
 };
 
 /** Cross-cutting views available in all scopes. */
-const CROSS_CUTTING_VIEWS: ViewId[] = ["token-usage", "feature-toggles", "cli-timeouts"];
+const CROSS_CUTTING_VIEWS: ViewId[] = ["token-usage", "feature-toggles", "cli-timeouts", "prompt-verbosity"];
 
 const ALL_VIEWS = new Set<ViewId>([...Object.values(VIEWS_BY_SCOPE).flat(), ...CROSS_CUTTING_VIEWS] as ViewId[]);
 

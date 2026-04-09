@@ -28,6 +28,7 @@ import { handleNotionRoute } from "./routes-notion.js";
 import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
+import { handlePromptVerbosityRoute } from "./routes-prompt-verbosity.js";
 import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
 import { ALL_DATA_FILES } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
@@ -476,6 +477,7 @@ async function handleApiRoutes(
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleIntegrationRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
+  if (await handlePromptVerbosityRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleRexRoute(req, res, ctx, ws.broadcast))) return true;

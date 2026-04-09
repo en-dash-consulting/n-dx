@@ -19257,10 +19257,11 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-04-02T17:55:36.327Z",
+      "completedAt": "2026-04-09T17:41:09.708Z",
       "mergedProposals": [
         {
           "proposalNodeKey": "p0:epic",
@@ -20921,7 +20922,7 @@
         {
           "id": "dcf6018e-e658-4708-ae6e-1bd23431748f",
           "title": "Auto-Update Detection from npm Registry",
-          "status": "in_progress",
+          "status": "completed",
           "level": "feature",
           "description": "Automatically detect when a newer version of n-dx is available on the npm registry and notify the user non-intrusively after command output. Cache the check with a 24-hour TTL to avoid repeated network calls.",
           "acceptanceCriteria": [
@@ -20937,12 +20938,13 @@
             "ux"
           ],
           "source": "conversation",
-          "startedAt": "2026-04-09T16:57:10.926Z"
+          "startedAt": "2026-04-09T16:57:10.926Z",
+          "completedAt": "2026-04-09T17:32:52.679Z"
         },
         {
           "id": "013bc11c-ec20-4ac2-8463-9c17adf31fe4",
           "title": "Auto Re-Init Detection for Stale Projects",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Detect when a project's n-dx setup is stale or incomplete and suggest re-initialization. Check for missing directories, schema version mismatches, and missing config keys from newer versions.",
           "acceptanceCriteria": [
@@ -20960,7 +20962,9 @@
           "source": "conversation",
           "blockedBy": [
             "dcf6018e-e658-4708-ae6e-1bd23431748f"
-          ]
+          ],
+          "startedAt": "2026-04-09T17:32:55.241Z",
+          "completedAt": "2026-04-09T17:41:09.540Z"
         }
       ]
     },
@@ -24209,7 +24213,7 @@
             {
               "id": "47bf2bb3-6c85-4008-bbb3-0bb54928bbc5",
               "title": "Implement token-cost warning on verbose mode activation and expose toggle in web settings UI",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "When a user enables verbose mode — via `ndx config prompts.verbosity verbose` or the web settings panel — display a prominent warning that verbose prompts consume significantly more tokens than the compact default and that compact is recommended for cost control. The warning must appear at the point of activation. Add a Prompt Verbosity section to the web settings panel with compact/verbose toggle, inline warning callout, and persistence via the config API endpoint.",
               "acceptanceCriteria": [
@@ -24228,7 +24232,8 @@
                 "ux",
                 "token-optimization"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:41:12.251Z"
             }
           ]
         }
