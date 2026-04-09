@@ -545,6 +545,62 @@ describe("rolling window", () => {
     expect(captured[1]).toBe("line2");
     expect(captured[2]).toBe("line3");
   });
+
+  // ── AC: regression tests for multi-line scroll window behaviour ───────────
+
+  it("4-line message followed by 3 single-line messages produces exactly 7 rendered lines", () => {
+    // AC: feeding a 4-line message (3 embedded \n) then 3 single-line messages
+    // must yield a window of exactly 7 rows — no more, no less.
+    resetRollingWindow();
+    stream("Agent", "ml1\nml2\nml3\nml4"); // 4 physical lines
+    stream("Agent", "single1");
+    stream("Agent", "single2");
+    writeSpy.mockClear();
+    stream("Agent", "single3"); // triggers a 7-row redraw
+    const lineWrites = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[2K"));
+    expect(lineWrites).toHaveLength(7);
+  });
+
+  it("a single message with 15 newlines is capped to the 10-line window bound", () => {
+    // AC: one message with 15 newlines = 16 physical lines; window must cap at 10.
+    resetRollingWindow();
+    const bigMessage = Array.from({ length: 16 }, (_, i) => `line${i}`).join("\n");
+    stream("Agent", bigMessage);
+    // Window stabilises at 10; cursor-up on the next call proves the size.
+    writeSpy.mockClear();
+    stream("Agent", "probe");
+    const cursorUps = writeSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.startsWith("\x1b[") && s.endsWith("A"));
+    expect(cursorUps[0]).toBe("\x1b[10A");
+  });
+
+  it("mixed single- and multi-line messages never produce a rendered frame exceeding 10 lines", () => {
+    // AC: any sequence of mixed message types must keep every redraw ≤ 10 rows.
+    resetRollingWindow();
+    const inputs = [
+      "a\nb",           // 2 lines → window: 2
+      "c",              // 1 line  → window: 3
+      "d\ne\nf",        // 3 lines → window: 6
+      "g",              // 1 line  → window: 7
+      "h\ni\nj\nk\nl",  // 5 lines → window: 10 (cap hit)
+      "m",              // 1 line  → window: 10 (eviction)
+      "n\no",           // 2 lines → window: 10 (eviction)
+      "p",              // 1 line  → window: 10 (eviction)
+    ];
+    let maxRows = 0;
+    for (const input of inputs) {
+      writeSpy.mockClear();
+      stream("Agent", input);
+      const rowsThisRedraw = writeSpy.mock.calls
+        .map((c) => String(c[0]))
+        .filter((s) => s.startsWith("\x1b[2K")).length;
+      if (rowsThisRedraw > maxRows) maxRows = rowsThisRedraw;
+    }
+    expect(maxRows).toBeLessThanOrEqual(10);
+  });
 });
 
 // ---------------------------------------------------------------------------
