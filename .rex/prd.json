@@ -25631,7 +25631,7 @@
             {
               "id": "536c72d7-d8d3-410b-8710-67e24e330690",
               "title": "Audit current animation frames against Rex-F.png and identify divergences",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Render each current ASCII animation frame side-by-side with Rex-F.png to document exactly where the existing sequence diverges from the reference. Identify which frames are misaligned in proportions, pose, or character anatomy. Produce a written frame-by-frame audit that will drive the subsequent correction work.",
               "acceptanceCriteria": [
@@ -25645,7 +25645,8 @@
                 "animation",
                 "ascii-art"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:45:21.352Z"
             },
             {
               "id": "42b353ce-031b-4c72-bca3-64983608a8fb",
