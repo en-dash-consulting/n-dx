@@ -36,7 +36,7 @@ describe("ndx init dinosaur ASCII art", () => {
  ▐████████████▛▘
  ▝▜███████████▘
    ▝▜███▘  ▜██▀
-      ▐▌    ▐▌"
+      █     █"
 `);
   });
 
@@ -44,7 +44,7 @@ describe("ndx init dinosaur ASCII art", () => {
     const frames = getMascotFrames();
     expect(frames).toHaveLength(2);
 
-    // Frame 0 — reference: packages/rex/Rex-F.png (feet lifted, ▐▌ open form)
+    // Frame 0 — reference: packages/rex/Rex-F.png (both feet planted, █ █ double-support)
     expect(frames[0]).toMatchInlineSnapshot(`
 "          ▗████▖
          ▗████▜▝
@@ -54,7 +54,7 @@ describe("ndx init dinosaur ASCII art", () => {
  ▐████████████▛▘
  ▝▜███████████▘
    ▝▜███▘  ▜██▀
-      ▐▌    ▐▌"
+      █     █"
 `);
 
     // Frame 1 — reference: packages/rex/Rex.png (left leg planted █, right leg in stride ▐▌)

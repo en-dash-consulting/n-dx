@@ -89,9 +89,9 @@ const DINO_BODY_PIXELS = `000000002222222200000000
 000000021111200000000000`;
 
 const DINO_LEGS = [
-  // Frame 0 — reference: packages/rex/Rex-F.png (canonical frame; legs spread, feet lifted mid-stride — ▀ at tips)
-  `000000021100002110000000
-000000021000002100000000`,
+  // Frame 0 — reference: packages/rex/Rex-F.png (canonical frame; both feet planted on ground — ▄ at tips)
+  `000000021000002100000000
+000000021100002110000000`,
   // Frame 1 — reference: packages/rex/Rex.png (stride phase 2; same leg positions, feet planted on ground — ▄ at tips)
   `000000021000002100000000
 000000021100002110000000`,
@@ -138,9 +138,9 @@ const QUADRANT_BODY = [
   " ▝▜███████████▘",
   "   ▝▜███▘  ▜██▀",
 ];
-// Frame 0 — reference: packages/rex/Rex-F.png (legs in stride, feet mid-air — ▐▌ open form)
+// Frame 0 — reference: packages/rex/Rex-F.png (both legs planted — █ █ double-support)
 // Frame 1 — reference: packages/rex/Rex.png (left leg fully planted — █ solid; right leg in stride)
-const QUADRANT_LEGS = [["      ▐▌    ▐▌"], ["      █     ▐▌"]];
+const QUADRANT_LEGS = [["      █     █"], ["      █     ▐▌"]];
 
 /** Static mascot string for non-TTY / test use (monochrome quadrant fallback). */
 export function getMascot() {
