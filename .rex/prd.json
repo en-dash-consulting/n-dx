@@ -25650,7 +25650,7 @@
             {
               "id": "42b353ce-031b-4c72-bca3-64983608a8fb",
               "title": "Establish Rex-F.png as the canonical first animation frame",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Redraw the first ASCII animation frame so it faithfully represents Rex-F.png's proportions, silhouette, and key anatomical landmarks (head, body, tail, limbs). The existing snapshot test must be updated to reflect the corrected frame. This is the reference anchor all subsequent frames are measured against.",
               "acceptanceCriteria": [
@@ -25665,7 +25665,8 @@
                 "ascii-art"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-09T15:39:17.409Z"
+              "startedAt": "2026-04-09T15:39:17.409Z",
+              "completedAt": "2026-04-09T17:40:24.760Z"
             },
             {
               "id": "3788d2a4-0d5d-410b-81e6-0854bceb1510",
@@ -25737,9 +25738,8 @@
             {
               "id": "8f3ffe22-c031-4b7a-97e4-c4895439d6ea",
               "title": "Add spinner and stage labels to ndx plan output between LLM response and proposal display",
-              "level": "task",
               "status": "pending",
-              "source": "smart-add",
+              "level": "task",
               "description": "Insert a progress indicator (spinner or step label) immediately after the 'Done.' / 'Vendor: ...' lines so users know the process is still active. The indicator should cover at minimum the proposal-building and proposal-display phases. It must be suppressed in --quiet / JSON modes and must not interfere with the existing 'Done.' and 'Vendor: ...' output.",
               "acceptanceCriteria": [
                 "A spinner or step label appears immediately after 'Done.' / 'Vendor: ...' with no perceptible gap",
@@ -25754,7 +25754,8 @@
                 "ndx-plan",
                 "dx",
                 "ux"
-              ]
+              ],
+              "source": "smart-add"
             }
           ]
         }
