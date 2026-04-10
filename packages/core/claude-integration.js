@@ -11,7 +11,7 @@
  * @module n-dx/claude-integration
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync, readdirSync } from "fs";
 import { createRequire } from "module";
 import { join, resolve } from "path";
 import { execSync } from "child_process";
@@ -393,7 +393,7 @@ function writeSkills(dir) {
  * Prefers HTTP transport if the web server is running, falls back to stdio.
  */
 function registerMcpServers(dir) {
-  const discovery = discoverClaudeCli();
+  const discovery = discoverClaudeCli(dir);
   if (!discovery.found) {
     return { registered: false, reason: "claude CLI not found", searched: discovery.searched };
   }
@@ -430,14 +430,96 @@ function registerMcpServers(dir) {
 }
 
 /**
+ * Read cli.claudePath from .n-dx.json in the given project root.
+ * Returns undefined if not set.
+ * @param {string|null} dir
+ * @returns {string|undefined}
+ */
+function readConfiguredClaudePath(dir) {
+  if (!dir) return undefined;
+  try {
+    const raw = readFileSync(join(dir, ".n-dx.json"), "utf-8");
+    const cfg = JSON.parse(raw);
+    const p = cfg?.cli?.claudePath;
+    return typeof p === "string" && p.length > 0 ? p : undefined;
+  } catch { return undefined; }
+}
+
+/**
+ * Persist the discovered claude CLI path to .hench/config.json so
+ * subsequent hench invocations reuse it without re-discovering.
+ * Silently skips if the config file doesn't exist yet.
+ * @param {string|null} dir  Project root
+ * @param {string} resolvedPath
+ */
+function persistDiscoveredClaudePath(dir, resolvedPath) {
+  if (!dir) return;
+  const configPath = join(dir, ".hench", "config.json");
+  if (!existsSync(configPath)) return;
+  try {
+    const config = JSON.parse(readFileSync(configPath, "utf-8"));
+    if (config.claudePath === resolvedPath) return; // already correct
+    config.claudePath = resolvedPath;
+    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+  } catch { /* skip — non-critical */ }
+}
+
+/**
+ * Build the list of well-known install location candidates for claude CLI.
+ * @returns {string[]}
+ */
+function buildClaudeWellKnownCandidates() {
+  const home = homedir();
+  const platform = process.platform;
+  const candidates = [];
+
+  // Claude desktop app local install (all platforms)
+  if (platform === "win32") {
+    const appData = process.env.APPDATA ?? join(home, "AppData", "Roaming");
+    candidates.push(join(appData, "npm", "claude.cmd"));
+    candidates.push(join(appData, "Claude", "claude.exe"));
+  } else {
+    candidates.push(join(home, ".claude", "local", "claude"));
+    if (platform === "darwin") {
+      candidates.push("/usr/local/bin/claude", "/opt/homebrew/bin/claude");
+    }
+    candidates.push(join(home, ".npm-global", "bin", "claude"));
+
+    // nvm-managed node versions
+    const nvmVersionsDir = join(home, ".nvm", "versions", "node");
+    if (existsSync(nvmVersionsDir)) {
+      try {
+        const versions = readdirSync(nvmVersionsDir);
+        for (const v of versions) {
+          candidates.push(join(nvmVersionsDir, v, "bin", "claude"));
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  return candidates;
+}
+
+/**
  * Discover the claude CLI binary.
- * Checks CLAUDE_CLI_PATH env var first, then system PATH, then common install locations.
+ *
+ * Discovery order:
+ *  1. CLAUDE_CLI_PATH env var (exclusive — no fallback when set)
+ *  2. cli.claudePath in .n-dx.json (exclusive — no fallback when set)
+ *  3. System PATH
+ *  4. Well-known install locations (~/.claude/local/claude, nvm, Homebrew, etc.)
+ *
+ * When a path is found via (3) or (4) it is persisted to .hench/config.json
+ * so subsequent hench invocations reuse it without re-discovering.
+ *
+ * @param {string|null} [dir=null]  Project root (used to read .n-dx.json and write .hench/config.json)
  * @returns {{ found: true, path: string } | { found: false, searched: string[] }}
  */
-export function discoverClaudeCli() {
+export function discoverClaudeCli(dir = null) {
   const searched = [];
-  const envPath = process.env.CLAUDE_CLI_PATH;
 
+  // 1. CLAUDE_CLI_PATH env var — exclusive if set
+  const envPath = process.env.CLAUDE_CLI_PATH;
   if (envPath) {
     searched.push(`${envPath} (CLAUDE_CLI_PATH)`);
     if (existsSync(envPath)) {
@@ -446,33 +528,37 @@ export function discoverClaudeCli() {
         return { found: true, path: envPath };
       } catch { /* not executable */ }
     }
-    // When CLAUDE_CLI_PATH is explicitly set, only search that path
     return { found: false, searched };
   }
 
-  // System PATH
+  // 2. cli.claudePath from .n-dx.json — exclusive if set
+  const configPath = readConfiguredClaudePath(dir);
+  if (configPath) {
+    searched.push(`${configPath} (cli.claudePath)`);
+    if (existsSync(configPath)) {
+      try {
+        execSync(`"${configPath}" --version`, { stdio: "ignore", timeout: 5_000 });
+        return { found: true, path: configPath };
+      } catch { /* not executable */ }
+    }
+    return { found: false, searched };
+  }
+
+  // 3. System PATH
   searched.push("claude (PATH)");
   try {
     execSync("claude --version", { stdio: "ignore", timeout: 5_000 });
+    persistDiscoveredClaudePath(dir, "claude");
     return { found: true, path: "claude" };
   } catch { /* not in PATH */ }
 
-  // Common install locations
-  const platform = process.platform;
-  const candidates = [];
-  if (platform === "darwin") {
-    candidates.push("/usr/local/bin/claude", "/opt/homebrew/bin/claude");
-  } else if (platform === "win32") {
-    const appData = process.env.APPDATA ?? join(homedir(), "AppData", "Roaming");
-    candidates.push(join(appData, "Claude", "claude.exe"));
-  }
-  candidates.push(join(homedir(), ".npm-global", "bin", "claude"));
-
-  for (const p of candidates) {
+  // 4. Well-known install locations
+  for (const p of buildClaudeWellKnownCandidates()) {
     searched.push(p);
     if (existsSync(p)) {
       try {
         execSync(`"${p}" --version`, { stdio: "ignore", timeout: 5_000 });
+        persistDiscoveredClaudePath(dir, p);
         return { found: true, path: p };
       } catch { /* not executable */ }
     }

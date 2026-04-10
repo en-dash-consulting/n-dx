@@ -1078,7 +1078,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   });
 
   // CLI-specific: load config for CLI path and env resolution
-  const cliBinary = resolveVendorCliPath(llmConfig);
+  const cliBinary = resolveVendorCliPath(llmConfig, config);
   const cliEnv = resolveVendorCliEnv(llmConfig);
 
   // Shared: capture HEAD before agent runs

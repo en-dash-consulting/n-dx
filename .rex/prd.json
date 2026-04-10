@@ -25847,22 +25847,24 @@
     {
       "id": "de44833e-deb4-4959-aa0a-2963b2a5b7d0",
       "title": "LLM Integration",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "6840c2dc-3dc0-4354-a07c-85c780df4ff4",
           "title": "Robust Claude CLI Discovery for ndx init",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "ndx init fails to locate the claude CLI on machines where it is installed outside the shell's default PATH — common when users install via npm, Homebrew, or the Claude desktop app, or when ndx is invoked from a non-interactive shell (CI, IDE terminals) that does not source the user's profile. The discovery mechanism must work across macOS, Linux, and Windows regardless of how or where claude was installed.",
           "source": "smart-add",
+          "startedAt": "2026-04-10T16:27:02.649Z",
+          "completedAt": "2026-04-10T16:27:02.649Z",
           "children": [
             {
               "id": "ac39fe86-e0af-4b0d-b3b0-87bc26d81399",
               "title": "Implement multi-location Claude CLI discovery chain with configurable override",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Replace the current single PATH lookup for the claude binary with an ordered discovery chain that checks: (1) a user-configured path from .n-dx.json or CLAUDE_CLI_PATH env var, (2) the shell PATH, (3) well-known install locations (~/.claude/local/claude, ~/.nvm/versions/node/*/bin/claude, /usr/local/bin, /opt/homebrew/bin, %APPDATA%\\npm\\claude.cmd on Windows). The resolved path should be persisted in .hench/config.json so subsequent commands reuse it without re-discovering each time.",
               "acceptanceCriteria": [
@@ -25878,7 +25880,9 @@
                 "cli-discovery",
                 "cross-platform"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-10T16:15:12.695Z",
+              "completedAt": "2026-04-10T16:27:02.356Z"
             },
             {
               "id": "caadeba9-0971-4a34-b088-63c4e76d8a6b",
@@ -25905,7 +25909,9 @@
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-10T16:27:02.858Z",
+      "completedAt": "2026-04-10T16:27:02.858Z"
     }
   ]
 }
