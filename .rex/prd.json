@@ -19261,7 +19261,7 @@
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-04-02T17:55:36.327Z",
-      "completedAt": "2026-04-09T21:58:12.523Z",
+      "completedAt": "2026-04-10T18:34:32.028Z",
       "mergedProposals": [
         {
           "proposalNodeKey": "p0:epic",
@@ -20973,7 +20973,7 @@
           "level": "feature",
           "priority": "high",
           "startedAt": "2026-04-09T21:10:06.271Z",
-          "completedAt": "2026-04-09T21:43:39.667Z",
+          "completedAt": "2026-04-10T18:34:31.906Z",
           "children": [
             {
               "id": "fa0a2b37-5288-42aa-8b20-1b2ad6beb0fb",
@@ -21022,6 +21022,16 @@
               "priority": "medium",
               "startedAt": "2026-04-09T21:38:43.676Z",
               "completedAt": "2026-04-09T21:43:39.451Z"
+            },
+            {
+              "id": "9474e0c0-dfca-486a-9b62-5b66fea5d235",
+              "title": "Add assistant-integration cross-vendor contract integration test",
+              "status": "completed",
+              "level": "task",
+              "description": "Add a new integration test file at tests/integration/assistant-integration.test.js that validates the cross-package assistant-integration contract. The test should: (1) import setupAssistantIntegrations and formatInitReport from packages/core/assistant-integration.js, (2) call setupAssistantIntegrations(tmpDir) in a temp directory with both vendors enabled and verify the result has entries for both 'claude' and 'codex' with expected shape (summary string, label string, skipped boolean, detail object), (3) call formatInitReport on the result and verify it returns an array of strings starting with 'Assistant surfaces:', (4) verify that disabling a vendor via { claude: false } produces a skipped result for claude but still provisions codex. This test exercises the cross-package boundary between core's orchestration layer and the vendor-specific integration modules (claude-integration.js, codex-integration.js). It satisfies the integration-coverage-policy ratio requirement (currently 5 integration tests for 36 e2e, needs 6). Follow existing patterns in tests/integration/ for setup/teardown.",
+              "priority": "high",
+              "startedAt": "2026-04-10T18:27:43.479Z",
+              "completedAt": "2026-04-10T18:34:31.731Z"
             }
           ]
         }
