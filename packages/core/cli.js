@@ -72,7 +72,7 @@ import {
   formatMainHelp,
   formatOrchestratorCommandHelp,
 } from "./help.js";
-import { setupClaudeIntegration, printClaudeSetupSummary } from "./claude-integration.js";
+import { setupClaudeIntegration, printClaudeSetupSummary, formatClaudeCliNotFoundError } from "./claude-integration.js";
 import {
   formatInitBanner,
   formatRecap,
@@ -856,10 +856,18 @@ async function handleInit(rest) {
 
   let claudeSummary = "skipped";
   if (!noClaude) {
+    let claudeResult;
     try {
-      const result = setupClaudeIntegration(dir);
-      claudeSummary = `${result.skills.written} skills, ${result.settings.total} permissions`;
-    } catch { /* skip */ }
+      claudeResult = setupClaudeIntegration(dir);
+    } catch (err) {
+      console.error(formatError(err));
+      exitWithCleanup(1);
+    }
+    if (!claudeResult.mcp.registered && claudeResult.mcp.searched) {
+      console.error(formatClaudeCliNotFoundError(claudeResult.mcp.searched));
+      exitWithCleanup(1);
+    }
+    claudeSummary = `${claudeResult.skills.written} skills, ${claudeResult.settings.total} permissions`;
   }
 
   // Record the current n-dx version so future stale-check runs can report it.

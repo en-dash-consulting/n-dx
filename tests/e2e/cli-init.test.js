@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { tmpdir, homedir } from "node:os";
 
 const isWin = process.platform === "win32";
 const PATH_SEP = isWin ? ";" : ":";
@@ -73,7 +74,7 @@ describe("n-dx init provider selection", () => {
     try {
       await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
 
-      const output = run(["init", tmpDir], {
+      const output = run(["init", "--no-claude", tmpDir], {
         input: "1\n",
         env: {
           ...process.env,
@@ -114,17 +115,17 @@ describe("n-dx init provider selection", () => {
 
   it("persists both providers through config get pathway", async () => {
     const cases = [
-      { provider: "codex", stdout: "ok" },
-      { provider: "claude", stdout: '{"result":"ok"}' },
+      { provider: "codex", stdout: "ok", extraFlags: ["--no-claude"] },
+      { provider: "claude", stdout: '{"result":"ok"}', extraFlags: [] },
     ];
 
-    for (const { provider, stdout } of cases) {
+    for (const { provider, stdout, extraFlags } of cases) {
       const projectDir = await mkdtemp(join(tmpdir(), `ndx-init-${provider}-`));
       const binDir = await mkdtemp(join(tmpdir(), `ndx-init-bin-${provider}-`));
       try {
         await writeFakeBinary(join(binDir, provider), { stdout });
 
-        run(["init", `--provider=${provider}`, projectDir], {
+        run(["init", `--provider=${provider}`, ...extraFlags, projectDir], {
           env: {
             ...process.env,
             PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
@@ -180,7 +181,7 @@ describe("n-dx init provider selection", () => {
         await writeFakeBinary(join(binDir, "codex"), { stdout: "ok", captureArgs: true });
 
         const output = run(
-          ["init", "--provider=codex", tmpDir],
+          ["init", "--provider=codex", "--no-claude", tmpDir],
           { env: pathEnvWith(binDir) },
         );
 
@@ -251,7 +252,7 @@ describe("n-dx init provider selection", () => {
       try {
         await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
 
-        const output = run(["init", "--provider=codex", tmpDir], {
+        const output = run(["init", "--provider=codex", "--no-claude", tmpDir], {
           env: {
             ...process.env,
             PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
@@ -275,7 +276,7 @@ describe("n-dx init provider selection", () => {
       try {
         await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
 
-        const output = run(["init", "--provider=codex", tmpDir], {
+        const output = run(["init", "--provider=codex", "--no-claude", tmpDir], {
           env: {
             ...process.env,
             PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
@@ -295,7 +296,7 @@ describe("n-dx init provider selection", () => {
       try {
         await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
 
-        const output = run(["init", "--provider=codex", tmpDir], {
+        const output = run(["init", "--provider=codex", "--no-claude", tmpDir], {
           env: {
             ...process.env,
             NO_COLOR: "1",
@@ -316,7 +317,7 @@ describe("n-dx init provider selection", () => {
       try {
         await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
 
-        const output = run(["init", "--quiet", "--provider=codex", tmpDir], {
+        const output = run(["init", "--quiet", "--provider=codex", "--no-claude", tmpDir], {
           env: {
             ...process.env,
             PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
@@ -330,5 +331,85 @@ describe("n-dx init provider selection", () => {
         await rm(binDir, { recursive: true, force: true });
       }
     });
+  });
+});
+
+describe("claude CLI discovery diagnostics", () => {
+  let tmpDir;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-diag-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Returns true if claude is reachable via system PATH or common absolute install
+   * paths — used to skip the "no claude" scenario on developer machines.
+   */
+  function claudeFoundOnSystem() {
+    try {
+      execFileSync("claude", ["--version"], { stdio: "ignore", timeout: 3_000 });
+      return true;
+    } catch { /* not in PATH */ }
+    const commonPaths = [
+      "/usr/local/bin/claude",
+      "/opt/homebrew/bin/claude",
+      join(homedir(), ".npm-global", "bin", "claude"),
+    ];
+    return commonPaths.some((p) => existsSync(p));
+  }
+
+  it("exits non-zero and lists searched paths when claude CLI is absent from PATH", async () => {
+    if (claudeFoundOnSystem()) return; // skip on machines with claude installed system-wide
+
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-diag-bin-"));
+    try {
+      await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+      const { CLAUDE_CLI_PATH: _omit, ...envWithout } = process.env;
+      // Include node's own bin dir so subprocesses can find node, but nothing else
+      const nodeBinDir = dirname(process.execPath);
+
+      const result = runFail(["init", "--provider=codex", tmpDir], {
+        env: {
+          ...envWithout,
+          PATH: `${binDir}${PATH_SEP}${nodeBinDir}`,
+          HOME: tmpDir, // prevent ~/.npm-global match on homedir()
+        },
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("claude CLI not found");
+      expect(result.stderr).toContain("Searched:");
+      expect(result.stderr).toMatch(/claude \(PATH\)/);
+      expect(result.stderr).toMatch(/brew install claude|npm install -g claude/);
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits non-zero with structured error when CLAUDE_CLI_PATH points to nonexistent file", async () => {
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-diag-envpath-"));
+    try {
+      await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+
+      const result = runFail(["init", "--provider=codex", tmpDir], {
+        env: {
+          ...process.env,
+          PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+          CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
+        },
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("claude CLI not found");
+      expect(result.stderr).toContain("/nonexistent/path/to/claude");
+      expect(result.stderr).toContain("CLAUDE_CLI_PATH");
+      expect(result.stderr).toMatch(/brew install claude|npm install -g claude/);
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+    }
   });
 });

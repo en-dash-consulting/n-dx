@@ -17,6 +17,7 @@ import { join, resolve } from "path";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { homedir } from "os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -392,11 +393,12 @@ function writeSkills(dir) {
  * Prefers HTTP transport if the web server is running, falls back to stdio.
  */
 function registerMcpServers(dir) {
-  const hasClaude = hasClaudeCli();
-  if (!hasClaude) {
-    return { registered: false, reason: "claude CLI not found" };
+  const discovery = discoverClaudeCli();
+  if (!discovery.found) {
+    return { registered: false, reason: "claude CLI not found", searched: discovery.searched };
   }
 
+  const claudeCmd = discovery.path;
   const results = [];
 
   // Always use stdio — it doesn't require a running server
@@ -406,7 +408,7 @@ function registerMcpServers(dir) {
 
   try {
     execSync(
-      `claude mcp add rex -- node "${rexBin}" mcp "${absDir}"`,
+      `"${claudeCmd}" mcp add rex -- node "${rexBin}" mcp "${absDir}"`,
       { stdio: "ignore", timeout: 10_000 },
     );
     results.push({ name: "rex", transport: "stdio", ok: true });
@@ -416,7 +418,7 @@ function registerMcpServers(dir) {
 
   try {
     execSync(
-      `claude mcp add sourcevision -- node "${svBin}" mcp "${absDir}"`,
+      `"${claudeCmd}" mcp add sourcevision -- node "${svBin}" mcp "${absDir}"`,
       { stdio: "ignore", timeout: 10_000 },
     );
     results.push({ name: "sourcevision", transport: "stdio", ok: true });
@@ -427,13 +429,78 @@ function registerMcpServers(dir) {
   return { registered: true, servers: results };
 }
 
-function hasClaudeCli() {
+/**
+ * Discover the claude CLI binary.
+ * Checks CLAUDE_CLI_PATH env var first, then system PATH, then common install locations.
+ * @returns {{ found: true, path: string } | { found: false, searched: string[] }}
+ */
+export function discoverClaudeCli() {
+  const searched = [];
+  const envPath = process.env.CLAUDE_CLI_PATH;
+
+  if (envPath) {
+    searched.push(`${envPath} (CLAUDE_CLI_PATH)`);
+    if (existsSync(envPath)) {
+      try {
+        execSync(`"${envPath}" --version`, { stdio: "ignore", timeout: 5_000 });
+        return { found: true, path: envPath };
+      } catch { /* not executable */ }
+    }
+    // When CLAUDE_CLI_PATH is explicitly set, only search that path
+    return { found: false, searched };
+  }
+
+  // System PATH
+  searched.push("claude (PATH)");
   try {
     execSync("claude --version", { stdio: "ignore", timeout: 5_000 });
-    return true;
-  } catch {
-    return false;
+    return { found: true, path: "claude" };
+  } catch { /* not in PATH */ }
+
+  // Common install locations
+  const platform = process.platform;
+  const candidates = [];
+  if (platform === "darwin") {
+    candidates.push("/usr/local/bin/claude", "/opt/homebrew/bin/claude");
+  } else if (platform === "win32") {
+    const appData = process.env.APPDATA ?? join(homedir(), "AppData", "Roaming");
+    candidates.push(join(appData, "Claude", "claude.exe"));
   }
+  candidates.push(join(homedir(), ".npm-global", "bin", "claude"));
+
+  for (const p of candidates) {
+    searched.push(p);
+    if (existsSync(p)) {
+      try {
+        execSync(`"${p}" --version`, { stdio: "ignore", timeout: 5_000 });
+        return { found: true, path: p };
+      } catch { /* not executable */ }
+    }
+  }
+
+  return { found: false, searched };
+}
+
+/**
+ * Format a structured error message when claude CLI cannot be located.
+ * @param {string[]} searched  Paths that were checked, in order.
+ * @returns {string}
+ */
+export function formatClaudeCliNotFoundError(searched) {
+  const installCmd = process.platform === "darwin"
+    ? "brew install claude"
+    : "npm install -g claude";
+  return [
+    "Error: claude CLI not found.",
+    "Searched:",
+    ...searched.map((p) => `  ${p}`),
+    "",
+    `Install: ${installCmd}`,
+    "Download: https://claude.ai/download",
+    "",
+    "After installing, re-run 'ndx init'.",
+    "To skip Claude Code integration: ndx init --no-claude",
+  ].join("\n");
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
