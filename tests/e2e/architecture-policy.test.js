@@ -64,6 +64,8 @@ const ALLOWED = new Set([
   "packages/core/claude-integration.js",
   // Codex integration — writes .codex/config.toml, .agents/skills, AGENTS.md
   "packages/core/codex-integration.js",
+  // CI preflight script — runs build/test/check steps via child processes
+  "scripts/preflight.mjs",
 ]);
 
 /** Directories to skip entirely. */
@@ -195,16 +197,14 @@ const ORCHESTRATION_FILES = ["packages/core/cli.js", "packages/core/web.js", "pa
  */
 const ORCHESTRATION_PEERS = new Set([
   "cli-brand.js",
-  "config.js",
-  "web.js",
-  "ci.js",
-  "help.js",
-  "refresh-plan.js",
-  "refresh-artifacts.js",
-  "refresh-validate.js",
-  "claude-integration.js",
-  "codex-integration.js",
-  "assistant-integration.js",
+  "packages/core/config.js",
+  "packages/core/web.js",
+  "packages/core/ci.js",
+  "packages/core/help.js",
+  "packages/core/refresh-plan.js",
+  "packages/core/refresh-artifacts.js",
+  "packages/core/refresh-validate.js",
+  "packages/core/claude-integration.js",
 ]);
 
 /**
@@ -931,8 +931,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 80,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry)",
+    maxExports: 85,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification)",
   },
 ];
 
@@ -1178,8 +1178,6 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
   ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
-  // Core — lazy-loads Ink TUI to avoid loading React for non-init commands
-  ["packages/core/cli.js", "Lazy-loads Ink renderer for animated init UI (TTY only)"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies
@@ -1187,14 +1185,14 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/sourcevision/src/analyzers/callgraph-findings.ts", "Lazy-loads callgraph analysis on demand"],
   ["packages/sourcevision/src/analyzers/convergence.ts", "Lazy-loads convergence analyzer on demand"],
   ["packages/sourcevision/src/analyzers/imports.ts", "Lazy-loads import graph analysis on demand"],
+  // Init LLM selection — lazy-loads enquirer prompt library
+  ["packages/core/init-llm.js", "Lazy-loads enquirer for interactive provider/model selection"],
   // Web server — lazy-loads route handlers
   ["packages/web/src/server/routes-integrations.ts", "Lazy-loads integration handlers on demand"],
   ["packages/web/src/server/routes-notion.ts", "Lazy-loads Notion integration on demand"],
   ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
   // Core orchestrator — dynamic import of rex public API for export pre-rendering
   ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],
-  // Core init-llm — lazy-loads enquirer for interactive provider & model selection (TTY-only)
-  ["packages/core/init-llm.js", "Lazy-loads enquirer for keyboard-driven provider and model selectors in TTY environments"],
 ]);
 
 describe("architecture policy: dynamic import audit", () => {

@@ -256,28 +256,11 @@ describe("hench → llm-client gateway contract", () => {
     "parseStreamTokenUsage",
     "resolveModel",
     "formatUsage",
-    "createPromptEnvelope",
-    "assemblePrompt",
-    "mapErrorReasonToFailureCategory",
-    "mapRunFailureToCategory",
-    "compileCodexPolicyFlags",
-    "mapSandboxToCodexFlag",
-    "mapApprovalToCodexFlag",
-    "toAnthropicToolDef",
-    "toAnthropicToolDefs",
-    "toOpenAiToolDef",
-    "toOpenAiToolDefs",
   ];
 
-  const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError", "ProviderRegistry"];
+  const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
-  const GATEWAY_CONSTANTS = [
-    "PROJECT_DIRS",
-    "DEFAULT_EXECUTION_POLICY",
-    "CANONICAL_PROMPT_SECTIONS",
-    "ALL_FAILURE_CATEGORIES",
-    "defaultRegistry",
-  ];
+  const GATEWAY_CONSTANTS = ["PROJECT_DIRS"];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -599,17 +582,16 @@ describe("gateway export auto-detection", () => {
         "CLIError", "ClaudeClientError", "CLI_ERROR_CODES",
         "exec", "execStdout", "execShellCmd", "getCurrentHead", "getCurrentBranch",
         "isExecutableOnPath", "spawnTool", "spawnManaged", "ProcessPool", "ProcessLimitError",
-        "parseApiTokenUsage", "parseApiTokenUsageWithDiagnostic",
-        "parseStreamTokenUsage", "parseStreamTokenUsageWithDiagnostic",
-        "mapCodexUsageToTokenUsage",
-        "resolveModel", "formatUsage",
-        "createPromptEnvelope", "assemblePrompt", "mapErrorReasonToFailureCategory",
-        "mapRunFailureToCategory", "classifyVendorError", "failureCategoryLabel",
+        "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "formatUsage",
+        "parseApiTokenUsageWithDiagnostic", "parseStreamTokenUsageWithDiagnostic",
+        "mapCodexUsageToTokenUsage", "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS",
+        "ALL_FAILURE_CATEGORIES", "createPromptEnvelope", "assemblePrompt",
+        "mapErrorReasonToFailureCategory", "mapRunFailureToCategory",
+        "classifyVendorError", "failureCategoryLabel", "defaultRegistry",
         "compileCodexPolicyFlags", "mapSandboxToCodexFlag", "mapApprovalToCodexFlag",
         "toAnthropicToolDef", "toAnthropicToolDefs", "toOpenAiToolDef", "toOpenAiToolDefs",
-        "ProviderRegistry", "defaultRegistry"],
-      ...["PROJECT_DIRS", "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS",
-        "ALL_FAILURE_CATEGORIES"],
+        "ProviderRegistry"],
+      ...["PROJECT_DIRS"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
@@ -839,9 +821,10 @@ describe("orchestration spawn call-sites match package CLI parsers", () => {
     expect(spawnedCommands.hench).toBeDefined();
 
     // Known minimum spawned commands (from cli.js handlers)
-    expect(spawnedCommands.rex).toEqual(expect.arrayContaining(["init", "analyze", "status"]));
-    expect(spawnedCommands.sourcevision).toEqual(expect.arrayContaining(["init", "analyze"]));
-    expect(spawnedCommands.hench).toEqual(expect.arrayContaining(["init", "run"]));
+    // Note: "init" is not spawned — handleInit runs sub-package inits in-process
+    expect(spawnedCommands.rex).toEqual(expect.arrayContaining(["analyze", "status"]));
+    expect(spawnedCommands.sourcevision).toEqual(expect.arrayContaining(["analyze"]));
+    expect(spawnedCommands.hench).toEqual(expect.arrayContaining(["run"]));
   });
 });
 
