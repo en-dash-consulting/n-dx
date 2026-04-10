@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync, mkdtempSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -235,7 +235,7 @@ describe("saveWorkspaceConfig", () => {
     saveWorkspaceConfig(tmpDir, { members: [{ path: "packages/web" }] });
 
     const raw = JSON.parse(
-      require("node:fs").readFileSync(join(tmpDir, ".n-dx.json"), "utf-8"),
+      readFileSync(join(tmpDir, ".n-dx.json"), "utf-8"),
     );
     expect(raw.rex).toEqual({ someKey: "value" });
     expect(raw.sourcevision.archetypes).toEqual({ custom: [] });
@@ -530,12 +530,11 @@ describe("writeWorkspaceOutput", () => {
 
     const result = writeWorkspaceOutput(tmpDir, [api]);
 
-    const fs = require("node:fs");
     const svDir = join(tmpDir, ".sourcevision");
-    expect(fs.existsSync(join(svDir, "manifest.json"))).toBe(true);
-    expect(fs.existsSync(join(svDir, "inventory.json"))).toBe(true);
-    expect(fs.existsSync(join(svDir, "imports.json"))).toBe(true);
-    expect(fs.existsSync(join(svDir, "zones.json"))).toBe(true);
+    expect(existsSync(join(svDir, "manifest.json"))).toBe(true);
+    expect(existsSync(join(svDir, "inventory.json"))).toBe(true);
+    expect(existsSync(join(svDir, "imports.json"))).toBe(true);
+    expect(existsSync(join(svDir, "zones.json"))).toBe(true);
 
     expect(result.zoneCount).toBe(1);
     expect(result.fileCount).toBe(1);
@@ -548,9 +547,8 @@ describe("writeWorkspaceOutput", () => {
 
     writeWorkspaceOutput(tmpDir, [api]);
 
-    const fs = require("node:fs");
     const manifest = JSON.parse(
-      fs.readFileSync(join(tmpDir, ".sourcevision/manifest.json"), "utf-8"),
+      readFileSync(join(tmpDir, ".sourcevision/manifest.json"), "utf-8"),
     );
     expect(manifest.workspace).toBe(true);
   });
@@ -565,9 +563,8 @@ describe("writeWorkspaceOutput", () => {
 
     writeWorkspaceOutput(tmpDir, [api, web]);
 
-    const fs = require("node:fs");
     const manifest = JSON.parse(
-      fs.readFileSync(join(tmpDir, ".sourcevision/manifest.json"), "utf-8"),
+      readFileSync(join(tmpDir, ".sourcevision/manifest.json"), "utf-8"),
     );
     expect(manifest.children).toHaveLength(2);
     expect(manifest.children[0].id).toBe("api");
@@ -581,10 +578,9 @@ describe("writeWorkspaceOutput", () => {
 
     writeWorkspaceOutput(tmpDir, [api]);
 
-    const fs = require("node:fs");
     const svDir = join(tmpDir, ".sourcevision");
-    expect(fs.existsSync(join(svDir, "llms.txt"))).toBe(true);
-    expect(fs.existsSync(join(svDir, "CONTEXT.md"))).toBe(true);
+    expect(existsSync(join(svDir, "llms.txt"))).toBe(true);
+    expect(existsSync(join(svDir, "CONTEXT.md"))).toBe(true);
   });
 });
 

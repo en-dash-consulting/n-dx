@@ -39,6 +39,7 @@ import {
   resolveVendorCliPath,
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
+import { resolveVendorModel } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -97,7 +98,6 @@ interface SpawnTokenMetadata {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const MAX_SUMMARY_LENGTH = 500;
-const DEFAULT_CODEX_MODEL = "gpt-5-codex";
 
 // ── Transient error detection & retry helpers ─────────────────────────────
 
@@ -784,12 +784,11 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
 function resolveCliEventModel(
   vendor: LLMVendor,
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
-  configuredModel: string,
+  _configuredModel: string,
   modelOverride?: string,
 ): string {
   if (modelOverride) return modelOverride;
-  if (vendor === "codex") return llmConfig.codex?.model ?? DEFAULT_CODEX_MODEL;
-  return llmConfig.claude?.model ?? configuredModel;
+  return resolveVendorModel(vendor, llmConfig);
 }
 
 // ── Accumulated retry state ───────────────────────────────────────────────
@@ -1051,7 +1050,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   });
 
   // CLI-specific: load config for CLI path and env resolution
-  const cliBinary = resolveVendorCliPath(llmConfig);
+  const cliBinary = resolveVendorCliPath(llmConfig, config);
   const cliEnv = resolveVendorCliEnv(llmConfig);
 
   // Shared: capture HEAD before agent runs

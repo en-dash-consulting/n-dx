@@ -11,6 +11,7 @@ import { isFullyCompleted } from "../../core/prune.js";
 import { isRootLevel } from "../../schema/index.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { TreeStats } from "../../core/stats.js";
+import { dim, red, cyan, yellow, green } from "@n-dx/llm-client";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -155,6 +156,31 @@ export function filterDeleted(items: PRDItem[]): PRDItem[] {
   return result;
 }
 
+/**
+ * Apply semantic color to a single tree line based on item status.
+ *
+ * - completed / deferred → dim (reduced visual noise; already done)
+ * - failing              → red
+ * - in_progress          → cyan (active work)
+ * - blocked              → yellow (needs attention)
+ * - pending              → no color (neutral)
+ */
+function colorLine(line: string, status: string): string {
+  switch (status) {
+    case "completed":
+    case "deferred":
+      return dim(line);
+    case "failing":
+      return red(line);
+    case "in_progress":
+      return cyan(line);
+    case "blocked":
+      return yellow(line);
+    default:
+      return line;
+  }
+}
+
 /** Render a PRD tree to lines with status icons and indentation. */
 export function renderTree(
   items: PRDItem[],
@@ -180,16 +206,27 @@ export function renderTree(
         const pct = Math.round(ratio * 100);
         const bar = renderProgressBar(ratio);
         lines.push(
-          `${prefix}${icon} ${item.title}${override}${priority} ${bar} ${pct}% ${count}${blocked}`,
+          colorLine(
+            `${prefix}${icon} ${item.title}${override}${priority} ${bar} ${pct}% ${count}${blocked}`,
+            item.status,
+          ),
         );
       } else {
         lines.push(
-          `${prefix}${icon} ${item.title}${override}${priority} ${count}${ts}${blocked}`,
+          colorLine(
+            `${prefix}${icon} ${item.title}${override}${priority} ${count}${ts}${blocked}`,
+            item.status,
+          ),
         );
       }
       lines.push(...renderTree(item.children, indent + 1, coverage));
     } else {
-      lines.push(`${prefix}${icon} ${item.title}${override}${priority}${cov}${ts}${blocked}`);
+      lines.push(
+        colorLine(
+          `${prefix}${icon} ${item.title}${override}${priority}${cov}${ts}${blocked}`,
+          item.status,
+        ),
+      );
     }
   }
   return lines;
@@ -200,13 +237,13 @@ export function formatStats(
   options?: { hidingCompleted?: boolean },
 ): string {
   const parts = [];
-  if (stats.completed > 0) parts.push(`${stats.completed} completed`);
-  if (stats.inProgress > 0) parts.push(`${stats.inProgress} in progress`);
+  if (stats.completed > 0) parts.push(green(`${stats.completed} completed`));
+  if (stats.inProgress > 0) parts.push(cyan(`${stats.inProgress} in progress`));
   if (stats.pending > 0) parts.push(`${stats.pending} pending`);
-  if (stats.failing > 0) parts.push(`${stats.failing} failing`);
-  if (stats.deferred > 0) parts.push(`${stats.deferred} deferred`);
-  if (stats.blocked > 0) parts.push(`${stats.blocked} blocked`);
-  if (stats.deleted > 0) parts.push(`${stats.deleted} deleted`);
+  if (stats.failing > 0) parts.push(red(`${stats.failing} failing`));
+  if (stats.deferred > 0) parts.push(dim(`${stats.deferred} deferred`));
+  if (stats.blocked > 0) parts.push(yellow(`${stats.blocked} blocked`));
+  if (stats.deleted > 0) parts.push(dim(`${stats.deleted} deleted`));
   const pct =
     stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
   const suffix =

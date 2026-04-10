@@ -21,6 +21,7 @@ import {
   LEGS,
   INIT_PHASES,
 } from "./cli-brand.js";
+import { formatClaudeCliNotFoundError } from "./claude-integration.js";
 
 // ── Subprocess helper (never blocks the main thread) ───────────────────
 
@@ -200,14 +201,25 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
       if (!noClaude) {
         const integrationUrl = new URL("./claude-integration.js", import.meta.url).href;
         const script = [
-          `import{setupClaudeIntegration}from"${integrationUrl}";`,
+          `import{setupClaudeIntegration,formatClaudeCliNotFoundError}from"${integrationUrl}";`,
           `try{const r=setupClaudeIntegration(${JSON.stringify(dir)});`,
+          `if(!r.mcp.registered&&r.mcp.searched){process.stdout.write(JSON.stringify({notFound:true,searched:r.mcp.searched}));process.exit(1);}`,
           `process.stdout.write(JSON.stringify({s:r.skills.written,p:r.settings.total}))}`,
-          `catch{process.stdout.write("{}")}`,
+          `catch(e){process.stdout.write(JSON.stringify({err:String(e)}));process.exit(1)}`,
         ].join("");
         const result = await spawnAsync("node", ["--input-type=module", "-e", script], true);
         try {
           const data = JSON.parse(result);
+          if (data.notFound) {
+            setPhase("claude", "failed", "not installed");
+            onComplete(1, formatClaudeCliNotFoundError(data.searched));
+            return;
+          }
+          if (data.err) {
+            setPhase("claude", "failed");
+            onComplete(1, data.err);
+            return;
+          }
           if (data.s !== undefined) claudeSummary = `${data.s} skills, ${data.p} permissions`;
         } catch { /* keep skipped */ }
       }

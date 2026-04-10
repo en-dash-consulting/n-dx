@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadClaudeConfig, resolveApiKey, resolveCliPath } from "../../src/config.js";
+import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveVendorModel, NEWEST_MODELS } from "../../src/config.js";
 
 describe("loadClaudeConfig", () => {
   let tmpDir: string;
@@ -194,5 +194,64 @@ describe("resolveCliPath", () => {
 
   it("defaults to 'claude' when not set", () => {
     expect(resolveCliPath({})).toBe("claude");
+  });
+});
+
+describe("NEWEST_MODELS", () => {
+  it("defines a newest model for claude vendor", () => {
+    expect(typeof NEWEST_MODELS.claude).toBe("string");
+    expect(NEWEST_MODELS.claude.length).toBeGreaterThan(0);
+  });
+
+  it("defines a newest model for codex vendor", () => {
+    expect(typeof NEWEST_MODELS.codex).toBe("string");
+    expect(NEWEST_MODELS.codex.length).toBeGreaterThan(0);
+  });
+});
+
+describe("resolveVendorModel", () => {
+  it("returns NEWEST_MODELS.claude for claude vendor with no config", () => {
+    expect(resolveVendorModel("claude")).toBe(NEWEST_MODELS.claude);
+  });
+
+  it("returns NEWEST_MODELS.claude for claude vendor with empty config", () => {
+    expect(resolveVendorModel("claude", {})).toBe(NEWEST_MODELS.claude);
+  });
+
+  it("returns configured claude model from config", () => {
+    expect(
+      resolveVendorModel("claude", { claude: { model: "claude-opus-4-20250514" } }),
+    ).toBe("claude-opus-4-20250514");
+  });
+
+  it("expands claude model aliases from config", () => {
+    expect(
+      resolveVendorModel("claude", { claude: { model: "opus" } }),
+    ).toBe("claude-opus-4-20250514");
+  });
+
+  it("expands 'sonnet' alias to full claude model ID", () => {
+    expect(
+      resolveVendorModel("claude", { claude: { model: "sonnet" } }),
+    ).toBe(NEWEST_MODELS.claude);
+  });
+
+  it("returns NEWEST_MODELS.codex for codex vendor with no config", () => {
+    expect(resolveVendorModel("codex")).toBe(NEWEST_MODELS.codex);
+  });
+
+  it("returns NEWEST_MODELS.codex for codex vendor with empty config", () => {
+    expect(resolveVendorModel("codex", {})).toBe(NEWEST_MODELS.codex);
+  });
+
+  it("returns configured codex model from config", () => {
+    expect(
+      resolveVendorModel("codex", { codex: { model: "gpt-4o" } }),
+    ).toBe("gpt-4o");
+  });
+
+  it("returns empty string for unknown vendor", () => {
+    // TypeScript prevents this at compile time; we test runtime safety.
+    expect(resolveVendorModel("unknown" as "claude", {})).toBe("");
   });
 });

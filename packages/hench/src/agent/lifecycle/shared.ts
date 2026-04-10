@@ -24,12 +24,12 @@ import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
-import { saveRun } from "../../store/index.js";
+import { saveRun, persistRunLog } from "../../store/index.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
 import { runPostTaskTests } from "../../tools/index.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
-import { section, subsection, stream, detail, info } from "../../types/output.js";
+import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
@@ -496,6 +496,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;
   await saveRun(henchDir, run);
+
+  // Persist full run output to .run-logs/ at the project root.
+  // Best-effort: a log write failure must not crash the run.
+  const logLines = getCapturedLines();
+  try {
+    const logPath = await persistRunLog(projectDir, run.id, run.startedAt, logLines);
+    info(`\nRun log: ${logPath}`);
+  } catch {
+    // Swallow — log persistence is optional; the run result stands.
+  }
+  resetCapturedLines();
 }
 
 // ---------------------------------------------------------------------------

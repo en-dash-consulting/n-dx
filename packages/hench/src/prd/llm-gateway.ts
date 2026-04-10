@@ -52,10 +52,39 @@ export { PROJECT_DIRS } from "@n-dx/llm-client";
 export { toCanonicalJSON } from "@n-dx/llm-client";
 
 // ---- CLI output control -----------------------------------------------------
-export { setQuiet, isQuiet, info, result } from "@n-dx/llm-client";
+export { setQuiet, isQuiet, info, result, warn } from "@n-dx/llm-client";
+
+// ---- Deprecation filter (CLI entry points) ----------------------------------
+export { suppressKnownDeprecations } from "@n-dx/llm-client";
+
+// ---- Vendor/model header ----------------------------------------------------
+export { printVendorModelHeader } from "@n-dx/llm-client";
+export type { VendorModelHeaderOptions } from "@n-dx/llm-client";
 
 // ---- CLI help formatting ----------------------------------------------------
 export { formatHelp, formatTypoSuggestion } from "@n-dx/llm-client";
+
+// ---- CLI color formatting ---------------------------------------------------
+export {
+  isColorEnabled,
+  bold,
+  dim,
+  cyan,
+  yellow,
+  green,
+  red,
+  magenta,
+  // Semantic color helpers (prefer over raw primitives for status/severity)
+  colorSuccess,
+  colorWarn,
+  colorInfo,
+  colorDim,
+  colorPending,
+  colorPink,
+  // Canonical status→color map + helper (PRD statuses, run statuses, log-levels)
+  STATUS_COLORS,
+  colorStatus,
+} from "@n-dx/llm-client";
 
 // ---- CLI error classes ------------------------------------------------------
 export { CLIError, ClaudeClientError, CLI_ERROR_CODES } from "@n-dx/llm-client";
@@ -85,7 +114,7 @@ export {
 } from "@n-dx/llm-client";
 
 // ---- Model resolution -------------------------------------------------------
-export { resolveModel } from "@n-dx/llm-client";
+export { resolveModel, resolveVendorModel, NEWEST_MODELS } from "@n-dx/llm-client";
 
 // ---- Usage formatting -------------------------------------------------------
 export { formatUsage } from "@n-dx/llm-client";

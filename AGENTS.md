@@ -87,6 +87,25 @@ pnpm typecheck      # typecheck all packages
 
 Re-run `ndx init` to regenerate all instruction files after changes to `assistant-assets/`.
 
+## CLI Color Convention
+
+All CLI output across rex, hench, sourcevision, and the ndx orchestrator follows a
+shared semantic color vocabulary defined in `packages/llm-client/src/help-format.ts`
+(`STATUS_COLORS` map). Import `colorStatus` from `@n-dx/llm-client` (or the hench
+`llm-gateway`) instead of writing your own status→color switch.
+
+| Color  | Meaning                                                 |
+|--------|---------------------------------------------------------|
+| green  | completed · success — work is done                      |
+| cyan   | in_progress · running · info — active or informational  |
+| yellow | pending · blocked · warning — needs attention           |
+| red    | failing · failed · error · timeout — problem state      |
+| dim    | deferred · deleted · muted — background / done-and-gone |
+
+**Tree-row vs badge coloring:** `status-shared.ts` `colorLine()` dims the *entire row*
+for completed items to reduce visual noise in tree views. This is an intentional UX
+choice distinct from status badge coloring — completed *badge labels* are green.
+
 ## Command Aliases
 
 Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).

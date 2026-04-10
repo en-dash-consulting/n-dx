@@ -27,7 +27,9 @@ import { cmdPrMarkdown } from "./commands/pr-markdown.js";
 import { cmdWorkspace } from "./commands/workspace.js";
 import { CLIError, handleCLIError, requireSvDir } from "./errors.js";
 import { setQuiet } from "./output.js";
-import { CLI_ERROR_CODES, formatTypoSuggestion } from "@n-dx/llm-client";
+import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "@n-dx/llm-client";
+
+suppressKnownDeprecations();
 
 const args = process.argv.slice(2);
 const command = args[0];

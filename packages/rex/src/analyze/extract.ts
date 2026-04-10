@@ -21,7 +21,6 @@ import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
 import type { Proposal, ProposalTask } from "./propose.js";
 import {
   detectFileFormat,
-  DEFAULT_MODEL,
   extractJson,
   repairTruncatedJson,
   emptyAnalyzeTokenUsage,
@@ -1640,7 +1639,7 @@ async function disambiguateWithLLM(
 
   try {
     const prompt = buildDisambiguationPrompt(content, existingTitles);
-    const result = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
+    const result = await spawnClaude(prompt, model);
     accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
     const proposals = parseDisambiguationResponse(result.text);

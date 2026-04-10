@@ -11,11 +11,14 @@
 
 import { extname } from "node:path";
 import type { TokenUsage, AnalyzeTokenUsage } from "../schema/index.js";
+import { NEWEST_MODELS } from "@n-dx/llm-client";
 
 // ── Model defaults ──
+// Derived from the single canonical source in @n-dx/llm-client so that
+// updating a vendor's newest model requires only one edit.
 
-export const DEFAULT_MODEL = "claude-sonnet-4-6";
-export const DEFAULT_CODEX_MODEL = "gpt-5-codex";
+export const DEFAULT_MODEL = NEWEST_MODELS.claude;
+export const DEFAULT_CODEX_MODEL = NEWEST_MODELS.codex;
 
 /** Maximum number of LLM retry attempts for transient/parse failures. */
 export const MAX_RETRIES = 2;

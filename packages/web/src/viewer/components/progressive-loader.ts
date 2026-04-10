@@ -97,52 +97,40 @@ function sliceItems(
   items: PRDItemData[],
   activeStatuses: Set<ItemStatus>,
   budget: SliceBudget,
-): PRDItemData[] {
+): { items: PRDItemData[]; fullyRendered: boolean } {
   const result: PRDItemData[] = [];
+  let fullyRendered = true;
 
   for (const item of items) {
-    if (budget.remaining <= 0) break;
+    if (budget.remaining <= 0) {
+      fullyRendered = false;
+      break;
+    }
     if (!itemMatchesFilter(item, activeStatuses)) continue;
 
     // This node consumes 1 from the budget.
     budget.remaining--;
 
     if (item.children && item.children.length > 0) {
-      // Snapshot budget before recursing to detect whether children were truncated.
-      const budgetBefore = budget.remaining;
       const childSlice = sliceItems(item.children, activeStatuses, budget);
-      const childrenConsumed = budgetBefore - budget.remaining;
 
-      // Count how many of this item's children are visible (for truncation check).
-      const visibleChildCount = countVisibleChildren(item.children, activeStatuses);
-
-      if (childrenConsumed === visibleChildCount) {
+      if (childSlice.fullyRendered) {
         // All visible children survived — reuse the original item reference.
         result.push(item);
       } else {
         // Some children truncated — shallow-copy with sliced children.
         result.push({
           ...item,
-          children: childSlice.length > 0 ? childSlice : undefined,
+          children: childSlice.items.length > 0 ? childSlice.items : undefined,
         });
+        fullyRendered = false;
       }
     } else {
       result.push(item);
     }
   }
 
-  return result;
-}
-
-/**
- * Count visible direct + nested children of an item (for truncation detection).
- * Similar to countVisibleNodes but operates on a single parent's children.
- */
-function countVisibleChildren(
-  children: PRDItemData[],
-  activeStatuses: Set<ItemStatus>,
-): number {
-  return countVisibleNodes(children, activeStatuses);
+  return { items: result, fullyRendered };
 }
 
 /**
@@ -171,7 +159,7 @@ export function sliceVisibleTree(
   const sliced = sliceItems(items, activeStatuses, budget);
   const renderedCount = limit - budget.remaining;
 
-  return { items: sliced, renderedCount, totalCount };
+  return { items: sliced.items, renderedCount, totalCount };
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────

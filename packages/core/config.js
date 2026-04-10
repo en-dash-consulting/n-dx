@@ -48,6 +48,7 @@ const PACKAGES = {
  */
 const PROJECT_SECTIONS = new Set([
   "claude",
+  "cli",
   "llm",
   "web",
   "features",
@@ -832,6 +833,18 @@ Sourcevision zone overrides (.n-dx.json):
   sourcevision.zones.pins  object    Override zone assignments: {"file/path.ts": "zone-id"}
   sourcevision.zones.mergeThreshold
                            number    Min zone size for small-zone merge (default: 3)
+
+CLI settings (.n-dx.json):
+  cli.claudePath           string    Path to the Claude Code CLI binary (optional).
+                                     Overrides all discovery heuristics (PATH, nvm,
+                                     Homebrew, etc.). Set this when claude is installed
+                                     in a non-standard location and ndx init cannot
+                                     locate it automatically. The value is NOT validated
+                                     on set — use --force to skip validation on other
+                                     keys, or set directly in .n-dx.json.
+                                     Example: n-dx config cli.claudePath /usr/local/bin/claude
+  cli.timeoutMs            number    Global command timeout in milliseconds (default: 1800000)
+  cli.timeouts.<command>   number    Per-command timeout override (0 = no timeout)
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)

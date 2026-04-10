@@ -56,11 +56,11 @@ describe("n-dx refresh", () => {
     expect(stdout).not.toContain("Unknown command");
     expect(stderr).not.toContain("Unknown command");
     expect(stdout).toContain("skipping UI build because --data-only was set");
-    expect(stdout).toContain("Refresh step: sourcevision-analyze -> started");
-    expect(stdout).toContain("Refresh step: sourcevision-analyze -> succeeded");
-    expect(stdout).toContain("Refresh step: sourcevision-dashboard-artifacts -> started");
-    expect(stdout).toContain("Refresh step: sourcevision-dashboard-artifacts -> succeeded");
-    expect(stdout).toContain("Refresh step: web-build -> skipped (--data-only)");
+    expect(stdout).toContain("[refresh] sourcevision-analyze -> started");
+    expect(stdout).toContain("[refresh] sourcevision-analyze -> succeeded");
+    expect(stdout).toContain("[refresh] sourcevision-dashboard-artifacts -> started");
+    expect(stdout).toContain("[refresh] sourcevision-dashboard-artifacts -> succeeded");
+    expect(stdout).toContain("[refresh] web-build -> skipped (--data-only)");
     expect(stdout).toContain("Refresh step summary:");
     expect(stdout).toContain("web-build: skipped (--data-only)");
   });

@@ -71,28 +71,41 @@ export const TOOL_NAME = "n-dx";
  * Palette: 0=transparent, 1=body (bright purple), 2=outline (dark purple), 3=eye (white)
  */
 
-const DINO_BODY_PIXELS = `000000000000022222200000
-000000000000211111120000
-000000000000211111120000
-000000000002111111112000
-000000000002131111112000
-000000000002111111112000
-000000000002211110022000
-000000000021111112000000
-000000000211111120000000
-000000021111111120000000
-022000211111111120000000
-002202111111111112200000
-000211111111111112012000
-000021111111111112000000
-000002111111111120000000
-000000211111111200000000`;
+const DINO_BODY_PIXELS = `
+000000000000000000000000
+000000000022222000000000
+000000002222222222220000
+000000002223222222120000
+000000022222222222220000
+000000222212122222220000
+000000221111111111100000
+000000022111111111000000`;
 
 const DINO_LEGS = [
-  `000000021110000012100000
-000000211000000001210000`,
-  `000000001210002111000000
-000000001210021100000000`,
+  // Frame 0 — reference: packages/rex/Rex-F.png (canonical frame; both feet planted on ground — ▄ at tips)
+  `
+000000022221221222200000
+000000222221112222200000
+002222222222111222000000
+002222222222111220000000
+000222222111111220000000
+000022222211111220000000
+000002222221112220000000
+000000022211122220000000
+0000000222200002220000
+00000000211000002110000`,
+  // Frame 1 — reference: packages/rex/Rex.png (stride phase 2; right leg stepped one pixel forward — ▄ at tip)
+  `
+000000022221221222000000
+000000222221112222200000
+002222222221111222200000
+002222222222111220000000
+000222222122111220000000
+000022222211111220000000
+000002222221112220000000
+000000022211122220000000
+0000000022220022200000
+00000000021100021100000`,
 ];
 
 // True-color ANSI codes for the shaded palette
@@ -127,21 +140,35 @@ export const LEGS = DINO_LEGS.map((l) => pixelsToLines(l));
 
 /** Monochrome fallback for non-TTY (no true-color). Uses simple purple ANSI. */
 const QUADRANT_BODY = [
-  "       ▗████",
-  "       ▐▙▄██",
-  "       ▟██▛▝",
-  "      ▟███▖",
-  " ▜▄ ▗▟████▌",
-  "  ▜███████▟▘",
-  "   ▜█████▀▘",
-  "    ▜██▀",
+  "          ▗████▖",
+  "         ▗████▜▝",
+  "         ▟████▛▘",
+  "        ▟█████▌",
+  " ▜▖  ▗▟████████▌",
+  " ▐████████████▛▘",
+  " ▝▜███████████▘",
+  "   ▝▜███▘  ▜██▀",
 ];
-const QUADRANT_LEGS = [["    ▟▘ ▜▖"], ["    █  ▜▖"]];
+// Frame 0 — reference: packages/rex/Rex-F.png (both legs planted — █ █ double-support)
+// Frame 1 — reference: packages/rex/Rex.png (left leg fully planted — █ solid; right leg in stride)
+const QUADRANT_LEGS = [["      █     █"], ["      █     ▐▌"]];
 
 /** Static mascot string for non-TTY / test use (monochrome quadrant fallback). */
 export function getMascot() {
   return [...QUADRANT_BODY, ...QUADRANT_LEGS[0]].map((l) => purple(l)).join("\n");
 }
+
+/**
+ * All animation frames of the mascot (monochrome quadrant fallback).
+ * Frame index corresponds to QUADRANT_LEGS index.
+ */
+export function getMascotFrames() {
+  return QUADRANT_LEGS.map((legs) =>
+    [...QUADRANT_BODY, ...legs].map((l) => purple(l)).join("\n"),
+  );
+}
+
+export { QUADRANT_LEGS };
 
 // ── Spinner ────────────────────────────────────────────────────────────
 

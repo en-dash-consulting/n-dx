@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { listRuns } from "../../store/index.js";
 import { HENCH_DIR, safeParseInt } from "./constants.js";
 import { info, result } from "../output.js";
+import { colorStatus } from "../../prd/llm-gateway.js";
 import { batchLookupTasksInRex, formatTaskLine } from "./task-lookup.js";
 
 export async function cmdStatus(
@@ -40,7 +41,7 @@ export async function cmdStatus(
     const taskLine = formatTaskLine(run.taskTitle, run.taskId, taskExists);
 
     result(`${icon} ${run.id.slice(0, 8)}  ${taskLine}`);
-    info(`  ${run.status} | ${run.turns} turns | ${duration} | ${run.model}`);
+    info(`  ${colorStatus(run.status)} | ${run.turns} turns | ${duration} | ${run.model}`);
     const totalTokens = run.tokenUsage.input + run.tokenUsage.output;
     info(`  tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out (${totalTokens} total)`);
     if (run.error) {

@@ -71,6 +71,8 @@ import type {
   UsageDefinition,
   // provider-registry.ts
   ProviderFactory,
+  // vendor-header.ts
+  VendorModelHeaderOptions,
 } from "../../src/public.js";
 
 // Value imports (present at runtime; used directly in assertions below).
@@ -95,6 +97,8 @@ import {
   resolveApiKey,
   resolveCliPath,
   resolveModel,
+  resolveVendorModel,
+  NEWEST_MODELS,
   // token-usage.ts
   parseApiTokenUsage,
   parseCliTokenUsage,
@@ -144,6 +148,8 @@ import {
   isQuiet,
   info,
   result,
+  // vendor-header.ts
+  printVendorModelHeader,
   // suggest.ts
   editDistance,
   suggestCommands,
@@ -155,6 +161,16 @@ import {
   dim,
   cyan,
   yellow,
+  green,
+  red,
+  colorSuccess,
+  colorError,
+  colorPending,
+  colorWarn,
+  colorInfo,
+  colorDim,
+  STATUS_COLORS,
+  colorStatus,
   cmd,
   flag,
   sectionHeader,
@@ -237,6 +253,17 @@ describe("public API — function exports", () => {
 
   it("exports resolveModel as a function", () => {
     expect(typeof resolveModel).toBe("function");
+  });
+
+  it("exports resolveVendorModel as a function", () => {
+    expect(typeof resolveVendorModel).toBe("function");
+  });
+
+  it("exports NEWEST_MODELS as an object with claude and codex keys", () => {
+    expect(typeof NEWEST_MODELS).toBe("object");
+    expect(NEWEST_MODELS).not.toBeNull();
+    expect(typeof NEWEST_MODELS.claude).toBe("string");
+    expect(typeof NEWEST_MODELS.codex).toBe("string");
   });
 
   it("exports parseApiTokenUsage as a function", () => {
@@ -397,6 +424,10 @@ describe("public API — utility exports", () => {
     expect(typeof result).toBe("function");
   });
 
+  it("exports printVendorModelHeader as a function", () => {
+    expect(typeof printVendorModelHeader).toBe("function");
+  });
+
   it("exports editDistance as a function", () => {
     expect(typeof editDistance).toBe("function");
   });
@@ -435,6 +466,47 @@ describe("public API — help formatting exports", () => {
 
   it("exports yellow as a function", () => {
     expect(typeof yellow).toBe("function");
+  });
+
+  it("exports green as a function", () => {
+    expect(typeof green).toBe("function");
+  });
+
+  it("exports red as a function", () => {
+    expect(typeof red).toBe("function");
+  });
+
+  it("exports colorSuccess as a function", () => {
+    expect(typeof colorSuccess).toBe("function");
+  });
+
+  it("exports colorError as a function", () => {
+    expect(typeof colorError).toBe("function");
+  });
+
+  it("exports colorPending as a function", () => {
+    expect(typeof colorPending).toBe("function");
+  });
+
+  it("exports colorWarn as a function", () => {
+    expect(typeof colorWarn).toBe("function");
+  });
+
+  it("exports colorInfo as a function", () => {
+    expect(typeof colorInfo).toBe("function");
+  });
+
+  it("exports colorDim as a function", () => {
+    expect(typeof colorDim).toBe("function");
+  });
+
+  it("exports STATUS_COLORS as an object", () => {
+    expect(typeof STATUS_COLORS).toBe("object");
+    expect(STATUS_COLORS).not.toBeNull();
+  });
+
+  it("exports colorStatus as a function", () => {
+    expect(typeof colorStatus).toBe("function");
   });
 
   it("exports cmd as a function", () => {

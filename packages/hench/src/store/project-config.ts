@@ -15,6 +15,7 @@ import {
   resolveCliPath as sharedResolveCliPath,
 } from "../prd/llm-gateway.js";
 import type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
+import type { HenchConfig } from "../schema/index.js";
 
 // Re-export the shared ClaudeConfig type so existing consumers keep working
 export type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
@@ -57,15 +58,23 @@ export function resolveLLMVendor(llmConfig: LLMConfig): LLMVendor {
 
 /**
  * Resolve active vendor CLI binary.
- * - codex: llm.codex.cli_path or "codex"
- * - claude: llm.claude.cli_path / legacy claude.cli_path or "claude"
+ *
+ * Priority for Claude:
+ *  1. llm.claude.cli_path (or legacy claude.cli_path) from .n-dx.json
+ *  2. henchConfig.claudePath — discovered path persisted by ndx init
+ *  3. "claude" (system PATH fallback)
+ *
+ * For Codex: llm.codex.cli_path or "codex".
  */
-export function resolveVendorCliPath(llmConfig: LLMConfig): string {
+export function resolveVendorCliPath(llmConfig: LLMConfig, henchConfig?: HenchConfig): string {
   const vendor = resolveLLMVendor(llmConfig);
   if (vendor === "codex") {
     return llmConfig.codex?.cli_path ?? "codex";
   }
-  return sharedResolveCliPath(llmConfig.claude ?? {});
+  const configured = sharedResolveCliPath(llmConfig.claude ?? {});
+  if (configured !== "claude") return configured; // explicit user config wins
+  // Fall back to persisted discovered path from .hench/config.json
+  return henchConfig?.claudePath ?? "claude";
 }
 
 /**

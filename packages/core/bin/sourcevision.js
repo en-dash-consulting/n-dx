@@ -9,6 +9,9 @@ import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
 } from "../child-lifecycle.js";
+import { suppressKnownDeprecations } from "@n-dx/llm-client";
+
+suppressKnownDeprecations();
 
 const MONOREPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const _require = createRequire(import.meta.url);

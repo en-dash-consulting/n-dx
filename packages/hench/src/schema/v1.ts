@@ -108,6 +108,8 @@ export interface HenchConfig {
    * Claude. Will be removed once the registry path is validated.
    */
   useRegistryProvider?: boolean;
+  /** Discovered claude CLI path, persisted by ndx init to avoid re-discovery on every run. */
+  claudePath?: string;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────

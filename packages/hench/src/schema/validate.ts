@@ -69,6 +69,7 @@ export const HenchConfigSchema = z.object({
   language: ProjectLanguageSchema,
   useEventPipeline: z.boolean().optional(),
   useRegistryProvider: z.boolean().optional(),
+  claudePath: z.string().optional(),
 });
 
 const RunStatusSchema = z.enum(["running", "completed", "failed", "timeout", "budget_exceeded", "error_transient"]);

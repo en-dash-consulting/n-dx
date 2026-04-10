@@ -578,11 +578,16 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "loadProjectOverrides", "mergeWithOverrides", "toCanonicalJSON",
-        "setQuiet", "isQuiet", "info", "result", "formatHelp", "formatTypoSuggestion",
+        "setQuiet", "isQuiet", "info", "result", "warn", "suppressKnownDeprecations",
+        "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "yellow",
+        "green", "red", "magenta", "colorSuccess", "colorWarn", "colorInfo",
+        "colorDim", "colorPending", "colorPink", "STATUS_COLORS", "colorStatus",
+        "formatHelp", "formatTypoSuggestion",
         "CLIError", "ClaudeClientError", "CLI_ERROR_CODES",
         "exec", "execStdout", "execShellCmd", "getCurrentHead", "getCurrentBranch",
         "isExecutableOnPath", "spawnTool", "spawnManaged", "ProcessPool", "ProcessLimitError",
-        "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "formatUsage",
+        "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "resolveVendorModel",
+        "formatUsage",
         "parseApiTokenUsageWithDiagnostic", "parseStreamTokenUsageWithDiagnostic",
         "mapCodexUsageToTokenUsage", "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS",
         "ALL_FAILURE_CATEGORIES", "createPromptEnvelope", "assemblePrompt",
@@ -591,7 +596,7 @@ describe("gateway export auto-detection", () => {
         "compileCodexPolicyFlags", "mapSandboxToCodexFlag", "mapApprovalToCodexFlag",
         "toAnthropicToolDef", "toAnthropicToolDefs", "toOpenAiToolDef", "toOpenAiToolDefs",
         "ProviderRegistry"],
-      ...["PROJECT_DIRS"],
+      ...["PROJECT_DIRS", "NEWEST_MODELS"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

@@ -6,6 +6,19 @@
  *
  * ## Color semantics
  *
+ * ### Status / severity (use these for CLI output)
+ *
+ * | Helper         | Color  | Meaning                        |
+ * |----------------|--------|--------------------------------|
+ * | colorSuccess   | Green  | completed / success            |
+ * | colorError     | Red    | failure / error                |
+ * | colorPending   | Yellow | in-progress / pending          |
+ * | colorWarn      | Yellow | warning                        |
+ * | colorInfo      | Cyan   | informational / secondary hint |
+ * | colorDim       | Dim    | muted / de-emphasised text     |
+ *
+ * ### Help formatting (use these for --help pages)
+ *
  * | Element           | Color  | Purpose                          |
  * |-------------------|--------|----------------------------------|
  * | Commands          | Cyan   | Executable names and subcommands |
@@ -90,6 +103,138 @@ export function cyan(text: string): string {
 /** Yellow text (flags, options). */
 export function yellow(text: string): string {
   return ansi("33", text, "39");
+}
+
+/** Green text (success, completed). */
+export function green(text: string): string {
+  return ansi("32", text, "39");
+}
+
+/** Red text (errors, failures). */
+export function red(text: string): string {
+  return ansi("31", text, "39");
+}
+
+/** Magenta text (loop-iteration boundaries, decorative separators). */
+export function magenta(text: string): string {
+  return ansi("35", text, "39");
+}
+
+// ── Status-semantic color helpers ───────────────────────────────────────
+
+/**
+ * Color helpers that express CLI output semantics rather than raw colors.
+ * Prefer these over the raw `green`, `red`, etc. helpers when the intent
+ * is to communicate status or severity.
+ *
+ * | Helper         | Meaning                        | Color   |
+ * |----------------|--------------------------------|---------|
+ * | colorSuccess   | completed / success            | green   |
+ * | colorError     | failure / error                | red     |
+ * | colorPending   | in-progress / pending          | yellow  |
+ * | colorWarn      | warning                        | yellow  |
+ * | colorInfo      | informational / secondary hint | cyan    |
+ * | colorDim       | muted / de-emphasised text     | dim     |
+ * | colorPink      | loop-iteration boundary        | magenta |
+ */
+
+/** Color a success or completed status (green). */
+export function colorSuccess(text: string): string {
+  return green(text);
+}
+
+/** Color an error or failure status (red). */
+export function colorError(text: string): string {
+  return red(text);
+}
+
+/** Color a pending or in-progress status (yellow). */
+export function colorPending(text: string): string {
+  return yellow(text);
+}
+
+/** Color a warning (yellow). */
+export function colorWarn(text: string): string {
+  return yellow(text);
+}
+
+/** Color an informational or secondary hint (cyan). */
+export function colorInfo(text: string): string {
+  return cyan(text);
+}
+
+/** Mute or de-emphasise text (dim). */
+export function colorDim(text: string): string {
+  return dim(text);
+}
+
+/** Color a loop-iteration boundary separator (magenta/pink). */
+export function colorPink(text: string): string {
+  return magenta(text);
+}
+
+// ── PRD status + log-level color map ────────────────────────────────────
+
+/**
+ * Canonical color map for PRD status values and log-level labels.
+ *
+ * This is the single source of truth for CLI color semantics across all
+ * n-dx tools (rex, hench, sourcevision, ndx orchestrator). Use
+ * `colorStatus()` to apply; reference this map when building tables or
+ * badges where you need the raw color function directly.
+ *
+ * ## Color convention
+ *
+ * | Color  | Meaning                                                 |
+ * |--------|---------------------------------------------------------|
+ * | green  | completed · success — work is done                      |
+ * | cyan   | in_progress · running · info — active or informational  |
+ * | yellow | pending · blocked · warning — needs attention           |
+ * | red    | failing · failed · error · timeout — problem state      |
+ * | dim    | deferred · deleted · muted — background / done-and-gone |
+ *
+ * All tools must import `colorStatus` from `@n-dx/llm-client` (or the
+ * hench `llm-gateway`) rather than defining their own status→color switch.
+ */
+export const STATUS_COLORS: Record<string, (text: string) => string> = {
+  // ── PRD status values ────────────────────────────────────────────────
+  completed:       green,
+  in_progress:     cyan,
+  pending:         yellow,
+  blocked:         yellow,
+  failing:         red,
+  deferred:        dim,
+  deleted:         dim,
+  // ── Hench run status values ──────────────────────────────────────────
+  running:         cyan,
+  failed:          red,
+  timeout:         red,
+  budget_exceeded: red,
+  // ── Log-level / severity labels ──────────────────────────────────────
+  success:         green,
+  error:           red,
+  warn:            yellow,
+  warning:         yellow,
+  info:            cyan,
+};
+
+/**
+ * Apply the canonical status color to a string.
+ *
+ * Looks up `status` in {@link STATUS_COLORS} and applies the corresponding
+ * color function. Pass an optional `text` argument to display a different
+ * label than the status key itself.  Unknown status values are returned
+ * unstyled.
+ *
+ * @example
+ *   colorStatus("completed")            // → green("completed")
+ *   colorStatus("failing")              // → red("failing")
+ *   colorStatus("pending")              // → yellow("pending")
+ *   colorStatus("completed", "✓ done")  // → green("✓ done")
+ */
+export function colorStatus(status: string, text?: string): string {
+  const colorFn = STATUS_COLORS[status] ?? ((s: string) => s);
+  return colorFn(text ?? status);
 }
 
 // ── Semantic formatters ─────────────────────────────────────────────────
