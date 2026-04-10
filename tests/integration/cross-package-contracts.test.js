@@ -578,12 +578,17 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "loadProjectOverrides", "mergeWithOverrides", "toCanonicalJSON",
-        "setQuiet", "isQuiet", "info", "result", "formatHelp", "formatTypoSuggestion",
+        "setQuiet", "isQuiet", "info", "result", "warn", "suppressKnownDeprecations",
+        "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "yellow",
+        "green", "red", "magenta", "colorSuccess", "colorWarn", "colorInfo",
+        "colorDim", "colorPending", "colorPink", "STATUS_COLORS", "colorStatus",
+        "formatHelp", "formatTypoSuggestion",
         "CLIError", "ClaudeClientError", "CLI_ERROR_CODES",
         "exec", "execStdout", "execShellCmd", "getCurrentHead", "getCurrentBranch",
         "isExecutableOnPath", "spawnTool", "spawnManaged", "ProcessPool", "ProcessLimitError",
-        "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "formatUsage"],
-      ...["PROJECT_DIRS"],
+        "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "resolveVendorModel",
+        "formatUsage"],
+      ...["PROJECT_DIRS", "NEWEST_MODELS"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

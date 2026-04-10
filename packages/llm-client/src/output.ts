@@ -39,3 +39,12 @@ export function info(...args: unknown[]): void {
 export function result(...args: unknown[]): void {
   console.log(...args);
 }
+
+/**
+ * Print warning output. Suppressed in quiet mode.
+ * Output goes to stderr to avoid polluting machine-readable stdout.
+ * Use for non-fatal problems, deprecation notices, model-change alerts.
+ */
+export function warn(...args: unknown[]): void {
+  if (!_quiet) console.error(...args);
+}

@@ -13,7 +13,7 @@ import {
   reasonFromDescriptions,
   reasonFromIdeasFile,
   validateProposalQuality,
-  DEFAULT_MODEL,
+  resolveConfiguredModel,
   setLLMConfig,
   setClaudeConfig,
   getAuthMode,
@@ -32,7 +32,9 @@ import {
 } from "./smart-add-duplicates.js";
 import type { ProposalDuplicateMatch } from "./smart-add-duplicates.js";
 import type { LLMVendor } from "@n-dx/llm-client";
+import { printVendorModelHeader } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
+import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
 
 const PENDING_FILE = "pending-smart-proposals.json";
 
@@ -1139,14 +1141,17 @@ async function initializeSmartAddLLM(dir: string, format?: string): Promise<void
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
 
-  if (format === "json") return;
   const vendor = getLLMVendor();
-  if (vendor) info(`Using ${vendor} for reasoning.`);
   llmDebug(`resolved vendor=${vendor ?? "unknown"} configDir=${rexConfigDir}`);
-  const authMode = getAuthMode();
-  llmDebug(`resolved authMode=${authMode ?? "unknown"}`);
-  if (authMode === "api") {
-    info("Using direct API authentication.");
+  if (vendor) {
+    printVendorModelHeader(vendor, llmConfig, { format });
+  }
+  if (format !== "json") {
+    const authMode = getAuthMode();
+    llmDebug(`resolved authMode=${authMode ?? "unknown"}`);
+    if (authMode === "api") {
+      info("Using direct API authentication.");
+    }
   }
 }
 
@@ -1193,12 +1198,14 @@ async function resolveSmartAddModel(
     const rexDir = join(dir, REX_DIR);
     const store = await resolveStore(rexDir);
     const config = await store.loadConfig();
-    const model = config.model;
-    llmDebug(`effective model=${model ?? DEFAULT_MODEL}`);
+    const vendor = getLLMVendor() ?? "claude";
+    const model = resolveVendorCompatibleRexModel(vendor, config.model);
+    llmDebug(`effective model=${model ?? resolveConfiguredModel()}`);
     return model;
   } catch {
-    llmDebug(`effective model=${DEFAULT_MODEL}`);
-    return undefined;
+    const resolvedModel = resolveConfiguredModel();
+    llmDebug(`effective model=${resolvedModel}`);
+    return resolvedModel;
   }
 }
 
@@ -1242,7 +1249,7 @@ async function generateSmartAddProposals(params: {
   isJson: boolean;
 }): Promise<Proposal[]> {
   const { dir, existing, parentId, model, descList, filePaths, isJson } = params;
-  const effectiveModel = model ?? DEFAULT_MODEL;
+  const effectiveModel = resolveConfiguredModel(model);
 
   if (filePaths.length > 0) {
     const resolved = filePaths.map((fp) => resolve(dir, fp));
@@ -1353,7 +1360,7 @@ async function runInteractiveSmartAddApproval(params: {
 }): Promise<void> {
   const { dir, existing, parentId, parentLevel, model, thresholdWeeks } = params;
   const { adjustGranularity } = await import("../../analyze/index.js");
-  const resolvedModel = model ?? DEFAULT_MODEL;
+  const resolvedModel = model;
   let currentProposals = params.proposals;
   let currentDuplicateMatches = params.duplicateMatches;
   let done = false;

@@ -147,6 +147,8 @@ export {
   resolveApiKey,
   resolveCliPath,
   resolveModel,
+  resolveVendorModel,
+  NEWEST_MODELS,
 } from "./config.js";
 
 // Token usage parsing
@@ -225,7 +227,14 @@ export {
   isQuiet,
   info,
   result,
+  warn,
 } from "./output.js";
+
+// Vendor/model header (surfaces active vendor+model at command start)
+export {
+  printVendorModelHeader,
+} from "./vendor-header.js";
+export type { VendorModelHeaderOptions } from "./vendor-header.js";
 
 // CLI typo correction
 export {
@@ -233,6 +242,9 @@ export {
   suggestCommands,
   formatTypoSuggestion,
 } from "./suggest.js";
+
+// Deprecation warning filter (CLI entry points)
+export { suppressKnownDeprecations } from "./suppress-deprecations.js";
 
 // CLI help formatting
 export {
@@ -242,6 +254,20 @@ export {
   dim,
   cyan,
   yellow,
+  green,
+  red,
+  magenta,
+  // Status-semantic color helpers
+  colorSuccess,
+  colorError,
+  colorPending,
+  colorWarn,
+  colorInfo,
+  colorDim,
+  colorPink,
+  // Canonical status→color map (PRD statuses + log-levels)
+  STATUS_COLORS,
+  colorStatus,
   cmd,
   flag,
   sectionHeader,

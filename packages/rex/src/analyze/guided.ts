@@ -8,7 +8,7 @@ import {
   PRD_SCHEMA,
   TASK_QUALITY_RULES,
   OUTPUT_INSTRUCTION,
-  DEFAULT_MODEL,
+  resolveConfiguredModel,
   emptyAnalyzeTokenUsage,
   accumulateTokenUsage,
 } from "./reason.js";
@@ -180,7 +180,7 @@ export async function runGuidedSpec(
   dir: string,
   model?: string,
 ): Promise<ReasonResult> {
-  const effectiveModel = model ?? DEFAULT_MODEL;
+  const effectiveModel = resolveConfiguredModel(model);
   const tokenUsage = emptyAnalyzeTokenUsage();
 
   info("Guided spec builder — let's define your project.\n");

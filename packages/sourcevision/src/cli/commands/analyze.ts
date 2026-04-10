@@ -13,7 +13,7 @@ import { toCanonicalJSON } from "../../util/sort.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
 import { emptyAnalyzeTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
-import { loadLLMConfig } from "@n-dx/llm-client";
+import { loadLLMConfig, printVendorModelHeader, bold, dim, green, cyan } from "@n-dx/llm-client";
 import type { RiskJustificationEntry } from "../../schema/v1.js";
 import type { ZoneType } from "../../analyzers/risk-scoring.js";
 import { detectSubAnalyses } from "../../analyzers/workspace.js";
@@ -111,7 +111,9 @@ async function initAndLoadLLMConfig(absDir: string): Promise<{
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
   const vendor = getLLMVendor();
-  if (vendor) info(`Using ${vendor} for enrichment.`);
+  if (vendor) {
+    printVendorModelHeader(vendor, llmConfig);
+  }
   if (getAuthMode() === "api") info("Using direct API authentication.");
 
   return { svDir, llmConfig };
@@ -126,15 +128,15 @@ async function runDeepSubAnalyses(absDir: string, extraArgs: string[]): Promise<
   const subAnalyses = detectSubAnalyses(absDir);
   if (subAnalyses.length === 0) return;
 
-  info(`[deep] Found ${subAnalyses.length} sub-package${subAnalyses.length > 1 ? "s" : ""}: ${subAnalyses.map((s) => s.prefix).join(", ")}`);
+  info(`${dim("[deep]")} Found ${subAnalyses.length} sub-package${subAnalyses.length > 1 ? "s" : ""}: ${subAnalyses.map((s) => s.prefix).join(", ")}`);
   const childArgs = extraArgs.filter((a) => a !== "--deep");
   for (const sub of subAnalyses) {
     const subDir = join(absDir, sub.prefix);
-    info(`\n[deep] Analyzing ${sub.prefix}...`);
+    info(`\n${dim("[deep]")} Analyzing ${sub.prefix}...`);
     await cmdAnalyze(subDir, childArgs);
     info("");
   }
-  info(`[deep] Sub-package analysis complete, proceeding with root.\n`);
+  info(`${dim("[deep]")} Sub-package analysis complete, proceeding with root.\n`);
 }
 
 /**
@@ -179,7 +181,7 @@ function finalizeTokenUsage(
 ): void {
   const usageLine = formatTokenUsage(ctx.tokenUsage);
   if (usageLine) {
-    info(`Token usage: ${usageLine}`);
+    info(`${dim("Token usage:")} ${usageLine}`);
   }
 
   if (ctx.tokenUsage.calls > 0) {
@@ -217,7 +219,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
 
   await runDeepSubAnalyses(absDir, extraArgs);
 
-  info(`Analyzing: ${absDir}`);
+  info(`${bold("Analyzing:")} ${dim(absDir)}`);
   info("");
 
   await executePhases(ctx, filter, extraArgs);
@@ -239,15 +241,15 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     const structuralCount = findings.filter((f: { category?: string }) => f.category === "structural").length;
     if (moveCount > 0 || structuralCount > 0) {
       info("");
-      info(`Tip: ${moveCount > 0 ? `${moveCount} file-move suggestion${moveCount === 1 ? "" : "s"} detected. ` : ""}If zone assignments look wrong, you can override them with zone pins:`);
-      info("  ndx config sourcevision.zones.pins '{\"path/to/file.ts\": \"target-zone-id\"}'");
+      info(`${cyan("Tip:")} ${moveCount > 0 ? `${bold(String(moveCount))} file-move suggestion${moveCount === 1 ? "" : "s"} detected. ` : ""}If zone assignments look wrong, you can override them with zone pins:`);
+      info(`  ${dim("ndx config sourcevision.zones.pins '{\"path/to/file.ts\": \"target-zone-id\"}'")}`);
     }
   } catch {
     // Non-critical — don't fail the analysis
   }
 
   info("");
-  info("Done.");
+  info(green("Done."));
 }
 
 // ── PR markdown generation ───────────────────────────────────────────
@@ -288,10 +290,10 @@ async function generatePrMarkdownStep(ctx: AnalyzeContext): Promise<void> {
       info(`  Warning: ${warning}`);
     }
 
-    info(`[output] pr-markdown.md (${itemCount} item${itemCount !== 1 ? "s" : ""}) → ${outputPath}`);
+    info(`${dim("[output]")} pr-markdown.md (${bold(String(itemCount))} item${itemCount !== 1 ? "s" : ""}) → ${dim(outputPath)}`);
   } catch (err) {
     const guidance = classifyPrMarkdownError(err);
-    info("[output] pr-markdown.md — generation failed");
+    info(`${dim("[output]")} pr-markdown.md — generation failed`);
     info(`  ${guidance}`);
   }
 }
@@ -369,9 +371,9 @@ function generateOutputFiles(ctx: AnalyzeContext): void {
       emitZoneOutputs(ctx.svDir, inventory, importsData, zonesData);
       manifest.zoneOutputs = true;
       writeManifest(ctx.absDir, manifest);
-      info(`[output] llms.txt + CONTEXT.md + zones/ → ${ctx.svDir}`);
+      info(`${dim("[output]")} llms.txt + CONTEXT.md + zones/ → ${dim(ctx.svDir)}`);
     } else {
-      info(`[output] llms.txt + CONTEXT.md → ${ctx.svDir}`);
+      info(`${dim("[output]")} llms.txt + CONTEXT.md → ${dim(ctx.svDir)}`);
     }
   } catch {
     // Non-critical — don't fail the analysis

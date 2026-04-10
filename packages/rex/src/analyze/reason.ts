@@ -32,11 +32,11 @@ export {
   setClaudeClient,
   getAuthMode,
   getLLMVendor,
+  resolveConfiguredModel,
   spawnClaude,
 } from "./llm-bridge.js";
 
 import {
-  DEFAULT_MODEL,
   emptyAnalyzeTokenUsage,
   accumulateTokenUsage,
   extractJson,
@@ -806,7 +806,7 @@ ${content}
 
 ${OUTPUT_INSTRUCTION}`;
 
-  const result = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
+  const result = await spawnClaude(prompt, model);
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
@@ -934,7 +934,7 @@ export async function reasonFromScanResults(
     return { proposals: [], tokenUsage };
   }
 
-  const model = options?.model ?? DEFAULT_MODEL;
+  const model = options?.model;
   const allProposals: Proposal[] = [];
 
   for (let i = 0; i < chunks.length; i++) {
@@ -1105,7 +1105,7 @@ export async function reasonFromDescription(
   });
 
   const tokenUsage = emptyAnalyzeTokenUsage();
-  const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+  const result = await spawnClaude(prompt, options?.model);
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
@@ -1207,7 +1207,7 @@ export async function reasonFromDescriptions(
     parentId: options?.parentId,
   });
 
-  const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+  const result = await spawnClaude(prompt, options?.model);
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
@@ -1287,7 +1287,7 @@ export async function adjustGranularity(
     : buildConsolidatePrompt(proposals);
 
   const tokenUsage = emptyAnalyzeTokenUsage();
-  const result = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
+  const result = await spawnClaude(prompt, model);
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
@@ -1485,7 +1485,7 @@ export async function assessGranularity(
   }
 
   const prompt = buildAssessmentPrompt(proposals);
-  const result = await spawnClaude(prompt, model ?? DEFAULT_MODEL);
+  const result = await spawnClaude(prompt, model);
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const assessments = parseAssessmentResponse(result.text, proposals);
@@ -1648,7 +1648,7 @@ export async function reasonFromIdeasFile(
       parentId: options?.parentId,
     });
 
-    const result = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+    const result = await spawnClaude(prompt, options?.model);
     accumulateTokenUsage(tokenUsage, result.tokenUsage);
     localProposals.push(...parseProposalResponse(result.text));
   }
@@ -1747,7 +1747,7 @@ export async function reasonFromBatch(
       const prompt = await buildIdeasPrompt(combined, existingItems, dir, {
         parentId: options?.parentId,
       });
-      const llmResult = await spawnClaude(prompt, options?.model ?? DEFAULT_MODEL);
+      const llmResult = await spawnClaude(prompt, options?.model);
       accumulateTokenUsage(tokenUsage, llmResult.tokenUsage);
       const proposals = parseProposalResponse(llmResult.text);
       allProposals.push(...proposals);

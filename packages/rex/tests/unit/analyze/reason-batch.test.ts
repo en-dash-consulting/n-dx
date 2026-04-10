@@ -5,13 +5,24 @@ import { tmpdir } from "node:os";
 import type { BatchImportItem, BatchImportResult } from "../../../src/analyze/reason.js";
 
 // We need to mock spawnClaude since it calls the LLM
-vi.mock("@n-dx/llm-client", () => ({
-  createClient: () => ({
-    mode: "api",
-    prompt: vi.fn().mockResolvedValue({ text: "[]", tokenUsage: undefined }),
-  }),
-  detectAuthMode: () => "api",
-}));
+vi.mock("@n-dx/llm-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
+  return {
+    ...actual,
+    // Mock both old (createClient) and current (createLLMClient) factory names
+    // so that spawnClaude in llm-bridge.ts never hits a real LLM endpoint.
+    createClient: () => ({
+      mode: "api" as const,
+      complete: vi.fn().mockResolvedValue({ text: "[]", tokenUsage: undefined }),
+    }),
+    createLLMClient: () => ({
+      mode: "api" as const,
+      complete: vi.fn().mockResolvedValue({ text: "[]", tokenUsage: undefined }),
+    }),
+    detectAuthMode: () => "api",
+    detectLLMAuthMode: () => "api",
+  };
+});
 
 describe("reasonFromBatch", () => {
   let tmpDir: string;

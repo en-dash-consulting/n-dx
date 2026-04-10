@@ -7,13 +7,17 @@ import type { Proposal } from "../../../src/analyze/propose.js";
 // Shared mock client — all tests control LLM responses through this
 const mockComplete = vi.fn().mockResolvedValue({ text: "[]", tokenUsage: undefined });
 
-vi.mock("@n-dx/llm-client", () => ({
-  createLLMClient: () => ({
-    mode: "api",
-    complete: mockComplete,
-  }),
-  detectLLMAuthMode: () => "api",
-}));
+vi.mock("@n-dx/llm-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
+  return {
+    ...actual,
+    createLLMClient: () => ({
+      mode: "api",
+      complete: mockComplete,
+    }),
+    detectLLMAuthMode: () => "api",
+  };
+});
 
 function makeProposal(title: string, featureCount = 1, taskCount = 2): Proposal {
   const features = [];

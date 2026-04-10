@@ -2,6 +2,7 @@ import type { Proposal } from "../../analyze/index.js";
 import { classifyModificationRequest } from "../../analyze/validate-modification.js";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 import type { GranularityAdjustmentRecord, BatchAcceptanceRecord } from "../../analyze/batch-types.js";
+import { green, red, cyan, dim, yellow } from "@n-dx/llm-client";
 
 // Re-export so existing consumers of chunked-review-state keep working.
 export type { GranularityAdjustmentRecord, BatchAcceptanceRecord };
@@ -167,23 +168,23 @@ export function formatChunk(
     const p = proposals[i];
     const globalIdx = indices[i] + 1; // 1-based display number
     const status = state.accepted.has(indices[i])
-      ? " ✓"
+      ? green(" ✓")
       : state.rejected.has(indices[i])
-        ? " ✗"
+        ? red(" ✗")
         : "";
 
-    lines.push(`${globalIdx}. [epic] ${p.epic.title}${status}`);
+    lines.push(`${globalIdx}. ${cyan("[epic]")} ${p.epic.title}${status}`);
     if (p.epic.description) {
-      lines.push(`   ${p.epic.description}`);
+      lines.push(`   ${dim(p.epic.description)}`);
     }
     for (const f of p.features) {
-      lines.push(`     [feature] ${f.title}`);
+      lines.push(`     ${yellow("[feature]")} ${f.title}`);
       for (const t of f.tasks) {
         const pri = t.priority ? ` [${t.priority}]` : "";
         if (t.decomposition) {
           const loeLabel = t.loe !== undefined ? `${t.loe}w` : "?";
           const thresholdLabel = `${t.decomposition.thresholdWeeks}w`;
-          lines.push(`       [task] ${t.title}${pri} ⚡ decomposed (LoE: ${loeLabel} > ${thresholdLabel} threshold)`);
+          lines.push(`       ${dim("[task]")} ${t.title}${pri} ⚡ decomposed (LoE: ${loeLabel} > ${thresholdLabel} threshold)`);
           for (const child of t.decomposition.children) {
             const childPri = child.priority ? ` [${child.priority}]` : "";
             const childLoe = formatTaskLoE(child, state.thresholdWeeks);
@@ -193,7 +194,7 @@ export function formatChunk(
           }
         } else {
           const loe = formatTaskLoE(t, state.thresholdWeeks);
-          lines.push(`       [task] ${t.title}${pri}${loe}`);
+          lines.push(`       ${dim("[task]")} ${t.title}${pri}${loe}`);
           const rationale = formatTaskLoERationale(t, "         ");
           if (rationale) lines.push(rationale);
         }
@@ -214,24 +215,24 @@ export function formatActionMenu(state: ChunkReviewState): string {
 
   const options: string[] = [];
 
-  options.push("a=accept these");
+  options.push(green("a=accept these"));
   if (hasNext) options.push("n=next");
   if (hasPrev) options.push("p=prev");
   options.push("+more");
   options.push("-fewer");
-  options.push("A=accept all");
-  options.push("R=reject all");
-  options.push("b#=break down");
-  options.push("c#=consolidate");
-  options.push("ba=break chunk");
-  options.push("ca=consolidate chunk");
-  options.push("g=assess");
+  options.push(green("A=accept all"));
+  options.push(red("R=reject all"));
+  options.push(dim("b#=break down"));
+  options.push(dim("c#=consolidate"));
+  options.push(dim("ba=break chunk"));
+  options.push(dim("ca=consolidate chunk"));
+  options.push(dim("g=assess"));
   if (state.lastAssessment && state.lastAssessment.length > 0) {
-    options.push("apply=apply assessment");
+    options.push(yellow("apply=apply assessment"));
   }
-  options.push("d=done");
-  options.push("#,#=select");
-  options.push("or type a change");
+  options.push(dim("d=done"));
+  options.push(dim("#,#=select"));
+  options.push(dim("or type a change"));
 
   return `[${options.join(" | ")}]`;
 }

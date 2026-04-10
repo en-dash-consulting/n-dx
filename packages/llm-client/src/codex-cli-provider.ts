@@ -16,6 +16,7 @@ import type {
 } from "./types.js";
 import { ClaudeClientError } from "./types.js";
 import type { CodexConfig } from "./llm-types.js";
+import { NEWEST_MODELS } from "./config.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
@@ -37,7 +38,7 @@ const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_DELAY_MS = 10000;
 const DEFAULT_CODEX_BINARY = "codex";
-const DEFAULT_CODEX_MODEL = "gpt-5-codex";
+const DEFAULT_CODEX_MODEL = NEWEST_MODELS.codex;
 
 export interface CodexCliProviderOptions {
   codexConfig?: CodexConfig;

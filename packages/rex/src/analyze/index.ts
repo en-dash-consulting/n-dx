@@ -30,6 +30,7 @@ export {
   setClaudeClient,
   getAuthMode,
   getLLMVendor,
+  resolveConfiguredModel,
   CHUNK_CHAR_LIMIT,
   CHUNK_ITEM_LIMIT,
   FEW_SHOT_EXAMPLE,

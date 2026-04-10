@@ -1,5 +1,6 @@
 This codebase will outlive you. Every shortcut you take becomes someone else's burden.
-Fight entropy. Leave the codebase better than you found it.
+Fight entropy. Leave the codebase better than you found it. Use as few words as is necessary
+to describe changes, and thoughts.
 
 0. Run the project's validation command to ensure a clean state.
    Fix and commit if anything fails.

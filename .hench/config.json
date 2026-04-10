@@ -26,5 +26,6 @@
     "memoryThrottle": {
       "enabled": false
     }
-  }
+  },
+  "claudePath": "claude"
 }

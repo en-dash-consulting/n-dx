@@ -67,14 +67,20 @@ export function getAncestorIds(items: PRDItemData[], targetId: string): string[]
  * Returns a Set containing the item's own ID plus every descendant ID.
  */
 export function collectSubtreeIds(item: PRDItemData): Set<string> {
-  const ids = new Set<string>([item.id]);
-  if (item.children) {
-    for (const child of item.children) {
-      for (const id of collectSubtreeIds(child)) {
-        ids.add(id);
-      }
+  const ids = new Set<string>();
+  const stack: PRDItemData[] = [item];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    ids.add(current.id);
+    const children = current.children;
+    if (!children || children.length === 0) continue;
+    for (let i = children.length - 1; i >= 0; i -= 1) {
+      stack.push(children[i]);
     }
   }
+
   return ids;
 }
 

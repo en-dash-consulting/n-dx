@@ -19257,10 +19257,11 @@
     {
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-04-02T17:55:36.327Z",
+      "completedAt": "2026-04-09T14:26:25.556Z",
       "mergedProposals": [
         {
           "proposalNodeKey": "p0:epic",
@@ -20921,7 +20922,7 @@
         {
           "id": "dcf6018e-e658-4708-ae6e-1bd23431748f",
           "title": "Auto-Update Detection from npm Registry",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Automatically detect when a newer version of n-dx is available on the npm registry and notify the user non-intrusively after command output. Cache the check with a 24-hour TTL to avoid repeated network calls.",
           "acceptanceCriteria": [
@@ -20936,12 +20937,21 @@
             "cli",
             "ux"
           ],
-          "source": "conversation"
+          "source": "conversation",
+          "startedAt": "2026-04-09T13:39:49.171Z",
+          "completedAt": "2026-04-09T13:50:20.353Z",
+          "log": [
+            {
+              "timestamp": "2026-04-09T13:50:20.353Z",
+              "type": "task_completed",
+              "message": "Implemented auto-update detection from npm registry.\n\n## What was done\n\n**New file: packages/core/update-check.js**\n- Fetches latest @n-dx/core version from npm registry (https://registry.npmjs.org/@n-dx/core/latest)\n- Caches result with 24-hour TTL in OS temp dir (n-dx-update-check.json)\n- Never throws — all errors silently swallowed so network failures never crash CLI\n- Exports: startUpdateCheck({ currentVersion }), formatUpdateNotice({ current, latest }), CACHE_TTL_MS\n- 3-second fetch timeout to avoid blocking on slow/firewalled networks\n\n**Modified: packages/core/cli.js**\n- Imports startUpdateCheck + formatUpdateNotice from ./update-check.js\n- Module-level pendingUpdateCheck promise + updateCheckQuiet flag\n- main() detects --quiet/-q early and starts background update check\n- flushAndExit() races the check promise against 500ms timeout; prints notice to stderr on success (code 0)\n- Notice goes to stderr so JSON stdout output stays machine-parseable\n\n**New file: tests/unit/update-check.test.js**\n- 18 tests covering: registry fetch success/failure, cache hit/miss/expiry, malformed cache, version comparisons (major/minor/patch), cache writes, formatUpdateNotice output\n\n**Fixed pre-existing failure: tests/unit/cli-smoke-parity.test.js**\n- Updated hardcoded version 0.2.1 -> 0.2.2 to match current package.json version\n\n**Modified: packages/core/package.json**\n- Added update-check.js to files array so it's included in npm publish\n\n## Decisions\n- Used OS tmpdir for cache (not .n-dx.json) — avoids polluting versioned config, works without knowing project dir\n- Writes to stderr not stdout — keeps JSON output clean for scripting\n- 500ms race timeout in flushAndExit — caps any post-command delay\n- Quiet flag check is global (process.argv) so it works for all commands\n\n## Test coverage\n124 unit tests pass. 27 CLI contract/version e2e tests pass. Pre-existing architecture policy failures unchanged."
+            }
+          ]
         },
         {
           "id": "013bc11c-ec20-4ac2-8463-9c17adf31fe4",
           "title": "Auto Re-Init Detection for Stale Projects",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Detect when a project's n-dx setup is stale or incomplete and suggest re-initialization. Check for missing directories, schema version mismatches, and missing config keys from newer versions.",
           "acceptanceCriteria": [
@@ -20959,7 +20969,9 @@
           "source": "conversation",
           "blockedBy": [
             "dcf6018e-e658-4708-ae6e-1bd23431748f"
-          ]
+          ],
+          "startedAt": "2026-04-09T14:24:17.627Z",
+          "completedAt": "2026-04-09T14:26:25.267Z"
         }
       ]
     },
@@ -24102,6 +24114,1800 @@
               "source": "smart-add",
               "startedAt": "2026-04-06T19:19:59.169Z",
               "completedAt": "2026-04-06T19:23:14.178Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cc09612c-005f-4239-b0c9-3a7edfc6f538",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T14:28:53.469Z",
+      "completedAt": "2026-04-07T14:28:53.469Z",
+      "children": [
+        {
+          "id": "08464700-9955-4338-87b6-afea0646a6f8",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Extend the existing PR validation pipeline with additive cross-platform execution stages that run the same n-dx install and smoke-command flow in MacOS and Windows containerized environments, then verify parity against each other and against the repository's existing static expected responses and exit codes.",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T14:28:53.235Z",
+          "completedAt": "2026-04-07T14:28:53.235Z",
+          "children": [
+            {
+              "id": "d10a172b-4b1f-4da1-8736-ec9ae8e11b12",
+              "title": "Add MacOS pipeline stage for ndx install-and-run smoke validation",
+              "status": "completed",
+              "level": "task",
+              "description": "Introduce a new CI stage that starts the requested MacOS-based container environment, installs n-dx using the repository's supported setup path, runs the agreed smoke commands, and captures only deterministic outputs and exit codes needed for validation without changing existing command logic.",
+              "acceptanceCriteria": [
+                "Pipeline includes a distinct MacOS validation stage that runs after existing prerequisite setup and before final pipeline success is reported",
+                "The stage executes the documented install-and-run smoke script for n-dx using MacOS-appropriate commands",
+                "The stage records command exit codes and only the static response fields already considered deterministic by the current test contract",
+                "The stage does not assert on generated code, model-authored prose, or any other nondeterministic LLM output",
+                "A failure in any expected static response or exit code causes the MacOS stage to fail the pipeline with actionable diagnostics"
+              ],
+              "priority": "high",
+              "tags": [
+                "ci",
+                "pipeline",
+                "macos",
+                "cli",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:22:19.737Z",
+              "completedAt": "2026-04-07T14:26:24.041Z"
+            },
+            {
+              "id": "1a72b5c1-bc52-42f6-8918-402065d6e324",
+              "title": "Add Windows pipeline stage for ndx install-and-run smoke validation",
+              "status": "completed",
+              "level": "task",
+              "description": "Introduce a second CI stage that starts the requested Windows-based container environment, runs the same install and smoke-command workflow using Windows-native commands, and captures deterministic outputs and exit codes using the same assertion scope as the MacOS stage.",
+              "acceptanceCriteria": [
+                "Pipeline includes a distinct Windows validation stage parallel to the MacOS validation stage",
+                "The stage executes the same logical install-and-run smoke flow as MacOS, translated to Windows command syntax where required",
+                "The Windows stage captures the same set of deterministic response fields and exit codes as the MacOS stage",
+                "The stage excludes assertions on generated code, model-generated prose, and any nondeterministic text output",
+                "A mismatch against expected static responses or exit codes causes the Windows stage to fail with platform-specific diagnostics"
+              ],
+              "priority": "high",
+              "tags": [
+                "ci",
+                "pipeline",
+                "windows",
+                "cli",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:26:24.720Z",
+              "completedAt": "2026-04-07T14:28:52.966Z"
+            },
+            {
+              "id": "e1319df0-a11c-47c5-b4a2-840ea087160f",
+              "title": "Implement cross-platform parity assertions for deterministic CLI responses",
+              "status": "completed",
+              "level": "task",
+              "description": "Add an additive validation step that compares the MacOS and Windows smoke-run artifacts against each other and against the existing static expected responses and error codes, ensuring platform consistency without expanding the contract to nondeterministic model output.",
+              "acceptanceCriteria": [
+                "Pipeline collects normalized result artifacts from both MacOS and Windows stages in a format suitable for automated comparison",
+                "A parity check verifies that both platforms return matching deterministic responses and matching expected exit codes for the covered smoke commands",
+                "The assertion set is explicitly limited to known static responses and existing error codes already treated as stable by the test suite",
+                "The parity check ignores generated code diffs, model-produced text bodies, and other nondeterministic output fields",
+                "The new validation is additive only and does not require modification of existing production command logic to pass"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "parity",
+                "cross-platform",
+                "cli",
+                "test-harness"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-06T18:34:06.588Z",
+              "completedAt": "2026-04-06T18:39:35.822Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "95b432f8-c0df-446c-aab5-e639ccbf8ced",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T14:21:28.188Z",
+      "completedAt": "2026-04-07T14:21:28.188Z",
+      "children": [
+        {
+          "id": "3257d8b1-30cc-4323-8f36-f724ed1052fc",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T14:21:27.955Z",
+          "completedAt": "2026-04-07T14:21:27.955Z",
+          "children": [
+            {
+              "id": "a306484a-e1e0-44a2-9740-70fc31efd9ef",
+              "title": "Diagnose smoke parity suite failure and capture reproducible error context",
+              "status": "completed",
+              "level": "task",
+              "description": "Reproduce the current smoke parity suite failure in a controlled environment, identify the exact failing assertion or command path, and document the concrete error signature so follow-up fixes target the real regression instead of symptoms.",
+              "acceptanceCriteria": [
+                "Smoke parity suite is executed in the affected environment and the failing test case is identified",
+                "The exact error message, failing command, and relevant platform/runtime context are captured in a reproducible issue note or test output artifact",
+                "The failure is classified into a concrete root-cause category such as CLI output drift, install/runtime issue, or environment-specific behavior",
+                "A deterministic reproduction path exists that another engineer can run without relying on tribal knowledge"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "smoke",
+                "parity",
+                "diagnostics"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:09:24.928Z",
+              "completedAt": "2026-04-07T14:13:30.097Z"
+            },
+            {
+              "id": "774bf7cb-f8e0-4b00-afa3-d0f63d10d5fe",
+              "title": "Implement targeted fix for smoke parity regression",
+              "status": "completed",
+              "level": "task",
+              "description": "Apply the minimal production or test-harness change needed to restore smoke parity suite stability while preserving the intended cross-platform CLI validation behavior.",
+              "acceptanceCriteria": [
+                "The identified failing smoke parity test passes locally in the previously affected environment",
+                "The fix preserves expected CLI behavior and does not mask the failure by weakening assertions without justification",
+                "Any changed snapshots, fixtures, or expected outputs are updated only if they reflect intended product behavior",
+                "Regression coverage is added or updated so the same failure mode is caught deterministically in future runs"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "smoke",
+                "parity",
+                "fix"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T14:16:17.833Z",
+              "completedAt": "2026-04-07T14:21:27.688Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cfd5f0e3-1546-47ca-bac5-606d5411c530",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T20:06:32.040Z",
+      "completedAt": "2026-04-07T20:06:32.040Z",
+      "children": [
+        {
+          "id": "1dc42829-b53b-41f2-b05c-d987c79c7437",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation Hardening",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T20:06:31.825Z",
+          "completedAt": "2026-04-07T20:06:31.825Z",
+          "children": [
+            {
+              "id": "d050ace2-ba93-4528-8370-98be3ac9348f",
+              "title": "Harden CLI smoke parity JSON collection for macOS and Windows runners",
+              "status": "completed",
+              "level": "task",
+              "description": "Fix the `scripts/cli-smoke-parity.mjs collect` flow so CI can reliably capture and parse `ndx` output even when Node emits deprecation warnings or platform-specific noise, preventing `Unexpected end of JSON input` failures in the macOS and Windows jobs.",
+              "acceptanceCriteria": [
+                "Running `node scripts/cli-smoke-parity.mjs collect --cli-command ndx --output <file>` on both macOS and Windows produces a valid JSON artifact with no parse failure",
+                "The collector ignores or safely isolates non-JSON warnings and stderr output so deprecation warnings do not corrupt the JSON payload",
+                "If the CLI output is incomplete or malformed, the script exits with a classified error message that identifies the failing stage instead of throwing a raw JSON parse exception",
+                "Regression coverage exists for warning-prefixed or mixed-stream output representative of the failing CI scenario"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cli",
+                "cross-platform",
+                "windows",
+                "macos"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T19:50:31.008Z",
+              "completedAt": "2026-04-07T19:53:21.439Z"
+            },
+            {
+              "id": "d01f7636-0eff-4d7c-b827-736bd7e1039d",
+              "title": "Stabilize repeatable parity verification across original macOS and Windows CI steps",
+              "status": "completed",
+              "level": "task",
+              "description": "Make the two OS smoke-check heads deterministic and repeatable by ensuring they execute the same canonical `ndx` validation steps, compare against the expected baseline behavior, and fail only on real parity regressions rather than runner-specific instability.",
+              "acceptanceCriteria": [
+                "The macOS and Windows CI jobs execute the same documented CLI smoke parity sequence and produce comparable output artifacts",
+                "Parity validation checks that the current responses match the established baseline/original expected steps for both OS jobs",
+                "At least one automated test or fixture-based validation covers repeat runs of the parity workflow and confirms stable output shape across executions",
+                "The CI pipeline completes successfully when outputs are equivalent and surfaces a clear diff when platform responses diverge"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "pipeline",
+                "parity",
+                "stability",
+                "cross-platform"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T20:02:13.961Z",
+              "completedAt": "2026-04-07T20:06:31.646Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3fd50e03-9204-4495-9555-dd853950f97c",
+      "title": "External Integrations",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-07T22:58:12.976Z",
+      "completedAt": "2026-04-07T22:58:12.976Z",
+      "children": [
+        {
+          "id": "544adbc1-c439-4df0-98c1-0a0cb1686a06",
+          "title": "PR Build Pipeline and Cross-Platform CLI Validation Hardening",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T22:50:03.910Z",
+          "completedAt": "2026-04-07T22:50:03.910Z",
+          "children": [
+            {
+              "id": "5392be41-1f99-42d2-8f70-fe6185663517",
+              "title": "Define OS-agnostic CLI error code taxonomy",
+              "status": "completed",
+              "level": "task",
+              "description": "Introduce a stable set of unique error codes for comparable failure classes so macOS and Windows smoke runs can be matched by semantics instead of platform-specific text output.",
+              "acceptanceCriteria": [
+                "Each cross-platform-comparable CLI failure class has a unique, stable error code",
+                "The same logical failure produces the same error code on macOS and Windows",
+                "Human-readable error output includes the code alongside the existing diagnostic message",
+                "Unknown or uncategorized failures fall back to an explicit generic code path rather than omitting a code"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cli",
+                "cross-platform",
+                "diagnostics"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:37:10.572Z",
+              "completedAt": "2026-04-07T22:47:20.604Z"
+            },
+            {
+              "id": "b714bd5d-c003-423e-a367-e759ae74eba1",
+              "title": "Emit structured smoke artifacts with normalized error codes",
+              "status": "completed",
+              "level": "task",
+              "description": "Update the smoke-validation artifact generation so each run records machine-readable error codes and comparable failure metadata, enabling deterministic parity checks across operating systems.",
+              "acceptanceCriteria": [
+                "Smoke artifacts include normalized error code fields for failed command executions",
+                "Artifact schema distinguishes error code from platform-specific stderr or path details",
+                "Successful runs continue to emit artifacts without introducing placeholder failure codes",
+                "Artifact generation is covered by tests that validate schema shape for both success and failure cases"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "artifacts",
+                "cross-platform",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:47:23.170Z",
+              "completedAt": "2026-04-07T22:50:03.750Z"
+            }
+          ]
+        },
+        {
+          "id": "4ee969d6-cb9e-41c1-85ac-f79b3b6a6ac3",
+          "title": "Cross-Platform Failure Diagnostics",
+          "status": "completed",
+          "level": "feature",
+          "description": "Refocus smoke parity validation on standardized error semantics so failures remain easy to compare, diagnose, and fix regardless of operating system.",
+          "source": "smart-add",
+          "startedAt": "2026-04-07T22:58:12.823Z",
+          "completedAt": "2026-04-07T22:58:12.823Z",
+          "children": [
+            {
+              "id": "0886fe61-3205-466f-a0ee-a3c098622fc1",
+              "title": "Refactor smoke parity checks to compare normalized error codes",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace direct artifact content comparison with parity logic that validates equivalent error codes and other OS-neutral fields, avoiding false mismatches caused by expected platform-specific output differences.",
+              "acceptanceCriteria": [
+                "CI parity checks fail when normalized error codes differ for the same smoke scenario",
+                "CI parity checks ignore expected OS-specific variations such as file paths, shell wording, and native process messages",
+                "Parity output clearly reports code mismatches with the corresponding scenario name",
+                "Existing macOS and Windows smoke jobs continue to run under the updated comparison flow"
+              ],
+              "priority": "critical",
+              "tags": [
+                "ci",
+                "cross-platform",
+                "validation",
+                "smoke-tests"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:50:06.438Z",
+              "completedAt": "2026-04-07T22:54:06.485Z"
+            },
+            {
+              "id": "47b55bf8-f68b-48c0-b7bb-c469ff552436",
+              "title": "Document error code meanings and remediation expectations",
+              "status": "completed",
+              "level": "task",
+              "description": "Provide a maintained reference for the new error codes so engineers can interpret smoke failures quickly and understand which issues are intended to compare across platforms.",
+              "acceptanceCriteria": [
+                "Documentation lists each exported cross-platform error code with its failure meaning",
+                "The docs explain which artifact fields are parity-critical versus OS-specific",
+                "Contributor guidance describes how to assign a code for newly introduced comparable failures",
+                "CI or test coverage fails if a newly emitted comparable error code is missing from the reference list"
+              ],
+              "priority": "high",
+              "tags": [
+                "docs",
+                "diagnostics",
+                "ci",
+                "developer-experience"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-07T22:54:09.031Z",
+              "completedAt": "2026-04-07T22:58:12.661Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e58f1fb0-d3c3-48f2-9cfd-aff59b1419f4",
+      "title": "LLM Integration",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T14:47:55.155Z",
+      "completedAt": "2026-04-08T14:47:55.155Z",
+      "children": [
+        {
+          "id": "e4b6edfe-b8e0-4b6a-87d6-b0a79cca4eeb",
+          "title": "Consistent Vendor and Model Resolution Across Commands",
+          "status": "completed",
+          "level": "feature",
+          "description": "Ensure a single, authoritative vendor/model resolution path is used across all ndx commands — including reasoning/thinking calls and standard API calls — so that no command silently diverges from the configured or defaulted model. Default resolution should produce the newest available model for the active vendor when no explicit model is configured.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T14:47:55.036Z",
+          "completedAt": "2026-04-08T14:47:55.036Z",
+          "children": [
+            {
+              "id": "d9eaeb4f-6fb4-4ead-b644-4bc2d99ba4d6",
+              "title": "Implement centralized vendor/model resolver with newest-model default",
+              "status": "completed",
+              "level": "task",
+              "description": "Create a single resolver in llm-gateway (or llm-client) that, given a vendor, returns the canonical model to use. The resolver must consult .n-dx.json / hench config first, then fall back to a hardcoded 'newest model' constant per vendor. All call sites that currently hard-code or independently derive a model string must be updated to call this resolver instead, including reasoning/extended-thinking invocations so that those calls stay in sync with standard API calls.",
+              "acceptanceCriteria": [
+                "A single exported function (e.g. resolveModel(vendor, config)) returns the correct model string for all supported vendors",
+                "The 'newest model' fallback constant per vendor is defined in one place and can be updated in a single edit",
+                "Reasoning/thinking invocations and standard API call sites both call the same resolver — no duplicated model derivation logic remains",
+                "Unit tests assert the resolver returns the correct model for configured, unconfigured, and unknown-vendor inputs"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "config",
+                "foundation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T13:33:23.136Z",
+              "completedAt": "2026-04-08T13:52:42.313Z"
+            },
+            {
+              "id": "abcddab7-0602-4fb4-9f69-5a4101b41a73",
+              "title": "Propagate resolved vendor/model uniformly to all LLM call sites",
+              "status": "completed",
+              "level": "task",
+              "description": "Audit every location in rex, hench, and sourcevision where an LLM call is constructed and ensure each one uses the centralized resolver rather than a local default or inline constant. This includes calls made during analyze, plan, work, recommend, and any background reasoning passes. The goal is that changing the configured model in .n-dx.json produces identical behavior change across every command without per-package patches.",
+              "acceptanceCriteria": [
+                "No LLM call site outside the resolver contains a hard-coded model string or independent fallback logic",
+                "Running ndx analyze, ndx plan, ndx work, and ndx recommend with a non-default model config all use the overridden model — verified by log or output inspection",
+                "Integration test confirms that changing the model in config before running two different commands yields the same model in both commands' token usage records",
+                "Grep for hard-coded model strings in packages/rex, packages/hench, packages/sourcevision returns zero production-code hits after this task"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "consistency",
+                "refactor"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T13:55:08.183Z",
+              "completedAt": "2026-04-08T14:03:17.530Z"
+            },
+            {
+              "id": "08f6d0b0-9462-494e-adf9-2830113caede",
+              "title": "Surface active vendor and model in ndx console output",
+              "status": "completed",
+              "level": "task",
+              "description": "Display the resolved vendor and model at the start of every ndx command that performs LLM calls, so operators can confirm what is being used without inspecting config files. The output should show the vendor name, resolved model ID, and whether the model was explicitly configured or defaulted. This replaces any existing ad-hoc model logging and provides a consistent prefix line across commands.",
+              "acceptanceCriteria": [
+                "All ndx commands that invoke an LLM (analyze, plan, work, recommend, add) print a single line at command start showing vendor, model ID, and source (configured | default)",
+                "The line is omitted in --quiet / --format=json modes to avoid breaking machine-readable output",
+                "If the resolved model differs from a previously cached model stored in a run artifact, a warning is emitted (e.g. 'model changed since last run')",
+                "E2E test asserts the vendor/model header is present in CLI stdout for at least one command in each package"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "ux",
+                "cli"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T14:03:48.313Z",
+              "completedAt": "2026-04-08T14:47:54.864Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d67a2aaf-4515-4bcc-b35b-e3f8191d3a86",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T15:36:35.368Z",
+      "completedAt": "2026-04-08T15:36:35.368Z",
+      "children": [
+        {
+          "id": "9aaa6f12-199e-4737-9b0e-737a76ed23fc",
+          "title": "Suppress DEP0040 punycode Deprecation Warning in CLI Output",
+          "status": "completed",
+          "level": "feature",
+          "description": "The CLI emits a noisy Node.js deprecation warning (DEP0040) about the built-in punycode module on every invocation. This clutters output and degrades the CLI's professional appearance. The fix involves tracing which dependency introduces punycode, updating or replacing it, and adding a fallback suppression at the CLI entry point if the transitive source cannot be cleanly replaced.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T15:36:34.920Z",
+          "completedAt": "2026-04-08T15:36:34.920Z",
+          "children": [
+            {
+              "id": "1a926c58-e25d-417b-96ef-0694ac9153e8",
+              "title": "Trace and eliminate the DEP0040 punycode deprecation source",
+              "status": "completed",
+              "level": "task",
+              "description": "Identify which direct or transitive dependency triggers the 'The punycode module is deprecated' warning (DEP0040) at runtime. Use `node --trace-deprecation` or audit `node_modules` to pinpoint the culprit package, then either upgrade it to a version that uses the `punycode` userland package, replace it with an equivalent dependency, or patch the import path to the userland alternative. Confirm the warning is eliminated across all CLI entry points (ndx, rex, hench, sv).",
+              "acceptanceCriteria": [
+                "Running any ndx/rex/hench/sv command produces no DEP0040 punycode deprecation line in stdout or stderr",
+                "The root dependency introducing punycode is identified and documented in the commit or PR description",
+                "If a dependency upgrade is made, the full test suite passes without regressions",
+                "No use of process.noDeprecation or --no-deprecation flags as the sole fix (root cause must be addressed)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "dx",
+                "node"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T14:48:24.897Z",
+              "completedAt": "2026-04-08T14:55:50.193Z"
+            },
+            {
+              "id": "81c3499f-0526-4dd4-8979-e273596a01bd",
+              "title": "Add CLI startup deprecation filter as a belt-and-suspenders guard",
+              "status": "completed",
+              "level": "task",
+              "description": "Even after the root-cause fix, future dependency upgrades could reintroduce DEP0040 or similar deprecation noise. Add a targeted process-level warning filter at the CLI entry points (packages/core cli.js, and any package bin entry points) that silences known Node.js built-in deprecation codes (DEP0040 at minimum) without broadly suppressing all warnings. Include a CI assertion that no unfiltered deprecation lines appear in standard CLI smoke output.",
+              "acceptanceCriteria": [
+                "A narrow warning filter targeting DEP0040 (and any other known-noisy built-in deprecations) is applied before CLI argument parsing begins",
+                "The filter does not suppress application-level or user-generated warnings — only Node.js built-in deprecation codes in the allowlist",
+                "A CI smoke test asserts that stdout and stderr from `ndx --version` contain no 'DeprecationWarning' lines",
+                "Filter logic is co-located in a single shared module imported by all CLI entry points, not duplicated per-binary"
+              ],
+              "priority": "low",
+              "tags": [
+                "cli",
+                "dx",
+                "node",
+                "ci"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T14:55:52.778Z",
+              "completedAt": "2026-04-08T15:36:34.581Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b93b7019-394a-4c1b-880f-cc1bab04421c",
+      "title": "LLM Integration",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T15:52:18.555Z",
+      "completedAt": "2026-04-08T15:52:18.555Z",
+      "children": [
+        {
+          "id": "d1438d1e-9233-4fff-a6d9-6a218d5d50bc",
+          "title": "Rex Command Vendor-Model Binding Regression Fix",
+          "status": "completed",
+          "level": "feature",
+          "description": "When `ndx config llm.vendor codex` is set, rex CLI commands (analyze, recommend, add, etc.) should resolve and use GPT-family models rather than falling back to Claude defaults. The centralized resolver exists but rex call sites may not be reading vendor config correctly or may be bypassing the resolver.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T15:52:18.334Z",
+          "completedAt": "2026-04-08T15:52:18.334Z",
+          "children": [
+            {
+              "id": "633f588d-040d-4187-94a0-84e5e1892e30",
+              "title": "Audit rex LLM call sites for vendor/model resolver gaps",
+              "status": "completed",
+              "level": "task",
+              "description": "Trace every rex command that invokes an LLM (analyze, recommend, add, reorganize, prune) and verify each one routes through the centralized vendor/model resolver introduced in the prior feature. Identify any call sites that hardcode a model string, skip resolver invocation, or fail to forward the resolved vendor to the API client. Produce a list of specific files and lines requiring fixes.",
+              "acceptanceCriteria": [
+                "All rex LLM call sites are enumerated with their current model-resolution path documented",
+                "Any call site that does not use the centralized resolver is flagged with the specific bypass mechanism",
+                "Audit findings match the behavior observed when running `ndx config llm.vendor codex` followed by a rex analyze command"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "llm",
+                "model-resolution"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T15:25:34.896Z",
+              "completedAt": "2026-04-08T15:30:34.783Z",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:abcddab7-0602-4fb4-9f69-5a4101b41a73",
+                "matchedItemId": "abcddab7-0602-4fb4-9f69-5a4101b41a73",
+                "matchedItemTitle": "Propagate resolved vendor/model uniformly to all LLM call sites",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-04-08T15:25:20.127Z"
+              }
+            },
+            {
+              "id": "f0c313d6-0218-4020-98c8-68034346c23a",
+              "title": "Fix rex commands to use resolved GPT model when vendor is codex",
+              "status": "completed",
+              "level": "task",
+              "description": "Based on the audit, update all rex LLM call sites so they invoke the centralized vendor/model resolver and forward the resulting model identifier to the llm-client API call. When the configured vendor is `codex`, the resolver must return a GPT-family model (e.g. `gpt-4o`) rather than a Claude model. This fix must go through `hench/src/prd/llm-gateway.ts` if rex is called from hench, or through rex's own config-reading path for direct rex CLI invocations.",
+              "acceptanceCriteria": [
+                "Running `ndx config llm.vendor codex && rex analyze .` sends requests to a GPT model, not a Claude model",
+                "Running `ndx config llm.vendor claude && rex analyze .` sends requests to a Claude model",
+                "No rex command hardcodes a model string outside of the centralized resolver",
+                "ndx console output surfaces the active vendor and model for rex commands (consistent with prior surface-vendor-model feature)",
+                "Existing rex unit and integration tests pass after the fix"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "llm",
+                "model-resolution",
+                "codex"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T15:36:38.309Z",
+              "completedAt": "2026-04-08T15:46:53.379Z"
+            },
+            {
+              "id": "0270df79-5844-45ea-8bd9-da2df2ae8a26",
+              "title": "Add regression tests for vendor-scoped model selection in rex commands",
+              "status": "completed",
+              "level": "task",
+              "description": "Add integration tests that exercise at least one rex LLM command (e.g. rex analyze) with each supported vendor config value and assert that the outbound API call uses a model string consistent with that vendor. Tests should mock the llm-client API boundary so they run without real API credentials.",
+              "acceptanceCriteria": [
+                "A test with vendor=codex asserts the resolved model is a GPT-family identifier",
+                "A test with vendor=claude asserts the resolved model is a Claude-family identifier",
+                "Tests run as part of `pnpm test` without network access",
+                "Tests fail if a call site bypasses the resolver and uses a hardcoded model"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "llm",
+                "testing",
+                "model-resolution"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T15:46:56.318Z",
+              "completedAt": "2026-04-08T15:52:18.043Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e6bbdd09-5653-44a2-a494-9eab083fd5f0",
+      "title": "LLM Integration",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T20:46:18.361Z",
+      "completedAt": "2026-04-08T20:46:18.361Z",
+      "children": [
+        {
+          "id": "642df761-d076-4309-bd5c-edba76604dfd",
+          "title": "Between-Run API Quota Status Logging",
+          "status": "completed",
+          "level": "feature",
+          "description": "After each hench run completes, check remaining API quota or configured budget headroom for Claude and Codex providers and report it to the user in the run log with color-coded warnings at threshold boundaries.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T20:46:18.155Z",
+          "completedAt": "2026-04-08T20:46:18.155Z",
+          "children": [
+            {
+              "id": "af8ede6d-f8ff-4460-9816-34ed51c3fa7d",
+              "title": "Define typed quota result interface and identify invocation point in hench run loop",
+              "status": "completed",
+              "level": "task",
+              "description": "Establish the TypeScript interface for the quota-remaining result object and locate the correct insertion point in the hench multi-run loop where the check should fire — after each run completes and before the next begins. No calculation logic yet; this task is scoped to type definition and wiring the call site so the follow-on implementation task has a stable contract to fill in.",
+              "acceptanceCriteria": [
+                "A named TypeScript interface or type alias (e.g., `QuotaRemaining`) is defined with at minimum `vendor: string`, `model: string`, and `percentRemaining: number` fields",
+                "The invocation point in the hench multi-run loop is identified and a stub call (returning an empty array) is inserted so the wiring compiles and tests can reference the hook",
+                "The stub is placed such that it fires after each run completes and before the next one begins in multi-run loops",
+                "No run is blocked and no error is thrown when the stub returns an empty array"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "quota",
+                "hench"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T16:37:10.891Z",
+              "completedAt": "2026-04-08T16:44:10.332Z"
+            },
+            {
+              "id": "41169580-92d1-4032-b5ee-60ef39f13c52",
+              "title": "Implement budget-based percent-remaining calculation for active providers",
+              "status": "completed",
+              "level": "task",
+              "description": "Fill in the quota check logic introduced by the previous task. Query accumulated spend vs. configured weekly budget for each active provider (Claude, Codex) using the existing token usage tracking infrastructure and/or provider-reported rate-limit headers captured during the run. Compute percent remaining per provider/model and return the typed result array. Degrade silently when quota data is unavailable or budget is not configured.",
+              "acceptanceCriteria": [
+                "Returns percent-remaining for each active provider (claude, codex) based on configured weekly budget and accumulated spend",
+                "Falls back gracefully — no error thrown, no run blocked — when quota data is unavailable or budget is not configured",
+                "Result conforms to the typed interface defined in the preceding task",
+                "Unit tests cover: normal output with expected percentages, missing config fallback returning empty array, zero-spend edge case returning 100%"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "quota",
+                "hench"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:28:30.708Z",
+              "completedAt": "2026-04-08T20:46:17.870Z"
+            },
+            {
+              "id": "4fbde3c0-c586-45c1-9309-fab162520b05",
+              "title": "Implement ANSI color-coded quota log formatter",
+              "status": "completed",
+              "level": "task",
+              "description": "Write a pure formatting function that accepts the typed quota-remaining array and returns a human-readable string (or array of strings) with ANSI color codes applied per threshold: red (ANSI 31) when percent remaining is below 5%, yellow (ANSI 33) when between 5% and 10%, and default terminal color otherwise. The formatter should return an empty result when the input array is empty so callers can skip output with a simple length check.",
+              "acceptanceCriteria": [
+                "Text is rendered yellow (ANSI 33) when percent remaining is >= 5% and < 10%",
+                "Text is rendered red (ANSI 31) when percent remaining is < 5%",
+                "Text uses default terminal color when percent remaining is >= 10%",
+                "Formatter returns empty output (empty string or empty array) when the quota-remaining input is empty",
+                "Output format includes provider/model and percent value (e.g., 'Claude: 8% remaining')"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "quota",
+                "cli",
+                "hench"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T18:00:30.436Z",
+              "completedAt": "2026-04-08T18:03:00.004Z"
+            },
+            {
+              "id": "ac656b7b-240c-45c4-b07f-5f6e8583daf9",
+              "title": "Integrate quota log output into hench run console with quiet/JSON suppression",
+              "status": "completed",
+              "level": "task",
+              "description": "Connect the Codex quota fetch result to the existing ANSI color-coded quota log formatter and integrate the formatted line into the hench run loop at the inter-run boundary. The output should be suppressed in quiet mode and omitted from structured JSON output, consistent with the suppression contract documented in the existing 'Integrate quota log output' task. This task covers the wiring layer only — the formatter and fetch adapter are handled by sibling tasks.",
+              "acceptanceCriteria": [
+                "Log line is printed after each run showing remaining quota per provider/model",
+                "Log line is suppressed when `--quiet` flag is active",
+                "Log line is suppressed when output format is JSON",
+                "No log line is emitted if quota data is unavailable (graceful omission)",
+                "Integration test verifies the yellow and red thresholds trigger at correct boundaries through the full output path",
+                "After each completed hench run, the quota percent-remaining line is printed to stdout before the next run begins",
+                "Output is suppressed when --quiet or --format=json flags are active",
+                "If the Codex quota fetch fails, the inter-run line prints a degraded indicator (e.g. 'quota: unavailable') rather than crashing the loop",
+                "An integration test verifies the quota line appears in normal mode and is absent in quiet/JSON modes",
+                "No quota fetch is attempted when the active vendor is not Codex"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "quota",
+                "cli",
+                "hench",
+                "codex"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T18:15:31.162Z",
+              "completedAt": "2026-04-08T18:29:09.274Z",
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:0:1",
+                  "proposalTitle": "Wire live Codex quota result into hench inter-run console output",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.7007639054666985,
+                  "mergedAt": "2026-04-08T18:15:19.864Z",
+                  "source": "smart-add"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "overrideMarker": {
+        "type": "duplicate_guard_override",
+        "reason": "exact_title",
+        "reasonRef": "exact_title:7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
+        "matchedItemId": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3",
+        "matchedItemTitle": "LLM Integration",
+        "matchedItemLevel": "epic",
+        "matchedItemStatus": "completed",
+        "createdAt": "2026-04-08T16:18:20.755Z"
+      }
+    },
+    {
+      "id": "877432ac-c7a2-45b2-ba6b-298e55a75be2",
+      "title": "LLM Integration",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T19:28:20.429Z",
+      "completedAt": "2026-04-08T19:28:20.429Z",
+      "children": [
+        {
+          "id": "adf5e546-51d8-43e6-8f42-1be4331b01ea",
+          "title": "Between-Run API Quota Status Logging",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T19:28:19.691Z",
+          "completedAt": "2026-04-08T19:28:19.691Z",
+          "children": [
+            {
+              "id": "208d645e-27e5-47bb-a1bf-db3e69d80361",
+              "title": "Implement Codex API quota fetch and normalize response to QuotaRemaining",
+              "status": "completed",
+              "level": "task",
+              "description": "Make a live HTTP request to the Codex (OpenAI) usage/quota endpoint between hench runs to retrieve the current consumption and hard limit for the authenticated account. Parse the response and map it to the existing QuotaRemaining typed interface so downstream formatters and log integrations receive a consistent shape regardless of provider. This is distinct from the budget-based percent calculation (which derives limits from configured values) — this task fetches real-time quota directly from the provider API.",
+              "acceptanceCriteria": [
+                "An HTTP call is made to the Codex quota or usage endpoint using the configured API key before each inter-run log line",
+                "The raw Codex response is parsed and mapped to the existing QuotaRemaining interface (tokens used, tokens limit, percent remaining)",
+                "A network or auth failure returns a typed error result rather than throwing, allowing the caller to degrade gracefully",
+                "The fetch function is unit-tested with mocked HTTP responses covering success, rate-limit, and auth-failure cases",
+                "No Codex-specific types leak past the adapter boundary — callers receive only QuotaRemaining or a typed error"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "codex",
+                "quota",
+                "api"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T18:39:57.135Z",
+              "completedAt": "2026-04-08T19:28:19.337Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18ad839f-1985-40c4-9036-7a25180bb8e0",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T20:27:58.353Z",
+      "completedAt": "2026-04-08T20:27:58.353Z",
+      "children": [
+        {
+          "id": "c513f257-7f0b-4bce-9bf5-82f5cc909ef0",
+          "title": "ANSI Color Output Across Rex, SourceVision, and Hench",
+          "status": "completed",
+          "level": "feature",
+          "description": "Add semantic ANSI color formatting to all CLI log output across rex, sourcevision, hench, and the ndx orchestrator, so operators can quickly distinguish statuses, results, and severity levels at a glance. Includes a shared utility layer with TTY detection and environment-flag support to ensure colors are never emitted in non-interactive or piped contexts.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T20:27:58.146Z",
+          "completedAt": "2026-04-08T20:27:58.146Z",
+          "children": [
+            {
+              "id": "2faf9d58-2878-4e12-a9e3-b613591fd7bd",
+              "title": "Build shared ANSI color formatting utility with TTY and NO_COLOR support",
+              "status": "completed",
+              "level": "task",
+              "description": "Create a shared color formatting module in the llm-client or core package that defines a semantic palette (success/completed, pending/in-progress, error/failure, warning, info/dim) and exposes lightweight helpers. The module must check process.stdout.isTTY and respect the NO_COLOR and FORCE_COLOR environment variables so that piped output, CI logs, and --json/--quiet modes receive plain text. This utility becomes the single color source-of-truth consumed by all packages.",
+              "acceptanceCriteria": [
+                "Module exposes named semantic color helpers (e.g. colorSuccess, colorError, colorPending, colorDim) rather than raw ANSI codes",
+                "Colors are disabled when process.stdout.isTTY is false",
+                "Colors are disabled when NO_COLOR env var is set (any non-empty value)",
+                "Colors are forced on when FORCE_COLOR env var is set",
+                "Module has unit tests covering TTY=false, NO_COLOR, FORCE_COLOR, and default TTY=true branches",
+                "Module is exported through the appropriate package public API or gateway"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "color",
+                "shared"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:21:44.163Z",
+              "completedAt": "2026-04-08T20:27:57.857Z"
+            },
+            {
+              "id": "0225e4e7-659e-40f3-917d-ee6b81515379",
+              "title": "Apply color formatting to rex CLI output",
+              "status": "completed",
+              "level": "task",
+              "description": "Wire the shared color utility into rex command output so that status trees, next-task selection, validate results, and add/proposal feedback use semantic colors. Completed items should render dimmed or in a success color; pending items in neutral or highlight color; errors and validation failures in red; warnings in yellow. Output from --format=json and --quiet flags must remain unaffected.",
+              "acceptanceCriteria": [
+                "rex status tree renders completed items in a distinct success/dim color and pending items in a neutral color",
+                "rex next output highlights the selected task title and its priority level with semantic colors",
+                "rex validate renders error-level findings in red, warning-level in yellow, and passing checks in green",
+                "rex add proposal review renders accept/skip/reject options with distinct colors",
+                "rex --format=json output contains no ANSI escape codes",
+                "rex --quiet output contains no ANSI escape codes",
+                "Colors are suppressed when stdout is not a TTY (e.g. piped to file)"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "cli",
+                "color"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T19:06:05.882Z",
+              "completedAt": "2026-04-08T19:13:22.896Z"
+            },
+            {
+              "id": "51364a6f-bb3e-4b55-8523-ed490367ec37",
+              "title": "Apply color formatting to sourcevision CLI output",
+              "status": "completed",
+              "level": "task",
+              "description": "Wire the shared color utility into sourcevision command output so that analyze progress, zone detection results, findings by severity, and next-steps output use semantic colors. Finding severity levels (anti-pattern, pattern, suggestion, observation) should map to distinct colors. Analysis pass headers should be visually distinct from finding detail lines.",
+              "acceptanceCriteria": [
+                "sourcevision analyze progress lines show phase headers in a distinct highlight color",
+                "Finding severity levels render with consistent colors: anti-pattern in red, pattern in yellow, suggestion in cyan, observation in dim",
+                "Zone summary output shows zone names and metrics with readable contrast",
+                "sourcevision validate pass/fail lines use green/red respectively",
+                "JSON and quiet output modes contain no ANSI escape codes",
+                "Colors are suppressed when stdout is not a TTY"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "cli",
+                "color"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:10:37.969Z",
+              "completedAt": "2026-04-08T20:21:01.846Z"
+            },
+            {
+              "id": "be167d08-8687-4ad6-a8cd-aeb929f8d838",
+              "title": "Apply color formatting to hench and ndx orchestrator output",
+              "status": "completed",
+              "level": "task",
+              "description": "Wire the shared color utility into hench run-loop output and the ndx orchestrator so that task selection headers, run status updates, completion summaries, and multi-package orchestration output are color-coded. Hench run start/end banners, per-iteration task labels, and error/timeout notices should each have distinct colors. ndx orchestration commands (plan, work, ci, status) should emit colored section headers and outcome lines.",
+              "acceptanceCriteria": [
+                "hench run start banner and task title render in a highlighted color",
+                "Per-iteration status lines (in_progress, completed, failed) use semantic colors matching the shared palette",
+                "hench run summary shows completed task count in green and failed count in red",
+                "ndx orchestration commands emit colored section headers that visually separate package output",
+                "Errors and failures across all ndx commands render in red with the error message clearly distinct from surrounding output",
+                "hench --quiet and --format=json suppress all ANSI codes",
+                "ndx color output is suppressed when stdout is not a TTY"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "ndx",
+                "cli",
+                "color"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T18:45:56.232Z",
+              "completedAt": "2026-04-08T18:59:19.653Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "991a796e-b75b-4b3a-ba85-f6a494ec99cb",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T21:08:10.991Z",
+      "completedAt": "2026-04-08T21:08:10.991Z",
+      "children": [
+        {
+          "id": "e7370225-ce8d-43e5-a1cc-2e4efb876d2e",
+          "title": "ANSI Color Output Across Rex, SourceVision, and Hench",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T21:08:10.870Z",
+          "completedAt": "2026-04-08T21:08:10.870Z",
+          "children": [
+            {
+              "id": "50c4d2b6-d8e8-49dd-9c8a-ee66b0f9b89d",
+              "title": "Standardize semantic color conventions for status and log-level output across all CLI tools",
+              "status": "completed",
+              "level": "task",
+              "description": "Define a shared color vocabulary in the ANSI utility (e.g. green=completed/success, yellow=pending/warning, red=error/failed, cyan=info) and apply it consistently to every status badge, result summary line, and log-level label produced by rex, sourcevision, hench, and the ndx orchestrator. Without a shared convention, color is cosmetic rather than meaningful — the goal is that a user can parse the semantic state of output from any tool by color alone.",
+              "acceptanceCriteria": [
+                "A STATUS_COLORS or equivalent map is defined in the shared ANSI utility, mapping PRD status values and log levels to specific ANSI color codes",
+                "Rex, sourcevision, hench, and ndx orchestrator all use the same color for the same logical state (e.g. every 'completed' label is green regardless of which tool emits it)",
+                "Error lines across all tools share one color; info, success, and warning lines are each visually distinct and consistent",
+                "The color convention is documented with a code comment or a brief entry in CODEX.md"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "ux",
+                "color"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:57:32.922Z",
+              "completedAt": "2026-04-08T21:08:10.700Z"
+            },
+            {
+              "id": "83cafd67-4b87-4a64-a16f-936f0b78b775",
+              "title": "Add integration tests validating TTY-aware color emission and NO_COLOR suppression across all CLI tools",
+              "status": "completed",
+              "level": "task",
+              "description": "Without automated checks, color regressions (raw ANSI codes polluting piped JSON output, NO_COLOR being silently ignored, or colors absent in real TTY sessions) are invisible in CI. This task adds a test harness that spawns each CLI tool and asserts color code presence or absence based on the execution context.",
+              "acceptanceCriteria": [
+                "Tests spawn rex, sourcevision, hench, and ndx and assert ANSI escape codes are present when stdout is a TTY (or simulated TTY)",
+                "Tests assert ANSI codes are stripped when stdout is piped or when NO_COLOR=1 is set in the environment",
+                "Coverage includes at least one representative output per tool: rex status, sourcevision analyze summary, hench run summary, and ndx orchestrator log line",
+                "All tests pass in CI and are wired into the standard test suite via pnpm test"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "testing",
+                "color"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T20:46:49.195Z",
+              "completedAt": "2026-04-08T20:57:04.128Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b38af51b-d290-4b8e-a5c4-a8a77ae2e70d",
+      "title": "Hench",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-09T14:36:55.652Z",
+      "completedAt": "2026-04-09T14:36:55.652Z",
+      "children": [
+        {
+          "id": "d1d0627e-dc69-4f84-b68b-512bef332fdb",
+          "title": "Hench Run-Loop Visual Output Refinements",
+          "status": "completed",
+          "level": "feature",
+          "description": "Apply consistent semantic color conventions and styled separators to hench's run-loop console output, making task completion states, inter-task pause intervals, and loop-iteration boundaries immediately legible when scanning long run transcripts.",
+          "source": "smart-add",
+          "startedAt": "2026-04-09T14:32:47.496Z",
+          "completedAt": "2026-04-09T14:36:24.994Z",
+          "children": [
+            {
+              "id": "c5ba3c69-5738-421f-8648-76956e36b869",
+              "title": "Apply semantic success and pause colors to hench run-loop status messages",
+              "status": "completed",
+              "level": "task",
+              "description": "Color-code the two recurring run-loop progress messages using the established STATUS_COLORS / llm-client color helpers. The run-success line ('All tasks complete' or equivalent) should render in green to confirm a clean exit; the inter-task pause line ('Pausing ...ms before next task...') should render in yellow to signal a transient wait state. Both messages must honour TTY detection and NO_COLOR.",
+              "acceptanceCriteria": [
+                "The run-success message is rendered with colorSuccess (green) when stdout is a TTY and NO_COLOR is unset",
+                "The inter-task pause message is rendered with colorWarn or colorPending (yellow) under the same conditions",
+                "Both messages render as unstyled plain text when NO_COLOR=1 or stdout is not a TTY",
+                "No new color primitives are introduced — existing helpers from @n-dx/llm-client (colorSuccess, colorWarn, colorPending) are reused",
+                "An integration or e2e assertion verifies the correct ANSI codes appear in TTY mode and are absent under NO_COLOR"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "color",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:01:23.109Z",
+              "completedAt": "2026-04-08T23:07:44.151Z"
+            },
+            {
+              "id": "62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff",
+              "title": "Add pink loop-iteration separator line to hench run output",
+              "status": "completed",
+              "level": "task",
+              "description": "Print a horizontal separator line in pink/magenta at each loop-iteration boundary (after run-complete) to visually distinguish loop boundaries from individual agent-turn separators. The separator width should match the existing agent-turn separator so the transcript is consistently structured. This makes it easy to scan which work happened in which iteration of a multi-loop hench run.",
+              "acceptanceCriteria": [
+                "A separator line is emitted after each loop-iteration boundary in hench run output",
+                "The separator renders in pink/magenta (colorPink or nearest STATUS_COLORS equivalent) in TTY contexts",
+                "The separator character width is consistent with the existing agent-turn separator line",
+                "The separator is fully suppressed (no characters, no newline artifact) when NO_COLOR=1 or stdout is not a TTY",
+                "An integration or e2e test verifies separator presence in TTY mode and full suppression under NO_COLOR"
+              ],
+              "priority": "low",
+              "tags": [
+                "hench",
+                "cli",
+                "color",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:50:10.308Z",
+              "completedAt": "2026-04-09T00:10:00.000Z",
+              "log": "Added colorPink (magenta/35m) primitive to llm-client help-format.ts and exported through public.ts. Re-exported magenta and colorPink through hench llm-gateway.ts. Added formatLoopIterationSeparator() helper to run.ts that returns 60 × ─ in colorPink. Emits separator at end of each loop iteration (after pause) guarded by isColorEnabled() for full suppression when NO_COLOR=1 or non-TTY. Added 5-case test suite in run-colors.test.ts: magenta ANSI code present under FORCE_COLOR=1, 60-char width under NO_COLOR=1, no ANSI codes under NO_COLOR=1, isColorEnabled()=false under NO_COLOR=1, isColorEnabled()=true under FORCE_COLOR=1."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dd338f09-ae53-4c57-95f5-58b4e982090e",
+      "title": "Hench",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T23:44:31.225Z",
+      "completedAt": "2026-04-08T23:44:31.225Z",
+      "children": [
+        {
+          "id": "8f175c2d-6868-4687-a7e5-355e78f785f1",
+          "title": "Rex Run Rolling Log Display and Persistent Log Files",
+          "status": "completed",
+          "level": "feature",
+          "description": "Limit live console output during rex runs to a rolling 10-line grey window while capturing the full run output to a timestamped file in .run-logs/, which is excluded from git.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T23:44:31.021Z",
+          "completedAt": "2026-04-08T23:44:31.021Z",
+          "children": [
+            {
+              "id": "b86e2af1-19c7-43ee-90a1-c82ce7038fae",
+              "title": "Implement rolling 10-line grey output window for rex run console",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace unbounded stdout streaming during rex/hench runs with a rolling buffer that renders only the most recent 10 lines. Lines should be rendered in grey/dim using the ANSI color helpers already present in llm-client. The window should overwrite previous lines in-place via cursor control when stdout is a TTY, and fall back to plain streaming when it is not.",
+              "acceptanceCriteria": [
+                "Console shows at most 10 lines of run output at any time during a rex run",
+                "Each displayed line is rendered in grey/dim via the existing colorDim ANSI helper",
+                "When a new line arrives, the oldest visible line is evicted from the window",
+                "Full output is not discarded — it is captured for log file persistence",
+                "Rolling overwrite is only applied when stdout is a TTY; non-TTY and NO_COLOR environments receive plain streaming output"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "output"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:29:50.876Z",
+              "completedAt": "2026-04-08T23:38:08.895Z"
+            },
+            {
+              "id": "b892e543-006f-402f-ae07-e359c1229a81",
+              "title": "Persist full rex run log to .run-logs/ and add directory to .gitignore",
+              "status": "completed",
+              "level": "task",
+              "description": "Capture the complete output of each rex/hench run to a timestamped log file under .run-logs/ at the project root. The directory should be created automatically on first use. Each run must produce a distinct file (named by timestamp or run ID) so logs from concurrent or sequential runs do not collide. .run-logs/ must be added to the repository .gitignore.",
+              "acceptanceCriteria": [
+                ".run-logs/ is created automatically before the first log write if it does not exist",
+                "Each rex run produces a distinct file in .run-logs/ named with a timestamp or run ID",
+                "Log files contain the complete unbuffered run output, including lines not shown in the rolling window",
+                ".run-logs/ is present in .gitignore after the first run (appended if missing)",
+                "The log file path is printed to the user at run completion so they can locate it"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "logging",
+                "persistence"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:38:36.976Z",
+              "completedAt": "2026-04-08T23:44:30.738Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "62f4a08a-7130-4b91-a8dc-ea5f37ab7d89",
+      "title": "Dependency Health & Module Modernization",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T23:50:07.453Z",
+      "completedAt": "2026-04-08T23:50:07.453Z",
+      "children": [
+        {
+          "id": "f6c36dec-764a-4a56-adc7-cb11e66890c9",
+          "title": "Deprecated npm Dependency Audit and Remediation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Identify and replace deprecated or end-of-life npm packages across all monorepo package.json files. Covers direct and transitive dependencies flagged by pnpm audit, npm deprecation notices, and packages with published successors.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T22:59:36.242Z",
+          "completedAt": "2026-04-08T22:59:36.242Z",
+          "children": [
+            {
+              "id": "cd67dfc1-0053-43fd-8e4f-1722d6b6a982",
+              "title": "Audit and remediate deprecated npm dependencies across all monorepo packages",
+              "status": "completed",
+              "level": "task",
+              "description": "Run pnpm audit and inspect each package.json for npm packages marked as deprecated, unmaintained, or superseded across packages/core, packages/rex, packages/hench, packages/sourcevision, packages/llm-client, and packages/web. Produce a prioritized remediation list distinguishing direct from transitive hits and flagging CVEs, then execute: upgrade packages with semver-compatible replacements, swap deprecated packages for their published successors, and update all call sites where replacement APIs have changed. Verify the full test suite passes after each replacement.",
+              "acceptanceCriteria": [
+                "pnpm audit output reviewed and all deprecation notices catalogued across all six packages",
+                "Each deprecated direct dependency has either been replaced or has a documented justification for deferral",
+                "Transitive-only deprecations are noted separately with no action required unless they surface a CVE",
+                "No direct dependency in any package.json resolves to an npm-deprecated package",
+                "pnpm audit reports zero high/critical advisories after upgrades",
+                "Full monorepo test suite (pnpm test) passes with no new failures introduced by replacements",
+                "Any breaking API changes in upgraded packages are handled at all call sites within the monorepo"
+              ],
+              "priority": "high",
+              "tags": [
+                "dependencies",
+                "audit",
+                "upgrade",
+                "security"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T22:08:34.925Z",
+              "completedAt": "2026-04-08T22:59:35.957Z"
+            }
+          ]
+        },
+        {
+          "id": "5117fd5f-ca53-4095-8228-f210bfe9eefe",
+          "title": "Stale Import Path and Deprecated Node.js API Cleanup",
+          "status": "completed",
+          "level": "feature",
+          "description": "Scan the codebase for imports referencing moved or renamed internal modules, deprecated Node.js built-in APIs, and outdated TypeScript path patterns, then apply all targeted fixes across all packages.",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T23:50:07.209Z",
+          "completedAt": "2026-04-08T23:50:07.209Z",
+          "children": [
+            {
+              "id": "96780413-6007-4eb0-8550-a118e3d9a8c2",
+              "title": "Scan and fix stale import paths, deprecated Node.js APIs, and outdated module references across packages",
+              "status": "completed",
+              "level": "task",
+              "description": "Use static analysis (grep, tsc --noEmit, sourcevision import graph) to enumerate: imports pointing to moved or renamed files, uses of deprecated Node.js built-in APIs (fs.exists, url.parse, etc.), and any CommonJS require() calls in ESM-targeted files. Then apply all fixes: update import paths to current locations, replace deprecated APIs with modern equivalents (e.g. url.parse → new URL(), fs.exists → fs.access), and convert stray require() to ESM imports. Confirm tsc --noEmit and pnpm test pass cleanly after all changes.",
+              "acceptanceCriteria": [
+                "All TS compiler errors related to unresolved or mismatched module paths are enumerated before any changes are made",
+                "grep scan for known deprecated Node.js API patterns completes and all findings are documented with file, line, current usage, and recommended fix",
+                "Any require() calls in ESM-target files are identified and converted",
+                "tsc --noEmit reports no new module-resolution or deprecated-API errors after changes",
+                "No remaining uses of documented deprecated Node.js APIs in production source files",
+                "pnpm test passes with no regressions introduced by the import path changes",
+                "sourcevision analyze import graph shows no broken or dangling edges for changed files"
+              ],
+              "priority": "medium",
+              "tags": [
+                "imports",
+                "node",
+                "typescript",
+                "audit",
+                "refactor"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:44:47.183Z",
+              "completedAt": "2026-04-08T23:49:58.622Z",
+              "log": [
+                {
+                  "timestamp": "2026-04-08T23:49:58.622Z",
+                  "message": "Completed: full codebase audit found no deprecated Node.js APIs (url.parse, fs.exists, new Buffer, etc.), no stale import paths, and no broken module references. Found 6 CommonJS require() calls in ESM-targeted test files across 2 files. Fixed by moving require() to top-level ESM import statements. tsc --noEmit passes for both packages. All 61 affected tests pass (22 hench errors.test.ts + 39 sourcevision workspace-aggregate.test.ts). Committed as e0d4912e."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b7b7e0b3-4cb6-450f-a88d-7a28a7afa249",
+      "title": "Hench",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-08T23:29:06.849Z",
+      "completedAt": "2026-04-08T23:29:06.849Z",
+      "children": [
+        {
+          "id": "1b15f101-807e-4372-8ba2-23e99f10860b",
+          "title": "Hench Run-Loop Visual Output Refinements",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-08T23:29:06.643Z",
+          "completedAt": "2026-04-08T23:29:06.643Z",
+          "children": [
+            {
+              "id": "48ee8da4-56b6-4201-ae86-5e9372b45543",
+              "title": "Color-code [Tool], [Agent], and vendor prefix labels in hench run output",
+              "status": "completed",
+              "level": "task",
+              "description": "Hench run console output includes source-attribution prefix markers such as [Tool], [Agent], and vendor/model identifiers (e.g. [claude], [codex]). These prefixes should be color-coded to let users visually scan and distinguish message origins at a glance: [Tool] in grey/dim, [Agent] in yellow, and vendor/model labels in blue. The existing semantic color helpers in llm-client (colorDim, colorWarn, colorInfo) should be used so TTY and NO_COLOR behavior is already handled.",
+              "acceptanceCriteria": [
+                "[Tool] prefix renders in grey/dim ANSI color when stdout is a TTY",
+                "[Agent] prefix renders in yellow ANSI color when stdout is a TTY",
+                "Vendor/model labels (e.g. [claude], [codex]) render in blue ANSI color when stdout is a TTY",
+                "All three prefix types render without any ANSI codes when NO_COLOR is set or stdout is not a TTY",
+                "Color wrapping delegates to existing semantic helpers in llm-client — no new color utility code is introduced"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "color",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:21:17.861Z",
+              "completedAt": "2026-04-08T23:29:06.354Z"
+            },
+            {
+              "id": "418753a7-1d86-446e-a5c7-aeedc63b1ec1",
+              "title": "Apply yellow coloring to help notes and warning messages in hench CLI output",
+              "status": "completed",
+              "level": "task",
+              "description": "Help notes (usage hints, guidance prompts) and warning messages emitted by hench should render in yellow to signal caution or informational guidance without alarming the user. This aligns these message categories with the established semantic convention where yellow (colorWarn) represents advisory information, making them visually distinct from success (green) and error (red) output.",
+              "acceptanceCriteria": [
+                "Help notes (guidance hints, usage prompts) render in yellow when stdout is a TTY",
+                "Warning messages render in yellow when stdout is a TTY",
+                "Yellow is applied via the existing colorWarn semantic helper — no ad-hoc ANSI codes",
+                "No color is emitted when NO_COLOR is set or stdout is not a TTY",
+                "At least one hench command (e.g. hench run with an out-of-quota warning) demonstrates the colored output in a manual smoke test"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "color",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-08T23:08:34.229Z",
+              "completedAt": "2026-04-08T23:20:47.434Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a9cadabc-15ef-4340-bdfb-0d0db1f0de54",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-09T15:06:38.669Z",
+      "completedAt": "2026-04-09T15:06:38.669Z",
+      "children": [
+        {
+          "id": "453e030c-021c-4f41-a39f-eb7804e356b4",
+          "title": "Dinosaur ASCII Art Proportions Fix",
+          "status": "completed",
+          "level": "feature",
+          "description": "The dinosaur rendered in the `ndx init` banner does not accurately represent the Rex-F.png mascot image used in marketing and branding. This feature corrects the ASCII art to match the proportions and silhouette of the reference image.",
+          "source": "smart-add",
+          "startedAt": "2026-04-09T15:06:38.369Z",
+          "completedAt": "2026-04-09T15:06:38.369Z",
+          "children": [
+            {
+              "id": "ef198516-592b-473a-8a8f-e0c7a0b12bc1",
+              "title": "Redesign ndx init ASCII dinosaur to match Rex-F.png proportions",
+              "status": "completed",
+              "level": "task",
+              "description": "The current ASCII art dinosaur in the ndx init banner has incorrect body proportions relative to the Rex-F.png reference image (packages/rex/Rex-F.png). Audit the reference image, identify the key proportion mismatches (head size, tail length, leg stance, overall silhouette), and redraw the ASCII art character to closely follow the reference. The fix should be applied to whichever module renders the init banner output.",
+              "acceptanceCriteria": [
+                "The new ASCII art is visually compared against Rex-F.png and the proportions are judged as substantially more accurate (head-to-body ratio, tail curve, leg placement)",
+                "The ASCII art renders without line-wrapping at standard 80-column terminal width",
+                "The ASCII art renders correctly with and without ANSI color codes (i.e., no invisible characters disrupting column alignment)",
+                "Running `ndx init` in a clean temp directory displays the updated dinosaur",
+                "No existing snapshot or integration test is broken by the change; any affected test is updated to reflect the new art"
+              ],
+              "priority": "low",
+              "tags": [
+                "cli",
+                "branding",
+                "init"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T14:44:42.925Z",
+              "completedAt": "2026-04-09T15:06:38.081Z"
+            },
+            {
+              "id": "7a7249e7-1a6b-4e09-bf2c-73a4cea7d4de",
+              "title": "Add visual regression snapshot for ndx init dinosaur output",
+              "status": "completed",
+              "level": "task",
+              "description": "Without a captured baseline, future changes can silently re-break the dinosaur's proportions. Add a lightweight snapshot test that captures the raw ASCII art string so that any character-level change is caught and requires explicit review. This test should sit alongside the existing init integration tests.",
+              "acceptanceCriteria": [
+                "A snapshot test exists that captures the ASCII art string produced during ndx init",
+                "The snapshot test fails if any character in the dinosaur art is changed without a deliberate snapshot update",
+                "The snapshot file is committed alongside the test and reflects the corrected art from the companion redesign task",
+                "The test runs as part of `pnpm test` without requiring a live Claude API or network call"
+              ],
+              "priority": "low",
+              "tags": [
+                "cli",
+                "testing",
+                "init",
+                "branding"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T14:37:54.893Z",
+              "completedAt": "2026-04-09T14:43:13.397Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b63b4ea4-2086-4b63-8f73-81cb86865618",
+      "title": "Hench",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-09T14:32:25.600Z",
+      "completedAt": "2026-04-09T14:32:25.600Z",
+      "children": [
+        {
+          "id": "f5ccc9cc-ad9f-4e44-9f4a-98c43b2f8de3",
+          "title": "Hench Run-Loop Visual Output Refinements",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-09T14:32:25.306Z",
+          "completedAt": "2026-04-09T14:32:25.306Z",
+          "children": [
+            {
+              "id": "0b9042e1-523e-4fab-aca4-1d89bbb0c6f3",
+              "title": "Fix rolling window to count visual lines instead of message entries",
+              "status": "completed",
+              "level": "task",
+              "description": "The current rolling 10-line window tracks the number of messages rather than the number of rendered lines. When a single message contains embedded newlines (e.g. tool output, JSON blocks, multi-line agent responses), each message may occupy 2–10+ terminal rows, causing the scroll region to overflow well beyond 10 visible lines. The fix must split each queued message on newlines before counting, so the window always displays at most 10 terminal rows regardless of message structure.",
+              "acceptanceCriteria": [
+                "A message containing N embedded newlines counts as N+1 lines toward the 10-line cap",
+                "The visible output region never exceeds 10 lines when any combination of single- and multi-line messages is present",
+                "Single-line-only runs behave identically to before the fix",
+                "A multi-line tool response that alone exceeds 10 lines is truncated or capped so the window stays within bounds",
+                "The ANSI cursor-reposition logic correctly erases the prior frame before redrawing when multi-line messages change the row count"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "cli",
+                "output",
+                "bugfix"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T13:55:23.150Z",
+              "completedAt": "2026-04-09T13:58:42.608Z"
+            },
+            {
+              "id": "cd39ee5e-585e-49a2-85a1-3b2b77b8f87e",
+              "title": "Add regression tests for multi-line scroll window behavior",
+              "status": "completed",
+              "level": "task",
+              "description": "No automated tests currently assert that the rolling window stays within its 10-line bound when multi-line content is injected. Add unit tests that feed synthetic multi-line messages into the window renderer and assert the rendered output line count, plus an integration smoke test that pipes a hench run with known multi-line tool output and counts the terminal rows emitted.",
+              "acceptanceCriteria": [
+                "Unit test: feeding a 4-line message followed by 3 single-line messages produces exactly 7 rendered lines",
+                "Unit test: a single message with 15 newlines is capped/truncated to fit within the 10-line bound",
+                "Unit test: mixed single- and multi-line messages never produce a rendered frame exceeding 10 lines",
+                "Integration test: a hench dry-run that emits known multi-line output passes the 10-line cap assertion"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "testing",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T14:26:45.181Z",
+              "completedAt": "2026-04-09T14:32:25.014Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ec3d96fd-86fd-43d3-845a-418c50058849",
+      "title": "Hench",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-09T15:15:23.076Z",
+      "completedAt": "2026-04-09T15:15:23.076Z",
+      "children": [
+        {
+          "id": "f505bbac-616d-43fd-8b5f-33aac47cb79f",
+          "title": "Hench Run-Loop Visual Output Refinements",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-09T15:15:22.844Z",
+          "completedAt": "2026-04-09T15:15:22.844Z",
+          "children": [
+            {
+              "id": "67886370-b75c-4e7a-ad8c-2a66b4f281a9",
+              "title": "Apply cyan color to agent text and task separator line in hench run output",
+              "status": "completed",
+              "level": "task",
+              "description": "Color the agent narrative text (lines emitted by the agent during a run) and the '_____ Task _____' separator line in cyan. No other existing color assignments should change — this is a targeted addition to the existing semantic color scheme established for hench run-loop output.",
+              "acceptanceCriteria": [
+                "Agent text lines rendered during a hench run are colored cyan in TTY output",
+                "The '_____ Task _____' separator line is colored cyan in TTY output",
+                "All other existing color assignments (pink loop separator, yellow warnings, label prefixes, etc.) are unchanged",
+                "Cyan is suppressed when NO_COLOR is set or output is not a TTY, consistent with existing color suppression behavior",
+                "Existing color integration tests pass without modification"
+              ],
+              "priority": "low",
+              "tags": [
+                "hench",
+                "cli",
+                "color"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T15:07:06.601Z",
+              "completedAt": "2026-04-09T15:15:22.555Z",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff",
+                "matchedItemId": "62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff",
+                "matchedItemTitle": "Add pink loop-iteration separator line to hench run output",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-04-09T13:55:05.624Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "624c6516-0082-4328-89f3-d1e0cb5aeb10",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-09T17:48:19.740Z",
+      "completedAt": "2026-04-09T17:48:19.740Z",
+      "children": [
+        {
+          "id": "6db5328c-2df6-437a-80a1-771fa55401a5",
+          "title": "Dinosaur Animation Frame Sequence Correction",
+          "status": "completed",
+          "level": "feature",
+          "description": "The ndx init dinosaur animation sequence is incorrect. Rex-F.png must be the canonical first frame, and each subsequent animation frame must be derived from the closest available reference image to Rex-F.png rather than being independently invented.",
+          "source": "smart-add",
+          "startedAt": "2026-04-09T17:48:19.524Z",
+          "completedAt": "2026-04-09T17:48:19.524Z",
+          "children": [
+            {
+              "id": "536c72d7-d8d3-410b-8710-67e24e330690",
+              "title": "Audit current animation frames against Rex-F.png and identify divergences",
+              "status": "completed",
+              "level": "task",
+              "description": "Render each current ASCII animation frame side-by-side with Rex-F.png to document exactly where the existing sequence diverges from the reference. Identify which frames are misaligned in proportions, pose, or character anatomy. Produce a written frame-by-frame audit that will drive the subsequent correction work.",
+              "acceptanceCriteria": [
+                "Every current animation frame is compared against Rex-F.png and differences are documented",
+                "Audit output identifies which frames require redrawing vs minor adjustment",
+                "Audit is committed as a markdown or inline comment artifact so future contributors can reference it"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "animation",
+                "ascii-art"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:45:21.352Z",
+              "completedAt": "2026-04-09T17:48:19.354Z"
+            },
+            {
+              "id": "42b353ce-031b-4c72-bca3-64983608a8fb",
+              "title": "Establish Rex-F.png as the canonical first animation frame",
+              "status": "completed",
+              "level": "task",
+              "description": "Redraw the first ASCII animation frame so it faithfully represents Rex-F.png's proportions, silhouette, and key anatomical landmarks (head, body, tail, limbs). The existing snapshot test must be updated to reflect the corrected frame. This is the reference anchor all subsequent frames are measured against.",
+              "acceptanceCriteria": [
+                "Frame 0 of the animation matches Rex-F.png proportions as verified by visual inspection",
+                "Existing snapshot test for the dinosaur ASCII art is updated to match the corrected frame 0",
+                "No other animation frames are changed in this task"
+              ],
+              "priority": "critical",
+              "tags": [
+                "cli",
+                "animation",
+                "ascii-art"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T15:39:17.409Z",
+              "completedAt": "2026-04-09T17:40:24.760Z"
+            },
+            {
+              "id": "3788d2a4-0d5d-410b-81e6-0854bceb1510",
+              "title": "Source subsequent animation frames from nearest reference images and update sequence",
+              "status": "completed",
+              "level": "task",
+              "description": "Locate reference images in the repository (e.g. packages/rex/) that are most visually similar to Rex-F.png in pose progression, then use them as the basis for each remaining animation frame. For any frame with no close reference image, derive the pose by interpolating logically from Rex-F.png rather than reinventing the character. Update the animation array in code with the corrected frame sequence and update or add snapshot tests covering the full sequence.",
+              "acceptanceCriteria": [
+                "Each subsequent animation frame traces back to a specific reference image or a documented interpolation decision from Rex-F.png",
+                "The full animation sequence plays without regressing back to old incorrect frames",
+                "Snapshot tests cover all animation frames and pass",
+                "A comment in the animation source lists the reference image (filename or 'interpolated from Rex-F.png') used for each frame"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "animation",
+                "ascii-art"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T16:31:08.928Z",
+              "completedAt": "2026-04-09T16:39:16.822Z",
+              "log": [
+                {
+                  "timestamp": "2026-04-09T16:39:16.822Z",
+                  "event": "task_completed",
+                  "message": "Fixed DINO_LEGS[1] (was a merged 4-pixel cluster, now shows two separate legs with feet-planted pose). Added reference comments mapping each frame to Rex-F.png (frame 0) or Rex.png (frame 1). Exported getMascotFrames() and QUADRANT_LEGS. Added snapshot tests covering all 2 animation frames. Committed as fix/add-consistent-model-across-calls@069839e3."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "df0b312f-6a01-48f7-87ca-cefd3a1cd29f",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-09T17:58:55.447Z",
+      "completedAt": "2026-04-09T17:58:55.447Z",
+      "children": [
+        {
+          "id": "fea07c28-af09-4696-9999-18eb37be4fc6",
+          "title": "ndx plan Post-LLM Progress Feedback",
+          "status": "completed",
+          "level": "feature",
+          "description": "After `ndx plan` prints 'Done.' and 'Vendor: ...' (which marks the end of the LLM response stream), the process appears to stall with no visible output while it processes the response and builds proposals. Users cannot distinguish a working pipeline from a hung process.",
+          "source": "smart-add",
+          "startedAt": "2026-04-09T17:58:55.309Z",
+          "completedAt": "2026-04-09T17:58:55.309Z",
+          "children": [
+            {
+              "id": "b3bdcdb5-1bed-46be-8190-56b022fa5787",
+              "title": "Trace ndx plan output flow and identify the silent gap after 'Done.'",
+              "status": "completed",
+              "level": "task",
+              "description": "Instrument the ndx plan execution path — from the LLM response completion signal through proposal parsing, merging, and final output — to identify exactly where output is suppressed. Determine whether the gap is in sourcevision analyze post-processing, rex analyze proposal building, or the orchestration layer between the two spawned commands.",
+              "acceptanceCriteria": [
+                "A written or code-comment trace identifies each stage between 'Done.' output and the next user-visible line",
+                "The stage(s) responsible for the silent gap are named and their duration is measurable",
+                "Any buffered-but-not-flushed stdout paths are documented"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "ndx-plan",
+                "dx"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:53:51.610Z",
+              "completedAt": "2026-04-09T17:58:55.134Z"
+            },
+            {
+              "id": "8f3ffe22-c031-4b7a-97e4-c4895439d6ea",
+              "title": "Add spinner and stage labels to ndx plan output between LLM response and proposal display",
+              "status": "completed",
+              "level": "task",
+              "description": "Insert a progress indicator (spinner or step label) immediately after the 'Done.' / 'Vendor: ...' lines so users know the process is still active. The indicator should cover at minimum the proposal-building and proposal-display phases. It must be suppressed in --quiet / JSON modes and must not interfere with the existing 'Done.' and 'Vendor: ...' output.",
+              "acceptanceCriteria": [
+                "A spinner or step label appears immediately after 'Done.' / 'Vendor: ...' with no perceptible gap",
+                "The indicator is cleared and replaced by the next substantive output line when proposals are ready",
+                "Running ndx plan in a TTY shows the spinner; piped/non-TTY output omits it",
+                "ndx plan --accept produces identical behavior with indicator present before proposal acceptance",
+                "No duplicate or garbled output when the indicator and proposal output overlap"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "ndx-plan",
+                "dx",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:48:22.321Z",
+              "completedAt": "2026-04-09T17:53:31.645Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5f15fa5d-0d68-4911-bbb0-6fa0d6c0cead",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-09T18:32:06.608Z",
+      "completedAt": "2026-04-09T18:32:06.608Z",
+      "children": [
+        {
+          "id": "eb21a965-6d17-4ee7-b6bd-0f1e6d07ff33",
+          "title": "ANSI Color Reset Consistency in Tool Output",
+          "status": "completed",
+          "level": "feature",
+          "description": "Tool output lines using blue (and potentially other) ANSI colors do not emit a reset code at the end of the line, causing the color to bleed into subsequent terminal output. This is a correctness issue in the color formatting layer — every colorized segment must close with a reset so downstream text renders in the default terminal color.",
+          "source": "smart-add",
+          "startedAt": "2026-04-09T18:32:06.317Z",
+          "completedAt": "2026-04-09T18:32:06.317Z",
+          "children": [
+            {
+              "id": "5f17b7af-ba00-43a6-8c6c-dcd5c8bf1d00",
+              "title": "Audit and fix missing ANSI reset codes in tool and CLI output lines",
+              "status": "completed",
+              "level": "task",
+              "description": "Identify all call sites in the CLI output pipeline where blue (and other) ANSI color codes are applied without a trailing reset sequence. The primary symptom is that text after a colored tool-output line inherits the blue color. Fix each site to ensure every colorized string ends with the ANSI reset code (`\\x1b[0m`), including multi-line and wrapped tool output. Cover rex, hench, sourcevision, and the ndx orchestrator.",
+              "acceptanceCriteria": [
+                "No terminal line colored blue (or any other ANSI color) bleeds color onto the next output line",
+                "All colorized output strings end with the ANSI reset sequence",
+                "Color formatting utility enforces reset-on-close so callers cannot emit a color without a paired reset",
+                "Verified across rex, hench, sourcevision, and ndx orchestrator output paths"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "ansi",
+                "color",
+                "bug"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T17:59:32.893Z",
+              "completedAt": "2026-04-09T18:13:00.000Z"
+            },
+            {
+              "id": "dbb2f5ef-4e60-431a-9e9f-8ade8f2eba28",
+              "title": "Add regression tests for ANSI color reset and line-boundary consistency",
+              "status": "completed",
+              "level": "task",
+              "description": "Add targeted tests that assert colorized CLI output strings always contain a reset code at the end of each colored segment. Tests should cover the shared color utility and at least one representative output path from each CLI tool (rex, hench, sourcevision). Prevents future contributors from reintroducing missing resets when adding new color usage.",
+              "acceptanceCriteria": [
+                "Unit tests assert that every string returned by the color utility ends with the ANSI reset sequence",
+                "At least one integration-level test per CLI tool verifies no color bleed across output lines in TTY mode",
+                "Tests fail if a colorized string is returned without a trailing reset",
+                "NO_COLOR and non-TTY paths are also covered (no ANSI codes emitted at all)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "cli",
+                "ansi",
+                "color",
+                "test"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-09T18:14:03.723Z",
+              "completedAt": "2026-04-09T18:32:06.024Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "de44833e-deb4-4959-aa0a-2963b2a5b7d0",
+      "title": "LLM Integration",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-10T16:27:02.858Z",
+      "completedAt": "2026-04-10T16:27:02.858Z",
+      "children": [
+        {
+          "id": "6840c2dc-3dc0-4354-a07c-85c780df4ff4",
+          "title": "Robust Claude CLI Discovery for ndx init",
+          "status": "completed",
+          "level": "feature",
+          "description": "ndx init fails to locate the claude CLI on machines where it is installed outside the shell's default PATH — common when users install via npm, Homebrew, or the Claude desktop app, or when ndx is invoked from a non-interactive shell (CI, IDE terminals) that does not source the user's profile. The discovery mechanism must work across macOS, Linux, and Windows regardless of how or where claude was installed.",
+          "source": "smart-add",
+          "startedAt": "2026-04-10T16:27:02.649Z",
+          "completedAt": "2026-04-10T16:27:02.649Z",
+          "children": [
+            {
+              "id": "ac39fe86-e0af-4b0d-b3b0-87bc26d81399",
+              "title": "Implement multi-location Claude CLI discovery chain with configurable override",
+              "status": "completed",
+              "level": "task",
+              "description": "Replace the current single PATH lookup for the claude binary with an ordered discovery chain that checks: (1) a user-configured path from .n-dx.json or CLAUDE_CLI_PATH env var, (2) the shell PATH, (3) well-known install locations (~/.claude/local/claude, ~/.nvm/versions/node/*/bin/claude, /usr/local/bin, /opt/homebrew/bin, %APPDATA%\\npm\\claude.cmd on Windows). The resolved path should be persisted in .hench/config.json so subsequent commands reuse it without re-discovering each time.",
+              "acceptanceCriteria": [
+                "ndx init succeeds when claude is installed via npm global, Homebrew, or the Claude desktop app and is not on the invoking shell's PATH",
+                "CLAUDE_CLI_PATH environment variable, when set, takes precedence over all discovery heuristics",
+                "cli.claudePath key in .n-dx.json overrides discovery and is documented in ndx config --help",
+                "Resolved path is written to .hench/config.json on successful discovery",
+                "Discovery logic is exercised by a unit test that stubs PATH and file-existence checks for each platform"
+              ],
+              "priority": "high",
+              "tags": [
+                "init",
+                "cli-discovery",
+                "cross-platform"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-10T16:15:12.695Z",
+              "completedAt": "2026-04-10T16:27:02.356Z"
+            },
+            {
+              "id": "caadeba9-0971-4a34-b088-63c4e76d8a6b",
+              "title": "Emit actionable diagnostics when Claude CLI cannot be located",
+              "status": "completed",
+              "level": "task",
+              "description": "When all discovery attempts fail, ndx init should print a clear, structured error that tells the user exactly which paths were searched and provides install instructions specific to the detected platform (Homebrew for macOS, npm global for Linux/Windows, and a link to the Claude desktop download). The error must not expose an unhandled exception or stack trace.",
+              "acceptanceCriteria": [
+                "Error output lists every path that was checked, in order, so the user can diagnose their own environment",
+                "Platform-specific install command is suggested (e.g. 'brew install claude' on macOS, 'npm install -g claude' otherwise)",
+                "ndx init exits with a non-zero code and a human-readable message rather than an uncaught exception",
+                "Running ndx init with CLAUDE_CLI_PATH pointing to a nonexistent file produces the same structured error",
+                "Integration test verifies the error message contains both the searched paths and an install hint"
+              ],
+              "priority": "high",
+              "tags": [
+                "init",
+                "error-handling",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-10T16:00:14.790Z",
+              "completedAt": "2026-04-10T16:14:21.791Z"
             }
           ]
         }

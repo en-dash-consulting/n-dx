@@ -3,6 +3,16 @@ import { resolveStore } from "../../store/index.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
+import { bold, yellow, red, dim, colorStatus } from "@n-dx/llm-client";
+
+function colorPriority(priority: string): string {
+  switch (priority) {
+    case "high": return red(priority);
+    case "medium": return yellow(priority);
+    case "low": return dim(priority);
+    default: return priority;
+  }
+}
 
 export async function cmdNext(
   dir: string,
@@ -34,14 +44,14 @@ export async function cmdNext(
   }
 
   if (parents.length > 0) {
-    const breadcrumb = parents.map((p) => p.title).join(" → ");
-    info(`${breadcrumb} →`);
+    const breadcrumb = parents.map((p) => p.title).join(dim(" → "));
+    info(dim(breadcrumb + " →"));
   }
 
-  result(`\n[${item.level}] ${item.title}`);
-  result(`  ID:     ${item.id}`);
-  info(`  Status: ${item.status}`);
-  if (item.priority) info(`  Priority: ${item.priority}`);
+  result(`\n[${item.level}] ${bold(item.title)}`);
+  result(`  ID:     ${dim(item.id)}`);
+  info(`  Status: ${colorStatus(item.status)}`);
+  if (item.priority) info(`  Priority: ${colorPriority(item.priority)}`);
   if (item.blockedBy && item.blockedBy.length > 0) {
     info(`  Blocked by: ${item.blockedBy.join(", ")}`);
   }

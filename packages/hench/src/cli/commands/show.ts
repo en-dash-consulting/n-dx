@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { loadRun } from "../../store/index.js";
 import { HENCH_DIR } from "./constants.js";
 import { info, result } from "../output.js";
+import { colorStatus } from "../../prd/llm-gateway.js";
 import { lookupTaskInRex, formatTaskLine } from "./task-lookup.js";
 
 export async function cmdShow(
@@ -24,7 +25,7 @@ export async function cmdShow(
   result(`Run: ${run.id}`);
   result(`Task: ${taskLine}`);
   info(`Model: ${run.model}`);
-  result(`Status: ${run.status}`);
+  result(`Status: ${colorStatus(run.status)}`);
   info(`Started: ${run.startedAt}`);
   if (run.finishedAt) info(`Finished: ${run.finishedAt}`);
   info(`Turns: ${run.turns}`);

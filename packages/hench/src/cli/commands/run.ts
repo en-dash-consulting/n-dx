@@ -10,12 +10,14 @@ import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/bri
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
-import { info, result as output } from "../output.js";
+import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
+import { printVendorModelHeader, resolveModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
 import { MemoryThrottle } from "../../process/memory-throttle.js";
+import { checkQuotaRemaining, formatQuotaLog } from "../../quota/index.js";
 
 // ---------------------------------------------------------------------------
 // Schema compatibility
@@ -47,6 +49,54 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
   return `${minutes}m ${remaining}s`;
+}
+
+/**
+ * Format an inter-task or inter-epic pause notification.
+ * Rendered in yellow (colorWarn) to signal a transient wait state.
+ * Exported for testing — verifies semantic color helpers are applied.
+ */
+export function formatPauseMessage(pauseMs: number, target: "task" | "epic"): string {
+  return colorWarn(`Pausing ${pauseMs}ms before next ${target}...`);
+}
+
+/**
+ * Format a run-loop completion message.
+ * Rendered in green (colorSuccess) to confirm a clean exit.
+ * Exported for testing — verifies semantic color helpers are applied.
+ */
+export function formatRunSuccessMessage(text: string): string {
+  return colorSuccess(text);
+}
+
+/**
+ * Format a loop-iteration boundary separator line.
+ *
+ * Rendered in pink/magenta (colorPink) to visually distinguish loop-iteration
+ * boundaries from the cyan ═══ agent-turn section separators.  Width matches
+ * SECTION_WIDTH (60 chars) for visual consistency with the rest of the
+ * transcript.
+ *
+ * Fully suppressed (returns plain text that callers skip via NO_COLOR / !isTTY
+ * checks in colorPink) when color is disabled.
+ * Exported for testing — verifies colorPink is applied and suppression works.
+ */
+export function formatLoopIterationSeparator(): string {
+  return colorPink("─".repeat(60));
+}
+
+/**
+ * Format a "no actionable tasks" advisory block for epic scope mode.
+ * All three lines are rendered in yellow (colorWarn) to signal an advisory
+ * state without alarming the user.
+ * Exported for testing — verifies semantic color helpers are applied.
+ */
+export function formatNoActionableTasksWarning(epicTitle: string, blockedCount: number): [string, string, string] {
+  return [
+    colorWarn(`\n⚠ Epic "${epicTitle}" has no actionable tasks.`),
+    colorWarn(`  ${blockedCount} task(s) are blocked or deferred.`),
+    colorWarn(`  Use 'rex status' to see task statuses, or update tasks with 'rex update <id> --status=pending'.`),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +271,33 @@ export function loopPause(ms: number, signal?: AbortSignal): Promise<void> {
       signal.addEventListener("abort", onAbort, { once: true });
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Quota log helper (exported for testing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch remaining quota and emit ANSI-colored log lines at the inter-run
+ * boundary.
+ *
+ * - If `checkQuotaRemaining()` returns data, each entry is formatted and
+ *   emitted via `info()`, which suppresses output in quiet/JSON mode.
+ * - If the fetch throws, a single degraded indicator is emitted instead
+ *   of crashing the loop.
+ * - An empty result (no quota data available) produces no output.
+ */
+export async function emitQuotaLog(): Promise<void> {
+  let quotas: Awaited<ReturnType<typeof checkQuotaRemaining>>;
+  try {
+    quotas = await checkQuotaRemaining();
+  } catch {
+    info("quota: unavailable");
+    return;
+  }
+  for (const line of formatQuotaLog(quotas)) {
+    info(line);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -578,10 +655,10 @@ async function runOne(
 
   const { run } = result;
 
-  info("\n=== Run Complete ===");
+  info(`\n${bold("=== Run Complete ===")}`);
   output(`Run ID: ${run.id}`);
-  output(`Task: ${run.taskTitle}`);
-  output(`Status: ${run.status}`);
+  output(`Task: ${cyan(run.taskTitle)}`);
+  output(`Status: ${colorStatus(run.status)}`);
 
   // Duration
   if (run.startedAt && run.finishedAt) {
@@ -611,7 +688,8 @@ async function runOne(
     const scope = postTests.targetedFiles.length > 0
       ? `${postTests.targetedFiles.length} targeted file(s)`
       : "full suite";
-    info(`Post-task tests: ${postTests.passed ? "passed" : "FAILED"} (${scope}, ${postTests.durationMs ?? 0}ms)`);
+    const testResult = postTests.passed ? green("passed") : red("FAILED");
+    info(`Post-task tests: ${testResult} (${scope}, ${postTests.durationMs ?? 0}ms)`);
   }
 
   // Change classification
@@ -621,7 +699,7 @@ async function runOne(
     info(`\nSummary: ${run.summary}`);
   }
   if (run.error) {
-    output(`\nError: ${run.error}`);
+    output(`\n${red("Error:")} ${run.error}`);
   }
 
   return { status: run.status };
@@ -650,6 +728,18 @@ export async function cmdRun(
   const rexDir = join(dir, config.rexDir);
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
+
+  // Surface vendor/model at command start for operator visibility.
+  // Reads the most recent run artifact (if any) to detect model changes.
+  const recentRuns = await listRuns(henchDir, 1);
+  const lastRunModel = recentRuns[0]?.model;
+  printVendorModelHeader(llmVendor, llmConfig, {
+    lastModel: lastRunModel ? resolveModel(lastRunModel) : undefined,
+  });
+
+  // Suppress all informational output (including quota lines) in JSON mode,
+  // consistent with how --quiet suppresses info() output.
+  if (flags.format === "json") setQuiet(true);
 
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
@@ -699,13 +789,17 @@ export async function cmdRun(
 
     // Check for completion or no actionable tasks
     if (scopeInfo.isComplete) {
-      output(`\n✓ All tasks in epic "${scopeInfo.title}" are complete.`);
+      output(`\n${formatRunSuccessMessage(`✓ All tasks in epic "${scopeInfo.title}" are complete.`)}`);
       process.exit(0);
     }
     if (!scopeInfo.hasActionableTasks) {
-      output(`\n⚠ Epic "${scopeInfo.title}" has no actionable tasks.`);
-      output(`  ${scopeInfo.totalTasks - scopeInfo.completedTasks} task(s) are blocked or deferred.`);
-      output(`  Use 'rex status' to see task statuses, or update tasks with 'rex update <id> --status=pending'.`);
+      const [line1, line2, line3] = formatNoActionableTasksWarning(
+        scopeInfo.title,
+        scopeInfo.totalTasks - scopeInfo.completedTasks,
+      );
+      output(line1);
+      output(line2);
+      output(line3);
       process.exit(0);
     }
   }
@@ -796,7 +890,7 @@ async function runIterations(
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
     if (iterations > 1) {
-      info(`\n=== Iteration ${i + 1}/${iterations} ===`);
+      info(`\n${bold(`=== Iteration ${i + 1}/${iterations} ===`)}`);
     }
 
     // For autoselected iterations, skip stuck tasks
@@ -816,13 +910,16 @@ async function runIterations(
       epicId,
     );
 
+    // Emit quota log line(s) at the inter-run boundary.
+    await emitQuotaLog();
+
     if (status === "error_transient") {
-      info(`\nTransient error on iteration ${i + 1}, continuing to next task...`);
+      info(`\n${colorWarn(`Transient error on iteration ${i + 1}, continuing to next task...`)}`);
       continue;
     }
 
     if (status === "failed" || status === "timeout" || status === "budget_exceeded") {
-      info(`\nStopping after ${i + 1} iteration(s) due to ${status} status.`);
+      info(`\n${red(`Stopping after ${i + 1} iteration(s) due to ${status} status.`)}`);
       break;
     }
 
@@ -882,7 +979,7 @@ async function runLoop(
       }
 
       completed++;
-      info(`\n=== Loop iteration ${completed} ===`);
+      info(`\n${bold(`=== Loop iteration ${completed} ===`)}`);
 
       // Show queue status if there are pending tasks
       if (queue) logQueueStatus(queue);
@@ -932,10 +1029,13 @@ async function runLoop(
         throw err;
       }
 
+      // Emit quota log line(s) at the inter-run boundary.
+      await emitQuotaLog();
+
       if (!shouldContinueLoop(status)) {
         // In loop mode, hard failures don't stop the loop — the stuck
         // task will be detected and skipped on the next iteration.
-        info(`\nTask failed (${status}), will skip if stuck on next iteration...`);
+        info(`\n${red(`Task failed (${status}), will skip if stuck on next iteration...`)}`);
       }
 
       if (dryRun) {
@@ -944,13 +1044,22 @@ async function runLoop(
       }
 
       if (status === "error_transient") {
-        info("\nTransient error, continuing to next task...");
+        info(`\n${colorWarn("Transient error, continuing to next task...")}`);
       }
 
       // Pause between tasks (interruptible)
       if (!stopping && pauseMs > 0) {
-        info(`\nPausing ${pauseMs}ms before next task...`);
+        info(`\n${formatPauseMessage(pauseMs, "task")}`);
         await loopPause(pauseMs, ac.signal);
+      }
+
+      // Emit a pink separator at each loop-iteration boundary so long
+      // transcripts are easy to scan.  Suppressed entirely when color is
+      // disabled (NO_COLOR=1 or non-TTY without FORCE_COLOR) — no plain-text
+      // fallback, because a bare ─── line would add noise without the colour
+      // distinction that makes it useful.
+      if (isColorEnabled()) {
+        info(`\n${formatLoopIterationSeparator()}`);
       }
     }
   } finally {
@@ -1043,7 +1152,7 @@ async function runEpicByEpic(
     // Filter to epics that need work
     const actionableEpics = allEpics.filter((e) => !e.isComplete);
     if (actionableEpics.length === 0) {
-      output("✓ All epics are complete.");
+      output(formatRunSuccessMessage("✓ All epics are complete."));
       return;
     }
 
@@ -1070,15 +1179,15 @@ async function runEpicByEpic(
 
       const epic = actionableEpics[epicIdx];
 
-      info(`\n${"═".repeat(60)}`);
-      info(`Epic ${epicIdx + 1}/${actionableEpics.length}: ${epic.title}`);
-      info(`${"═".repeat(60)}`);
+      info(`\n${cyan("═".repeat(60))}`);
+      info(bold(`Epic ${epicIdx + 1}/${actionableEpics.length}: ${epic.title}`));
+      info(cyan("═".repeat(60)));
 
       // Re-check epic scope (tasks may have changed from prior epic's work)
       const freshScope = await getEpicScopeInfo(store, epic.id);
 
       if (freshScope.isComplete) {
-        info(`✓ Epic "${epic.title}" is already complete.`);
+        info(green(`✓ Epic "${epic.title}" is already complete.`));
         summaries.push({
           id: epic.id,
           title: epic.title,
@@ -1090,7 +1199,7 @@ async function runEpicByEpic(
       }
 
       if (!freshScope.hasActionableTasks) {
-        info(`⚠ Epic "${epic.title}" has no actionable tasks (${freshScope.totalTasks - freshScope.completedTasks} blocked/deferred).`);
+        info(colorWarn(`⚠ Epic "${epic.title}" has no actionable tasks (${freshScope.totalTasks - freshScope.completedTasks} blocked/deferred).`));
         summaries.push({
           id: epic.id,
           title: epic.title,
@@ -1150,6 +1259,9 @@ async function runEpicByEpic(
           throw err;
         }
 
+        // Emit quota log line(s) at the inter-run boundary.
+        await emitQuotaLog();
+
         if (status === "completed") {
           tasksCompleted++;
         } else if (status === "failed" || status === "timeout" || status === "budget_exceeded") {
@@ -1164,17 +1276,17 @@ async function runEpicByEpic(
         // Re-check epic scope after each task
         const updated = await getEpicScopeInfo(store, epic.id);
         if (updated.isComplete) {
-          info(`\n✓ Epic "${epic.title}" is now complete!`);
+          info(`\n${green(`✓ Epic "${epic.title}" is now complete!`)}`);
           break;
         }
         if (!updated.hasActionableTasks) {
-          info(`\n⚠ Epic "${epic.title}" has no more actionable tasks.`);
+          info(`\n${colorWarn(`⚠ Epic "${epic.title}" has no more actionable tasks.`)}`);
           break;
         }
 
         // Pause between tasks (interruptible)
         if (!stopping && pauseMs > 0) {
-          info(`\nPausing ${pauseMs}ms before next task...`);
+          info(`\n${formatPauseMessage(pauseMs, "task")}`);
           await loopPause(pauseMs, ac.signal);
         }
       }
@@ -1197,7 +1309,7 @@ async function runEpicByEpic(
 
       // Pause between epics (interruptible)
       if (!stopping && epicIdx < actionableEpics.length - 1 && pauseMs > 0) {
-        info(`\nPausing ${pauseMs}ms before next epic...`);
+        info(`\n${formatPauseMessage(pauseMs, "epic")}`);
         await loopPause(pauseMs, ac.signal);
       }
     }
@@ -1213,9 +1325,9 @@ async function runEpicByEpic(
  * Print a summary table of epic-by-epic execution results.
  */
 export function printEpicByEpicSummary(summaries: EpicRunSummary[]): void {
-  info(`\n${"═".repeat(60)}`);
-  info("Epic-by-Epic Execution Summary");
-  info(`${"═".repeat(60)}`);
+  info(`\n${cyan("═".repeat(60))}`);
+  info(bold("Epic-by-Epic Execution Summary"));
+  info(cyan("═".repeat(60)));
 
   let totalCompleted = 0;
   let totalFailed = 0;
@@ -1229,7 +1341,7 @@ export function printEpicByEpicSummary(summaries: EpicRunSummary[]): void {
       "?";
 
     const stats = s.tasksCompleted > 0 || s.tasksFailed > 0
-      ? ` (${s.tasksCompleted} done, ${s.tasksFailed} failed)`
+      ? ` (${green(String(s.tasksCompleted))} done, ${red(String(s.tasksFailed))} failed)`
       : "";
 
     output(`  ${icon} ${s.title} — ${s.outcome}${stats}`);
@@ -1238,5 +1350,5 @@ export function printEpicByEpicSummary(summaries: EpicRunSummary[]): void {
   }
 
   const epicsDone = summaries.filter((s) => s.outcome === "completed").length;
-  output(`\nEpics: ${epicsDone}/${summaries.length} completed | Tasks: ${totalCompleted} done, ${totalFailed} failed`);
+  output(`\nEpics: ${epicsDone}/${summaries.length} completed | Tasks: ${green(String(totalCompleted))} done, ${red(String(totalFailed))} failed`);
 }

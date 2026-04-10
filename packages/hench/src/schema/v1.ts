@@ -90,6 +90,8 @@ export interface HenchConfig {
   selfHeal?: boolean;
   /** Detected project language. Drives guard defaults during init. */
   language?: ProjectLanguage;
+  /** Discovered claude CLI path, persisted by ndx init to avoid re-discovery on every run. */
+  claudePath?: string;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────

@@ -56,7 +56,8 @@
     "claude-integration.js",
     "refresh-validate.js",
     "child-lifecycle.js",
-    "cli-timeout.js"
+    "cli-timeout.js",
+    "update-check.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"

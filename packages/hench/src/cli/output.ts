@@ -16,4 +16,7 @@ export {
   subsection,
   stream,
   detail,
+  resetRollingWindow,
+  getCapturedLines,
+  resetCapturedLines,
 } from "../types/output.js";
