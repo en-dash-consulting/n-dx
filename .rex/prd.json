@@ -26128,7 +26128,7 @@
             {
               "id": "de5ca68f-3c4a-4387-90ec-8edcbf210182",
               "title": "Fix observation in global: Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extract",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "- Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extracting shared interface",
               "priority": "high",
@@ -26142,7 +26142,8 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              }
+              },
+              "startedAt": "2026-04-13T20:09:32.123Z"
             }
           ],
           "recommendationMeta": {
@@ -26891,20 +26892,24 @@
         {
           "id": "9d4e78ef-a61b-4b90-9246-69b9b541e0ad",
           "title": "Fix move-file in web-server (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T20:09:29.458Z",
+          "completedAt": "2026-04-13T20:09:29.458Z",
           "children": [
             {
               "id": "90066670-a9d5-4469-b14b-064cc633c318",
               "title": "Fix move-file in web-server: File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Ser",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T20:05:37.693Z",
+              "completedAt": "2026-04-13T20:09:29.287Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "bbfc211213fe"
@@ -26931,20 +26936,24 @@
         {
           "id": "6d9a909f-b68e-4437-ad68-04e85e1a0588",
           "title": "Fix suggestion in rex (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Zone \"Rex\" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0.79) — requires immediate architectural intervention",
           "priority": "critical",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T20:05:35.003Z",
+          "completedAt": "2026-04-13T20:05:35.003Z",
           "children": [
             {
               "id": "362e105b-c0eb-4111-8109-7a8dbe283b24",
               "title": "Fix suggestion in rex: Zone \"Rex\" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- Zone \"Rex\" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0.79) — requires immediate architectural intervention",
               "priority": "critical",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T18:49:22.288Z",
+              "completedAt": "2026-04-13T20:05:34.822Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "07da8e13aff4"
@@ -26954,8 +26963,7 @@
                   "critical": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-13T18:49:22.288Z"
+              }
             }
           ],
           "recommendationMeta": {

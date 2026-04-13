@@ -4,6 +4,10 @@
  * These interfaces define the API shape for GET/PUT /api/features.
  * Both the server (routes-features.ts) and viewer (feature-toggles.ts)
  * import from here, preventing silent type drift when a field changes.
+ *
+ * Placed in shared/ because this is a framework-agnostic contract with
+ * two distinct consumer zones (web-server and web-viewer), consistent
+ * with the web-shared foundation layer governance rules.
  */
 
 export interface FeatureToggle {

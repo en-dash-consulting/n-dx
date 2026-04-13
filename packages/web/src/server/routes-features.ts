@@ -16,11 +16,11 @@ import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// Types — canonical definitions in src/schema/features.ts
+// Types — canonical definitions in src/shared/features.ts
 // ---------------------------------------------------------------------------
 
-export type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
-import type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
+export type { FeatureToggle, FeaturesResponse } from "../shared/index.js";
+import type { FeatureToggle, FeaturesResponse } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Feature registry — defines all known feature flags
