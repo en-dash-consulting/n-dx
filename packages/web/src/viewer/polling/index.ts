@@ -53,6 +53,13 @@ export {
   type PollingStateChangeHandler,
 } from "./polling-state.js";
 
+// ── Preact hooks ────────────────────────────────────────────────────────────
+
+export {
+  usePollingSuspension,
+  type UsePollingSuspensionResult,
+} from "./use-polling-suspension.js";
+
 // ── Tab visibility ──────────────────────────────────────────────────────────
 
 export {
