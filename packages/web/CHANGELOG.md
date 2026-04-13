@@ -1,5 +1,16 @@
 # @n-dx/web
 
+## 0.2.3
+
+### Patch Changes
+
+- [#155](https://github.com/en-dash-consulting/n-dx/pull/155) [`46184f2`](https://github.com/en-dash-consulting/n-dx/commit/46184f2130fef7c6394a2dba1581e3c350b3b817) Thanks [@endash-shal](https://github.com/endash-shal)! - model and quality of experience improvements
+
+- Updated dependencies [[`46184f2`](https://github.com/en-dash-consulting/n-dx/commit/46184f2130fef7c6394a2dba1581e3c350b3b817)]:
+  - @n-dx/sourcevision@0.2.3
+  - @n-dx/llm-client@0.2.3
+  - @n-dx/rex@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes
