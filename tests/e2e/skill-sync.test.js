@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { join } from "path";
 import {
   getManifest,
@@ -18,34 +18,15 @@ import {
 const ROOT = join(import.meta.dirname, "../..");
 
 /**
- * Read all local skill files from .claude/skills/.
- * Returns a Map of skill name → content string.
- */
-function readLocalSkills() {
-  const skillsDir = join(ROOT, ".claude", "skills");
-  if (!existsSync(skillsDir)) return new Map();
-
-  const skills = new Map();
-  for (const dir of readdirSync(skillsDir, { withFileTypes: true })) {
-    if (!dir.isDirectory()) continue;
-    const skillFile = join(skillsDir, dir.name, "SKILL.md");
-    if (existsSync(skillFile)) {
-      skills.set(dir.name, readFileSync(skillFile, "utf-8").trim());
-    }
-  }
-
-  return skills;
-}
-
-/**
- * List skill file names from the assistant-assets/skills/ directory.
+ * List skill names from the assistant-assets/skills/ directory.
+ * Skills are stored as flat <name>.md files (e.g., ndx-plan.md).
  */
 function listSkillFiles() {
   const skillsDir = join(ROOT, "assistant-assets", "skills");
   if (!existsSync(skillsDir)) return [];
   return readdirSync(skillsDir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name);
+    .filter((d) => d.isFile() && d.name.endsWith(".md"))
+    .map((d) => d.name.replace(/\.md$/, ""));
 }
 
 // ── Manifest structure validation ───────────────────────────────────────────
@@ -98,34 +79,34 @@ describe("assistant-assets manifest structure", () => {
 });
 
 describe("skill file sync", () => {
-  const localSkills = readLocalSkills();
+  const canonicalSkills = new Set(listSkillFiles());
   const manifestSkillNames = new Set(getSkillNames());
 
-  it("local skills exist for all manifest entries", () => {
+  it("canonical skill files exist for all manifest entries", () => {
     const missing = [];
     for (const name of manifestSkillNames) {
-      if (!localSkills.has(name)) {
+      if (!canonicalSkills.has(name)) {
         missing.push(name);
       }
     }
     if (missing.length > 0) {
       expect.fail(
-        `Skills in manifest but not in .claude/skills/: ${missing.join(", ")}\n` +
-        "Create matching .claude/skills/<name>/SKILL.md files.",
+        `Skills in manifest but not in assistant-assets/skills/: ${missing.join(", ")}\n` +
+        "Create matching assistant-assets/skills/<name>.md files.",
       );
     }
   });
 
-  it("manifest has entries for all local ndx skills", () => {
+  it("manifest has entries for all canonical skill files", () => {
     const missing = [];
-    for (const name of localSkills.keys()) {
-      if (!manifestSkillNames.has(name) && name.includes("ndx")) {
+    for (const name of canonicalSkills) {
+      if (!manifestSkillNames.has(name)) {
         missing.push(name);
       }
     }
     if (missing.length > 0) {
       expect.fail(
-        `Local skills not in manifest: ${missing.join(", ")}\n` +
+        `Canonical skill files not in manifest: ${missing.join(", ")}\n` +
         "Add them to assistant-assets/manifest.json so ndx init installs them for all users.",
       );
     }

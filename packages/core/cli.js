@@ -97,20 +97,6 @@ import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
 
-// ── Update check (fire-and-forget) ───────────────────────────────────────────
-// Read the current version synchronously (package.json is tiny) and fire the
-// registry check immediately.  The result is captured via .then() and checked
-// synchronously at exit — zero additional delay to any command.
-const _coreVersion = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8")).version;
-let _updateResult;
-checkForUpdate(_coreVersion).then((r) => { _updateResult = r ?? null; }).catch(() => { _updateResult = null; });
-
-// ── Staleness check (deferred) ───────────────────────────────────────────────
-// The staleness check is synchronous (reads local JSON files only — no network
-// I/O) so it runs lazily once the project directory is known, inside main().
-// The result is checked at exit alongside the update notice.
-let _stalenessResult;
-
 /** Map monorepo directory names to npm package names. */
 const PKG_NAMES = {
   "packages/rex": "@n-dx/rex",
@@ -182,10 +168,6 @@ function ansi(code, text, reset) {
 
 function bold(text) {
   return ansi("1", text, "22");
-}
-
-function dim(text) {
-  return ansi("2", text, "22");
 }
 
 function cyan(text) {
@@ -1740,27 +1722,6 @@ try {
   await flushAndExit(0);
 } catch (err) {
   if (err instanceof ExitRequest) {
-    const cliArgs = process.argv.slice(2);
-
-    // Show staleness notice after command output, before exit.
-    // _stalenessResult is populated synchronously inside main() once the
-    // project directory is known.
-    if (
-      _stalenessResult?.isStale &&
-      !shouldSuppressStaleness(cliArgs, err.code)
-    ) {
-      console.log(dim(formatStalenessNotice(_stalenessResult, _coreVersion)));
-    }
-
-    // Show update notice after command output, before exit.
-    // _updateResult is populated asynchronously by the fire-and-forget check
-    // started at module load.  If it hasn't resolved yet, we skip silently.
-    if (
-      _updateResult?.updateAvailable &&
-      !shouldSuppressNotice(cliArgs, err.code)
-    ) {
-      console.log(dim(formatUpdateNotice(_updateResult.latestVersion, _updateResult.currentVersion)));
-    }
     await flushAndExit(err.code);
   } else {
     console.error(formatError(err));

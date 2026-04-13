@@ -301,11 +301,11 @@ describe("registerMcpServers error field in result", () => {
 
 // ── Source-level: hasClaudeCli guard ─────────────────────────────────────────
 
-describe("registerMcpServers guard: hasClaudeCli", () => {
+describe("registerMcpServers guard: discoverClaudeCli", () => {
   it("checks for claude CLI before attempting registration", () => {
     const fnStart = SRC.indexOf("function registerMcpServers");
     const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
-    expect(fnBody).toContain("hasClaudeCli()");
+    expect(fnBody).toContain("discoverClaudeCli");
   });
 
   it("returns early with reason when claude CLI is absent", () => {
@@ -313,12 +313,5 @@ describe("registerMcpServers guard: hasClaudeCli", () => {
     const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
     expect(fnBody).toContain("claude CLI not found");
     expect(fnBody).toContain("registered: false");
-  });
-
-  it("hasClaudeCli uses execSync with timeout", () => {
-    const fnStart = SRC.indexOf("function hasClaudeCli");
-    const fnBody = SRC.slice(fnStart, SRC.indexOf("\n}", fnStart) + 2);
-    expect(fnBody).toContain("claude --version");
-    expect(fnBody).toContain("timeout");
   });
 });

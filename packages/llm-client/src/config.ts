@@ -34,7 +34,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-4-6",
-  codex: "gpt-5",
+  codex: "gpt-5-codex",
 };
 
 /**
