@@ -278,15 +278,15 @@ sv <command> [args]               # alias for sourcevision
 
 ### Rex commands
 
-`init`, `status`, `next`, `add`, `remove`, `update`, `validate`, `analyze`, `recommend`, `mcp`
+`init`, `status`, `next`, `add`, `update`, `move`, `remove`, `reshape`, `prune`, `validate`, `fix`, `sync`, `usage`, `report`, `verify`, `recommend`, `analyze`, `reorganize`, `health`, `adapter`, `mcp`
 
 ### Sourcevision commands
 
-`init`, `analyze`, `serve`, `validate`, `reset`, `mcp`
+`init`, `analyze`, `serve`, `validate`, `export-pdf`, `pr-markdown`, `git-credential-helper`, `reset`, `workspace`, `mcp`
 
 ### Hench commands
 
-`init`, `run`, `status`, `show`
+`init`, `run`, `config`, `template`, `status`, `show`
 
 ## MCP Servers
 

@@ -25931,7 +25931,7 @@
             {
               "id": "e2ddb064-3972-475d-8162-91d33caa5ec3",
               "title": "Audit and repair CLI hint text across all commands",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Walk every CLI command in all packages (ndx/rex/hench/sourcevision) and verify that each hint, suggestion, and recommendation references a command, flag, or workflow that currently exists and behaves as described. Fix hint text that references removed flags, renamed commands, outdated invocation patterns, or deprecated workflows. Covers both inline help strings and the interactive hint/suggestion output paths.",
               "acceptanceCriteria": [
@@ -25948,7 +25948,8 @@
                 "hints"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-13T16:35:01.665Z"
+              "startedAt": "2026-04-13T16:35:01.665Z",
+              "completedAt": "2026-04-13T16:45:52.704Z"
             },
             {
               "id": "2fc45532-6443-43ad-ba55-c0668a2fcd33",
@@ -25976,7 +25977,7 @@
             {
               "id": "f2bfa3e5-ff03-4c8d-b294-5850185bb5a9",
               "title": "Synchronize project documentation with current CLI command surface",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Audit CLAUDE.md, CODEX.md, README files, and commands.md for command invocations, flag references, and workflow descriptions that no longer match the current CLI. Update all stale sections to reflect the actual command surface, remove references to removed commands, and add entries for commands added since the last documentation pass. Also verify that CLI --help output for each command matches the documented description.",
               "acceptanceCriteria": [
@@ -25992,7 +25993,8 @@
                 "cli",
                 "dx"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-13T16:49:33.071Z"
             }
           ]
         }
@@ -26001,21 +26003,25 @@
     {
       "id": "995cad13-7633-4911-9f51-e0633a38b51f",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-13T16:48:29.051Z",
+      "completedAt": "2026-04-13T16:48:29.051Z",
       "children": [
         {
           "id": "77b9a870-68fd-49b1-9dd9-4ece01493c8d",
           "title": "CLI Hint Correctness, Test Coverage, and Documentation Sync",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
+          "startedAt": "2026-04-13T16:48:28.800Z",
+          "completedAt": "2026-04-13T16:48:28.800Z",
           "children": [
             {
               "id": "bb5f0641-67a7-43d2-b0fe-186faf73c0bc",
               "title": "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The ndx init dinosaur ASCII art was redesigned and corrected in a prior sprint (proportions fixed, animation frames sourced from Rex-F.png). The E2E brand test at tests/e2e/cli-brand.test.js still asserts against the old dinosaur output, causing it to fail or carry a stale snapshot. Update the expected output in the test to match the current canonical dinosaur so the suite is green and serves as an accurate regression guard going forward.",
               "acceptanceCriteria": [
@@ -26030,7 +26036,9 @@
                 "cli",
                 "branding"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-13T16:47:37.099Z",
+              "completedAt": "2026-04-13T16:48:28.514Z"
             }
           ]
         }

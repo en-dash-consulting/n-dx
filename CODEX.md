@@ -141,10 +141,12 @@ ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals
 ndx plan --accept [dir]   # ...then accept proposals into PRD
 ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, etc.)
 ndx self-heal [N] [dir]   # iterative improvement loop (analyze → recommend → execute)
-ndx status [dir]          # rex status (pass --format=json)
 ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
+ndx status [dir]          # rex status (pass --format=json)
 ndx usage [dir]           # token usage analytics (--format=json, --group=day|week|month)
 ndx sync [dir]            # sync local PRD with remote adapter (--push, --pull)
+ndx refresh [dir]         # refresh dashboard artifacts (--ui-only, --data-only, --no-build)
+ndx dev [dir]             # start web dev server with live reload
 ndx ci [dir]              # run analysis pipeline and validate PRD health (--format=json)
 ndx config [key] [value]  # view/edit settings (--json, --help)
 ndx export [dir]          # export static deployable dashboard (--out-dir, --deploy=github)
@@ -168,15 +170,15 @@ sv <command> [args]               # alias for sourcevision
 
 ### Rex commands
 
-`init`, `status`, `next`, `add`, `update`, `validate`, `analyze`, `recommend`, `mcp`
+`init`, `status`, `next`, `add`, `update`, `move`, `remove`, `reshape`, `prune`, `validate`, `fix`, `sync`, `usage`, `report`, `verify`, `recommend`, `analyze`, `reorganize`, `health`, `adapter`, `mcp`
 
 ### Sourcevision commands
 
-`init`, `analyze`, `serve`, `validate`, `reset`, `mcp`
+`init`, `analyze`, `serve`, `validate`, `export-pdf`, `pr-markdown`, `git-credential-helper`, `reset`, `workspace`, `mcp`
 
 ### Hench commands
 
-`init`, `run`, `status`, `show`
+`init`, `run`, `config`, `template`, `status`, `show`
 
 ## Codex Troubleshooting
 
