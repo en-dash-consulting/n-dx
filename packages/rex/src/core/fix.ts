@@ -16,6 +16,10 @@
 import type { PRDItem, ItemStatus } from "../schema/index.js";
 import { walkTree, collectAllIds } from "./tree.js";
 
+// Re-export schema types used in this module's public API so consumers can
+// import them from a single location without reaching into schema directly.
+export type { PRDItem, ItemStatus };
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------

@@ -19,6 +19,10 @@ import type { PRDItem } from "../schema/index.js";
 // Re-export for backward compatibility
 export { extractKeywords, scoreMatch };
 
+// Re-export schema type used in this module's public API so consumers can
+// import it from a single location without reaching into schema directly.
+export type { PRDItem };
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------

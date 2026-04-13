@@ -8,6 +8,7 @@
       "status": "completed",
       "level": "epic",
       "description": "Static analysis engine: file inventory, import graph, zone detection (Louvain community detection), React component catalog, PR markdown generation. Produces .sourcevision/CONTEXT.md and llms.txt for AI consumption.",
+      "startedAt": "2026-04-13T18:35:49.604Z",
       "completedAt": "2026-03-24T04:16:45.798Z",
       "children": [
         {
@@ -20304,6 +20305,7 @@
           "level": "feature",
           "description": "Branded ASCII art, smart config reuse, clean summary output on init.",
           "priority": "medium",
+          "startedAt": "2026-04-13T18:35:49.604Z",
           "completedAt": "2026-03-24T13:06:25.502Z",
           "children": [
             {
@@ -20321,6 +20323,7 @@
                 "cli",
                 "ux"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             },
             {
@@ -20340,6 +20343,7 @@
               "blockedBy": [
                 "224703a3-3a67-44ef-9e01-375c0990827b"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             },
             {
@@ -20357,6 +20361,7 @@
                 "cli",
                 "branding"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             }
           ]
@@ -20368,6 +20373,7 @@
           "level": "feature",
           "description": "Every user-facing command accessible through ndx. Users never need to know which package owns what.",
           "priority": "high",
+          "startedAt": "2026-04-13T18:35:49.604Z",
           "completedAt": "2026-03-24T13:06:25.502Z",
           "children": [
             {
@@ -20384,6 +20390,7 @@
                 "cli",
                 "ux"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             },
             {
@@ -20400,6 +20407,7 @@
                 "cli",
                 "ux"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             },
             {
@@ -20419,6 +20427,7 @@
               "blockedBy": [
                 "70cd90a1-cb38-4536-ae0b-671af963878f"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             }
           ]
@@ -20430,6 +20439,7 @@
           "level": "feature",
           "description": "Docs match the product vision: ndx is the interface, no package internals needed.",
           "priority": "medium",
+          "startedAt": "2026-04-13T18:35:49.604Z",
           "completedAt": "2026-03-24T13:06:25.502Z",
           "children": [
             {
@@ -20446,6 +20456,7 @@
               "tags": [
                 "docs"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             },
             {
@@ -20460,6 +20471,7 @@
               "tags": [
                 "docs"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             },
             {
@@ -20478,6 +20490,7 @@
               "blockedBy": [
                 "70cd90a1-cb38-4536-ae0b-671af963878f"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             }
           ]
@@ -20489,6 +20502,7 @@
           "level": "feature",
           "description": "ndx work --auto should make reasoning transparent at both ends of the run.",
           "priority": "medium",
+          "startedAt": "2026-04-13T18:35:49.604Z",
           "completedAt": "2026-03-24T13:06:25.502Z",
           "children": [
             {
@@ -20506,6 +20520,7 @@
                 "hench",
                 "ux"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             },
             {
@@ -20522,6 +20537,7 @@
                 "hench",
                 "ux"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             },
             {
@@ -20541,6 +20557,7 @@
               "blockedBy": [
                 "d0c0c683-75e6-4857-8ef2-0c1a0bb90680"
               ],
+              "startedAt": "2026-04-13T18:35:49.604Z",
               "completedAt": "2026-03-24T13:06:25.502Z"
             }
           ]
@@ -20981,6 +20998,7 @@
       "status": "completed",
       "level": "epic",
       "description": "AI client infrastructure: vendor-neutral LLM foundation, token usage tracking and analytics, budget management, vendor support (Claude, Codex), onboarding and authentication.",
+      "startedAt": "2026-04-13T18:35:49.604Z",
       "completedAt": "2026-03-24T04:16:45.798Z",
       "children": [
         {
@@ -22279,6 +22297,7 @@
       "status": "completed",
       "level": "epic",
       "description": "Store adapters, bidirectional sync (Notion, future backends), CI/CD pipeline automation, and external service configuration.",
+      "startedAt": "2026-04-13T18:35:49.604Z",
       "completedAt": "2026-03-24T04:16:45.798Z",
       "children": [
         {
@@ -23545,7 +23564,8 @@
                 "tests"
               ],
               "source": "smart-add",
-              "startedAt": "2026-03-26T20:09:20.039Z"
+              "startedAt": "2026-03-26T20:09:20.039Z",
+              "completedAt": "2026-04-13T18:35:49.604Z"
             }
           ]
         },
@@ -25916,17 +25936,32 @@
     {
       "id": "b0f863a5-2765-48be-8489-7dfbcd17ee91",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-13T18:44:46.290Z",
+      "completedAt": "2026-04-13T18:44:46.290Z",
       "children": [
         {
           "id": "6ba40421-b660-40fb-9c7d-70651bb863e1",
           "title": "CLI Hint Correctness, Test Coverage, and Documentation Sync",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Audit the current state of CLI command hints and recommendations across all ndx/rex/hench/sourcevision commands, repair any stale or incorrect hint text, add tests that verify hints are surfaced and actionable, and synchronize all documentation (CLAUDE.md, README, commands.md, help text) with the current CLI command surface.",
           "source": "smart-add",
+          "startedAt": "2026-04-13T18:44:45.995Z",
+          "completedAt": "2026-04-13T18:44:45.995Z",
+          "mergedProposals": [
+            {
+              "proposalNodeKey": "p0:feature:0",
+              "proposalTitle": "CLI Hint Correctness, Test Coverage, and Documentation Sync",
+              "proposalKind": "feature",
+              "reason": "exact_title",
+              "score": 1,
+              "mergedAt": "2026-04-13T18:35:35.968Z",
+              "source": "smart-add"
+            }
+          ],
           "children": [
             {
               "id": "e2ddb064-3972-475d-8162-91d33caa5ec3",
@@ -25977,7 +26012,7 @@
             {
               "id": "f2bfa3e5-ff03-4c8d-b294-5850185bb5a9",
               "title": "Synchronize project documentation with current CLI command surface",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Audit CLAUDE.md, CODEX.md, README files, and commands.md for command invocations, flag references, and workflow descriptions that no longer match the current CLI. Update all stale sections to reflect the actual command surface, remove references to removed commands, and add entries for commands added since the last documentation pass. Also verify that CLI --help output for each command matches the documented description.",
               "acceptanceCriteria": [
@@ -25994,7 +26029,8 @@
                 "dx"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-13T16:49:33.071Z"
+              "startedAt": "2026-04-13T16:49:33.071Z",
+              "completedAt": "2026-04-13T18:44:45.687Z"
             }
           ]
         }
@@ -26012,37 +26048,931 @@
         {
           "id": "77b9a870-68fd-49b1-9dd9-4ece01493c8d",
           "title": "CLI Hint Correctness, Test Coverage, and Documentation Sync",
-          "status": "completed",
+          "status": "in_progress",
           "level": "feature",
           "source": "smart-add",
           "startedAt": "2026-04-13T16:48:28.800Z",
-          "completedAt": "2026-04-13T16:48:28.800Z",
           "children": [
             {
               "id": "bb5f0641-67a7-43d2-b0fe-186faf73c0bc",
               "title": "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur",
-              "status": "completed",
+              "status": "pending",
               "level": "task",
               "description": "The ndx init dinosaur ASCII art was redesigned and corrected in a prior sprint (proportions fixed, animation frames sourced from Rex-F.png). The E2E brand test at tests/e2e/cli-brand.test.js still asserts against the old dinosaur output, causing it to fail or carry a stale snapshot. Update the expected output in the test to match the current canonical dinosaur so the suite is green and serves as an accurate regression guard going forward.",
               "acceptanceCriteria": [
                 "tests/e2e/cli-brand.test.js passes cleanly with no snapshot mismatches after the update",
                 "Expected dinosaur output in the test matches the current ndx init dinosaur character-for-character, including whitespace and line boundaries",
                 "No other assertions in cli-brand.test.js are weakened or removed — only stale snapshot strings are replaced",
-                "Full test suite (pnpm test) exits 0 with cli-brand included"
+                "Full test suite (pnpm test) exits 0 with cli-brand included",
+                "Running ndx init when already initialized (no-change path) displays the same dinosaur as a fresh ndx init run",
+                "The rendered dinosaur matches exactly the canonical art exported from cli-brand.js",
+                "No regression in the standard (first-time) init dinosaur display",
+                "No duplicate dinosaur string literals remain outside cli-brand.js",
+                "cli-brand.test.js snapshots reflect the canonical dinosaur for both standard and no-change init code paths",
+                "All init regression and visual snapshot tests pass without manual override or skip flags",
+                "No snapshot mismatch between no-change and standard init test outputs",
+                "Test suite produces zero snapshot update warnings after the fix is applied"
               ],
               "priority": "high",
               "tags": [
                 "testing",
                 "cli",
-                "branding"
+                "branding",
+                "init"
               ],
               "source": "smart-add",
               "startedAt": "2026-04-13T16:47:37.099Z",
-              "completedAt": "2026-04-13T16:48:28.514Z"
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:0:0",
+                  "proposalTitle": "Update no-change init path to render the canonical cli-brand.js dinosaur",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.654590930618044,
+                  "mergedAt": "2026-04-13T18:30:31.780Z",
+                  "source": "smart-add"
+                },
+                {
+                  "proposalNodeKey": "p0:task:0:1",
+                  "proposalTitle": "Update cli-brand and init snapshot tests to reflect unified dinosaur across all init paths",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.6934012066365007,
+                  "mergedAt": "2026-04-13T18:30:31.780Z",
+                  "source": "smart-add"
+                }
+              ]
             }
           ]
         }
       ]
+    },
+    {
+      "id": "b700ee09-e422-46df-a866-50f46682d21e",
+      "title": "Code Health: 25 findings across 16 zones",
+      "status": "pending",
+      "level": "epic",
+      "description": "Automated recommendations from SourceVision analysis. 21 zone+category groups covering 25 total findings.",
+      "priority": "critical",
+      "source": "sourcevision",
+      "children": [
+        {
+          "id": "e9981c80-c6a2-42b3-adb8-d47a6c00b825",
+          "title": "Fix observation in global (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extracting shared interface",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "de5ca68f-3c4a-4387-90ec-8edcbf210182",
+              "title": "Fix observation in global: Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extract",
+              "status": "pending",
+              "level": "task",
+              "description": "- Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extracting shared interface",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "be3b59862e22"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "be3b59862e22"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "ce8e81d4-7109-43c2-aef1-3db94d25f2a3",
+          "title": "Fix observation in health (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.67) — 4 imports target \"web\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "47ea748c-8c91-408c-88ba-2b483665802a",
+              "title": "Fix observation in health: High coupling (0.67) — 4 imports target \"web\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.67) — 4 imports target \"web\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "fb6d16434a1b"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "fb6d16434a1b"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "d97894ab-858b-4fc4-a4ff-239ffc3b4ba3",
+          "title": "Fix observation in panel (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.71) — 9 imports target \"web\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "c3de1be9-4349-492e-b8fa-71241f2417a5",
+              "title": "Fix observation in panel: High coupling (0.71) — 9 imports target \"web\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.71) — 9 imports target \"web\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "b1611c599d3e"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "b1611c599d3e"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "c662581c-9dff-413e-ac0b-bbadbeffb85d",
+          "title": "Fix observation in polling (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.75) — 3 imports target \"web\"\n- Low cohesion (0.25) — files are loosely related, consider splitting this zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "be039cd0-ef60-4bf7-81f4-c5321fc52a15",
+              "title": "Fix observation in polling: High coupling (0.75) — 3 imports target \"web\" (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.75) — 3 imports target \"web\"\n- Low cohesion (0.25) — files are loosely related, consider splitting this zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "1408c4a712f4",
+                  "d816c59dfffe"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "1408c4a712f4",
+              "d816c59dfffe"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "c126fff3-4adf-400d-a2ad-460501940c81",
+          "title": "Fix observation in refresh (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.67) — 3 imports target \"web-unit\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "dd7a6dec-3a75-4934-80ad-d40bb53ad8fd",
+              "title": "Fix observation in refresh: High coupling (0.67) — 3 imports target \"web-unit\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.67) — 3 imports target \"web-unit\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "8ed43d3ac5d7"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "8ed43d3ac5d7"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "da070c29-653d-4b8f-bad4-f17c5de4a65e",
+          "title": "Fix observation in rex (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.79) — 9 imports target \"web\"\n- Low cohesion (0.21) — files are loosely related, consider splitting this zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "fbb2f272-1acb-43e7-a2e7-91205dbcdce3",
+              "title": "Fix observation in rex: High coupling (0.79) — 9 imports target \"web\" (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.79) — 9 imports target \"web\"\n- Low cohesion (0.21) — files are loosely related, consider splitting this zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "803bcf510222",
+                  "fbed7733cfbc"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "803bcf510222",
+              "fbed7733cfbc"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "38612bc8-f23d-4df6-93c9-12885c505902",
+          "title": "Fix observation in rex-core (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.82) — 5 imports target \"web\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "d6dd5c9d-a7d4-4fe4-9e0e-03eb46dfb282",
+              "title": "Fix observation in rex-core: High coupling (0.82) — 5 imports target \"web\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.82) — 5 imports target \"web\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "56bf686efc97"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "56bf686efc97"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "ba206df9-1316-4072-98ae-28d3133b96ad",
+          "title": "Fix observation in rex-recommend (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.78) — 5 imports target \"web\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "b97a4410-1564-4c2d-8efc-e714e18c69cc",
+              "title": "Fix observation in rex-recommend: High coupling (0.78) — 5 imports target \"web\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.78) — 5 imports target \"web\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "486e0d515a9f"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "486e0d515a9f"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "3f73524e-d54e-4812-9beb-a71cd4e36506",
+          "title": "Fix observation in sourcevision-2 (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Generic zone name \"Sourcevision 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "f7cb6201-e0d8-483b-b2bb-f713a96b5e18",
+              "title": "Fix observation in sourcevision-2: Generic zone name \"Sourcevision 2\" — enrichment did not assign a meaningful name",
+              "status": "pending",
+              "level": "task",
+              "description": "- Generic zone name \"Sourcevision 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "9c5ad2b38d42"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "9c5ad2b38d42"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "6c79b33e-9969-4ed1-b9a1-ea5737d5dd36",
+          "title": "Fix observation in sourcevision-cli (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.85) — 6 imports target \"sourcevision\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "f015f1db-7e23-43e9-bec8-033e514eaf9e",
+              "title": "Fix observation in sourcevision-cli: High coupling (0.85) — 6 imports target \"sourcevision\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.85) — 6 imports target \"sourcevision\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "e2aef7b4b37f"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "e2aef7b4b37f"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "3da1eb3a-3b0d-4452-8644-95dc64968811",
+          "title": "Fix observation in tick (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.56) — 3 imports target \"web\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "793e0718-9cd8-4b15-b828-fef49bc92921",
+              "title": "Fix observation in tick: High coupling (0.56) — 3 imports target \"web\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.56) — 3 imports target \"web\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "19e38d2cc6ec"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "19e38d2cc6ec"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "3742b95d-2265-4a08-b021-70aab56337be",
+          "title": "Fix observation in token (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.65) — 8 imports target \"web\"\n- Low cohesion (0.35) — files are loosely related, consider splitting this zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "df28f81c-3fb7-4b97-9a0d-c8dea9428d0e",
+              "title": "Fix observation in token: High coupling (0.65) — 8 imports target \"web\" (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.65) — 8 imports target \"web\"\n- Low cohesion (0.35) — files are loosely related, consider splitting this zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "fce8066ebc46",
+                  "8c101888afbb"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "fce8066ebc46",
+              "8c101888afbb"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "afe3615b-d9d8-444d-97e0-06d578292e84",
+          "title": "Fix observation in use (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.75) — 3 imports target \"web\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "024c8e66-91e1-47ea-bbf1-a26ccb1f31f8",
+              "title": "Fix observation in use: High coupling (0.75) — 3 imports target \"web\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.75) — 3 imports target \"web\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "22e2ac610c63"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "22e2ac610c63"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "2de3bf8b-961a-42ca-aacf-fba4c29fde3a",
+          "title": "Fix observation in web-2 (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.75) — 3 imports target \"web\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "0fe2a07e-516e-4bd7-8e77-29c43e0fc7ca",
+              "title": "Fix observation in web-2: Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecti (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.75) — 3 imports target \"web\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "6889586452ef",
+                  "3675eb6941e8"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "6889586452ef",
+              "3675eb6941e8"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "1f995e5a-c5af-4607-94dc-8b35e97220cc",
+          "title": "Fix observation in web-unit (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.71) — 3 imports target \"web\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "41d979c9-41e8-4b4c-802d-51712f8c4bb3",
+              "title": "Fix observation in web-unit: High coupling (0.71) — 3 imports target \"web\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.71) — 3 imports target \"web\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "6b8c0272a14c"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "6b8c0272a14c"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "a6bc77c4-a492-4678-87cc-00f1d1954c97",
+          "title": "Fix suggestion in global (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): rex, polling, web-unit, token — mandatory refactoring recommended before further development",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "88ecc136-aaa5-4408-937c-ce9f6db1974d",
+              "title": "Fix suggestion in global: 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): r",
+              "status": "pending",
+              "level": "task",
+              "description": "- 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): rex, polling, web-unit, token — mandatory refactoring recommended before further development",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "e70d947ed2ca"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "e70d947ed2ca"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "1fd3f6e9-93e4-484e-9f0d-957cbd16cc91",
+          "title": "Fix suggestion in polling (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone \"Polling\" (polling) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention",
+          "priority": "critical",
+          "source": "sourcevision",
+          "startedAt": "2026-04-13T18:49:19.159Z",
+          "completedAt": "2026-04-13T18:49:19.159Z",
+          "children": [
+            {
+              "id": "952af9fc-c752-461d-9501-e16018fae396",
+              "title": "Fix suggestion in polling: Zone \"Polling\" (polling) has catastrophic risk (score: 0.75, cohesion: 0.25, cou",
+              "status": "completed",
+              "level": "task",
+              "description": "- Zone \"Polling\" (polling) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention",
+              "priority": "critical",
+              "source": "sourcevision",
+              "startedAt": "2026-04-13T18:44:49.350Z",
+              "completedAt": "2026-04-13T18:49:18.867Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "2927c697390e"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "critical": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "2927c697390e"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "critical": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "3fb82f2e-dbe8-4495-8b10-a78d52c4a906",
+          "title": "Fix suggestion in token (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0.65) — requires refactoring before new feature development",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "db8cf9f9-7ecf-4100-8f8e-533b7a104d3c",
+              "title": "Fix suggestion in token: Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0.65) — requires refactoring before new feature development",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "6e7913c87be3"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "6e7913c87be3"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "b50953a3-1853-45b9-aaa6-2050033af692",
+          "title": "Fix suggestion in web-2 (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "77111aec-d990-4b9c-82cb-47c60fc195df",
+              "title": "Fix suggestion in web-2: Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its fil",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "878fba44f7c4"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "878fba44f7c4"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "9d4e78ef-a61b-4b90-9246-69b9b541e0ad",
+          "title": "Fix move-file in web-server (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "90066670-a9d5-4469-b14b-064cc633c318",
+              "title": "Fix move-file in web-server: File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Ser",
+              "status": "pending",
+              "level": "task",
+              "description": "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "bbfc211213fe"
+                ],
+                "category": "move-file",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "bbfc211213fe"
+            ],
+            "category": "move-file",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "6d9a909f-b68e-4437-ad68-04e85e1a0588",
+          "title": "Fix suggestion in rex (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone \"Rex\" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0.79) — requires immediate architectural intervention",
+          "priority": "critical",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "362e105b-c0eb-4111-8109-7a8dbe283b24",
+              "title": "Fix suggestion in rex: Zone \"Rex\" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0",
+              "status": "in_progress",
+              "level": "task",
+              "description": "- Zone \"Rex\" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0.79) — requires immediate architectural intervention",
+              "priority": "critical",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "07da8e13aff4"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "critical": 1
+                },
+                "findingCount": 1
+              },
+              "startedAt": "2026-04-13T18:49:22.288Z"
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "07da8e13aff4"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "critical": 1
+            },
+            "findingCount": 1
+          }
+        }
+      ],
+      "recommendationMeta": {
+        "findingCount": 25
+      }
     }
   ]
 }

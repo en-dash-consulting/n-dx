@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { PRDItem } from "../../../src/schema/index.js";
+import type { PRDItem } from "../../../src/core/fix.js";
 import {
   detectTimestampIssues,
   detectOrphanBlockedBy,

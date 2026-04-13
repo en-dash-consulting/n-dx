@@ -10,7 +10,7 @@ import {
   findTestFiles,
   verify,
 } from "../../../src/core/verify.js";
-import type { PRDItem } from "../../../src/schema/index.js";
+import type { PRDItem } from "../../../src/core/verify.js";
 
 // ---------------------------------------------------------------------------
 // extractKeywords
