@@ -11,8 +11,12 @@ describe("resolveCommandTimeout", () => {
   it("returns DEFAULT_TIMEOUT_MS for normal commands when no config is present", () => {
     expect(resolveCommandTimeout("analyze", {})).toBe(DEFAULT_TIMEOUT_MS);
     expect(resolveCommandTimeout("plan", {})).toBe(DEFAULT_TIMEOUT_MS);
-    expect(resolveCommandTimeout("work", {})).toBe(DEFAULT_TIMEOUT_MS);
     expect(resolveCommandTimeout("init", {})).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  it("returns the extended default for work and self-heal when no config is present", () => {
+    expect(resolveCommandTimeout("work", {})).toBe(14400000);
+    expect(resolveCommandTimeout("self-heal", {})).toBe(14400000);
   });
 
   it("returns 0 for long-running server commands when no config is present", () => {

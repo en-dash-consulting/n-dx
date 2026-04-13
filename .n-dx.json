@@ -95,7 +95,13 @@
         "packages/rex/tests/e2e/cli-sync.test.ts": "rex-cli-e2e",
         "packages/rex/tests/e2e/cli-workflow.test.ts": "rex-cli-e2e",
         "packages/rex/vitest.config.ts": "rex-prd-engine",
-        "packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl": "rex-cli-e2e"
+        "packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl": "rex-cli-e2e",
+        "packages/rex/src/core/tree.ts": "rex-prd-engine",
+        "packages/rex/src/schema/index.ts": "rex-prd-engine",
+        "packages/rex/src/schema/v1.ts": "rex-prd-engine",
+        "packages/rex/src/schema/levels.ts": "rex-prd-engine",
+        "packages/rex/tests/unit/core/keywords.test.ts": "rex-prd-engine",
+        "packages/rex/tests/unit/core/verify.test.ts": "rex-prd-engine"
       },
       "types": {
         "e2e": "test",
@@ -110,5 +116,6 @@
       }
     }
   },
-  "_initVersion": "0.2.3"
+  "_initVersion": "0.2.3",
+  "cli": {}
 }

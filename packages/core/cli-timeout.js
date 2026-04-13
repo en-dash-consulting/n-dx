@@ -18,6 +18,18 @@
 export const DEFAULT_TIMEOUT_MS = 1800000;
 
 /**
+ * Per-command timeout defaults that override DEFAULT_TIMEOUT_MS.
+ * These apply when no per-command or global override is present in config.
+ *
+ * `work` and `self-heal` run full agent loops and are bounded by vendor
+ * session limits (4 hours), so they get a higher default than the global 30 min.
+ */
+const COMMAND_TIMEOUT_DEFAULTS = new Map([
+  ["work", 14400000],
+  ["self-heal", 14400000],
+]);
+
+/**
  * Commands that run indefinitely by design (servers, dev watchers).
  * These receive no default timeout — they can only be bounded if the user
  * explicitly sets cli.timeouts.<command> in .n-dx.json.
@@ -30,8 +42,9 @@ const NO_DEFAULT_TIMEOUT_COMMANDS = new Set(["start", "web", "dev"]);
  * Priority (highest first):
  *  1. cli.timeouts.<command> in project config (per-command override)
  *  2. cli.timeoutMs in project config (global override)
- *  3. DEFAULT_TIMEOUT_MS (for bounded commands)
- *  4. 0 / no timeout (for long-running server commands)
+ *  3. 0 / no timeout (for long-running server commands)
+ *  4. COMMAND_TIMEOUT_DEFAULTS (per-command code defaults, e.g. work / self-heal)
+ *  5. DEFAULT_TIMEOUT_MS (global fallback)
  *
  * A return value of 0 means "no timeout" — the command may run indefinitely.
  *
@@ -60,7 +73,13 @@ export function resolveCommandTimeout(command, projectConfig) {
     return 0;
   }
 
-  // 4. Apply the default timeout for all other commands
+  // 4. Per-command code default (e.g. work / self-heal use a higher threshold)
+  const commandDefault = COMMAND_TIMEOUT_DEFAULTS.get(command);
+  if (commandDefault !== undefined) {
+    return commandDefault;
+  }
+
+  // 5. Apply the default timeout for all other commands
   return DEFAULT_TIMEOUT_MS;
 }
 
