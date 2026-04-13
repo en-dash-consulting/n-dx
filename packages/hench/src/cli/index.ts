@@ -85,8 +85,39 @@ async function main(): Promise<void> {
     return process.cwd();
   };
 
+  const HENCH_COMMANDS = ["init", "run", "status", "show", "config", "template"];
+
+  // Orchestration commands that belong to ndx, not hench directly
+  const NDX_ONLY_COMMANDS: Record<string, string> = {
+    plan: "ndx plan",
+    work: "ndx work",
+    "self-heal": "ndx self-heal",
+    start: "ndx start",
+    ci: "ndx ci",
+    dev: "ndx dev",
+    refresh: "ndx refresh",
+    export: "ndx export",
+    analyze: "ndx analyze",
+  };
+
   try {
-    // Ensure .hench/ exists for all commands except init
+    // Resolve unknown and ndx-only commands before any directory checks so
+    // typo hints and redirect messages are shown even without .hench/ present.
+    if (!HENCH_COMMANDS.includes(command)) {
+      if (command in NDX_ONLY_COMMANDS) {
+        throw new CLIError(
+          `"${command}" is an orchestrator command. Run: ${NDX_ONLY_COMMANDS[command]} .`,
+        );
+      }
+      const typoHint = formatTypoSuggestion(command, HENCH_COMMANDS, "hench ");
+      throw new CLIError(
+        `Unknown command: ${command}`,
+        typoHint ?? "Run 'hench --help' to see available commands.",
+        CLI_ERROR_CODES.UNKNOWN_COMMAND,
+      );
+    }
+
+    // Ensure .hench/ exists for all known commands except init
     if (command !== "init") {
       requireHenchDir(resolveDir());
     }
@@ -130,33 +161,6 @@ async function main(): Promise<void> {
         const { cmdTemplate } = await import("./commands/template.js");
         await cmdTemplate(resolveDir(), positional, flags);
         break;
-      }
-      default: {
-        // Check if the user tried an ndx-only orchestration command
-        const NDX_ONLY_COMMANDS: Record<string, string> = {
-          plan: "ndx plan",
-          work: "ndx work",
-          "self-heal": "ndx self-heal",
-          start: "ndx start",
-          ci: "ndx ci",
-          dev: "ndx dev",
-          refresh: "ndx refresh",
-          export: "ndx export",
-          analyze: "ndx analyze",
-        };
-        if (command in NDX_ONLY_COMMANDS) {
-          throw new CLIError(
-            `"${command}" is an orchestrator command. Run: ${NDX_ONLY_COMMANDS[command]} .`,
-          );
-        }
-
-        const HENCH_COMMANDS = ["init", "run", "status", "show", "config", "template"];
-        const typoHint = formatTypoSuggestion(command, HENCH_COMMANDS, "hench ");
-        throw new CLIError(
-          `Unknown command: ${command}`,
-          typoHint ?? "Run 'hench --help' to see available commands.",
-          CLI_ERROR_CODES.UNKNOWN_COMMAND,
-        );
       }
     }
   } catch (err) {

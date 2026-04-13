@@ -25912,6 +25912,129 @@
           ]
         }
       ]
+    },
+    {
+      "id": "b0f863a5-2765-48be-8489-7dfbcd17ee91",
+      "title": "CLI & Developer Tools",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "6ba40421-b660-40fb-9c7d-70651bb863e1",
+          "title": "CLI Hint Correctness, Test Coverage, and Documentation Sync",
+          "status": "pending",
+          "level": "feature",
+          "description": "Audit the current state of CLI command hints and recommendations across all ndx/rex/hench/sourcevision commands, repair any stale or incorrect hint text, add tests that verify hints are surfaced and actionable, and synchronize all documentation (CLAUDE.md, README, commands.md, help text) with the current CLI command surface.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "e2ddb064-3972-475d-8162-91d33caa5ec3",
+              "title": "Audit and repair CLI hint text across all commands",
+              "status": "in_progress",
+              "level": "task",
+              "description": "Walk every CLI command in all packages (ndx/rex/hench/sourcevision) and verify that each hint, suggestion, and recommendation references a command, flag, or workflow that currently exists and behaves as described. Fix hint text that references removed flags, renamed commands, outdated invocation patterns, or deprecated workflows. Covers both inline help strings and the interactive hint/suggestion output paths.",
+              "acceptanceCriteria": [
+                "All hint strings in ndx, rex, hench, and sourcevision reference commands and flags that exist in the current CLI surface",
+                "No hint references a removed or renamed flag (e.g., obsolete --mode values, deprecated subcommands)",
+                "Typo-correction suggestions map to valid existing command names",
+                "Related-command hints shown after errors resolve to commands that succeed when run",
+                "A manual audit checklist is committed documenting each command's hint coverage status"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "dx",
+                "hints"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-13T16:35:01.665Z"
+            },
+            {
+              "id": "2fc45532-6443-43ad-ba55-c0668a2fcd33",
+              "title": "Add regression tests that verify hint surfacing and follow-through correctness",
+              "status": "completed",
+              "level": "task",
+              "description": "Implement tests that invoke CLI commands under error or ambiguity conditions, capture the hint/suggestion output, assert the hint text is present and well-formed, and then execute the suggested follow-up command to confirm it succeeds. Tests should cover: typo-correction suggestions, related-command hints after unknown-command errors, flag-validation hints, and next-step suggestions after successful operations. Tests must reference that they are validating hint output explicitly.",
+              "acceptanceCriteria": [
+                "At least one test per package (ndx/rex/hench/sourcevision) invokes a mistyped or unknown command and asserts that a hint is emitted referencing a valid command",
+                "Each hint test follows the hinted command and asserts it exits 0 (or the expected code)",
+                "Test descriptions reference hint validation explicitly (e.g., 'hint text matches valid command')",
+                "Tests run as part of the existing integration test suite without additional setup",
+                "No existing test suite regressions introduced"
+              ],
+              "priority": "high",
+              "tags": [
+                "cli",
+                "testing",
+                "hints"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-13T16:18:43.018Z",
+              "completedAt": "2026-04-13T16:34:36.589Z"
+            },
+            {
+              "id": "f2bfa3e5-ff03-4c8d-b294-5850185bb5a9",
+              "title": "Synchronize project documentation with current CLI command surface",
+              "status": "pending",
+              "level": "task",
+              "description": "Audit CLAUDE.md, CODEX.md, README files, and commands.md for command invocations, flag references, and workflow descriptions that no longer match the current CLI. Update all stale sections to reflect the actual command surface, remove references to removed commands, and add entries for commands added since the last documentation pass. Also verify that CLI --help output for each command matches the documented description.",
+              "acceptanceCriteria": [
+                "Every command listed in CLAUDE.md Orchestration Commands and Direct Tool Access sections exists in the CLI and exits 0 with --help",
+                "All flag names and default values in documentation match current CLI behavior (verified by running --help against each)",
+                "No documentation section references commands or flags that have been removed or renamed",
+                "CODEX.md sections mirroring CLAUDE.md are updated in sync per the SYNC NOTICE at the top of CLAUDE.md",
+                "A CI assertion or documentation linting step is added (or an existing one is confirmed) that catches future doc/CLI divergence"
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
+                "cli",
+                "dx"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "995cad13-7633-4911-9f51-e0633a38b51f",
+      "title": "CLI & Developer Tools",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "77b9a870-68fd-49b1-9dd9-4ece01493c8d",
+          "title": "CLI Hint Correctness, Test Coverage, and Documentation Sync",
+          "status": "pending",
+          "level": "feature",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "bb5f0641-67a7-43d2-b0fe-186faf73c0bc",
+              "title": "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur",
+              "status": "pending",
+              "level": "task",
+              "description": "The ndx init dinosaur ASCII art was redesigned and corrected in a prior sprint (proportions fixed, animation frames sourced from Rex-F.png). The E2E brand test at tests/e2e/cli-brand.test.js still asserts against the old dinosaur output, causing it to fail or carry a stale snapshot. Update the expected output in the test to match the current canonical dinosaur so the suite is green and serves as an accurate regression guard going forward.",
+              "acceptanceCriteria": [
+                "tests/e2e/cli-brand.test.js passes cleanly with no snapshot mismatches after the update",
+                "Expected dinosaur output in the test matches the current ndx init dinosaur character-for-character, including whitespace and line boundaries",
+                "No other assertions in cli-brand.test.js are weakened or removed — only stale snapshot strings are replaced",
+                "Full test suite (pnpm test) exits 0 with cli-brand included"
+              ],
+              "priority": "high",
+              "tags": [
+                "testing",
+                "cli",
+                "branding"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
