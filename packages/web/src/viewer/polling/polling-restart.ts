@@ -24,6 +24,8 @@
  *                                          polling-manager  tick-timer
  *
  * Designed as a standalone module with zero framework dependencies.
+ * The degradation callbacks are injected by the caller (bootstrap.ts) so
+ * this module does not depend on the performance zone directly.
  */
 
 import {
@@ -33,11 +35,29 @@ import {
   getGeneration,
   isGenerationCurrent,
 } from "./polling-state.js";
-import {
-  onDegradationChange,
-  isFeatureDisabled,
-  type DegradationState,
-} from "../performance/graceful-degradation.js";
+
+// ─── Injection types ─────────────────────────────────────────────────────────
+
+/** Minimal degradation state slice required by this module. */
+type DegradationStateSlice = { disabledFeatures: ReadonlySet<string> };
+
+/**
+ * Callbacks injected by bootstrap.ts to decouple this module from the
+ * performance zone. Follows the injection seam pattern (see CLAUDE.md).
+ */
+export interface PollingRestartOptions {
+  /** Subscribe to degradation state changes. Returns an unsubscribe function. */
+  onDegradationChange: (
+    handler: (state: DegradationStateSlice) => void,
+  ) => () => void;
+  /**
+   * Check whether a specific feature is currently disabled.
+   * Only `"autoRefresh"` is checked by this module; the narrow type ensures
+   * any `(feature: DegradableFeature) => boolean` implementation is assignable
+   * without needing to import DegradableFeature here.
+   */
+  isFeatureDisabled: (feature: "autoRefresh") => boolean;
+}
 
 // ─── Module state ────────────────────────────────────────────────────────────
 
@@ -55,7 +75,7 @@ let coordinatorSuspended = false;
 
 // ─── Internal handler ────────────────────────────────────────────────────────
 
-function handleDegradationChange(state: DegradationState): void {
+function handleDegradationChange(state: DegradationStateSlice): void {
   const autoRefreshDisabled = state.disabledFeatures.has("autoRefresh");
 
   if (autoRefreshDisabled && !coordinatorSuspended) {
@@ -79,18 +99,20 @@ function handleDegradationChange(state: DegradationState): void {
  * is started after memory pressure began), sources are suspended at once.
  *
  * Safe to call multiple times — restarts cleanly.
+ *
+ * @param options - Degradation callbacks injected by bootstrap.ts.
  */
-export function startPollingRestart(): void {
+export function startPollingRestart(options: PollingRestartOptions): void {
   if (started) stopPollingRestart();
 
   started = true;
   coordinatorSuspended = false;
 
   // Subscribe to ongoing degradation changes.
-  unsubscribeDegradation = onDegradationChange(handleDegradationChange);
+  unsubscribeDegradation = options.onDegradationChange(handleDegradationChange);
 
   // Evaluate current state immediately (handles late-start scenarios).
-  if (isFeatureDisabled("autoRefresh")) {
+  if (options.isFeatureDisabled("autoRefresh")) {
     coordinatorSuspended = true;
     suspendAllSources();
   }

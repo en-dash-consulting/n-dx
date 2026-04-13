@@ -22,6 +22,7 @@ export {
 export {
   startPollingRestart,
   stopPollingRestart,
+  type PollingRestartOptions,
 } from "./polling-restart.js";
 
 export {

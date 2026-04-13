@@ -17,6 +17,7 @@ import {
   startPollingRestart,
   createTickVisibilityGate,
 } from "./polling/index.js";
+import { onDegradationChange, isFeatureDisabled } from "./performance/index.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 
 /** Run all one-time setup operations. */
@@ -46,5 +47,5 @@ export function bootstrap(): void {
   // when memory pressure disables autoRefresh, all non-essential polling
   // sources are suspended; when pressure subsides, they restart at
   // original intervals.
-  startPollingRestart();
+  startPollingRestart({ onDegradationChange, isFeatureDisabled });
 }

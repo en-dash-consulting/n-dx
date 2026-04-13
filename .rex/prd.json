@@ -26207,20 +26207,24 @@
         {
           "id": "d97894ab-858b-4fc4-a4ff-239ffc3b4ba3",
           "title": "Fix observation in panel (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.71) — 9 imports target \"web\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T20:52:30.340Z",
+          "completedAt": "2026-04-13T20:52:30.340Z",
           "children": [
             {
               "id": "c3de1be9-4349-492e-b8fa-71241f2417a5",
               "title": "Fix observation in panel: High coupling (0.71) — 9 imports target \"web\"",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.71) — 9 imports target \"web\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T20:48:12.050Z",
+              "completedAt": "2026-04-13T20:52:30.039Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "b1611c599d3e"
@@ -26230,8 +26234,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-13T20:48:12.050Z"
+              }
             }
           ],
           "recommendationMeta": {
@@ -26257,7 +26260,7 @@
             {
               "id": "be039cd0-ef60-4bf7-81f4-c5321fc52a15",
               "title": "Fix observation in polling: High coupling (0.75) — 3 imports target \"web\" (+1 more)",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "- High coupling (0.75) — 3 imports target \"web\"\n- Low cohesion (0.25) — files are loosely related, consider splitting this zone",
               "priority": "high",
@@ -26272,7 +26275,8 @@
                   "warning": 2
                 },
                 "findingCount": 2
-              }
+              },
+              "startedAt": "2026-04-13T20:52:33.390Z"
             }
           ],
           "recommendationMeta": {
