@@ -91,9 +91,10 @@ function parseOrchestrationCommands(content) {
     .filter(Boolean);
 }
 
-// ── Read CLAUDE.md once ───────────────────────────────────────────────────
+// ── Read docs once ────────────────────────────────────────────────────────
 
 const claudeMd = readFileSync(join(root, "CLAUDE.md"), "utf-8");
+const codexMd = readFileSync(join(root, "CODEX.md"), "utf-8");
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,98 @@ describe("cli-doc-sync: CLAUDE.md command lists match CLI --help", () => {
           helpOutput.includes(cmd),
           `CLAUDE.md lists hench command "${cmd}" but it does not appear in \`hench --help\` output.\n` +
             `Update CLAUDE.md to reflect the current CLI surface.\n\n` +
+            `hench --help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
+        ).toBe(true);
+      });
+    }
+  });
+});
+
+// ── CODEX.md must mirror CLAUDE.md command lists ──────────────────────────
+
+describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
+  // ── ndx orchestration commands ──────────────────────────────────────────
+
+  describe("ndx orchestration commands", () => {
+    const documented = parseOrchestrationCommands(codexMd);
+    const helpOutput = getHelpOutput("packages/core", ["help"]);
+
+    it("parses at least 10 orchestration commands from CODEX.md", () => {
+      expect(documented.length).toBeGreaterThanOrEqual(10);
+    });
+
+    for (const cmd of documented) {
+      it(`"${cmd}" appears in ndx help output`, () => {
+        expect(
+          helpOutput.includes(cmd),
+          `CODEX.md lists "ndx ${cmd}" but it does not appear in \`ndx help\` output.\n` +
+            `Update CODEX.md (and CLAUDE.md per SYNC NOTICE) to reflect the current CLI surface.\n\n` +
+            `ndx help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
+        ).toBe(true);
+      });
+    }
+  });
+
+  // ── rex subcommands ──────────────────────────────────────────────────────
+
+  describe("rex subcommands", () => {
+    const documented = parseDocCommandList(codexMd, "Rex");
+    const helpOutput = getHelpOutput("packages/rex");
+
+    it("parses at least 10 rex commands from CODEX.md", () => {
+      expect(documented.length).toBeGreaterThanOrEqual(10);
+    });
+
+    for (const cmd of documented) {
+      it(`"${cmd}" appears in rex --help output`, () => {
+        expect(
+          helpOutput.includes(cmd),
+          `CODEX.md lists rex command "${cmd}" but it does not appear in \`rex --help\` output.\n` +
+            `Update CODEX.md (and CLAUDE.md per SYNC NOTICE) to reflect the current CLI surface.\n\n` +
+            `rex --help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
+        ).toBe(true);
+      });
+    }
+  });
+
+  // ── sourcevision subcommands ─────────────────────────────────────────────
+
+  describe("sourcevision subcommands", () => {
+    const documented = parseDocCommandList(codexMd, "Sourcevision");
+    const helpOutput = getHelpOutput("packages/sourcevision");
+
+    it("parses at least 6 sourcevision commands from CODEX.md", () => {
+      expect(documented.length).toBeGreaterThanOrEqual(6);
+    });
+
+    for (const cmd of documented) {
+      it(`"${cmd}" appears in sourcevision --help output`, () => {
+        expect(
+          helpOutput.includes(cmd),
+          `CODEX.md lists sourcevision command "${cmd}" but it does not appear in \`sourcevision --help\` output.\n` +
+            `Update CODEX.md (and CLAUDE.md per SYNC NOTICE) to reflect the current CLI surface.\n\n` +
+            `sourcevision --help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
+        ).toBe(true);
+      });
+    }
+  });
+
+  // ── hench subcommands ────────────────────────────────────────────────────
+
+  describe("hench subcommands", () => {
+    const documented = parseDocCommandList(codexMd, "Hench");
+    const helpOutput = getHelpOutput("packages/hench");
+
+    it("parses at least 4 hench commands from CODEX.md", () => {
+      expect(documented.length).toBeGreaterThanOrEqual(4);
+    });
+
+    for (const cmd of documented) {
+      it(`"${cmd}" appears in hench --help output`, () => {
+        expect(
+          helpOutput.includes(cmd),
+          `CODEX.md lists hench command "${cmd}" but it does not appear in \`hench --help\` output.\n` +
+            `Update CODEX.md (and CLAUDE.md per SYNC NOTICE) to reflect the current CLI surface.\n\n` +
             `hench --help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
         ).toBe(true);
       });

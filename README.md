@@ -51,7 +51,6 @@ Translates SourceVision findings into concrete PRD tasks. The `--actionable-only
 ```sh
 ndx add "Add SSO support with Google and Okta" .    # natural language
 ndx add --file=ideas.txt .                           # import from file
-ndx add "Add retries" --parent=<item-id> .           # under specific parent
 ```
 
 Smart add uses an LLM to decompose descriptions into structured epic/feature/task proposals with duplicate detection against existing PRD items.

@@ -101,7 +101,6 @@ ndx recommend --acknowledge-completed .  # acknowledge completed findings
 ndx add "Add SSO support with Google and Okta" .
 ndx add "Request A" "Request B" .     # multiple requests
 ndx add --file=ideas.txt .            # import from file
-ndx add "Add retries" --parent=ID .   # under specific parent
 ```
 
 Uses an LLM to decompose natural language descriptions into structured PRD items (epics, features, tasks). Detects duplicates and offers merge/cancel/proceed options.
@@ -182,7 +181,7 @@ ndx start stop .            # stop daemon
 ```sh
 ndx status .                # PRD tree
 ndx status --format=json .  # machine-readable
-ndx status --since=7d .     # changes in last 7 days
+ndx status --all .          # include completed items
 ```
 
 ### config
