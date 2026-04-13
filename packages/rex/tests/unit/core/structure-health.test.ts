@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkStructureHealth } from "../../../src/core/structure-health.js";
+import { checkStructureHealth } from "../../../src/core/health.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
 function makeItem(id: string, level: string, children?: PRDItem[]): PRDItem {

@@ -26119,20 +26119,24 @@
         {
           "id": "e9981c80-c6a2-42b3-adb8-d47a6c00b825",
           "title": "Fix observation in global (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extracting shared interface",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T20:41:34.887Z",
+          "completedAt": "2026-04-13T20:41:34.887Z",
           "children": [
             {
               "id": "de5ca68f-3c4a-4387-90ec-8edcbf210182",
               "title": "Fix observation in global: Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extract",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extracting shared interface",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T20:09:32.123Z",
+              "completedAt": "2026-04-13T20:41:34.557Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "be3b59862e22"
@@ -26142,8 +26146,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-13T20:09:32.123Z"
+              }
             }
           ],
           "recommendationMeta": {
@@ -26169,7 +26172,7 @@
             {
               "id": "47ea748c-8c91-408c-88ba-2b483665802a",
               "title": "Fix observation in health: High coupling (0.67) — 4 imports target \"web\"",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "- High coupling (0.67) — 4 imports target \"web\"",
               "priority": "high",
@@ -26183,7 +26186,8 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              }
+              },
+              "startedAt": "2026-04-13T20:41:37.915Z"
             }
           ],
           "recommendationMeta": {

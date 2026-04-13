@@ -10,7 +10,7 @@
 
 import type { PRDStore } from "../../store/index.js";
 import type { StructureHealthThresholds } from "../../schema/index.js";
-import { checkStructureHealth } from "../../core/structure-health.js";
+import { checkStructureHealth } from "../../core/health.js";
 
 /**
  * Check PRD structure health and print warnings to stderr.
