@@ -26163,20 +26163,24 @@
         {
           "id": "ce8e81d4-7109-43c2-aef1-3db94d25f2a3",
           "title": "Fix observation in health (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.67) — 4 imports target \"web\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T20:48:08.996Z",
+          "completedAt": "2026-04-13T20:48:08.996Z",
           "children": [
             {
               "id": "47ea748c-8c91-408c-88ba-2b483665802a",
               "title": "Fix observation in health: High coupling (0.67) — 4 imports target \"web\"",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.67) — 4 imports target \"web\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T20:41:37.915Z",
+              "completedAt": "2026-04-13T20:48:08.698Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "fb6d16434a1b"
@@ -26186,8 +26190,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-13T20:41:37.915Z"
+              }
             }
           ],
           "recommendationMeta": {
@@ -26213,7 +26216,7 @@
             {
               "id": "c3de1be9-4349-492e-b8fa-71241f2417a5",
               "title": "Fix observation in panel: High coupling (0.71) — 9 imports target \"web\"",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "- High coupling (0.71) — 9 imports target \"web\"",
               "priority": "high",
@@ -26227,7 +26230,8 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              }
+              },
+              "startedAt": "2026-04-13T20:48:12.050Z"
             }
           ],
           "recommendationMeta": {
