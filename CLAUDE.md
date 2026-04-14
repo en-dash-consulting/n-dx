@@ -133,17 +133,6 @@ This is a **privileged-consumer pattern**: CLI commands are the only non-test co
 
 `crash` (cohesion 0.5, unidirectional coupling: web-viewer → crash) sits at the dual-fragility threshold boundary. Crash imports web-shared directly (documented bypass) rather than web-viewer. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
 
-##### rex-2 unnamed zone (governance gap)
-
-`rex-2` (4 files, cohesion 1, 5 inbound imports from the rex hub) is an unnamed overflow zone produced by Louvain community detection. It has no CLAUDE.md policy entry, no zone-pin configuration, and no descriptive ID. Its files are invisible to API surface audits and changeset impact analysis for the rex package — each new rex feature that touches rex-2 files goes unnoticed by zone tooling.
-
-**Governance requirements:**
-- Identify the files belonging to `rex-2` and add explicit zone pins in `.n-dx.json` under a descriptive ID (e.g., `rex-schema-types`).
-- Once pinned, add a zone policy entry to this document.
-- Until pinned, treat any finding referencing `rex-2` as potentially misclassified.
-
-See also: `ZONES.md` for the zone-pin manifest.
-
 ##### Confirmed zone-level cycles
 
 Zones with confirmed bidirectional dependencies require separate governance from the metric-based dual-fragility table. A zone can have cohesion 1 and coupling 0 yet still participate in a genuine cycle with a peer zone — the threshold conditions are simply never met, so the zone is invisible to fragility governance.

@@ -107,6 +107,9 @@ Files pinned to keep critical modules stable across re-analyses regardless of im
 - `packages/hench/src/tools/test-runner.ts` → `hench-agent` — Overflow community (hench-4); tool file belongs with other hench tools
 - `packages/hench/tests/unit/tools/go-test-runner.test.ts` → `hench-agent` — Test for test-runner.ts; follows source file pin
 - `packages/hench/tests/unit/tools/test-runner.test.ts` → `hench-agent` — Test for test-runner.ts; follows source file pin
+- `packages/rex/tests/helpers/rex-dir-test-support.ts` → `rex-unit` — Overflow community (rex-2); test helper used by rex unit tests
+- `packages/rex/tests/unit/cli/commands/next-colors.test.ts` → `rex-unit` — Overflow community (rex-2); unit test for CLI color output
+- `packages/rex/tests/unit/cli/commands/usage.test.ts` → `rex-unit` — Overflow community (rex-2); unit test for CLI usage command
 - `packages/hench/src/prd/rex-gateway.ts` → `hench-gateway` — Cross-package gateway; prevents hench-agent misclassification
 - `packages/rex/src/core/{fix,keywords,verify,tree}.ts` → `rex-prd-engine` — Domain logic; must not drift into rex-cli
 - `packages/rex/src/analyze/batch-types.ts` → `rex-prd-engine`
@@ -125,7 +128,6 @@ Files pinned to keep critical modules stable across re-analyses regardless of im
 | `packages/web/src/shared/index.ts` | `web-server` | Phantom web-server↔web-viewer coupling driver |
 | `packages/web/src/viewer/crash/view-id.ts` (if exists) | `web-viewer` | Phantom viewer-crash-recovery↔web-viewer coupling |
 | `packages/web/src/server/task-usage/shared-types.ts` (if exists) | `web-server` | Phantom task-usage-scheduler↔web-server coupling |
-| rex-2 files (unidentified) | Descriptive zone TBD | Unnamed overflow zone — run `sv zones` to identify |
 
 ---
 
@@ -159,5 +161,4 @@ Three issues are fully characterized but not yet tracked as PRD tasks. Each has 
 | Item | Location | Resolution path | Suggested PRD title |
 |------|---------|----------------|---------------------|
 | `completion-reader.ts` dead code | `packages/hench/src/` (exact path TBD) | Audit callers with grep; remove if zero consumers | "Remove completion-reader.ts dead code" |
-| `rex-2` zone naming | `packages/rex/src/` (files unidentified) | Run `sv zones` to identify files; add pins in `.n-dx.json` | "Identify and pin rex-2 zone files" |
 | `web-viewer-search-overlay` ↔ `web-viewer` cycle | `packages/web/src/viewer/components/search-overlay.ts` | Absorb `search-overlay.ts` into web-viewer (preferred) or inject `getLevelEmoji` as prop and move `NavigateTo` to `web-shared`; moving `levels.ts` alone is insufficient | "Fix web-viewer-search-overlay↔web-viewer import cycle" |

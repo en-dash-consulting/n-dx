@@ -112,7 +112,10 @@
         "packages/web/tests/helpers/preact-test-support.ts": "web-viewer",
         "packages/hench/src/tools/test-runner.ts": "hench-agent",
         "packages/hench/tests/unit/tools/go-test-runner.test.ts": "hench-agent",
-        "packages/hench/tests/unit/tools/test-runner.test.ts": "hench-agent"
+        "packages/hench/tests/unit/tools/test-runner.test.ts": "hench-agent",
+        "packages/rex/tests/helpers/rex-dir-test-support.ts": "rex-unit",
+        "packages/rex/tests/unit/cli/commands/next-colors.test.ts": "rex-unit",
+        "packages/rex/tests/unit/cli/commands/usage.test.ts": "rex-unit"
       },
       "types": {
         "e2e": "test",
