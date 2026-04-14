@@ -95,6 +95,11 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
 - `packages/web/tests/unit/viewer/enrichment-thresholds.test.ts` → `web-sv-view-tests`
 - `packages/web/tests/unit/viewer/sourcevision-tabs.test.ts` → `web-sv-view-tests`
 
+**web-viewer-search-overlay zone** — Search overlay component and its dedicated test. Pinned to replace the misleading `web-helpers` zone name (which implied a general utility bucket) with a bounded, intent-revealing ID. The component participates in a confirmed zone-level cycle with `web-viewer`; see "Confirmed zone-level cycles" in CLAUDE.md.
+- `packages/web/src/viewer/components/search-overlay.ts` → `web-viewer-search-overlay` — sole production file in the zone; anchor for cycle documentation
+- `packages/web/tests/unit/viewer/search-overlay.test.ts` → `web-viewer-search-overlay` — dedicated component test
+- `packages/web/tests/helpers/preact-test-support.ts` → `web-viewer` — test utility used by multiple viewer tests (tree-view, search-overlay); belongs in viewer zone, not search-overlay satellite
+
 ### Architectural Anchor Pins
 
 Files pinned to keep critical modules stable across re-analyses regardless of import topology changes.
@@ -138,7 +143,7 @@ Zone coupling reports can contain **phantom coupling artifacts** — bidirection
 
 | Pair | Nature | Resolution path |
 |------|--------|----------------|
-| `web-helpers` ↔ `web-viewer` | Real bidirectional coupling via `levels.ts` | Refactor `levels.ts` import direction |
+| `web-viewer-search-overlay` ↔ `web-viewer` | Real bidirectional coupling — `search-overlay.ts` imports `getLevelEmoji` (runtime) and `NavigateTo` (type) from web-viewer; `components/index.ts` imports back | Absorb `search-overlay.ts` into web-viewer (preferred), or inject `getLevelEmoji` as prop and move `NavigateTo` to `web-shared`; moving `levels.ts` alone is insufficient |
 
 **Future tooling:** A `zone-pin confirmed / artifact suppressed` annotation in sourcevision zone metadata (`ZoneSummary.detectionQuality` extended to `"pin-confirmed-artifact"`) would allow governance tooling to distinguish known-artifact pairs from actionable violations automatically. See `packages/sourcevision/src/schema/v1.ts`.
 
@@ -152,5 +157,5 @@ Four issues are fully characterized but not yet tracked as PRD tasks. Each has a
 |------|---------|----------------|---------------------|
 | `completion-reader.ts` dead code | `packages/hench/src/` (exact path TBD) | Audit callers with grep; remove if zero consumers | "Remove completion-reader.ts dead code" |
 | `rex-2` zone naming | `packages/rex/src/` (files unidentified) | Run `sv zones` to identify files; add pins in `.n-dx.json` | "Identify and pin rex-2 zone files" |
-| `web-helpers` ↔ `web-viewer` levels.ts cycle | `packages/web/src/viewer/` | Refactor `levels.ts` import direction to break bidirectional cycle | "Fix web-helpers↔web-viewer levels.ts import cycle" |
+| `web-viewer-search-overlay` ↔ `web-viewer` cycle | `packages/web/src/viewer/components/search-overlay.ts` | Absorb `search-overlay.ts` into web-viewer (preferred) or inject `getLevelEmoji` as prop and move `NavigateTo` to `web-shared`; moving `levels.ts` alone is insufficient | "Fix web-viewer-search-overlay↔web-viewer import cycle" |
 | `hench-4` genuine bidirectional coupling | `packages/hench/src/` | Identify which coupling is acceptable vs. fixable; document or refactor | "Audit and resolve hench-4 bidirectional coupling" |

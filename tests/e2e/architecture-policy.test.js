@@ -400,7 +400,7 @@ const CYCLE_EXCEPTIONS = new Map([
   ["use", "Tiny hooks cluster; imports still flow through shared viewer barrels and are tracked as a temporary zone cycle."],
   ["web-2", "Small viewer utility cluster; current SourceVision split still routes shared types through the web hub."],
   ["web-4", "Small viewer data-loading cluster; cycles with the multi-package 'web' zone for the same packageFamily mismatch reason as 'polling'."],
-  ["web-helpers", "Search/test-support helper cluster; current SourceVision split still routes shared viewer imports through the web hub."],
+  ["web-viewer-search-overlay", "Search overlay component zone; confirmed genuine cycle with web-viewer — search-overlay.ts imports getLevelEmoji (runtime) and NavigateTo (type) from web-viewer while components/index.ts imports back. Tracked in CLAUDE.md 'Confirmed zone-level cycles' table."],
   ["web-viewer", "Viewer facade cluster; cohesion now meets threshold but still cycles with the multi-package 'web' zone due to the packageFamily mismatch (web zone first file is rex)."],
 ]);
 

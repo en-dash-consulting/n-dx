@@ -144,6 +144,16 @@ This is a **privileged-consumer pattern**: CLI commands are the only non-test co
 
 See also: `ZONES.md` for the zone-pin manifest.
 
+##### Confirmed zone-level cycles
+
+Zones with confirmed bidirectional dependencies require separate governance from the metric-based dual-fragility table. A zone can have cohesion 1 and coupling 0 yet still participate in a genuine cycle with a peer zone — the threshold conditions are simply never met, so the zone is invisible to fragility governance.
+
+| Pair | Evidence | Blast radius | Resolution path |
+|------|---------|-------------|----------------|
+| `web-viewer-search-overlay` ↔ `web-viewer` | `search-overlay.ts` imports `getLevelEmoji` (runtime) from `prd-tree/levels.ts` and `NavigateTo` (type) from `types.ts`, both in web-viewer; `components/index.ts` imports `search-overlay.ts` back | Any change to `levels.ts` or `NavigateTo` in web-viewer breaks the component — equivalent to a circular module dependency | Absorb `search-overlay.ts` into `web-viewer` (preferred); alternatively inject `getLevelEmoji` as a prop and move `NavigateTo` to `web-shared`. Moving `levels.ts` alone is insufficient — `NavigateTo` type import preserves the cycle edge. |
+
+> **Governance rule:** New zones must not introduce zone-level cycles. Any finding of confirmed bidirectional zone coupling requires a PRD task before the change is merged. Cycles are not governed by fragility thresholds and will not appear in the dual-fragility table.
+
 ##### Zone ID naming convention
 
 Zone IDs must encode their package to prevent cross-package prefix collisions in zone-filter queries and zone reports:

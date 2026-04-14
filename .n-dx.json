@@ -106,7 +106,10 @@
         "packages/rex/tests/unit/core/keywords.test.ts": "rex-prd-engine",
         "packages/rex/tests/unit/core/verify.test.ts": "rex-prd-engine",
         "packages/web/tests/unit/viewer/enrichment-thresholds.test.ts": "web-sv-view-tests",
-        "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts": "web-sv-view-tests"
+        "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts": "web-sv-view-tests",
+        "packages/web/src/viewer/components/search-overlay.ts": "web-viewer-search-overlay",
+        "packages/web/tests/unit/viewer/search-overlay.test.ts": "web-viewer-search-overlay",
+        "packages/web/tests/helpers/preact-test-support.ts": "web-viewer"
       },
       "types": {
         "e2e": "test",
