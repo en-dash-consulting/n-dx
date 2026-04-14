@@ -151,7 +151,8 @@ Some cross-zone dependencies use callback injection rather than gateway imports.
 
 | Injection site | Target module | Injected callbacks | Interface type |
 |----------------|---------------|--------------------|----------------|
-| `web/src/server/start.ts` | `web/src/server/register-scheduler.ts` | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
+| `web/src/server/start.ts` | `web/src/server/task-usage/register-scheduler.ts` | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
+| `web/src/server/start.ts` | `web/src/server/routes-hench.ts` | `onStatusInvalidate` | `HenchRouteOptions` |
 | `web/src/viewer/bootstrap.ts` | `web/src/viewer/polling/polling-restart.ts` | `onDegradationChange`, `isFeatureDisabled` | `PollingRestartOptions` |
 
 Rules:

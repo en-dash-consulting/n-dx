@@ -236,7 +236,7 @@ describe("build output contract", () => {
     const REQUIRED_SERVER_MODULES = [
       "dist/server/rex-gateway.js",
       "dist/server/domain-gateway.js",
-      "dist/server/register-scheduler.js",
+      "dist/server/task-usage/register-scheduler.js",
     ];
 
     const missing = REQUIRED_SERVER_MODULES.filter(

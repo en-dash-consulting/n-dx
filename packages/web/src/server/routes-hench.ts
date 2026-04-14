@@ -44,7 +44,6 @@ import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-cli
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { clearStatusCache } from "./routes-status.js";
 import { IncrementalTaskUsageAggregator } from "./task-usage.js";
 import { collectAllIds } from "./rex-gateway.js";
 import type { PRDDocument } from "./rex-gateway.js";
@@ -298,6 +297,16 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
 // Each sub-router handles a resource group under /api/hench/.
 // Returns false if the path doesn't belong to its group.
 
+/** Options for the hench route handler. */
+export interface HenchRouteOptions {
+  /**
+   * Called after mutations that change active/stale run counts so that the
+   * status sidebar reflects the latest state. Injected by start.ts to avoid
+   * a direct routes-hench → routes-status import.
+   */
+  onStatusInvalidate?: () => void;
+}
+
 /** Parsed request context shared across sub-routers. */
 interface RouteContext {
   path: string;
@@ -309,6 +318,7 @@ interface RouteContext {
   ctx: ServerContext;
   runsDir: string;
   broadcast?: WebSocketBroadcaster;
+  onStatusInvalidate?: () => void;
 }
 
 /** Routes: task-usage, audit */
@@ -388,7 +398,7 @@ function routeThrottle(rc: RouteContext): boolean | Promise<boolean> | null {
     return handleThrottleResume(rc.res, rc.broadcast, rc.ctx);
   }
   if (rc.path === "throttle/emergency-stop" && rc.method === "POST") {
-    return handleEmergencyStop(rc.req, rc.res, rc.broadcast, rc.ctx);
+    return handleEmergencyStop(rc.req, rc.res, rc.broadcast, rc.ctx, rc.onStatusInvalidate);
   }
   return null;
 }
@@ -399,7 +409,7 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
 
   const terminateMatch = rc.path.match(/^execute\/([^/?]+)\/terminate$/);
   if (terminateMatch && rc.method === "POST") {
-    return handleTerminate(terminateMatch[1], rc.res, rc.runsDir, rc.broadcast);
+    return handleTerminate(terminateMatch[1], rc.res, rc.runsDir, rc.broadcast, rc.onStatusInvalidate);
   }
   if (rc.path === "execute" && rc.method === "POST") {
     return handleExecute(rc.req, rc.res, rc.ctx, rc.broadcast);
@@ -423,7 +433,7 @@ function routeRuns(rc: RouteContext): boolean | null {
   }
   const markStuckMatch = rc.path.match(/^runs\/([^/?]+)\/mark-stuck$/);
   if (markStuckMatch && rc.method === "POST") {
-    return handleMarkStuck(markStuckMatch[1], rc.res, rc.runsDir);
+    return handleMarkStuck(markStuckMatch[1], rc.res, rc.runsDir, rc.onStatusInvalidate);
   }
 
   // GET /api/hench/runs — list runs with summary (?limit=N&offset=N)
@@ -560,6 +570,7 @@ export function handleHenchRoute(
   res: ServerResponse,
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
+  options?: HenchRouteOptions,
 ): boolean | Promise<boolean> {
   const url = req.url || "/";
   if (!url.startsWith(HENCH_PREFIX)) return false;
@@ -578,6 +589,7 @@ export function handleHenchRoute(
     ctx,
     runsDir: join(ctx.projectDir, ".hench", "runs"),
     broadcast,
+    onStatusInvalidate: options?.onStatusInvalidate,
   };
 
   // Dispatch to sub-routers — first non-null result wins.
@@ -1286,6 +1298,7 @@ function handleMarkStuck(
   runId: string,
   res: ServerResponse,
   runsDir: string,
+  onStatusInvalidate?: () => void,
 ): boolean {
   const runPath = join(runsDir, `${runId}.json`);
   const run = loadRunFile(runsDir, runId);
@@ -1312,7 +1325,7 @@ function handleMarkStuck(
   }
 
   // Invalidate status cache so sidebar shows updated active/stale counts
-  clearStatusCache();
+  onStatusInvalidate?.();
 
   jsonResponse(res, 200, { id: runId, status: "failed", markedStuckAt: run.finishedAt });
   return true;
@@ -2097,6 +2110,7 @@ function handleTerminate(
   res: ServerResponse,
   runsDir: string,
   broadcast?: WebSocketBroadcaster,
+  onStatusInvalidate?: () => void,
 ): boolean {
   const entry = activeExecutions.get(taskId);
 
@@ -2126,7 +2140,7 @@ function handleTerminate(
           errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
           return true;
         }
-        clearStatusCache();
+        onStatusInvalidate?.();
         jsonResponse(res, 200, {
           taskId,
           runId: id,
@@ -2155,7 +2169,7 @@ function handleTerminate(
   processMemoryTracker.markCompleted(taskId);
   executionMetrics.taskCompleted(taskId);
   activeExecutions.delete(taskId);
-  clearStatusCache();
+  onStatusInvalidate?.();
 
   jsonResponse(res, 200, {
     taskId,
@@ -2384,6 +2398,7 @@ async function handleEmergencyStop(
   res: ServerResponse,
   broadcast?: WebSocketBroadcaster,
   ctx?: ServerContext,
+  onStatusInvalidate?: () => void,
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
@@ -2452,7 +2467,7 @@ async function handleEmergencyStop(
   throttleState.lastEmergencyStopCount = terminated + failed;
 
   if (broadcast && ctx) broadcastThrottleState(broadcast, ctx);
-  clearStatusCache();
+  onStatusInvalidate?.();
 
   jsonResponse(res, 200, {
     ok: true,

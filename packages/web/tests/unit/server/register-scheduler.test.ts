@@ -9,8 +9,8 @@
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { registerUsageScheduler } from "../../../src/server/register-scheduler.js";
-import type { RegisterSchedulerOptions } from "../../../src/server/register-scheduler.js";
+import { registerUsageScheduler } from "../../../src/server/task-usage/register-scheduler.js";
+import type { RegisterSchedulerOptions } from "../../../src/server/task-usage/register-scheduler.js";
 
 /** Create a minimal mock aggregator. */
 function mockAggregator() {

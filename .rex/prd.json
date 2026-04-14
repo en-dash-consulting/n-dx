@@ -26251,20 +26251,24 @@
         {
           "id": "c662581c-9dff-413e-ac0b-bbadbeffb85d",
           "title": "Fix observation in polling (2 findings)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.75) — 3 imports target \"web\"\n- Low cohesion (0.25) — files are loosely related, consider splitting this zone",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:02:44.200Z",
+          "completedAt": "2026-04-13T21:02:44.200Z",
           "children": [
             {
               "id": "be039cd0-ef60-4bf7-81f4-c5321fc52a15",
               "title": "Fix observation in polling: High coupling (0.75) — 3 imports target \"web\" (+1 more)",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.75) — 3 imports target \"web\"\n- Low cohesion (0.25) — files are loosely related, consider splitting this zone",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T20:52:33.390Z",
+              "completedAt": "2026-04-13T21:02:43.893Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "1408c4a712f4",
@@ -26275,8 +26279,7 @@
                   "warning": 2
                 },
                 "findingCount": 2
-              },
-              "startedAt": "2026-04-13T20:52:33.390Z"
+              }
             }
           ],
           "recommendationMeta": {
@@ -26303,7 +26306,7 @@
             {
               "id": "dd7a6dec-3a75-4934-80ad-d40bb53ad8fd",
               "title": "Fix observation in refresh: High coupling (0.67) — 3 imports target \"web-unit\"",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "- High coupling (0.67) — 3 imports target \"web-unit\"",
               "priority": "high",
@@ -26317,7 +26320,8 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              }
+              },
+              "startedAt": "2026-04-13T21:02:47.284Z"
             }
           ],
           "recommendationMeta": {
