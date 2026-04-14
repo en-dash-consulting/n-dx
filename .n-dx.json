@@ -57,7 +57,7 @@
         "packages/web/src/server/routes-integrations.ts": "web-server",
         "packages/web/src/server/routes-notion.ts": "web-server",
         "packages/web/src/server/routes-project.ts": "web-server",
-        "packages/web/src/server/routes-rex/analysis.ts": "web-server",
+        "packages/web/src/server/routes-rex-analysis.ts": "web-server",
         "packages/web/src/server/routes-rex/execution.ts": "web-server",
         "packages/web/src/server/routes-rex/health.ts": "web-server",
         "packages/web/src/server/routes-rex/index.ts": "web-server",
