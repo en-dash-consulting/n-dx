@@ -1727,6 +1727,35 @@ describe("filename-based zone IDs replace numeric suffixes", () => {
       expect(zone.id).not.toMatch(/^src-\d+$/);
     }
   });
+
+  it("uses flat file stems before falling back to a numeric package-name suffix", async () => {
+    const publicFiles = [
+      "packages/sourcevision/src/public.ts",
+      "packages/sourcevision/src/constants.ts",
+    ];
+    const cliFiles = [
+      "packages/sourcevision/src/cli/index.ts",
+      "packages/sourcevision/src/cli/help.ts",
+      "packages/sourcevision/src/cli/output.ts",
+    ];
+
+    const inventory = makeInventory(
+      [...publicFiles, ...cliFiles].map((file) => makeFileEntry(file))
+    );
+    const imports = makeImports([
+      makeEdge(publicFiles[0], publicFiles[1]),
+      makeEdge(cliFiles[0], cliFiles[1]),
+      makeEdge(cliFiles[1], cliFiles[2]),
+      makeEdge(cliFiles[2], cliFiles[0]),
+    ]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+    const ids = result.zones.map((zone) => zone.id).sort();
+
+    expect(ids).toContain("sourcevision");
+    expect(ids).toContain("constants-public");
+    expect(ids).not.toContain("sourcevision-2");
+  });
 });
 
 // ── mergeSatelliteCommunities ────────────────────────────────────────────────

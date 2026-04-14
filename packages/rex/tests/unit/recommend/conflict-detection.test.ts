@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import type { PRDItem } from "../../../src/schema/index.js";
-import type { EnrichedRecommendation } from "../../../src/recommend/types.js";
+import type {
+  EnrichedRecommendation,
+  RecommendationTreeItem,
+} from "../../../src/recommend/types.js";
 import {
   detectRecommendationConflicts,
   formatConflict,
@@ -23,7 +25,7 @@ function makeRecommendation(
   };
 }
 
-function makeItem(overrides: Partial<PRDItem> = {}): PRDItem {
+function makeItem(overrides: Partial<RecommendationTreeItem> = {}): RecommendationTreeItem {
   return {
     id: "existing-1",
     title: "Address auth issues (3 findings)",
@@ -142,7 +144,7 @@ describe("detectRecommendationConflicts", () => {
 
   it("detects conflicts with nested PRD items", () => {
     const recs = [makeRecommendation({ title: "Fix auth token refresh" })];
-    const items: PRDItem[] = [
+    const items: RecommendationTreeItem[] = [
       {
         id: "epic-1",
         title: "Security Epic",

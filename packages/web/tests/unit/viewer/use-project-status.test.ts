@@ -17,16 +17,13 @@ vi.mock("../../../src/viewer/hooks/use-polling.js", () => ({
 
 let pipelineOnFlush: ((batch: { types: Set<string> }) => void) | null = null;
 
-vi.mock("../../../src/viewer/messaging/index.js", () => ({
+const degradationListeners: Array<(state: { disabledFeatures: Set<string> }) => void> = [];
+
+vi.mock("../../../src/viewer/hooks/use-gateway.js", () => ({
   createWSPipeline: vi.fn((opts: { onFlush: (batch: { types: Set<string> }) => void }) => {
     pipelineOnFlush = opts.onFlush;
     return { push: vi.fn(), dispose: vi.fn() };
   }),
-}));
-
-const degradationListeners: Array<(state: { disabledFeatures: Set<string> }) => void> = [];
-
-vi.mock("../../../src/viewer/performance/index.js", () => ({
   isFeatureDisabled: vi.fn(() => false),
   onDegradationChange: (handler: (state: { disabledFeatures: Set<string> }) => void) => {
     degradationListeners.push(handler);

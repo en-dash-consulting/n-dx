@@ -1,5 +1,5 @@
-import type { Proposal } from "../../analyze/index.js";
-import { classifyModificationRequest } from "../../analyze/validate-modification.js";
+import type { Proposal } from "./chunked-review-types.js";
+import { classifyModificationRequest } from "./modification-intent.js";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 import type { GranularityAdjustmentRecord, BatchAcceptanceRecord } from "../../analyze/batch-types.js";
 import { green, red, cyan, dim, yellow } from "@n-dx/llm-client";

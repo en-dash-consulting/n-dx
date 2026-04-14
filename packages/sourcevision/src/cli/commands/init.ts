@@ -1,7 +1,7 @@
 import { writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { getCurrentHead, getCurrentBranch } from "@n-dx/llm-client";
-import { SCHEMA_VERSION } from "../../schema/v1.js";
+import { SCHEMA_VERSION } from "../sourcevision-core.js";
 import { TOOL_VERSION, SV_DIR } from "./constants.js";
 import { info } from "../output.js";
 

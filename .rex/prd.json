@@ -26048,15 +26048,16 @@
         {
           "id": "77b9a870-68fd-49b1-9dd9-4ece01493c8d",
           "title": "CLI Hint Correctness, Test Coverage, and Documentation Sync",
-          "status": "in_progress",
+          "status": "completed",
           "level": "feature",
           "source": "smart-add",
           "startedAt": "2026-04-13T16:48:28.800Z",
+          "completedAt": "2026-04-13T21:59:49.214Z",
           "children": [
             {
               "id": "bb5f0641-67a7-43d2-b0fe-186faf73c0bc",
               "title": "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "The ndx init dinosaur ASCII art was redesigned and corrected in a prior sprint (proportions fixed, animation frames sourced from Rex-F.png). The E2E brand test at tests/e2e/cli-brand.test.js still asserts against the old dinosaur output, causing it to fail or carry a stale snapshot. Update the expected output in the test to match the current canonical dinosaur so the suite is green and serves as an accurate regression guard going forward.",
               "acceptanceCriteria": [
@@ -26110,11 +26111,13 @@
     {
       "id": "b700ee09-e422-46df-a866-50f46682d21e",
       "title": "Code Health: 25 findings across 16 zones",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Automated recommendations from SourceVision analysis. 21 zone+category groups covering 25 total findings.",
       "priority": "critical",
       "source": "sourcevision",
+      "startedAt": "2026-04-13T21:59:43.253Z",
+      "completedAt": "2026-04-13T21:59:43.253Z",
       "children": [
         {
           "id": "e9981c80-c6a2-42b3-adb8-d47a6c00b825",
@@ -26297,20 +26300,24 @@
         {
           "id": "c126fff3-4adf-400d-a2ad-460501940c81",
           "title": "Fix observation in refresh (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.67) — 3 imports target \"web-unit\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:08:04.523Z",
+          "completedAt": "2026-04-13T21:08:04.523Z",
           "children": [
             {
               "id": "dd7a6dec-3a75-4934-80ad-d40bb53ad8fd",
               "title": "Fix observation in refresh: High coupling (0.67) — 3 imports target \"web-unit\"",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.67) — 3 imports target \"web-unit\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:02:47.284Z",
+              "completedAt": "2026-04-13T21:08:04.236Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "8ed43d3ac5d7"
@@ -26320,8 +26327,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-13T21:02:47.284Z"
+              }
             }
           ],
           "recommendationMeta": {
@@ -26338,20 +26344,24 @@
         {
           "id": "da070c29-653d-4b8f-bad4-f17c5de4a65e",
           "title": "Fix observation in rex (2 findings)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.79) — 9 imports target \"web\"\n- Low cohesion (0.21) — files are loosely related, consider splitting this zone",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:26:37.377Z",
+          "completedAt": "2026-04-13T21:26:37.377Z",
           "children": [
             {
               "id": "fbb2f272-1acb-43e7-a2e7-91205dbcdce3",
               "title": "Fix observation in rex: High coupling (0.79) — 9 imports target \"web\" (+1 more)",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.79) — 9 imports target \"web\"\n- Low cohesion (0.21) — files are loosely related, consider splitting this zone",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:18:56.948Z",
+              "completedAt": "2026-04-13T21:26:37.209Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "803bcf510222",
@@ -26380,20 +26390,24 @@
         {
           "id": "38612bc8-f23d-4df6-93c9-12885c505902",
           "title": "Fix observation in rex-core (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.82) — 5 imports target \"web\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:13:14.055Z",
+          "completedAt": "2026-04-13T21:13:14.055Z",
           "children": [
             {
               "id": "d6dd5c9d-a7d4-4fe4-9e0e-03eb46dfb282",
               "title": "Fix observation in rex-core: High coupling (0.82) — 5 imports target \"web\"",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.82) — 5 imports target \"web\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:08:07.552Z",
+              "completedAt": "2026-04-13T21:13:13.734Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "56bf686efc97"
@@ -26420,20 +26434,24 @@
         {
           "id": "ba206df9-1316-4072-98ae-28d3133b96ad",
           "title": "Fix observation in rex-recommend (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.78) — 5 imports target \"web\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:18:53.935Z",
+          "completedAt": "2026-04-13T21:18:53.935Z",
           "children": [
             {
               "id": "b97a4410-1564-4c2d-8efc-e714e18c69cc",
               "title": "Fix observation in rex-recommend: High coupling (0.78) — 5 imports target \"web\"",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.78) — 5 imports target \"web\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:13:17.076Z",
+              "completedAt": "2026-04-13T21:18:53.612Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "486e0d515a9f"
@@ -26460,20 +26478,24 @@
         {
           "id": "3f73524e-d54e-4812-9beb-a71cd4e36506",
           "title": "Fix observation in sourcevision-2 (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Generic zone name \"Sourcevision 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:32:02.964Z",
+          "completedAt": "2026-04-13T21:32:02.964Z",
           "children": [
             {
               "id": "f7cb6201-e0d8-483b-b2bb-f713a96b5e18",
               "title": "Fix observation in sourcevision-2: Generic zone name \"Sourcevision 2\" — enrichment did not assign a meaningful name",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Generic zone name \"Sourcevision 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:26:40.025Z",
+              "completedAt": "2026-04-13T21:32:02.792Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "9c5ad2b38d42"
@@ -26500,20 +26522,24 @@
         {
           "id": "6c79b33e-9969-4ed1-b9a1-ea5737d5dd36",
           "title": "Fix observation in sourcevision-cli (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.85) — 6 imports target \"sourcevision\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:35:31.450Z",
+          "completedAt": "2026-04-13T21:35:31.450Z",
           "children": [
             {
               "id": "f015f1db-7e23-43e9-bec8-033e514eaf9e",
               "title": "Fix observation in sourcevision-cli: High coupling (0.85) — 6 imports target \"sourcevision\"",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.85) — 6 imports target \"sourcevision\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:32:05.661Z",
+              "completedAt": "2026-04-13T21:35:31.275Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "e2aef7b4b37f"
@@ -26540,20 +26566,24 @@
         {
           "id": "3da1eb3a-3b0d-4452-8644-95dc64968811",
           "title": "Fix observation in tick (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.56) — 3 imports target \"web\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:38:15.824Z",
+          "completedAt": "2026-04-13T21:38:15.824Z",
           "children": [
             {
               "id": "793e0718-9cd8-4b15-b828-fef49bc92921",
               "title": "Fix observation in tick: High coupling (0.56) — 3 imports target \"web\"",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.56) — 3 imports target \"web\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:35:34.109Z",
+              "completedAt": "2026-04-13T21:38:15.653Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "19e38d2cc6ec"
@@ -26580,20 +26610,24 @@
         {
           "id": "3742b95d-2265-4a08-b021-70aab56337be",
           "title": "Fix observation in token (2 findings)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.65) — 8 imports target \"web\"\n- Low cohesion (0.35) — files are loosely related, consider splitting this zone",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:44:25.224Z",
+          "completedAt": "2026-04-13T21:44:25.224Z",
           "children": [
             {
               "id": "df28f81c-3fb7-4b97-9a0d-c8dea9428d0e",
               "title": "Fix observation in token: High coupling (0.65) — 8 imports target \"web\" (+1 more)",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.65) — 8 imports target \"web\"\n- Low cohesion (0.35) — files are loosely related, consider splitting this zone",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:38:18.464Z",
+              "completedAt": "2026-04-13T21:44:25.056Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "fce8066ebc46",
@@ -26622,20 +26656,24 @@
         {
           "id": "afe3615b-d9d8-444d-97e0-06d578292e84",
           "title": "Fix observation in use (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.75) — 3 imports target \"web\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:49:04.432Z",
+          "completedAt": "2026-04-13T21:49:04.432Z",
           "children": [
             {
               "id": "024c8e66-91e1-47ea-bbf1-a26ccb1f31f8",
               "title": "Fix observation in use: High coupling (0.75) — 3 imports target \"web\"",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.75) — 3 imports target \"web\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:44:27.866Z",
+              "completedAt": "2026-04-13T21:49:04.260Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "22e2ac610c63"
@@ -26662,20 +26700,24 @@
         {
           "id": "2de3bf8b-961a-42ca-aacf-fba4c29fde3a",
           "title": "Fix observation in web-2 (2 findings)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.75) — 3 imports target \"web\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:53:18.531Z",
+          "completedAt": "2026-04-13T21:53:18.531Z",
           "children": [
             {
               "id": "0fe2a07e-516e-4bd7-8e77-29c43e0fc7ca",
               "title": "Fix observation in web-2: Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecti (+1 more)",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.75) — 3 imports target \"web\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:49:07.077Z",
+              "completedAt": "2026-04-13T21:53:18.361Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "6889586452ef",
@@ -26704,20 +26746,24 @@
         {
           "id": "1f995e5a-c5af-4607-94dc-8b35e97220cc",
           "title": "Fix observation in web-unit (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.71) — 3 imports target \"web\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:57:29.987Z",
+          "completedAt": "2026-04-13T21:57:29.987Z",
           "children": [
             {
               "id": "41d979c9-41e8-4b4c-802d-51712f8c4bb3",
               "title": "Fix observation in web-unit: High coupling (0.71) — 3 imports target \"web\"",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.71) — 3 imports target \"web\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:53:21.171Z",
+              "completedAt": "2026-04-13T21:57:29.816Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "6b8c0272a14c"
@@ -26744,20 +26790,24 @@
         {
           "id": "a6bc77c4-a492-4678-87cc-00f1d1954c97",
           "title": "Fix suggestion in global (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): rex, polling, web-unit, token — mandatory refactoring recommended before further development",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:59:29.365Z",
+          "completedAt": "2026-04-13T21:59:29.365Z",
           "children": [
             {
               "id": "88ecc136-aaa5-4408-937c-ce9f6db1974d",
               "title": "Fix suggestion in global: 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): r",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): rex, polling, web-unit, token — mandatory refactoring recommended before further development",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:57:32.623Z",
+              "completedAt": "2026-04-13T21:59:29.197Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "e70d947ed2ca"
@@ -26828,20 +26878,23 @@
         {
           "id": "3fb82f2e-dbe8-4495-8b10-a78d52c4a906",
           "title": "Fix suggestion in token (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0.65) — requires refactoring before new feature development",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:59:36.959Z",
+          "completedAt": "2026-04-13T21:59:36.959Z",
           "children": [
             {
               "id": "db8cf9f9-7ecf-4100-8f8e-533b7a104d3c",
               "title": "Fix suggestion in token: Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "- Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0.65) — requires refactoring before new feature development",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:59:32.028Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "6e7913c87be3"
@@ -26868,20 +26921,23 @@
         {
           "id": "b50953a3-1853-45b9-aaa6-2050033af692",
           "title": "Fix suggestion in web-2 (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-13T21:59:43.128Z",
+          "completedAt": "2026-04-13T21:59:43.128Z",
           "children": [
             {
               "id": "77111aec-d990-4b9c-82cb-47c60fc195df",
               "title": "Fix suggestion in web-2: Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its fil",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "- Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-13T21:59:39.597Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "878fba44f7c4"
@@ -26997,6 +27053,1116 @@
       "recommendationMeta": {
         "findingCount": 25
       }
+    },
+    {
+      "id": "1abcfd99-f8d3-4e84-bcea-5b6c6e412819",
+      "title": "Code Health: 43 findings across 16 zones",
+      "status": "completed",
+      "level": "epic",
+      "description": "Automated recommendations from SourceVision analysis. 24 zone+category groups covering 43 total findings.",
+      "priority": "critical",
+      "source": "sourcevision",
+      "children": [
+        {
+          "id": "7d140635-dd3c-4488-b008-d9f792b61519",
+          "title": "Fix documentation in global (8 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Add a policy note to CLAUDE.md's dual-fragility governance section clarifying whether the 'production zones' qualifier intentionally excludes test zones from the two-consumer rule and addition-review requirements. packages-web:unit-server (cohesion 0.45, coupling 0.55) is a concrete case where the exclusion is ambiguous and ungoverned.\n- Audit all manually maintained governance lists in the codebase (PANEL_FILES in boundary-check.test.ts, injection seam registry in CLAUDE.md, gateway table in CLAUDE.md) for automated completeness-check coverage. Any list with no exhaustiveness assertion is a silent governance drift risk as the codebase grows.\n- Create a zone-pin manifest in sourcevision configuration listing all intentionally pinned files with the reason for each pin. At minimum six files are known to need pinning to eliminate phantom coupling artifacts; without a central manifest each re-analysis regenerates phantom edges and requires per-reviewer knowledge of the insight history.\n- Establish a formal zone promotion checklist triggered when any sub-directory crosses the 5-file reliable-metrics threshold: (1) CLAUDE.md zone policy entry, (2) zone-pin configuration for anchor files, (3) index.ts barrel if absent. Document the checklist in TESTING.md or a ZONES.md to prevent ad-hoc promotion decisions and ensure the two governance mechanisms stay in sync.\n- Establish a zone ID naming convention that encodes the package in all zone prefixes: 'sv-' for packages/sourcevision/, 'rex-' for packages/rex/, 'web-server-' for web server zones, 'web-viewer-' for web viewer zones, and 'web-sv-' for web package zones that render sourcevision data. Apply this retroactively to sourcevision-view-tests (→ web-sv-view-tests) to eliminate the cross-package prefix collision that makes zone-filter queries unreliable.\n- Four enrichment passes have fully characterized but not resolved: completion-reader.ts dead code, rex-2 zone naming, web-helpers↔web-viewer levels.ts cycle, and hench-4 genuine bidirectional coupling. None of these requires further analysis — all resolution paths are known. Creating PRD tasks for each would convert them from perpetual insight record entries into tracked work items with owners.\n- Zone coupling reports present artifact-driven bidirectional pairs (four of five in the web package) identically alongside the one genuine cycle, providing no triage signal for reviewers — a 'zone-pin confirmed / artifact suppressed' annotation in sourcevision zone metadata would allow governance tooling to distinguish known-artifact pairs from actionable architectural violations without requiring per-reviewer knowledge of the underlying misclassifications.\n- rex-2 (4 files, cohesion 1, 5 inbound imports from the rex hub) is an unnamed overflow zone with no documentation, no zone pinning, and no descriptive ID. Its files are invisible to API surface audits and changeset impact analysis for the rex package. This is a governance gap that compounds silently as the rex package evolves — each new rex feature that touches rex-2 files goes unnoticed by zone tooling.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:51:57.519Z",
+          "completedAt": "2026-04-14T01:51:57.519Z",
+          "children": [
+            {
+              "id": "907a29cc-07c7-4dff-ac5a-31e15ff87e1b",
+              "title": "Fix documentation in global: Add a policy note to CLAUDE.md's dual-fragility governance section clarifying wh (+7 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- Add a policy note to CLAUDE.md's dual-fragility governance section clarifying whether the 'production zones' qualifier intentionally excludes test zones from the two-consumer rule and addition-review requirements. packages-web:unit-server (cohesion 0.45, coupling 0.55) is a concrete case where the exclusion is ambiguous and ungoverned.\n- Audit all manually maintained governance lists in the codebase (PANEL_FILES in boundary-check.test.ts, injection seam registry in CLAUDE.md, gateway table in CLAUDE.md) for automated completeness-check coverage. Any list with no exhaustiveness assertion is a silent governance drift risk as the codebase grows.\n- Create a zone-pin manifest in sourcevision configuration listing all intentionally pinned files with the reason for each pin. At minimum six files are known to need pinning to eliminate phantom coupling artifacts; without a central manifest each re-analysis regenerates phantom edges and requires per-reviewer knowledge of the insight history.\n- Establish a formal zone promotion checklist triggered when any sub-directory crosses the 5-file reliable-metrics threshold: (1) CLAUDE.md zone policy entry, (2) zone-pin configuration for anchor files, (3) index.ts barrel if absent. Document the checklist in TESTING.md or a ZONES.md to prevent ad-hoc promotion decisions and ensure the two governance mechanisms stay in sync.\n- Establish a zone ID naming convention that encodes the package in all zone prefixes: 'sv-' for packages/sourcevision/, 'rex-' for packages/rex/, 'web-server-' for web server zones, 'web-viewer-' for web viewer zones, and 'web-sv-' for web package zones that render sourcevision data. Apply this retroactively to sourcevision-view-tests (→ web-sv-view-tests) to eliminate the cross-package prefix collision that makes zone-filter queries unreliable.\n- Four enrichment passes have fully characterized but not resolved: completion-reader.ts dead code, rex-2 zone naming, web-helpers↔web-viewer levels.ts cycle, and hench-4 genuine bidirectional coupling. None of these requires further analysis — all resolution paths are known. Creating PRD tasks for each would convert them from perpetual insight record entries into tracked work items with owners.\n- Zone coupling reports present artifact-driven bidirectional pairs (four of five in the web package) identically alongside the one genuine cycle, providing no triage signal for reviewers — a 'zone-pin confirmed / artifact suppressed' annotation in sourcevision zone metadata would allow governance tooling to distinguish known-artifact pairs from actionable architectural violations without requiring per-reviewer knowledge of the underlying misclassifications.\n- rex-2 (4 files, cohesion 1, 5 inbound imports from the rex hub) is an unnamed overflow zone with no documentation, no zone pinning, and no descriptive ID. Its files are invisible to API surface audits and changeset impact analysis for the rex package. This is a governance gap that compounds silently as the rex package evolves — each new rex feature that touches rex-2 files goes unnoticed by zone tooling.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:44:33.633Z",
+              "completedAt": "2026-04-14T01:51:57.343Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "4cc8b9bb113f",
+                  "8e422e9c38f0",
+                  "68e2f71fd74c",
+                  "9ffd2b8bbc62",
+                  "471dbb1551d4",
+                  "1f63a46ec29e",
+                  "843f35b17616",
+                  "5fa275eee85b"
+                ],
+                "category": "documentation",
+                "severityDistribution": {
+                  "warning": 8
+                },
+                "findingCount": 8
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "4cc8b9bb113f",
+              "8e422e9c38f0",
+              "68e2f71fd74c",
+              "9ffd2b8bbc62",
+              "471dbb1551d4",
+              "1f63a46ec29e",
+              "843f35b17616",
+              "5fa275eee85b"
+            ],
+            "category": "documentation",
+            "severityDistribution": {
+              "warning": 8
+            },
+            "findingCount": 8
+          }
+        },
+        {
+          "id": "6f416000-3e57-4e87-808b-0f9a14b4dc7c",
+          "title": "Fix code in global (4 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Establish a satellite zone testing policy requiring every production file in a satellite zone to have a corresponding unit test file, using task-usage-scheduler's 4:4 production-to-test parity as the benchmark. Currently both rex satellite zones fail this bar: rex-fix-pipeline leaves fix/tree.ts and fix/types.ts untested, while rex-recommend leaves similarity.ts (140 lines) and tree.ts untested. Without an explicit policy, satellite zones pass test-presence checks while leaving core implementation logic unexercised.\n- No integration test verifies the behavioral contract of either injection seam (register-scheduler.ts RegisterSchedulerOptions, polling-restart.ts PollingRestartOptions) — TypeScript enforces structural compatibility at compile time but cannot verify that injected implementations behave correctly at runtime; a seam-contract integration test per site would catch behavioral regressions when the implementing module changes without altering the interface signature.\n- The filesystem-level coupling between prd-epic-resolver.ts and core/ci.js (CLI flag conventions, exit code contracts, stderr parsing format) is unenforceable by any existing monorepo boundary tool. It is the only cross-tier contract in the codebase with zero type-system or test coverage at the boundary itself. A contract test in the e2e suite that asserts specific exit codes and output format from prd-epic-resolver.ts would make this invisible contract auditable.\n- boundary-check.test.ts enforces the web-shared addition policy and two-consumer rule but does not assert that all viewer→server imports are type-only. Given that viewer and server are separate build artifacts, a runtime import in this direction would be a silent build-time boundary violation. The current codebase has no violations, but the absence of an automated guard means the invariant is enforced only by convention. Adding a 'viewer files must not runtime-import from server/' assertion closes the last unchecked boundary in the web package.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:01:18.085Z",
+          "completedAt": "2026-04-14T01:01:18.085Z",
+          "children": [
+            {
+              "id": "71575514-5f7c-4500-ae0c-49a21183c2d4",
+              "title": "Fix code in global: Establish a satellite zone testing policy requiring every production file in a s (+3 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- Establish a satellite zone testing policy requiring every production file in a satellite zone to have a corresponding unit test file, using task-usage-scheduler's 4:4 production-to-test parity as the benchmark. Currently both rex satellite zones fail this bar: rex-fix-pipeline leaves fix/tree.ts and fix/types.ts untested, while rex-recommend leaves similarity.ts (140 lines) and tree.ts untested. Without an explicit policy, satellite zones pass test-presence checks while leaving core implementation logic unexercised.\n- No integration test verifies the behavioral contract of either injection seam (register-scheduler.ts RegisterSchedulerOptions, polling-restart.ts PollingRestartOptions) — TypeScript enforces structural compatibility at compile time but cannot verify that injected implementations behave correctly at runtime; a seam-contract integration test per site would catch behavioral regressions when the implementing module changes without altering the interface signature.\n- The filesystem-level coupling between prd-epic-resolver.ts and core/ci.js (CLI flag conventions, exit code contracts, stderr parsing format) is unenforceable by any existing monorepo boundary tool. It is the only cross-tier contract in the codebase with zero type-system or test coverage at the boundary itself. A contract test in the e2e suite that asserts specific exit codes and output format from prd-epic-resolver.ts would make this invisible contract auditable.\n- boundary-check.test.ts enforces the web-shared addition policy and two-consumer rule but does not assert that all viewer→server imports are type-only. Given that viewer and server are separate build artifacts, a runtime import in this direction would be a silent build-time boundary violation. The current codebase has no violations, but the absence of an automated guard means the invariant is enforced only by convention. Adding a 'viewer files must not runtime-import from server/' assertion closes the last unchecked boundary in the web package.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T00:46:29.439Z",
+              "completedAt": "2026-04-14T01:01:17.902Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "0f588dde4e7b",
+                  "d097b91db35d",
+                  "d26d62ed253d",
+                  "1557c903aa2c"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 4
+                },
+                "findingCount": 4
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "0f588dde4e7b",
+              "d097b91db35d",
+              "d26d62ed253d",
+              "1557c903aa2c"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 4
+            },
+            "findingCount": 4
+          }
+        },
+        {
+          "id": "62872f4e-d9f7-43a9-8ab3-b40bd51f6f32",
+          "title": "Fix suggestion in hench-4 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone \"hench-4\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T02:15:49.843Z",
+          "completedAt": "2026-04-14T02:15:49.843Z",
+          "children": [
+            {
+              "id": "3ad8f0c5-a022-401f-8771-3f800131970b",
+              "title": "Fix suggestion in hench-4: Zone \"hench-4\" has a numeric suffix indicating an overflow community — pin its f",
+              "status": "completed",
+              "level": "task",
+              "description": "- Zone \"hench-4\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T02:11:52.157Z",
+              "completedAt": "2026-04-14T02:15:49.669Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "9164366920c3"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "9164366920c3"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "27e2cb62-a5ac-4c35-bded-8fe671973086",
+          "title": "Fix documentation in rex (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Document the CLI two-tier API pattern in CLAUDE.md with an explicit allowlist of approved internal sub-zones for CLI imports (analyze/index, store/, recommend/conflict-detection, fix/index). This converts the current undocumented privileged-consumer surface into a governed one. Without documentation, every new CLI command author independently discovers (or violates) this pattern with no authoritative precedent to consult.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:57:07.126Z",
+          "completedAt": "2026-04-14T01:57:07.126Z",
+          "children": [
+            {
+              "id": "272c4b15-c73b-4a0a-9df3-f0ac03ae87a4",
+              "title": "Fix documentation in rex: Document the CLI two-tier API pattern in CLAUDE.md with an explicit allowlist of",
+              "status": "completed",
+              "level": "task",
+              "description": "- Document the CLI two-tier API pattern in CLAUDE.md with an explicit allowlist of approved internal sub-zones for CLI imports (analyze/index, store/, recommend/conflict-detection, fix/index). This converts the current undocumented privileged-consumer surface into a governed one. Without documentation, every new CLI command author independently discovers (or violates) this pattern with no authoritative precedent to consult.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:55:12.779Z",
+              "completedAt": "2026-04-14T01:57:06.951Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "2a44a54ec113"
+                ],
+                "category": "documentation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "2a44a54ec113"
+            ],
+            "category": "documentation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "383579c7-0862-4841-8263-fc4d771fff85",
+          "title": "Fix suggestion in rex-2 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone \"rex-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T02:18:42.281Z",
+          "completedAt": "2026-04-14T02:18:42.281Z",
+          "children": [
+            {
+              "id": "cf1fe89a-0bc8-4aff-9205-96502b15dc13",
+              "title": "Fix suggestion in rex-2: Zone \"rex-2\" has a numeric suffix indicating an overflow community — pin its fil",
+              "status": "completed",
+              "level": "task",
+              "description": "- Zone \"rex-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T02:15:52.538Z",
+              "completedAt": "2026-04-14T02:18:42.111Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "17a77de52148"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "17a77de52148"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "7d6bf10f-35b0-4d87-81e1-30018ddbe277",
+          "title": "Fix suggestion in sourcevision-4 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone \"sourcevision-4\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T02:20:30.195Z",
+          "completedAt": "2026-04-14T02:20:30.195Z",
+          "children": [
+            {
+              "id": "643cd3bf-fb50-41d4-8adb-f8148ed951cc",
+              "title": "Fix suggestion in sourcevision-4: Zone \"sourcevision-4\" has a numeric suffix indicating an overflow community — pi",
+              "status": "completed",
+              "level": "task",
+              "description": "- Zone \"sourcevision-4\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T02:18:44.946Z",
+              "completedAt": "2026-04-14T02:20:30.022Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "e42895144581"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "e42895144581"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "e985fe67-805b-4070-8fb6-2a6f6f4abc9c",
+          "title": "Fix documentation in web-server (2 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- packages/web/src/server/ contains two *types.ts files with opposite runtime contracts in the same zone: shared-types.ts (explicitly documented 'Types only — no runtime code') and types.ts (exports jsonResponse, errorResponse, readBody runtime utilities). Rename types.ts to http-utils.ts or response-helpers.ts to eliminate the false pure-type signal and align with the monorepo-wide *types.ts = pure-type convention enforced by documentation in shared-types.ts.\n- routes-rex/shared.ts and server/shared-types.ts both use 'shared' in their names for different structural purposes (route-level utilities vs. cross-zone type bridge). Before routes-rex/ is formally governed as an internal sub-zone, rename routes-rex/shared.ts to routes-rex/rex-route-helpers.ts or similar to eliminate the naming collision.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T02:06:00.698Z",
+          "completedAt": "2026-04-14T02:06:00.698Z",
+          "children": [
+            {
+              "id": "4c31ebc0-15a1-487b-b3c7-01b6f2005c25",
+              "title": "Fix documentation in web-server: packages/web/src/server/ contains two *types.ts files with opposite runtime cont (+1 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- packages/web/src/server/ contains two *types.ts files with opposite runtime contracts in the same zone: shared-types.ts (explicitly documented 'Types only — no runtime code') and types.ts (exports jsonResponse, errorResponse, readBody runtime utilities). Rename types.ts to http-utils.ts or response-helpers.ts to eliminate the false pure-type signal and align with the monorepo-wide *types.ts = pure-type convention enforced by documentation in shared-types.ts.\n- routes-rex/shared.ts and server/shared-types.ts both use 'shared' in their names for different structural purposes (route-level utilities vs. cross-zone type bridge). Before routes-rex/ is formally governed as an internal sub-zone, rename routes-rex/shared.ts to routes-rex/rex-route-helpers.ts or similar to eliminate the naming collision.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T02:03:28.821Z",
+              "completedAt": "2026-04-14T02:06:00.524Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "ba44c5901a65",
+                  "e58dc53f4568"
+                ],
+                "category": "documentation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "ba44c5901a65",
+              "e58dc53f4568"
+            ],
+            "category": "documentation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "b5e80d0d-c827-4499-948b-7dd1a012190c",
+          "title": "Fix suggestion in web-server (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone \"Web Server Composition Root\" (web-server) has catastrophic risk (score: 0.80, cohesion: 0.20, coupling: 0.80) — requires immediate architectural intervention",
+          "priority": "critical",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T00:46:26.707Z",
+          "completedAt": "2026-04-14T00:46:26.707Z",
+          "children": [
+            {
+              "id": "bca36520-15e1-43c4-a990-04f221dbe987",
+              "title": "Fix suggestion in web-server: Zone \"Web Server Composition Root\" (web-server) has catastrophic risk (score: 0.",
+              "status": "completed",
+              "level": "task",
+              "description": "- Zone \"Web Server Composition Root\" (web-server) has catastrophic risk (score: 0.80, cohesion: 0.20, coupling: 0.80) — requires immediate architectural intervention",
+              "priority": "critical",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T00:31:38.500Z",
+              "completedAt": "2026-04-14T00:46:26.511Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "b30fdc85a11b"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "critical": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "b30fdc85a11b"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "critical": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "19e84fd7-0250-44ca-9fde-aaeb285c3522",
+          "title": "Fix move-file in web-server (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server Composition Root\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T02:07:29.050Z",
+          "completedAt": "2026-04-14T02:07:29.050Z",
+          "children": [
+            {
+              "id": "645e4aad-f281-4f93-88cd-dbf11e0b6dfa",
+              "title": "Fix move-file in web-server: File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Ser",
+              "status": "completed",
+              "level": "task",
+              "description": "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server Composition Root\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T02:06:03.371Z",
+              "completedAt": "2026-04-14T02:07:28.877Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "aa9a262e0b87"
+                ],
+                "category": "move-file",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "aa9a262e0b87"
+            ],
+            "category": "move-file",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "bc5b3bcf-7f83-4d63-b219-201a8812d9e7",
+          "title": "Fix move-file in web-viewer (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- File \"packages/web/src/viewer/components/prd-tree/status-filter.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/prd-tree/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T02:11:49.484Z",
+          "completedAt": "2026-04-14T02:11:49.484Z",
+          "children": [
+            {
+              "id": "755f116e-d661-4643-9ca4-4485e569f155",
+              "title": "Fix move-file in web-viewer: File \"packages/web/src/viewer/components/prd-tree/status-filter.ts\" is pinned to",
+              "status": "completed",
+              "level": "task",
+              "description": "- File \"packages/web/src/viewer/components/prd-tree/status-filter.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/prd-tree/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T02:07:31.735Z",
+              "completedAt": "2026-04-14T02:11:49.310Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "f1995705f207"
+                ],
+                "category": "move-file",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "f1995705f207"
+            ],
+            "category": "move-file",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "76ab3e87-ff97-40b3-94be-084cc92256fe",
+          "title": "Fix code in packages-web:integration (2 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- search-overlay.ts is missing from the PANEL_FILES constant in boundary-check.test.ts (lines 257-263). The barrel-import assertion protects five other panel components but not search-overlay, meaning direct imports from components/search-overlay.ts silently pass CI. Add 'search-overlay' to the PANEL_FILES list to close the gap.\n- Replace the manually maintained PANEL_FILES array in boundary-check.test.ts with a runtime glob over the components/ directory (e.g. all files matching *-panel.ts or *-controls.ts). This closes the gap where new panel files (like search-overlay.ts) are added without updating the constant, and makes the barrel-import enforcement self-maintaining.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:03:50.293Z",
+          "completedAt": "2026-04-14T01:03:50.293Z",
+          "children": [
+            {
+              "id": "0e8681dc-e39d-4f02-9aba-7972cbda15a3",
+              "title": "Fix code in packages-web:integration: search-overlay.ts is missing from the PANEL_FILES constant in boundary-check.tes (+1 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- search-overlay.ts is missing from the PANEL_FILES constant in boundary-check.test.ts (lines 257-263). The barrel-import assertion protects five other panel components but not search-overlay, meaning direct imports from components/search-overlay.ts silently pass CI. Add 'search-overlay' to the PANEL_FILES list to close the gap.\n- Replace the manually maintained PANEL_FILES array in boundary-check.test.ts with a runtime glob over the components/ directory (e.g. all files matching *-panel.ts or *-controls.ts). This closes the gap where new panel files (like search-overlay.ts) are added without updating the constant, and makes the barrel-import enforcement self-maintaining.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:01:20.813Z",
+              "completedAt": "2026-04-14T01:03:50.078Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "128a48af7658",
+                  "b22a76957260"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "128a48af7658",
+              "b22a76957260"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "46e9648a-b652-4da8-9655-cc1da05e9aba",
+          "title": "Fix code in prd-tree-search (2 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- SearchFacets now has three canonical import paths after the prd-tree/index.ts barrel was added without removing tree-search.ts's inline `export type { SearchFacets }`. Remove the inline re-export from tree-search.ts so the single authoritative path is prd-tree/index.ts, which re-exports from search-types.ts.\n- Add unit tests for use-facet-state.ts (initial state, toggle, reset) and search-types.ts (type guard or import-shape assertions). Two of three production files are currently untested, leaving the facet filter contract and type exports unverified. This matches the gap identified for this zone in prior passes but has not yet been acted on.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:13:19.203Z",
+          "completedAt": "2026-04-14T01:13:19.203Z",
+          "children": [
+            {
+              "id": "f6ad260e-dd40-4e7f-a308-a6a670f17016",
+              "title": "Fix code in prd-tree-search: SearchFacets now has three canonical import paths after the prd-tree/index.ts ba (+1 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- SearchFacets now has three canonical import paths after the prd-tree/index.ts barrel was added without removing tree-search.ts's inline `export type { SearchFacets }`. Remove the inline re-export from tree-search.ts so the single authoritative path is prd-tree/index.ts, which re-exports from search-types.ts.\n- Add unit tests for use-facet-state.ts (initial state, toggle, reset) and search-types.ts (type guard or import-shape assertions). Two of three production files are currently untested, leaving the facet filter contract and type exports unverified. This matches the gap identified for this zone in prior passes but has not yet been acted on.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:03:52.967Z",
+              "completedAt": "2026-04-14T01:13:19.019Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "bad8ad4ebda4",
+                  "3ef274c92b0e"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "bad8ad4ebda4",
+              "3ef274c92b0e"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "3fecf45d-371c-4772-969f-203383f29f7e",
+          "title": "Fix code in rex (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, core/stats, schema/index, recommend/conflict-detection, fix/index, and 30+ others) with no boundary assertion preventing the surface from expanding. public.ts exports ~30 symbols but CLI commands bypass it entirely, creating a de-facto second internal API that is invisible to external consumers and to domain-isolation.test.js. Adding a boundary assertion — 'cli/commands/ may only import from public.ts or core/ directly' — would cap growth of this surface and make the privileged-consumer pattern explicit.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:20:10.658Z",
+          "completedAt": "2026-04-14T01:20:10.658Z",
+          "children": [
+            {
+              "id": "4fc913c5-82c4-4fb0-958f-ba5836822c0d",
+              "title": "Fix code in rex: packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, ",
+              "status": "completed",
+              "level": "task",
+              "description": "- packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, core/stats, schema/index, recommend/conflict-detection, fix/index, and 30+ others) with no boundary assertion preventing the surface from expanding. public.ts exports ~30 symbols but CLI commands bypass it entirely, creating a de-facto second internal API that is invisible to external consumers and to domain-isolation.test.js. Adding a boundary assertion — 'cli/commands/ may only import from public.ts or core/ directly' — would cap growth of this surface and make the privileged-consumer pattern explicit.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:14:16.214Z",
+              "completedAt": "2026-04-14T01:20:10.484Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "8f2cc5a5bc0d"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "8f2cc5a5bc0d"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "3e8d8551-2fd3-4006-803b-e96747fec318",
+          "title": "Fix code in sourcevision-analyzers (2 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- The sourcevision-analyzers zone is a degenerate 2-file zone containing only dead code (completion-reader.ts with zero production importers) and its own test. This zone will persist indefinitely unless a binary decision is made: delete both files if the module is abandoned, or add completion-reader to public.ts and wire it into the production pipeline if the export is intentional. Leaving the zone as-is gives sourcevision a misleading test coverage signal for a module with no callers.\n- Four enrichment passes have documented completion-reader.ts as dead code (zero production importers confirmed) with no deletion decision made. The sourcevision-analyzers zone will persist indefinitely as a 2-file satellite in zone reports, creating a false coverage signal. If no decision is made to wire it into the production pipeline (add to public.ts), schedule deletion of both completion-reader.ts and completion-reader.test.ts in the next dead-code cleanup PR.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:21:33.459Z",
+          "completedAt": "2026-04-14T01:21:33.459Z",
+          "children": [
+            {
+              "id": "e15d326f-777c-417d-9437-631e2c6638f9",
+              "title": "Fix code in sourcevision-analyzers: The sourcevision-analyzers zone is a degenerate 2-file zone containing only dead (+1 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- The sourcevision-analyzers zone is a degenerate 2-file zone containing only dead code (completion-reader.ts with zero production importers) and its own test. This zone will persist indefinitely unless a binary decision is made: delete both files if the module is abandoned, or add completion-reader to public.ts and wire it into the production pipeline if the export is intentional. Leaving the zone as-is gives sourcevision a misleading test coverage signal for a module with no callers.\n- Four enrichment passes have documented completion-reader.ts as dead code (zero production importers confirmed) with no deletion decision made. The sourcevision-analyzers zone will persist indefinitely as a 2-file satellite in zone reports, creating a false coverage signal. If no decision is made to wire it into the production pipeline (add to public.ts), schedule deletion of both completion-reader.ts and completion-reader.test.ts in the next dead-code cleanup PR.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:20:13.352Z",
+              "completedAt": "2026-04-14T01:21:33.284Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "e0cabebea779",
+                  "b14cb87cac19"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "e0cabebea779",
+              "b14cb87cac19"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "6fe462af-722d-4fb6-b082-2f9ab301c2d7",
+          "title": "Fix code in sourcevision-view-tests (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Coupling score 0.75 is produced entirely by false-positive string-literal edges, while the real architectural risk (white-box leaf-path imports into web-viewer internals) is unrepresented in the metric. Zone tooling that gates on coupling score will raise a false alarm for the wrong reason while the true refactor trap goes undetected.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:27:08.622Z",
+          "completedAt": "2026-04-14T01:27:08.622Z",
+          "children": [
+            {
+              "id": "b180b915-2dd1-45dc-bfdc-681ac87d8cbd",
+              "title": "Fix code in sourcevision-view-tests: Coupling score 0.75 is produced entirely by false-positive string-literal edges,",
+              "status": "completed",
+              "level": "task",
+              "description": "- Coupling score 0.75 is produced entirely by false-positive string-literal edges, while the real architectural risk (white-box leaf-path imports into web-viewer internals) is unrepresented in the metric. Zone tooling that gates on coupling score will raise a false alarm for the wrong reason while the true refactor trap goes undetected.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:21:36.154Z",
+              "completedAt": "2026-04-14T01:27:08.447Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "f3893648f6ba"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "f3893648f6ba"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "a7e09490-34bb-4b1d-ad69-a67c94cf167b",
+          "title": "Fix documentation in sourcevision-view-tests (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone name 'sourcevision-view-tests' is semantically misleading. These tests cover web viewer tabs that display sourcevision-derived data, not the sourcevision analysis package. The name will cause contributor confusion and test misplacement as the package grows, particularly since the real sourcevision test suite lives in a different package.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:59:27.747Z",
+          "completedAt": "2026-04-14T01:59:27.747Z",
+          "children": [
+            {
+              "id": "2ef9671c-43ef-4c87-8d24-04d15a300229",
+              "title": "Fix documentation in sourcevision-view-tests: Zone name 'sourcevision-view-tests' is semantically misleading. These tests cove",
+              "status": "completed",
+              "level": "task",
+              "description": "- Zone name 'sourcevision-view-tests' is semantically misleading. These tests cover web viewer tabs that display sourcevision-derived data, not the sourcevision analysis package. The name will cause contributor confusion and test misplacement as the package grows, particularly since the real sourcevision test suite lives in a different package.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:57:09.818Z",
+              "completedAt": "2026-04-14T01:59:27.569Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "a74288ecc381"
+                ],
+                "category": "documentation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "a74288ecc381"
+            ],
+            "category": "documentation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "05826b41-581b-4485-98af-892996fc5620",
+          "title": "Fix code in task-usage-scheduler (3 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- start.ts satisfies RegisterSchedulerOptions by passing a concrete options literal, but no compile-time satisfies assertion or assignability check enforces this at the definition site. Interface drift (a new required callback added to RegisterSchedulerOptions, a changed callback signature) will produce a type error only at the call site in start.ts — not in register-scheduler.test.ts, which uses mocks. A `satisfies RegisterSchedulerOptions` annotation on the options literal in start.ts would surface drift at the definition site where it is easier to fix.\n- Add 'satisfies RegisterSchedulerOptions' to the options literal passed to registerScheduler in packages/web/src/server/start.ts. This one-line change surfaces interface drift at the injection site — the exact location where a new required callback would be missed — rather than only at the TypeScript structural check for the function call itself.\n- Add a behavioral contract test to register-scheduler.test.ts covering: (1) that a callback throwing an error does not prevent subsequent callbacks from being called in the same tick, and (2) that a loadPRD callback that delays longer than the interval does not cause overlapping tick execution. These are the two most likely production failure modes for the scheduler and cannot be caught by interface compliance alone.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:32:07.551Z",
+          "completedAt": "2026-04-14T01:32:07.551Z",
+          "children": [
+            {
+              "id": "0804a39b-7f33-4fe4-ab2a-7c86b8e491b2",
+              "title": "Fix code in task-usage-scheduler: start.ts satisfies RegisterSchedulerOptions by passing a concrete options litera (+2 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- start.ts satisfies RegisterSchedulerOptions by passing a concrete options literal, but no compile-time satisfies assertion or assignability check enforces this at the definition site. Interface drift (a new required callback added to RegisterSchedulerOptions, a changed callback signature) will produce a type error only at the call site in start.ts — not in register-scheduler.test.ts, which uses mocks. A `satisfies RegisterSchedulerOptions` annotation on the options literal in start.ts would surface drift at the definition site where it is easier to fix.\n- Add 'satisfies RegisterSchedulerOptions' to the options literal passed to registerScheduler in packages/web/src/server/start.ts. This one-line change surfaces interface drift at the injection site — the exact location where a new required callback would be missed — rather than only at the TypeScript structural check for the function call itself.\n- Add a behavioral contract test to register-scheduler.test.ts covering: (1) that a callback throwing an error does not prevent subsequent callbacks from being called in the same tick, and (2) that a loadPRD callback that delays longer than the interval does not cause overlapping tick execution. These are the two most likely production failure modes for the scheduler and cannot be caught by interface compliance alone.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:27:11.340Z",
+              "completedAt": "2026-04-14T01:32:07.376Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "6636ce618824",
+                  "943ae20c35b1",
+                  "85a842d4a6c3"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 3
+                },
+                "findingCount": 3
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "6636ce618824",
+              "943ae20c35b1",
+              "85a842d4a6c3"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 3
+            },
+            "findingCount": 3
+          }
+        },
+        {
+          "id": "9df71711-8089-4ba1-8933-725aa23ccfdc",
+          "title": "Fix documentation in web-helpers (2 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Zone name 'web-helpers' is misleading for a single-component zone — it invites scope creep by suggesting a general utility bucket rather than a bounded component zone, and may attract future additions that bypass the two-consumer rule check.\n- Add a 'confirmed zone-level cycles' section to CLAUDE.md's architectural governance table, separate from the metric-based dual-fragility table. The only true cycle in the monorepo is more dangerous than all metric-triggered zones yet is invisible to threshold-based governance because web-helpers has cohesion 1 and coupling 0.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T02:03:26.140Z",
+          "completedAt": "2026-04-14T02:03:26.140Z",
+          "children": [
+            {
+              "id": "d262a54e-0a71-4580-b100-9f7c7e265699",
+              "title": "Fix documentation in web-helpers: Zone name 'web-helpers' is misleading for a single-component zone — it invites s (+1 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- Zone name 'web-helpers' is misleading for a single-component zone — it invites scope creep by suggesting a general utility bucket rather than a bounded component zone, and may attract future additions that bypass the two-consumer rule check.\n- Add a 'confirmed zone-level cycles' section to CLAUDE.md's architectural governance table, separate from the metric-based dual-fragility table. The only true cycle in the monorepo is more dangerous than all metric-triggered zones yet is invisible to threshold-based governance because web-helpers has cohesion 1 and coupling 0.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:59:30.427Z",
+              "completedAt": "2026-04-14T02:03:25.961Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "8a974d742024",
+                  "025ac56f630d"
+                ],
+                "category": "documentation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "8a974d742024",
+              "025ac56f630d"
+            ],
+            "category": "documentation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "4bc33a6b-3827-44e3-8e6d-154653c9b4c3",
+          "title": "Fix code in web-helpers (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- getLevelEmoji is imported as a runtime function from web-viewer's prd-tree/levels.ts — this cross-zone dependency cannot be eliminated by type-only import refactoring; the call site must be refactored (inject as prop or move getLevelEmoji to a shared location accessible without importing from web-viewer) before the zone-level cycle is broken.",
+          "priority": "critical",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T00:31:35.774Z",
+          "completedAt": "2026-04-14T00:31:35.774Z",
+          "children": [
+            {
+              "id": "d519390b-e500-4cff-a9ae-6cfb76c29b32",
+              "title": "Fix code in web-helpers: getLevelEmoji is imported as a runtime function from web-viewer's prd-tree/level",
+              "status": "completed",
+              "level": "task",
+              "description": "- getLevelEmoji is imported as a runtime function from web-viewer's prd-tree/levels.ts — this cross-zone dependency cannot be eliminated by type-only import refactoring; the call site must be refactored (inject as prop or move getLevelEmoji to a shared location accessible without importing from web-viewer) before the zone-level cycle is broken.",
+              "priority": "critical",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T00:27:09.262Z",
+              "completedAt": "2026-04-14T00:31:35.592Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "efda7ec258c5"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "critical": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "efda7ec258c5"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "critical": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "31f3c63c-f33f-4b2c-88f1-59f3ae423072",
+          "title": "Fix code in web-server (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- server/types.ts exports runtime functions jsonResponse(), errorResponse(), and readBody() alongside type definitions. Every other *types.ts file in the monorepo (fix/types.ts, recommend/types.ts, search-types.ts, batch-types.ts) is pure TypeScript types. Callers importing these helpers from a types.ts file violate the naming convention and couple to a file they likely assume is compile-time erased. Extract the three functions to server/response-utils.ts.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:38:08.081Z",
+          "completedAt": "2026-04-14T01:38:08.081Z",
+          "children": [
+            {
+              "id": "f6c7a659-5ffe-46b1-af46-1b77e398ac59",
+              "title": "Fix code in web-server: server/types.ts exports runtime functions jsonResponse(), errorResponse(), and r",
+              "status": "completed",
+              "level": "task",
+              "description": "- server/types.ts exports runtime functions jsonResponse(), errorResponse(), and readBody() alongside type definitions. Every other *types.ts file in the monorepo (fix/types.ts, recommend/types.ts, search-types.ts, batch-types.ts) is pure TypeScript types. Callers importing these helpers from a types.ts file violate the naming convention and couple to a file they likely assume is compile-time erased. Extract the three functions to server/response-utils.ts.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:32:10.265Z",
+              "completedAt": "2026-04-14T01:38:07.906Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "fdea9b16749b"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "fdea9b16749b"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "4a8cfe94-39a7-4c24-b10a-28376a222cd4",
+          "title": "Fix code in web-viewer (3 findings)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- boundary-check.test.ts does not assert that viewer→server imports are type-only. Since the viewer and server are separate build artifacts, any runtime import in this direction would be a build-time boundary violation. Although the current codebase has zero real server imports in viewer code, the absence of an automated assertion means a future contributor can introduce one silently — the test that enforces the web-shared addition policy is the natural place to add this guard.\n- external.ts imports from shared/ leaf files (features.js, data-files.js, view-id.js) rather than through shared/index.ts, bypassing the barrel rule it enforces for every other consumer. The exemption in boundary-check.test.ts (line 326) is necessary for the test to pass but makes external.ts a misleading reference implementation. Change the three leaf-file imports in external.ts to import through ../shared/index.ts to make the reference implementation self-consistent.\n- viewer/external.ts bypasses the web-shared barrel by importing from three leaf files (../shared/features.js, ../shared/data-files.js, ../shared/view-id.js) instead of consolidating to a single `from \"../shared/index.js\"` import. CLAUDE.md's web-shared addition policy mandates barrel-only imports for all consumers. The messaging/ exemption does not cover external.ts. boundary-check.test.ts should add an assertion that no viewer-zone file imports from web-shared leaf paths directly.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:44:30.962Z",
+          "completedAt": "2026-04-14T01:44:30.962Z",
+          "children": [
+            {
+              "id": "eca99bb2-a2f8-42d8-a125-b41bf0da112e",
+              "title": "Fix code in web-viewer: boundary-check.test.ts does not assert that viewer→server imports are type-only. (+2 more)",
+              "status": "completed",
+              "level": "task",
+              "description": "- boundary-check.test.ts does not assert that viewer→server imports are type-only. Since the viewer and server are separate build artifacts, any runtime import in this direction would be a build-time boundary violation. Although the current codebase has zero real server imports in viewer code, the absence of an automated assertion means a future contributor can introduce one silently — the test that enforces the web-shared addition policy is the natural place to add this guard.\n- external.ts imports from shared/ leaf files (features.js, data-files.js, view-id.js) rather than through shared/index.ts, bypassing the barrel rule it enforces for every other consumer. The exemption in boundary-check.test.ts (line 326) is necessary for the test to pass but makes external.ts a misleading reference implementation. Change the three leaf-file imports in external.ts to import through ../shared/index.ts to make the reference implementation self-consistent.\n- viewer/external.ts bypasses the web-shared barrel by importing from three leaf files (../shared/features.js, ../shared/data-files.js, ../shared/view-id.js) instead of consolidating to a single `from \"../shared/index.js\"` import. CLAUDE.md's web-shared addition policy mandates barrel-only imports for all consumers. The messaging/ exemption does not cover external.ts. boundary-check.test.ts should add an assertion that no viewer-zone file imports from web-shared leaf paths directly.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:38:10.792Z",
+              "completedAt": "2026-04-14T01:44:30.788Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "70636022d780",
+                  "9ed219748ac8",
+                  "fe58d005efda"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 3
+                },
+                "findingCount": 3
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "70636022d780",
+              "9ed219748ac8",
+              "fe58d005efda"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 3
+            },
+            "findingCount": 3
+          }
+        },
+        {
+          "id": "c172d6b1-8d8d-4a05-82cb-961def53c63d",
+          "title": "Fix documentation in integration (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Codify a co-evolution rule in TESTING.md: each new entry in CLAUDE.md's injection seam registry or gateway table must have a corresponding integration test in this zone. Without this rule, the current 5:5 seam-to-test correspondence will silently degrade as the monorepo grows.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:54:25.544Z",
+          "completedAt": "2026-04-14T01:54:25.544Z",
+          "children": [
+            {
+              "id": "3817e46d-04c6-4a5d-8559-abc3e3bbe0b6",
+              "title": "Fix documentation in integration: Codify a co-evolution rule in TESTING.md: each new entry in CLAUDE.md's injectio",
+              "status": "completed",
+              "level": "task",
+              "description": "- Codify a co-evolution rule in TESTING.md: each new entry in CLAUDE.md's injection seam registry or gateway table must have a corresponding integration test in this zone. Without this rule, the current 5:5 seam-to-test correspondence will silently degrade as the monorepo grows.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:52:00.230Z",
+              "completedAt": "2026-04-14T01:54:25.369Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "2e0ab11654b0"
+                ],
+                "category": "documentation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "2e0ab11654b0"
+            ],
+            "category": "documentation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "f223f7ef-a609-4707-88ea-53a7eda45ea6",
+          "title": "Fix documentation in packages-web:unit-server (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- packages-web:unit-server meets the dual-fragility criteria (cohesion 0.45, coupling 0.55) but is excluded from CLAUDE.md's governance table by the 'production zones' qualifier. Either add an explicit exemption note for test zones with rationale, or add this zone to the table — the structural fragility that the governance rules address (wide blast radius from internal file moves) applies equally to test zones.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:55:10.110Z",
+          "completedAt": "2026-04-14T01:55:10.110Z",
+          "children": [
+            {
+              "id": "1056a6db-d382-44d4-a7d3-df91a8a899d5",
+              "title": "Fix documentation in packages-web:unit-server: packages-web:unit-server meets the dual-fragility criteria (cohesion 0.45, coupl",
+              "status": "completed",
+              "level": "task",
+              "description": "- packages-web:unit-server meets the dual-fragility criteria (cohesion 0.45, coupling 0.55) but is excluded from CLAUDE.md's governance table by the 'production zones' qualifier. Either add an explicit exemption note for test zones with rationale, or add this zone to the table — the structural fragility that the governance rules address (wide blast radius from internal file moves) applies equally to test zones.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:54:28.241Z",
+              "completedAt": "2026-04-14T01:55:09.936Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "0dad39e052b4"
+                ],
+                "category": "documentation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "0dad39e052b4"
+            ],
+            "category": "documentation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "f439f940-24bc-46a2-b7bd-9fe6021af6d3",
+          "title": "Fix code in rex-recommend (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, test the core similarity scoring function with known inputs and expected outputs, edge cases (empty inputs, exact duplicates, zero-similarity pairs). similarity.ts is the only substantial untested implementation file in the recommend zone and is on the critical path for recommendation quality — a logic error here produces incorrect recommendations with no test catching it.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-14T01:14:13.523Z",
+          "completedAt": "2026-04-14T01:14:13.523Z",
+          "children": [
+            {
+              "id": "8d046ac6-f628-4bbb-91e9-39db17263341",
+              "title": "Fix code in rex-recommend: Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, ",
+              "status": "completed",
+              "level": "task",
+              "description": "- Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, test the core similarity scoring function with known inputs and expected outputs, edge cases (empty inputs, exact duplicates, zero-similarity pairs). similarity.ts is the only substantial untested implementation file in the recommend zone and is on the critical path for recommendation quality — a logic error here produces incorrect recommendations with no test catching it.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-14T01:13:21.922Z",
+              "completedAt": "2026-04-14T01:14:13.346Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "1e78ed897cf4"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "1e78ed897cf4"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        }
+      ],
+      "recommendationMeta": {
+        "findingCount": 43
+      },
+      "startedAt": "2026-04-14T02:20:30.356Z",
+      "completedAt": "2026-04-14T02:20:30.356Z"
     }
   ]
 }

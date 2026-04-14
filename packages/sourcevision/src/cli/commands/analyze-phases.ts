@@ -13,26 +13,46 @@
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { DATA_FILES } from "../../schema/data-files.js";
-import { toCanonicalJSON } from "../../util/sort.js";
-import { analyzeInventory } from "../../analyzers/inventory.js";
-import type { InventoryResult } from "../../analyzers/inventory.js";
-import { detectLanguages, mergeLanguageConfigs } from "../../language/index.js";
-import { analyzeImports } from "../../analyzers/imports.js";
-import { analyzeClassifications, enrichClassificationsWithLLM, mergeClassificationResults } from "../../analyzers/classify.js";
-import { analyzeZones } from "../../analyzers/zones.js";
-import { analyzeComponents } from "../../analyzers/components.js";
-import { analyzeCallGraph, computeZoneCallStats } from "../../analyzers/callgraph.js";
-import { generateCallGraphFindings } from "../../analyzers/callgraph-findings.js";
-import { deduplicateFindings, enforceSeverityRules } from "../../analyzers/enrich-parsing.js";
-import type { CallGraph, Classifications, ImportEdge, Inventory } from "../../schema/index.js";
-import { readManifest, writeManifest, updateManifestModule, updateManifestError } from "../../analyzers/manifest.js";
-import { detectSubAnalyses, buildSubAnalysisRefs } from "../../analyzers/workspace.js";
+import {
+  DATA_FILES,
+  toCanonicalJSON,
+  analyzeInventory,
+  detectLanguages,
+  mergeLanguageConfigs,
+  analyzeImports,
+  analyzeClassifications,
+  enrichClassificationsWithLLM,
+  mergeClassificationResults,
+  analyzeZones,
+  analyzeComponents,
+  analyzeCallGraph,
+  computeZoneCallStats,
+  generateCallGraphFindings,
+  deduplicateFindings,
+  enforceSeverityRules,
+  readManifest,
+  writeManifest,
+  updateManifestModule,
+  updateManifestError,
+  detectSubAnalyses,
+  buildSubAnalysisRefs,
+  createSnapshot,
+  computeDeltas,
+  loadLatestReport,
+  saveReport,
+  formatDeltaReport,
+} from "../sourcevision-core.js";
+import type {
+  AnalyzeTokenUsage,
+  CallGraph,
+  Classifications,
+  ConvergenceReport,
+  ImportEdge,
+  Inventory,
+  InventoryResult,
+} from "../sourcevision-core.js";
 import { info } from "../output.js";
 import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
-import { createSnapshot, computeDeltas, loadLatestReport, saveReport, formatDeltaReport } from "../../analyzers/convergence.js";
-import type { ConvergenceReport } from "../../analyzers/convergence.js";
-import type { AnalyzeTokenUsage } from "../../schema/index.js";
 
 // ── Shared context passed between phases ─────────────────────────────
 

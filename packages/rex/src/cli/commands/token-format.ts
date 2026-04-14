@@ -6,11 +6,11 @@
  * this module composes them with CLI-specific formatting.
  */
 
-import { resolveStore } from "../../store/index.js";
 import {
   aggregateTokenUsage,
   checkBudget,
 } from "../../core/token-usage.js";
+import { loadTokenUsageConfig, readTokenUsageLog } from "../../core/token-store.js";
 import type {
   AggregateTokenUsage,
   BudgetCheckResult,
@@ -97,18 +97,16 @@ export async function preflightBudgetCheck(
   rexDir: string,
   projectDir: string,
 ): Promise<BudgetCheckResult | undefined> {
-  const store = await resolveStore(rexDir);
-
   let config;
   try {
-    config = await store.loadConfig();
+    config = await loadTokenUsageConfig(rexDir);
   } catch {
     return undefined; // Config not available — skip
   }
 
   if (!config.budget) return undefined;
 
-  const logEntries = await store.readLog();
+  const logEntries = await readTokenUsageLog(rexDir);
   const usage = await aggregateTokenUsage(logEntries, projectDir);
 
   return checkBudget(usage, config.budget);

@@ -8,8 +8,8 @@ import {
   validateImports,
   validateZones,
   validateComponents,
-} from "../../schema/index.js";
-import { DATA_FILES } from "../../schema/data-files.js";
+  DATA_FILES,
+} from "../sourcevision-core.js";
 import { info, result } from "../output.js";
 import { green, red, dim } from "@n-dx/llm-client";
 

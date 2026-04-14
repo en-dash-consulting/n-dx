@@ -15,8 +15,7 @@
  * the Preact hook (`useRefreshThrottle`) is provided separately.
  */
 
-import type { MemoryLevel, MemorySnapshot } from "./memory-monitor.js";
-import { onSnapshot, getLatestSnapshot, getCurrentLevel } from "./memory-monitor.js";
+import type { MemoryLevel } from "./memory-monitor.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +65,10 @@ export interface RefreshThrottleConfig {
   avgRefreshMs: number;
   /** Called when the queue state changes. */
   onChange: QueueChangeHandler | null;
+  /** Returns the current memory level when the throttle starts. */
+  getInitialMemoryLevel: (() => MemoryLevel) | null;
+  /** Subscribes to future memory level updates. */
+  subscribeToMemoryLevel: ((listener: (level: MemoryLevel) => void) => () => void) | null;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -101,6 +104,8 @@ let config: RefreshThrottleConfig = {
   baseIntervalMs: DEFAULT_BASE_INTERVAL_MS,
   avgRefreshMs: DEFAULT_AVG_REFRESH_MS,
   onChange: null,
+  getInitialMemoryLevel: null,
+  subscribeToMemoryLevel: null,
 };
 
 let queue: QueuedRefresh[] = [];
@@ -211,11 +216,9 @@ function scheduleDrain(): void {
 
 // ─── Memory snapshot handler ─────────────────────────────────────────────────
 
-function handleMemorySnapshot(snapshot: MemorySnapshot): void {
-  const newLevel = snapshot.level;
+function handleMemoryLevelChange(newLevel: MemoryLevel): void {
   if (newLevel === currentMemoryLevel) return;
 
-  const previousLevel = currentMemoryLevel;
   currentMemoryLevel = newLevel;
 
   notifyListeners();
@@ -251,18 +254,12 @@ export function startRefreshThrottle(
     baseIntervalMs: overrides.baseIntervalMs ?? DEFAULT_BASE_INTERVAL_MS,
     avgRefreshMs: overrides.avgRefreshMs ?? DEFAULT_AVG_REFRESH_MS,
     onChange: overrides.onChange ?? null,
+    getInitialMemoryLevel: overrides.getInitialMemoryLevel ?? null,
+    subscribeToMemoryLevel: overrides.subscribeToMemoryLevel ?? null,
   };
 
-  // Evaluate current memory level immediately.
-  const latest = getLatestSnapshot();
-  if (latest) {
-    currentMemoryLevel = latest.level;
-  } else {
-    currentMemoryLevel = getCurrentLevel();
-  }
-
-  // Subscribe to ongoing memory snapshots.
-  unsubscribeMonitor = onSnapshot(handleMemorySnapshot);
+  currentMemoryLevel = config.getInitialMemoryLevel?.() ?? "normal";
+  unsubscribeMonitor = config.subscribeToMemoryLevel?.(handleMemoryLevelChange) ?? null;
 
   notifyListeners();
 
@@ -348,6 +345,11 @@ export function getThrottleLevel(): MemoryLevel {
   return currentMemoryLevel;
 }
 
+/** Update the current memory level used for throttle decisions. */
+export function setRefreshThrottleMemoryLevel(level: MemoryLevel): void {
+  handleMemoryLevelChange(level);
+}
+
 /** Reset all module state (for testing). */
 export function resetRefreshThrottle(): void {
   stopRefreshThrottle();
@@ -360,5 +362,7 @@ export function resetRefreshThrottle(): void {
     baseIntervalMs: DEFAULT_BASE_INTERVAL_MS,
     avgRefreshMs: DEFAULT_AVG_REFRESH_MS,
     onChange: null,
+    getInitialMemoryLevel: null,
+    subscribeToMemoryLevel: null,
   };
 }

@@ -512,6 +512,37 @@ export function deriveZoneIdFromFilenames(files: string[]): string | null {
   return bestWord;
 }
 
+function deriveZoneIdFromFileStems(
+  files: string[],
+  excludedWords: Iterable<string> = [],
+): string | null {
+  const SMALL_COMMUNITY_STEM_SKIP_WORDS = new Set(["index", "test", "spec"]);
+  const sourceFiles = files.filter(
+    (f) => !f.endsWith(".test.ts") && !f.endsWith(".spec.ts")
+      && !f.endsWith(".test.js") && !f.endsWith(".spec.js")
+      && !f.endsWith(".test.tsx") && !f.endsWith(".spec.tsx")
+  );
+
+  if (sourceFiles.length < 2 || sourceFiles.length > 3) return null;
+
+  const skipWords = new Set(
+    [...excludedWords]
+      .flatMap((word) => word.split("/"))
+      .map((word) => word.toLowerCase())
+  );
+
+  const stems = [...new Set(
+    sourceFiles
+      .map((file) => basename(file).replace(/\.[^.]+$/, ""))
+      .map((stem) => stem.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, ""))
+      .filter((stem) => stem && !SMALL_COMMUNITY_STEM_SKIP_WORDS.has(stem) && !skipWords.has(stem))
+      .sort()
+  )];
+
+  if (stems.length < 2) return null;
+  return stems.slice(0, 2).join("-");
+}
+
 /**
  * Title-case a zone ID: "detail-panel" → "Detail Panel"
  */
@@ -1424,6 +1455,13 @@ function buildZonesFromCommunities(
           id = filenameId;
           filenameBasedZoneIds.add(parentId ? `${parentId}/${id}` : id);
         } else {
+          const stemId = deriveZoneIdFromFileStems(members, [
+            id,
+            ...(parentId ? parentId.split("/") : []),
+          ]);
+          if (stemId && !usedIds.has(stemId)) {
+            id = stemId;
+          } else {
           // Merge into existing zone instead of creating a numbered duplicate,
           // but only if the combined size doesn't exceed the zone size cap
           const targetId = parentId ? `${parentId}/${id}` : id;
@@ -1449,6 +1487,7 @@ function buildZonesFromCommunities(
           let suffix = 2;
           while (usedIds.has(`${id}-${suffix}`)) suffix++;
           id = `${id}-${suffix}`;
+          }
         }
       }
     }

@@ -3,7 +3,7 @@ import {
   createReviewState,
   formatChunk,
 } from "../../../../src/cli/commands/chunked-review-state.js";
-import type { Proposal, ProposalTask } from "../../../../src/analyze/index.js";
+import type { Proposal, ProposalTask } from "../../../../src/cli/commands/chunked-review-types.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 

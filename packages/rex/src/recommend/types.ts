@@ -5,10 +5,23 @@
  * dependency between create-from-recommendations ↔ conflict-detection.
  * Both modules import these types from here instead of from each other.
  *
+ * This module intentionally defines the small subset of PRD types that the
+ * recommend pipeline needs so the zone does not depend on the broader schema
+ * barrel for read-only similarity checks.
+ *
  * @module recommend/types
  */
 
-import type { ItemLevel, Priority } from "../schema/index.js";
+export type ItemLevel = "epic" | "feature" | "task" | "subtask";
+export type ItemStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "failing"
+  | "deferred"
+  | "blocked"
+  | "deleted";
+export type Priority = "critical" | "high" | "medium" | "low";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -25,6 +38,20 @@ export interface RecommendationMeta {
   severityDistribution?: Record<string, number>;
   /** Total number of findings that contributed to this recommendation. */
   findingCount?: number;
+}
+
+/**
+ * Minimal PRD item shape needed for conflict detection.
+ */
+export interface RecommendationTreeItem {
+  id: string;
+  title: string;
+  status: ItemStatus;
+  level: ItemLevel;
+  description?: string;
+  acceptanceCriteria?: string[];
+  recommendationMeta?: RecommendationMeta;
+  children?: RecommendationTreeItem[];
 }
 
 /**

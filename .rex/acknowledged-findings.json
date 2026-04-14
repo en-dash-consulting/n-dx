@@ -5607,6 +5607,568 @@
       "scope": "global",
       "acknowledgedAt": "2026-04-03T14:35:17.954Z",
       "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "be3b59862e22",
+      "reason": "completed",
+      "text": "Fix observation in global (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.875Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fb6d16434a1b",
+      "reason": "completed",
+      "text": "Fix observation in health (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b1611c599d3e",
+      "reason": "completed",
+      "text": "Fix observation in panel (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1408c4a712f4",
+      "reason": "completed",
+      "text": "Fix observation in polling (2 findings)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d816c59dfffe",
+      "reason": "completed",
+      "text": "Fix observation in polling (2 findings)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8ed43d3ac5d7",
+      "reason": "completed",
+      "text": "Fix observation in refresh (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "803bcf510222",
+      "reason": "completed",
+      "text": "Fix observation in rex (2 findings)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fbed7733cfbc",
+      "reason": "completed",
+      "text": "Fix observation in rex (2 findings)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "56bf686efc97",
+      "reason": "completed",
+      "text": "Fix observation in rex-core (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "486e0d515a9f",
+      "reason": "completed",
+      "text": "Fix observation in rex-recommend (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9c5ad2b38d42",
+      "reason": "completed",
+      "text": "Fix observation in sourcevision-2 (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e2aef7b4b37f",
+      "reason": "completed",
+      "text": "Fix observation in sourcevision-cli (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "19e38d2cc6ec",
+      "reason": "completed",
+      "text": "Fix observation in tick (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fce8066ebc46",
+      "reason": "completed",
+      "text": "Fix observation in token (2 findings)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8c101888afbb",
+      "reason": "completed",
+      "text": "Fix observation in token (2 findings)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "22e2ac610c63",
+      "reason": "completed",
+      "text": "Fix observation in use (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6889586452ef",
+      "reason": "completed",
+      "text": "Fix observation in web-2 (2 findings)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3675eb6941e8",
+      "reason": "completed",
+      "text": "Fix observation in web-2 (2 findings)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6b8c0272a14c",
+      "reason": "completed",
+      "text": "Fix observation in web-unit (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e70d947ed2ca",
+      "reason": "completed",
+      "text": "Fix suggestion in global (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2927c697390e",
+      "reason": "completed",
+      "text": "Fix suggestion in polling (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6e7913c87be3",
+      "reason": "completed",
+      "text": "Fix suggestion in token (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "878fba44f7c4",
+      "reason": "completed",
+      "text": "Fix suggestion in web-2 (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bbfc211213fe",
+      "reason": "completed",
+      "text": "Fix move-file in web-server (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "07da8e13aff4",
+      "reason": "completed",
+      "text": "Fix suggestion in rex (1 finding)",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "4cc8b9bb113f",
+      "reason": "completed",
+      "text": "Fix documentation in global (8 findings)",
+      "type": "suggestion",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8e422e9c38f0",
+      "reason": "completed",
+      "text": "Fix documentation in global (8 findings)",
+      "type": "suggestion",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "68e2f71fd74c",
+      "reason": "completed",
+      "text": "Fix documentation in global (8 findings)",
+      "type": "suggestion",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9ffd2b8bbc62",
+      "reason": "completed",
+      "text": "Fix documentation in global (8 findings)",
+      "type": "suggestion",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "471dbb1551d4",
+      "reason": "completed",
+      "text": "Fix documentation in global (8 findings)",
+      "type": "suggestion",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1f63a46ec29e",
+      "reason": "completed",
+      "text": "Fix documentation in global (8 findings)",
+      "type": "suggestion",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "843f35b17616",
+      "reason": "completed",
+      "text": "Fix documentation in global (8 findings)",
+      "type": "anti-pattern",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "5fa275eee85b",
+      "reason": "completed",
+      "text": "Fix documentation in global (8 findings)",
+      "type": "anti-pattern",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0f588dde4e7b",
+      "reason": "completed",
+      "text": "Fix code in global (4 findings)",
+      "type": "suggestion",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d097b91db35d",
+      "reason": "completed",
+      "text": "Fix code in global (4 findings)",
+      "type": "anti-pattern",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "d26d62ed253d",
+      "reason": "completed",
+      "text": "Fix code in global (4 findings)",
+      "type": "anti-pattern",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.876Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1557c903aa2c",
+      "reason": "completed",
+      "text": "Fix code in global (4 findings)",
+      "type": "anti-pattern",
+      "scope": "global",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9164366920c3",
+      "reason": "completed",
+      "text": "Fix suggestion in hench-4 (1 finding)",
+      "type": "suggestion",
+      "scope": "hench-4",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2a44a54ec113",
+      "reason": "completed",
+      "text": "Fix documentation in rex (1 finding)",
+      "type": "suggestion",
+      "scope": "rex",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "17a77de52148",
+      "reason": "completed",
+      "text": "Fix suggestion in rex-2 (1 finding)",
+      "type": "suggestion",
+      "scope": "rex-2",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e42895144581",
+      "reason": "completed",
+      "text": "Fix suggestion in sourcevision-4 (1 finding)",
+      "type": "suggestion",
+      "scope": "sourcevision-4",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "ba44c5901a65",
+      "reason": "completed",
+      "text": "Fix documentation in web-server (2 findings)",
+      "type": "suggestion",
+      "scope": "web-server",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e58dc53f4568",
+      "reason": "completed",
+      "text": "Fix documentation in web-server (2 findings)",
+      "type": "anti-pattern",
+      "scope": "web-server",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b30fdc85a11b",
+      "reason": "completed",
+      "text": "Fix suggestion in web-server (1 finding)",
+      "type": "suggestion",
+      "scope": "web-server",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "aa9a262e0b87",
+      "reason": "completed",
+      "text": "Fix move-file in web-server (1 finding)",
+      "type": "move-file",
+      "scope": "web-server",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f1995705f207",
+      "reason": "completed",
+      "text": "Fix move-file in web-viewer (1 finding)",
+      "type": "move-file",
+      "scope": "web-viewer",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "128a48af7658",
+      "reason": "completed",
+      "text": "Fix code in packages-web:integration (2 findings)",
+      "type": "anti-pattern",
+      "scope": "packages-web:integration",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b22a76957260",
+      "reason": "completed",
+      "text": "Fix code in packages-web:integration (2 findings)",
+      "type": "suggestion",
+      "scope": "packages-web:integration",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "bad8ad4ebda4",
+      "reason": "completed",
+      "text": "Fix code in prd-tree-search (2 findings)",
+      "type": "anti-pattern",
+      "scope": "prd-tree-search",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "3ef274c92b0e",
+      "reason": "completed",
+      "text": "Fix code in prd-tree-search (2 findings)",
+      "type": "suggestion",
+      "scope": "prd-tree-search",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8f2cc5a5bc0d",
+      "reason": "completed",
+      "text": "Fix code in rex (1 finding)",
+      "type": "anti-pattern",
+      "scope": "rex",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "e0cabebea779",
+      "reason": "completed",
+      "text": "Fix code in sourcevision-analyzers (2 findings)",
+      "type": "anti-pattern",
+      "scope": "sourcevision-analyzers",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "b14cb87cac19",
+      "reason": "completed",
+      "text": "Fix code in sourcevision-analyzers (2 findings)",
+      "type": "suggestion",
+      "scope": "sourcevision-analyzers",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "f3893648f6ba",
+      "reason": "completed",
+      "text": "Fix code in sourcevision-view-tests (1 finding)",
+      "type": "anti-pattern",
+      "scope": "sourcevision-view-tests",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "a74288ecc381",
+      "reason": "completed",
+      "text": "Fix documentation in sourcevision-view-tests (1 finding)",
+      "type": "anti-pattern",
+      "scope": "sourcevision-view-tests",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "6636ce618824",
+      "reason": "completed",
+      "text": "Fix code in task-usage-scheduler (3 findings)",
+      "type": "anti-pattern",
+      "scope": "task-usage-scheduler",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "943ae20c35b1",
+      "reason": "completed",
+      "text": "Fix code in task-usage-scheduler (3 findings)",
+      "type": "suggestion",
+      "scope": "task-usage-scheduler",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "85a842d4a6c3",
+      "reason": "completed",
+      "text": "Fix code in task-usage-scheduler (3 findings)",
+      "type": "suggestion",
+      "scope": "task-usage-scheduler",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "8a974d742024",
+      "reason": "completed",
+      "text": "Fix documentation in web-helpers (2 findings)",
+      "type": "anti-pattern",
+      "scope": "web-helpers",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "025ac56f630d",
+      "reason": "completed",
+      "text": "Fix documentation in web-helpers (2 findings)",
+      "type": "suggestion",
+      "scope": "web-helpers",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "efda7ec258c5",
+      "reason": "completed",
+      "text": "Fix code in web-helpers (1 finding)",
+      "type": "anti-pattern",
+      "scope": "web-helpers",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fdea9b16749b",
+      "reason": "completed",
+      "text": "Fix code in web-server (1 finding)",
+      "type": "anti-pattern",
+      "scope": "web-server",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "70636022d780",
+      "reason": "completed",
+      "text": "Fix code in web-viewer (3 findings)",
+      "type": "anti-pattern",
+      "scope": "web-viewer",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "9ed219748ac8",
+      "reason": "completed",
+      "text": "Fix code in web-viewer (3 findings)",
+      "type": "anti-pattern",
+      "scope": "web-viewer",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "fe58d005efda",
+      "reason": "completed",
+      "text": "Fix code in web-viewer (3 findings)",
+      "type": "anti-pattern",
+      "scope": "web-viewer",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "2e0ab11654b0",
+      "reason": "completed",
+      "text": "Fix documentation in integration (1 finding)",
+      "type": "suggestion",
+      "scope": "integration",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "0dad39e052b4",
+      "reason": "completed",
+      "text": "Fix documentation in packages-web:unit-server (1 finding)",
+      "type": "suggestion",
+      "scope": "packages-web:unit-server",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "1e78ed897cf4",
+      "reason": "completed",
+      "text": "Fix code in rex-recommend (1 finding)",
+      "type": "suggestion",
+      "scope": "rex-recommend",
+      "acknowledgedAt": "2026-04-14T02:20:32.877Z",
+      "acknowledgedBy": "self-heal"
     }
   ]
 }

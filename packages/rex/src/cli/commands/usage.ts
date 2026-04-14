@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { resolveStore } from "../../store/index.js";
+import { CLIError, PROJECT_DIRS, info, result, warn } from "@n-dx/llm-client";
 import {
   aggregateTokenUsage,
   estimateCost,
@@ -8,10 +8,9 @@ import {
   groupByTimePeriod,
   checkBudget,
 } from "../../core/token-usage.js";
+import { loadTokenUsageConfig, readTokenUsageLog } from "../../core/token-store.js";
 import { formatAggregateTokenUsage, formatBudgetWarnings } from "./token-format.js";
-import { CLIError, BudgetExceededError } from "../errors.js";
-import { REX_DIR } from "./constants.js";
-import { info, warn, result } from "../output.js";
+import { BudgetExceededError } from "./token-errors.js";
 import type {
   AggregateTokenUsage,
   TokenUsageFilter,
@@ -105,15 +104,14 @@ export async function cmdUsage(
     );
   }
 
-  const rexDir = join(dir, REX_DIR);
-  const store = await resolveStore(rexDir);
+  const rexDir = join(dir, PROJECT_DIRS.REX);
 
   // Build time filter
   const tokenFilter: TokenUsageFilter = {};
   if (flags.since) tokenFilter.since = flags.since;
   if (flags.until) tokenFilter.until = flags.until;
 
-  const logEntries = await store.readLog();
+  const logEntries = await readTokenUsageLog(rexDir);
 
   // Collect individual events for command and period breakdowns
   const events = await collectTokenEvents(logEntries, dir, tokenFilter);
@@ -127,7 +125,7 @@ export async function cmdUsage(
   const periodBuckets = group ? groupByTimePeriod(events, group) : undefined;
 
   // Budget checking
-  const config = await store.loadConfig();
+  const config = await loadTokenUsageConfig(rexDir);
   const budgetResult = config.budget
     ? checkBudget(usage, config.budget)
     : undefined;

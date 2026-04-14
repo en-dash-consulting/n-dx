@@ -16,7 +16,7 @@ import { validateTransition } from "../core/transitions.js";
 import { computeTimestampUpdates } from "../core/timestamps.js";
 import { findAutoCompletions } from "../core/parent-completion.js";
 import { validateDAG } from "../core/dag.js";
-import { cascadeParentReset } from "../core/cascade-reset.js";
+import { cascadeParentReset } from "../core/index.js";
 import { validateMove, moveItem } from "../core/move.js";
 import { validateMerge, previewMerge, mergeItems } from "../core/merge.js";
 import { verify } from "../core/verify.js";

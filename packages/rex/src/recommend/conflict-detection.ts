@@ -16,10 +16,15 @@
  * @module recommend/conflict-detection
  */
 
-import { similarity } from "../analyze/dedupe.js";
-import { walkTree } from "../core/tree.js";
-import type { PRDItem, ItemLevel, ItemStatus } from "../schema/index.js";
-import type { EnrichedRecommendation, RecommendationMeta } from "./types.js";
+import { similarity } from "./similarity.js";
+import { walkRecommendationTree } from "./tree.js";
+import type {
+  EnrichedRecommendation,
+  ItemLevel,
+  ItemStatus,
+  RecommendationMeta,
+  RecommendationTreeItem,
+} from "./types.js";
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -110,7 +115,7 @@ function buildRecommendationContent(rec: EnrichedRecommendation): string {
   return rec.description?.trim() ?? "";
 }
 
-function buildItemContent(item: PRDItem): string {
+function buildItemContent(item: RecommendationTreeItem): string {
   const parts: string[] = [];
   if (item.description) parts.push(item.description);
   if (item.acceptanceCriteria?.length) parts.push(item.acceptanceCriteria.join(" "));
@@ -118,7 +123,7 @@ function buildItemContent(item: PRDItem): string {
 }
 
 interface ScoredCandidate {
-  item: PRDItem;
+  item: RecommendationTreeItem;
   score: number;
   reason: ConflictReason;
 }
@@ -129,7 +134,7 @@ interface ScoredCandidate {
  */
 function scoreRecommendationAgainstItem(
   rec: EnrichedRecommendation,
-  item: PRDItem,
+  item: RecommendationTreeItem,
 ): ScoredCandidate | null {
   // Category-aware short-circuit: when both items carry recommendation
   // metadata with a category (e.g. "observation", "suggestion", "anti-pattern"),
@@ -201,7 +206,7 @@ function scoreRecommendationAgainstItem(
  */
 export function detectRecommendationConflicts(
   recommendations: readonly EnrichedRecommendation[],
-  existingItems: PRDItem[],
+  existingItems: RecommendationTreeItem[],
 ): ConflictReport {
   const conflicts: RecommendationConflict[] = [];
   const conflictingSet = new Set<number>();
@@ -215,7 +220,7 @@ export function detectRecommendationConflicts(
     const rec = recommendations[i];
     let best: ScoredCandidate | null = null;
 
-    for (const { item } of walkTree(existingItems)) {
+    for (const item of walkRecommendationTree(existingItems)) {
       if (item.status === "completed") continue;
       const candidate = scoreRecommendationAgainstItem(rec, item);
       if (!candidate) continue;

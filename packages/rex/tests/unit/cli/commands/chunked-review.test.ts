@@ -22,7 +22,7 @@ import type {
   GranularityAdjustmentRecord,
   ProposalAssessment,
 } from "../../../../src/cli/commands/chunked-review-state.js";
-import type { Proposal } from "../../../../src/analyze/index.js";
+import type { Proposal } from "../../../../src/cli/commands/chunked-review-types.js";
 
 // ─── Test fixtures ───────────────────────────────────────────────────
 

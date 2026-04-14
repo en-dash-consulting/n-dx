@@ -208,8 +208,7 @@ export { findAutoCompletions } from "./core/parent-completion.js";
 
 // ---- Core: parent status reset ----------------------------------------------
 
-export { findParentResets } from "./core/parent-reset.js";
-export { cascadeParentReset } from "./core/cascade-reset.js";
+export { findParentResets, cascadeParentReset } from "./core/index.js";
 
 // ---- Core: requirements -----------------------------------------------------
 
