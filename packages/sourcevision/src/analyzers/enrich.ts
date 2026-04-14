@@ -43,7 +43,7 @@ import {
   getPassConfig,
 } from "./enrich-config.js";
 import { computeGlobalContentHash } from "./zone-hash.js";
-import { extractFindings, mergeZonesByName, deduplicateZoneIds } from "./enrich-parsing.js";
+import { extractFindings, mergeZonesByName, deduplicateZoneIds, findPrevZone, extractZoneInsights } from "./enrich-parsing.js";
 import type { EnrichResult } from "./enrich-parsing.js";
 import {
   enrichBatch,
@@ -94,16 +94,11 @@ export async function enrichZonesWithAI(
     const curGlobalHash = computeGlobalContentHash(currentContentHashes);
     if (prevGlobalHash === curGlobalHash && passNumber <= prevEnrichPass) {
       console.log(`  [enrich] Content unchanged — skipping enrichment (pass ${prevEnrichPass} preserved)`);
-      // Preserve previous names/descriptions on current zones
-      const prevZones = previousZones.zones;
-      const preserved: Zone[] = zones.map((zone) => {
-        const prev = prevZones.find(
-          (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
-        );
-        if (prev) {
-          return { ...zone, id: prev.id, name: prev.name, description: prev.description };
-        }
-        return zone;
+      const preserved = zones.map((zone) => {
+        const prev = findPrevZone(previousZones.zones, zone);
+        return prev
+          ? { ...zone, id: prev.id, name: prev.name, description: prev.description }
+          : zone;
       });
       return {
         zones: preserved,
@@ -141,16 +136,13 @@ export async function enrichZonesWithAI(
 
   if (currentContentHashes && previousZones?.zoneContentHashes && passNumber <= prevEnrichPass) {
     const changed: Zone[] = [];
-    const unchanged: Zone[] = [];
     for (const zone of zones) {
       if (currentContentHashes[zone.id] !== previousZones.zoneContentHashes[zone.id]) {
         changed.push(zone);
       } else {
-        const prev = previousZones.zones.find(
-          (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
-        );
+        const prev = findPrevZone(previousZones.zones, zone);
         if (prev) {
-          unchanged.push({
+          unchangedZones.push({
             ...zone,
             id: prev.id,
             name: prev.name,
@@ -161,10 +153,9 @@ export async function enrichZonesWithAI(
         }
       }
     }
-    if (changed.length < zones.length) {
-      console.log(`  [enrich] ${changed.length}/${zones.length} zones changed — skipping ${unchanged.length} unchanged`);
+    if (unchangedZones.length > 0) {
+      console.log(`  [enrich] ${changed.length}/${zones.length} zones changed — skipping ${unchangedZones.length} unchanged`);
       zonesToEnrich = changed;
-      unchangedZones = unchanged;
     }
   }
 
@@ -234,16 +225,7 @@ export async function enrichZonesWithAI(
 
   // 6. Aggregate and apply results, merging unchanged zones back in
   const agg = aggregateBatchResults(allBatchResults);
-
-  if (isFirstPass) {
-    const result = applyFirstPassResults(zonesToEnrich, agg, passConfig);
-    if (unchangedZones.length > 0) {
-      result.zones = [...result.zones, ...unchangedZones];
-    }
-    return result;
-  }
-
-  const result = applyLaterPassResults(zonesToEnrich, agg, passNumber, passConfig, previousZones);
+  const result = applyEnrichResults(zonesToEnrich, agg, passNumber, passConfig, previousZones);
   if (unchangedZones.length > 0) {
     result.zones = [...result.zones, ...unchangedZones];
   }
@@ -252,88 +234,51 @@ export async function enrichZonesWithAI(
 
 // ── Result application (private) ─────────────────────────────────────────────
 
-/** Apply pass 1 results: rename zones, extract insights and findings. */
-function applyFirstPassResults(
-  zones: Zone[],
-  agg: ReturnType<typeof aggregateBatchResults>,
-  passConfig: { expectedTypes: FindingType[] },
-): EnrichResult {
-  const { allParsedZones, dedupedInsights, allParsedFindings, totalTokenUsage, successfulBatchIds } = agg;
-
-  const enrichedRaw: Zone[] = zones.map((zone) => {
-    if (!successfulBatchIds.has(zone.id)) return zone;
-    const e = allParsedZones.find((x: any) => x?.algorithmicId === zone.id);
-    if (
-      !e ||
-      typeof e.id !== "string" ||
-      typeof e.name !== "string" ||
-      typeof e.description !== "string"
-    ) {
-      return zone;
-    }
-    return { ...zone, id: e.id, name: e.name, description: e.description };
-  });
-
-  // Merge zones the LLM identified as semantically identical across batches
-  const enriched = mergeZonesByName(enrichedRaw);
-  if (enriched.length < enrichedRaw.length) {
-    console.log(`  [enrich] Merged ${enrichedRaw.length - enriched.length} duplicate zones (${enrichedRaw.length} → ${enriched.length})`);
-  }
-  deduplicateZoneIds(enriched);
-
-  const newZoneInsights = new Map<string, string[]>();
-  for (const zone of enriched) {
-    const e = allParsedZones.find((x: any) =>
-      x?.algorithmicId === zone.id || x?.id === zone.id
-    );
-    const aiInsights = Array.isArray(e?.insights)
-      ? e.insights.filter((s: any) => typeof s === "string")
-      : [];
-    newZoneInsights.set(zone.id, aiInsights);
-  }
-
-  const combinedParsed = { zones: allParsedZones, insights: dedupedInsights, findings: allParsedFindings };
-  const newFindings = extractFindings(combinedParsed, 1, passConfig.expectedTypes);
-
-  return {
-    zones: enriched,
-    newZoneInsights,
-    newGlobalInsights: dedupedInsights,
-    newFindings,
-    pass: 1,
-    tokenUsage: totalTokenUsage,
-  };
-}
-
-/** Apply pass 2+ results: preserve previous names, extract new insights. */
-function applyLaterPassResults(
+/** Apply enrichment results (pass 1 renames zones; pass 2+ preserves names). */
+function applyEnrichResults(
   zones: Zone[],
   agg: ReturnType<typeof aggregateBatchResults>,
   passNumber: number,
   passConfig: { expectedTypes: FindingType[] },
   previousZones?: Zones,
 ): EnrichResult {
-  const { allParsedZones, dedupedInsights, allParsedFindings, totalTokenUsage } = agg;
-  const prevZones = previousZones?.zones ?? [];
+  const { allParsedZones, dedupedInsights, allParsedFindings, totalTokenUsage, successfulBatchIds } = agg;
+  const isFirstPass = passNumber === 1;
 
-  const enriched: Zone[] = zones.map((zone) => {
-    const prev = prevZones.find(
-      (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
+  // Apply parsed data to zones
+  let enriched: Zone[] = zones.map((zone) => {
+    if (isFirstPass && !successfulBatchIds.has(zone.id)) return zone;
+    const e = allParsedZones.find((x: any) =>
+      isFirstPass ? x?.algorithmicId === zone.id : x?.id === zone.id
     );
-    if (prev) {
-      return { ...zone, id: prev.id, name: prev.name, description: prev.description };
+    if (!e) return zone;
+    if (isFirstPass) {
+      if (!e.id || !e.name || !e.description) return zone;
+      return { ...zone, id: e.id, name: e.name, description: e.description };
     }
-    return zone;
+    // Pass 2+: preserve previous names
+    const prev = findPrevZone(previousZones?.zones, zone);
+    return prev ? { ...zone, id: prev.id, name: prev.name, description: prev.description } : zone;
   });
+
+  // Merge duplicates only on first pass
+  if (isFirstPass) {
+    enriched = mergeZonesByName(enriched);
+    if (enriched.length < zones.length) {
+      console.log(`  [enrich] Merged ${zones.length - enriched.length} duplicate zones (${zones.length} → ${enriched.length})`);
+    }
+  }
   deduplicateZoneIds(enriched);
 
+  // Extract per-zone insights
   const newZoneInsights = new Map<string, string[]>();
   for (const zone of enriched) {
-    const entry = allParsedZones.find((n: any) => n?.id === zone.id);
-    const newInsights = Array.isArray(entry?.newInsights)
-      ? entry.newInsights.filter((s: any) => typeof s === "string")
-      : [];
-    newZoneInsights.set(zone.id, newInsights);
+    const entry = allParsedZones.find((x: any) =>
+      isFirstPass ? x?.algorithmicId === zone.id || x?.id === zone.id : x?.id === zone.id
+    );
+    const insightField = isFirstPass ? "insights" : "newInsights";
+    const insights = extractZoneInsights(entry, insightField);
+    newZoneInsights.set(zone.id, insights);
   }
 
   const combinedParsed = { zones: allParsedZones, insights: dedupedInsights, findings: allParsedFindings };

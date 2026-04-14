@@ -20,7 +20,7 @@ import {
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
-import { tryParseJSON, extractFindings } from "./enrich-parsing.js";
+import { tryParseJSON, extractFindings, formatFileLabel, findPrevZone } from "./enrich-parsing.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 
@@ -318,12 +318,6 @@ export function aggregateBatchResults(results: BatchResult[]): AggregatedBatchDa
 interface AttemptConfig {
   maxFiles: number;
   maxCrossings: number;
-}
-
-function formatFileLabel(f: string, archetypes?: Map<string, string | null>): string {
-  if (!archetypes?.size) return `"${f}"`;
-  const arch = archetypes.get(f);
-  return arch ? `"${f}" [${arch}]` : `"${f}"`;
 }
 
 function buildFirstPassPrompt(
