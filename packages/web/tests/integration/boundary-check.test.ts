@@ -62,6 +62,24 @@ function extractImportPaths(filePath: string): string[] {
   return paths;
 }
 
+/**
+ * Extract only runtime (non-type-only) import paths from a TypeScript file.
+ * Skips `import type { ... }` and `export type { ... }` — those are erased
+ * by the compiler and create no runtime coupling.
+ */
+function extractRuntimeImportPaths(filePath: string): string[] {
+  const content = readFileSync(filePath, "utf-8");
+  const paths: string[] = [];
+  // Same as extractImportPaths but with a negative lookahead for `type\s`
+  // to exclude `import type` / `export type` forms.
+  const re = /(?:import|export)\s+(?!type\s)(?:\{[^}]*\}\s+from\s+|[\w*]+\s+from\s+)?["']([^"']+)["']/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    paths.push(m[1]!);
+  }
+  return paths;
+}
+
 describe("server/client boundary", () => {
   it("no server file imports from viewer", () => {
     const serverDir = join(WEB_SRC, "server");
@@ -292,19 +310,39 @@ describe("server/client boundary", () => {
   });
 
   /**
-   * Viewer → server import check.
+   * Viewer → server runtime import guard.
    *
-   * This test catches ALL import forms — both runtime (`import { foo }`)
-   * and type-only (`import type { Foo }`). For the viewer → server
-   * direction, even type-only imports are treated as violations because
-   * the viewer is built separately and served as static assets; it has
-   * no legitimate reason to reference server-side modules at any level.
+   * The viewer is built separately and served as static assets; it must
+   * never carry a runtime dependency on server-side modules. Type-only
+   * imports (`import type`) are erased by the TypeScript compiler and do
+   * not create build-time coupling, but any runtime import would pull
+   * server code into the viewer bundle.
    *
-   * Cross-zone import analysis may report "web-viewer → web-server"
-   * edges when zones don't map exactly to src/viewer/ vs src/server/.
-   * This test is the ground-truth enforcement — zero violations means
-   * the boundary is clean regardless of zone-level analysis.
+   * The companion test "no viewer file imports from server" (below) is
+   * zero-tolerance for ALL import forms. This test makes the runtime
+   * constraint explicit so that the intent is clear when reviewing diffs.
    */
+  it("no viewer file has runtime imports from server", () => {
+    const viewerDir = join(WEB_SRC, "viewer");
+    const violations: string[] = [];
+
+    try {
+      for (const file of collectTsFiles(viewerDir)) {
+        const rel = relative(WEB_SRC, file);
+        for (const imp of extractRuntimeImportPaths(file)) {
+          if (imp.includes("/server/") || imp.match(/\.\.\/server\b/)) {
+            violations.push(`${rel} imports "${imp}"`);
+          }
+        }
+      }
+    } catch {
+      // viewerDir doesn't exist in test environment — pass
+      return;
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   /**
    * web-shared barrel import enforcement — consumers of src/shared/ must import
    * through shared/index.ts rather than directly from leaf files (data-files.ts,
@@ -312,7 +350,6 @@ describe("server/client boundary", () => {
    * consumer counting required by the two-consumer governance rule.
    *
    * Exemptions:
-   * - viewer/external.ts — gateway whose purpose is to re-export from shared/
    * - viewer/crash/ — documented exemption for ViewId (cycle avoidance)
    * - viewer/messaging/ — documented exemption for shared/ direct access
    */
@@ -325,9 +362,6 @@ describe("server/client boundary", () => {
         const base = join(WEB_SRC, dir);
         for (const file of collectTsFiles(base)) {
           const rel = relative(WEB_SRC, file);
-
-          // Gateway files are allowed to import from leaf files
-          if (rel === join("viewer", "external.ts")) continue;
 
           // Crash zone exemption (documented cycle avoidance)
           if (rel.startsWith(join("viewer", "crash") + "/")) continue;
