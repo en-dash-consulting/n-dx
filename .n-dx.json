@@ -130,7 +130,9 @@
         "server-route-guardrails-tests": "test",
         "web-build-tooling": "infrastructure",
         "web-integration": "test",
-        "web-sv-view-tests": "test"
+        "web-sv-view-tests": "test",
+    "packages-web-unit-server": "test",
+    "sourcevision-view-tests": "test"
       }
     }
   },

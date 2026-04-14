@@ -1624,6 +1624,11 @@ async function main() {
     handleVersion(rest);
   }
 
+  // Handle top-level help flags before normal command parsing.
+  if (command === "--help" || command === "-h") {
+    handleHelp(rest);
+  }
+
   // ── Per-command --help ──────────────────────────────────────────────────
   const hasHelp = rest.some((a) => a === "--help" || a === "-h");
   if (hasHelp && command && showCommandHelp(command)) {

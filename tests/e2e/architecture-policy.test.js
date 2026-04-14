@@ -809,18 +809,7 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["polling", "Small viewer polling state cluster; Louvain splits polling state into a narrow satellite zone with few internal edges, yielding artificially low cohesion."],
-  ["refresh", "Small zone; refresh utilities grouped by Louvain; metrics unreliable at this scale."],
-  ["rex", "Large mixed rex analysis/CLI/store zone; current SourceVision clustering is still coarse and yields artificially low cohesion."],
-  ["sourcevision-cli", "Small sourcevision CLI satellite zone; metrics unreliable at this scale due to few internal edges."],
-  ["sync", "Small sync command cluster; narrow satellite zone with few internal edges yields artificially low cohesion."],
-  ["tick", "Small viewer tick dispatcher cluster; Louvain isolates tick timing files from the broader polling zone, yielding slightly below-threshold cohesion."],
-  ["token", "Small token parsing cluster; metrics unreliable at this scale due to few internal edges."],
-  ["use", "Tiny hooks cluster; metrics remain noisy while SourceVision isolates a small subset of shared viewer hooks."],
-  ["web-2", "Small viewer utility cluster; metrics remain noisy while SourceVision isolates a narrow tree-search/facet-state slice."],
-  ["web-4", "Small viewer data-loading cluster; Louvain isolates loader/validate files from the broader viewer zone, yielding below-threshold cohesion."],
-  ["web-7", "Small viewer cluster; metrics unreliable at this scale due to few internal edges."],
-  ["web-shared", "Foundation layer; 3 files (below the 5-file threshold for reliable metrics); documented dual-fragility zone — low cohesion reflects the inherent structural gap between data-file constants and view identifiers, not decay."],
+  ["web-server", "Large composition-root zone (44 files); all server routes, gateways, and infrastructure are deliberately aggregated here via zone pins. Low cohesion reflects intentional breadth, not decay — the zone is the web package's server composition root."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
