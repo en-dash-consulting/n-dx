@@ -148,6 +148,57 @@ Tokens used: 1234 in, 567 out
     });
   });
 
+  describe("two-line format", () => {
+    // Codex CLI may emit token usage split across two lines:
+    // the label "tokens used" on one line and the numeric count on the next.
+    // These tests define expected behaviour for that format.
+
+    it("extracts token count from nominal two-line 'tokens used\\n<number>' format", () => {
+      const output = "tokens used\n1234";
+      const result = parseCodexCliTokenUsage(output);
+      // Total count stored as input; no input/output split available.
+      expect(result).toEqual({ input: 1234, output: 0 });
+    });
+
+    it("extracts token count from 'Tokens used:\\n<number>' variant", () => {
+      const output = "Tokens used:\n1234";
+      const result = parseCodexCliTokenUsage(output);
+      expect(result).toEqual({ input: 1234, output: 0 });
+    });
+
+    it("handles comma-formatted count in two-line format", () => {
+      const output = "tokens used\n1,234";
+      const result = parseCodexCliTokenUsage(output);
+      expect(result).toEqual({ input: 1234, output: 0 });
+    });
+
+    it("handles whitespace-padded count in two-line format", () => {
+      const output = "tokens used\n  1,234  ";
+      const result = parseCodexCliTokenUsage(output);
+      expect(result).toEqual({ input: 1234, output: 0 });
+    });
+
+    it("returns null when a blank line separates label from count", () => {
+      // A blank line breaks the two-line pattern — safe null rather than silent mis-parse.
+      const output = "tokens used\n\n1234";
+      const result = parseCodexCliTokenUsage(output);
+      expect(result).toBeNull();
+    });
+
+    it("two-line format embedded in multi-line output", () => {
+      const output =
+        "[Codex] Running...\ntokens used\n8542\n[Codex] Done.";
+      const result = parseCodexCliTokenUsage(output);
+      expect(result).toEqual({ input: 8542, output: 0 });
+    });
+
+    it("legacy same-line format is unaffected by two-line support", () => {
+      const output = "Tokens used: 1234 in, 567 out";
+      const result = parseCodexCliTokenUsage(output);
+      expect(result).toEqual({ input: 1234, output: 567 });
+    });
+  });
+
   describe("edge cases", () => {
     it("handles zero token counts", () => {
       const output = "Tokens used: 0 in, 0 out\n";

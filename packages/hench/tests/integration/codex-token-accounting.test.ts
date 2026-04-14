@@ -274,6 +274,55 @@ Tokens used: 8,542 in, 2,130 out
     });
   });
 
+  it("extracts tokens from two-line Codex format and accumulates in run record", async () => {
+    const mockSpawn = vi.fn();
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return {
+        ...actual,
+        spawn: mockSpawn,
+      };
+    });
+
+    // Two-line format: label on one line, total count on the next.
+    mockSpawn.mockImplementationOnce(() =>
+      mockCliProcess({
+        stdout: `[Codex] Starting execution...
+[Codex] Running tool: shell
+[Codex] Command completed successfully
+tokens used
+8542
+[Codex] Execution complete`,
+        code: 0,
+      }),
+    );
+
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", rexDir);
+
+    const result = await cliLoop({
+      config,
+      store,
+      projectDir,
+      henchDir,
+      taskId: "task-1",
+    });
+
+    // Two-line format yields total count stored as input, output 0.
+    expect(result.run.tokenUsage).toEqual({ input: 8542, output: 0 });
+    expect(result.run.turnTokenUsage).toHaveLength(1);
+    expect(result.run.turnTokenUsage[0]).toMatchObject({
+      turn: 1,
+      input: 8542,
+      output: 0,
+      vendor: "codex",
+    });
+  });
+
   it("uses last token line occurrence when multiple are present", async () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {

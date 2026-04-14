@@ -15,12 +15,8 @@ export interface CodexCliTokenUsage {
 }
 
 /**
- * Pattern to match Codex CLI token usage line.
- *
- * Matches formats like:
- * - "Tokens used: 1234 in, 567 out"
- * - "Tokens used: 1,234 in, 5,678 out"
- * - "Token used: 1234 input, 567 output"
+ * Pattern to match same-line Codex CLI token usage:
+ * "Tokens used: 1234 in, 567 out" (both counts on one line).
  *
  * Captures:
  * - Group 1: input token count (may include commas)
@@ -28,6 +24,18 @@ export interface CodexCliTokenUsage {
  */
 const TOKEN_LINE_PATTERN =
   /tokens?\s+used:\s*([\d,]+)\s*(?:in(?:put)?)\s*,\s*([\d,]+)\s*(?:out(?:put)?)/i;
+
+/**
+ * Label-only pattern for the two-line Codex format:
+ * "tokens used" or "Tokens used:" on its own line, count on the next line.
+ */
+const TWO_LINE_LABEL_PATTERN = /^tokens?\s+used:?\s*$/i;
+
+/**
+ * Count-only pattern for the second line of the two-line Codex format.
+ * Captures a bare integer (possibly comma-formatted, possibly padded).
+ */
+const TWO_LINE_COUNT_PATTERN = /^\s*([\d,]+)\s*$/;
 
 /**
  * Parse a comma-formatted number string into a number.
@@ -64,31 +72,39 @@ export function parseCodexCliTokenUsage(output: string): CodexCliTokenUsage | nu
     return null;
   }
 
-  // Find all matches (we want the last one)
+  // Scan all lines; keep the last valid match across both formats.
   const lines = output.split(/\r?\n/);
-  let lastMatch: RegExpMatchArray | null = null;
+  let lastResult: CodexCliTokenUsage | null = null;
 
-  for (const line of lines) {
-    const match = line.match(TOKEN_LINE_PATTERN);
-    if (match) {
-      lastMatch = match;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Same-line format: "Tokens used: N in, N out"
+    const sameLineMatch = line.match(TOKEN_LINE_PATTERN);
+    if (sameLineMatch) {
+      const input = parseCommaNumber(sameLineMatch[1]);
+      const output_ = parseCommaNumber(sameLineMatch[2]);
+      if (Number.isFinite(input) && Number.isFinite(output_)) {
+        lastResult = { input, output: output_ };
+      }
+      continue;
+    }
+
+    // Two-line format: label on this line, count on the immediately next line.
+    if (TWO_LINE_LABEL_PATTERN.test(line)) {
+      const nextLine = lines[i + 1];
+      if (nextLine !== undefined) {
+        const countMatch = nextLine.match(TWO_LINE_COUNT_PATTERN);
+        if (countMatch) {
+          const total = parseCommaNumber(countMatch[1]);
+          if (Number.isFinite(total)) {
+            lastResult = { input: total, output: 0 };
+            i++; // consume the count line
+          }
+        }
+      }
     }
   }
 
-  if (!lastMatch) {
-    return null;
-  }
-
-  const inputStr = lastMatch[1];
-  const outputStr = lastMatch[2];
-
-  const input = parseCommaNumber(inputStr);
-  const output_ = parseCommaNumber(outputStr);
-
-  // Return null if either value is invalid
-  if (!Number.isFinite(input) || !Number.isFinite(output_)) {
-    return null;
-  }
-
-  return { input, output: output_ };
+  return lastResult;
 }
