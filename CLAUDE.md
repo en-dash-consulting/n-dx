@@ -79,6 +79,8 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 | `crash` | web | 0.50 | unidirectional (web-viewer → crash) | At threshold boundary — crash imports web-shared directly (documented bypass), not web-viewer |
 | `web-dashboard-platform` | web | 0.53 | — | Watch designation; 33 files (metrics reliable); 0.03 above dual-fragility threshold — baseline documented for regression tracking |
 
+> **Test zone exclusion:** The "production zones" qualifier is intentional. Zones classified as `test` in `sourcevision.zones.types` (`.n-dx.json`) are excluded from dual-fragility governance. Test zones' cohesion/coupling metrics reflect fixture dependencies rather than architectural design choices, making the thresholds non-actionable. `packages-web:unit-server` (cohesion 0.45, coupling 0.55) meets both numeric thresholds but is exempt under this policy. To verify a zone's classification, check the `types` map in `.n-dx.json`.
+
 **Universal governance rules** (apply to all dual-fragility zones):
 - **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
 - **Addition review required:** Treat these as risk zones requiring active review on additions. Changes have a wide blast radius.
@@ -102,6 +104,34 @@ Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` wit
 ##### crash zone proactive governance
 
 `crash` (cohesion 0.5, unidirectional coupling: web-viewer → crash) sits at the dual-fragility threshold boundary. Crash imports web-shared directly (documented bypass) rather than web-viewer. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
+
+##### rex-2 unnamed zone (governance gap)
+
+`rex-2` (4 files, cohesion 1, 5 inbound imports from the rex hub) is an unnamed overflow zone produced by Louvain community detection. It has no CLAUDE.md policy entry, no zone-pin configuration, and no descriptive ID. Its files are invisible to API surface audits and changeset impact analysis for the rex package — each new rex feature that touches rex-2 files goes unnoticed by zone tooling.
+
+**Governance requirements:**
+- Identify the files belonging to `rex-2` and add explicit zone pins in `.n-dx.json` under a descriptive ID (e.g., `rex-schema-types`).
+- Once pinned, add a zone policy entry to this document.
+- Until pinned, treat any finding referencing `rex-2` as potentially misclassified.
+
+See also: `ZONES.md` for the zone-pin manifest.
+
+##### Zone ID naming convention
+
+Zone IDs must encode their package to prevent cross-package prefix collisions in zone-filter queries and zone reports:
+
+| Prefix | Package | Example |
+|--------|---------|---------|
+| `sv-` | packages/sourcevision/ | `sv-analyzer` |
+| `rex-` | packages/rex/ | `rex-cli` |
+| `hench-` | packages/hench/ | `hench-agent` |
+| `web-server-` | web server zones | `web-server-gateway` |
+| `web-viewer-` | web viewer zones | `web-viewer-hub` |
+| `web-sv-` | web zones rendering sourcevision data | `web-sv-view-tests` |
+
+The `sourcevision-view-tests` zone currently violates this convention — it is in the web package but uses the `sourcevision-` prefix, colliding with sourcevision package zones. The correct ID is `web-sv-view-tests`. Apply this via zone pins in `.n-dx.json` at next re-analysis.
+
+See also: `ZONES.md` for the zone promotion checklist.
 
 ##### hench-agent internal governance
 
@@ -159,6 +189,20 @@ Rules:
 - **Prefer injection over import** when the target module would otherwise need to import from a higher-tier zone (e.g., scheduler importing from dashboard wiring).
 - **Document the interface type** — every injection seam must have a named TypeScript interface (not inline parameter types) so that refactoring either side triggers a type error.
 - **New seams** require an entry in this table and a named interface type in the target module.
+
+#### Governance list completeness audit
+
+The following manually maintained governance lists currently have no automated exhaustiveness check. Each is a silent drift risk as the codebase grows:
+
+| List | Location | Drift risk | Automated? |
+|------|----------|------------|------------|
+| Injection seam registry | CLAUDE.md (above) | New seams added without table entry | ❌ None |
+| Gateway table | CLAUDE.md (above) | New gateways added without table entry | ❌ None |
+| `SHARED_LEAF_FILES` | `boundary-check.test.ts` | New shared/ leaf files bypass barrel enforcement | ⚠️ Partially (two-consumer rule covers existing files) |
+| `BARREL_ZONES` | `boundary-check.test.ts` | New sub-zones bypass barrel enforcement | ❌ None |
+| Zone pins | `.n-dx.json` | Zone additions without pin documentation | ❌ No reason field; see `ZONES.md` for the pin manifest |
+
+Until automated checks are added, treat these lists as requiring active review on every PR that touches the relevant infrastructure. The gateway table and injection seam registry are especially prone to drift because their entries are widely separated from the code they describe.
 
 ### Tier boundary crossing: spawn vs gateway
 
@@ -387,3 +431,4 @@ gh pr create --repo en-dash-consulting/n-dx \         # PR targets upstream
 | `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
+| `ZONES.md` | Zone promotion checklist, zone ID naming convention, and zone-pin manifest |

@@ -342,3 +342,4 @@ Use `ndx start .` for the dashboard + MCP server, `ndx self-heal 3 .` for iterat
 | `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
+| `ZONES.md` | Zone promotion checklist, zone ID naming convention, and zone-pin manifest |
