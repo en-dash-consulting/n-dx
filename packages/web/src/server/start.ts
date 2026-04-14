@@ -14,7 +14,7 @@ import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
-import { registerUsageScheduler, type CollectAllIdsFn } from "./task-usage.js";
+import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync } from "./prd-io.js";
 import { collectAllIds } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
@@ -627,7 +627,7 @@ export async function startServer(
       broadcast: ws.broadcast,
       collectAllIds: collectAllIds as CollectAllIdsFn,
       loadPRD: loadPRDSync,
-    });
+    } satisfies RegisterSchedulerOptions);
     watcherHandles.monitorIntervals.push(cleanupInterval);
   }
 

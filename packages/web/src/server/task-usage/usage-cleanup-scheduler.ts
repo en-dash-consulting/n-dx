@@ -259,7 +259,12 @@ export function startUsageCleanupScheduler(
   // Determine interval: explicit override > .n-dx.json config > default
   const intervalMs = overrideIntervalMs ?? loadCleanupConfig(ctx.projectDir).intervalMs;
 
+  // Guard prevents overlapping ticks when a cycle takes longer than the interval.
+  let running = false;
+
   const timer = setInterval(async () => {
+    if (running) return;
+    running = true;
     try {
       const aggregator = getAggregator();
       const result = await runCleanupCycle({
@@ -280,6 +285,8 @@ export function startUsageCleanupScheduler(
     } catch (err) {
       // Non-fatal: cleanup errors must not crash the server
       console.error("[usage-cleanup] Error during cleanup cycle:", err);
+    } finally {
+      running = false;
     }
   }, intervalMs);
 
