@@ -27062,6 +27062,8 @@
       "description": "Automated recommendations from SourceVision analysis. 24 zone+category groups covering 43 total findings.",
       "priority": "critical",
       "source": "sourcevision",
+      "startedAt": "2026-04-14T02:20:30.356Z",
+      "completedAt": "2026-04-14T02:20:30.356Z",
       "children": [
         {
           "id": "7d140635-dd3c-4488-b008-d9f792b61519",
