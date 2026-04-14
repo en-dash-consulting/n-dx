@@ -520,6 +520,31 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     };
   }
 
+  // Load pending dependency audit result if it exists (pre-loop audit from run.ts)
+  if (selfHeal && run.structuredSummary) {
+    let auditResult = undefined;
+    try {
+      const { readFileSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const auditFile = join(henchDir, ".pending-audit.json");
+      const content = readFileSync(auditFile, "utf-8");
+      auditResult = JSON.parse(content);
+      // Delete after reading so subsequent runs don't use it
+      try {
+        const { unlinkSync } = await import("node:fs");
+        unlinkSync(auditFile);
+      } catch {
+        // Ignore if we can't delete
+      }
+    } catch {
+      // Audit file doesn't exist or can't be read
+    }
+
+    if (auditResult) {
+      run.dependencyAudit = auditResult;
+    }
+  }
+
   // Run test suite gate in self-heal mode (mandatory full test validation)
   if (selfHeal && run.structuredSummary) {
     subsection("Test Suite Gate");

@@ -26021,22 +26021,22 @@
                 "No documentation section references commands or flags that have been removed or renamed",
                 "CODEX.md sections mirroring CLAUDE.md are updated in sync per the SYNC NOTICE at the top of CLAUDE.md",
                 "A CI assertion or documentation linting step is added (or an existing one is confirmed) that catches future doc/CLI divergence"
-                ],
-                "priority": "medium",
-                "tags": [
-                  "docs",
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
                 "cli",
-                  "dx"
-                ],
-                "source": "smart-add",
-                "startedAt": "2026-04-13T16:49:33.071Z",
-                "completedAt": "2026-04-13T18:44:45.687Z"
-              }
-            ]
-          }
-        ]
-      },
-      {
+                "dx"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-13T16:49:33.071Z",
+              "completedAt": "2026-04-13T18:44:45.687Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "d0646ca0-b3c0-4cdd-93f5-ed5ae88e728a",
       "title": "SourceVision",
       "status": "completed",
@@ -26340,8 +26340,6 @@
       ]
     },
     {
-      "id": "b700ee09-e422-46df-a866-50f46682d21e",
-      "title": "Code Health: 25 findings across 16 zones",
       "id": "f38dd45c-a4ee-4eed-ad8c-a667d39c8c86",
       "title": "LLM Integration",
       "status": "completed",
@@ -26353,20 +26351,12 @@
       "completedAt": "2026-04-13T21:59:43.253Z",
       "children": [
         {
-          "id": "e9981c80-c6a2-42b3-adb8-d47a6c00b825",
-          "title": "Fix observation in global (1 finding)",
-          "status": "completed",
-          "level": "feature",
-          "description": "- Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extracting shared interface",
-          "priority": "high",
-          "source": "sourcevision",
-          "startedAt": "2026-04-13T20:41:34.887Z",
-          "completedAt": "2026-04-13T20:41:34.887Z",
           "id": "3d1dfc17-ba48-4fb7-8b2e-392593740605",
           "title": "ndx work Model Resolution, Display, and Vendor-Change Reset",
           "status": "completed",
           "level": "feature",
           "description": "The ndx work command does not surface the LLM model configured in .n-dx.json to the user at run time, and may not propagate it to the underlying hench LLM call sites. Additionally, when the vendor is changed, a stale model value from the previous vendor can persist in config, causing silent misconfiguration.",
+          "priority": "high",
           "source": "smart-add",
           "startedAt": "2026-04-14T16:33:04.573Z",
           "completedAt": "2026-04-14T16:33:04.573Z",
@@ -26378,9 +26368,15 @@
               "level": "task",
               "description": "- Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extracting shared interface",
               "priority": "high",
-              "source": "sourcevision",
-              "startedAt": "2026-04-13T20:09:32.123Z",
-              "completedAt": "2026-04-13T20:41:34.557Z",
+              "tags": [
+                "hench",
+                "llm",
+                "config",
+                "bug"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T16:22:08.354Z",
+              "completedAt": "2026-04-14T16:28:37.118Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "be3b59862e22"
@@ -26390,16 +26386,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "tags": [
-                "hench",
-                "llm",
-                "config",
-                "bug"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-14T16:22:08.354Z",
-              "completedAt": "2026-04-14T16:28:37.118Z"
+              }
             },
             {
               "id": "cc8616dd-581e-4fa7-abb4-6276b2e0882c",
@@ -28437,6 +28424,194 @@
       "recommendationMeta": {
         "findingCount": 43
       }
+    },
+    {
+      "id": "7699ef03-e874-41f0-aeb0-bbef9868bb39",
+      "title": "Self-Heal Pipeline Enhancements",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "c8582d6b-6088-49bb-8d94-cdf81bc4dc54",
+          "title": "Dependency Health Pass",
+          "status": "pending",
+          "level": "feature",
+          "description": "Extend the self-heal loop with an automated dependency audit and cleanup step that inspects all monorepo package.json files, identifies unused, outdated, or duplicate dependencies, and applies safe remediation before proceeding with the analysis–recommend–execute cycle.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "8af32cae-af63-4d0f-a1c7-2a6f9e34a3a5",
+              "title": "Implement dependency audit step in self-heal pipeline",
+              "status": "in_progress",
+              "level": "task",
+              "description": "Add a pre-loop dependency audit that scans all monorepo workspace package.json files using depcheck (or equivalent) and pnpm audit. The step produces a structured report of unused, outdated, and vulnerable packages grouped by workspace package. This report feeds into the cleanup step and is stored in the run artifact for dashboard visibility. No files are modified during this step.",
+              "acceptanceCriteria": [
+                "Runs before the analyze–recommend–execute loop begins",
+                "Detects unused dependencies in each workspace package via depcheck or equivalent",
+                "Detects outdated patch and minor versions via pnpm outdated",
+                "Detects known vulnerabilities via pnpm audit",
+                "Produces a structured JSON summary stored under a 'dependencyAudit' key in the run artifact",
+                "Does not modify any files — audit only in this step",
+                "Audit step is skippable via a --skip-deps flag on ndx self-heal"
+              ],
+              "priority": "high",
+              "tags": [
+                "self-heal",
+                "dependencies",
+                "audit"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T19:39:02.939Z"
+            },
+            {
+              "id": "5052d7d9-c825-4644-93ab-d1c011976c60",
+              "title": "Implement automated dependency cleanup executor",
+              "status": "completed",
+              "level": "task",
+              "description": "Based on the audit report, apply safe dependency cleanup actions: remove unused packages, apply patch-level updates that pass the subsequent test gate, and deduplicate the lockfile. Major version bumps and breaking changes are flagged as manual action items rather than auto-applied. Each action is recorded in the run artifact with before/after package versions.",
+              "acceptanceCriteria": [
+                "Removes packages flagged as unused by the audit step via pnpm remove",
+                "Applies patch-level updates (x.y.Z only) via pnpm update with conservative version constraints",
+                "Runs pnpm dedupe after cleanup to resolve lockfile duplication",
+                "Skips major version bumps and records them as manual action items in the run summary",
+                "Does not auto-remove packages that appear only in devDependencies of test-only suites without explicit config",
+                "All cleanup actions are recorded with before/after package versions in the run artifact"
+              ],
+              "priority": "high",
+              "tags": [
+                "self-heal",
+                "dependencies",
+                "cleanup"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T19:35:59.861Z",
+              "completedAt": "2026-04-14T19:39:00.163Z"
+            }
+          ]
+        },
+        {
+          "id": "b7327b20-6de9-419f-b390-1032c92573fe",
+          "title": "Non-Test Codebase Cleanup and Condensation Pass",
+          "status": "pending",
+          "level": "feature",
+          "description": "Add a codebase cleanup phase to self-heal that identifies and removes dead code, consolidates duplicated utilities, and condenses verbose patterns — strictly scoped to production source files. A hard exclusion guard must prevent any modification to test files (*.test.ts, *.spec.ts, tests/**).",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "be4d8de4-31a8-4caa-bd27-f28902b93d32",
+              "title": "Implement scoped dead-code and duplication analyzer for production files",
+              "status": "pending",
+              "level": "task",
+              "description": "Build a static analysis step that uses sourcevision's existing dead-export detection and import graph, augmented with a structural similarity pass for near-duplicate utility functions across non-test source files. Produces a prioritized list of cleanup candidates with file paths, confidence scores, and suggested actions. This step is analysis-only — no files are modified.",
+              "acceptanceCriteria": [
+                "Identifies dead exports not referenced anywhere in the import graph, excluding test consumers",
+                "Identifies unused imports (imported symbol never referenced in file body)",
+                "Identifies near-duplicate utility functions across files using structural or textual similarity",
+                "Excludes all files matching *.test.ts, *.spec.ts, tests/**, and __fixtures__/**",
+                "Produces a ranked cleanup candidate list sorted by confidence and estimated blast radius",
+                "Integrates with sourcevision MCP or public API rather than re-implementing graph traversal",
+                "Does not modify any files — analysis only"
+              ],
+              "priority": "medium",
+              "tags": [
+                "self-heal",
+                "cleanup",
+                "dead-code",
+                "sourcevision"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "dd478339-ddfe-4ec9-bbe4-857f91e8ea64",
+              "title": "Apply production-scoped cleanup transformations with test-exclusion hard guard",
+              "status": "pending",
+              "level": "task",
+              "description": "Execute safe automated cleanup transformations on production source files identified by the analyzer: remove dead exports with zero cross-package consumers, prune unused imports, and consolidate trivially duplicated utilities where both callers can be updated atomically. After each transformation batch, run tsc --noEmit to confirm no type errors; roll back the batch on failure. A hard guard must throw and halt if any write would touch a test file.",
+              "acceptanceCriteria": [
+                "Removes dead exports confirmed by the analyzer with zero cross-package consumers",
+                "Prunes unused import statements from production source files",
+                "Consolidates duplicated utility functions when all callers can be updated atomically in the same pass",
+                "Throws a hard error and halts immediately if a write would target any file under tests/, *.test.ts, or *.spec.ts",
+                "Runs tsc --noEmit after each transformation batch; rolls back the entire batch on any type error",
+                "Each transformation is logged with file, line range, and change type in the run artifact",
+                "Transformation pass is idempotent — re-running on an already-clean codebase produces no changes"
+              ],
+              "priority": "medium",
+              "tags": [
+                "self-heal",
+                "cleanup",
+                "transformation",
+                "safety"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "0cae57c4-182c-40eb-9d77-af71eb5cb6c7",
+          "title": "Test Suite Validation Gate and Remediation Loop",
+          "status": "completed",
+          "level": "feature",
+          "description": "Close the self-heal loop with a full test suite execution gate. If dependency cleanup or codebase condensation caused test failures, a remediation sub-loop identifies the root cause in production code, applies targeted fixes (never modifying tests), and re-runs until the suite is green or the iteration budget is exhausted.",
+          "source": "smart-add",
+          "startedAt": "2026-04-14T19:35:57.089Z",
+          "completedAt": "2026-04-14T19:35:57.089Z",
+          "children": [
+            {
+              "id": "c18166e3-f748-45f9-bda4-958d303783f6",
+              "title": "Integrate full test suite runner as a mandatory self-heal gate step",
+              "status": "completed",
+              "level": "task",
+              "description": "After dependency cleanup and codebase condensation phases, run pnpm test across all workspace packages. Capture per-package pass/fail status, failure counts, and raw error output. The gate result is stored in the run artifact under a 'testGate' key and drives the remediation sub-loop. If no files were modified in preceding phases, the gate step is skipped with a logged notice.",
+              "acceptanceCriteria": [
+                "Runs pnpm test (full suite) after the cleanup and condensation phases complete",
+                "Captures per-package pass/fail, test count, failure count, and abbreviated failure output",
+                "Structured result is stored in the run artifact under a 'testGate' key",
+                "Gate step exits with a non-zero code on any package failure, triggering the remediation loop",
+                "Gate step is skipped with an explicit log notice when no source files were modified in prior phases",
+                "Total elapsed time per package is recorded for performance baseline tracking"
+              ],
+              "priority": "critical",
+              "tags": [
+                "self-heal",
+                "testing",
+                "gate",
+                "validation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T19:29:53.894Z",
+              "completedAt": "2026-04-14T19:35:56.900Z"
+            },
+            {
+              "id": "35803d82-ef26-418f-ac27-0b28b33217a9",
+              "title": "Implement test-failure remediation sub-loop in self-heal",
+              "status": "completed",
+              "level": "task",
+              "description": "When the test gate detects failures, initiate a bounded remediation sub-loop: parse vitest failure output to identify the failing production file (not the test file), construct a focused hench brief scoped to that file and error message, execute a fix attempt restricted to production code only, and re-run only the affected package's tests. The loop repeats up to a configurable max-iterations limit before surfacing a human-readable failure report. Test files are never in scope for modification.",
+              "acceptanceCriteria": [
+                "Parses vitest failure output to extract the production file path and error message implicated in each failure",
+                "Constructs a hench brief scoped to the failing production file and specific error",
+                "Blocks hench fix attempts from writing to any file under tests/, *.test.ts, or *.spec.ts — throws on violation",
+                "Re-runs only the affected package's test suite after each fix attempt (not the full monorepo suite) for speed",
+                "Exits the sub-loop and marks self-heal run as failed with a structured summary if max iterations is reached without a green gate",
+                "Max iterations is configurable via selfHeal.testRemediationMaxIterations in .n-dx.json (default: 3)",
+                "Each fix attempt, its outcome, and the re-run result are appended to the run artifact"
+              ],
+              "priority": "critical",
+              "tags": [
+                "self-heal",
+                "testing",
+                "remediation",
+                "hench"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T19:25:20.523Z",
+              "completedAt": "2026-04-14T19:29:51.094Z"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

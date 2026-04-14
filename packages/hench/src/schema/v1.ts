@@ -280,6 +280,73 @@ export interface TestGateResult {
   error?: string;
 }
 
+export interface DependencyVulnerability {
+  /** Package name */
+  name: string;
+  /** Current version */
+  version: string;
+  /** Severity level */
+  severity: "critical" | "high" | "moderate" | "low";
+}
+
+export interface DependencyOutdated {
+  /** Package name */
+  name: string;
+  /** Current version */
+  current: string;
+  /** Latest available version */
+  latest: string;
+  /** Type of update: major, minor, or patch */
+  type: "major" | "minor" | "patch";
+}
+
+export interface DependencyAuditPackageResult {
+  /** Workspace package name or path */
+  name: string;
+  /** Number of vulnerabilities found */
+  vulnerabilityCount: number;
+  /** Number of outdated packages */
+  outdatedCount: number;
+}
+
+export interface DependencyAuditResult {
+  /** Whether the audit ran at all */
+  ran: boolean;
+  /** Whether the audit was skipped */
+  skipped: boolean;
+  /** Reason audit was skipped if applicable */
+  skipReason?: string;
+  /** ISO timestamp when audit started */
+  startedAt: string;
+  /** ISO timestamp when audit finished */
+  finishedAt: string;
+  /** Total elapsed time (ms) */
+  totalDurationMs: number;
+  /** Aggregated vulnerability counts by severity */
+  vulnerabilities: {
+    critical: number;
+    high: number;
+    moderate: number;
+    low: number;
+    packages: DependencyVulnerability[];
+  };
+  /** Aggregated outdated package counts by update type */
+  outdated: {
+    major: string[];
+    minor: string[];
+    patch: string[];
+  };
+  /** Per-workspace-package results */
+  perPackage: DependencyAuditPackageResult[];
+  /** Commands executed during audit */
+  commands?: {
+    audit?: { command: string; exitCode: number };
+    outdated?: { command: string; exitCode: number };
+  };
+  /** Error if audit itself failed */
+  error?: string;
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -304,6 +371,8 @@ export interface RunRecord {
   memoryStats?: RunMemoryStats;
   /** Full test suite gate results (self-heal mode only). */
   testGate?: TestGateResult;
+  /** Dependency audit results (self-heal mode only). */
+  dependencyAudit?: DependencyAuditResult;
 }
 
 export interface TaskBriefTask {

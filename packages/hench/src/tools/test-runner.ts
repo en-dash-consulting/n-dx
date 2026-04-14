@@ -584,3 +584,273 @@ export async function runTestGate(
     totalDurationMs,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Dependency audit (pre-loop validation for self-heal mode)
+// ---------------------------------------------------------------------------
+
+import type {
+  DependencyAuditResult,
+  DependencyVulnerability,
+  DependencyOutdated,
+  DependencyAuditPackageResult,
+} from "../schema/index.js";
+
+export interface DependencyAuditOptions {
+  /** Project root directory. */
+  projectDir: string;
+  /** Timeout for pnpm commands in ms. Default: 60_000. */
+  timeout?: number;
+}
+
+const DEPENDENCY_AUDIT_TIMEOUT = 60_000; // 1 minute per command
+
+/**
+ * Parse pnpm audit JSON output and extract vulnerability data.
+ * Returns both aggregated counts and detailed vulnerability list.
+ */
+function parsePnpmAuditOutput(stdout: string): {
+  vulnerabilities: {
+    critical: number;
+    high: number;
+    moderate: number;
+    low: number;
+    packages: DependencyVulnerability[];
+  };
+  perPackageVulnerabilityCount: Map<string, number>;
+} {
+  const vulnerabilities = {
+    critical: 0,
+    high: 0,
+    moderate: 0,
+    low: 0,
+    packages: [] as DependencyVulnerability[],
+  };
+  const perPackageVulnerabilityCount = new Map<string, number>();
+
+  if (!stdout.trim()) {
+    return { vulnerabilities, perPackageVulnerabilityCount };
+  }
+
+  try {
+    const auditData = JSON.parse(stdout) as any;
+
+    // Handle pnpm audit JSON output format
+    if (auditData.metadata?.vulnerabilities) {
+      const counts = auditData.metadata.vulnerabilities;
+      vulnerabilities.critical = counts.critical ?? 0;
+      vulnerabilities.high = counts.high ?? 0;
+      vulnerabilities.moderate = counts.moderate ?? 0;
+      vulnerabilities.low = counts.low ?? 0;
+    }
+
+    // Extract detailed vulnerability info from vulnerabilities object
+    if (auditData.vulnerabilities) {
+      for (const pkgName of Object.keys(auditData.vulnerabilities)) {
+        const pkgVulns = auditData.vulnerabilities[pkgName];
+        if (Array.isArray(pkgVulns.via)) {
+          for (const vuln of pkgVulns.via) {
+            if (typeof vuln === "object" && vuln.severity) {
+              vulnerabilities.packages.push({
+                name: pkgName,
+                version: pkgVulns.version ?? "unknown",
+                severity: vuln.severity,
+              });
+
+              // Track per-package counts
+              perPackageVulnerabilityCount.set(
+                pkgName,
+                (perPackageVulnerabilityCount.get(pkgName) ?? 0) + 1,
+              );
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // JSON parse failed, return empty results
+  }
+
+  return { vulnerabilities, perPackageVulnerabilityCount };
+}
+
+/**
+ * Parse pnpm outdated JSON output and categorize by update type.
+ */
+function parsePnpmOutdatedOutput(stdout: string): {
+  outdated: {
+    major: string[];
+    minor: string[];
+    patch: string[];
+  };
+  perPackageOutdatedCount: Map<string, number>;
+} {
+  const outdated = {
+    major: [] as string[],
+    minor: [] as string[],
+    patch: [] as string[],
+  };
+  const perPackageOutdatedCount = new Map<string, number>();
+
+  if (!stdout.trim()) {
+    return { outdated, perPackageOutdatedCount };
+  }
+
+  try {
+    const outdatedData = JSON.parse(stdout) as Record<string, any>;
+
+    for (const pkgName of Object.keys(outdatedData)) {
+      const pkg = outdatedData[pkgName];
+      if (!pkg.current || !pkg.latest) continue;
+
+      // Simple version comparison: split by dots and compare numeric parts
+      const currentParts = pkg.current.split(".").map((x: string) => parseInt(x) || 0);
+      const latestParts = pkg.latest.split(".").map((x: string) => parseInt(x) || 0);
+
+      if (currentParts[0] < latestParts[0]) {
+        outdated.major.push(pkgName);
+      } else if (currentParts[1] < latestParts[1]) {
+        outdated.minor.push(pkgName);
+      } else if (currentParts[2] < latestParts[2]) {
+        outdated.patch.push(pkgName);
+      }
+
+      perPackageOutdatedCount.set(
+        pkgName,
+        (perPackageOutdatedCount.get(pkgName) ?? 0) + 1,
+      );
+    }
+  } catch {
+    // JSON parse failed, return empty results
+  }
+
+  return { outdated, perPackageOutdatedCount };
+}
+
+/**
+ * Run a comprehensive dependency audit: vulnerabilities, outdated versions.
+ *
+ * Behavior:
+ * - Runs `pnpm audit --json` to detect known vulnerabilities
+ * - Runs `pnpm outdated --json` to detect outdated versions
+ * - Aggregates results by severity and update type
+ * - Merges per-package counts to provide monorepo-wide summary
+ * - Never throws — always returns a structured result
+ * - Timeout: 60 seconds per command
+ */
+export async function runDependencyAudit(
+  options: DependencyAuditOptions,
+): Promise<DependencyAuditResult> {
+  const { projectDir, timeout = DEPENDENCY_AUDIT_TIMEOUT } = options;
+
+  const startedAt = new Date().toISOString();
+  const startMs = Date.now();
+
+  let vulnerabilities = {
+    critical: 0,
+    high: 0,
+    moderate: 0,
+    low: 0,
+    packages: [] as DependencyVulnerability[],
+  };
+  let outdated = {
+    major: [] as string[],
+    minor: [] as string[],
+    patch: [] as string[],
+  };
+  const perPackageMetrics = new Map<string, DependencyAuditPackageResult>();
+
+  // Step 1: Run pnpm audit
+  let auditCommand = "pnpm audit --json";
+  let auditExitCode: number | null = 1;
+
+  try {
+    const auditResult = await execShellCmd(auditCommand, {
+      cwd: projectDir,
+      timeout,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    auditExitCode = auditResult.exitCode;
+
+    if (auditResult.exitCode !== null && auditResult.stdout) {
+      const { vulnerabilities: parsed, perPackageVulnerabilityCount } =
+        parsePnpmAuditOutput(auditResult.stdout);
+      vulnerabilities = parsed;
+
+      // Populate per-package metrics from audit
+      for (const [pkgName, count] of perPackageVulnerabilityCount) {
+        if (!perPackageMetrics.has(pkgName)) {
+          perPackageMetrics.set(pkgName, {
+            name: pkgName,
+            vulnerabilityCount: 0,
+            outdatedCount: 0,
+          });
+        }
+        const metrics = perPackageMetrics.get(pkgName)!;
+        metrics.vulnerabilityCount = count;
+      }
+    }
+  } catch {
+    // pnpm audit failed, continue with outdated check
+  }
+
+  // Step 2: Run pnpm outdated
+  let outdatedCommand = "pnpm outdated --json";
+  let outdatedExitCode: number | null = 1;
+
+  try {
+    const outdatedResult = await execShellCmd(outdatedCommand, {
+      cwd: projectDir,
+      timeout,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    outdatedExitCode = outdatedResult.exitCode;
+
+    if (outdatedResult.exitCode !== null && outdatedResult.stdout) {
+      const { outdated: parsed, perPackageOutdatedCount } =
+        parsePnpmOutdatedOutput(outdatedResult.stdout);
+      outdated = parsed;
+
+      // Populate per-package metrics from outdated
+      for (const [pkgName, count] of perPackageOutdatedCount) {
+        if (!perPackageMetrics.has(pkgName)) {
+          perPackageMetrics.set(pkgName, {
+            name: pkgName,
+            vulnerabilityCount: 0,
+            outdatedCount: 0,
+          });
+        }
+        const metrics = perPackageMetrics.get(pkgName)!;
+        metrics.outdatedCount = count;
+      }
+    }
+  } catch {
+    // pnpm outdated failed, continue
+  }
+
+  const finishedAt = new Date().toISOString();
+  const totalDurationMs = Date.now() - startMs;
+
+  // Determine overall pass/fail: pass only if no vulnerabilities or outdated packages
+  const hasIssues =
+    vulnerabilities.critical > 0 ||
+    vulnerabilities.high > 0 ||
+    outdated.major.length > 0;
+
+  return {
+    ran: true,
+    skipped: false,
+    startedAt,
+    finishedAt,
+    totalDurationMs,
+    vulnerabilities,
+    outdated,
+    perPackage: Array.from(perPackageMetrics.values()),
+    commands: {
+      audit: { command: auditCommand, exitCode: auditExitCode ?? 1 },
+      outdated: { command: outdatedCommand, exitCode: outdatedExitCode ?? 1 },
+    },
+  };
+}

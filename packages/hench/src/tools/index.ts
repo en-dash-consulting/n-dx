@@ -25,10 +25,11 @@ export { toolGit } from "./git.js";
 export {
   runPostTaskTests,
   runTestGate,
+  runDependencyAudit,
   findRelevantTests,
   isTestFile,
   candidateTestPaths,
   detectRunner,
   buildScopedCommand,
 } from "./test-runner.js";
-export type { PostRunTestResult, TestRunnerOptions, TestGateOptions } from "./test-runner.js";
+export type { PostRunTestResult, TestRunnerOptions, TestGateOptions, DependencyAuditOptions, DependencyAuditResult } from "./test-runner.js";
