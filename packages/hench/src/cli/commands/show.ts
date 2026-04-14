@@ -4,6 +4,7 @@ import { HENCH_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";
 import { lookupTaskInRex, formatTaskLine } from "./task-lookup.js";
+import { formatTokenReport } from "../token-logging.js";
 
 export async function cmdShow(
   dir: string,
@@ -29,8 +30,7 @@ export async function cmdShow(
   info(`Started: ${run.startedAt}`);
   if (run.finishedAt) info(`Finished: ${run.finishedAt}`);
   info(`Turns: ${run.turns}`);
-  const totalTokens = run.tokenUsage.input + run.tokenUsage.output;
-  info(`Tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out (${totalTokens} total)`);
+  info(formatTokenReport(run.tokenUsage));
   if (run.tokenUsage.cacheCreationInput || run.tokenUsage.cacheReadInput) {
     info(`  Cache: ${run.tokenUsage.cacheCreationInput ?? 0} created / ${run.tokenUsage.cacheReadInput ?? 0} read`);
   }

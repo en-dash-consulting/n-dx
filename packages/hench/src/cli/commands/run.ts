@@ -18,6 +18,7 @@ import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
 import { MemoryThrottle } from "../../process/memory-throttle.js";
 import { checkQuotaRemaining, formatQuotaLog } from "../../quota/index.js";
+import { formatTokenReport } from "../token-logging.js";
 
 // ---------------------------------------------------------------------------
 // Schema compatibility
@@ -667,7 +668,7 @@ async function runOne(
   }
 
   info(`Turns: ${run.turns}`);
-  info(`Tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out`);
+  info(formatTokenReport(run.tokenUsage));
   info(`Tool calls: ${run.toolCalls.length}`);
 
   // Memory stats
