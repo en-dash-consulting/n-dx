@@ -347,6 +347,47 @@ export interface DependencyAuditResult {
   error?: string;
 }
 
+export interface CleanupTransformationRecord {
+  /** Type of transformation applied. */
+  type: "dead_export_removal" | "unused_import_prune" | "utility_consolidation";
+  /** File path (relative to project root). */
+  file: string;
+  /** Start line (1-indexed). */
+  startLine: number;
+  /** End line (1-indexed). */
+  endLine: number;
+  /** Human-readable description. */
+  description: string;
+  /** The removed/modified code snippet. */
+  removedCode?: string;
+}
+
+export interface CleanupBatchRecord {
+  /** Transformations in this batch. */
+  transformations: CleanupTransformationRecord[];
+  /** Whether tsc validated the batch. */
+  validated: boolean;
+  /** Whether the batch was rolled back. */
+  rolledBack: boolean;
+  /** Error message if validation failed. */
+  error?: string;
+}
+
+export interface CleanupTransformationResult {
+  /** Whether cleanup ran at all */
+  ran: boolean;
+  /** Number of transformations successfully applied */
+  appliedCount: number;
+  /** Number of transformations rolled back due to validation failure */
+  rolledBackCount: number;
+  /** All transformation batches (for logging) */
+  batches: CleanupBatchRecord[];
+  /** Total elapsed time (ms) */
+  totalDurationMs: number;
+  /** Error if cleanup itself failed */
+  error?: string;
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -373,6 +414,8 @@ export interface RunRecord {
   testGate?: TestGateResult;
   /** Dependency audit results (self-heal mode only). */
   dependencyAudit?: DependencyAuditResult;
+  /** Cleanup transformation results (self-heal mode only). */
+  cleanupTransformations?: CleanupTransformationResult;
 }
 
 export interface TaskBriefTask {

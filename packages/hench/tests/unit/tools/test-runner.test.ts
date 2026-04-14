@@ -445,9 +445,8 @@ describe("runPostTaskTests", () => {
 // ---------------------------------------------------------------------------
 
 describe("runTestGate", () => {
-  const { runTestGate } = await import("../../../src/tools/test-runner.js");
-
   it("skips gate when no files changed", async () => {
+    const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
       projectDir: "/tmp",
       filesChanged: [],
@@ -460,6 +459,7 @@ describe("runTestGate", () => {
   });
 
   it("returns failed gate on non-zero exit code", async () => {
+    const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
       projectDir: "/tmp",
       filesChanged: ["src/foo.ts"],
@@ -474,6 +474,7 @@ describe("runTestGate", () => {
   });
 
   it("includes command in result", async () => {
+    const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
       projectDir: "/tmp",
       filesChanged: ["src/foo.ts"],
@@ -486,6 +487,7 @@ describe("runTestGate", () => {
   });
 
   it("measures total duration", async () => {
+    const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
       projectDir: "/tmp",
       filesChanged: ["src/foo.ts"],

@@ -32,4 +32,22 @@ export {
   detectRunner,
   buildScopedCommand,
 } from "./test-runner.js";
-export type { PostRunTestResult, TestRunnerOptions, TestGateOptions, DependencyAuditOptions, DependencyAuditResult } from "./test-runner.js";
+export type { PostRunTestResult, TestRunnerOptions, TestGateOptions, DependencyAuditOptions } from "./test-runner.js";
+// DependencyAuditResult is a schema type — import from schema/index.js instead
+export {
+  runCleanupTransformations,
+  formatCleanupResults,
+  isTestFilePath,
+  assertNotTestFile,
+  TestFileGuardError,
+} from "./cleanup-transformations.js";
+export type {
+  CleanupTransformation,
+  CleanupBatch,
+  CleanupResult,
+  CleanupOptions,
+  AnalyzerOutput,
+  DeadExport,
+  UnusedImport,
+  DuplicateUtility,
+} from "./cleanup-transformations.js";
