@@ -101,6 +101,34 @@ Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` wit
 - **CLI-only content:** These zones must contain only CLI command handlers and their direct support modules. Domain logic belongs in `rex-prd-engine` (e.g., `src/core/`).
 - **Subdirectory convention:** Satellite zone files should be grouped into subdirectories under `packages/rex/src/cli/commands/` to make zone boundaries visible in the file tree.
 
+##### rex CLI two-tier API pattern
+
+Rex exposes two distinct consumer surfaces:
+
+- **Public API** (`src/public.ts`) — for library consumers (hench, web, external packages). Curated, stable, intentionally narrow.
+- **CLI internal imports** — `src/cli/commands/` files may import directly from internal sub-zone barrels when the operation is too fine-grained or CLI-specific for the public API.
+
+This is a **privileged-consumer pattern**: CLI commands are the only non-test code permitted to bypass `public.ts`. All other packages must go through the gateway.
+
+**Approved internal import paths for CLI commands:**
+
+| Path | Used by | Purpose |
+|------|---------|---------|
+| `../../analyze/index.js` | `analyze.ts` | Full analyze pipeline (scan, reconcile, propose) |
+| `../../analyze/acknowledge.js` | `recommend.ts` | Acknowledgment state for recommendations |
+| `../../store/index.js` | `analyze.ts`, `fix.ts`, `recommend.ts` | PRD store resolution |
+| `../../store/atomic-write.js` | `analyze.ts` | Atomic JSON writes for intermediate state |
+| `../../store/project-config.js` | `analyze.ts` | Claude/LLM config loading |
+| `../../fix/index.js` | `fix.ts` | Issue detection and repair |
+| `../../recommend/create-from-recommendations.js` | `recommend.ts` | Recommendation → PRD item pipeline |
+| `../../recommend/conflict-detection.js` | `recommend.ts` | Conflict/duplicate detection |
+| `../../schema/index.js` | `analyze.ts`, `recommend.ts` | Schema types and constants |
+
+**Rules:**
+- **No new internal paths without a table entry.** Adding an import from a sub-zone not listed above requires adding a row to this table.
+- **No domain logic in CLI files.** CLI commands are orchestration only. New domain behavior belongs in the sub-zone, not in the command handler.
+- **Library consumers use `public.ts` only.** If a function needed by hench or web isn't in `public.ts`, add it there — don't create a second internal import path from outside the package.
+
 ##### crash zone proactive governance
 
 `crash` (cohesion 0.5, unidirectional coupling: web-viewer → crash) sits at the dual-fragility threshold boundary. Crash imports web-shared directly (documented bypass) rather than web-viewer. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
