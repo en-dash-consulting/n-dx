@@ -26390,7 +26390,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              }
+              },
               "tags": [
                 "hench",
                 "llm",
@@ -28436,7 +28436,7 @@
       ],
       "recommendationMeta": {
         "findingCount": 43
-      },
+      }
     }
   ]
 }
