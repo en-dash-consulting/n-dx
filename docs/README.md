@@ -17,6 +17,7 @@ Welcome to the n-dx documentation. Use the sidebar or links below to navigate.
 - [Self-Heal Loop](/guide/self-heal) — Automated iterative improvement
 - [Codebase Onboarding](/guide/onboarding) — Understand an unfamiliar codebase in under 30 minutes
 - [Run While You Sleep](/guide/overnight) — Autonomous overnight operation with guardrails
+- [Spec-Driven Development](/guide/spec-driven) — From written spec to executing agent in one session
 
 ## Architecture
 

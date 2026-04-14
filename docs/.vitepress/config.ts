@@ -36,6 +36,7 @@ export default defineConfig({
             { text: "Self-Heal Loop", link: "/guide/self-heal" },
             { text: "Codebase Onboarding", link: "/guide/onboarding" },
             { text: "Run While You Sleep", link: "/guide/overnight" },
+            { text: "Spec-Driven Development", link: "/guide/spec-driven" },
             { text: "Troubleshooting", link: "/guide/troubleshooting" },
           ],
         },
