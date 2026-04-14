@@ -62,6 +62,7 @@
         "packages/web/src/server/routes-rex/health.ts": "web-server",
         "packages/web/src/server/routes-rex/index.ts": "web-server",
         "packages/web/src/server/routes-rex/items.ts": "web-server",
+        "packages/web/src/server/routes-rex/rex-route-helpers.ts": "web-server",
         "packages/web/src/server/routes-rex/prune.ts": "web-server",
         "packages/web/src/server/routes-rex/reads.ts": "web-server",
         "packages/web/src/server/routes-rex/requirements.ts": "web-server",

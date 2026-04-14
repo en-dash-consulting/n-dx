@@ -24,7 +24,7 @@ import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.js";
-import { BrandedHeader } from "../components/logos.js";
+import { BrandedHeader } from "../components/index.js";
 import { CompletionTimeline } from "../components/prd-tree/completion-timeline.js";
 import type { PRDDocumentData } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";

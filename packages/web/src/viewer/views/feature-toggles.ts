@@ -11,7 +11,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { NdxLogoPng } from "../components/logos.js";
+import { NdxLogoPng } from "../components/index.js";
 
 // ── Types (canonical definitions in src/shared/features.ts) ──────────
 import type { FeatureToggle, FeaturesResponse } from "../external.js";

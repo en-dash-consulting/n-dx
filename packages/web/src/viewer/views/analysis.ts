@@ -10,7 +10,7 @@ import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { AnalyzePanel } from "../components/prd-tree/analyze-panel.js";
 import { SmartAddInput, BatchImportPanel } from "../components/prd-tree/index.js";
-import { BrandedHeader } from "../components/logos.js";
+import { BrandedHeader } from "../components/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 

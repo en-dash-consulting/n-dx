@@ -66,6 +66,25 @@ describe("ndx CLI hint surfacing and follow-through", () => {
       expect(code).toBe(0);
       expect(stdout).toContain("ndx work");
     });
+
+    it("hint text matches valid command: 'validat' → 'validate'", () => {
+      const { stderr, status } = runFail(["validat"]);
+      expect(stderr).toContain(`[${UNKNOWN_COMMAND_CODE}]`);
+      expect(stderr).toContain("Did you mean");
+      expect(stderr).toContain("validate");
+      expect(status).toBe(1);
+    });
+
+    it("follow-through: hinted 'validate' exits 0 after init", async () => {
+      const tmp = await createTmpDir("ndx-hints-validate-");
+      try {
+        await setupRexDir(tmp);
+        const { code } = runResult(["validate", tmp]);
+        expect(code).toBe(0);
+      } finally {
+        await removeTmpDir(tmp);
+      }
+    });
   });
 
   describe("related-command hints after unknown-command errors", () => {

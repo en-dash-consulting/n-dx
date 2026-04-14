@@ -9,8 +9,8 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
-import { BrandedHeader } from "../components/logos.js";
-import { RexTaskLink } from "../components/rex-task-link.js";
+import { BrandedHeader } from "../components/index.js";
+import { RexTaskLink } from "../components/index.js";
 import { SmartAddInput, ExecutionPanel, ReorganizePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { usePolling } from "../hooks/index.js";

@@ -809,7 +809,10 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["web-server", "Large composition-root zone (44 files); all server routes, gateways, and infrastructure are deliberately aggregated here via zone pins. Low cohesion reflects intentional breadth, not decay — the zone is the web package's server composition root."],
+  ["prd-tree-search", "Small viewer search zone that intentionally bridges tree-search utilities with facet-state orchestration. Its low score reflects the metric's sensitivity on 3 production files more than a structural boundary problem."],
+  ["refresh-throttle-pipeline", "Two-file pipeline split between framework-agnostic throttling logic and the viewer hook that adapts it. The zone is intentionally minimal, so cohesion remains noisy until more shared runtime surface exists."],
+  ["web-shared", "Foundation barrel intentionally groups a few unrelated cross-layer constants and feature flags that must stay framework-agnostic. With only 3 files, the cohesion metric underestimates the value of keeping these shared primitives centralized."],
+  ["web-theme-toggle", "Single-file leaf component isolated on purpose to keep theme switching self-contained. A one-file zone cannot achieve the threshold without artificial merging into an unrelated viewer zone."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {

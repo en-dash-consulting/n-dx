@@ -21,9 +21,9 @@ import {
   getZoneColorByIndex,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
-import { SearchFilter } from "../components/search-filter.js";
-import { BrandedHeader } from "../components/logos.js";
-import { ZoneSlideout } from "../components/zone-slideout.js";
+import { SearchFilter } from "../components/index.js";
+import { BrandedHeader } from "../components/index.js";
+import { ZoneSlideout } from "../components/index.js";
 import type {
   ZoneData,
   BoxRect,

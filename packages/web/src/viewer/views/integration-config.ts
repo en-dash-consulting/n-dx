@@ -17,7 +17,7 @@
 
 import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
-import { BrandedHeader } from "../components/logos.js";
+import { BrandedHeader } from "../components/index.js";
 
 // ── Types (duplicated from rex for browser context) ──────────────────
 

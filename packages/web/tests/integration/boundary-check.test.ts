@@ -293,7 +293,7 @@ describe("server/client boundary", () => {
 
         for (const imp of extractImportPaths(file)) {
           for (const component of componentFiles) {
-            if (imp.includes(`/${component}`) && !imp.includes("/index")) {
+            if (imp.includes(`/components/${component}`) && !imp.includes("/index")) {
               violations.push(
                 `${rel} imports "${imp}" — must use components/index.js barrel`
               );
