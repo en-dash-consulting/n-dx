@@ -38,6 +38,7 @@ import { findAvailablePort } from "./port.js";
  * where the server's stdout is not available.
  */
 export const PORT_FILE = ".n-dx-web.port";
+const LOOPBACK_HOST = "127.0.0.1";
 
 // ── Shutdown handler ──────────────────────────────────────────────────────
 
@@ -656,7 +657,7 @@ export async function startServer(
       }
     });
 
-    server.listen(actualPort, async () => {
+    server.listen(actualPort, LOOPBACK_HOST, async () => {
       // Write port file so the orchestrator can discover the actual port
       // (especially important in background mode where stdout is unavailable).
       const portFilePath = join(absDir, PORT_FILE);

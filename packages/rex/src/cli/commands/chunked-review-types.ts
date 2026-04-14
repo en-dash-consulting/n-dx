@@ -1,9 +1,6 @@
-export type ProposalItemStatus =
-  | "pending"
-  | "in_progress"
-  | "completed"
-  | "deferred"
-  | "deleted";
+import type { ItemStatus } from "../../schema/index.js";
+
+export type ProposalItemStatus = ItemStatus;
 
 export interface ProposalTask {
   title: string;

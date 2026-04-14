@@ -10,6 +10,8 @@
 
 import { createServer, createConnection } from "node:net";
 
+const LOOPBACK_HOST = "127.0.0.1";
+
 /** Default port range for fallback allocation. */
 export const DEFAULT_PORT = 3117;
 export const PORT_RANGE_START = 3117;
@@ -31,6 +33,27 @@ export interface PortAllocationResult {
   isOriginal: boolean;
   /** The originally requested port. */
   requestedPort: number;
+}
+
+async function allocateEphemeralPort(): Promise<number> {
+  return await new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, LOOPBACK_HOST, () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate an ephemeral port.")));
+        return;
+      }
+      server.close((err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(address.port);
+      });
+    });
+  });
 }
 
 /**
@@ -70,7 +93,7 @@ export interface PortRetryOptions {
 export function checkPort(port: number): Promise<PortCheckResult> {
   return new Promise((resolve) => {
     // Phase 1: try to connect — detects if a server is already listening
-    const sock = createConnection({ port, host: "127.0.0.1" });
+    const sock = createConnection({ port, host: LOOPBACK_HOST });
     sock.once("connect", () => {
       sock.destroy();
       resolve({ available: false, port, error: "EADDRINUSE" });
@@ -83,7 +106,7 @@ export function checkPort(port: number): Promise<PortCheckResult> {
         server.once("error", (err: NodeJS.ErrnoException) => {
           resolve({ available: false, port, error: err.code ?? err.message });
         });
-        server.listen(port, () => {
+        server.listen(port, LOOPBACK_HOST, () => {
           server.close(() => {
             resolve({ available: true, port });
           });
@@ -176,6 +199,12 @@ export async function findAvailablePort(
       `Permission denied for port ${preferred}. ` +
       `Try a port above 1024 or run with elevated privileges.`,
     );
+  }
+
+  const preferredInFallbackRange = preferred >= rangeStart && preferred <= rangeEnd;
+  if (!preferredInFallbackRange) {
+    const port = await allocateEphemeralPort();
+    return { port, isOriginal: false, requestedPort: preferred };
   }
 
   // Scan the range for an available port

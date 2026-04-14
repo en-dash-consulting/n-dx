@@ -12,7 +12,7 @@
     "build": "pnpm -r run build",
     "dev": "pnpm -r run dev",
     "typecheck": "pnpm -r run typecheck",
-    "test": "vitest run && pnpm -r run test",
+    "test": "node scripts/run-vitest-bind-aware.mjs root && pnpm -r run test",
     "validate": "pnpm -r run validate",
     "verify": "vitest run tests/e2e && node packages/core/ci.js .",
     "pr-check": "node pr-check.js",

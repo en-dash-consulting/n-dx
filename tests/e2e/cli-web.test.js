@@ -6,6 +6,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
+const LOOPBACK_HOST = "127.0.0.1";
 
 function runResult(args) {
   try {
@@ -78,7 +79,7 @@ async function setupProject(dir) {
 function findAvailablePort() {
   return new Promise((resolve, reject) => {
     const srv = createServer();
-    srv.listen(0, () => {
+    srv.listen(0, LOOPBACK_HOST, () => {
       const port = srv.address().port;
       srv.close(() => resolve(port));
     });
@@ -93,7 +94,7 @@ function findAvailablePort() {
 function blockPort(port) {
   return new Promise((resolve, reject) => {
     const srv = createServer();
-    srv.listen(port, () => {
+    srv.listen(port, LOOPBACK_HOST, () => {
       resolve({
         server: srv,
         port,

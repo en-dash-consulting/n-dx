@@ -31,7 +31,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node ../../scripts/run-vitest-bind-aware.mjs sourcevision",
     "test:watch": "vitest",
     "validate": "tsc --noEmit && vitest run",
     "prepare": "pnpm run build"

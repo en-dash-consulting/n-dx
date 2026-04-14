@@ -23,6 +23,7 @@ import {
 } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
+const LOOPBACK_HOST = "127.0.0.1";
 
 /**
  * Wait for the server to accept connections on the given port.
@@ -101,7 +102,7 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
     const { createServer } = await import("node:net");
     port = await new Promise((resolve, reject) => {
       const srv = createServer();
-      srv.listen(0, () => {
+      srv.listen(0, LOOPBACK_HOST, () => {
         const p = srv.address().port;
         srv.close(() => resolve(p));
       });

@@ -97,6 +97,9 @@ describe("registerUsageScheduler", () => {
   });
 
   it("an error in one tick does not prevent subsequent ticks from firing", async () => {
+    // Use fake timers so the test is deterministic and not subject to event-loop
+    // starvation when 150+ test files run in parallel.
+    vi.useFakeTimers();
     let callCount = 0;
 
     const options: RegisterSchedulerOptions = {
@@ -112,8 +115,11 @@ describe("registerUsageScheduler", () => {
     const handle = registerUsageScheduler(options);
     activeTimers.push(handle);
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Advance fake clock by 100 ms (≥ 5 ticks at 20 ms interval); also flushes
+    // any pending microtasks between each tick so async callbacks settle fully.
+    await vi.advanceTimersByTimeAsync(100);
     clearInterval(handle);
+    vi.useRealTimers();
 
     // The scheduler must have recovered and fired subsequent ticks despite the first error.
     expect(callCount).toBeGreaterThan(1);

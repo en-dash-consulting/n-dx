@@ -50,6 +50,7 @@ const ALLOWED = new Set([
   // Development scripts
   "packages/web/dev.js",
   "scripts/cli-smoke-parity.mjs",
+  "scripts/run-vitest-bind-aware.mjs",
   // Process monitoring — needs raw execFile for system commands (vm_stat, sysctl)
   "packages/hench/src/process/memory-monitor.ts",
   // Git operations — need execFileSync for git CLI calls

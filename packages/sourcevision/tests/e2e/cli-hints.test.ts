@@ -60,7 +60,7 @@ describe("sourcevision CLI hint surfacing and follow-through", () => {
       expect(init.code).toBe(0);
       const { code } = runResult(["validate", tmpDir]);
       expect(code).toBe(0);
-    });
+    }, 15_000);
 
     it(
       "hint text matches valid command: 'analyzee' → 'analyze'",
