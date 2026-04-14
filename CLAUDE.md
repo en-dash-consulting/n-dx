@@ -157,7 +157,7 @@ Zone IDs must encode their package to prevent cross-package prefix collisions in
 | `web-viewer-` | web viewer zones | `web-viewer-hub` |
 | `web-sv-` | web zones rendering sourcevision data | `web-sv-view-tests` |
 
-The `sourcevision-view-tests` zone currently violates this convention — it is in the web package but uses the `sourcevision-` prefix, colliding with sourcevision package zones. The correct ID is `web-sv-view-tests`. Apply this via zone pins in `.n-dx.json` at next re-analysis.
+The `sourcevision-view-tests` zone violated this convention — it was in the web package but used the `sourcevision-` prefix. It has been corrected to `web-sv-view-tests` via zone pins in `.n-dx.json` (see `ZONES.md` for the pin manifest).
 
 See also: `ZONES.md` for the zone promotion checklist.
 

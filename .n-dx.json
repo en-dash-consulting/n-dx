@@ -76,6 +76,9 @@
         "packages/web/src/server/start.ts": "web-server",
         "packages/web/src/server/types.ts": "web-server",
         "packages/web/src/server/websocket.ts": "web-server",
+        "packages/web/tests/helpers/server-route-test-support.ts": "web-server",
+        "packages/web/tests/unit/server/routes-hench-execute.test.ts": "web-server",
+        "packages/web/tests/unit/server/routes-sourcevision.test.ts": "web-server",
         "packages/rex/src/core/fix.ts": "rex-prd-engine",
         "packages/rex/src/analyze/batch-types.ts": "rex-prd-engine",
         "packages/rex/src/core/keywords.ts": "rex-prd-engine",
@@ -101,7 +104,9 @@
         "packages/rex/src/schema/v1.ts": "rex-prd-engine",
         "packages/rex/src/schema/levels.ts": "rex-prd-engine",
         "packages/rex/tests/unit/core/keywords.test.ts": "rex-prd-engine",
-        "packages/rex/tests/unit/core/verify.test.ts": "rex-prd-engine"
+        "packages/rex/tests/unit/core/verify.test.ts": "rex-prd-engine",
+        "packages/web/tests/unit/viewer/enrichment-thresholds.test.ts": "web-sv-view-tests",
+        "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts": "web-sv-view-tests"
       },
       "types": {
         "e2e": "test",
@@ -112,7 +117,8 @@
         "rex-unit": "test",
         "server-route-guardrails-tests": "test",
         "web-build-tooling": "infrastructure",
-        "web-integration": "test"
+        "web-integration": "test",
+        "web-sv-view-tests": "test"
       }
     }
   },

@@ -39,9 +39,7 @@ Zone IDs must encode their package to prevent cross-package prefix collisions in
 
 ### Known violations
 
-| Current ID | Correct ID | Location | Resolution |
-|-----------|-----------|---------|-----------|
-| `sourcevision-view-tests` | `web-sv-view-tests` | `packages/web/tests/` | Add zone pin in `.n-dx.json` at next re-analysis |
+_(none — all resolved via zone pins in `.n-dx.json`)_
 
 ---
 
@@ -93,6 +91,10 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
 - `packages/web/src/landing/landing.ts` → `web-landing`
 - `packages/web/{build,dev}.js`, `packages/web/{package.json,tsconfig.json,vitest.config.ts,*.png}` → `web-package-assets`
 
+**web-sv-view-tests zone** — Tests for viewer tabs rendering sourcevision-derived data. Pinned to prevent `sourcevision-` prefix misclassification:
+- `packages/web/tests/unit/viewer/enrichment-thresholds.test.ts` → `web-sv-view-tests`
+- `packages/web/tests/unit/viewer/sourcevision-tabs.test.ts` → `web-sv-view-tests`
+
 ### Architectural Anchor Pins
 
 Files pinned to keep critical modules stable across re-analyses regardless of import topology changes.
@@ -116,7 +118,6 @@ Files pinned to keep critical modules stable across re-analyses regardless of im
 | `packages/web/src/viewer/crash/view-id.ts` (if exists) | `web-viewer` | Phantom viewer-crash-recovery↔web-viewer coupling |
 | `packages/web/src/server/task-usage/shared-types.ts` (if exists) | `web-server` | Phantom task-usage-scheduler↔web-server coupling |
 | rex-2 files (unidentified) | Descriptive zone TBD | Unnamed overflow zone — run `sv zones` to identify |
-| `sourcevision-view-tests` files | `web-sv-view-tests` | Zone ID naming convention violation |
 
 ---
 
