@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { loadPRD, savePRD } from "./shared.js";
+import { loadPRD, savePRD } from "./rex-route-helpers.js";
 
 import {
   computeHealthScore,

@@ -13,7 +13,7 @@
  *   ../routes-rex-analysis.ts — Analysis, proposals, smart-add, batch-import
  *   execution.ts    — Epic-by-epic execution, pause/resume, shutdown
  *   health.ts       — Health score and reorganization proposals
- *   shared.ts       — Shared helpers (load/save PRD, appendLog, etc.)
+ *   rex-route-helpers.ts — Route-level helpers (load/save PRD, appendLog, etc.)
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";

@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse } from "../response-utils.js";
-import { loadPRD, findNextTask, collectCompletedIds } from "./shared.js";
+import { loadPRD, findNextTask, collectCompletedIds } from "./rex-route-helpers.js";
 
 import {
   computeStats,

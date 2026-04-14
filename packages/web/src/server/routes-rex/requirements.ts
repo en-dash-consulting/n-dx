@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, loadPRD, savePRD, appendLog } from "./shared.js";
+import { findItemById, loadPRD, savePRD, appendLog } from "./rex-route-helpers.js";
 
 import {
   type PRDItem,
