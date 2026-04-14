@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { h, render } from "preact";
 import { usePersistentFilter } from "../../../src/viewer/hooks/use-persistent-filter.js";
 import type { ItemStatus } from "../../../src/viewer/components/prd-tree/types.js";
-import { defaultStatusFilter } from "../../../src/viewer/components/prd-tree/status-filter.js";
+import { defaultStatusFilter } from "../../../src/viewer/views/status-filter.js";
 
 /**
  * Captures the hook's return value via a ref callback pattern.

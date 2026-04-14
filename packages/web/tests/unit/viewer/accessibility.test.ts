@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { Guide } from "../../../src/viewer/components/guide.js";
 import { SidebarThemeToggle } from "../../../src/viewer/components/theme-toggle.js";
-import { StatusFilter, defaultStatusFilter } from "../../../src/viewer/components/prd-tree/status-filter.js";
+import { StatusFilter, defaultStatusFilter } from "../../../src/viewer/views/status-filter.js";
 import { PRDTree } from "../../../src/viewer/components/prd-tree/prd-tree.js";
 import type { PRDDocumentData } from "../../../src/viewer/components/prd-tree/types.js";
 

@@ -74,7 +74,7 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
 **web-viewer zone** — Viewer infrastructure and viewer-prd-interaction zone containment:
 - `packages/web/src/viewer/external.ts` → `web-viewer` — Intra-package gateway anchor
 - `packages/web/src/viewer/components/{progressive-loader,guide}.ts` → `web-viewer`
-- `packages/web/src/viewer/components/prd-tree/status-filter.ts` → `web-viewer`
+- `packages/web/src/viewer/views/status-filter.ts` → `web-viewer`
 - `packages/web/src/viewer/views/{enrichment-thresholds,graph,sourcevision-tabs,token-usage,prd}.ts` → `web-viewer`
 - `packages/web/src/viewer/usage/{constants,index}.ts` → `web-viewer`
 - `packages/web/src/viewer/graph/{index,physics,renderer}.ts` → `web-viewer`

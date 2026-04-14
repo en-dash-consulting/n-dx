@@ -8,7 +8,7 @@
 
 import { h } from "preact";
 import { useCallback, useMemo } from "preact/hooks";
-import type { ItemStatus } from "./types.js";
+import type { ItemStatus } from "../components/prd-tree/types.js";
 
 /** All available statuses in display order. */
 export const ALL_STATUSES: ItemStatus[] = [

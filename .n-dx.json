@@ -32,7 +32,7 @@
         "packages/web/src/server/aggregation-cache.ts": "web-server",
         "packages/web/src/landing/landing.ts": "web-landing",
         "packages/web/src/viewer/components/guide.ts": "web-viewer",
-        "packages/web/src/viewer/components/prd-tree/status-filter.ts": "web-viewer",
+        "packages/web/src/viewer/views/status-filter.ts": "web-viewer",
         "packages/web/src/viewer/views/enrichment-thresholds.ts": "web-viewer",
         "packages/web/src/viewer/views/graph.ts": "web-viewer",
         "packages/web/src/viewer/views/sourcevision-tabs.ts": "web-viewer",
