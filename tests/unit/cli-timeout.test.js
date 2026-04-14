@@ -58,6 +58,23 @@ describe("resolveCommandTimeout", () => {
     // Negative is not a valid timeout; falls back to DEFAULT_TIMEOUT_MS
     expect(resolveCommandTimeout("analyze", cfg)).toBe(DEFAULT_TIMEOUT_MS);
   });
+
+  it("accepts per-command override stored as a numeric string", () => {
+    // Legacy configs may store the value as a string (e.g. from the first
+    // `ndx config cli.timeouts.work 14400000` where existingValue was undefined).
+    const cfg = { cli: { timeouts: { work: "14400000" } } };
+    expect(resolveCommandTimeout("work", cfg)).toBe(14400000);
+  });
+
+  it("accepts global cli.timeoutMs stored as a numeric string", () => {
+    const cfg = { cli: { timeoutMs: "5000" } };
+    expect(resolveCommandTimeout("analyze", cfg)).toBe(5000);
+  });
+
+  it("ignores non-numeric strings and falls back to the default", () => {
+    const cfg = { cli: { timeouts: { analyze: "lots" } } };
+    expect(resolveCommandTimeout("analyze", cfg)).toBe(DEFAULT_TIMEOUT_MS);
+  });
 });
 
 // ── withCommandTimeout ───────────────────────────────────────────────────────

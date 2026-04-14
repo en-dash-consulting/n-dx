@@ -25,6 +25,20 @@ export const DEFAULT_TIMEOUT_MS = 1800000;
 const NO_DEFAULT_TIMEOUT_COMMANDS = new Set(["start", "web", "dev"]);
 
 /**
+ * Coerce a config value to a finite non-negative number of milliseconds.
+ * Accepts both native numbers and numeric strings (e.g. "14400000") so
+ * manually-edited or legacy configs that stored numbers as strings still work.
+ * Returns NaN if the value cannot be interpreted as a timeout.
+ */
+function toTimeoutMs(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim())) {
+    return Number(value);
+  }
+  return NaN;
+}
+
+/**
  * Resolve the effective timeout for a CLI command.
  *
  * Priority (highest first):
@@ -43,15 +57,15 @@ export function resolveCommandTimeout(command, projectConfig) {
   const cli = projectConfig?.cli ?? {};
 
   // 1. Per-command override takes highest precedence
-  const perCommand = cli.timeouts?.[command];
-  if (typeof perCommand === "number") {
+  const perCommand = toTimeoutMs(cli.timeouts?.[command]);
+  if (Number.isFinite(perCommand)) {
     // Explicit 0 means "no timeout"; positive value is a timeout in ms
     return perCommand >= 0 ? perCommand : DEFAULT_TIMEOUT_MS;
   }
 
   // 2. Global CLI timeout override
-  const global = cli.timeoutMs;
-  if (typeof global === "number" && global >= 0) {
+  const global = toTimeoutMs(cli.timeoutMs);
+  if (Number.isFinite(global) && global >= 0) {
     return global;
   }
 

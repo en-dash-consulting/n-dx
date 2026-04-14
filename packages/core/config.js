@@ -47,6 +47,13 @@ const PROJECT_SECTIONS = new Set([
  */
 const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "auto"]);
 
+/**
+ * Regex matching integer or simple decimal strings (positive or negative).
+ * Intentionally strict: rejects multi-dot strings like "1.2.3" so version
+ * strings are left as strings.
+ */
+const NUMERIC_STRING_RE = /^-?\d+(\.\d+)?$/;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function fileExists(path) {
@@ -140,6 +147,70 @@ export async function loadProjectConfig(dir) {
   return merged;
 }
 
+/**
+ * Known config paths whose values must be finite numbers.
+ * Used by repairProjectConfig() to re-type string values that should have
+ * been stored as numbers (e.g. from first-time sets before coerceValue
+ * auto-detected numeric strings).
+ *
+ * Paths may use "*" as a final segment to match any key under an object.
+ */
+const NUMERIC_CONFIG_PATHS = [
+  "cli.timeoutMs",
+  "cli.timeouts.*",
+  "web.port",
+];
+
+/**
+ * In-place: coerce string numeric values at known-numeric paths to numbers.
+ * Returns a list of { path, from, to } entries describing each repair.
+ */
+function applyNumericRepairs(obj) {
+  const repairs = [];
+  for (const path of NUMERIC_CONFIG_PATHS) {
+    const parts = path.split(".");
+    const leaf = parts[parts.length - 1];
+    const parent = getByPath(obj, parts.slice(0, -1).join("."));
+    if (parent == null || typeof parent !== "object") continue;
+
+    const entries = leaf === "*" ? Object.keys(parent) : [leaf];
+    for (const key of entries) {
+      const value = parent[key];
+      if (typeof value !== "string") continue;
+      if (!NUMERIC_STRING_RE.test(value)) continue;
+      const n = Number(value);
+      if (!Number.isFinite(n)) continue;
+      const displayPath = leaf === "*"
+        ? `${parts.slice(0, -1).join(".")}.${key}`
+        : path;
+      parent[key] = n;
+      repairs.push({ path: displayPath, from: value, to: n });
+    }
+  }
+  return repairs;
+}
+
+/**
+ * Scan the project-level .n-dx.json for values stored with the wrong JSON
+ * type (typically: numbers stored as strings by old write paths) and repair
+ * them in place. Only rewrites the file when repairs are found.
+ *
+ * Returns { repairs } — a list of { path, from, to } entries. An empty list
+ * means the config was already well-typed (or was missing).
+ */
+export async function repairProjectConfig(dir) {
+  const configPath = join(dir, PROJECT_CONFIG_FILE);
+  const current = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
+  if (!current || Object.keys(current).length === 0) {
+    return { repairs: [] };
+  }
+  const repairs = applyNumericRepairs(current);
+  if (repairs.length > 0) {
+    await saveProjectJSON(configPath, current);
+  }
+  return { repairs };
+}
+
 function isLocalProjectSetting(pkg, settingPath) {
   if (pkg === "claude") return settingPath === "cli_path";
   if (pkg === "llm") return settingPath.endsWith(".cli_path");
@@ -182,10 +253,22 @@ function setByPath(obj, path, value) {
  * - If existing is a number, parse as number
  * - If existing is a boolean, parse as boolean
  * - If existing is an array, split on commas
+ * - If existing is undefined/null, auto-detect: numeric-shaped strings become
+ *   numbers, "true"/"false" become booleans, anything else stays a string.
+ *   This ensures first-time sets of numeric keys (e.g. cli.timeouts.work) are
+ *   stored with the correct JSON type instead of as a string.
  * - Otherwise keep as string
  */
 function coerceValue(newValue, existingValue) {
   if (existingValue === undefined || existingValue === null) {
+    if (typeof newValue === "string") {
+      if (NUMERIC_STRING_RE.test(newValue)) {
+        const n = Number(newValue);
+        if (Number.isFinite(n)) return n;
+      }
+      if (newValue === "true") return true;
+      if (newValue === "false") return false;
+    }
     return newValue;
   }
   if (typeof existingValue === "number") {
