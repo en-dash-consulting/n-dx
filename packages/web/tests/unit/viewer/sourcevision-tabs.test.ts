@@ -4,8 +4,8 @@ import {
   SOURCEVISION_TAB_IDS,
   type SourceVisionTab,
   type SourceVisionTabId,
-} from "../../../src/viewer/views/sourcevision-tabs.js";
-import { ENRICHMENT_THRESHOLDS } from "../../../src/viewer/views/enrichment-thresholds.js";
+  ENRICHMENT_THRESHOLDS,
+} from "../../../src/viewer/views/index.js";
 
 describe("SOURCEVISION_TABS", () => {
   it("defines exactly 9 tabs", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ENRICHMENT_THRESHOLDS } from "../../../src/viewer/views/enrichment-thresholds.js";
+import { ENRICHMENT_THRESHOLDS } from "../../../src/viewer/views/index.js";
 
 describe("ENRICHMENT_THRESHOLDS", () => {
   it("exports architecture threshold", () => {
