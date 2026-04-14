@@ -43,6 +43,36 @@ Integration tests for gateways should verify:
    gateway (e.g., `resolveStore()` -> `findNextTask()` -> `updateStatus()`)
 3. **Type alignment** -- type re-exports match the upstream package's public API
 
+### Co-evolution Rule: Seam Registry and Gateway Table
+
+CLAUDE.md maintains two manually-maintained governance tables documenting
+cross-zone seams — the **injection seam registry** and the **gateway table**.
+These tables have no automated exhaustiveness check (see the governance list
+completeness audit in CLAUDE.md), so correspondence with integration tests can
+only be maintained through discipline.
+
+**Rule:** Every new row added to either table in CLAUDE.md requires a
+corresponding integration test in the same PR. Never widen the gap between table
+entries and tests.
+
+For **injection seam entries** the test must verify:
+
+1. **Runtime callback invocation** — the target module calls each injected
+   function with the expected calling convention. TypeScript structural checks
+   verify signature compatibility but cannot verify that the callback is actually
+   invoked at runtime.
+2. **Optional-callback safety** — the target module does not throw when optional
+   callbacks are omitted from the options object.
+
+See `packages/web/tests/integration/seam-register-scheduler.test.ts` as the
+reference implementation for injection seam tests.
+
+For **gateway entries** follow the Gateway Admission Criterion above.
+
+Violating this rule silently decouples the documented architecture from
+integration coverage. When you encounter a table entry without a corresponding
+test, add the test before adding further entries — do not widen the gap.
+
 ### Test File Placement Convention
 
 A test file whose primary production import target is classified in zone X must
