@@ -32,6 +32,8 @@ import { section, subsection, stream, detail, info, getCapturedLines, resetCaptu
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
+import { fetchCodexTokenUsage } from "../../quota/index.js";
+import { loadLLMConfig } from "../../store/project-config.js";
 
 // ---------------------------------------------------------------------------
 // Shared option types
@@ -389,6 +391,78 @@ export async function runPostTaskTestsIfNeeded(
 }
 
 // ---------------------------------------------------------------------------
+// Codex token retrieval (post-run operation)
+// ---------------------------------------------------------------------------
+
+/**
+ * Attempt to retrieve actual Codex token usage from the OpenAI API after run completion.
+ *
+ * This is a best-effort, asynchronous operation: failures are logged but never
+ * propagate. If tokens are retrieved and are higher than the current run's recorded
+ * tokens (which may be zero-valued), they are merged into the run record.
+ *
+ * Only runs when this was a Codex run (detected by checking turnTokenUsage
+ * entries for vendor="codex").
+ */
+async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): Promise<void> {
+  // Check if any turn used Codex as the vendor
+  const isCodexRun = run.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false;
+  if (!isCodexRun) {
+    return;
+  }
+
+  try {
+    const llmConfig = await loadLLMConfig(projectDir);
+    const codexApiKey = llmConfig.codex?.api_key ?? process.env["OPENAI_API_KEY"];
+
+    if (!codexApiKey || !run.model) {
+      // Silent skip: no API key available or model not set
+      return;
+    }
+
+    const result = await fetchCodexTokenUsage({
+      apiKey: codexApiKey,
+      model: run.model,
+      apiEndpoint: llmConfig.codex?.api_endpoint,
+      timeoutMs: 500,
+      runId: run.id,
+    });
+
+    if (!result.ok) {
+      // Log diagnostic on certain error kinds
+      if (result.error.kind !== "not-found" && result.error.kind !== "rate-limit") {
+        detail(`Codex token retrieval: ${result.error.message}`);
+      }
+      return;
+    }
+
+    // Merge retrieved tokens if they are higher than the current values.
+    // This handles the case where Codex CLI output had zero-valued tokens.
+    const retrieved = result.tokens;
+    const current = run.tokenUsage;
+
+    // Only update if retrieved tokens are strictly higher
+    if (retrieved.input > current.input || retrieved.output > current.output) {
+      const oldTotal = current.input + current.output;
+      const newTotal = retrieved.input + retrieved.output;
+      run.tokenUsage.input = Math.max(current.input, retrieved.input);
+      run.tokenUsage.output = Math.max(current.output, retrieved.output);
+      detail(
+        `Updated Codex tokens from API: ${oldTotal} → ${newTotal} ` +
+          `(input: ${current.input} → ${retrieved.input}, output: ${current.output} → ${retrieved.output})`,
+      );
+    }
+
+    if (result.diagnostic) {
+      detail(`Codex token diagnostic: ${result.diagnostic}`);
+    }
+  } catch {
+    // Swallow any unexpected errors — this is a post-run operation and must never
+    // fail the run itself. The run tokens already captured during execution stand.
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Run finalization (identical in both loops)
 // ---------------------------------------------------------------------------
 
@@ -403,8 +477,8 @@ export interface FinalizeRunOptions {
 
 /**
  * Finalize a run: build structured summary, capture memory stats,
- * run post-task tests, set timestamps, and persist.
- * Called at the end of both loops.
+ * run post-task tests, retrieve Codex tokens if applicable, set timestamps,
+ * and persist. Called at the end of both loops.
  */
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx } = opts;
@@ -433,6 +507,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   }
 
   await runPostTaskTestsIfNeeded(run, projectDir, testCommand);
+
+  // Attempt to retrieve Codex token usage from the OpenAI API after run completion.
+  // This is a best-effort operation: if the API is unavailable or returns zero data,
+  // we silently skip and use the tokens already captured during the run.
+  // Only attempt if this was a Codex run (vendor is "codex" in turnTokenUsage).
+  await retrieveCodexTokensIfNeeded(run, projectDir);
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;
