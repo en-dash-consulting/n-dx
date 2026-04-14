@@ -242,25 +242,29 @@ describe("server/client boundary", () => {
   });
 
   /**
-   * Hench-agent-monitor panel barrel enforcement — files outside the
-   * components/ directory that import panel components must do so through
-   * components/index.ts rather than individual component files.
+   * Components barrel enforcement — files outside the components/ directory
+   * must import through components/index.ts rather than individual component
+   * files. The protected set is derived dynamically from the filesystem so
+   * new files are covered automatically without updating this test.
    *
    * This enforces the barrel contract that exists in components/index.ts
    * and prevents direct file imports from creating encapsulation leaks.
    */
   it("panel component imports from outside components/ must use barrel", () => {
     const viewerDir = join(WEB_SRC, "viewer");
+    const componentsDir = join(viewerDir, "components");
     const violations: string[] = [];
 
-    // Panel components that must be imported via barrel
-    const PANEL_FILES = [
-      "active-tasks-panel",
-      "concurrency-panel",
-      "memory-panel",
-      "ws-health-panel",
-      "throttle-controls",
-    ];
+    // Dynamically collect all component leaf files (excluding the barrel itself)
+    let componentFiles: string[];
+    try {
+      componentFiles = readdirSync(componentsDir)
+        .filter((f) => /\.ts$/.test(f) && f !== "index.ts")
+        .map((f) => f.replace(/\.ts$/, ""));
+    } catch {
+      // components/ doesn't exist in test environment — pass
+      return;
+    }
 
     try {
       for (const file of collectTsFiles(viewerDir)) {
@@ -270,8 +274,8 @@ describe("server/client boundary", () => {
         if (rel.startsWith(join("viewer", "components") + "/")) continue;
 
         for (const imp of extractImportPaths(file)) {
-          for (const panel of PANEL_FILES) {
-            if (imp.includes(`/${panel}`) && !imp.includes("/index")) {
+          for (const component of componentFiles) {
+            if (imp.includes(`/${component}`) && !imp.includes("/index")) {
               violations.push(
                 `${rel} imports "${imp}" — must use components/index.js barrel`
               );
