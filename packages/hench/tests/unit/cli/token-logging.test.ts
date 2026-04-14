@@ -36,10 +36,12 @@ describe("Token logging standardization", () => {
       const inputLine = lines[0];
       const outputLine = lines[1];
 
-      // Both lines should have their value sections aligned (after the label)
-      const inputValueStart = inputLine.indexOf(":");
-      const outputValueStart = outputLine.indexOf(":");
-      expect(inputValueStart).toBe(outputValueStart);
+      // Both lines should reserve the same padded width for the value segment.
+      const inputValue = inputLine.split(": ")[1];
+      const outputValue = outputLine.split(": ")[1];
+      expect(inputValue).toBeTruthy();
+      expect(outputValue).toBeTruthy();
+      expect(inputValue.length).toBe(outputValue.length);
     });
 
     it("handles zero tokens (unavailable data fallback)", () => {

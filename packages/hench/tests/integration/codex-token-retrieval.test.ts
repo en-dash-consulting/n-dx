@@ -171,16 +171,16 @@ describe("Codex token retrieval integration", () => {
         const signal = options.signal as AbortSignal;
         return new Promise<Response>((resolve, reject) => {
           const timeoutId = setTimeout(() => {
-            const error = new DOMException("Aborted", "AbortError");
-            (error as any).name = "AbortError";
+            const error = new Error("Aborted");
+            error.name = "AbortError";
             reject(error);
           }, 10);
 
           if (signal) {
             signal.addEventListener("abort", () => {
               clearTimeout(timeoutId);
-              const error = new DOMException("Aborted", "AbortError");
-              (error as any).name = "AbortError";
+              const error = new Error("Aborted");
+              error.name = "AbortError";
               reject(error);
             });
           }

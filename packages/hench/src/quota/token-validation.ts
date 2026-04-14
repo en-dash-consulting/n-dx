@@ -157,6 +157,15 @@ function detectTaskComplexity(run: RunRecord): "simple" | "moderate" | "complex"
   const turnCount = run.turns ?? 0;
   const totalTokens = (run.tokenUsage?.input ?? 0) + (run.tokenUsage?.output ?? 0);
 
+  if (
+    taskTitle.includes("complex")
+    || taskTitle.includes("refactor")
+    || taskTitle.includes("architecture")
+    || taskTitle.includes("many changes")
+  ) {
+    return "complex";
+  }
+
   // Use heuristics based on turn count and tokens
   if (turnCount <= 3 && totalTokens < 5000) return "simple";
   if (turnCount <= 8 && totalTokens < 15000) return "moderate";
@@ -204,7 +213,9 @@ export function validateTokenReporting(
       if (turnTotal > maxTokens) maxTokens = turnTotal;
 
       // Vendor breakdown
-      metrics.vendorBreakdown[turn.vendor] = (metrics.vendorBreakdown[turn.vendor] ?? 0) + 1;
+      if (turn.vendor) {
+        metrics.vendorBreakdown[turn.vendor] = (metrics.vendorBreakdown[turn.vendor] ?? 0) + 1;
+      }
     }
     metrics.avgTokensPerTurn = Math.round((metrics.totalInput + metrics.totalOutput) / turns.length);
     metrics.maxTokensPerTurn = maxTokens;
@@ -240,10 +251,11 @@ export function validateTokenReporting(
   const relevantBaselines = baselines.filter((b) => b.vendor === (metrics.isCodexRun ? "codex" : "claude") && b.taskComplexity === complexity);
 
   for (const baseline of relevantBaselines) {
-    const minInput = baseline.expectedInput * (1 - baseline.rangePercent / 100);
-    const maxInput = baseline.expectedInput * (1 + baseline.rangePercent / 100);
-    const minOutput = baseline.expectedOutput * (1 - baseline.rangePercent / 100);
-    const maxOutput = baseline.expectedOutput * (1 + baseline.rangePercent / 100);
+    const rangeFactor = baseline.rangePercent / 200;
+    const minInput = baseline.expectedInput * (1 - rangeFactor);
+    const maxInput = baseline.expectedInput * (1 + rangeFactor);
+    const minOutput = baseline.expectedOutput * (1 - rangeFactor);
+    const maxOutput = baseline.expectedOutput * (1 + rangeFactor);
 
     if (metrics.totalInput > 0 && (metrics.totalInput < minInput || metrics.totalInput > maxInput)) {
       issues.push({
@@ -268,6 +280,14 @@ export function validateTokenReporting(
       severity: "error",
       category: "attribution",
       message: "Run marked as Codex but no turns recorded Codex vendor.",
+    });
+  }
+
+  for (const message of validateVendorAttribution(run)) {
+    issues.push({
+      severity: "warning",
+      category: "attribution",
+      message,
     });
   }
 

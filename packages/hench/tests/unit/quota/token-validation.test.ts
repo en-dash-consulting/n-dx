@@ -334,6 +334,7 @@ describe("validateVendorAttribution", () => {
         { turn: 1, vendor: "codex", model: "gpt-4o", input: 1000, output: 200 },
         { turn: 2, vendor: "codex", model: "gpt-4o", input: 500, output: 100 },
       ],
+      model: "gpt-4o",
     });
 
     const issues = validateVendorAttribution(run);

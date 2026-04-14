@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { formatTokenReport, type TokenCount } from "../../../src/cli/token-logging.js";
+import { formatTokenReport, type TokenCount } from "../../src/cli/token-logging.js";
 
 describe("token logging parity between vendors", () => {
   /**

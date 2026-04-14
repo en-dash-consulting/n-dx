@@ -72,7 +72,7 @@ function formatTokenValue(count: number | null | undefined, width: number = DEFA
  * // "tokens_in:       1,500\ntokens_out:        300"
  */
 export function formatTokenReport(tokens: TokenUsage | TokenCount | null): string {
-  if (!tokens) {
+  if (!tokens || getTokenAvailability(tokens) === "unavailable") {
     return `tokens_in: ${formatTokenValue(null)}\ntokens_out: ${formatTokenValue(null)}`;
   }
 

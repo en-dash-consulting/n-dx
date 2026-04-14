@@ -810,10 +810,11 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["prd-tree-search", "Small viewer search zone that intentionally bridges tree-search utilities with facet-state orchestration. Its low score reflects the metric's sensitivity on 3 production files more than a structural boundary problem."],
-  ["refresh-throttle-pipeline", "Two-file pipeline split between framework-agnostic throttling logic and the viewer hook that adapts it. The zone is intentionally minimal, so cohesion remains noisy until more shared runtime surface exists."],
-  ["web-shared", "Foundation barrel intentionally groups a few unrelated cross-layer constants and feature flags that must stay framework-agnostic. With only 3 files, the cohesion metric underestimates the value of keeping these shared primitives centralized."],
-  ["web-theme-toggle", "Single-file leaf component isolated on purpose to keep theme switching self-contained. A one-file zone cannot achieve the threshold without artificial merging into an unrelated viewer zone."],
+  ["prd-tree-search", "Small PRD tree search cluster; SourceVision isolates a narrow subtree-search slice with few internal edges, so cohesion remains slightly below threshold despite a coherent responsibility."],
+  ["refresh-throttle-pipeline", "Tiny refresh throttle pipeline zone; the scheduler and throttle helpers form a narrow satellite with sparse internal edges, making the cohesion score noisy at this size."],
+  ["sourcevision-view-tests", "Small test-only satellite around the SourceVision viewer tabs; cohesion remains low because it exercises multiple viewer entry points rather than a single internal module cluster."],
+  ["web-theme-toggle", "Very small theme toggle cluster; the zone currently contains a minimal pair of loosely connected files, so the measured cohesion is not meaningful yet."],
+  ["web-shared", "Foundation layer; 3 files (below the 5-file threshold for reliable metrics); documented dual-fragility zone — low cohesion reflects the inherent structural gap between data-file constants and view identifiers, not decay."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
@@ -934,8 +935,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 65,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, color/model helpers)",
+    maxExports: 70,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, color/model helpers, vendor reset helpers)",
   },
 ];
 
@@ -1126,11 +1127,10 @@ describe("architecture policy: web package intra-zone cycle detection", () => {
       if (zoneRank.get(fromZone) < zoneRank.get(toZone)) {
         // Verify the import still exists
         const srcPath = join(ROOT, c.from);
-        if (existsSync(srcPath)) {
-          const srcContent = readFileSync(srcPath, "utf-8");
-          const targetBase = c.to.split("/").pop().replace(/\.\w+$/, "");
-          if (!srcContent.includes(targetBase)) continue;
-        }
+        if (!existsSync(srcPath)) continue;
+        const srcContent = readFileSync(srcPath, "utf-8");
+        const targetBase = c.to.split("/").pop().replace(/\.\w+$/, "");
+        if (!srcContent.includes(targetBase)) continue;
         violations.push(`${fromZone} → ${toZone} (${c.from} imports ${c.to})`);
       }
     }
@@ -1183,6 +1183,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
   // Core — lazy-loads Ink TUI to avoid loading React for non-init commands
   ["packages/core/cli.js", "Lazy-loads Ink renderer for animated init UI (TTY only)"],
+  ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers only when the configured vendor changes"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies

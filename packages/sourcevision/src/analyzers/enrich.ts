@@ -134,7 +134,7 @@ export async function enrichZonesWithAI(
   let zonesToEnrich = zones;
   let unchangedZones: Zone[] = [];
 
-  if (currentContentHashes && previousZones?.zoneContentHashes && passNumber <= prevEnrichPass) {
+  if (currentContentHashes && previousZones?.zoneContentHashes && prevEnrichPass > 0) {
     const changed: Zone[] = [];
     for (const zone of zones) {
       if (currentContentHashes[zone.id] !== previousZones.zoneContentHashes[zone.id]) {
@@ -153,7 +153,7 @@ export async function enrichZonesWithAI(
         }
       }
     }
-    if (unchangedZones.length > 0) {
+    if (changed.length > 0 && unchangedZones.length > 0) {
       console.log(`  [enrich] ${changed.length}/${zones.length} zones changed — skipping ${unchangedZones.length} unchanged`);
       zonesToEnrich = changed;
     }
@@ -248,8 +248,11 @@ function applyEnrichResults(
   // Apply parsed data to zones
   let enriched: Zone[] = zones.map((zone) => {
     if (isFirstPass && !successfulBatchIds.has(zone.id)) return zone;
+    const prev = isFirstPass ? undefined : findPrevZone(previousZones?.zones, zone);
     const e = allParsedZones.find((x: any) =>
-      isFirstPass ? x?.algorithmicId === zone.id : x?.id === zone.id
+      isFirstPass
+        ? x?.algorithmicId === zone.id
+        : x?.id === prev?.id || x?.id === zone.id
     );
     if (!e) return zone;
     if (isFirstPass) {
@@ -257,7 +260,6 @@ function applyEnrichResults(
       return { ...zone, id: e.id, name: e.name, description: e.description };
     }
     // Pass 2+: preserve previous names
-    const prev = findPrevZone(previousZones?.zones, zone);
     return prev ? { ...zone, id: prev.id, name: prev.name, description: prev.description } : zone;
   });
 
@@ -273,8 +275,11 @@ function applyEnrichResults(
   // Extract per-zone insights
   const newZoneInsights = new Map<string, string[]>();
   for (const zone of enriched) {
+    const prev = isFirstPass ? undefined : findPrevZone(previousZones?.zones, zone);
     const entry = allParsedZones.find((x: any) =>
-      isFirstPass ? x?.algorithmicId === zone.id || x?.id === zone.id : x?.id === zone.id
+      isFirstPass
+        ? x?.algorithmicId === zone.id || x?.id === zone.id
+        : x?.id === zone.id || x?.id === prev?.id
     );
     const insightField = isFirstPass ? "insights" : "newInsights";
     const insights = extractZoneInsights(entry, insightField);

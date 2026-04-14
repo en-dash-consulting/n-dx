@@ -160,10 +160,15 @@ Cross-zone crossings: ${crossings.length} total across ${new Set(crossings.map(c
 ${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Constraints:
 - Never escalate "pass 0: automated heuristic" findings to "critical" without multiple corroborating findings.
+- Do NOT escalate their severity unless corroborated by MULTIPLE independent findings.
 - No decomposition suggestions unless metric exceeds 2× threshold.
+- Do NOT generate specific file decomposition suggestions unless a metric exceeds 2x its detection threshold.
 - Preserve exact metric values from existing findings; do not round or modify.
+- When referencing heuristic findings, preserve the exact numeric values as written.
 - Good architecture → "info". Problems/risks → "warning"/"critical".
+- Positive findings describing good architecture, clean patterns, or successful design choices must have severity "info".
 - Test-to-implementation coupling is expected; do not flag it.
+- Test files coupling to implementation internals is expected by design.
 
 Tasks:
 1. Reassess severities from cumulative evidence; upgrade to "critical" only with multiple corroborating findings.

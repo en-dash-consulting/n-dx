@@ -95,7 +95,7 @@ function formatTextReport(options: ValidateTokensOptions, runs: RunRecord[]) {
   }
 
   // Per-run validation
-  if (!options.codexOnly || summary.codexSummary) {
+  if (options["codex-only"] !== "true" || summary.codexSummary) {
     subsection("Per-Run Details");
 
     for (const run of runs) {

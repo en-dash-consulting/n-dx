@@ -9,10 +9,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { setQuiet } from "../../../../llm-client/dist/output.js";
-import type { LLMConfig, VendorModelHeaderOptions } from "../../../../llm-client/dist/llm-types.js";
-import { printVendorModelHeader } from "../../../../llm-client/dist/vendor-header.js";
-import { NEWEST_MODELS } from "../../../../llm-client/dist/config.js";
+import { setQuiet, printVendorModelHeader, NEWEST_MODELS } from "@n-dx/llm-client";
+import type { LLMConfig } from "@n-dx/llm-client";
+import type { VendorModelHeaderOptions } from "../../../../../llm-client/src/vendor-header.js";
 
 describe("Model resolution in ndx work", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;

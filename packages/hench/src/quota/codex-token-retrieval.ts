@@ -164,7 +164,10 @@ async function fetchJson<T>(
       fetchFn,
     );
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
+    if (
+      (err instanceof DOMException && err.name === "AbortError")
+      || (err instanceof Error && err.name === "AbortError")
+    ) {
       return {
         ok: false,
         error: {

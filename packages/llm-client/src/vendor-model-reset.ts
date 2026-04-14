@@ -91,6 +91,17 @@ export function resetStaleModel(
     };
   }
 
+  // First-time vendor selection should not emit a reset warning. There is no
+  // previous vendor/model pair to invalidate yet.
+  if (oldVendor === undefined) {
+    return {
+      changed: false,
+      oldModel,
+      newModel: oldModel,
+      reason: undefined,
+    };
+  }
+
   // Vendor is changing. Check if old model is compatible with new vendor.
   const modelIsCompatible = isModelCompatibleWithVendor(newVendor, oldModel);
 
