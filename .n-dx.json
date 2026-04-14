@@ -109,7 +109,10 @@
         "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts": "web-sv-view-tests",
         "packages/web/src/viewer/components/search-overlay.ts": "web-viewer-search-overlay",
         "packages/web/tests/unit/viewer/search-overlay.test.ts": "web-viewer-search-overlay",
-        "packages/web/tests/helpers/preact-test-support.ts": "web-viewer"
+        "packages/web/tests/helpers/preact-test-support.ts": "web-viewer",
+        "packages/hench/src/tools/test-runner.ts": "hench-agent",
+        "packages/hench/tests/unit/tools/go-test-runner.test.ts": "hench-agent",
+        "packages/hench/tests/unit/tools/test-runner.test.ts": "hench-agent"
       },
       "types": {
         "e2e": "test",
