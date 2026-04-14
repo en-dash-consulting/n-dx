@@ -12,7 +12,7 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -730,12 +730,24 @@ export async function cmdRun(
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 
+  // Resolve model: CLI flag > .n-dx.json config > default
+  const cliModelOverride = flags.model;
+  const configuredModel = resolveVendorModel(llmVendor, llmConfig);
+  const resolvedModel = cliModelOverride ? resolveModel(cliModelOverride) : configuredModel;
+  const modelSource: "cli-override" | "configured" | "default" = cliModelOverride
+    ? "cli-override"
+    : (llmVendor === "claude" ? !!llmConfig?.claude?.model : !!llmConfig?.codex?.model)
+      ? "configured"
+      : "default";
+
   // Surface vendor/model at command start for operator visibility.
   // Reads the most recent run artifact (if any) to detect model changes.
   const recentRuns = await listRuns(henchDir, 1);
   const lastRunModel = recentRuns[0]?.model;
   printVendorModelHeader(llmVendor, llmConfig, {
     lastModel: lastRunModel ? resolveModel(lastRunModel) : undefined,
+    resolvedModel,
+    modelSource,
   });
 
   // Suppress all informational output (including quota lines) in JSON mode,
@@ -745,7 +757,7 @@ export async function cmdRun(
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
   const review = flags.review === "true";
-  const model = flags.model;
+  const model = resolvedModel;
   const auto = flags.auto === "true";
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";
