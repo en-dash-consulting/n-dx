@@ -255,6 +255,176 @@ Remediation:
 - If upstream only provides `prompt_tokens`/`completion_tokens`, those are already mapped.
 - If no usage fields are available, zero fallback is intentional; treat the warning as a data-quality signal.
 
+### 3) Token reporting validation and monitoring
+
+Codex token reporting is validated automatically after every run. Use the validation CLI to audit production accuracy.
+
+#### Validation checks
+
+The token validation system checks for:
+
+1. **Non-zero token values** — Codex runs should report non-zero input and output tokens. Zero values may indicate API retrieval failure or upstream omission.
+2. **Outlier detection** — Tokens outside expected ranges for task complexity (simple/moderate/complex) are flagged as warnings.
+3. **Vendor attribution** — Each turn must have a valid vendor (codex/claude), and vendor/model pairs must match (e.g., Codex runs use GPT models, Claude runs use Claude models).
+4. **Per-turn consistency** — Flags if a run has a mix of zero and non-zero token turns (may indicate partial data).
+
+#### Running validation
+
+Validate all recent runs:
+```sh
+hench validate-tokens .
+```
+
+JSON output for analysis/dashboards:
+```sh
+hench validate-tokens --format=json .
+```
+
+Validate only Codex runs (subset):
+```sh
+hench validate-tokens --codex-only .
+```
+
+Strict mode (fail if validation fails):
+```sh
+hench validate-tokens --strict .
+```
+
+#### Interpreting the report
+
+Text output example:
+```
+Token Reporting Validation
+────────────────────────────
+Batch Summary
+  Runs analyzed:  20
+  Passed:         18
+  Warnings:       2
+  Failed:         0
+
+Most Common Issues
+  2x Input tokens outside expected range [...] for moderate task.
+  1x Run reported zero tokens (input and output).
+
+Codex Summary
+  Total Codex runs:          12
+  With non-zero tokens:      11
+  With zero tokens:           1
+  Avg tokens per run:      3,450
+
+Per-Run Details
+  ✓ [Codex] run-abc123 Task: Implement login feature
+    All checks passed
+    Tokens: 1000 input / 200 output
+
+  ⚠ [Codex] run-def456 Task: Fix typo in README
+    ⚠ Input tokens outside expected range [400, 4000] for simple task.
+    Tokens: 50 input / 10 output
+
+Codex vs Claude Comparison
+  ✓ Implement auth module Ratio: 95%
+  ⚠ Refactor parser Ratio: 180%
+    • Codex used significantly more tokens (180% of Claude).
+```
+
+A "✓" indicates the run passed all checks. "⚠" indicates warnings (non-critical). "✗" indicates validation failures.
+
+#### Token baselines and complexity detection
+
+Validation uses task complexity to determine acceptable token ranges:
+
+| Complexity | Expected Input | Expected Output | Range |
+|-----------|---|---|---|
+| Simple | 2,000 | 400 | ±200% |
+| Moderate | 5,000 | 1,000 | ±150% |
+| Complex | 10,000 | 2,000 | ±100% |
+
+Complexity is auto-detected from task metadata (turn count, token totals). Use of high turn counts or large token totals suggests complex work.
+
+#### Dashboard attribution and aggregation
+
+The web dashboard attributes tokens to vendors based on `turnTokenUsage[].vendor` in each run record. Validation ensures:
+- All turns have a valid vendor (codex/claude)
+- Vendor/model pairs are consistent (e.g., Codex runs use GPT models)
+- Aggregations in the dashboard correctly sum tokens per vendor
+
+Example dashboard query:
+```sql
+SELECT
+  vendor,
+  SUM(input) as total_input,
+  SUM(output) as total_output,
+  COUNT(*) as run_count
+FROM hench.turnTokenUsage
+GROUP BY vendor
+```
+
+If validation detects vendor mismatches, the dashboard may attribute tokens incorrectly. Use `hench validate-tokens --format=json` to audit attribution before reporting production metrics.
+
+#### Codex vs Claude token comparison
+
+When both Codex and Claude have run the same task, the validation output includes a comparison:
+
+```
+Codex vs Claude Comparison
+  ✓ Implement auth module Ratio: 95%
+```
+
+The **ratio** is Codex tokens / Claude tokens. Values 0.5–2.0 are considered comparable; ratios outside this range indicate:
+- **< 0.5** — Codex is using significantly fewer tokens. Output quality may differ.
+- **> 2.0** — Codex is using significantly more tokens. May indicate inefficiency or more detailed responses.
+
+Use this to identify when Codex and Claude produce substantially different outputs for similar work.
+
+#### Troubleshooting validation failures
+
+**Issue: "Codex run reported zero tokens"**
+- Codex token retrieval from OpenAI API failed or timed out.
+- Check: `OPENAI_API_KEY` is set and valid.
+- Check: Network connectivity to api.openai.com is available.
+- Remedy: Re-run the task; token retrieval is attempted post-run and may succeed on retry.
+
+**Issue: "Input tokens outside expected range [X, Y] for task complexity"**
+- Task used more/fewer tokens than baseline.
+- Verify task actually completed (check `run.summary` and `run.toolCalls`).
+- If tokens are legitimately high, increase baseline ranges in `.n-dx.json` (see [Configuration](#codex-configuration)).
+- If tokens are legitimately low, the task may have been simpler than detected.
+
+**Issue: "Run contains multiple vendors (codex, claude)"**
+- Run started with Codex and fell back to Claude (or vice versa).
+- This is allowed but requires verification that the fallback was intentional.
+- Check `run.error` and tool call history to confirm why the transition occurred.
+
+**Issue: "Run vendor is Codex but model is not GPT"**
+- Mismatch between recorded vendor and model in `run.model`.
+- Check `turnTokenUsage[0].model` to confirm actual model used.
+- If model is correct, update `run.model` in run record.
+
+#### Configuration
+
+Token validation parameters can be customized in `.n-dx.json`:
+
+```json
+{
+  "tokenValidation": {
+    "enabled": true,
+    "baselines": {
+      "simple": { "expectedInput": 2000, "rangePercent": 200, "expectedOutput": 400 },
+      "moderate": { "expectedInput": 5000, "rangePercent": 150, "expectedOutput": 1000 },
+      "complex": { "expectedInput": 10000, "rangePercent": 100, "expectedOutput": 2000 }
+    },
+    "minNonZeroTokens": 1,
+    "compareCodexAndClaude": true
+  }
+}
+```
+
+**Parameters:**
+- `enabled` — Enable/disable validation on run completion (default: true).
+- `baselines` — Task complexity baseline expectations and acceptable ranges.
+- `minNonZeroTokens` — Minimum non-zero tokens to pass validation (default: 1).
+- `compareCodexAndClaude` — Compute and report Codex vs Claude comparisons (default: true).
+
 ## MCP Servers
 
 Rex and sourcevision expose MCP servers for Claude Code tool use. Two transport options are available: **HTTP** (recommended) and **stdio** (legacy).

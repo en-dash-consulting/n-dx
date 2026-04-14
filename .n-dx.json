@@ -1,6 +1,7 @@
 {
   "llm": {
-    "vendor": "claude"
+    "vendor": "claude",
+    "model": "claude-haiku-4-5"
   },
   "sourcevision": {
     "zones": {

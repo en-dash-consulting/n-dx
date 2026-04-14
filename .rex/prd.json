@@ -26021,16 +26021,247 @@
                 "No documentation section references commands or flags that have been removed or renamed",
                 "CODEX.md sections mirroring CLAUDE.md are updated in sync per the SYNC NOTICE at the top of CLAUDE.md",
                 "A CI assertion or documentation linting step is added (or an existing one is confirmed) that catches future doc/CLI divergence"
+                ],
+                "priority": "medium",
+                "tags": [
+                  "docs",
+                "cli",
+                  "dx"
+                ],
+                "source": "smart-add",
+                "startedAt": "2026-04-13T16:49:33.071Z",
+                "completedAt": "2026-04-13T18:44:45.687Z"
+              }
+            ]
+          }
+        ]
+      },
+      {
+      "id": "d0646ca0-b3c0-4cdd-93f5-ed5ae88e728a",
+      "title": "SourceVision",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-14T15:56:50.296Z",
+      "completedAt": "2026-04-14T15:56:50.296Z",
+      "children": [
+        {
+          "id": "ede8a6b4-dff8-4576-abea-3af9fbd7eaba",
+          "title": "SourceVision Token Efficiency and Prompt Compaction",
+          "status": "completed",
+          "level": "feature",
+          "description": "Reduce the number of tokens consumed during sourcevision LLM calls by compacting prompt templates, trimming redundant data payloads, and simplifying analysis code paths — without changing observable behavior or breaking existing tests.",
+          "source": "smart-add",
+          "startedAt": "2026-04-14T15:56:50.053Z",
+          "completedAt": "2026-04-14T15:56:50.053Z",
+          "children": [
+            {
+              "id": "c6bca124-43c6-4d98-96a8-03e86a7870b8",
+              "title": "Audit and compact sourcevision LLM prompt templates",
+              "status": "completed",
+              "level": "task",
+              "description": "Review every prompt template in the sourcevision analysis pipeline (scan, enrich, findings, next-steps, zone analysis) and rewrite verbose sections to be maximally concise. Remove filler prose, repeated instructions, and redundant context that does not change model behavior. Measure token reduction against current baselines using the existing token tracking infrastructure.",
+              "acceptanceCriteria": [
+                "Each modified prompt template produces output that passes all existing unit and integration tests unchanged",
+                "Total token count across the standard analysis run decreases measurably (measured via token tracking log)",
+                "No prompt loses an instruction that is required for correct model output — confirmed by running the full test suite",
+                "Prompt diffs are reviewed and documented so future contributors understand what was removed and why"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "llm",
+                "tokens",
+                "prompts"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:26:18.744Z",
+              "completedAt": "2026-04-14T15:33:40.705Z"
+            },
+            {
+              "id": "8474f71e-41ac-4d6f-b963-77c8f7a91d85",
+              "title": "Trim and deduplicate LLM data payloads in sourcevision analysis",
+              "status": "completed",
+              "level": "task",
+              "description": "Identify data structures assembled before each LLM call in the sourcevision pipeline — file inventory summaries, import graph excerpts, zone descriptions, findings lists — and remove fields that are duplicated, unused by the model, or trivially derivable. Apply deduplication where the same content appears multiple times across a single prompt context. Goal is to shrink prompt context size without altering which information the model receives.",
+              "acceptanceCriteria": [
+                "All existing tests pass without modification after payload changes",
+                "No field removal causes a regression in findings quality detectable by the test suite",
+                "Token usage for a representative analysis run decreases compared to the pre-change baseline",
+                "Removed or deduplicated fields are documented with rationale in the relevant source files"
+              ],
+              "priority": "high",
+              "tags": [
+                "sourcevision",
+                "llm",
+                "tokens",
+                "data"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:33:43.826Z",
+              "completedAt": "2026-04-14T15:36:44.478Z"
+            },
+            {
+              "id": "caa57841-e765-418d-9c47-035b2a0a01f3",
+              "title": "Simplify and compact sourcevision analysis code for readability and reduced context size",
+              "status": "completed",
+              "level": "task",
+              "description": "Refactor overly verbose or redundant code in the sourcevision analysis modules — particularly large functions and duplicated logic across scan passes — to be more compact. Compaction reduces the surface area when code is included as context in prompts or read by AI tooling, and makes the codebase cheaper to reason about. All changes must be behaviorally equivalent: same inputs produce same outputs, and the existing test suite passes green.",
+              "acceptanceCriteria": [
+                "Refactored functions produce identical outputs on existing test inputs",
+                "Full test suite (unit + integration) passes without modification",
+                "No new abstractions are introduced that don't already have at least two call sites",
+                "Code size reduction is visible in diff — no net-new lines added beyond what is removed"
               ],
               "priority": "medium",
               "tags": [
-                "docs",
-                "cli",
-                "dx"
+                "sourcevision",
+                "refactor",
+                "compaction"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-13T16:49:33.071Z",
-              "completedAt": "2026-04-13T18:44:45.687Z"
+              "startedAt": "2026-04-14T15:53:11.650Z",
+              "completedAt": "2026-04-14T15:56:49.767Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "25f39e2e-c4ca-4132-a053-25beb189d31b",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-14T15:52:50.753Z",
+      "completedAt": "2026-04-14T15:52:50.753Z",
+      "children": [
+        {
+          "id": "32799258-d738-428d-8d6f-8a5bfacfb12a",
+          "title": "Workflow Use Case Guides",
+          "status": "completed",
+          "level": "feature",
+          "description": "End-to-end narrative guides covering the primary n-dx workflows: autonomous overnight operation, self-healing, codebase onboarding, spec-driven development, vibe-coded cleanup, and ongoing PRD change management. Each guide should be opinionated and scenario-specific — not a command reference.",
+          "source": "smart-add",
+          "startedAt": "2026-04-14T15:52:50.546Z",
+          "completedAt": "2026-04-14T15:52:50.546Z",
+          "children": [
+            {
+              "id": "800f8220-0386-48d2-b566-22b5e46c3cea",
+              "title": "Write Autonomous Overnight Operation Guide ('Run While You Sleep')",
+              "status": "completed",
+              "level": "task",
+              "description": "Document how to configure and launch n-dx for unattended multi-iteration autonomous execution — overnight runs, long CI sessions, or background work while the developer is away. Covers hench auto mode, iteration limits, background server setup, how to monitor a running session, how to safely resume or inspect results in the morning, and guardrails to prevent runaway spending or broken states.",
+              "acceptanceCriteria": [
+                "Guide covers `ndx work --auto --iterations=N` and `ndx start --background` setup end-to-end",
+                "Guide explains how to set token budget limits and per-run guardrails to prevent runaway costs",
+                "Guide includes a 'morning after' section: how to check run history, review what was done, and handle partial or failed runs",
+                "Guide documents safe concurrency rules (what can run alongside what) referencing the Concurrency Contract in CLAUDE.md",
+                "Guide is structured as a scenario walkthrough, not a command reference — a developer unfamiliar with n-dx can follow it start to finish"
+              ],
+              "priority": "high",
+              "tags": [
+                "docs",
+                "hench",
+                "autonomous"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:36:47.614Z",
+              "completedAt": "2026-04-14T15:38:43.302Z"
+            },
+            {
+              "id": "984b4cf8-443b-45c9-9a55-5f40e8f59f1c",
+              "title": "Write Codebase Onboarding Guide",
+              "status": "completed",
+              "level": "task",
+              "description": "Document how to use n-dx to rapidly understand an unfamiliar codebase — from first clone through a working mental model of the architecture. Covers running sourcevision analysis, reading CONTEXT.md and llms.txt, exploring zones and the import graph in the dashboard, using sourcevision MCP tools in Claude Code for interactive Q&A, and generating an initial PRD from discovered structure.",
+              "acceptanceCriteria": [
+                "Guide covers the full onboarding sequence: `ndx init` → `ndx analyze` → dashboard exploration → MCP-assisted Q&A",
+                "Guide explains what CONTEXT.md and llms.txt contain and how to use them in an AI-assisted session",
+                "Guide includes a section on reading the zone map and import graph to identify architectural hotspots",
+                "Guide shows how to produce an initial PRD snapshot from a fresh codebase using `ndx plan`",
+                "A developer who has never seen the codebase can follow the guide and reach a useful architectural overview in under 30 minutes"
+              ],
+              "priority": "high",
+              "tags": [
+                "docs",
+                "sourcevision",
+                "onboarding"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:38:46.384Z",
+              "completedAt": "2026-04-14T15:44:01.525Z"
+            },
+            {
+              "id": "41bc75d8-637e-4336-853c-7bfb9b41ddfa",
+              "title": "Write Spec-Driven Development Guide",
+              "status": "completed",
+              "level": "task",
+              "description": "Document how to drive development from a written specification or requirements document using n-dx. Covers importing a spec file into rex (`ndx add --file=spec.md`), reviewing and shaping the generated PRD hierarchy, locking in scope with `ndx plan --accept`, and executing the plan autonomously with `ndx work`. Includes guidance on iterating the spec as requirements evolve and keeping the PRD as the source of truth.",
+              "acceptanceCriteria": [
+                "Guide covers the full spec-to-execution path: spec file → `ndx add --file` import → proposal review → `ndx plan --accept` → `ndx work`",
+                "Guide explains how to review and reshape the imported PRD before accepting — including priority ordering and LoE estimation",
+                "Guide includes a section on updating the spec mid-flight: how to add new items without duplicating existing PRD structure",
+                "Guide shows how to use `ndx status` and the dashboard to track spec coverage as tasks complete",
+                "A developer can follow the guide to go from a markdown spec to an executing autonomous agent in one session"
+              ],
+              "priority": "high",
+              "tags": [
+                "docs",
+                "rex",
+                "spec-driven"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:44:04.607Z",
+              "completedAt": "2026-04-14T15:46:30.933Z"
+            },
+            {
+              "id": "bdf200a2-5695-4716-9ede-73720c5e32c9",
+              "title": "Write Vibe-Coded App Cleanup and Self-Healing Guide",
+              "status": "completed",
+              "level": "task",
+              "description": "Document how to use n-dx to systematically clean up a codebase that was built quickly without formal structure — ad-hoc code, missing tests, architectural violations, or accumulated tech debt. Covers running sourcevision to surface findings, using `ndx recommend` to generate actionable PRD proposals from those findings, accepting a remediation plan, and executing it autonomously with `ndx work` or `ndx self-heal`. Includes guidance on prioritizing findings and setting realistic scope.",
+              "acceptanceCriteria": [
+                "Guide covers the full cleanup loop: `ndx analyze` → `ndx recommend` → proposal review → `ndx plan --accept` → `ndx work` or `ndx self-heal`",
+                "Guide explains how to read sourcevision findings and distinguish high-impact architectural issues from low-signal noise",
+                "Guide includes a section on scoping a cleanup sprint: how to accept a subset of proposals and defer the rest",
+                "Guide documents the `ndx self-heal` command and how it differs from a manual `ndx work` loop",
+                "A developer can follow the guide to go from a messy codebase to a structured remediation plan and begin executing it in one session"
+              ],
+              "priority": "high",
+              "tags": [
+                "docs",
+                "sourcevision",
+                "self-heal",
+                "cleanup"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:46:34.022Z",
+              "completedAt": "2026-04-14T15:52:50.256Z"
+            },
+            {
+              "id": "bd466646-bb0a-400a-a56d-2b67876a2f30",
+              "title": "Write Ongoing Change Management and PRD Pruning Guide",
+              "status": "completed",
+              "level": "task",
+              "description": "Document how to keep n-dx useful over the life of a project — not just at initial setup, but as the codebase evolves, features are completed, and the PRD drifts from reality. Covers periodic re-analysis with `ndx plan`, pruning completed or stale items with `rex prune` and `rex reshape`, using `ndx recommend --acknowledge` to dismiss resolved findings, and establishing a cadence for self-healing passes. Includes guidance on when to push to upstream remote and how to use `ndx sync` for adapter-backed PRDs.",
+              "acceptanceCriteria": [
+                "Guide covers the maintenance loop: periodic `ndx plan` re-analysis → `rex prune` → `rex reshape` → `ndx recommend` acknowledgment",
+                "Guide explains how to identify PRD drift (completed items still marked pending, obsolete epics, orphaned tasks) and resolve it",
+                "Guide includes recommended cadence guidance (e.g., post-sprint pruning, monthly self-heal pass)",
+                "Guide documents `ndx sync` for teams using a Notion or external adapter to keep the PRD accessible outside the CLI",
+                "Guide explains the archive mechanism (`.rex/archive.json`) and how to recover pruned items if needed",
+                "A developer maintaining an active project can follow the guide to restore PRD health after 2–3 months of active development"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "change-management",
+                "pruning"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:51:35.714Z",
+              "completedAt": "2026-04-14T15:51:35.714Z"
             }
           ]
         }
@@ -26111,6 +26342,8 @@
     {
       "id": "b700ee09-e422-46df-a866-50f46682d21e",
       "title": "Code Health: 25 findings across 16 zones",
+      "id": "f38dd45c-a4ee-4eed-ad8c-a667d39c8c86",
+      "title": "LLM Integration",
       "status": "completed",
       "level": "epic",
       "description": "Automated recommendations from SourceVision analysis. 21 zone+category groups covering 25 total findings.",
@@ -26129,6 +26362,14 @@
           "source": "sourcevision",
           "startedAt": "2026-04-13T20:41:34.887Z",
           "completedAt": "2026-04-13T20:41:34.887Z",
+          "id": "3d1dfc17-ba48-4fb7-8b2e-392593740605",
+          "title": "ndx work Model Resolution, Display, and Vendor-Change Reset",
+          "status": "completed",
+          "level": "feature",
+          "description": "The ndx work command does not surface the LLM model configured in .n-dx.json to the user at run time, and may not propagate it to the underlying hench LLM call sites. Additionally, when the vendor is changed, a stale model value from the previous vendor can persist in config, causing silent misconfiguration.",
+          "source": "smart-add",
+          "startedAt": "2026-04-14T16:33:04.573Z",
+          "completedAt": "2026-04-14T16:33:04.573Z",
           "children": [
             {
               "id": "de5ca68f-3c4a-4387-90ec-8edcbf210182",
@@ -26149,7 +26390,40 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              }
+              },
+              "tags": [
+                "hench",
+                "llm",
+                "config",
+                "bug"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T16:22:08.354Z",
+              "completedAt": "2026-04-14T16:28:37.118Z"
+            },
+            {
+              "id": "cc8616dd-581e-4fa7-abb4-6276b2e0882c",
+              "title": "Implement vendor-change model reset to prevent cross-vendor stale config",
+              "status": "completed",
+              "level": "task",
+              "description": "When the user changes the LLM vendor in .n-dx.json (or via ndx config), any previously persisted model value is likely invalid for the new vendor. Detect vendor/model mismatch at config write time and either clear the model field automatically or prompt the user to confirm or reset it.",
+              "acceptanceCriteria": [
+                "Changing the vendor via ndx config clears or resets the model field if the current model value is not valid for the new vendor",
+                "A warning is emitted when a stale model value is detected and auto-cleared, stating the old value and the new resolved default",
+                "Manually editing .n-dx.json to change vendor without updating model triggers a validation warning on the next ndx work or ndx config run",
+                "No model reset occurs when the vendor is unchanged",
+                "Unit tests cover the vendor-change detection and reset logic for at least two vendor transitions (e.g. claude → codex, codex → claude)"
+              ],
+              "priority": "high",
+              "tags": [
+                "config",
+                "llm",
+                "validation",
+                "hench"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-14T16:28:40.254Z",
+              "completedAt": "2026-04-14T16:33:04.257Z"
             }
           ],
           "recommendationMeta": {
@@ -28162,9 +28436,7 @@
       ],
       "recommendationMeta": {
         "findingCount": 43
-      },
-      "startedAt": "2026-04-14T02:20:30.356Z",
-      "completedAt": "2026-04-14T02:20:30.356Z"
+      }
     }
   ]
 }

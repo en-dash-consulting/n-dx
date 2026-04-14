@@ -12,12 +12,13 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
 import { MemoryThrottle } from "../../process/memory-throttle.js";
 import { checkQuotaRemaining, formatQuotaLog } from "../../quota/index.js";
+import { formatTokenReport } from "../token-logging.js";
 
 // ---------------------------------------------------------------------------
 // Schema compatibility
@@ -667,7 +668,7 @@ async function runOne(
   }
 
   info(`Turns: ${run.turns}`);
-  info(`Tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out`);
+  info(formatTokenReport(run.tokenUsage));
   info(`Tool calls: ${run.toolCalls.length}`);
 
   // Memory stats
@@ -729,12 +730,50 @@ export async function cmdRun(
   const llmConfig = await loadLLMConfig(henchDir);
   const llmVendor = resolveLLMVendor(llmConfig);
 
+  // Resolve model: CLI flag > .n-dx.json config > default
+  const cliModelOverride = flags.model;
+  const configuredModel = resolveVendorModel(llmVendor, llmConfig);
+  const resolvedModel = cliModelOverride ? resolveModel(cliModelOverride) : configuredModel;
+  const modelSource: "cli-override" | "configured" | "default" = cliModelOverride
+    ? "cli-override"
+    : (llmVendor === "claude" ? !!llmConfig?.claude?.model : !!llmConfig?.codex?.model)
+      ? "configured"
+      : "default";
+
+  // Validate vendor-model compatibility: warn if configured model is stale
+  const configuredClaudeModel = llmConfig?.claude?.model;
+  const configuredCodexModel = llmConfig?.codex?.model;
+  if (!cliModelOverride) {
+    if (
+      llmVendor === "claude" &&
+      configuredClaudeModel &&
+      !isModelCompatibleWithVendor("claude", configuredClaudeModel)
+    ) {
+      throw new CLIError(
+        `Configured model "${configuredClaudeModel}" is not compatible with vendor="claude".`,
+        `Either use a Claude model (e.g., sonnet, opus) or switch vendor: 'n-dx config llm.vendor codex'`,
+      );
+    }
+    if (
+      llmVendor === "codex" &&
+      configuredCodexModel &&
+      !isModelCompatibleWithVendor("codex", configuredCodexModel)
+    ) {
+      throw new CLIError(
+        `Configured model "${configuredCodexModel}" is not compatible with vendor="codex".`,
+        `Either use a Codex/GPT model (e.g., gpt-4o, o1) or switch vendor: 'n-dx config llm.vendor claude'`,
+      );
+    }
+  }
+
   // Surface vendor/model at command start for operator visibility.
   // Reads the most recent run artifact (if any) to detect model changes.
   const recentRuns = await listRuns(henchDir, 1);
   const lastRunModel = recentRuns[0]?.model;
   printVendorModelHeader(llmVendor, llmConfig, {
     lastModel: lastRunModel ? resolveModel(lastRunModel) : undefined,
+    resolvedModel,
+    modelSource,
   });
 
   // Suppress all informational output (including quota lines) in JSON mode,
@@ -744,7 +783,7 @@ export async function cmdRun(
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
   const review = flags.review === "true";
-  const model = flags.model;
+  const model = resolvedModel;
   const auto = flags.auto === "true";
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";

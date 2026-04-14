@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -105,8 +105,25 @@ function blockPort(port) {
   });
 }
 
+function isListenPermissionError(error) {
+  return Boolean(error && typeof error === "object" && error.code === "EPERM");
+}
+
 describe("n-dx start", { timeout: 120_000 }, () => {
   let tmpDir;
+  let canBindPorts = true;
+
+  beforeAll(async () => {
+    try {
+      await findAvailablePort();
+    } catch (error) {
+      if (isListenPermissionError(error)) {
+        canBindPorts = false;
+        return;
+      }
+      throw error;
+    }
+  });
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "ndx-start-e2e-"));
@@ -138,6 +155,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
 
   describe("port conflict detection", () => {
     it("falls back to another port when requested port is in use", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       const blocker = await blockPort(port);
       try {
@@ -187,6 +205,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
 
   describe("background mode", () => {
     it("starts server in background and creates PID file", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       const { stdout, code } = runResult([`--port=${port}`, "--background", tmpDir]);
       expect(code).toBe(0);
@@ -206,6 +225,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
     });
 
     it("prevents starting a second background server", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       // Start first
       runResult([`--port=${port}`, "--background", tmpDir]);
@@ -229,6 +249,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
     });
 
     it("stop subcommand kills background server", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       runResult([`--port=${port}`, "--background", tmpDir]);
 
@@ -241,6 +262,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
     });
 
     it("status shows running server info", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       runResult([`--port=${port}`, "--background", tmpDir]);
 
@@ -261,6 +283,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
 
   describe("messaging", () => {
     it("uses 'n-dx server' in background output", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       const { stdout, code } = runResult([`--port=${port}`, "--background", tmpDir]);
       expect(code).toBe(0);
@@ -277,6 +300,7 @@ describe("n-dx start", { timeout: 120_000 }, () => {
     });
 
     it("uses 'n-dx server' in already-running error", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       runResult([`--port=${port}`, "--background", tmpDir]);
       await new Promise((r) => setTimeout(r, 200));

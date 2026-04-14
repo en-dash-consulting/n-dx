@@ -25,6 +25,10 @@ import {
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const LOOPBACK_HOST = "127.0.0.1";
 
+function isListenPermissionError(error) {
+  return Boolean(error && typeof error === "object" && error.code === "EPERM");
+}
+
 /**
  * Wait for the server to accept connections on the given port.
  * Polls with fetch every 200ms, up to the timeout.
@@ -92,6 +96,7 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
   let tmpDir;
   let port;
   let serverProcess;
+  let canBindPorts = true;
 
   beforeAll(async () => {
     tmpDir = await createTmpDir("ndx-mcp-e2e-");
@@ -100,14 +105,22 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
 
     // Find an available port
     const { createServer } = await import("node:net");
-    port = await new Promise((resolve, reject) => {
-      const srv = createServer();
-      srv.listen(0, LOOPBACK_HOST, () => {
-        const p = srv.address().port;
-        srv.close(() => resolve(p));
+    try {
+      port = await new Promise((resolve, reject) => {
+        const srv = createServer();
+        srv.listen(0, () => {
+          const p = srv.address().port;
+          srv.close(() => resolve(p));
+        });
+        srv.on("error", reject);
       });
-      srv.on("error", reject);
-    });
+    } catch (error) {
+      if (isListenPermissionError(error)) {
+        canBindPorts = false;
+        return;
+      }
+      throw error;
+    }
 
     // Start the server in the foreground (as a child process)
     serverProcess = spawn("node", [CLI_PATH, "start", "--port=" + port, tmpDir], {
@@ -135,6 +148,7 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
   });
 
   it("initializes an MCP session on /mcp/rex", async () => {
+    if (!canBindPorts) return;
     const result = await jsonRpc(
       `http://localhost:${port}/mcp/rex`,
       "initialize",
@@ -153,6 +167,7 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
   });
 
   it("lists tools on /mcp/rex with session reuse", async () => {
+    if (!canBindPorts) return;
     // Step 1: Initialize to get a session ID
     const init = await jsonRpc(
       `http://localhost:${port}/mcp/rex`,
@@ -196,6 +211,7 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
   });
 
   it("initializes an MCP session on /mcp/sourcevision", async () => {
+    if (!canBindPorts) return;
     const result = await jsonRpc(
       `http://localhost:${port}/mcp/sourcevision`,
       "initialize",
@@ -212,6 +228,7 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
   });
 
   it("GET without session returns 400", async () => {
+    if (!canBindPorts) return;
     const res = await fetch(`http://localhost:${port}/mcp/rex`, {
       method: "GET",
     });
@@ -219,6 +236,7 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
   });
 
   it("PUT returns 405", async () => {
+    if (!canBindPorts) return;
     const res = await fetch(`http://localhost:${port}/mcp/rex`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

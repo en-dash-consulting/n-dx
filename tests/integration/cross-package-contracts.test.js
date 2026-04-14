@@ -255,6 +255,9 @@ describe("hench → llm-client gateway contract", () => {
     "parseApiTokenUsage",
     "parseStreamTokenUsage",
     "resolveModel",
+    "isModelCompatibleWithVendor",
+    "resetStaleModel",
+    "formatVendorChangeWarning",
     "formatUsage",
   ];
 
@@ -587,6 +590,7 @@ describe("gateway export auto-detection", () => {
         "exec", "execStdout", "execShellCmd", "getCurrentHead", "getCurrentBranch",
         "isExecutableOnPath", "spawnTool", "spawnManaged", "ProcessPool", "ProcessLimitError",
         "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "resolveVendorModel",
+        "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
         "formatUsage"],
       ...["PROJECT_DIRS", "NEWEST_MODELS"],
     ]);

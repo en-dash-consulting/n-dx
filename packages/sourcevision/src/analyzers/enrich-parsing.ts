@@ -488,6 +488,29 @@ export function deduplicateZoneIds(zones: Zone[]): void {
   }
 }
 
+// ── Zone helpers ────────────────────────────────────────────────────────────
+
+/** Find the previous zone for a given zone by matching files. */
+export function findPrevZone(prevZones: Zone[] | undefined, zone: Zone): Zone | undefined {
+  if (!prevZones) return;
+  return prevZones.find(
+    (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
+  );
+}
+
+/** Extract insights array from a parsed zone object, filtering for strings. */
+export function extractZoneInsights(zone: any, field: "insights" | "newInsights" = "insights"): string[] {
+  const arr = Array.isArray(zone?.[field]) ? zone[field] : [];
+  return arr.filter((s: any) => typeof s === "string");
+}
+
+/** Format a file label with optional archetype annotation. */
+export function formatFileLabel(file: string, archetypes?: Map<string, string | null>): string {
+  if (!archetypes?.size) return `"${file}"`;
+  const arch = archetypes.get(file);
+  return arch ? `"${file}" [${arch}]` : `"${file}"`;
+}
+
 // ── Result type ──────────────────────────────────────────────────────────────
 
 export interface EnrichResult {

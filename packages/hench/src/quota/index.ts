@@ -29,6 +29,28 @@ export type {
 export { fetchCodexQuota } from "./codex-quota.js";
 export type { ClaudeQuotaResult, FetchClaudeQuotaOptions } from "./claude-quota.js";
 export { fetchClaudeQuota } from "./claude-quota.js";
+export type {
+  TokenRetrievalError,
+  TokenRetrievalErrorKind,
+  CodexTokenRetrievalResult,
+  FetchCodexTokenUsageOptions,
+} from "./codex-token-retrieval.js";
+export { fetchCodexTokenUsage } from "./codex-token-retrieval.js";
+export type {
+  TokenValidationResult,
+  TokenValidationIssue,
+  TokenValidationMetrics,
+  TokenBaseline,
+  CodexClaudeComparison,
+  TokenValidationSummary,
+} from "./token-validation.js";
+export {
+  validateTokenReporting,
+  compareCodexAndClaude,
+  validateVendorAttribution,
+  validateTokenReportingBatch,
+} from "./token-validation.js";
+export { validateRunTokensPostRun } from "./token-validation-hook.js";
 
 import { fetchCodexQuota } from "./codex-quota.js";
 import { fetchClaudeQuota } from "./claude-quota.js";

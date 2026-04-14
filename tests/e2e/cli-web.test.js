@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -105,8 +105,25 @@ function blockPort(port) {
   });
 }
 
+function isListenPermissionError(error) {
+  return Boolean(error && typeof error === "object" && error.code === "EPERM");
+}
+
 describe("n-dx web", { timeout: 120_000 }, () => {
   let tmpDir;
+  let canBindPorts = true;
+
+  beforeAll(async () => {
+    try {
+      await findAvailablePort();
+    } catch (error) {
+      if (isListenPermissionError(error)) {
+        canBindPorts = false;
+        return;
+      }
+      throw error;
+    }
+  });
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "ndx-web-e2e-"));
@@ -150,6 +167,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
 
   describe("port conflict detection", () => {
     it("falls back to another port when requested port is in use", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       const blocker = await blockPort(port);
       try {
@@ -199,6 +217,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
 
   describe("config integration", () => {
     it("reads port from .n-dx.json config", async () => {
+      if (!canBindPorts) return;
       // Write a config with a port. Use background mode to verify the
       // config port is passed to the server (it appears in the output).
       const port = await findAvailablePort();
@@ -216,6 +235,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
     });
 
     it("--port flag overrides config", async () => {
+      if (!canBindPorts) return;
       const configPort = await findAvailablePort();
       const flagPort = await findAvailablePort();
       await writeFile(
@@ -236,6 +256,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
 
   describe("background mode", () => {
     it("starts server in background and creates PID file", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       const { stdout, code } = runResult([`--port=${port}`, "--background", tmpDir]);
       expect(code).toBe(0);
@@ -255,6 +276,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
     });
 
     it("prevents starting a second background server", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       // Start first
       runResult([`--port=${port}`, "--background", tmpDir]);
@@ -278,6 +300,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
     });
 
     it("stop subcommand kills background server", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       runResult([`--port=${port}`, "--background", tmpDir]);
 
@@ -290,6 +313,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
     });
 
     it("status shows running server info", async () => {
+      if (!canBindPorts) return;
       const port = await findAvailablePort();
       runResult([`--port=${port}`, "--background", tmpDir]);
 

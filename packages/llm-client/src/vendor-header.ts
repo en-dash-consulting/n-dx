@@ -28,6 +28,16 @@ export interface VendorModelHeaderOptions {
    * expanding shorthand aliases), a warning is emitted.
    */
   lastModel?: string;
+  /**
+   * The final resolved model after applying all overrides (CLI flag > .n-dx.json > default).
+   * When provided, this is displayed instead of resolving from config alone.
+   */
+  resolvedModel?: string;
+  /**
+   * Source of the resolved model: "cli-override", "configured", or "default".
+   * Used to label the model display appropriately.
+   */
+  modelSource?: "cli-override" | "configured" | "default";
 }
 
 /**
@@ -49,11 +59,21 @@ export function printVendorModelHeader(
 ): void {
   if (options?.format === "json") return;
 
-  const resolved = resolveVendorModel(vendor, config);
-  const isConfigured = vendor === "claude"
-    ? !!config?.claude?.model
-    : !!config?.codex?.model;
-  const source = isConfigured ? "configured" : "default";
+  // Use provided resolved model if available, otherwise resolve from config
+  const resolved = options?.resolvedModel || resolveVendorModel(vendor, config);
+
+  // Use provided source if available, otherwise determine from config
+  let source: string = options?.modelSource || "default";
+  if (!options?.modelSource) {
+    const configModel = vendor === "claude"
+      ? config?.claude?.model
+      : vendor === "codex"
+        ? config?.codex?.model
+        : undefined;
+    if (configModel) {
+      source = "configured";
+    }
+  }
 
   info(`Vendor: ${vendor}  Model: ${resolved} (${source})`);
 
