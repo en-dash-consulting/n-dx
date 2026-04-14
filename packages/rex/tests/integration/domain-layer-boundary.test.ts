@@ -17,6 +17,18 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 
+/** Extract all `from "..."` import paths — handles multi-line imports. */
+function extractFromPaths(filePath: string): string[] {
+  const content = readFileSync(filePath, "utf-8");
+  const paths: string[] = [];
+  const re = /from\s+["']([^"']+)["']/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    paths.push(m[1]!);
+  }
+  return paths;
+}
+
 const REX_SRC = join(import.meta.dirname!, "..", "..", "src");
 
 /** Recursively collect all .ts files under a directory. */
@@ -130,5 +142,64 @@ describe("rex domain-layer boundary", () => {
       expect(imp).not.toMatch(/\/cli\//);
       expect(imp).not.toMatch(/\/analyze\//);
     }
+  });
+});
+
+describe("rex cli/commands import surface", () => {
+  /**
+   * cli/commands/ files may import from:
+   *   - Same zone: ./anything (sibling command files)
+   *   - Adjacent CLI layer: ../errors.js, ../output.js, etc. (one level up)
+   *   - Core directly: ../../core/anything (privileged direct consumer)
+   *   - External packages: @n-dx/llm-client, node:*
+   *
+   * Imports from schema/, store/, analyze/, fix/, recommend/, workflow/
+   * bypass public.ts entirely, creating a de-facto second internal API
+   * that is invisible to domain-isolation.test.js and external consumers.
+   *
+   * The KNOWN_VIOLATIONS set below documents the current surface. Any new
+   * module path outside this set will fail CI, capping surface growth and
+   * making additions deliberate and visible in code review.
+   */
+  const KNOWN_VIOLATIONS = new Set([
+    "../../analyze/acknowledge.js",
+    "../../analyze/batch-types.js",
+    "../../analyze/dedupe.js",
+    "../../analyze/index.js",
+    "../../analyze/reason.js",
+    "../../analyze/reshape-reason.js",
+    "../../fix/index.js",
+    "../../recommend/conflict-detection.js",
+    "../../recommend/create-from-recommendations.js",
+    "../../schema/index.js",
+    "../../schema/validate.js",
+    "../../store/adapter-registry.js",
+    "../../store/atomic-write.js",
+    "../../store/index.js",
+    "../../store/project-config.js",
+    "../../workflow/default.js",
+  ]);
+
+  it("cli/commands/ does not introduce new bypass imports outside the tracked surface", () => {
+    const commandsDir = join(REX_SRC, "cli", "commands");
+    const newViolations: string[] = [];
+
+    for (const file of collectTsFiles(commandsDir)) {
+      const rel = relative(REX_SRC, file);
+      for (const imp of extractFromPaths(file)) {
+        // Only check imports that cross two directory levels (../../zone/module)
+        if (!imp.startsWith("../../")) continue;
+        // core/ is the privileged direct consumer — explicitly allowed
+        if (imp.startsWith("../../core/")) continue;
+        // Anything else not in the tracked surface is a new violation
+        if (!KNOWN_VIOLATIONS.has(imp)) {
+          newViolations.push(
+            `${rel} imports "${imp}" — not in KNOWN_VIOLATIONS; route through public.ts or add to tracked surface with justification`,
+          );
+        }
+      }
+    }
+
+    expect(newViolations).toEqual([]);
   });
 });
