@@ -162,6 +162,44 @@ async function main(): Promise<void> {
         await cmdTemplate(resolveDir(), positional, flags);
         break;
       }
+      case "validate-tokens": {
+        const { cmdValidateTokens } = await import("./commands/validate-tokens.js");
+        const henchDir = `${resolveDir()}/.hench`;
+        await cmdValidateTokens(henchDir, {
+          format: flags.format,
+          strict: flags.strict,
+          limit: flags.limit,
+          "codex-only": flags["codex-only"],
+        });
+        break;
+      }
+      default: {
+        // Check if the user tried an ndx-only orchestration command
+        const NDX_ONLY_COMMANDS: Record<string, string> = {
+          plan: "ndx plan",
+          work: "ndx work",
+          "self-heal": "ndx self-heal",
+          start: "ndx start",
+          ci: "ndx ci",
+          dev: "ndx dev",
+          refresh: "ndx refresh",
+          export: "ndx export",
+          analyze: "ndx analyze",
+        };
+        if (command in NDX_ONLY_COMMANDS) {
+          throw new CLIError(
+            `"${command}" is an orchestrator command. Run: ${NDX_ONLY_COMMANDS[command]} .`,
+          );
+        }
+
+        const HENCH_COMMANDS = ["init", "run", "status", "show", "config", "template", "validate-tokens"];
+        const typoHint = formatTypoSuggestion(command, HENCH_COMMANDS, "hench ");
+        throw new CLIError(
+          `Unknown command: ${command}`,
+          typoHint ?? "Run 'hench --help' to see available commands.",
+          CLI_ERROR_CODES.UNKNOWN_COMMAND,
+        );
+      }
     }
   } catch (err) {
     handleCLIError(err);

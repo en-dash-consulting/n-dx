@@ -32,7 +32,7 @@ import { section, subsection, stream, detail, info, getCapturedLines, resetCaptu
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
-import { fetchCodexTokenUsage } from "../../quota/index.js";
+import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig } from "../../store/project-config.js";
 
 // ---------------------------------------------------------------------------
@@ -513,6 +513,10 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // we silently skip and use the tokens already captured during the run.
   // Only attempt if this was a Codex run (vendor is "codex" in turnTokenUsage).
   await retrieveCodexTokensIfNeeded(run, projectDir);
+
+  // Validate token reporting for Codex runs.
+  // This is a non-blocking post-run check that logs warnings but never fails the run.
+  validateRunTokensPostRun(run, true);
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;
