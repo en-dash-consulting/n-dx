@@ -813,8 +813,9 @@ const COHESION_EXCEPTIONS = new Map([
   ["prd-tree-search", "Small PRD tree search cluster; SourceVision isolates a narrow subtree-search slice with few internal edges, so cohesion remains slightly below threshold despite a coherent responsibility."],
   ["refresh-throttle-pipeline", "Tiny refresh throttle pipeline zone; the scheduler and throttle helpers form a narrow satellite with sparse internal edges, making the cohesion score noisy at this size."],
   ["sourcevision-view-tests", "Small test-only satellite around the SourceVision viewer tabs; cohesion remains low because it exercises multiple viewer entry points rather than a single internal module cluster."],
-  ["web-theme-toggle", "Very small theme toggle cluster; the zone currently contains a minimal pair of loosely connected files, so the measured cohesion is not meaningful yet."],
-  ["web-shared", "Foundation layer; 3 files (below the 5-file threshold for reliable metrics); documented dual-fragility zone — low cohesion reflects the inherent structural gap between data-file constants and view identifiers, not decay."],
+  ["prd-status-reset", "Small 3-file zone (below the 5-file threshold for reliable metrics); cascade-reset and parent-reset are sibling utilities for bidirectional status propagation — they work at the same level without calling each other, so internal edges are sparse despite a coherent responsibility."],
+  ["rex-chunked-review", "CLI satellite zone with files spanning analyze/ (batch-types.ts) and cli/commands/ sub-directories; the cross-directory provenance creates sparse internal edges. Documented dual-fragility zone per CLAUDE.md satellite zone policy."],
+  ["viewer-data-hooks", "Small 3-file zone (below the 5-file threshold for reliable metrics); use-polling and use-project-status serve distinct lifecycle concerns (polling vs. status aggregation) with few cross-imports, making the cohesion score unreliable at this size."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
