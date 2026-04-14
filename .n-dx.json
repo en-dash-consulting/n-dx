@@ -115,11 +115,14 @@
         "packages/hench/tests/unit/tools/test-runner.test.ts": "hench-agent",
         "packages/rex/tests/helpers/rex-dir-test-support.ts": "rex-unit",
         "packages/rex/tests/unit/cli/commands/next-colors.test.ts": "rex-unit",
-        "packages/rex/tests/unit/cli/commands/usage.test.ts": "rex-unit"
+        "packages/rex/tests/unit/cli/commands/usage.test.ts": "rex-unit",
+        "packages/sourcevision/tests/fixtures/go-project/internal/service/user.go": "sv-fixtures",
+        "packages/sourcevision/tests/fixtures/go-project/internal/service/user_test.go": "sv-fixtures"
       },
       "types": {
         "e2e": "test",
         "fixtures": "test",
+        "sv-fixtures": "test",
         "integration": "test",
         "repo-ops-shell": "infrastructure",
         "root": "infrastructure",
