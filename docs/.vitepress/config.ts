@@ -37,6 +37,7 @@ export default defineConfig({
             { text: "Codebase Onboarding", link: "/guide/onboarding" },
             { text: "Run While You Sleep", link: "/guide/overnight" },
             { text: "Spec-Driven Development", link: "/guide/spec-driven" },
+            { text: "Cleaning Up a Vibe-Coded App", link: "/guide/vibe-cleanup" },
             { text: "Troubleshooting", link: "/guide/troubleshooting" },
           ],
         },

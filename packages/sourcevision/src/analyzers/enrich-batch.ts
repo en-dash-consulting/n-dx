@@ -363,9 +363,7 @@ Cross-zone imports:
 ${crossingLines || "  (none)"}
 ${globalPromptNote}
 
-Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
-
-Each finding MUST include a "category" field: "structural" (zone boundary opinions, file placement, directory sprawl), "code" (bugs, duplication, anti-patterns, missing abstractions), or "documentation" (naming conventions, missing docs).
+Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
 
 Respond with ONLY a JSON object (no markdown, no explanation):
 {"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":["actionable insight"],"findings":[{"type":"observation","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["cross-zone observation"],"findings":[{"type":"observation","scope":"global","text":"finding text","severity":"info","category":"code"}]}
@@ -450,8 +448,7 @@ ${globalPromptNote}
 
 Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.
 
-Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
-Each finding MUST include a "category" field: "structural" (zone boundary opinions, file placement, directory sprawl), "code" (bugs, duplication, anti-patterns, missing abstractions), or "documentation" (naming conventions, missing docs).
+Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
 
 Respond with ONLY a JSON object (no markdown, no explanation):
 {"zones":[{"id":"existing-zone-id","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["new cross-zone observation"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"global","text":"finding text","severity":"info","category":"code"}]}

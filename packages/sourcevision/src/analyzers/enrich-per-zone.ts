@@ -121,7 +121,7 @@ ${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Boundary crossings:
 ${crossingLines || "  (none)"}
 
-Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
+Findings: severity ("info"|"warning"|"critical").
 
 Respond with ONLY a JSON object (no markdown, no explanation):
 {"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"${zone.id}","text":"finding text","severity":"info"}]}
@@ -149,7 +149,7 @@ This is enrichment pass ${passNumber}. ${passConfig.focus}
 
 Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.
 
-Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
+Findings: severity ("info"|"warning"|"critical").
 
 Respond with ONLY a JSON object:
 {"id":"${zone.id}","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"${zone.id}","text":"finding text","severity":"info"}]}

@@ -26077,7 +26077,7 @@
             {
               "id": "8474f71e-41ac-4d6f-b963-77c8f7a91d85",
               "title": "Trim and deduplicate LLM data payloads in sourcevision analysis",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Identify data structures assembled before each LLM call in the sourcevision pipeline — file inventory summaries, import graph excerpts, zone descriptions, findings lists — and remove fields that are duplicated, unused by the model, or trivially derivable. Apply deduplication where the same content appears multiple times across a single prompt context. Goal is to shrink prompt context size without altering which information the model receives.",
               "acceptanceCriteria": [
@@ -26094,7 +26094,8 @@
                 "data"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-14T15:33:43.826Z"
+              "startedAt": "2026-04-14T15:33:43.826Z",
+              "completedAt": "2026-04-14T15:36:44.478Z"
             },
             {
               "id": "caa57841-e765-418d-9c47-035b2a0a01f3",
@@ -26138,7 +26139,7 @@
             {
               "id": "800f8220-0386-48d2-b566-22b5e46c3cea",
               "title": "Write Autonomous Overnight Operation Guide ('Run While You Sleep')",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Document how to configure and launch n-dx for unattended multi-iteration autonomous execution — overnight runs, long CI sessions, or background work while the developer is away. Covers hench auto mode, iteration limits, background server setup, how to monitor a running session, how to safely resume or inspect results in the morning, and guardrails to prevent runaway spending or broken states.",
               "acceptanceCriteria": [
@@ -26154,12 +26155,14 @@
                 "hench",
                 "autonomous"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:36:47.614Z",
+              "completedAt": "2026-04-14T15:38:43.302Z"
             },
             {
               "id": "984b4cf8-443b-45c9-9a55-5f40e8f59f1c",
               "title": "Write Codebase Onboarding Guide",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Document how to use n-dx to rapidly understand an unfamiliar codebase — from first clone through a working mental model of the architecture. Covers running sourcevision analysis, reading CONTEXT.md and llms.txt, exploring zones and the import graph in the dashboard, using sourcevision MCP tools in Claude Code for interactive Q&A, and generating an initial PRD from discovered structure.",
               "acceptanceCriteria": [
@@ -26175,12 +26178,14 @@
                 "sourcevision",
                 "onboarding"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:38:46.384Z",
+              "completedAt": "2026-04-14T15:44:01.525Z"
             },
             {
               "id": "41bc75d8-637e-4336-853c-7bfb9b41ddfa",
               "title": "Write Spec-Driven Development Guide",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Document how to drive development from a written specification or requirements document using n-dx. Covers importing a spec file into rex (`ndx add --file=spec.md`), reviewing and shaping the generated PRD hierarchy, locking in scope with `ndx plan --accept`, and executing the plan autonomously with `ndx work`. Includes guidance on iterating the spec as requirements evolve and keeping the PRD as the source of truth.",
               "acceptanceCriteria": [
@@ -26196,12 +26201,14 @@
                 "rex",
                 "spec-driven"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:44:04.607Z",
+              "completedAt": "2026-04-14T15:46:30.933Z"
             },
             {
               "id": "bdf200a2-5695-4716-9ede-73720c5e32c9",
               "title": "Write Vibe-Coded App Cleanup and Self-Healing Guide",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Document how to use n-dx to systematically clean up a codebase that was built quickly without formal structure — ad-hoc code, missing tests, architectural violations, or accumulated tech debt. Covers running sourcevision to surface findings, using `ndx recommend` to generate actionable PRD proposals from those findings, accepting a remediation plan, and executing it autonomously with `ndx work` or `ndx self-heal`. Includes guidance on prioritizing findings and setting realistic scope.",
               "acceptanceCriteria": [
@@ -26218,7 +26225,8 @@
                 "self-heal",
                 "cleanup"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:46:34.022Z"
             },
             {
               "id": "bd466646-bb0a-400a-a56d-2b67876a2f30",

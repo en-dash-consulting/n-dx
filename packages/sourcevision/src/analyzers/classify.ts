@@ -508,17 +508,15 @@ function buildLLMClassifyPrompt(
     return parts.join("");
   }).join("\n");
 
-  return `Classify these source files into archetypes. Each archetype represents a structural role in the codebase.
+  return `Classify these source files. Assign each the best-fit archetype by path and likely purpose. Omit files with no clear fit.
 
-Available archetypes:
+Archetypes:
 ${archetypeLines}
 
-Files to classify:
+Files:
 ${fileLines}
 
-For each file, determine the best-fit archetype based on its path, directory structure, and likely purpose. If no archetype fits well, omit the file from the response.
-
-Respond with ONLY a JSON array (no markdown fences, no explanation):
+Respond with ONLY a JSON array (no markdown, no explanation):
 [{"path":"<file path>","archetype":"<archetype id>","reason":"<brief reason>"}]`;
 }
 
