@@ -1213,7 +1213,50 @@ async function handleSetProjectSection(
   if (!current[pkg] || typeof current[pkg] !== "object") {
     current[pkg] = {};
   }
+
+  // Vendor-change model reset: capture old values before setting new vendor
+  let warningMessages = [];
+  let oldVendor, oldClaudeModel, oldCodexModel;
+  if (pkg === "llm" && settingPath === "vendor") {
+    // Capture old values before overwriting
+    oldVendor = current[pkg].vendor;
+    oldClaudeModel = current[pkg].claude?.model;
+    oldCodexModel = current[pkg].codex?.model;
+  }
+
   setByPath(current[pkg], settingPath, coerced);
+
+  // Now perform vendor-change model reset if needed
+  if (pkg === "llm" && settingPath === "vendor") {
+    const { resetStaleModel, formatVendorChangeWarning, NEWEST_MODELS } =
+      await import("@n-dx/llm-client");
+
+    // Check if Claude model needs to be reset
+    const claudeReset = resetStaleModel(oldVendor, oldClaudeModel, coerced);
+    if (claudeReset.changed) {
+      if (current[pkg].claude) {
+        delete current[pkg].claude.model;
+      }
+      const warning = formatVendorChangeWarning(
+        claudeReset,
+        NEWEST_MODELS.claude,
+      );
+      if (warning) warningMessages.push(warning);
+    }
+
+    // Check if Codex model needs to be reset
+    const codexReset = resetStaleModel(oldVendor, oldCodexModel, coerced);
+    if (codexReset.changed) {
+      if (current[pkg].codex) {
+        delete current[pkg].codex.model;
+      }
+      const warning = formatVendorChangeWarning(
+        codexReset,
+        NEWEST_MODELS.codex,
+      );
+      if (warning) warningMessages.push(warning);
+    }
+  }
 
   // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
   if (pkg === "llm" && settingPath.startsWith("claude.")) {
@@ -1226,6 +1269,11 @@ async function handleSetProjectSection(
 
   await saveProjectJSON(configPath, current);
   console.log(`${keyArg} = ${formatValue(coerced)}`);
+
+  // Print warnings for cleared models
+  for (const warning of warningMessages) {
+    console.log(`  ⚠ ${warning.split("\n").join("\n  ")}`);
+  }
 }
 
 /** Handle SET mode for a package config (rex, hench). */

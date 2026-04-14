@@ -12,7 +12,7 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -739,6 +739,32 @@ export async function cmdRun(
     : (llmVendor === "claude" ? !!llmConfig?.claude?.model : !!llmConfig?.codex?.model)
       ? "configured"
       : "default";
+
+  // Validate vendor-model compatibility: warn if configured model is stale
+  const configuredClaudeModel = llmConfig?.claude?.model;
+  const configuredCodexModel = llmConfig?.codex?.model;
+  if (!cliModelOverride) {
+    if (
+      llmVendor === "claude" &&
+      configuredClaudeModel &&
+      !isModelCompatibleWithVendor("claude", configuredClaudeModel)
+    ) {
+      throw new CLIError(
+        `Configured model "${configuredClaudeModel}" is not compatible with vendor="claude".`,
+        `Either use a Claude model (e.g., sonnet, opus) or switch vendor: 'n-dx config llm.vendor codex'`,
+      );
+    }
+    if (
+      llmVendor === "codex" &&
+      configuredCodexModel &&
+      !isModelCompatibleWithVendor("codex", configuredCodexModel)
+    ) {
+      throw new CLIError(
+        `Configured model "${configuredCodexModel}" is not compatible with vendor="codex".`,
+        `Either use a Codex/GPT model (e.g., gpt-4o, o1) or switch vendor: 'n-dx config llm.vendor claude'`,
+      );
+    }
+  }
 
   // Surface vendor/model at command start for operator visibility.
   // Reads the most recent run artifact (if any) to detect model changes.
