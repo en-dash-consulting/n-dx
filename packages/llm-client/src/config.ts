@@ -75,6 +75,23 @@ export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
 };
 
 /**
+ * Maximum safe prompt size per vendor (in characters).
+ *
+ * Used by the CLI loop to bound the brief text before sending to the
+ * vendor CLI, preventing prompts that exceed the vendor's context window.
+ * Values are conservative — set well below the true context window limit
+ * to leave room for the system prompt, retry notices, and model overhead.
+ *
+ * Approximate derivation (~4 chars per token):
+ *   claude  200K-token window → ~800K chars; cap at 640K (80% utilisation)
+ *   codex   128K-token window → ~512K chars; cap at 400K (78% utilisation)
+ */
+export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
+  claude: 640_000,
+  codex: 400_000,
+};
+
+/**
  * Map of shorthand model aliases to full Anthropic API model IDs.
  * The Claude CLI resolves these internally, but the API requires full IDs.
  */
