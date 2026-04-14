@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, loadProjectConfig } from "./config.js";
+import { runConfig, loadProjectConfig, repairProjectConfig } from "./config.js";
 import { resolveCommandTimeout, withCommandTimeout } from "./cli-timeout.js";
 import { runCI } from "./ci.js";
 import {
@@ -749,13 +749,27 @@ async function handleInit(rest) {
   const initArgs = stripInitProviderFlag(rest).filter((a) => a !== "--no-claude");
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
+  const quiet = flags.includes("--quiet") || flags.includes("-q");
+
+  // Repair known-numeric config values that may have been stored as strings
+  // by earlier versions (e.g. cli.timeouts.work = "14400000"). Runs before
+  // anything reads the config so sub-package inits see well-typed values.
+  try {
+    const { repairs } = await repairProjectConfig(dir);
+    if (repairs.length > 0 && !quiet) {
+      console.log(`Repaired ${repairs.length} config value${repairs.length === 1 ? "" : "s"} in .n-dx.json:`);
+      for (const { path, from, to } of repairs) {
+        console.log(`  ${path}: "${from}" → ${to}`);
+      }
+    }
+  } catch {
+    // Non-fatal — repair failure never blocks init.
+  }
 
   // Check for existing provider config before prompting
   const existingVendor = readLLMVendor(dir);
   let selectedProvider;
   let providerSource;
-
-  const quiet = flags.includes("--quiet") || flags.includes("-q");
 
   if (providerFromFlag) {
     selectedProvider = providerFromFlag;
