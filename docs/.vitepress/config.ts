@@ -34,6 +34,7 @@ export default defineConfig({
             { text: "Configuration", link: "/guide/configuration" },
             { text: "MCP Integration", link: "/guide/mcp" },
             { text: "Self-Heal Loop", link: "/guide/self-heal" },
+            { text: "Codebase Onboarding", link: "/guide/onboarding" },
             { text: "Run While You Sleep", link: "/guide/overnight" },
             { text: "Troubleshooting", link: "/guide/troubleshooting" },
           ],
