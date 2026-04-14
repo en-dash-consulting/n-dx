@@ -26124,17 +26124,19 @@
     {
       "id": "25f39e2e-c4ca-4132-a053-25beb189d31b",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "32799258-d738-428d-8d6f-8a5bfacfb12a",
           "title": "Workflow Use Case Guides",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "End-to-end narrative guides covering the primary n-dx workflows: autonomous overnight operation, self-healing, codebase onboarding, spec-driven development, vibe-coded cleanup, and ongoing PRD change management. Each guide should be opinionated and scenario-specific — not a command reference.",
           "source": "smart-add",
+          "startedAt": "2026-04-14T15:52:50.546Z",
+          "completedAt": "2026-04-14T15:52:50.546Z",
           "children": [
             {
               "id": "800f8220-0386-48d2-b566-22b5e46c3cea",
@@ -26208,7 +26210,7 @@
             {
               "id": "bdf200a2-5695-4716-9ede-73720c5e32c9",
               "title": "Write Vibe-Coded App Cleanup and Self-Healing Guide",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Document how to use n-dx to systematically clean up a codebase that was built quickly without formal structure — ad-hoc code, missing tests, architectural violations, or accumulated tech debt. Covers running sourcevision to surface findings, using `ndx recommend` to generate actionable PRD proposals from those findings, accepting a remediation plan, and executing it autonomously with `ndx work` or `ndx self-heal`. Includes guidance on prioritizing findings and setting realistic scope.",
               "acceptanceCriteria": [
@@ -26226,12 +26228,13 @@
                 "cleanup"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-14T15:46:34.022Z"
+              "startedAt": "2026-04-14T15:46:34.022Z",
+              "completedAt": "2026-04-14T15:52:50.256Z"
             },
             {
               "id": "bd466646-bb0a-400a-a56d-2b67876a2f30",
               "title": "Write Ongoing Change Management and PRD Pruning Guide",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Document how to keep n-dx useful over the life of a project — not just at initial setup, but as the codebase evolves, features are completed, and the PRD drifts from reality. Covers periodic re-analysis with `ndx plan`, pruning completed or stale items with `rex prune` and `rex reshape`, using `ndx recommend --acknowledge` to dismiss resolved findings, and establishing a cadence for self-healing passes. Includes guidance on when to push to upstream remote and how to use `ndx sync` for adapter-backed PRDs.",
               "acceptanceCriteria": [
@@ -26248,7 +26251,9 @@
                 "change-management",
                 "pruning"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-14T15:51:35.714Z",
+              "completedAt": "2026-04-14T15:51:35.714Z"
             }
           ]
         }
