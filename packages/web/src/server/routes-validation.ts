@@ -7,7 +7,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse } from "./types.js";
+import { jsonResponse, errorResponse } from "./response-utils.js";
 import {
   type ItemLevel,
   type PRDItem,

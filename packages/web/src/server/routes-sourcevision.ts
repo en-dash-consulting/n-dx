@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse } from "./types.js";
+import { jsonResponse, errorResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
 import {
   classifyPRMarkdownRefreshFailureCode,

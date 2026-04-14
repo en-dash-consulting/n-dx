@@ -18,7 +18,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./types.js";
+import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
 // ---------------------------------------------------------------------------
 // Dynamic imports (avoid compile-time coupling to rex)

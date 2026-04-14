@@ -14,7 +14,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, basename, resolve } from "node:path";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./types.js";
+import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
 // ---------------------------------------------------------------------------
 // Types
