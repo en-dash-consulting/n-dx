@@ -140,15 +140,17 @@ export function resolveModel(model: string): string {
  * this instead of hardcoding or independently deriving model strings.
  *
  * Resolution order:
- * 1. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
- * 2. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
+ * 1. Config tier-specific model (`llm.claude.lightModel` when weight='light')
+ * 2. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
+ * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
  * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.4mini)
  * - `'standard'` or omitted — resolves to full-capability models (sonnet, gpt-5)
  *
- * Config model overrides always take precedence over tier-based selection,
- * ensuring explicit `--model` flags work as expected.
+ * For the 'light' weight, if `lightModel` is configured, it takes precedence
+ * over both `model` and `TIER_MODELS`. This allows users to customize which
+ * model serves the light tier without affecting the standard tier.
  *
  * For Claude, the result is also passed through `resolveModel()` so that
  * shorthand aliases (e.g. "sonnet") are expanded to full API model IDs.
@@ -164,20 +166,32 @@ export function resolveVendorModel(
   weight: TaskWeight = "standard",
 ): string {
   if (vendor === "claude") {
-    // Config model override takes precedence
+    if (weight === "light") {
+      // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
+      if (config?.claude?.lightModel) {
+        return resolveModel(config.claude.lightModel);
+      }
+      return resolveModel(TIER_MODELS.claude.light);
+    }
+    // Standard tier: model can override, then fall back to TIER_MODELS.standard
     if (config?.claude?.model) {
       return resolveModel(config.claude.model);
     }
-    // Fall back to tier-appropriate model
-    return resolveModel(TIER_MODELS.claude[weight]);
+    return resolveModel(TIER_MODELS.claude.standard);
   }
   if (vendor === "codex") {
-    // Config model override takes precedence
+    if (weight === "light") {
+      // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
+      if (config?.codex?.lightModel) {
+        return config.codex.lightModel;
+      }
+      return TIER_MODELS.codex.light;
+    }
+    // Standard tier: model can override, then fall back to TIER_MODELS.standard
     if (config?.codex?.model) {
       return config.codex.model;
     }
-    // Fall back to tier-appropriate model
-    return TIER_MODELS.codex[weight];
+    return TIER_MODELS.codex.standard;
   }
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).
@@ -235,19 +249,33 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
  * @param dir  The directory containing .n-dx.json (project root)
  */
 export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
-  const projectData = await loadJSONFile(join(dir, PROJECT_CONFIG_FILE));
-  const localData = await loadJSONFile(join(dir, LOCAL_CONFIG_FILE));
-
-  // Merge project and local configs (local wins)
-  let merged: Record<string, unknown> | null = projectData;
-  if (projectData && localData) {
-    merged = deepMerge(projectData, localData);
-  } else if (localData) {
-    merged = localData;
-  }
-
-  if (merged) {
-    return extractClaudeConfig(merged) ?? {};
+  const configPath = join(dir, PROJECT_CONFIG_FILE);
+  try {
+    await access(configPath);
+    const raw = await readFile(configPath, "utf-8");
+    const data = JSON.parse(raw);
+    if (data && typeof data === "object" && data.claude && typeof data.claude === "object") {
+      const claude = data.claude as Record<string, unknown>;
+      const result: ClaudeConfig = {};
+      if (typeof claude.cli_path === "string" && claude.cli_path) {
+        result.cli_path = claude.cli_path;
+      }
+      if (typeof claude.api_key === "string" && claude.api_key) {
+        result.api_key = claude.api_key;
+      }
+      if (typeof claude.api_endpoint === "string" && claude.api_endpoint) {
+        result.api_endpoint = claude.api_endpoint;
+      }
+      if (typeof claude.model === "string" && claude.model) {
+        result.model = claude.model;
+      }
+      if (typeof claude.lightModel === "string" && claude.lightModel) {
+        result.lightModel = claude.lightModel;
+      }
+      return result;
+    }
+  } catch {
+    // File doesn't exist or is invalid — no claude config
   }
   return {};
 }
