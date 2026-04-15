@@ -75,6 +75,26 @@ export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
 };
 
 /**
+ * Per-tier model mapping for task-weight-aware model selection.
+ *
+ * The `standard` tier always equals NEWEST_MODELS for backward compatibility —
+ * existing code that omits the weight parameter continues to use the default model.
+ * The `light` tier maps to cheaper/faster models for simple tasks.
+ *
+ * Invariant: TIER_MODELS[vendor].standard === NEWEST_MODELS[vendor]
+ */
+export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
+  claude: {
+    light: "claude-haiku-4-20250414",
+    standard: NEWEST_MODELS.claude,
+  },
+  codex: {
+    light: "gpt-5.4mini",
+    standard: NEWEST_MODELS.codex,
+  },
+};
+
+/**
  * Maximum safe prompt size per vendor (in characters).
  *
  * Used by the CLI loop to bound the brief text before sending to the
@@ -120,17 +140,15 @@ export function resolveModel(model: string): string {
  * this instead of hardcoding or independently deriving model strings.
  *
  * Resolution order:
- * 1. Config tier-specific model (`llm.claude.lightModel` when weight='light')
- * 2. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
- * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
+ * 1. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
+ * 2. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
  * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.4mini)
  * - `'standard'` or omitted — resolves to full-capability models (sonnet, gpt-5)
  *
- * For the 'light' weight, if `lightModel` is configured, it takes precedence
- * over both `model` and `TIER_MODELS`. This allows users to customize which
- * model serves the light tier without affecting the standard tier.
+ * Config model overrides always take precedence over tier-based selection,
+ * ensuring explicit `--model` flags work as expected.
  *
  * For Claude, the result is also passed through `resolveModel()` so that
  * shorthand aliases (e.g. "sonnet") are expanded to full API model IDs.
@@ -146,32 +164,20 @@ export function resolveVendorModel(
   weight: TaskWeight = "standard",
 ): string {
   if (vendor === "claude") {
-    if (weight === "light") {
-      // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
-      if (config?.claude?.lightModel) {
-        return resolveModel(config.claude.lightModel);
-      }
-      return resolveModel(TIER_MODELS.claude.light);
-    }
-    // Standard tier: model can override, then fall back to TIER_MODELS.standard
+    // Config model override takes precedence
     if (config?.claude?.model) {
       return resolveModel(config.claude.model);
     }
-    return resolveModel(TIER_MODELS.claude.standard);
+    // Fall back to tier-appropriate model
+    return resolveModel(TIER_MODELS.claude[weight]);
   }
   if (vendor === "codex") {
-    if (weight === "light") {
-      // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
-      if (config?.codex?.lightModel) {
-        return config.codex.lightModel;
-      }
-      return TIER_MODELS.codex.light;
-    }
-    // Standard tier: model can override, then fall back to TIER_MODELS.standard
+    // Config model override takes precedence
     if (config?.codex?.model) {
       return config.codex.model;
     }
-    return TIER_MODELS.codex.standard;
+    // Fall back to tier-appropriate model
+    return TIER_MODELS.codex[weight];
   }
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).

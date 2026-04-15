@@ -352,70 +352,20 @@ describe("resolveVendorModel", () => {
       expect(resolveVendorModel("codex")).toBe(resolveVendorModel("codex", {}, "standard"));
     });
 
-    it("model config does NOT override light weight for claude - use lightModel instead", () => {
-      // model only applies to standard tier; light tier needs lightModel
+    it("config model override takes precedence over light weight for claude", () => {
       const config = { claude: { model: "claude-opus-4-20250514" } };
-      expect(resolveVendorModel("claude", config, "light")).toBe(TIER_MODELS.claude.light);
+      expect(resolveVendorModel("claude", config, "light")).toBe("claude-opus-4-20250514");
     });
 
-    it("model config does NOT override light weight for codex - use lightModel instead", () => {
-      // model only applies to standard tier; light tier needs lightModel
+    it("config model override takes precedence over light weight for codex", () => {
       const config = { codex: { model: "gpt-4o" } };
-      expect(resolveVendorModel("codex", config, "light")).toBe(TIER_MODELS.codex.light);
+      expect(resolveVendorModel("codex", config, "light")).toBe("gpt-4o");
     });
 
     it("expands claude alias when using light tier", () => {
       // Light tier for Claude should not need alias expansion (it's a full model ID)
       // but verify the resolver path still works correctly
       expect(resolveVendorModel("claude", {}, "light")).toBe("claude-haiku-4-20250414");
-    });
-  });
-
-  // Per-tier config override tests (lightModel)
-  describe("with lightModel config override", () => {
-    it("uses lightModel for claude when weight is 'light' and lightModel is set", () => {
-      const config = { claude: { lightModel: "claude-haiku-4-20250414" } };
-      expect(resolveVendorModel("claude", config, "light")).toBe("claude-haiku-4-20250414");
-    });
-
-    it("uses lightModel for codex when weight is 'light' and lightModel is set", () => {
-      const config = { codex: { lightModel: "gpt-4o-mini" } };
-      expect(resolveVendorModel("codex", config, "light")).toBe("gpt-4o-mini");
-    });
-
-    it("falls back to TIER_MODELS.light when lightModel is absent for claude", () => {
-      expect(resolveVendorModel("claude", {}, "light")).toBe(TIER_MODELS.claude.light);
-    });
-
-    it("falls back to TIER_MODELS.light when lightModel is absent for codex", () => {
-      expect(resolveVendorModel("codex", {}, "light")).toBe(TIER_MODELS.codex.light);
-    });
-
-    it("lightModel is ignored when weight is 'standard' for claude", () => {
-      const config = { claude: { lightModel: "claude-haiku-4-20250414" } };
-      expect(resolveVendorModel("claude", config, "standard")).toBe(NEWEST_MODELS.claude);
-    });
-
-    it("lightModel is ignored when weight is 'standard' for codex", () => {
-      const config = { codex: { lightModel: "gpt-4o-mini" } };
-      expect(resolveVendorModel("codex", config, "standard")).toBe(NEWEST_MODELS.codex);
-    });
-
-    it("expands claude alias in lightModel config", () => {
-      const config = { claude: { lightModel: "haiku" } };
-      expect(resolveVendorModel("claude", config, "light")).toBe("claude-haiku-4-20250414");
-    });
-
-    it("lightModel takes precedence over TIER_MODELS.light for claude", () => {
-      const config = { claude: { lightModel: "claude-sonnet-4-6" } };
-      // Using a non-standard model for light tier
-      expect(resolveVendorModel("claude", config, "light")).toBe("claude-sonnet-4-6");
-    });
-
-    it("lightModel takes precedence over TIER_MODELS.light for codex", () => {
-      const config = { codex: { lightModel: "gpt-5" } };
-      // Using a non-standard model for light tier
-      expect(resolveVendorModel("codex", config, "light")).toBe("gpt-5");
     });
   });
 });
