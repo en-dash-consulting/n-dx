@@ -1,5 +1,11 @@
 # @n-dx/llm-client
 
+## 0.3.0
+
+### Patch Changes
+
+- [#167](https://github.com/en-dash-consulting/n-dx/pull/167) [`9ce5ee5`](https://github.com/en-dash-consulting/n-dx/commit/9ce5ee50f9c2a8f90099f2a0fed17475441d55c7) Thanks [@endash-shal](https://github.com/endash-shal)! - more documentation additions and sourcevision token optimizations
+
 ## 0.2.3
 
 ### Patch Changes

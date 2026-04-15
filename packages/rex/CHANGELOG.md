@@ -1,5 +1,14 @@
 # @n-dx/rex
 
+## 0.3.0
+
+### Patch Changes
+
+- [#165](https://github.com/en-dash-consulting/n-dx/pull/165) [`60c684e`](https://github.com/en-dash-consulting/n-dx/commit/60c684e42a97f12c22ee83a0ad299ade64c57589) Thanks [@endash-shal](https://github.com/endash-shal)! - Added more documentation, small fixes and increased base timeout
+
+- Updated dependencies [[`9ce5ee5`](https://github.com/en-dash-consulting/n-dx/commit/9ce5ee50f9c2a8f90099f2a0fed17475441d55c7)]:
+  - @n-dx/llm-client@0.3.0
+
 ## 0.2.3
 
 ### Patch Changes
