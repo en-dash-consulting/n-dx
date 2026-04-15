@@ -6,6 +6,8 @@
  *
  * - Default model source label ("default" when no config provided)
  * - Configured model source label ("configured" when model is set in config)
+ * - CLI override source label ("cli-override" when --model flag used)
+ * - Tier label rendering (light, standard, configured-override, flag-override)
  * - Suppression in --format=json mode
  * - Suppression in quiet mode
  * - Model-change warning when lastModel differs from resolved model
@@ -15,7 +17,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setQuiet } from "../../src/output.js";
 import { printVendorModelHeader } from "../../src/vendor-header.js";
-import { NEWEST_MODELS } from "../../src/config.js";
+import { NEWEST_MODELS, TIER_MODELS } from "../../src/config.js";
 import type { LLMConfig } from "../../src/llm-types.js";
 
 describe("printVendorModelHeader", () => {
@@ -133,5 +135,100 @@ describe("printVendorModelHeader", () => {
   it("does not emit warning when no lastModel is provided", () => {
     printVendorModelHeader("claude", undefined);
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  // ── Tier label rendering (modelSource option) ────────────────────────────────
+
+  describe("tier label rendering with modelSource", () => {
+    it("renders '(cli-override)' when modelSource is cli-override", () => {
+      printVendorModelHeader("claude", undefined, {
+        resolvedModel: "claude-opus-4-20250514",
+        modelSource: "cli-override",
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain("Model: claude-opus-4-20250514");
+      expect(line).toContain("(cli-override)");
+    });
+
+    it("renders '(configured)' when modelSource is configured", () => {
+      printVendorModelHeader("claude", undefined, {
+        resolvedModel: "claude-sonnet-4-6",
+        modelSource: "configured",
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain("(configured)");
+    });
+
+    it("renders '(default)' when modelSource is default", () => {
+      printVendorModelHeader("claude", undefined, {
+        resolvedModel: NEWEST_MODELS.claude,
+        modelSource: "default",
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain("(default)");
+    });
+
+    it("uses resolvedModel over config-resolved model when provided", () => {
+      const config: LLMConfig = {
+        vendor: "claude",
+        claude: { model: "claude-opus-4-20250514" },
+      };
+      // resolvedModel should override config lookup
+      printVendorModelHeader("claude", config, {
+        resolvedModel: TIER_MODELS.claude.light,
+        modelSource: "default",
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain(`Model: ${TIER_MODELS.claude.light}`);
+      expect(line).toContain("(default)");
+    });
+
+    it("renders light-tier model with cli-override source for flag override scenario", () => {
+      // Simulates: user ran `ndx add --model=haiku "task"` (CLI flag → light model)
+      printVendorModelHeader("claude", undefined, {
+        resolvedModel: TIER_MODELS.claude.light,
+        modelSource: "cli-override",
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain(`Model: ${TIER_MODELS.claude.light}`);
+      expect(line).toContain("(cli-override)");
+    });
+
+    it("renders codex light-tier model with configured source", () => {
+      // Simulates: lightModel configured in .n-dx.json for codex
+      const config: LLMConfig = {
+        vendor: "codex",
+        codex: { lightModel: "gpt-4o-mini" },
+      };
+      printVendorModelHeader("codex", config, {
+        resolvedModel: "gpt-4o-mini",
+        modelSource: "configured",
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain("Vendor: codex");
+      expect(line).toContain("Model: gpt-4o-mini");
+      expect(line).toContain("(configured)");
+    });
+
+    it("renders standard-tier model with default source when no config", () => {
+      // Simulates: analyze command using standard tier with no overrides
+      printVendorModelHeader("claude", undefined, {
+        resolvedModel: TIER_MODELS.claude.standard,
+        modelSource: "default",
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain(`Model: ${TIER_MODELS.claude.standard}`);
+      expect(line).toContain("(default)");
+    });
+
+    it("renders codex standard-tier model with default source", () => {
+      printVendorModelHeader("codex", undefined, {
+        resolvedModel: TIER_MODELS.codex.standard,
+        modelSource: "default",
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain(`Model: ${TIER_MODELS.codex.standard}`);
+      expect(line).toContain("(default)");
+    });
   });
 });
