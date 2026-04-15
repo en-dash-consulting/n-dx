@@ -305,6 +305,7 @@ describe("Codex config validation gauntlet", () => {
       });
       expect(promiseOrResult).toBeDefined();
       expect(typeof promiseOrResult.then).toBe("function");
+      await promiseOrResult.catch(() => undefined);
     });
 
     it("complete method accepts CompletionRequest with prompt", () => {
