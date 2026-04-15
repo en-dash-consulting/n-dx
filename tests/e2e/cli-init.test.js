@@ -78,6 +78,10 @@ describe("n-dx init provider selection", () => {
         env: {
           ...process.env,
           PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+          // Short-circuit claude MCP registration; this test only asserts on
+          // banner/LLM configuration output, not claude behavior. See
+          // packages/core/claude-integration.js:306–320.
+          CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
         },
       });
       // Banner shows on every init invocation
@@ -152,6 +156,11 @@ describe("n-dx init provider selection", () => {
         env: {
           ...process.env,
           PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+          // Short-circuit claude MCP registration to keep the child-process
+          // init under the 20s timeout. This test only checks banner/LLM
+          // output, not claude-specific behavior. See
+          // packages/core/claude-integration.js:306–320.
+          CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
         },
       });
 
@@ -316,6 +325,10 @@ describe("n-dx init provider selection", () => {
           env: {
             ...process.env,
             PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+            // Short-circuit claude MCP registration; this test checks the
+            // non-TTY summary, not claude-specific output. See
+            // packages/core/claude-integration.js:306–320.
+            CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
           },
         });
 

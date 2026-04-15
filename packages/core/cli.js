@@ -913,17 +913,13 @@ async function handleInit(rest) {
     const claudePresent = existsSync(join(dir, ".claude")) || existsSync(join(dir, "CLAUDE.md"));
     const codexPresent = existsSync(join(dir, ".codex")) || existsSync(join(dir, ".agents")) || existsSync(join(dir, "AGENTS.md"));
 
-  if (providerFromFlag) {
-    selectedProvider = providerFromFlag;
-    providerSource = "from --provider flag";
-  } else if (existingVendor) {
-    selectedProvider = existingVendor;
-    providerSource = "from existing config";
-  } else {
-    // First run — show static banner and prompt for provider
-    console.log(formatInitBanner());
-    selectedProvider = await promptInitProvider();
-    providerSource = "selected";
+    // When a prior init provisioned only one vendor, keep only that one enabled.
+    // When both or neither exist, the defaults apply (both enabled unless overridden elsewhere).
+    if (claudePresent && !codexPresent) {
+      assistantEnabled = { claude: true, codex: false };
+    } else if (!claudePresent && codexPresent) {
+      assistantEnabled = { claude: false, codex: true };
+    }
   }
 
   // Resolve LLM provider via init-llm.js (flag > config > prompt precedence).

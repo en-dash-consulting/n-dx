@@ -17,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
 import { getCurrentHead } from "../../process/index.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
@@ -498,6 +498,24 @@ export interface FinalizeRunOptions {
   testCommand?: string;
   heartbeat?: Heartbeat;
   memoryCtx?: MemoryContext;
+}
+
+/**
+ * Derive the diagnostic status from per-turn token usage data.
+ * Priority: unavailable > partial > complete.
+ * Returns "complete" if no diagnostic statuses are set.
+ */
+export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete" | "partial" | "unavailable" {
+  // unavailable takes precedence
+  if (turns.some((t) => t.diagnosticStatus === "unavailable")) {
+    return "unavailable";
+  }
+  // partial takes precedence over complete
+  if (turns.some((t) => t.diagnosticStatus === "partial")) {
+    return "partial";
+  }
+  // All others (including undefined) default to complete
+  return "complete";
 }
 
 /**

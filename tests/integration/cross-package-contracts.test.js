@@ -591,8 +591,13 @@ describe("gateway export auto-detection", () => {
         "isExecutableOnPath", "spawnTool", "spawnManaged", "ProcessPool", "ProcessLimitError",
         "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "resolveVendorModel",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
-        "formatUsage"],
-      ...["PROJECT_DIRS", "NEWEST_MODELS"],
+        "formatUsage", "parseApiTokenUsageWithDiagnostic", "parseStreamTokenUsageWithDiagnostic",
+        "mapCodexUsageToTokenUsage", "createPromptEnvelope", "assemblePrompt",
+        "mapErrorReasonToFailureCategory", "mapRunFailureToCategory", "classifyVendorError",
+        "failureCategoryLabel", "compileCodexPolicyFlags", "mapSandboxToCodexFlag",
+        "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
+        "toOpenAiToolDef", "toOpenAiToolDefs", "ProviderRegistry", "defaultRegistry"],
+      ...["PROJECT_DIRS", "NEWEST_MODELS", "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

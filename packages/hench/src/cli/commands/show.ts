@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { PersistedRuntimeEvent } from "../../schema/index.js";
 import { loadRun } from "../../store/index.js";
 import { HENCH_DIR } from "./constants.js";
 import { info, result } from "../output.js";
@@ -152,5 +153,47 @@ export async function cmdShow(
   // Event count hint (when events are present but not displayed)
   if (run.events && run.events.length > 0) {
     info(`\nEvents: ${run.events.length} captured (use --events to display)`);
+  }
+}
+
+/**
+ * Format a persisted runtime event into a human-readable string for display.
+ * Handles all event types: assistant, tool_use, tool_result, token_usage, failure, completion.
+ */
+export function formatEvent(event: PersistedRuntimeEvent): string {
+  const prefix = `[${event.turn}] ${event.vendor}:`;
+
+  switch (event.type) {
+    case "assistant":
+      // Truncate long text at 200 chars
+      const text = event.text || "";
+      const truncated = text.length > 200 ? text.slice(0, 200) + "..." : text;
+      return `${prefix} assistant — "${truncated}"`;
+
+    case "tool_use":
+      const toolName = event.toolCall?.tool || "unknown";
+      return `${prefix} tool_use — ${toolName}`;
+
+    case "tool_result":
+      const resultTool = event.toolResult?.tool || "unknown";
+      const duration = event.toolResult?.durationMs ? `${event.toolResult.durationMs}ms` : "?ms";
+      return `${prefix} tool_result — ${resultTool} (${duration})`;
+
+    case "token_usage":
+      const input = event.tokenUsage?.input ?? 0;
+      const output = event.tokenUsage?.output ?? 0;
+      return `${prefix} token_usage — ${input} in / ${output} out`;
+
+    case "completion":
+      const summary = event.completionSummary || "no summary";
+      return `${prefix} completion — ${summary}`;
+
+    case "failure":
+      const category = event.failure?.category || "unknown";
+      const message = event.failure?.message || "no details";
+      return `${prefix} failure [${category}] — ${message}`;
+
+    default:
+      return `${prefix} unknown event type`;
   }
 }

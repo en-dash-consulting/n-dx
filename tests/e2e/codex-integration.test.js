@@ -402,6 +402,10 @@ describe("ndx init --no-codex", () => {
           env: {
             ...process.env,
             PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+            // Short-circuit `claude mcp add` so init stays fast — this test
+            // only checks that Codex artifacts are absent. See
+            // packages/core/claude-integration.js:306–320.
+            CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
           },
         },
       );
@@ -426,6 +430,10 @@ describe("ndx init --no-codex", () => {
           env: {
             ...process.env,
             PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+            // Short-circuit claude MCP registration — this test checks only
+            // Codex artifacts/summary. See
+            // packages/core/claude-integration.js:306–320.
+            CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
           },
         },
       );

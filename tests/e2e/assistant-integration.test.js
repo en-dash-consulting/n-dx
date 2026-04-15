@@ -24,6 +24,14 @@ import { getSkillNames, getMcpServers } from "../../assistant-assets/index.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
+// Force claude CLI discovery to fail so `setupClaudeIntegration` skips the
+// real `claude mcp add`/`claude mcp remove` calls (which take 5–30s each and
+// make this file run for >5 minutes). No test here depends on Claude being
+// registered — they only check file writes, summary strings, and formatting,
+// all of which happen before MCP registration. See the short-circuit at
+// packages/core/claude-integration.js:306–320.
+process.env.CLAUDE_CLI_PATH = "/nonexistent/path/to/claude";
+
 // ── getSupportedAssistants() ────────────────────────────────────────────────
 
 describe("getSupportedAssistants", () => {

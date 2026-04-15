@@ -116,13 +116,26 @@ describe("registerMcpServers processes all manifest servers", () => {
 
 describe("registerMcpServers result shape", () => {
   let tmpDir;
+  let originalClaudeCliPath;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "ndx-mcp-reg-"));
+    // Force discoverClaudeCli to return { found: false } so MCP registration
+    // short-circuits instead of invoking the real `claude mcp add` CLI (which
+    // takes ~5–30s per call and makes these tests flaky). The existing
+    // CLAUDE_CLI_PATH env var is designed exactly for this — see
+    // packages/core/claude-integration.js:306–320.
+    originalClaudeCliPath = process.env.CLAUDE_CLI_PATH;
+    process.env.CLAUDE_CLI_PATH = "/nonexistent/path/to/claude";
   });
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
+    if (originalClaudeCliPath === undefined) {
+      delete process.env.CLAUDE_CLI_PATH;
+    } else {
+      process.env.CLAUDE_CLI_PATH = originalClaudeCliPath;
+    }
   });
 
   it("detail.mcp is always defined", () => {
@@ -175,13 +188,24 @@ describe("registerMcpServers result shape", () => {
 
 describe("setupClaudeIntegration is idempotent", () => {
   let tmpDir;
+  let originalClaudeCliPath;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "ndx-mcp-idempotent-"));
+    // Force CLAUDE CLI discovery to fail so we test idempotency of the
+    // non-MCP phases (settings, skills, instructions) without paying for
+    // real `claude mcp add` calls. See note above for details.
+    originalClaudeCliPath = process.env.CLAUDE_CLI_PATH;
+    process.env.CLAUDE_CLI_PATH = "/nonexistent/path/to/claude";
   });
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
+    if (originalClaudeCliPath === undefined) {
+      delete process.env.CLAUDE_CLI_PATH;
+    } else {
+      process.env.CLAUDE_CLI_PATH = originalClaudeCliPath;
+    }
   });
 
   it("running twice does not throw", () => {
@@ -269,13 +293,24 @@ describe("registerMcpServers error detail capture (source)", () => {
 
 describe("registerMcpServers error field in result", () => {
   let tmpDir;
+  let originalClaudeCliPath;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "ndx-mcp-err-"));
+    // Same short-circuit as the other behavioral describes — the tests below
+    // early-return when `!result.mcp.registered`, so forcing that branch is
+    // safe and keeps each call under ~100ms instead of 15s.
+    originalClaudeCliPath = process.env.CLAUDE_CLI_PATH;
+    process.env.CLAUDE_CLI_PATH = "/nonexistent/path/to/claude";
   });
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
+    if (originalClaudeCliPath === undefined) {
+      delete process.env.CLAUDE_CLI_PATH;
+    } else {
+      process.env.CLAUDE_CLI_PATH = originalClaudeCliPath;
+    }
   });
 
   it("failed server entries include a string error field", () => {

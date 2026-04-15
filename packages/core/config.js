@@ -1259,7 +1259,7 @@ async function handleSetProjectSection(
   setByPath(configs[pkg], settingPath, coerced);
 
   const targetFile = isLocalProjectSetting(pkg, settingPath)
-    ? LOCAL_PROJECT_CONFIG_FILE
+    ? LOCAL_CONFIG_FILE
     : PROJECT_CONFIG_FILE;
   const configPath = join(dir, targetFile);
   const current = await loadProjectConfigFile(dir, targetFile);
@@ -1316,35 +1316,12 @@ async function handleSetProjectSection(
     if (!current.claude || typeof current.claude !== "object") {
       current.claude = {};
     }
-    setByPath(localCurrent[pkg], settingPath, coerced);
-
-    // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
-    if (pkg === "llm" && settingPath.startsWith("claude.")) {
-      if (!localCurrent.claude || typeof localCurrent.claude !== "object") {
-        localCurrent.claude = {};
-      }
-      const legacySetting = settingPath.slice("claude.".length);
-      setByPath(localCurrent.claude, legacySetting, coerced);
-    }
-
-    await saveProjectJSON(localPath, localCurrent);
-  } else {
-    // Write back to .n-dx.json
-    const configPath = join(dir, PROJECT_CONFIG_FILE);
-    const current = await loadProjectConfig(dir);
-    current[pkg] = configs[pkg];
-
-    // Compatibility: keep legacy claude.* in sync when setting llm.claude.*
-    if (pkg === "llm" && settingPath.startsWith("claude.")) {
-      if (!current.claude || typeof current.claude !== "object") {
-        current.claude = {};
-      }
-      const legacySetting = settingPath.slice("claude.".length);
-      setByPath(current.claude, legacySetting, coerced);
-    }
-
-    await saveProjectJSON(configPath, current);
+    const legacySetting = settingPath.slice("claude.".length);
+    setByPath(current.claude, legacySetting, coerced);
   }
+
+  // Write back to the appropriate file (local or project)
+  await saveProjectJSON(configPath, current);
   console.log(`${keyArg} = ${formatValue(coerced)}`);
 
   // Print warnings for cleared models

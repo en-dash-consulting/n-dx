@@ -30,6 +30,13 @@ import { setupAssistantIntegrations } from "../../packages/core/assistant-integr
 
 const ROOT = join(import.meta.dirname, "../..");
 
+// Force claude CLI discovery to fail so `setupAssistantIntegrations` skips
+// the real `claude mcp add` calls (which caused the beforeAll hook to time
+// out at 10s). This test only verifies that CLAUDE.md/AGENTS.md are written
+// with the right content — file writes happen before MCP registration. See
+// packages/core/claude-integration.js:306–320.
+process.env.CLAUDE_CLI_PATH = "/nonexistent/path/to/claude";
+
 // ── Render once for all tests ────────────────────────────────────────────────
 
 let claudeContent;

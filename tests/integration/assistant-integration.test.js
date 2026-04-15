@@ -22,6 +22,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+// Force claude CLI discovery to fail so `setupClaudeIntegration` skips the
+// real `claude mcp add`/`claude mcp remove` calls (5–30s each). This test
+// only verifies the cross-vendor result shape and formatInitReport output —
+// both emit regardless of MCP registration outcome. See
+// packages/core/claude-integration.js:306–320.
+process.env.CLAUDE_CLI_PATH = "/nonexistent/path/to/claude";
+
 // Import from the core orchestration module (plain JS — no build step)
 const { setupAssistantIntegrations, formatInitReport } = await import(
   "../../packages/core/assistant-integration.js"

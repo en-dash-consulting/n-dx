@@ -127,14 +127,28 @@ describe("init output includes both assistant labels", () => {
 
   it("shows 'Assistant surfaces:' header in init summary", () => {
     const output = run(["init", "--provider=codex", tmpDir], {
-      env: { ...process.env, PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}` },
+      env: {
+        ...process.env,
+        PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+        // Skip real `claude mcp add` calls — keeps init fast and deterministic
+        // in tests that only assert on the summary output. See
+        // packages/core/claude-integration.js:306–320 for the short-circuit.
+        CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
+      },
     });
     expect(output).toContain("Assistant surfaces:");
   });
 
   it("shows both 'Claude Code' and 'Codex' labels", () => {
     const output = run(["init", "--provider=codex", tmpDir], {
-      env: { ...process.env, PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}` },
+      env: {
+        ...process.env,
+        PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+        // Skip real `claude mcp add` calls — keeps init fast and deterministic
+        // in tests that only assert on the summary output. See
+        // packages/core/claude-integration.js:306–320 for the short-circuit.
+        CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
+      },
     });
     expect(output).toContain("Claude Code");
     expect(output).toContain("Codex");
@@ -142,7 +156,14 @@ describe("init output includes both assistant labels", () => {
 
   it("mentions both CLAUDE.md and AGENTS.md artifacts", () => {
     const output = run(["init", "--provider=codex", tmpDir], {
-      env: { ...process.env, PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}` },
+      env: {
+        ...process.env,
+        PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+        // Skip real `claude mcp add` calls — keeps init fast and deterministic
+        // in tests that only assert on the summary output. See
+        // packages/core/claude-integration.js:306–320 for the short-circuit.
+        CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
+      },
     });
     expect(output).toContain("CLAUDE.md");
     expect(output).toContain("AGENTS.md");

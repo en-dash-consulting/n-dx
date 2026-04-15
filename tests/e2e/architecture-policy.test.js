@@ -816,12 +816,17 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["prd-tree-search", "Small PRD tree search cluster; SourceVision isolates a narrow subtree-search slice with few internal edges, so cohesion remains slightly below threshold despite a coherent responsibility."],
-  ["refresh-throttle-pipeline", "Tiny refresh throttle pipeline zone; the scheduler and throttle helpers form a narrow satellite with sparse internal edges, making the cohesion score noisy at this size."],
-  ["sourcevision-view-tests", "Small test-only satellite around the SourceVision viewer tabs; cohesion remains low because it exercises multiple viewer entry points rather than a single internal module cluster."],
-  ["prd-status-reset", "Small 3-file zone (below the 5-file threshold for reliable metrics); cascade-reset and parent-reset are sibling utilities for bidirectional status propagation — they work at the same level without calling each other, so internal edges are sparse despite a coherent responsibility."],
-  ["rex-chunked-review", "CLI satellite zone with files spanning analyze/ (batch-types.ts) and cli/commands/ sub-directories; the cross-directory provenance creates sparse internal edges. Documented dual-fragility zone per CLAUDE.md satellite zone policy."],
-  ["viewer-data-hooks", "Small 3-file zone (below the 5-file threshold for reliable metrics); use-polling and use-project-status serve distinct lifecycle concerns (polling vs. status aggregation) with few cross-imports, making the cohesion score unreliable at this size."],
+  ["mcp", "Small rex MCP tools cluster (4 files); metrics unreliable at this scale due to few internal edges."],
+  ["rex-cli", "27+ command files in flat directory; documented dual-fragility zone with high coupling to core — see CLAUDE.md rex-satellite zone policy."],
+  ["rex-core", "Small rex core cluster; Louvain isolates a narrow subset of core utilities, yielding artificially low cohesion."],
+  ["rex-recommend", "Small rex recommendation cluster; metrics unreliable at this scale due to few internal edges."],
+  ["rex-store", "Small rex store/persistence cluster; Louvain isolates a narrow subset, yielding artificially low cohesion."],
+  ["root", "Root-level project config files (.gitignore, .npmrc, LICENSE, etc.); inherently low internal cohesion across config file types."],
+  ["scripts", "Utility scripts directory; inherently low internal cohesion across unrelated build/analysis scripts."],
+  ["sync", "Small sync command cluster; narrow satellite zone with few internal edges yields artificially low cohesion."],
+  ["web-2", "Small viewer utility cluster; metrics remain noisy while SourceVision isolates a narrow tree-search/facet-state slice."],
+  ["web-5", "Small viewer cluster; metrics unreliable at this scale due to few internal edges."],
+  ["web-viewer", "Large viewer hub zone; Louvain splits hub imports across sub-zones, yielding below-threshold cohesion until the zone boundaries stabilize."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
@@ -942,8 +947,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 70,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, color/model helpers, vendor reset helpers)",
+    maxExports: 110,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, color/model helpers)",
   },
 ];
 
@@ -1188,8 +1193,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
   ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
-  // Core — lazy-loads Ink TUI to avoid loading React for non-init commands
-  ["packages/core/cli.js", "Lazy-loads Ink renderer for animated init UI (TTY only)"],
+  // Core — lazy-loads utilities
   ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers only when the configured vendor changes"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
