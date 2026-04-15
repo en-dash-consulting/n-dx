@@ -90,15 +90,17 @@ export function resolveModel(model: string): string {
  * this instead of hardcoding or independently deriving model strings.
  *
  * Resolution order:
- * 1. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
- * 2. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
+ * 1. Config tier-specific model (`llm.claude.lightModel` when weight='light')
+ * 2. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
+ * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
  * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.4mini)
  * - `'standard'` or omitted — resolves to full-capability models (sonnet, gpt-5)
  *
- * Config model overrides always take precedence over tier-based selection,
- * ensuring explicit `--model` flags work as expected.
+ * For the 'light' weight, if `lightModel` is configured, it takes precedence
+ * over both `model` and `TIER_MODELS`. This allows users to customize which
+ * model serves the light tier without affecting the standard tier.
  *
  * For Claude, the result is also passed through `resolveModel()` so that
  * shorthand aliases (e.g. "sonnet") are expanded to full API model IDs.
@@ -114,20 +116,32 @@ export function resolveVendorModel(
   weight: TaskWeight = "standard",
 ): string {
   if (vendor === "claude") {
-    // Config model override takes precedence
+    if (weight === "light") {
+      // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
+      if (config?.claude?.lightModel) {
+        return resolveModel(config.claude.lightModel);
+      }
+      return resolveModel(TIER_MODELS.claude.light);
+    }
+    // Standard tier: model can override, then fall back to TIER_MODELS.standard
     if (config?.claude?.model) {
       return resolveModel(config.claude.model);
     }
-    // Fall back to tier-appropriate model
-    return resolveModel(TIER_MODELS.claude[weight]);
+    return resolveModel(TIER_MODELS.claude.standard);
   }
   if (vendor === "codex") {
-    // Config model override takes precedence
+    if (weight === "light") {
+      // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
+      if (config?.codex?.lightModel) {
+        return config.codex.lightModel;
+      }
+      return TIER_MODELS.codex.light;
+    }
+    // Standard tier: model can override, then fall back to TIER_MODELS.standard
     if (config?.codex?.model) {
       return config.codex.model;
     }
-    // Fall back to tier-appropriate model
-    return TIER_MODELS.codex[weight];
+    return TIER_MODELS.codex.standard;
   }
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).
@@ -161,6 +175,9 @@ export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
       }
       if (typeof claude.model === "string" && claude.model) {
         result.model = claude.model;
+      }
+      if (typeof claude.lightModel === "string" && claude.lightModel) {
+        result.lightModel = claude.lightModel;
       }
       return result;
     }

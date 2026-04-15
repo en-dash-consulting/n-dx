@@ -52,4 +52,78 @@ describe("loadLLMConfig", () => {
     expect(cfg.claude?.api_key).toBe("sk-ant-test");
     expect(cfg.vendor).toBeUndefined();
   });
+
+  it("reads lightModel from llm.claude section", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          claude: {
+            model: "claude-sonnet-4-6",
+            lightModel: "claude-haiku-4-20250414",
+          },
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.claude?.model).toBe("claude-sonnet-4-6");
+    expect(cfg.claude?.lightModel).toBe("claude-haiku-4-20250414");
+  });
+
+  it("reads lightModel from llm.codex section", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          codex: {
+            model: "gpt-5",
+            lightModel: "gpt-5.4mini",
+          },
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.codex?.model).toBe("gpt-5");
+    expect(cfg.codex?.lightModel).toBe("gpt-5.4mini");
+  });
+
+  it("ignores non-string lightModel values", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          claude: { lightModel: 123 },
+          codex: { lightModel: true },
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.claude?.lightModel).toBeUndefined();
+    expect(cfg.codex?.lightModel).toBeUndefined();
+  });
+
+  it("ignores empty string lightModel values", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          claude: { lightModel: "", model: "sonnet" },
+          codex: { lightModel: "", model: "gpt-5" },
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.claude?.lightModel).toBeUndefined();
+    expect(cfg.claude?.model).toBe("sonnet");
+    expect(cfg.codex?.lightModel).toBeUndefined();
+    expect(cfg.codex?.model).toBe("gpt-5");
+  });
 });

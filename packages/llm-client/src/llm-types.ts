@@ -43,6 +43,12 @@ export interface CodexConfig {
   api_endpoint?: string;
   /** Default model for Codex requests. */
   model?: string;
+  /**
+   * Model override for the 'light' task weight tier.
+   * When set, resolveVendorModel uses this model for light-weight tasks
+   * instead of TIER_MODELS.codex.light.
+   */
+  lightModel?: string;
 }
 
 /** Vendor-neutral config shape loaded from `.n-dx.json`. */
