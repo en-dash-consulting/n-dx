@@ -398,14 +398,14 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
  */
 const CYCLE_EXEMPT_ZONE_TYPES = new Set(["test", "infrastructure"]);
 const CYCLE_EXCEPTIONS = new Map([
-  ["polling", "Small viewer polling state cluster; cycles with the multi-package 'web' zone because that zone spans both rex and web packages — packageFamily('web')='rex' while polling is pure web, making intra-package edges appear cross-package to the cycle detector."],
-  ["refresh", "Small refresh-throttle cluster; current SourceVision split still routes shared viewer imports through the web hub."],
-  ["tick", "Small viewer tick dispatcher cluster; cycles with the multi-package 'web' zone for the same packageFamily mismatch reason as 'polling'."],
-  ["use", "Tiny hooks cluster; imports still flow through shared viewer barrels and are tracked as a temporary zone cycle."],
+  ["mcp", "Rex MCP tools cluster; cycles with the duplicate-named 'web' zone (first file in rex package) making intra-rex edges appear cross-package to the cycle detector."],
+  ["rex-core", "Small rex core cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason — both zones are in the rex package."],
+  ["rex-recommend", "Small rex recommendation cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
+  ["rex-store", "Rex store/persistence cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
+  ["rex-unit", "Small rex unit cluster (src/core/tree.ts); cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
+  ["sync", "Small sync command cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["web-2", "Small viewer utility cluster; current SourceVision split still routes shared types through the web hub."],
-  ["web-4", "Small viewer data-loading cluster; cycles with the multi-package 'web' zone for the same packageFamily mismatch reason as 'polling'."],
-  ["web-helpers", "Search/test-support helper cluster; current SourceVision split still routes shared viewer imports through the web hub."],
-  ["web-viewer", "Viewer facade cluster; cohesion now meets threshold but still cycles with the multi-package 'web' zone due to the packageFamily mismatch (web zone first file is rex)."],
+  ["web-viewer", "Viewer facade cluster; still cycles with the multi-package 'web' zone due to the packageFamily mismatch (web zone first file is rex)."],
 ]);
 
 describe("architecture policy: zone import cycle detection", () => {
@@ -813,18 +813,17 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["polling", "Small viewer polling state cluster; Louvain splits polling state into a narrow satellite zone with few internal edges, yielding artificially low cohesion."],
-  ["refresh", "Small zone; refresh utilities grouped by Louvain; metrics unreliable at this scale."],
-  ["rex", "Large mixed rex analysis/CLI/store zone; current SourceVision clustering is still coarse and yields artificially low cohesion."],
-  ["sourcevision-cli", "Small sourcevision CLI satellite zone; metrics unreliable at this scale due to few internal edges."],
+  ["mcp", "Small rex MCP tools cluster (4 files); metrics unreliable at this scale due to few internal edges."],
+  ["rex-cli", "27+ command files in flat directory; documented dual-fragility zone with high coupling to core — see CLAUDE.md rex-satellite zone policy."],
+  ["rex-core", "Small rex core cluster; Louvain isolates a narrow subset of core utilities, yielding artificially low cohesion."],
+  ["rex-recommend", "Small rex recommendation cluster; metrics unreliable at this scale due to few internal edges."],
+  ["rex-store", "Small rex store/persistence cluster; Louvain isolates a narrow subset, yielding artificially low cohesion."],
+  ["root", "Root-level project config files (.gitignore, .npmrc, LICENSE, etc.); inherently low internal cohesion across config file types."],
+  ["scripts", "Utility scripts directory; inherently low internal cohesion across unrelated build/analysis scripts."],
   ["sync", "Small sync command cluster; narrow satellite zone with few internal edges yields artificially low cohesion."],
-  ["tick", "Small viewer tick dispatcher cluster; Louvain isolates tick timing files from the broader polling zone, yielding slightly below-threshold cohesion."],
-  ["token", "Small token parsing cluster; metrics unreliable at this scale due to few internal edges."],
-  ["use", "Tiny hooks cluster; metrics remain noisy while SourceVision isolates a small subset of shared viewer hooks."],
   ["web-2", "Small viewer utility cluster; metrics remain noisy while SourceVision isolates a narrow tree-search/facet-state slice."],
-  ["web-4", "Small viewer data-loading cluster; Louvain isolates loader/validate files from the broader viewer zone, yielding below-threshold cohesion."],
-  ["web-7", "Small viewer cluster; metrics unreliable at this scale due to few internal edges."],
-  ["web-shared", "Foundation layer; 3 files (below the 5-file threshold for reliable metrics); documented dual-fragility zone — low cohesion reflects the inherent structural gap between data-file constants and view identifiers, not decay."],
+  ["web-5", "Small viewer cluster; metrics unreliable at this scale due to few internal edges."],
+  ["web-viewer", "Large viewer hub zone; Louvain splits hub imports across sub-zones, yielding below-threshold cohesion until the zone boundaries stabilize."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
