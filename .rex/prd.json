@@ -28861,10 +28861,12 @@
         {
           "id": "220368bf-084e-4fbe-931a-a18112fcc33e",
           "title": "Windows Docker Testing Environment for ndx Gauntlet",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Create a local Docker-based testing infrastructure that allows developers to run ndx gauntlet tests on Windows without native Windows environments. The .local_testing folder serves as a git-ignored workspace for Docker configurations and test artifacts.",
           "source": "smart-add",
+          "startedAt": "2026-04-15T15:03:35.252Z",
+          "completedAt": "2026-04-15T15:03:35.252Z",
           "children": [
             {
               "id": "be4a2c03-b6d3-4b23-8fad-907f6ba4364a",
@@ -28914,7 +28916,7 @@
             {
               "id": "3321bd74-f5b9-463c-8d2c-752457fe3ac0",
               "title": "Implement local gauntlet test runner script",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Create shell scripts and Docker entrypoint that allow developers to execute gauntlet tests inside the Windows container locally. Output should stream to host terminal with proper exit codes.",
               "acceptanceCriteria": [
@@ -28931,7 +28933,8 @@
                 "automation"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-15T14:57:43.008Z"
+              "startedAt": "2026-04-15T14:57:43.008Z",
+              "completedAt": "2026-04-15T15:03:34.730Z"
             }
           ]
         },
@@ -28946,7 +28949,7 @@
             {
               "id": "1c3f1456-1a2f-4c63-9dcb-8af4d417f60b",
               "title": "Implement Claude config validation gauntlet tests",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create gauntlet test cases that validate Claude configuration: API key format, authentication flow, CLI discovery, and fallback behavior when config is missing or invalid.",
               "acceptanceCriteria": [
@@ -28963,12 +28966,14 @@
                 "claude",
                 "llm"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-15T15:03:38.803Z",
+              "completedAt": "2026-04-15T15:14:09.046Z"
             },
             {
               "id": "a89dacb4-d825-4a95-989a-fa86155c32a6",
               "title": "Implement Codex config validation gauntlet tests",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create gauntlet test cases that validate Codex configuration: API endpoint format, vendor-specific response parsing, token extraction accuracy, and authentication.",
               "acceptanceCriteria": [
@@ -28985,12 +28990,14 @@
                 "codex",
                 "llm"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-15T15:14:12.661Z",
+              "completedAt": "2026-04-15T15:19:27.919Z"
             },
             {
               "id": "f0645116-8597-4efc-8a1f-6b171e91d122",
               "title": "Integrate config validation tests into CI/CD gauntlet stage",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Wire Claude and Codex config validation tests into the CI/CD pipeline's gauntlet stage so they run before other stages and gate progression on validation success.",
               "acceptanceCriteria": [
@@ -29006,7 +29013,8 @@
                 "testing",
                 "automation"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-15T15:19:31.543Z"
             }
           ]
         }
