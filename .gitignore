@@ -31,13 +31,4 @@ scripts/HENCH_CALLGRAPH_FINDINGS.md
 .github/issues/
 
 *.local.json
-
-# Local testing workspace — ignore artifacts, but track infrastructure
 .local_testing/
-!.local_testing/
-!.local_testing/*.sh
-!.local_testing/*.ps1
-!.local_testing/Dockerfile.*
-!.local_testing/docker-compose.yml
-!.local_testing/.dockerignore
-!.local_testing/README.md
