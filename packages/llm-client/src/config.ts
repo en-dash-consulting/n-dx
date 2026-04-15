@@ -249,33 +249,19 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
  * @param dir  The directory containing .n-dx.json (project root)
  */
 export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
-  const configPath = join(dir, PROJECT_CONFIG_FILE);
-  try {
-    await access(configPath);
-    const raw = await readFile(configPath, "utf-8");
-    const data = JSON.parse(raw);
-    if (data && typeof data === "object" && data.claude && typeof data.claude === "object") {
-      const claude = data.claude as Record<string, unknown>;
-      const result: ClaudeConfig = {};
-      if (typeof claude.cli_path === "string" && claude.cli_path) {
-        result.cli_path = claude.cli_path;
-      }
-      if (typeof claude.api_key === "string" && claude.api_key) {
-        result.api_key = claude.api_key;
-      }
-      if (typeof claude.api_endpoint === "string" && claude.api_endpoint) {
-        result.api_endpoint = claude.api_endpoint;
-      }
-      if (typeof claude.model === "string" && claude.model) {
-        result.model = claude.model;
-      }
-      if (typeof claude.lightModel === "string" && claude.lightModel) {
-        result.lightModel = claude.lightModel;
-      }
-      return result;
-    }
-  } catch {
-    // File doesn't exist or is invalid — no claude config
+  const projectData = await loadJSONFile(join(dir, PROJECT_CONFIG_FILE));
+  const localData = await loadJSONFile(join(dir, LOCAL_CONFIG_FILE));
+
+  // Merge project and local configs (local wins)
+  let merged: Record<string, unknown> | null = projectData;
+  if (projectData && localData) {
+    merged = deepMerge(projectData, localData);
+  } else if (localData) {
+    merged = localData;
+  }
+
+  if (merged) {
+    return extractClaudeConfig(merged) ?? {};
   }
   return {};
 }
