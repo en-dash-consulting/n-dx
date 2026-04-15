@@ -29090,7 +29090,7 @@
     {
       "id": "d2635b48-f2a7-43c6-985c-c20b6479dd8f",
       "title": "Task-Weight-Aware Model Tiering",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -29156,10 +29156,12 @@
         {
           "id": "effae917-a7c4-4c7a-a0f8-2b8dce95ca58",
           "title": "Per-Command Task Weight Classification and Integration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Classify each LLM-calling command by its natural task weight and wire that weight through to the model resolver. Commands doing single-turn proposal generation or lightweight classification use 'light'; commands doing multi-turn agent loops, deep analysis, or ambiguous work use 'standard' (the default). This makes token-cost optimization automatic and transparent.",
           "source": "smart-add",
+          "startedAt": "2026-04-15T17:52:00.764Z",
+          "completedAt": "2026-04-15T17:52:00.764Z",
           "children": [
             {
               "id": "891e3a9b-8082-4ce5-8a6b-7c5897e38b59",
@@ -29187,7 +29189,7 @@
             {
               "id": "565c00fb-4271-4187-a75e-2a10c0cb060a",
               "title": "Surface active model tier in vendor header output and log task weight reasoning",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Update printVendorModelHeader in vendor-header.ts to display the active tier alongside the resolved model, so operators can see at a glance whether a command is running on the light or standard tier and why. When a tier override is active (via config lightModel), show that it's a configured override. This makes the cost optimization visible and debuggable.",
               "acceptanceCriteria": [
@@ -29203,6 +29205,8 @@
                 "observability"
               ],
               "source": "smart-add",
+              "startedAt": "2026-04-15T17:39:22.834Z",
+              "completedAt": "2026-04-15T17:52:00.239Z",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "content_overlap",
@@ -29212,8 +29216,7 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-04-15T17:16:24.162Z"
-              },
-              "startedAt": "2026-04-15T17:39:22.834Z"
+              }
             },
             {
               "id": "00b9416d-868f-4c13-93f5-9507096d46d7",
