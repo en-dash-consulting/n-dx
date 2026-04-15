@@ -29164,7 +29164,7 @@
             {
               "id": "891e3a9b-8082-4ce5-8a6b-7c5897e38b59",
               "title": "Wire light-tier model selection into rex smart-add and lightweight analysis paths",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Rex smart-add (reasonFromDescriptions, reasonFromIdeasFile in reason.ts) generates proposals from natural language — a bounded single-turn LLM call well-suited for lighter models. Pass TaskWeight 'light' through the smart-add call chain so resolveVendorModel selects haiku/gpt-5.4mini instead of sonnet/gpt-5.4codex. The model parameter plumbing already exists (spawnClaude accepts an optional model), so the change is in how the model is resolved, not in how it's passed.",
               "acceptanceCriteria": [
@@ -29181,12 +29181,13 @@
                 "model-resolution"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-15T17:34:26.554Z"
+              "startedAt": "2026-04-15T17:34:26.554Z",
+              "completedAt": "2026-04-15T17:39:16.385Z"
             },
             {
               "id": "565c00fb-4271-4187-a75e-2a10c0cb060a",
               "title": "Surface active model tier in vendor header output and log task weight reasoning",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Update printVendorModelHeader in vendor-header.ts to display the active tier alongside the resolved model, so operators can see at a glance whether a command is running on the light or standard tier and why. When a tier override is active (via config lightModel), show that it's a configured override. This makes the cost optimization visible and debuggable.",
               "acceptanceCriteria": [
@@ -29211,7 +29212,8 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-04-15T17:16:24.162Z"
-              }
+              },
+              "startedAt": "2026-04-15T17:39:22.834Z"
             },
             {
               "id": "00b9416d-868f-4c13-93f5-9507096d46d7",
