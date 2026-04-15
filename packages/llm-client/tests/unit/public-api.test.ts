@@ -31,6 +31,7 @@ import type {
   CodexConfig,
   LLMConfig,
   LLMClient,
+  TaskWeight,
   // types.ts
   TokenUsage,
   ClaudeConfig,
@@ -97,6 +98,7 @@ import {
   resolveModel,
   resolveVendorModel,
   NEWEST_MODELS,
+  TIER_MODELS,
   // token-usage.ts
   parseApiTokenUsage,
   parseCliTokenUsage,
@@ -231,6 +233,17 @@ describe("public API — function exports", () => {
     expect(NEWEST_MODELS).not.toBeNull();
     expect(typeof NEWEST_MODELS.claude).toBe("string");
     expect(typeof NEWEST_MODELS.codex).toBe("string");
+  });
+
+  it("exports TIER_MODELS as an object with claude and codex tiers", () => {
+    expect(typeof TIER_MODELS).toBe("object");
+    expect(TIER_MODELS).not.toBeNull();
+    expect(typeof TIER_MODELS.claude).toBe("object");
+    expect(typeof TIER_MODELS.codex).toBe("object");
+    expect(typeof TIER_MODELS.claude.light).toBe("string");
+    expect(typeof TIER_MODELS.claude.standard).toBe("string");
+    expect(typeof TIER_MODELS.codex.light).toBe("string");
+    expect(typeof TIER_MODELS.codex.standard).toBe("string");
   });
 
   it("exports parseApiTokenUsage as a function", () => {
@@ -561,5 +574,15 @@ describe("public API — refactoring regression guards", () => {
       model: "gpt-5-codex",
     };
     expect(codex.cli_path).toBe("/usr/local/bin/codex");
+  });
+
+  it("TaskWeight type is accessible and accepts 'light' and 'standard'", () => {
+    const light: TaskWeight = "light";
+    const standard: TaskWeight = "standard";
+    expect(light).toBe("light");
+    expect(standard).toBe("standard");
+    // Verify TIER_MODELS uses TaskWeight keys
+    expect(TIER_MODELS.claude[light]).toBeDefined();
+    expect(TIER_MODELS.claude[standard]).toBeDefined();
   });
 });

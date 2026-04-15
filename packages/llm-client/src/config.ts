@@ -8,7 +8,7 @@
 import { join } from "node:path";
 import { readFile, access } from "node:fs/promises";
 import type { ClaudeConfig } from "./types.js";
-import type { LLMVendor, LLMConfig } from "./llm-types.js";
+import type { LLMVendor, LLMConfig, TaskWeight } from "./llm-types.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 
@@ -22,6 +22,26 @@ const PROJECT_CONFIG_FILE = ".n-dx.json";
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-4-6",
   codex: "gpt-5",
+};
+
+/**
+ * Per-tier model mapping for task-weight-aware model selection.
+ *
+ * The `standard` tier always equals NEWEST_MODELS for backward compatibility —
+ * existing code that omits the weight parameter continues to use the default model.
+ * The `light` tier maps to cheaper/faster models for simple tasks.
+ *
+ * Invariant: TIER_MODELS[vendor].standard === NEWEST_MODELS[vendor]
+ */
+export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
+  claude: {
+    light: "claude-haiku-4-20250414",
+    standard: NEWEST_MODELS.claude,
+  },
+  codex: {
+    light: "gpt-5.4mini",
+    standard: NEWEST_MODELS.codex,
+  },
 };
 
 /**
@@ -64,29 +84,50 @@ export function resolveModel(model: string): string {
 
 /**
  * Resolve the canonical model string for a given vendor, consulting the
- * project config first and falling back to the newest model for that vendor.
+ * project config first and falling back to the tier-appropriate model.
  *
  * This is the single authoritative resolver for vendor/model selection. Use
  * this instead of hardcoding or independently deriving model strings.
  *
  * Resolution order:
  * 1. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
- * 2. Newest model fallback from `NEWEST_MODELS`
+ * 2. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
+ *
+ * The `weight` parameter enables task-weight-aware model tiering:
+ * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.4mini)
+ * - `'standard'` or omitted — resolves to full-capability models (sonnet, gpt-5)
+ *
+ * Config model overrides always take precedence over tier-based selection,
+ * ensuring explicit `--model` flags work as expected.
  *
  * For Claude, the result is also passed through `resolveModel()` so that
  * shorthand aliases (e.g. "sonnet") are expanded to full API model IDs.
  *
  * @param vendor  The LLM vendor ("claude" | "codex").
  * @param config  Optional `LLMConfig` loaded from `.n-dx.json`.
+ * @param weight  Optional task weight for tier-based selection. Defaults to 'standard'.
  * @returns       A fully-qualified model string ready for use in API calls.
  */
-export function resolveVendorModel(vendor: LLMVendor, config?: LLMConfig): string {
+export function resolveVendorModel(
+  vendor: LLMVendor,
+  config?: LLMConfig,
+  weight: TaskWeight = "standard",
+): string {
   if (vendor === "claude") {
-    const raw = config?.claude?.model ?? NEWEST_MODELS.claude;
-    return resolveModel(raw);
+    // Config model override takes precedence
+    if (config?.claude?.model) {
+      return resolveModel(config.claude.model);
+    }
+    // Fall back to tier-appropriate model
+    return resolveModel(TIER_MODELS.claude[weight]);
   }
   if (vendor === "codex") {
-    return config?.codex?.model ?? NEWEST_MODELS.codex;
+    // Config model override takes precedence
+    if (config?.codex?.model) {
+      return config.codex.model;
+    }
+    // Fall back to tier-appropriate model
+    return TIER_MODELS.codex[weight];
   }
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).

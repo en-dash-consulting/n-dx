@@ -22,6 +22,17 @@ import type { ClaudeClient, ClaudeConfig } from "./types.js";
 import type { LLMVendor } from "./provider-interface.js";
 export type { LLMVendor };
 
+/**
+ * Task weight for model tier selection.
+ *
+ * - `light` — single-turn proposals, simple classification, low-complexity work
+ * - `standard` — multi-turn agents, deep analysis, full-capability tasks
+ *
+ * Used by `resolveVendorModel()` to select the appropriate model tier.
+ * When omitted, defaults to 'standard' for backward compatibility.
+ */
+export type TaskWeight = "light" | "standard";
+
 /** Optional Codex-specific config section in `.n-dx.json`. */
 export interface CodexConfig {
   /** Path to Codex CLI binary. Defaults to `codex`. */

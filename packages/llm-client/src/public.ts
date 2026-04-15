@@ -116,6 +116,7 @@ export type {
   CodexConfig,
   LLMConfig,
   LLMClient,
+  TaskWeight,
 } from "./llm-types.js";
 
 // Types
@@ -149,6 +150,7 @@ export {
   resolveModel,
   resolveVendorModel,
   NEWEST_MODELS,
+  TIER_MODELS,
   VENDOR_CONTEXT_CHAR_LIMITS,
 } from "./config.js";
 
