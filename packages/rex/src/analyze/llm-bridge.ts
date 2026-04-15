@@ -18,6 +18,7 @@ import type {
   AuthMode,
   LLMConfig,
   LLMVendor,
+  TaskWeight,
 } from "@n-dx/llm-client";
 import {
   createLLMClient,
@@ -45,9 +46,9 @@ function resolveVendor(): LLMVendor {
   return _llmConfig?.vendor ?? "claude";
 }
 
-export function resolveConfiguredModel(model?: string): string {
+export function resolveConfiguredModel(model?: string, weight: TaskWeight = "standard"): string {
   if (model?.trim()) return model;
-  return resolveVendorModel(resolveVendor(), _llmConfig ?? {});
+  return resolveVendorModel(resolveVendor(), _llmConfig ?? {}, weight);
 }
 
 // ── Public configuration API ──

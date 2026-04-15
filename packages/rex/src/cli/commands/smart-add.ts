@@ -1200,10 +1200,10 @@ async function resolveSmartAddModel(
     const config = await store.loadConfig();
     const vendor = getLLMVendor() ?? "claude";
     const model = resolveVendorCompatibleRexModel(vendor, config.model);
-    llmDebug(`effective model=${model ?? resolveConfiguredModel()}`);
+    llmDebug(`effective model=${model ?? resolveConfiguredModel(undefined, "light")}`);
     return model;
   } catch {
-    const resolvedModel = resolveConfiguredModel();
+    const resolvedModel = resolveConfiguredModel(undefined, "light");
     llmDebug(`effective model=${resolvedModel}`);
     return resolvedModel;
   }
@@ -1249,7 +1249,7 @@ async function generateSmartAddProposals(params: {
   isJson: boolean;
 }): Promise<Proposal[]> {
   const { dir, existing, parentId, model, descList, filePaths, isJson } = params;
-  const effectiveModel = resolveConfiguredModel(model);
+  const effectiveModel = resolveConfiguredModel(model, "light");
 
   if (filePaths.length > 0) {
     const resolved = filePaths.map((fp) => resolve(dir, fp));
@@ -1261,7 +1261,7 @@ async function generateSmartAddProposals(params: {
     try {
       spinner?.update(`Processing ideas files...`);
       const reasonResult = await reasonFromIdeasFile(resolved, existing, {
-        model,
+        model: effectiveModel,
         dir,
         parentId,
       });
@@ -1288,7 +1288,7 @@ async function generateSmartAddProposals(params: {
 
   try {
     const reasonResult = await reasonFromDescriptions(descList, existing, {
-      model,
+      model: effectiveModel,
       dir,
       parentId,
     });
