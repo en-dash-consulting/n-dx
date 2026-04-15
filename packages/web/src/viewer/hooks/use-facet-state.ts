@@ -9,21 +9,23 @@
  * Combined with existing hash params using & separator.
  *
  * @see ../components/prd-tree/facet-filter.ts — FacetFilter component
- * @see ../components/prd-tree/tree-search.ts — SearchFacets type
+ * @see ../components/prd-tree/search-types.ts — SearchFacets type
  */
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
-import type { ItemStatus } from "../components/prd-tree/types.js";
-import type { SearchFacets } from "../components/prd-tree/tree-search.js";
+import type {
+  SearchFacets,
+  SearchItemStatus,
+} from "../components/prd-tree/search-types.js";
 
 // ── URL hash encoding/decoding ───────────────────────────────────────────
 
 const FACET_PARAM = "facets";
 
 /** Parse facet state from the URL hash. */
-function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<ItemStatus> } {
+function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<SearchItemStatus> } {
   const tags = new Set<string>();
-  const statuses = new Set<ItemStatus>();
+  const statuses = new Set<SearchItemStatus>();
 
   try {
     const hash = window.location.hash.slice(1); // remove leading #
@@ -41,7 +43,7 @@ function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<ItemStatus> }
       if (type === "tag" && value) {
         tags.add(value);
       } else if (type === "status" && value) {
-        statuses.add(value as ItemStatus);
+        statuses.add(value as SearchItemStatus);
       }
     }
   } catch {
@@ -52,7 +54,7 @@ function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<ItemStatus> }
 }
 
 /** Write facet state to the URL hash, preserving other hash params. */
-function writeFacetsToHash(tags: Set<string>, statuses: Set<ItemStatus>): void {
+function writeFacetsToHash(tags: Set<string>, statuses: Set<SearchItemStatus>): void {
   try {
     const hash = window.location.hash.slice(1);
     const params = new URLSearchParams(hash);
@@ -86,13 +88,13 @@ export interface FacetState {
   /** Currently active tag facets. */
   activeTags: Set<string>;
   /** Currently active status facets (for search narrowing, not the tree-level filter). */
-  activeSearchStatuses: Set<ItemStatus>;
+  activeSearchStatuses: Set<SearchItemStatus>;
   /** Combined facets object for searchTree(). null when no facets are active. */
   searchFacets: SearchFacets | undefined;
   /** Update active tags. */
   setActiveTags: (tags: Set<string>) => void;
   /** Update active search statuses. */
-  setActiveSearchStatuses: (statuses: Set<ItemStatus>) => void;
+  setActiveSearchStatuses: (statuses: Set<SearchItemStatus>) => void;
   /** Clear all facets. */
   clearFacets: () => void;
   /** Whether any facet is currently active. */
@@ -106,7 +108,7 @@ export function useFacetState(): FacetState {
     return parsed.tags;
   });
 
-  const [activeSearchStatuses, setActiveSearchStatusesRaw] = useState<Set<ItemStatus>>(() => {
+  const [activeSearchStatuses, setActiveSearchStatusesRaw] = useState<Set<SearchItemStatus>>(() => {
     const parsed = parseFacetsFromHash();
     return parsed.statuses;
   });
@@ -127,7 +129,7 @@ export function useFacetState(): FacetState {
     setActiveTagsRaw(tags);
   }, []);
 
-  const setActiveSearchStatuses = useCallback((statuses: Set<ItemStatus>) => {
+  const setActiveSearchStatuses = useCallback((statuses: Set<SearchItemStatus>) => {
     setActiveSearchStatusesRaw(statuses);
   }, []);
 

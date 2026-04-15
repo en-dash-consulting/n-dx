@@ -21,8 +21,12 @@ import {
   formatAggregateTokenUsage,
   formatBudgetWarnings,
 } from "../../../src/cli/commands/token-format.js";
-import type { LogEntry } from "../../../src/schema/index.js";
-import type { AggregateTokenUsage, TokenEvent, BudgetConfig } from "../../../src/core/token-usage.js";
+import type {
+  AggregateTokenUsage,
+  TokenEvent,
+  BudgetConfig,
+  TokenUsageLogEntry,
+} from "../../../src/core/token-usage.js";
 
 // ---------------------------------------------------------------------------
 // extractRexTokenUsage
@@ -30,7 +34,7 @@ import type { AggregateTokenUsage, TokenEvent, BudgetConfig } from "../../../src
 
 describe("extractRexTokenUsage", () => {
   it("extracts token usage from analyze_token_usage log entries", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -46,7 +50,7 @@ describe("extractRexTokenUsage", () => {
   });
 
   it("accumulates across multiple log entries", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -67,7 +71,7 @@ describe("extractRexTokenUsage", () => {
   });
 
   it("ignores non-token events", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "task_completed",
@@ -88,7 +92,7 @@ describe("extractRexTokenUsage", () => {
   });
 
   it("skips entries with malformed detail JSON", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -108,7 +112,7 @@ describe("extractRexTokenUsage", () => {
   });
 
   it("skips entries without detail field", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -130,7 +134,7 @@ describe("extractRexTokenUsage", () => {
   });
 
   describe("time filtering", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-10T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -498,7 +502,7 @@ describe("aggregateTokenUsage", () => {
   }
 
   it("combines rex, hench, and sv token usage", async () => {
-    const logEntries: LogEntry[] = [
+    const logEntries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -539,7 +543,7 @@ describe("aggregateTokenUsage", () => {
   });
 
   it("passes filter to all extractors", async () => {
-    const logEntries: LogEntry[] = [
+    const logEntries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-10T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -824,7 +828,7 @@ describe("estimateCost", () => {
 
 describe("extractRexTokenEvents", () => {
   it("returns token events from analyze_token_usage entries with vendor/model", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -851,7 +855,7 @@ describe("extractRexTokenEvents", () => {
   });
 
   it("maps smart_add_token_usage events to smart-add command", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "smart_add_token_usage",
@@ -869,7 +873,7 @@ describe("extractRexTokenEvents", () => {
   });
 
   it("uses unknown fallback when metadata is missing or empty", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -890,7 +894,7 @@ describe("extractRexTokenEvents", () => {
   });
 
   it("ignores non-token events", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       { timestamp: "2026-01-15T10:00:00.000Z", event: "task_completed", detail: "done" },
       {
         timestamp: "2026-01-15T11:00:00.000Z",
@@ -906,7 +910,7 @@ describe("extractRexTokenEvents", () => {
   });
 
   it("applies time filter", () => {
-    const entries: LogEntry[] = [
+    const entries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-10T10:00:00.000Z",
         event: "analyze_token_usage",
@@ -1103,7 +1107,7 @@ describe("collectTokenEvents", () => {
   }
 
   it("collects events from all packages sorted by timestamp", async () => {
-    const logEntries: LogEntry[] = [
+    const logEntries: TokenUsageLogEntry[] = [
       {
         timestamp: "2026-01-15T10:00:00.000Z",
         event: "analyze_token_usage",

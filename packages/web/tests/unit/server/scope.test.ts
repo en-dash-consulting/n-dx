@@ -14,7 +14,7 @@ import type { ServerContext, ViewerScope } from "../../../src/server/types.js";
 import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
-import { jsonResponse } from "../../../src/server/types.js";
+import { jsonResponse } from "../../../src/server/response-utils.js";
 
 type InScopeFn = (pkg: ViewerScope) => boolean;
 

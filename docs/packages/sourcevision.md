@@ -16,13 +16,17 @@ SourceVision runs a 4-phase analysis pipeline:
 ## CLI
 
 ```sh
-sourcevision analyze .           # full analysis
-sourcevision analyze --fast .    # skip AI enrichment
-sourcevision analyze --phase zones .  # run specific phase
-sourcevision serve .             # interactive browser viewer
-sourcevision mcp .               # start MCP server (stdio)
-sourcevision validate .          # validate analysis output
-sourcevision reset .             # clear analysis data
+sourcevision analyze .                    # full analysis
+sourcevision analyze --fast .             # skip AI enrichment
+sourcevision analyze --phase zones .      # run specific phase
+sourcevision serve .                      # interactive browser viewer
+sourcevision validate .                   # validate analysis output
+sourcevision export-pdf .                 # export analysis as PDF report
+sourcevision pr-markdown .                # regenerate PR markdown summary
+sourcevision git-credential-helper .      # interactive GitHub credential setup
+sourcevision reset .                      # clear analysis data
+sourcevision workspace .                  # aggregate multiple repos into unified view
+sourcevision mcp .                        # start MCP server (stdio)
 ```
 
 The `sv` command is an alias for `sourcevision`.

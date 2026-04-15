@@ -11,7 +11,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
-import { NdxLogoPng } from "../components/logos.js";
+import { NdxLogoPng } from "../components/index.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 

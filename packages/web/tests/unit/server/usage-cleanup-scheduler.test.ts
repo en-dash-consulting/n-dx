@@ -26,8 +26,8 @@ import {
   type CleanupResult,
   type CollectAllIdsFn,
   type LoadPRDFn,
-} from "../../../src/server/usage-cleanup-scheduler.js";
-import { IncrementalTaskUsageAggregator } from "../../../src/server/incremental-task-usage.js";
+} from "../../../src/server/task-usage/usage-cleanup-scheduler.js";
+import { IncrementalTaskUsageAggregator } from "../../../src/server/task-usage/incremental-task-usage.js";
 
 /**
  * Test-local implementation of collectAllIds.

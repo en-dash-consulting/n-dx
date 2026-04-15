@@ -27,7 +27,7 @@ import {
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
-import { tryParseJSON, extractFindings, deduplicateZoneIds } from "./enrich-parsing.js";
+import { tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone } from "./enrich-parsing.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 
@@ -100,45 +100,40 @@ async function enrichSingleZone(
       .map(([pair, count]) => `  ${pair}: ${count} imports`)
       .join("\n");
 
-    let prompt: string;
+    const filesSample = zone.files.length > config.maxFiles + 2
+      ? [...zone.files.slice(0, config.maxFiles), `... and ${zone.files.length - config.maxFiles} more`]
+      : zone.files;
+    const filesStr = filesSample.map((f) => formatFileLabel(f, fileArchetypes)).join(", ");
 
+    let prompt: string;
     if (isFirstPass) {
-      const filesSample = zone.files.length > config.maxFiles + 2
-        ? [...zone.files.slice(0, config.maxFiles), `... and ${zone.files.length - config.maxFiles} more`]
-        : zone.files;
       const entryLine = config.maxFiles >= 8
         ? `\nEntry points: ${zone.entryPoints.map((f) => `"${f}"`).join(", ") || "none"}`
         : "";
-
       prompt = `Analyze this code zone. It was discovered by import-graph community detection.
 
 ${passConfig.focus}
 
 Zone: "${zone.id}" (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zone.files.length} files)
-Files: ${filesSample.map((f) => { const a = fileArchetypes?.get(f); return a ? `"${f}" [${a}]` : `"${f}"`; }).join(", ")}${entryLine}
+Files: ${filesStr}${entryLine}
 ${otherContext}
 ${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Boundary crossings:
 ${crossingLines || "  (none)"}
 
-Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
+Findings: severity ("info"|"warning"|"critical").
 
 Respond with ONLY a JSON object (no markdown, no explanation):
 {"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"${zone.id}","text":"finding text","severity":"info"}]}
 
 Use finding types: ${passConfig.expectedTypes.join(", ")}.`;
     } else {
-      // Pass 2+: only new insights
       const prevInsights = previousZone?.insights ?? [];
-      const filesSample = zone.files.length > config.maxFiles + 2
-        ? [...zone.files.slice(0, config.maxFiles), `... and ${zone.files.length - config.maxFiles} more`]
-        : zone.files;
       const maxInsights = config.maxFiles >= 8 ? prevInsights.length : Math.min(prevInsights.length, 3);
-
       prompt = `You previously analyzed this zone. Here is the current state:
 
 Zone: "${zone.id}" (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zone.files.length} files)
-Files: ${filesSample.map((f: string) => { const a = fileArchetypes?.get(f); return a ? `"${f}" [${a}]` : `"${f}"`; }).join(", ")}
+Files: ${filesStr}
 Known insights: ${prevInsights.slice(0, maxInsights).length > 0 ? prevInsights.slice(0, maxInsights).map((i) => `"${i}"`).join("; ") : "(none)"}
 ${otherContext}
 ${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
@@ -149,7 +144,7 @@ This is enrichment pass ${passNumber}. ${passConfig.focus}
 
 Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.
 
-Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
+Findings: severity ("info"|"warning"|"critical").
 
 Respond with ONLY a JSON object:
 {"id":"${zone.id}","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"${zone.id}","text":"finding text","severity":"info"}]}
@@ -192,34 +187,26 @@ Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine
 
     // Apply result
     if (isFirstPass) {
-      if (typeof candidate.id !== "string" || typeof candidate.name !== "string" || typeof candidate.description !== "string") {
+      if (!candidate.id || !candidate.name || !candidate.description) {
         const label = attempt < ATTEMPT_CONFIGS.length - 1 ? "retrying" : "giving up";
         console.warn(`  [enrich] Zone "${zone.id}" attempt ${attempt + 1}: missing id/name/description — ${label}`);
         continue;
       }
-
-      const newInsights = Array.isArray(candidate.insights)
-        ? candidate.insights.filter((s: any) => typeof s === "string")
-        : [];
-      const newFindings = extractFindings({ zones: [candidate], findings: candidate.findings ?? [] }, passNumber, passConfig.expectedTypes);
-
       const enrichedZone: Zone = {
         ...zone,
         id: candidate.id,
         name: candidate.name,
         description: candidate.description,
       };
-
-      return { zone: enrichedZone, newInsights, newFindings, tokenUsage: zoneTokenUsage, success: true };
-    } else {
-      // Pass 2+
-      const newInsights = Array.isArray(candidate.newInsights)
-        ? candidate.newInsights.filter((s: any) => typeof s === "string")
-        : [];
+      const newInsights = extractZoneInsights(candidate, "insights");
       const newFindings = extractFindings({ zones: [candidate], findings: candidate.findings ?? [] }, passNumber, passConfig.expectedTypes);
-
-      return { zone, newInsights, newFindings, tokenUsage: zoneTokenUsage, success: true };
+      return { zone: enrichedZone, newInsights, newFindings, tokenUsage: zoneTokenUsage, success: true };
     }
+
+    // Pass 2+: preserve zone identity, extract new insights
+    const newInsights = extractZoneInsights(candidate, "newInsights");
+    const newFindings = extractFindings({ zones: [candidate], findings: candidate.findings ?? [] }, passNumber, passConfig.expectedTypes);
+    return { zone, newInsights, newFindings, tokenUsage: zoneTokenUsage, success: true };
   }
 
   console.warn(`  [enrich] Zone "${zone.id}" all attempts exhausted — keeping algorithmic data`);
@@ -278,9 +265,7 @@ export async function enrichZonesPerZone(
 
   for (const zone of zones) {
     const hash = zoneHashes.get(zone.id)!;
-    const prevZone = previousZones?.zones.find(
-      (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
-    );
+    const prevZone = findPrevZone(previousZones?.zones, zone);
 
     // Skip if structure unchanged and already enriched
     if (prevZone?.structureHash === hash && prevEnrichPass > 0) {
@@ -328,9 +313,7 @@ export async function enrichZonesPerZone(
     try {
       batchResults = await Promise.all(
         batch.map((zone) => {
-          const prevZone = previousZones?.zones.find(
-            (p) => p.files.length > 0 && p.files.some((f) => zone.files.includes(f))
-          );
+          const prevZone = findPrevZone(previousZones?.zones, zone);
           return enrichSingleZone(zone, zones, crossings, inventory, passNumber, passConfig, prevZone, fileArchetypes, hints);
         })
       );
@@ -347,13 +330,12 @@ export async function enrichZonesPerZone(
 
   for (const result of results) {
     const hash = zoneHashes.get(result.zone.id) ?? computeZoneStructureHash(result.zone);
-    const enrichedZone: Zone = {
+    enrichedZones.push({
       ...result.zone,
       structureHash: hash,
       tokenUsage: result.tokenUsage,
-    };
-    enrichedZones.push(enrichedZone);
-    newZoneInsights.set(enrichedZone.id, result.newInsights);
+    });
+    newZoneInsights.set(result.zone.id, result.newInsights);
     allNewFindings.push(...result.newFindings);
 
     // Accumulate token usage

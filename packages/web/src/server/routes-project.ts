@@ -12,7 +12,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { exec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { jsonResponse } from "./types.js";
+import { jsonResponse } from "./response-utils.js";
 
 // ---------------------------------------------------------------------------
 // Types

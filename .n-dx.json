@@ -1,9 +1,7 @@
 {
   "llm": {
     "vendor": "claude",
-    "claude": {
-      "model": "claude-sonnet-4-6"
-    }
+    "model": "claude-haiku-4-5"
   },
   "sourcevision": {
     "zones": {
@@ -36,7 +34,7 @@
         "packages/web/src/server/aggregation-cache.ts": "web-server",
         "packages/web/src/landing/landing.ts": "web-landing",
         "packages/web/src/viewer/components/guide.ts": "web-viewer",
-        "packages/web/src/viewer/components/prd-tree/status-filter.ts": "web-viewer",
+        "packages/web/src/viewer/views/status-filter.ts": "web-viewer",
         "packages/web/src/viewer/views/enrichment-thresholds.ts": "web-viewer",
         "packages/web/src/viewer/views/graph.ts": "web-viewer",
         "packages/web/src/viewer/views/sourcevision-tabs.ts": "web-viewer",
@@ -61,11 +59,12 @@
         "packages/web/src/server/routes-integrations.ts": "web-server",
         "packages/web/src/server/routes-notion.ts": "web-server",
         "packages/web/src/server/routes-project.ts": "web-server",
-        "packages/web/src/server/routes-rex/analysis.ts": "web-server",
+        "packages/web/src/server/routes-rex-analysis.ts": "web-server",
         "packages/web/src/server/routes-rex/execution.ts": "web-server",
         "packages/web/src/server/routes-rex/health.ts": "web-server",
         "packages/web/src/server/routes-rex/index.ts": "web-server",
         "packages/web/src/server/routes-rex/items.ts": "web-server",
+        "packages/web/src/server/routes-rex/rex-route-helpers.ts": "web-server",
         "packages/web/src/server/routes-rex/prune.ts": "web-server",
         "packages/web/src/server/routes-rex/reads.ts": "web-server",
         "packages/web/src/server/routes-rex/requirements.ts": "web-server",
@@ -80,6 +79,9 @@
         "packages/web/src/server/start.ts": "web-server",
         "packages/web/src/server/types.ts": "web-server",
         "packages/web/src/server/websocket.ts": "web-server",
+        "packages/web/tests/helpers/server-route-test-support.ts": "web-server",
+        "packages/web/tests/unit/server/routes-hench-execute.test.ts": "web-server",
+        "packages/web/tests/unit/server/routes-sourcevision.test.ts": "web-server",
         "packages/rex/src/core/fix.ts": "rex-prd-engine",
         "packages/rex/src/analyze/batch-types.ts": "rex-prd-engine",
         "packages/rex/src/core/keywords.ts": "rex-prd-engine",
@@ -99,18 +101,44 @@
         "packages/rex/tests/e2e/cli-sync.test.ts": "rex-cli-e2e",
         "packages/rex/tests/e2e/cli-workflow.test.ts": "rex-cli-e2e",
         "packages/rex/vitest.config.ts": "rex-prd-engine",
-        "packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl": "rex-cli-e2e"
+        "packages/rex/tests/e2e/fixtures/sample-prd/.rex/execution-log.jsonl": "rex-cli-e2e",
+        "packages/rex/src/core/tree.ts": "rex-prd-engine",
+        "packages/rex/src/schema/index.ts": "rex-prd-engine",
+        "packages/rex/src/schema/v1.ts": "rex-prd-engine",
+        "packages/rex/src/schema/levels.ts": "rex-prd-engine",
+        "packages/rex/tests/unit/core/keywords.test.ts": "rex-prd-engine",
+        "packages/rex/tests/unit/core/verify.test.ts": "rex-prd-engine",
+        "packages/web/tests/unit/viewer/enrichment-thresholds.test.ts": "web-sv-view-tests",
+        "packages/web/tests/unit/viewer/sourcevision-tabs.test.ts": "web-sv-view-tests",
+        "packages/web/src/viewer/components/search-overlay.ts": "web-viewer-search-overlay",
+        "packages/web/tests/unit/viewer/search-overlay.test.ts": "web-viewer-search-overlay",
+        "packages/web/tests/helpers/preact-test-support.ts": "web-viewer",
+        "packages/hench/src/tools/test-runner.ts": "hench-agent",
+        "packages/hench/tests/unit/tools/go-test-runner.test.ts": "hench-agent",
+        "packages/hench/tests/unit/tools/test-runner.test.ts": "hench-agent",
+        "packages/rex/tests/helpers/rex-dir-test-support.ts": "rex-unit",
+        "packages/rex/tests/unit/cli/commands/next-colors.test.ts": "rex-unit",
+        "packages/rex/tests/unit/cli/commands/usage.test.ts": "rex-unit",
+        "packages/sourcevision/tests/fixtures/go-project/internal/service/user.go": "sv-fixtures",
+        "packages/sourcevision/tests/fixtures/go-project/internal/service/user_test.go": "sv-fixtures"
       },
       "types": {
+        "e2e": "test",
+        "fixtures": "test",
+        "sv-fixtures": "test",
+        "integration": "test",
         "repo-ops-shell": "infrastructure",
         "root": "infrastructure",
         "scripts": "infrastructure",
         "server-route-guardrails-tests": "test",
-        "web-build-tooling": "infrastructure"
+        "web-build-tooling": "infrastructure",
+        "web-integration": "test",
+        "web-sv-view-tests": "test",
+    "packages-web-unit-server": "test",
+    "sourcevision-view-tests": "test"
       }
     }
   },
-  "claude": {
-    "model": "claude-sonnet-4-6"
-  }
+  "_initVersion": "0.2.3",
+  "cli": {}
 }

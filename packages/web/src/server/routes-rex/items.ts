@@ -7,12 +7,12 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse, readBody } from "../types.js";
+import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
   findItemById, insertChild, updateInTree, loadPRD, savePRD,
   appendLog, API_SETTABLE_STATUSES,
-} from "./shared.js";
+} from "./rex-route-helpers.js";
 
 import {
   type PRDItem,
@@ -28,8 +28,8 @@ import {
   mergeItems,
 } from "../rex-gateway.js";
 
-// Re-import parentIdOf from shared for merge handler
-import { parentIdOf } from "./shared.js";
+// Re-import parentIdOf from rex-route-helpers for merge handler
+import { parentIdOf } from "./rex-route-helpers.js";
 
 /** Item CRUD routes: add, get, patch, bulk update, merge. */
 export function routeItems(

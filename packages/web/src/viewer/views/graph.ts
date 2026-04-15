@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "preact/hooks"
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
 import { buildZoneColorMap, getZoneColorByIndex } from "../visualization/index.js";
 import { GraphRenderer, type GraphNode, type GraphLink, type ZoneInfo } from "../graph/renderer.js";
-import { BrandedHeader } from "../components/logos.js";
+import { BrandedHeader } from "../components/index.js";
 
 interface GraphProps {
   data: LoadedData;

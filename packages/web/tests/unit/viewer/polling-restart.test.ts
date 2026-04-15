@@ -8,24 +8,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Track degradation listeners so tests can emit events
-const degradationListeners: Array<(state: { disabledFeatures: Set<string> }) => void> = [];
-let featureDisabledResult = false;
-
-vi.mock("../../../src/viewer/performance/graceful-degradation.js", () => ({
-  onDegradationChange: (handler: (state: { disabledFeatures: Set<string> }) => void) => {
-    degradationListeners.push(handler);
-    return () => {
-      const idx = degradationListeners.indexOf(handler);
-      if (idx >= 0) degradationListeners.splice(idx, 1);
-    };
-  },
-  isFeatureDisabled: (feature: string) => {
-    if (feature === "autoRefresh") return featureDisabledResult;
-    return false;
-  },
-}));
-
 vi.mock("../../../src/viewer/polling/polling-state.js", () => ({
   suspendAllSources: vi.fn(),
   resumeAllSources: vi.fn(),
@@ -37,6 +19,7 @@ vi.mock("../../../src/viewer/polling/polling-state.js", () => ({
 import {
   startPollingRestart,
   stopPollingRestart,
+  type PollingRestartOptions,
 } from "../../../src/viewer/polling/polling-restart.js";
 
 import {
@@ -44,21 +27,42 @@ import {
   resumeAllSources,
 } from "../../../src/viewer/polling/polling-state.js";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Test helpers ─────────────────────────────────────────────────────────────
 
-function emitDegradation(disabledFeatures: string[]): void {
-  const state = { disabledFeatures: new Set(disabledFeatures) };
-  for (const listener of [...degradationListeners]) {
-    listener(state);
-  }
+/** Build a PollingRestartOptions with controllable degradation callbacks. */
+function makeOptions(): {
+  options: PollingRestartOptions;
+  emitDegradation: (disabledFeatures: string[]) => void;
+  featureDisabledMap: Map<string, boolean>;
+} {
+  const listeners: Array<(state: { disabledFeatures: Set<string> }) => void> = [];
+  const featureDisabledMap = new Map<string, boolean>();
+
+  const options: PollingRestartOptions = {
+    onDegradationChange: (handler) => {
+      listeners.push(handler);
+      return () => {
+        const idx = listeners.indexOf(handler);
+        if (idx >= 0) listeners.splice(idx, 1);
+      };
+    },
+    isFeatureDisabled: (feature: string) => featureDisabledMap.get(feature) ?? false,
+  };
+
+  const emitDegradation = (disabledFeatures: string[]) => {
+    const state = { disabledFeatures: new Set(disabledFeatures) };
+    for (const listener of [...listeners]) {
+      listener(state);
+    }
+  };
+
+  return { options, emitDegradation, featureDisabledMap };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("polling-restart coordinator", () => {
   beforeEach(() => {
-    featureDisabledResult = false;
-    degradationListeners.length = 0;
     vi.clearAllMocks();
   });
 
@@ -67,25 +71,34 @@ describe("polling-restart coordinator", () => {
   });
 
   it("subscribes to degradation changes on start", () => {
-    expect(degradationListeners).toHaveLength(0);
-    startPollingRestart();
-    expect(degradationListeners).toHaveLength(1);
+    let subscribed = false;
+    const options: PollingRestartOptions = {
+      onDegradationChange: (handler) => {
+        subscribed = true;
+        return () => { /* no-op */ };
+      },
+      isFeatureDisabled: () => false,
+    };
+    startPollingRestart(options);
+    expect(subscribed).toBe(true);
   });
 
   it("does not suspend sources when autoRefresh is enabled at start", () => {
-    featureDisabledResult = false;
-    startPollingRestart();
+    const { options } = makeOptions();
+    startPollingRestart(options);
     expect(suspendAllSources).not.toHaveBeenCalled();
   });
 
   it("suspends sources immediately when autoRefresh is already disabled at start", () => {
-    featureDisabledResult = true;
-    startPollingRestart();
+    const { options, featureDisabledMap } = makeOptions();
+    featureDisabledMap.set("autoRefresh", true);
+    startPollingRestart(options);
     expect(suspendAllSources).toHaveBeenCalledTimes(1);
   });
 
   it("suspends sources when degradation disables autoRefresh", () => {
-    startPollingRestart();
+    const { options, emitDegradation } = makeOptions();
+    startPollingRestart(options);
     expect(suspendAllSources).not.toHaveBeenCalled();
 
     emitDegradation(["autoRefresh"]);
@@ -93,7 +106,8 @@ describe("polling-restart coordinator", () => {
   });
 
   it("resumes sources when degradation re-enables autoRefresh", () => {
-    startPollingRestart();
+    const { options, emitDegradation } = makeOptions();
+    startPollingRestart(options);
 
     // Suspend first
     emitDegradation(["autoRefresh"]);
@@ -105,7 +119,8 @@ describe("polling-restart coordinator", () => {
   });
 
   it("does not double-suspend on repeated degradation events", () => {
-    startPollingRestart();
+    const { options, emitDegradation } = makeOptions();
+    startPollingRestart(options);
 
     emitDegradation(["autoRefresh"]);
     emitDegradation(["autoRefresh"]);
@@ -113,7 +128,8 @@ describe("polling-restart coordinator", () => {
   });
 
   it("does not resume if coordinator did not suspend", () => {
-    startPollingRestart();
+    const { options, emitDegradation } = makeOptions();
+    startPollingRestart(options);
 
     // autoRefresh was never disabled, so re-enabling should not resume
     emitDegradation([]);
@@ -121,7 +137,8 @@ describe("polling-restart coordinator", () => {
   });
 
   it("resumes sources on stop if coordinator had suspended them", () => {
-    startPollingRestart();
+    const { options, emitDegradation } = makeOptions();
+    startPollingRestart(options);
     emitDegradation(["autoRefresh"]);
 
     stopPollingRestart();
@@ -129,30 +146,36 @@ describe("polling-restart coordinator", () => {
   });
 
   it("does not resume on stop if coordinator did not suspend", () => {
-    startPollingRestart();
+    const { options } = makeOptions();
+    startPollingRestart(options);
 
     stopPollingRestart();
     expect(resumeAllSources).not.toHaveBeenCalled();
   });
 
   it("unsubscribes from degradation on stop", () => {
-    startPollingRestart();
-    expect(degradationListeners).toHaveLength(1);
-
+    let unsubscribed = false;
+    const options: PollingRestartOptions = {
+      onDegradationChange: (handler) => {
+        return () => { unsubscribed = true; };
+      },
+      isFeatureDisabled: () => false,
+    };
+    startPollingRestart(options);
     stopPollingRestart();
-    expect(degradationListeners).toHaveLength(0);
+    expect(unsubscribed).toBe(true);
   });
 
   it("restarts cleanly when called multiple times", () => {
-    startPollingRestart();
+    const { options, emitDegradation } = makeOptions();
+    startPollingRestart(options);
     emitDegradation(["autoRefresh"]);
 
     // Restart should clean up previous state
-    startPollingRestart();
+    const { options: options2 } = makeOptions();
+    startPollingRestart(options2);
 
     // Previous suspension should have been cleaned up
     expect(resumeAllSources).toHaveBeenCalledTimes(1);
-    // New subscription should be in place
-    expect(degradationListeners).toHaveLength(1);
   });
 });

@@ -9,7 +9,7 @@
 import { h, Fragment } from "preact";
 import { useState, useEffect, useMemo, useCallback } from "preact/hooks";
 import { MetricCard, BarChart } from "../visualization/index.js";
-import { BrandedHeader } from "../components/logos.js";
+import { BrandedHeader } from "../components/index.js";
 import { usePolling } from "../hooks/index.js";
 import { TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS } from "../usage/constants.js";
 

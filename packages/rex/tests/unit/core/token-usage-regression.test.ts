@@ -9,12 +9,11 @@ import {
   groupByCommand,
   checkBudget,
 } from "../../../src/core/token-usage.js";
-import type { LogEntry } from "../../../src/schema/index.js";
-import type { AggregateTokenUsage } from "../../../src/core/token-usage.js";
+import type { AggregateTokenUsage, TokenUsageLogEntry } from "../../../src/core/token-usage.js";
 
 interface RegressionFixtureFile {
   aggregation: {
-    logEntries: LogEntry[];
+    logEntries: TokenUsageLogEntry[];
     henchRuns: Array<Record<string, unknown>>;
     svManifest: Record<string, unknown>;
     allTime: {

@@ -4,34 +4,7 @@ import { HENCH_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";
 import { lookupTaskInRex, formatTaskLine } from "./task-lookup.js";
-import type { PersistedRuntimeEvent } from "../../schema/v1.js";
-
-/**
- * Format a single persisted event into a human-readable line.
- *
- * @internal Exported for testing.
- */
-export function formatEvent(event: PersistedRuntimeEvent): string {
-  const prefix = `  [${event.turn}] ${event.timestamp} ${event.vendor}`;
-  switch (event.type) {
-    case "assistant":
-      return `${prefix} assistant: ${(event.text ?? "").slice(0, 200)}`;
-    case "tool_use":
-      return `${prefix} tool_use: ${event.toolCall?.tool ?? "unknown"}(${JSON.stringify(event.toolCall?.input ?? {}).slice(0, 100)})`;
-    case "tool_result":
-      return `${prefix} tool_result: ${event.toolResult?.tool ?? "unknown"} (${event.toolResult?.durationMs ?? 0}ms) ${(event.toolResult?.output ?? "").slice(0, 120)}`;
-    case "token_usage": {
-      const u = event.tokenUsage;
-      return `${prefix} token_usage: ${u?.input ?? 0} in / ${u?.output ?? 0} out`;
-    }
-    case "completion":
-      return `${prefix} completion: ${(event.completionSummary ?? "").slice(0, 200)}`;
-    case "failure":
-      return `${prefix} failure [${event.failure?.category ?? "unknown"}]: ${event.failure?.message ?? ""}`;
-    default:
-      return `${prefix} ${event.type}`;
-  }
-}
+import { formatTokenReport } from "../token-logging.js";
 
 export async function cmdShow(
   dir: string,
@@ -73,8 +46,7 @@ export async function cmdShow(
   info(`Started: ${run.startedAt}`);
   if (run.finishedAt) info(`Finished: ${run.finishedAt}`);
   info(`Turns: ${run.turns}`);
-  const totalTokens = run.tokenUsage.input + run.tokenUsage.output;
-  info(`Tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out (${totalTokens} total)`);
+  info(formatTokenReport(run.tokenUsage));
   if (run.tokenUsage.cacheCreationInput || run.tokenUsage.cacheReadInput) {
     info(`  Cache: ${run.tokenUsage.cacheCreationInput ?? 0} created / ${run.tokenUsage.cacheReadInput ?? 0} read`);
   }

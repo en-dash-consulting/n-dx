@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import type { ServerContext } from "./types.js";
-import { jsonResponse } from "./types.js";
+import { jsonResponse } from "./response-utils.js";
 import { ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/index.js";
 import { prdExists, prdPath } from "./prd-io.js";
 

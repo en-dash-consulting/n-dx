@@ -10,7 +10,10 @@
  * @see ./virtual-scroll.ts — flattenVisibleTree respects search results
  */
 
-import type { PRDItemData, ItemStatus } from "./types.js";
+import type {
+  SearchablePRDItem,
+  SearchFacets,
+} from "./search-types.js";
 import type { ComponentChild } from "preact";
 import { h } from "preact";
 
@@ -29,15 +32,6 @@ export interface TreeSearchResult {
   matchCount: number;
 }
 
-// ── Facet filter types ──────────────────────────────────────────────────────
-
-export interface SearchFacets {
-  /** Active tag facets — item must have ALL of these tags (AND logic). */
-  tags?: Set<string>;
-  /** Active status facets — item must match ONE of these statuses (OR within group). */
-  statuses?: Set<ItemStatus>;
-}
-
 // ── Core search ──────────────────────────────────────────────────────────────
 
 /**
@@ -45,7 +39,7 @@ export interface SearchFacets {
  * Tag facets use AND logic: item must have every selected tag.
  * Status facets use OR logic: item status must be one of the selected statuses.
  */
-function itemPassesFacets(item: PRDItemData, facets: SearchFacets): boolean {
+function itemPassesFacets(item: SearchablePRDItem, facets: SearchFacets): boolean {
   // Status facet: OR logic — item's status must be in the set
   if (facets.statuses && facets.statuses.size > 0) {
     if (!facets.statuses.has(item.status)) return false;
@@ -76,7 +70,7 @@ function itemPassesFacets(item: PRDItemData, facets: SearchFacets): boolean {
  * Complexity: O(N) where N = total tree nodes.
  */
 export function searchTree(
-  items: PRDItemData[],
+  items: SearchablePRDItem[],
   query: string,
   facets?: SearchFacets,
 ): TreeSearchResult {
@@ -101,7 +95,7 @@ export function searchTree(
   const ancestorIds = new Set<string>();
 
   // Walk the tree, collecting matches and propagating ancestor info upward.
-  function walk(nodes: PRDItemData[], ancestors: string[]): boolean {
+  function walk(nodes: SearchablePRDItem[], ancestors: string[]): boolean {
     let anyMatch = false;
 
     for (const item of nodes) {
@@ -165,9 +159,9 @@ export function searchTree(
  * Collect all unique tags from the PRD tree, sorted alphabetically.
  * Used to populate tag facet chips dynamically.
  */
-export function collectAllTags(items: PRDItemData[]): string[] {
+export function collectAllTags(items: SearchablePRDItem[]): string[] {
   const tags = new Set<string>();
-  function walk(nodes: PRDItemData[]) {
+  function walk(nodes: SearchablePRDItem[]) {
     for (const item of nodes) {
       if (item.tags) {
         for (const tag of item.tags) {
@@ -186,7 +180,7 @@ export function collectAllTags(items: PRDItemData[]): string[] {
  * Used by flattenVisibleTree when a search is active.
  */
 export function itemMatchesSearch(
-  item: PRDItemData,
+  item: SearchablePRDItem,
   visibleIds: Set<string>,
 ): boolean {
   if (visibleIds.has(item.id)) return true;

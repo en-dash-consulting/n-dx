@@ -13,14 +13,14 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./types.js";
+import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
 // ---------------------------------------------------------------------------
-// Types — canonical definitions in src/schema/features.ts
+// Types — canonical definitions in src/shared/features.ts
 // ---------------------------------------------------------------------------
 
-export type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
-import type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
+export type { FeatureToggle, FeaturesResponse } from "../shared/index.js";
+import type { FeatureToggle, FeaturesResponse } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Feature registry — defines all known feature flags

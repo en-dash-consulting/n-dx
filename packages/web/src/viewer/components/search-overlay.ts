@@ -16,7 +16,17 @@ import { h, Fragment } from "preact";
 import type { ComponentChild } from "preact";
 import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
 import type { NavigateTo } from "../types.js";
-import { getLevelEmoji } from "./prd-tree/levels.js";
+
+// ── Level emoji (self-contained mirror of prd-tree/levels.ts — no cross-zone import) ──
+const LEVEL_EMOJI: Record<string, string> = {
+  epic: "\u{1F4E6}",    // 📦
+  feature: "\u{2728}",   // ✨
+  task: "\u{1F4CB}",     // 📋
+  subtask: "\u{1F539}",  // 🔹
+};
+function getLevelEmoji(level: string): string {
+  return LEVEL_EMOJI[level] ?? "\u2022";
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -88,8 +98,6 @@ const STATUS_LABELS: Record<string, string> = {
   deferred: "Deferred",
   deleted: "Deleted",
 };
-
-// Level emoji prefixes provided by getLevelEmoji() from prd-tree/levels.ts
 
 /**
  * Highlight matching terms within text, returning an array of VNodes.

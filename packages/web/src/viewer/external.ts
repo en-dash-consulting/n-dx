@@ -31,14 +31,9 @@ export type {
 // Namespace re-export for validate.ts (import type * as V1)
 export * as V1 from "../schema/v1.js";
 
-// ── Feature toggle contract types ──────────────────────────────────────────
-export type { FeatureToggle, FeaturesResponse } from "../schema/features.js";
-
-// ── Shared data-file constants ─────────────────────────────────────────────
-export { DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/data-files.js";
-
-// ── Shared types ──────────────────────────────────────────────────────────
-export type { ViewId } from "../shared/view-id.js";
+// ── Shared types and constants (via barrel) ───────────────────────────────
+export type { FeatureToggle, FeaturesResponse, ViewId } from "../shared/index.js";
+export { DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/index.js";
 
 // ── Shared utilities ───────────────────────────────────────────────────────
 export { createRequestDedup } from "./messaging/request-dedup.js";

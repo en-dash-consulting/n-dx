@@ -24,7 +24,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks"
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import { computeBranchStats, completionRatio, formatTimestamp, itemMatchesFilter } from "./compute.js";
 import { isWorkItem, isRootLevel } from "./levels.js";
-import { defaultStatusFilter } from "./status-filter.js";
+import { defaultStatusFilter } from "../../views/status-filter.js";
 import { InlineAddForm } from "./inline-add-form.js";
 import type { InlineAddInput } from "./inline-add-form.js";
 import { InlineStatusPicker } from "./inline-status-picker.js";

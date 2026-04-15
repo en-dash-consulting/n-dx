@@ -20,7 +20,7 @@ import {
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
-import { tryParseJSON, extractFindings } from "./enrich-parsing.js";
+import { tryParseJSON, extractFindings, formatFileLabel, findPrevZone } from "./enrich-parsing.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 
@@ -320,12 +320,6 @@ interface AttemptConfig {
   maxCrossings: number;
 }
 
-function formatFileLabel(f: string, archetypes?: Map<string, string | null>): string {
-  if (!archetypes?.size) return `"${f}"`;
-  const arch = archetypes.get(f);
-  return arch ? `"${f}" [${arch}]` : `"${f}"`;
-}
-
 function buildFirstPassPrompt(
   batchZones: Zone[],
   config: AttemptConfig,
@@ -363,9 +357,7 @@ Cross-zone imports:
 ${crossingLines || "  (none)"}
 ${globalPromptNote}
 
-Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
-
-Each finding MUST include a "category" field: "structural" (zone boundary opinions, file placement, directory sprawl), "code" (bugs, duplication, anti-patterns, missing abstractions), or "documentation" (naming conventions, missing docs).
+Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
 
 Respond with ONLY a JSON object (no markdown, no explanation):
 {"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":["actionable insight"],"findings":[{"type":"observation","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["cross-zone observation"],"findings":[{"type":"observation","scope":"global","text":"finding text","severity":"info","category":"code"}]}
@@ -450,8 +442,7 @@ ${globalPromptNote}
 
 Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.
 
-Each finding MUST include a "severity" field: "info" (informational), "warning" (should fix), or "critical" (must fix).
-Each finding MUST include a "category" field: "structural" (zone boundary opinions, file placement, directory sprawl), "code" (bugs, duplication, anti-patterns, missing abstractions), or "documentation" (naming conventions, missing docs).
+Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
 
 Respond with ONLY a JSON object (no markdown, no explanation):
 {"zones":[{"id":"existing-zone-id","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["new cross-zone observation"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"global","text":"finding text","severity":"info","category":"code"}]}

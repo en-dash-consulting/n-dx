@@ -7,6 +7,11 @@
  */
 
 import { useState, useEffect, useCallback } from "preact/hooks";
+import {
+  onSnapshot,
+  getLatestSnapshot,
+  getCurrentLevel,
+} from "../performance/index.js";
 import type { MemoryLevel, RefreshQueueState, RefreshPriority } from "../performance/index.js";
 import {
   startRefreshThrottle,
@@ -66,7 +71,13 @@ export function useRefreshThrottle(
   useEffect(() => {
     if (!enabled) return;
 
-    startRefreshThrottle({ baseIntervalMs, avgRefreshMs });
+    startRefreshThrottle({
+      baseIntervalMs,
+      avgRefreshMs,
+      getInitialMemoryLevel: () => getLatestSnapshot()?.level ?? getCurrentLevel(),
+      subscribeToMemoryLevel: (listener) =>
+        onSnapshot((snapshot: { level: MemoryLevel }) => listener(snapshot.level)),
+    });
 
     const unsubscribe = onQueueChange((newState) => {
       setQueueState(newState);

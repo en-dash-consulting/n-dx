@@ -21,6 +21,9 @@ export {
 export {
   formatBytes,
   formatRatio,
+  onSnapshot,
+  getLatestSnapshot,
+  getCurrentLevel,
   type MemorySnapshot,
   type MemoryLevel,
 } from "./memory-monitor.js";

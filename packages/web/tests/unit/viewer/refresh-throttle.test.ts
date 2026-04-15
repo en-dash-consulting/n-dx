@@ -16,40 +16,9 @@ import {
   getThrottleLevel,
   onQueueChange,
   resetRefreshThrottle,
+  setRefreshThrottleMemoryLevel,
   type RefreshQueueState,
 } from "../../../src/viewer/performance/refresh-throttle.js";
-import {
-  startMemoryMonitor,
-  resetMemoryMonitor,
-} from "../../../src/viewer/performance/memory-monitor.js";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function setMemory(usedGB: number, limitGB: number = 2): void {
-  (performance as unknown as Record<string, unknown>).memory = {
-    usedJSHeapSize: usedGB * 1024 * 1024 * 1024,
-    totalJSHeapSize: (usedGB + 0.1) * 1024 * 1024 * 1024,
-    jsHeapSizeLimit: limitGB * 1024 * 1024 * 1024,
-  };
-}
-
-function clearMemory(): void {
-  delete (performance as unknown as Record<string, unknown>).memory;
-}
-
-let savedMemory: unknown;
-
-function saveMemory(): void {
-  savedMemory = (performance as unknown as { memory?: unknown }).memory;
-}
-
-function restoreMemory(): void {
-  if (savedMemory === undefined) {
-    clearMemory();
-  } else {
-    (performance as unknown as Record<string, unknown>).memory = savedMemory;
-  }
-}
 
 /** Create a controllable async task. resolve() is safe to call even if execute() was never invoked. */
 function createTask(): { execute: () => Promise<void>; resolve: () => void } {
@@ -70,12 +39,10 @@ function createTask(): { execute: () => Promise<void>; resolve: () => void } {
 describe("getRecommendedInterval", () => {
   beforeEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   afterEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   it("returns base interval at normal level", () => {
@@ -84,33 +51,24 @@ describe("getRecommendedInterval", () => {
   });
 
   it("returns 2× interval at elevated level", () => {
-    saveMemory();
-    setMemory(1.1); // ratio ~0.55 → elevated
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle({ baseIntervalMs: 5000 });
+    setRefreshThrottleMemoryLevel("elevated");
 
     expect(getRecommendedInterval(5000)).toBe(10000);
-    restoreMemory();
   });
 
   it("returns 4× interval at warning level", () => {
-    saveMemory();
-    setMemory(1.5); // ratio ~0.75 → warning
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle({ baseIntervalMs: 5000 });
+    setRefreshThrottleMemoryLevel("warning");
 
     expect(getRecommendedInterval(5000)).toBe(20000);
-    restoreMemory();
   });
 
   it("returns Infinity at critical level", () => {
-    saveMemory();
-    setMemory(1.8); // ratio ~0.9 → critical
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle({ baseIntervalMs: 5000 });
+    setRefreshThrottleMemoryLevel("critical");
 
     expect(getRecommendedInterval(5000)).toBe(Infinity);
-    restoreMemory();
   });
 });
 
@@ -118,12 +76,10 @@ describe("queue state", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   afterEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
     vi.useRealTimers();
   });
 
@@ -143,34 +99,25 @@ describe("queue state", () => {
   });
 
   it("reports max concurrency 2 at elevated level", () => {
-    saveMemory();
-    setMemory(1.1);
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle();
+    setRefreshThrottleMemoryLevel("elevated");
 
     expect(getQueueState().maxConcurrency).toBe(2);
-    restoreMemory();
   });
 
   it("reports max concurrency 1 at warning level", () => {
-    saveMemory();
-    setMemory(1.5);
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle();
+    setRefreshThrottleMemoryLevel("warning");
 
     expect(getQueueState().maxConcurrency).toBe(1);
-    restoreMemory();
   });
 
   it("reports max concurrency 0 and paused at critical level", () => {
-    saveMemory();
-    setMemory(1.8);
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle();
+    setRefreshThrottleMemoryLevel("critical");
 
     expect(getQueueState().maxConcurrency).toBe(0);
     expect(getQueueState().paused).toBe(true);
-    restoreMemory();
   });
 
   it("returns the throttle level", () => {
@@ -188,12 +135,10 @@ describe("enqueueRefresh", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   afterEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
     vi.useRealTimers();
   });
 
@@ -230,11 +175,8 @@ describe("enqueueRefresh", () => {
   });
 
   it("respects priority ordering (high first)", () => {
-    saveMemory();
-    // Use critical level to prevent draining so we can inspect queue state
-    setMemory(1.8);
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle();
+    setRefreshThrottleMemoryLevel("critical");
 
     const lowTask = createTask();
     const highTask = createTask();
@@ -248,8 +190,6 @@ describe("enqueueRefresh", () => {
     const state = getQueueState();
     expect(state.queueLength).toBe(3);
     expect(state.paused).toBe(true);
-
-    restoreMemory();
   });
 });
 
@@ -257,12 +197,10 @@ describe("queue draining", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   afterEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
     vi.useRealTimers();
   });
 
@@ -296,10 +234,8 @@ describe("queue draining", () => {
   });
 
   it("does not drain when paused at critical level", async () => {
-    saveMemory();
-    setMemory(1.8); // critical
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle();
+    setRefreshThrottleMemoryLevel("critical");
 
     const fn = vi.fn().mockResolvedValue(undefined);
     enqueueRefresh("item", fn);
@@ -309,8 +245,6 @@ describe("queue draining", () => {
     expect(fn).not.toHaveBeenCalled();
     expect(getQueueState().queueLength).toBe(1);
     expect(getQueueState().paused).toBe(true);
-
-    restoreMemory();
   });
 
   it("increments completedCount after drain", async () => {
@@ -346,34 +280,26 @@ describe("estimated completion time", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   afterEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
     vi.useRealTimers();
   });
 
   it("returns -1 when paused at critical level", () => {
-    saveMemory();
-    setMemory(1.8);
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle();
+    setRefreshThrottleMemoryLevel("critical");
 
     const fn = vi.fn().mockResolvedValue(undefined);
     enqueueRefresh("item", fn);
 
     expect(getQueueState().estimatedCompletionMs).toBe(-1);
-    restoreMemory();
   });
 
   it("estimates based on queue size and avg refresh time", () => {
-    saveMemory();
-    // Use warning level (concurrency: 1) for predictable estimation
-    setMemory(1.5);
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle({ avgRefreshMs: 500 });
+    setRefreshThrottleMemoryLevel("warning");
 
     const tasks = Array.from({ length: 3 }, (_, i) => {
       const task = createTask();
@@ -388,7 +314,6 @@ describe("estimated completion time", () => {
     expect(state.estimatedCompletionMs).toBeGreaterThan(0);
 
     tasks.forEach((t) => t.resolve());
-    restoreMemory();
   });
 });
 
@@ -396,12 +321,10 @@ describe("listeners", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   afterEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
     vi.useRealTimers();
   });
 
@@ -453,21 +376,16 @@ describe("memory level transitions", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   afterEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
     vi.useRealTimers();
-    restoreMemory();
   });
 
   it("transitions from critical to normal and drains queue", async () => {
-    saveMemory();
-    setMemory(1.8); // critical
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle();
+    setRefreshThrottleMemoryLevel("critical");
 
     const fn = vi.fn().mockResolvedValue(undefined);
     enqueueRefresh("item", fn);
@@ -476,24 +394,20 @@ describe("memory level transitions", () => {
     expect(fn).not.toHaveBeenCalled();
 
     // Drop to normal
-    setMemory(0.2);
-    await vi.advanceTimersByTimeAsync(1000); // trigger memory poll
+    setRefreshThrottleMemoryLevel("normal");
     await vi.advanceTimersByTimeAsync(0); // trigger drain
 
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it("updates recommended interval when level changes", async () => {
-    saveMemory();
-    setMemory(0.1); // normal
-    startMemoryMonitor({ intervalMs: 1000 });
     startRefreshThrottle({ baseIntervalMs: 5000 });
 
     expect(getRecommendedInterval(5000)).toBe(5000);
 
     // Spike to elevated
-    setMemory(1.1);
-    await vi.advanceTimersByTimeAsync(1000);
+    setRefreshThrottleMemoryLevel("elevated");
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(getRecommendedInterval(5000)).toBe(10000);
   });
@@ -503,12 +417,10 @@ describe("resetRefreshThrottle", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetRefreshThrottle();
-    resetMemoryMonitor();
   });
 
   afterEach(() => {
     resetRefreshThrottle();
-    resetMemoryMonitor();
     vi.useRealTimers();
   });
 

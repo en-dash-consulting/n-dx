@@ -39,7 +39,8 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
-import { runConfig, loadProjectConfig } from "./config.js";
+import { createInterface } from "readline/promises";
+import { runConfig, loadProjectConfig, repairProjectConfig } from "./config.js";
 import { resolveCommandTimeout, withCommandTimeout } from "./cli-timeout.js";
 import { runCI } from "./ci.js";
 import {
@@ -883,6 +884,22 @@ async function handleInit(rest) {
   const initArgs = stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest))));
   const dir = resolveDir(initArgs);
   const flags = extractFlags(initArgs);
+  const quiet = flags.includes("--quiet") || flags.includes("-q");
+
+  // Repair known-numeric config values that may have been stored as strings
+  // by earlier versions (e.g. cli.timeouts.work = "14400000"). Runs before
+  // anything reads the config so sub-package inits see well-typed values.
+  try {
+    const { repairs } = await repairProjectConfig(dir);
+    if (repairs.length > 0 && !quiet) {
+      console.log(`Repaired ${repairs.length} config value${repairs.length === 1 ? "" : "s"} in .n-dx.json:`);
+      for (const { path, from, to } of repairs) {
+        console.log(`  ${path}: "${from}" → ${to}`);
+      }
+    }
+  } catch {
+    // Non-fatal — repair failure never blocks init.
+  }
 
   // ── Backward-compatibility: re-init detection ─────────────────────────────
   //
@@ -896,12 +913,17 @@ async function handleInit(rest) {
     const claudePresent = existsSync(join(dir, ".claude")) || existsSync(join(dir, "CLAUDE.md"));
     const codexPresent = existsSync(join(dir, ".codex")) || existsSync(join(dir, ".agents")) || existsSync(join(dir, "AGENTS.md"));
 
-    if (claudePresent && !codexPresent) {
-      assistantEnabled = { ...assistantEnabled, codex: false };
-    } else if (!claudePresent && codexPresent) {
-      assistantEnabled = { ...assistantEnabled, claude: false };
-    }
-    // Both present or neither → keep default (both enabled)
+  if (providerFromFlag) {
+    selectedProvider = providerFromFlag;
+    providerSource = "from --provider flag";
+  } else if (existingVendor) {
+    selectedProvider = existingVendor;
+    providerSource = "from existing config";
+  } else {
+    // First run — show static banner and prompt for provider
+    console.log(formatInitBanner());
+    selectedProvider = await promptInitProvider();
+    providerSource = "selected";
   }
 
   // Resolve LLM provider via init-llm.js (flag > config > prompt precedence).
@@ -1751,6 +1773,11 @@ async function main() {
   // Handle standard top-level version flags before normal command parsing.
   if (command === "-v" || command === "--version") {
     handleVersion(rest);
+  }
+
+  // Handle top-level help flags before normal command parsing.
+  if (command === "--help" || command === "-h") {
+    handleHelp(rest);
   }
 
   // ── Per-command --help ──────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline";
-import type { Proposal } from "../../analyze/index.js";
+import type { Proposal } from "./chunked-review-types.js";
 import { info } from "../output.js";
 
 // Re-export all pure logic and types from the state module.

@@ -171,6 +171,33 @@ export type { SelectionExplanation, TaskMatch, PrioritizationOptions, RiskTolera
 
 export { extractKeywords, scoreMatch } from "./core/keywords.js";
 
+// ---- Core: fix (structural auto-repair) -------------------------------------
+
+export {
+  detectIssues,
+  applyFixes,
+  detectTimestampIssues,
+  detectOrphanBlockedBy,
+  detectParentChildMisalignment,
+} from "./core/fix.js";
+export type { FixKind, FixAction, FixResult } from "./core/fix.js";
+
+// ---- Core: verify (acceptance criteria → test file mapping) -----------------
+
+export {
+  verify,
+  findTestFiles,
+  mapCriteriaToTests,
+  collectVerifiableTasks,
+} from "./core/verify.js";
+export type {
+  CriterionResult,
+  TaskVerification,
+  TestRunResult,
+  VerifyResult,
+  VerifyOptions,
+} from "./core/verify.js";
+
 // ---- Core: timestamps -------------------------------------------------------
 
 export { computeTimestampUpdates } from "./core/timestamps.js";
@@ -181,8 +208,7 @@ export { findAutoCompletions } from "./core/parent-completion.js";
 
 // ---- Core: parent status reset ----------------------------------------------
 
-export { findParentResets } from "./core/parent-reset.js";
-export { cascadeParentReset } from "./core/cascade-reset.js";
+export { findParentResets, cascadeParentReset } from "./core/index.js";
 
 // ---- Core: requirements -----------------------------------------------------
 

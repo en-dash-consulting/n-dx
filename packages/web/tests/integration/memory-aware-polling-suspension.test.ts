@@ -39,6 +39,7 @@ import {
 } from "../../src/viewer/polling/tab-visibility.js";
 import {
   startMemoryMonitor,
+  onSnapshot,
   getCurrentLevel,
   resetMemoryMonitor,
 } from "../../src/viewer/performance/memory-monitor.js";
@@ -184,7 +185,10 @@ function startMemorySubsystem(initialRatio: number, memoryIntervalMs = 1000) {
   setMemoryUsage(initialRatio);
   startMemoryMonitor({ intervalMs: memoryIntervalMs });
   startDegradation();
-  startRefreshThrottle();
+  startRefreshThrottle({
+    getInitialMemoryLevel: getCurrentLevel,
+    subscribeToMemoryLevel: (listener) => onSnapshot((snapshot) => listener(snapshot.level)),
+  });
 }
 
 // ─── Setup / Teardown ────────────────────────────────────────────────────────

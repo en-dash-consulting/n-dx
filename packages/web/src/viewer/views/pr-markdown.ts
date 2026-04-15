@@ -1,6 +1,6 @@
 import { h, type ComponentChildren } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { BrandedHeader } from "../components/logos.js";
+import { BrandedHeader } from "../components/index.js";
 
 interface PRMarkdownResponse {
   markdown: string | null;

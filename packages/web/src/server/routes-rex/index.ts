@@ -10,10 +10,10 @@
  *   items.ts        — Item CRUD (add, get, patch, bulk, merge, delete)
  *   requirements.ts — Requirements CRUD, coverage, traceability
  *   prune.ts        — Prune preview and execution
- *   analysis.ts     — Analysis, proposals, smart-add, batch-import
+ *   ../routes-rex-analysis.ts — Analysis, proposals, smart-add, batch-import
  *   execution.ts    — Epic-by-epic execution, pause/resume, shutdown
  *   health.ts       — Health score and reorganization proposals
- *   shared.ts       — Shared helpers (load/save PRD, appendLog, etc.)
+ *   rex-route-helpers.ts — Route-level helpers (load/save PRD, appendLog, etc.)
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -24,7 +24,7 @@ import { routePrdReads } from "./reads.js";
 import { routeItems } from "./items.js";
 import { routeItemRequirements, routeRequirementsAnalytics } from "./requirements.js";
 import { routePrune } from "./prune.js";
-import { routeProposals } from "./analysis.js";
+import { routeProposals } from "../routes-rex-analysis.js";
 import { routeExecution } from "./execution.js";
 import { routeHealthReorganize } from "./health.js";
 

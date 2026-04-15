@@ -11,8 +11,12 @@ describe("resolveCommandTimeout", () => {
   it("returns DEFAULT_TIMEOUT_MS for normal commands when no config is present", () => {
     expect(resolveCommandTimeout("analyze", {})).toBe(DEFAULT_TIMEOUT_MS);
     expect(resolveCommandTimeout("plan", {})).toBe(DEFAULT_TIMEOUT_MS);
-    expect(resolveCommandTimeout("work", {})).toBe(DEFAULT_TIMEOUT_MS);
     expect(resolveCommandTimeout("init", {})).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  it("returns the extended default for work and self-heal when no config is present", () => {
+    expect(resolveCommandTimeout("work", {})).toBe(14400000);
+    expect(resolveCommandTimeout("self-heal", {})).toBe(14400000);
   });
 
   it("returns 0 for long-running server commands when no config is present", () => {
@@ -56,6 +60,23 @@ describe("resolveCommandTimeout", () => {
   it("ignores negative per-command values and falls back to the default", () => {
     const cfg = { cli: { timeouts: { analyze: -1 } } };
     // Negative is not a valid timeout; falls back to DEFAULT_TIMEOUT_MS
+    expect(resolveCommandTimeout("analyze", cfg)).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  it("accepts per-command override stored as a numeric string", () => {
+    // Legacy configs may store the value as a string (e.g. from the first
+    // `ndx config cli.timeouts.work 14400000` where existingValue was undefined).
+    const cfg = { cli: { timeouts: { work: "14400000" } } };
+    expect(resolveCommandTimeout("work", cfg)).toBe(14400000);
+  });
+
+  it("accepts global cli.timeoutMs stored as a numeric string", () => {
+    const cfg = { cli: { timeoutMs: "5000" } };
+    expect(resolveCommandTimeout("analyze", cfg)).toBe(5000);
+  });
+
+  it("ignores non-numeric strings and falls back to the default", () => {
+    const cfg = { cli: { timeouts: { analyze: "lots" } } };
     expect(resolveCommandTimeout("analyze", cfg)).toBe(DEFAULT_TIMEOUT_MS);
   });
 });

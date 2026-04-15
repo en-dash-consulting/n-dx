@@ -259,6 +259,15 @@ export {
 } from "./vendor-header.js";
 export type { VendorModelHeaderOptions } from "./vendor-header.js";
 
+// Vendor-change detection and model reset
+export {
+  isModelCompatibleWithVendor,
+  detectVendorChange,
+  resetStaleModel,
+  formatVendorChangeWarning,
+} from "./vendor-model-reset.js";
+export type { VendorModelResetResult } from "./vendor-model-reset.js";
+
 // CLI typo correction
 export {
   editDistance,

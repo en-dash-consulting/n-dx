@@ -7,7 +7,7 @@ import {
   FILTER_PRESETS,
   activePresetKey,
   defaultStatusFilter,
-} from "../../../src/viewer/components/prd-tree/status-filter.js";
+} from "../../../src/viewer/views/status-filter.js";
 import type { ItemStatus } from "../../../src/viewer/components/prd-tree/types.js";
 
 function renderToDiv(vnode: ReturnType<typeof h>) {

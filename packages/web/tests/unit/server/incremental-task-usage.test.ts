@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm, unlink, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { IncrementalTaskUsageAggregator } from "../../../src/server/incremental-task-usage.js";
+import { IncrementalTaskUsageAggregator } from "../../../src/server/task-usage/incremental-task-usage.js";
 
 describe("IncrementalTaskUsageAggregator", () => {
   let tmpDir: string;

@@ -157,16 +157,42 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["config"],
   },
+  "validate-tokens": {
+    tool: "hench",
+    command: "validate-tokens",
+    summary: "validate Codex token reporting accuracy",
+    usage: "hench validate-tokens [options] [dir]",
+    description:
+      "Validates token reporting across all agent runs, checking for:\n" +
+      "  - Non-zero token values in Codex runs\n" +
+      "  - Outlier detection (tokens outside expected ranges)\n" +
+      "  - Vendor attribution accuracy (Codex vs Claude)\n" +
+      "  - Codex and Claude token comparability for similar tasks",
+    options: [
+      { flag: "--format=json", description: "Output as JSON for scripting" },
+      { flag: "--strict", description: "Exit with error code if validation fails" },
+      { flag: "--limit=<n>", description: "Validate only N most recent runs (default: 20)" },
+      { flag: "--codex-only", description: "Validate only Codex runs" },
+    ],
+    examples: [
+      { command: "hench validate-tokens", description: "Validate all recent runs" },
+      { command: "hench validate-tokens --codex-only", description: "Validate only Codex runs" },
+      { command: "hench validate-tokens --format=json .", description: "JSON output for analysis" },
+      { command: "hench validate-tokens --strict --limit=5", description: "Strict validation of last 5 runs" },
+    ],
+    related: ["status", "show"],
+  },
 };
 
 /** Related commands for each hench command (shown as "See also"). */
 const RELATED_COMMANDS: Record<string, string[]> = {
   init: ["run", "config"],
   run: ["status", "show"],
-  status: ["show", "run"],
+  status: ["show", "run", "validate-tokens"],
   show: ["status"],
   config: ["template"],
   template: ["config"],
+  "validate-tokens": ["status", "show"],
 };
 
 /**

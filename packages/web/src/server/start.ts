@@ -14,7 +14,7 @@ import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
-import { registerUsageScheduler, type CollectAllIdsFn } from "./task-usage.js";
+import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync } from "./prd-io.js";
 import { collectAllIds } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
@@ -38,6 +38,7 @@ import { findAvailablePort } from "./port.js";
  * where the server's stdout is not available.
  */
 export const PORT_FILE = ".n-dx-web.port";
+const LOOPBACK_HOST = "127.0.0.1";
 
 // ── Shutdown handler ──────────────────────────────────────────────────────
 
@@ -479,7 +480,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleRexRoute(req, res, ctx, ws.broadcast))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), handleHenchRoute(req, res, ctx, ws.broadcast))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), handleHenchRoute(req, res, ctx, ws.broadcast, { onStatusInvalidate: clearStatusCache }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), handleAdaptiveRoute(req, res, ctx))) return true;
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
@@ -628,7 +629,7 @@ export async function startServer(
       broadcast: ws.broadcast,
       collectAllIds: collectAllIds as CollectAllIdsFn,
       loadPRD: loadPRDSync,
-    });
+    } satisfies RegisterSchedulerOptions);
     watcherHandles.monitorIntervals.push(cleanupInterval);
   }
 
@@ -657,7 +658,7 @@ export async function startServer(
       }
     });
 
-    server.listen(actualPort, async () => {
+    server.listen(actualPort, LOOPBACK_HOST, async () => {
       // Write port file so the orchestrator can discover the actual port
       // (especially important in background mode where stdout is unavailable).
       const portFilePath = join(absDir, PORT_FILE);

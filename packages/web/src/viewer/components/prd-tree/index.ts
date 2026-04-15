@@ -7,8 +7,8 @@
  */
 export { PRDTree } from "./prd-tree.js";
 export type { PRDTreeProps } from "./prd-tree.js";
-export { StatusFilter, defaultStatusFilter, ALL_STATUSES } from "./status-filter.js";
-export type { StatusFilterProps } from "./status-filter.js";
+export { StatusFilter, defaultStatusFilter, ALL_STATUSES } from "../../views/status-filter.js";
+export type { StatusFilterProps } from "../../views/status-filter.js";
 export { FacetFilter } from "./facet-filter.js";
 export type { FacetFilterProps } from "./facet-filter.js";
 export type {
@@ -29,3 +29,7 @@ export { BatchImportPanel } from "./batch-import-panel.js";
 export type { BatchImportPanelProps } from "./batch-import-panel.js";
 export { ProposalEditor } from "./proposal-editor.js";
 export type { RawProposal, ProposalEditorProps } from "./proposal-editor.js";
+export { ExecutionPanel } from "./execution-panel.js";
+export type { ExecutionPanelProps } from "./execution-panel.js";
+export { ReorganizePanel } from "./reorganize-panel.js";
+export type { SearchFacets, SearchItemStatus, SearchablePRDItem } from "./search-types.js";

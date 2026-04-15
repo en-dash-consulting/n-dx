@@ -10,6 +10,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+// Static import: the module graph (rex + sourcevision + MCP SDK) can be large; loading
+// it at file-init time avoids exhausting the per-test 5 s timeout on a cold start.
+import { closeAllMcpSessions } from "../../../src/server/routes-mcp.js";
 
 // ── MCP session TTL tests ─────────────────────────────────────────────────────
 
@@ -19,7 +22,6 @@ describe("MCP session TTL", () => {
   // via closeAllMcpSessions which also clears the sweep timer.
 
   it("closeAllMcpSessions clears sessions and is safe to call multiple times", async () => {
-    const { closeAllMcpSessions } = await import("../../../src/server/routes-mcp.js");
     // Should not throw even with no active sessions
     await closeAllMcpSessions();
     await closeAllMcpSessions();

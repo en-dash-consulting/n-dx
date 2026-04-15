@@ -22,6 +22,7 @@ export {
 export {
   startPollingRestart,
   stopPollingRestart,
+  type PollingRestartOptions,
 } from "./polling-restart.js";
 
 export {
@@ -52,6 +53,13 @@ export {
   type PollingStateSnapshot,
   type PollingStateChangeHandler,
 } from "./polling-state.js";
+
+// ── Preact hooks ────────────────────────────────────────────────────────────
+
+export {
+  usePollingSuspension,
+  type UsePollingSuspensionResult,
+} from "./use-polling-suspension.js";
 
 // ── Tab visibility ──────────────────────────────────────────────────────────
 

@@ -10,7 +10,15 @@ import {
   findTestFiles,
   verify,
 } from "../../../src/core/verify.js";
-import type { PRDItem } from "../../../src/schema/index.js";
+
+type PRDItem = {
+  id: string;
+  title: string;
+  level: string;
+  status: "pending" | "in_progress" | "completed" | "deferred" | "deleted";
+  acceptanceCriteria?: string[];
+  children?: PRDItem[];
+};
 
 // ---------------------------------------------------------------------------
 // extractKeywords

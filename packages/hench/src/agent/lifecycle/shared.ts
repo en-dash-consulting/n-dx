@@ -33,6 +33,8 @@ import { section, subsection, stream, detail, info, getCapturedLines, resetCaptu
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
+import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
+import { loadLLMConfig } from "../../store/project-config.js";
 
 // ---------------------------------------------------------------------------
 // Shared option types
@@ -414,30 +416,75 @@ export async function runPostTaskTestsIfNeeded(
 }
 
 // ---------------------------------------------------------------------------
-// Token diagnostic status derivation
+// Codex token retrieval (post-run operation)
 // ---------------------------------------------------------------------------
 
 /**
- * Derive the run-level token diagnostic status from per-turn data.
+ * Attempt to retrieve actual Codex token usage from the OpenAI API after run completion.
  *
- * Priority: `unavailable` > `partial` > `complete`.
- * If any turn is `unavailable` the whole run is `unavailable`.
- * If any turn is `partial` (and none `unavailable`) the run is `partial`.
- * If all turns are `complete` (or there are no turns) the run is `complete`.
+ * This is a best-effort, asynchronous operation: failures are logged but never
+ * propagate. If tokens are retrieved and are higher than the current run's recorded
+ * tokens (which may be zero-valued), they are merged into the run record.
+ *
+ * Only runs when this was a Codex run (detected by checking turnTokenUsage
+ * entries for vendor="codex").
  */
-export function deriveTokenDiagnosticStatus(
-  turnTokenUsage: ReadonlyArray<{ diagnosticStatus?: "complete" | "partial" | "unavailable" }>,
-): "complete" | "partial" | "unavailable" {
-  let overall: "complete" | "partial" | "unavailable" = "complete";
-  for (const ttu of turnTokenUsage) {
-    if (ttu.diagnosticStatus === "unavailable") {
-      return "unavailable";
-    }
-    if (ttu.diagnosticStatus === "partial" && overall === "complete") {
-      overall = "partial";
-    }
+async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): Promise<void> {
+  // Check if any turn used Codex as the vendor
+  const isCodexRun = run.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false;
+  if (!isCodexRun) {
+    return;
   }
-  return overall;
+
+  try {
+    const llmConfig = await loadLLMConfig(projectDir);
+    const codexApiKey = llmConfig.codex?.api_key ?? process.env["OPENAI_API_KEY"];
+
+    if (!codexApiKey || !run.model) {
+      // Silent skip: no API key available or model not set
+      return;
+    }
+
+    const result = await fetchCodexTokenUsage({
+      apiKey: codexApiKey,
+      model: run.model,
+      apiEndpoint: llmConfig.codex?.api_endpoint,
+      timeoutMs: 500,
+      runId: run.id,
+    });
+
+    if (!result.ok) {
+      // Log diagnostic on certain error kinds
+      if (result.error.kind !== "not-found" && result.error.kind !== "rate-limit") {
+        detail(`Codex token retrieval: ${result.error.message}`);
+      }
+      return;
+    }
+
+    // Merge retrieved tokens if they are higher than the current values.
+    // This handles the case where Codex CLI output had zero-valued tokens.
+    const retrieved = result.tokens;
+    const current = run.tokenUsage;
+
+    // Only update if retrieved tokens are strictly higher
+    if (retrieved.input > current.input || retrieved.output > current.output) {
+      const oldTotal = current.input + current.output;
+      const newTotal = retrieved.input + retrieved.output;
+      run.tokenUsage.input = Math.max(current.input, retrieved.input);
+      run.tokenUsage.output = Math.max(current.output, retrieved.output);
+      detail(
+        `Updated Codex tokens from API: ${oldTotal} → ${newTotal} ` +
+          `(input: ${current.input} → ${retrieved.input}, output: ${current.output} → ${retrieved.output})`,
+      );
+    }
+
+    if (result.diagnostic) {
+      detail(`Codex token diagnostic: ${result.diagnostic}`);
+    }
+  } catch {
+    // Swallow any unexpected errors — this is a post-run operation and must never
+    // fail the run itself. The run tokens already captured during execution stand.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -455,9 +502,8 @@ export interface FinalizeRunOptions {
 
 /**
  * Finalize a run: build structured summary, capture memory stats,
- * update diagnostics with final token status, run post-task tests,
- * set timestamps, and persist.
- * Called at the end of both loops.
+ * run post-task tests, retrieve Codex tokens if applicable, set timestamps,
+ * and persist. Called at the end of both loops.
  */
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx } = opts;
@@ -492,6 +538,16 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   }
 
   await runPostTaskTestsIfNeeded(run, projectDir, testCommand);
+
+  // Attempt to retrieve Codex token usage from the OpenAI API after run completion.
+  // This is a best-effort operation: if the API is unavailable or returns zero data,
+  // we silently skip and use the tokens already captured during the run.
+  // Only attempt if this was a Codex run (vendor is "codex" in turnTokenUsage).
+  await retrieveCodexTokensIfNeeded(run, projectDir);
+
+  // Validate token reporting for Codex runs.
+  // This is a non-blocking post-run check that logs warnings but never fails the run.
+  validateRunTokensPostRun(run, true);
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;

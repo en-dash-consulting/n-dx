@@ -114,6 +114,7 @@ const HENCH_COMMANDS = [
   "template",
   "status",
   "show",
+  "validate-tokens",
 ];
 
 const SOURCEVISION_COMMANDS = [

@@ -14,8 +14,8 @@
 
 import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import { BrandedHeader } from "../components/logos.js";
-import { NotionSchemaWizard } from "../components/notion-schema-wizard.js";
+import { BrandedHeader } from "../components/index.js";
+import { NotionSchemaWizard } from "../components/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 

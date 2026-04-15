@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, rmSync, readdirSync, copyFileSync, statSync, wri
 import { resolve, join, relative } from "node:path";
 import { SV_DIR } from "./constants.js";
 import { info } from "../output.js";
-import { detectSubAnalyses } from "../../analyzers/workspace.js";
+import { detectSubAnalyses } from "../sourcevision-core.js";
 
 /** Reset a single .sourcevision/ directory: backup files then clear. */
 function resetSvDir(svDir: string, label: string): void {

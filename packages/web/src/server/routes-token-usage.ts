@@ -17,7 +17,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse } from "./types.js";
+import { jsonResponse, errorResponse } from "./response-utils.js";
 import { AggregationResultCache } from "./aggregation-cache.js";
 
 // ---------------------------------------------------------------------------

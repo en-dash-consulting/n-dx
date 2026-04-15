@@ -255,6 +255,9 @@ describe("hench → llm-client gateway contract", () => {
     "parseApiTokenUsage",
     "parseStreamTokenUsage",
     "resolveModel",
+    "isModelCompatibleWithVendor",
+    "resetStaleModel",
+    "formatVendorChangeWarning",
     "formatUsage",
   ];
 
@@ -587,15 +590,8 @@ describe("gateway export auto-detection", () => {
         "exec", "execStdout", "execShellCmd", "getCurrentHead", "getCurrentBranch",
         "isExecutableOnPath", "spawnTool", "spawnManaged", "ProcessPool", "ProcessLimitError",
         "parseApiTokenUsage", "parseStreamTokenUsage", "resolveModel", "resolveVendorModel",
-        "formatUsage",
-        "parseApiTokenUsageWithDiagnostic", "parseStreamTokenUsageWithDiagnostic",
-        "mapCodexUsageToTokenUsage", "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS",
-        "ALL_FAILURE_CATEGORIES", "createPromptEnvelope", "assemblePrompt",
-        "mapErrorReasonToFailureCategory", "mapRunFailureToCategory",
-        "classifyVendorError", "failureCategoryLabel", "defaultRegistry",
-        "compileCodexPolicyFlags", "mapSandboxToCodexFlag", "mapApprovalToCodexFlag",
-        "toAnthropicToolDef", "toAnthropicToolDefs", "toOpenAiToolDef", "toOpenAiToolDefs",
-        "ProviderRegistry"],
+        "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
+        "formatUsage"],
       ...["PROJECT_DIRS", "NEWEST_MODELS"],
     ]);
 

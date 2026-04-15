@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import type { PRDItem } from "../../../src/schema/index.js";
 import {
   detectTimestampIssues,
   detectOrphanBlockedBy,
@@ -7,6 +6,17 @@ import {
   detectIssues,
   applyFixes,
 } from "../../../src/core/fix.js";
+
+type PRDItem = {
+  id: string;
+  title: string;
+  level?: string;
+  status: "pending" | "in_progress" | "completed" | "deferred" | "deleted";
+  startedAt?: string;
+  completedAt?: string;
+  blockedBy?: string[];
+  children?: PRDItem[];
+};
 
 // ---------------------------------------------------------------------------
 // Helpers

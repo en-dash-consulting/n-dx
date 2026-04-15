@@ -10,9 +10,9 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse, readBody } from "../types.js";
+import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, loadPRD, appendLog } from "./shared.js";
+import { findItemById, loadPRD, appendLog } from "./rex-route-helpers.js";
 
 import {
   computeStats,

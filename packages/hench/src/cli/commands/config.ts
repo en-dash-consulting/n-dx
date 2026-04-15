@@ -190,6 +190,33 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     impact: (v) =>
       `Agent can run git: ${(v as string[]).join(", ")}`,
   },
+  {
+    path: "guard.memoryThrottle.enabled",
+    label: "Memory Throttle Enabled",
+    description: "Enable memory-based throttling that delays/rejects runs when system memory is low",
+    type: "boolean",
+    category: "guard",
+    impact: (v) =>
+      v
+        ? "Runs will be delayed or rejected when system memory is critically low"
+        : "Memory throttling disabled — runs proceed regardless of system memory",
+  },
+  {
+    path: "guard.memoryThrottle.rejectThreshold",
+    label: "Memory Reject Threshold (%)",
+    description: "System memory usage % at which new runs are rejected outright (0–100, default: 95)",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Runs rejected when system memory usage exceeds ${v}%`,
+  },
+  {
+    path: "guard.memoryThrottle.delayThreshold",
+    label: "Memory Delay Threshold (%)",
+    description: "System memory usage % at which new runs are delayed with backoff (0–100, default: 80)",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Runs delayed with backoff when system memory usage exceeds ${v}%`,
+  },
 
   // ── General ──
   {

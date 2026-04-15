@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { resolveStore } from "../../store/index.js";
-import { detectIssues, applyFixes } from "../../core/fix.js";
-import type { FixAction, FixKind } from "../../core/fix.js";
+import { detectIssues, applyFixes } from "../../fix/index.js";
+import type { FixAction, FixKind } from "../../fix/index.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 

@@ -10,7 +10,7 @@
 
 import { useState, useCallback } from "preact/hooks";
 import type { ItemStatus } from "../components/prd-tree/types.js";
-import { defaultStatusFilter } from "../components/prd-tree/status-filter.js";
+import { defaultStatusFilter } from "../views/status-filter.js";
 
 // ── Module-level persistent state ────────────────────────────────────
 //

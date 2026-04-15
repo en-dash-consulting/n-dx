@@ -19,9 +19,9 @@ import {
   resolveMembers,
   writeWorkspaceOutput,
   getWorkspaceStatus,
-} from "../../analyzers/workspace-aggregate.js";
-import type { WorkspaceConfig, WorkspaceMember } from "../../schema/index.js";
-import { toPosix } from "../../util/paths.js";
+  toPosix,
+} from "../sourcevision-core.js";
+import type { WorkspaceConfig, WorkspaceMember } from "../sourcevision-core.js";
 
 // ── Flag parsing ────────────────────────────────────────────────────────────
 

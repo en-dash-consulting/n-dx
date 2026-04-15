@@ -15,11 +15,14 @@ import type {
   Classifications,
   Zones,
   Components,
-} from "../schema/index.js";
-import { DATA_FILES } from "../schema/data-files.js";
-import { generateContext } from "../analyzers/context.js";
-import { deriveNextSteps } from "../analyzers/next-steps.js";
-import { SV_DIR, TOOL_VERSION } from "../constants.js";
+} from "./sourcevision-core.js";
+import {
+  DATA_FILES,
+  generateContext,
+  deriveNextSteps,
+  SV_DIR,
+  TOOL_VERSION,
+} from "./sourcevision-core.js";
 
 interface SourcevisionData {
   manifest: Manifest | null;

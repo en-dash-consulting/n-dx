@@ -9,12 +9,10 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
-import { BrandedHeader } from "../components/logos.js";
-import { RexTaskLink } from "../components/rex-task-link.js";
-import { ExecutionPanel } from "../components/prd-tree/execution-panel.js";
-import { SmartAddInput } from "../components/prd-tree/index.js";
+import { BrandedHeader } from "../components/index.js";
+import { RexTaskLink } from "../components/index.js";
+import { SmartAddInput, ExecutionPanel, ReorganizePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
-import { ReorganizePanel } from "../components/prd-tree/reorganize-panel.js";
 import { usePolling } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────

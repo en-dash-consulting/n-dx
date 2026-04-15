@@ -20,7 +20,7 @@ import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./types.js";
+import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
 const ADAPTIVE_PREFIX = "/api/hench/adaptive/";
 

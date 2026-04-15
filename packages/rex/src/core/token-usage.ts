@@ -10,7 +10,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { PROJECT_DIRS } from "@n-dx/llm-client";
-import type { LogEntry } from "../schema/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,6 +68,15 @@ export interface PeriodBucket {
   estimatedCost: CostEstimate;
 }
 
+/** Minimal rex execution-log entry shape used by token analytics. */
+export interface TokenUsageLogEntry {
+  timestamp: string;
+  event: string;
+  itemId?: string;
+  detail?: string;
+  [key: string]: unknown;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -100,7 +108,7 @@ function normalizeEventMetadata(value: unknown): string | undefined {
  * contains JSON-serialized AnalyzeTokenUsage data.
  */
 export function extractRexTokenUsage(
-  logEntries: LogEntry[],
+  logEntries: TokenUsageLogEntry[],
   filter: TokenUsageFilter = {},
 ): PackageTokenUsage {
   const usage = emptyPackageUsage();
@@ -250,7 +258,7 @@ export async function extractSvTokenUsage(
  * Maps event types to their originating commands.
  */
 export function extractRexTokenEvents(
-  logEntries: LogEntry[],
+  logEntries: TokenUsageLogEntry[],
   filter: TokenUsageFilter = {},
 ): TokenEvent[] {
   const events: TokenEvent[] = [];
@@ -391,7 +399,7 @@ export async function extractSvTokenEvents(
  * Collect all token events across all packages.
  */
 export async function collectTokenEvents(
-  logEntries: LogEntry[],
+  logEntries: TokenUsageLogEntry[],
   projectDir: string,
   filter: TokenUsageFilter = {},
 ): Promise<TokenEvent[]> {
@@ -545,7 +553,7 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
  * @param filter Optional time-based filter
  */
 export async function aggregateTokenUsage(
-  logEntries: LogEntry[],
+  logEntries: TokenUsageLogEntry[],
   projectDir: string,
   filter: TokenUsageFilter = {},
 ): Promise<AggregateTokenUsage> {
@@ -736,4 +744,3 @@ export function checkBudget(
 
   return { severity, tokens: tokenStatus, cost: costStatus, warnings };
 }
-

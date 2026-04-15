@@ -27,7 +27,7 @@ export type {
 
 export {
   IncrementalTaskUsageAggregator,
-} from "./incremental-task-usage.js";
+} from "./task-usage/incremental-task-usage.js";
 
 // ── Cleanup scheduling ───────────────────────────────────────────────
 
@@ -39,11 +39,11 @@ export {
   writeCleanupLog,
   DEFAULT_CLEANUP_INTERVAL_MS,
   type LoadPRDFn,
-} from "./usage-cleanup-scheduler.js";
+} from "./task-usage/usage-cleanup-scheduler.js";
 
 // ── Scheduler registration ───────────────────────────────────────────
 
 export {
   registerUsageScheduler,
   type RegisterSchedulerOptions,
-} from "./register-scheduler.js";
+} from "./task-usage/register-scheduler.js";

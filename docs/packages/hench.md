@@ -20,6 +20,10 @@ hench run --task=abc123 .            # specific task
 hench run --auto --iterations=4 .    # run 4 tasks sequentially
 hench run --dry-run .                # preview brief without executing
 hench run --model=claude-opus-4-20250514 .  # override model
+hench config .                       # view workflow configuration
+hench config hench.maxTurns 30 .     # edit a config value
+hench template list .                # list workflow templates
+hench template apply <name> .        # apply a saved template
 hench status .                       # show recent runs
 hench show <run-id> .                # detailed run transcript
 ```

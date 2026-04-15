@@ -17,8 +17,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "./use-polling.js";
-import { createWSPipeline } from "../messaging/index.js";
-import { isFeatureDisabled, onDegradationChange } from "../performance/index.js";
+import {
+  createWSPipeline,
+  isFeatureDisabled,
+  onDegradationChange,
+} from "./use-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirror server-side ProjectStatus shape)

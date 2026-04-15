@@ -22,15 +22,17 @@ import { join, resolve } from "node:path";
 import { requireSvDir } from "../errors.js";
 import { SV_DIR } from "./constants.js";
 import { info } from "../output.js";
-import { collectBranchWork } from "../../analyzers/branch-work-collector.js";
-import { classifyItems } from "../../analyzers/branch-work-classifier.js";
-import { renderPRMarkdownFromRecord } from "../../generators/pr-markdown-template.js";
+import {
+  collectBranchWork,
+  classifyItems,
+  renderPRMarkdownFromRecord,
+} from "../sourcevision-core.js";
 import type {
   BranchWorkRecord,
   BranchWorkRecordItem,
   BranchWorkEpicSummary,
-} from "../../schema/v1.js";
-import type { BranchWorkResult } from "../../analyzers/branch-work-collector.js";
+  BranchWorkResult,
+} from "../sourcevision-core.js";
 
 /** Output filename for generated PR markdown. */
 export const PR_MARKDOWN_FILENAME = "pr-markdown.md";

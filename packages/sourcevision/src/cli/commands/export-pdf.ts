@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { SV_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
-import { DATA_FILES } from "../../schema/data-files.js";
+import { DATA_FILES } from "../sourcevision-core.js";
 import { info, result } from "../output.js";
 import type {
   Manifest,
@@ -17,7 +17,7 @@ import type {
   Imports,
   Zones,
   Components,
-} from "../../schema/index.js";
+} from "../sourcevision-core.js";
 
 export interface ExportPdfOptions {
   output?: string;

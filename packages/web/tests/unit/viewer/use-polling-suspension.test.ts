@@ -16,7 +16,7 @@ import {
   resetPollingState,
   type PollingSourceCallbacks,
 } from "../../../src/viewer/polling/polling-state.js";
-import { usePollingSuspension } from "../../../src/viewer/hooks/use-polling-suspension.js";
+import { usePollingSuspension } from "../../../src/viewer/polling/use-polling-suspension.js";
 
 // Helper to create a minimal polling source
 function makeDummySource(): PollingSourceCallbacks {

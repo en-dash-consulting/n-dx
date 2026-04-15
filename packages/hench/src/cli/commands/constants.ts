@@ -40,6 +40,7 @@ export function usage(): void {
           { name: "template [subcommand]", description: "Manage workflow templates (list, show, apply, save, delete)" },
           { name: "status [dir]", description: "Show recent run history" },
           { name: "show <run-id> [dir]", description: "Show full details of a specific run" },
+          { name: "validate-tokens [dir]", description: "Validate Codex token reporting accuracy" },
         ],
       },
     ],

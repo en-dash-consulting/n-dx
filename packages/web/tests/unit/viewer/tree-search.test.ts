@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { searchTree, itemMatchesSearch, highlightSearchText, collectAllTags } from "../../../src/viewer/components/prd-tree/tree-search.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
-import type { SearchFacets } from "../../../src/viewer/components/prd-tree/tree-search.js";
+import type { SearchFacets } from "../../../src/viewer/components/prd-tree/index.js";
 
 function makeItem(
   overrides: Partial<PRDItemData> & { id: string; level: PRDItemData["level"]; status: PRDItemData["status"] },

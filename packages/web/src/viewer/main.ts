@@ -16,6 +16,7 @@ import {
   PollingSuspensionIndicator,
   SearchOverlay,
   useSearchOverlay,
+  initTheme,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -26,10 +27,20 @@ import {
   useRefreshThrottle,
   usePollingSuspension,
 } from "./hooks/index.js";
+import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
+import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
+import { startPollingRestart } from "./polling/index.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
 
+if (isDeployedMode()) {
+  installFetchAdapter();
+  document.body.classList.add("ndx-deployed");
+}
+
+initTheme();
 bootstrap();
+startPollingRestart({ onDegradationChange, isFeatureDisabled });
 
 /** Fetch viewer scope from the server config endpoint. */
 async function fetchScope(): Promise<string | null> {

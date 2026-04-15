@@ -1,29 +1,32 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
-import { SV_DIR } from "../../constants.js";
-import { CLIError } from "../errors.js";
-import { DATA_FILES, SUPPLEMENTARY_FILES } from "../../schema/data-files.js";
-import { readManifest, writeManifest } from "../../analyzers/manifest.js";
-import { generateLlmsTxt } from "../../analyzers/llms-txt.js";
-import { generateContext } from "../../analyzers/context.js";
-import { emitZoneOutputs } from "../../analyzers/zone-output.js";
-import { assessAllZoneRisks } from "../../analyzers/risk-scoring.js";
-import { deduplicateFindings, enforceSeverityRules } from "../../analyzers/enrich-parsing.js";
-import { toCanonicalJSON } from "../../util/sort.js";
-import { cmdInit } from "./init.js";
-import { info } from "../output.js";
-import { emptyAnalyzeTokenUsage, formatTokenUsage } from "../../analyzers/token-usage.js";
-import { loadLLMConfig, printVendorModelHeader, bold, dim, green, cyan } from "@n-dx/llm-client";
-import type { RiskJustificationEntry } from "../../schema/v1.js";
-import type { ZoneType } from "../../analyzers/risk-scoring.js";
-import { detectSubAnalyses } from "../../analyzers/workspace.js";
 import {
+  SV_DIR,
+  DATA_FILES,
+  SUPPLEMENTARY_FILES,
+  readManifest,
+  writeManifest,
+  generateLlmsTxt,
+  generateContext,
+  emitZoneOutputs,
+  assessAllZoneRisks,
+  deduplicateFindings,
+  enforceSeverityRules,
+  toCanonicalJSON,
+  emptyAnalyzeTokenUsage,
+  formatTokenUsage,
+  detectSubAnalyses,
   setLLMConfig,
   getAuthMode,
   getLLMVendor,
   DEFAULT_MODEL,
   DEFAULT_CODEX_MODEL,
-} from "../../analyzers/claude-client.js";
+} from "../sourcevision-core.js";
+import { CLIError } from "../errors.js";
+import { cmdInit } from "./init.js";
+import { info } from "../output.js";
+import { loadLLMConfig, printVendorModelHeader, bold, dim, green, cyan } from "@n-dx/llm-client";
+import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
   runImportsPhase,

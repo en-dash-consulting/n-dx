@@ -28,11 +28,22 @@ rex next .                           # next actionable task
 rex add "description" .              # smart add via LLM
 rex add --file=ideas.txt .           # import from file
 rex update <id> --status=completed . # update item
+rex move <id> --parent=<parent-id> . # reparent item
 rex remove <id> .                    # remove item and descendants
+rex reshape .                        # LLM-powered PRD restructuring
+rex prune .                          # remove completed subtrees
 rex validate .                       # check PRD integrity
+rex fix .                            # auto-fix common PRD issues
+rex sync .                           # sync with remote adapter
+rex usage .                          # token usage analytics
+rex report .                         # JSON health report for CI
+rex verify .                         # run acceptance criteria tests
 rex analyze .                        # scan project, generate proposals
 rex recommend .                      # show SourceVision recommendations
 rex recommend --accept .             # add recommendations to PRD
+rex reorganize .                     # detect and fix structural issues
+rex health .                         # PRD structure health score
+rex adapter list .                   # manage store adapters
 rex mcp .                            # start MCP server (stdio)
 ```
 
