@@ -164,8 +164,8 @@ describe("codex token accounting integration", () => {
     expect(result.run.status).toBe("budget_exceeded");
     expect(result.run.tokenUsage).toEqual({ input: 110, output: 40 });
     expect(result.run.turnTokenUsage).toEqual([
-      { turn: 1, input: 40, output: 10, vendor: "codex", model: "gpt-5" },
-      { turn: 1, input: 70, output: 30, vendor: "codex", model: "gpt-5" },
+      { turn: 1, input: 40, output: 10, vendor: "codex", model: "gpt-5-codex", diagnosticStatus: "complete" },
+      { turn: 1, input: 70, output: 30, vendor: "codex", model: "gpt-5-codex", diagnosticStatus: "complete" },
     ]);
     expect(result.run.error).toContain("150 used of 130 budget");
 

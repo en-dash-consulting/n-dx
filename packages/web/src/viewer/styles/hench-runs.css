@@ -648,6 +648,206 @@
   margin: 0;
 }
 
+/* ── Vendor chip in run card ───────────────────────────────────────── */
+
+.hench-run-vendor {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  text-transform: capitalize;
+}
+
+.hench-run-vendor-claude {
+  color: var(--brand-teal);
+}
+
+.hench-run-vendor-codex {
+  color: var(--brand-purple);
+}
+
+/* ── Token diagnostic status chip in run card ─────────────────────── */
+
+.hench-run-token-diag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.hench-run-token-diag-complete {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
+
+.hench-run-token-diag-partial {
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+
+.hench-run-token-diag-unavailable {
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
+
+/* ── Filter select (vendor/model dropdowns) ───────────────────────── */
+
+.hench-filter-select {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  appearance: auto;
+  margin-left: 4px;
+}
+
+.hench-filter-select:hover {
+  border-color: var(--accent);
+}
+
+.hench-filter-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Vendor Diagnostics section in detail view ────────────────────── */
+
+.hench-diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.hench-diag-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.hench-diag-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.hench-diag-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hench-diag-mono {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.hench-diag-vendor {
+  text-transform: capitalize;
+}
+
+.hench-diag-vendor-claude {
+  color: var(--brand-teal);
+}
+
+.hench-diag-vendor-codex {
+  color: var(--brand-purple);
+}
+
+/* Token status indicator in detail */
+.hench-diag-token-status-complete {
+  color: var(--green);
+}
+
+.hench-diag-token-status-partial {
+  color: var(--orange);
+}
+
+.hench-diag-token-status-unavailable {
+  color: var(--text-dim);
+}
+
+/* Diagnostic notes */
+.hench-diag-notes {
+  margin-top: 8px;
+}
+
+.hench-diag-notes-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.hench-diag-notes-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--text);
+  font-family: monospace;
+}
+
+.hench-diag-notes-list li {
+  margin-bottom: 2px;
+}
+
+/* Prompt sections */
+.hench-diag-prompt-sections {
+  margin-top: 12px;
+}
+
+.hench-diag-prompt-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.hench-diag-prompt-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hench-diag-prompt-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.hench-diag-prompt-name {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.hench-diag-prompt-size {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 /* Stale run indicator */
 .hench-run-card.stale {
   border-left: 3px solid var(--yellow, #f59e0b);

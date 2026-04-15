@@ -19262,7 +19262,7 @@
       "level": "epic",
       "description": "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline.",
       "startedAt": "2026-04-02T17:55:36.327Z",
-      "completedAt": "2026-04-09T14:26:25.556Z",
+      "completedAt": "2026-04-10T18:34:32.028Z",
       "mergedProposals": [
         {
           "proposalNodeKey": "p0:epic",
@@ -20955,15 +20955,8 @@
             "ux"
           ],
           "source": "conversation",
-          "startedAt": "2026-04-09T13:39:49.171Z",
-          "completedAt": "2026-04-09T13:50:20.353Z",
-          "log": [
-            {
-              "timestamp": "2026-04-09T13:50:20.353Z",
-              "type": "task_completed",
-              "message": "Implemented auto-update detection from npm registry.\n\n## What was done\n\n**New file: packages/core/update-check.js**\n- Fetches latest @n-dx/core version from npm registry (https://registry.npmjs.org/@n-dx/core/latest)\n- Caches result with 24-hour TTL in OS temp dir (n-dx-update-check.json)\n- Never throws — all errors silently swallowed so network failures never crash CLI\n- Exports: startUpdateCheck({ currentVersion }), formatUpdateNotice({ current, latest }), CACHE_TTL_MS\n- 3-second fetch timeout to avoid blocking on slow/firewalled networks\n\n**Modified: packages/core/cli.js**\n- Imports startUpdateCheck + formatUpdateNotice from ./update-check.js\n- Module-level pendingUpdateCheck promise + updateCheckQuiet flag\n- main() detects --quiet/-q early and starts background update check\n- flushAndExit() races the check promise against 500ms timeout; prints notice to stderr on success (code 0)\n- Notice goes to stderr so JSON stdout output stays machine-parseable\n\n**New file: tests/unit/update-check.test.js**\n- 18 tests covering: registry fetch success/failure, cache hit/miss/expiry, malformed cache, version comparisons (major/minor/patch), cache writes, formatUpdateNotice output\n\n**Fixed pre-existing failure: tests/unit/cli-smoke-parity.test.js**\n- Updated hardcoded version 0.2.1 -> 0.2.2 to match current package.json version\n\n**Modified: packages/core/package.json**\n- Added update-check.js to files array so it's included in npm publish\n\n## Decisions\n- Used OS tmpdir for cache (not .n-dx.json) — avoids polluting versioned config, works without knowing project dir\n- Writes to stderr not stdout — keeps JSON output clean for scripting\n- 500ms race timeout in flushAndExit — caps any post-command delay\n- Quiet flag check is global (process.argv) so it works for all commands\n\n## Test coverage\n124 unit tests pass. 27 CLI contract/version e2e tests pass. Pre-existing architecture policy failures unchanged."
-            }
-          ]
+          "startedAt": "2026-04-09T21:20:35.164Z",
+          "completedAt": "2026-04-09T21:37:39.977Z"
         },
         {
           "id": "013bc11c-ec20-4ac2-8463-9c17adf31fe4",
@@ -20987,8 +20980,77 @@
           "blockedBy": [
             "dcf6018e-e658-4708-ae6e-1bd23431748f"
           ],
-          "startedAt": "2026-04-09T14:24:17.627Z",
-          "completedAt": "2026-04-09T14:26:25.267Z"
+          "startedAt": "2026-04-09T21:44:44.254Z",
+          "completedAt": "2026-04-09T21:58:12.050Z"
+        },
+        {
+          "id": "6da267b9-d888-42e2-aecb-9b112f60ed84",
+          "title": "Fix MCP server re-registration during ndx init",
+          "status": "completed",
+          "level": "feature",
+          "priority": "high",
+          "startedAt": "2026-04-09T21:10:06.271Z",
+          "completedAt": "2026-04-10T18:34:31.906Z",
+          "children": [
+            {
+              "id": "fa0a2b37-5288-42aa-8b20-1b2ad6beb0fb",
+              "title": "Remove existing MCP server before re-adding in registerMcpServers",
+              "status": "completed",
+              "level": "task",
+              "priority": "high",
+              "startedAt": "2026-04-09T20:14:34.193Z",
+              "completedAt": "2026-04-09T20:37:10.425Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Upgraded registerMcpServers to remove MCP servers from all three scopes (local, project, user) before re-adding, making ndx init fully idempotent."
+            },
+            {
+              "id": "838b5702-f1cd-4839-a882-d2b135176d0a",
+              "title": "Capture and surface MCP registration error details in init summary",
+              "status": "completed",
+              "level": "task",
+              "priority": "medium",
+              "startedAt": "2026-04-09T20:51:37.145Z",
+              "completedAt": "2026-04-09T21:00:28.547Z"
+            },
+            {
+              "id": "1809164d-c3be-4c8b-95c0-d8d29d2c87c1",
+              "title": "Add test coverage for idempotent MCP registration",
+              "status": "completed",
+              "level": "task",
+              "priority": "medium",
+              "startedAt": "2026-04-09T20:44:05.570Z",
+              "completedAt": "2026-04-09T20:50:08.538Z"
+            },
+            {
+              "id": "a9963fc8-717c-4d96-ab05-e4332cc42d65",
+              "title": "De-emphasize non-selected vendor in init summary output",
+              "status": "completed",
+              "level": "task",
+              "priority": "medium",
+              "startedAt": "2026-04-09T21:01:10.969Z",
+              "completedAt": "2026-04-09T21:09:31.766Z"
+            },
+            {
+              "id": "2f718148-1812-4472-99bb-56b0396057a8",
+              "title": "Show trex mascot banner on every ndx init invocation",
+              "status": "completed",
+              "level": "task",
+              "description": "In packages/core/cli.js, the showInitBanner() call (line 752) is gated behind 'if (resolution.needsProviderPrompt)', meaning the trex mascot banner from cli-brand.js only appears on first-time init when no provider is configured. Move the showInitBanner() call outside the conditional so it runs unconditionally at the start of handleInit(), before the LLM selection flow. The banner is defined in packages/core/cli-brand.js formatInitBanner() and renders the pixel-art trex mascot.",
+              "priority": "medium",
+              "startedAt": "2026-04-09T21:38:43.676Z",
+              "completedAt": "2026-04-09T21:43:39.451Z"
+            },
+            {
+              "id": "9474e0c0-dfca-486a-9b62-5b66fea5d235",
+              "title": "Add assistant-integration cross-vendor contract integration test",
+              "status": "completed",
+              "level": "task",
+              "description": "Add a new integration test file at tests/integration/assistant-integration.test.js that validates the cross-package assistant-integration contract. The test should: (1) import setupAssistantIntegrations and formatInitReport from packages/core/assistant-integration.js, (2) call setupAssistantIntegrations(tmpDir) in a temp directory with both vendors enabled and verify the result has entries for both 'claude' and 'codex' with expected shape (summary string, label string, skipped boolean, detail object), (3) call formatInitReport on the result and verify it returns an array of strings starting with 'Assistant surfaces:', (4) verify that disabling a vendor via { claude: false } produces a skipped result for claude but still provisions codex. This test exercises the cross-package boundary between core's orchestration layer and the vendor-specific integration modules (claude-integration.js, codex-integration.js). It satisfies the integration-coverage-policy ratio requirement (currently 5 integration tests for 36 e2e, needs 6). Follow existing patterns in tests/integration/ for setup/teardown.",
+              "priority": "high",
+              "startedAt": "2026-04-10T18:27:43.479Z",
+              "completedAt": "2026-04-10T18:34:31.731Z"
+            }
+          ]
         }
       ]
     },

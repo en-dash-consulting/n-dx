@@ -298,6 +298,246 @@ describe("shared lifecycle", () => {
     });
   });
 
+  describe("initRunRecord with diagnostics", () => {
+    it("populates diagnostics when vendor and parseMode are provided", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "claude-sonnet-4-6",
+        henchDir,
+        vendor: "claude",
+        sandbox: "workspace-write",
+        approvals: "never",
+        parseMode: "stream-json",
+      });
+
+      expect(run.diagnostics).toBeDefined();
+      expect(run.diagnostics!.vendor).toBe("claude");
+      expect(run.diagnostics!.sandbox).toBe("workspace-write");
+      expect(run.diagnostics!.approvals).toBe("never");
+      expect(run.diagnostics!.parseMode).toBe("stream-json");
+      expect(run.diagnostics!.tokenDiagnosticStatus).toBe("unavailable");
+      expect(run.diagnostics!.notes).toEqual([]);
+    });
+
+    it("omits diagnostics when no vendor or parseMode provided", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "claude-sonnet-4-6",
+        henchDir,
+      });
+
+      expect(run.diagnostics).toBeUndefined();
+    });
+
+    it("uses 'unknown' parseMode when only vendor is provided", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "claude-sonnet-4-6",
+        henchDir,
+        vendor: "codex",
+      });
+
+      expect(run.diagnostics).toBeDefined();
+      expect(run.diagnostics!.vendor).toBe("codex");
+      expect(run.diagnostics!.parseMode).toBe("unknown");
+    });
+  });
+
+  describe("deriveTokenDiagnosticStatus", () => {
+    it("returns 'complete' when all turns are complete", async () => {
+      const { deriveTokenDiagnosticStatus } = await import("../../../src/agent/lifecycle/shared.js");
+
+      expect(deriveTokenDiagnosticStatus([
+        { diagnosticStatus: "complete" },
+        { diagnosticStatus: "complete" },
+      ])).toBe("complete");
+    });
+
+    it("returns 'partial' when any turn is partial", async () => {
+      const { deriveTokenDiagnosticStatus } = await import("../../../src/agent/lifecycle/shared.js");
+
+      expect(deriveTokenDiagnosticStatus([
+        { diagnosticStatus: "complete" },
+        { diagnosticStatus: "partial" },
+        { diagnosticStatus: "complete" },
+      ])).toBe("partial");
+    });
+
+    it("returns 'unavailable' when any turn is unavailable", async () => {
+      const { deriveTokenDiagnosticStatus } = await import("../../../src/agent/lifecycle/shared.js");
+
+      expect(deriveTokenDiagnosticStatus([
+        { diagnosticStatus: "complete" },
+        { diagnosticStatus: "unavailable" },
+      ])).toBe("unavailable");
+    });
+
+    it("returns 'unavailable' over partial (unavailable wins)", async () => {
+      const { deriveTokenDiagnosticStatus } = await import("../../../src/agent/lifecycle/shared.js");
+
+      expect(deriveTokenDiagnosticStatus([
+        { diagnosticStatus: "partial" },
+        { diagnosticStatus: "unavailable" },
+      ])).toBe("unavailable");
+    });
+
+    it("returns 'complete' for empty array", async () => {
+      const { deriveTokenDiagnosticStatus } = await import("../../../src/agent/lifecycle/shared.js");
+
+      expect(deriveTokenDiagnosticStatus([])).toBe("complete");
+    });
+
+    it("returns 'complete' when diagnosticStatus is undefined on all turns", async () => {
+      const { deriveTokenDiagnosticStatus } = await import("../../../src/agent/lifecycle/shared.js");
+
+      expect(deriveTokenDiagnosticStatus([{}, {}])).toBe("complete");
+    });
+  });
+
+  describe("finalizeRun updates diagnostics", () => {
+    it("updates tokenDiagnosticStatus from per-turn data", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+
+      const { run, memoryCtx } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "claude-sonnet-4-6",
+        henchDir,
+        vendor: "claude",
+        parseMode: "api-sdk",
+      });
+
+      // Simulate accumulated per-turn token data
+      run.turnTokenUsage = [
+        { turn: 1, input: 100, output: 50, diagnosticStatus: "complete" },
+        { turn: 2, input: 200, output: 100, diagnosticStatus: "partial" },
+      ];
+
+      await finalizeRun({
+        run,
+        henchDir,
+        projectDir,
+        memoryCtx,
+      });
+
+      expect(run.diagnostics!.tokenDiagnosticStatus).toBe("partial");
+    });
+
+    it("preserves vendor/sandbox/approvals through finalization", async () => {
+      const { initRunRecord, finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
+
+      const { run, memoryCtx } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "claude-sonnet-4-6",
+        henchDir,
+        vendor: "codex",
+        sandbox: "read-only",
+        approvals: "on-request",
+        parseMode: "json",
+      });
+
+      run.turnTokenUsage = [
+        { turn: 1, input: 100, output: 50, diagnosticStatus: "complete" },
+      ];
+
+      await finalizeRun({
+        run,
+        henchDir,
+        projectDir,
+        memoryCtx,
+      });
+
+      expect(run.diagnostics!.vendor).toBe("codex");
+      expect(run.diagnostics!.sandbox).toBe("read-only");
+      expect(run.diagnostics!.approvals).toBe("on-request");
+      expect(run.diagnostics!.parseMode).toBe("json");
+      expect(run.diagnostics!.tokenDiagnosticStatus).toBe("complete");
+    });
+  });
+
+  describe("RunDiagnostics schema backward compatibility", () => {
+    it("validates records without new runtime identity fields", async () => {
+      const { RunRecordSchema } = await import("../../../src/schema/validate.js");
+
+      // Record with old-style diagnostics (no vendor/sandbox/approvals)
+      const oldRecord = {
+        id: "run-old",
+        taskId: "t-1",
+        taskTitle: "old task",
+        startedAt: "2025-01-01T00:00:00.000Z",
+        status: "completed",
+        turns: 1,
+        tokenUsage: { input: 10, output: 5 },
+        toolCalls: [],
+        model: "sonnet",
+        diagnostics: {
+          tokenDiagnosticStatus: "complete",
+          parseMode: "stream-json",
+          notes: [],
+        },
+      };
+
+      const result = RunRecordSchema.safeParse(oldRecord);
+      expect(result.success).toBe(true);
+    });
+
+    it("validates records with new runtime identity fields", async () => {
+      const { RunRecordSchema } = await import("../../../src/schema/validate.js");
+
+      const newRecord = {
+        id: "run-new",
+        taskId: "t-2",
+        taskTitle: "new task",
+        startedAt: "2025-01-01T00:00:00.000Z",
+        status: "completed",
+        turns: 1,
+        tokenUsage: { input: 10, output: 5 },
+        toolCalls: [],
+        model: "sonnet",
+        diagnostics: {
+          tokenDiagnosticStatus: "complete",
+          parseMode: "api-sdk",
+          notes: [],
+          vendor: "claude",
+          sandbox: "workspace-write",
+          approvals: "never",
+        },
+      };
+
+      const result = RunRecordSchema.safeParse(newRecord);
+      expect(result.success).toBe(true);
+    });
+
+    it("validates records without diagnostics field at all", async () => {
+      const { RunRecordSchema } = await import("../../../src/schema/validate.js");
+
+      const nodiagRecord = {
+        id: "run-nodiag",
+        taskId: "t-3",
+        taskTitle: "legacy task",
+        startedAt: "2025-01-01T00:00:00.000Z",
+        status: "completed",
+        turns: 1,
+        tokenUsage: { input: 10, output: 5 },
+        toolCalls: [],
+        model: "sonnet",
+      };
+
+      const result = RunRecordSchema.safeParse(nodiagRecord);
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe("dry run parity between API and CLI loops", () => {
     it("both loops produce consistent dry run results through shared module", async () => {
       const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");

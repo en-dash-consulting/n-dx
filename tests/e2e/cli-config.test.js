@@ -610,13 +610,13 @@ describe("n-dx config", () => {
     });
 
     it("creates .n-dx.local.json if it does not exist", async () => {
-      // No .n-dx.local.json exists yet
+      // No .n-dx.local.json exists yet — cli_path is machine-local
       run(["claude.cli_path", "/usr/local/bin/claude", "--force", tmpDir]);
 
-      const ndxConfig = JSON.parse(
+      const localConfig = JSON.parse(
         await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
-      expect(ndxConfig.claude.cli_path).toBe("/usr/local/bin/claude");
+      expect(localConfig.claude.cli_path).toBe("/usr/local/bin/claude");
     });
 
     it("preserves existing .n-dx.json content when setting claude values", async () => {
@@ -943,9 +943,10 @@ describe("n-dx config", () => {
     });
 
     it("does not restrict permissions when no api_key present", async () => {
-      run(["claude.cli_path", "/some/path", "--force", tmpDir]);
+      // claude.model is not machine-local, writes to .n-dx.json
+      run(["claude.model", "claude-sonnet-4-6", tmpDir]);
 
-      const fileStat = await stat(LOCAL_CONFIG_PATH(tmpDir));
+      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
       const mode = fileStat.mode & 0o777;
       // Should not be 0o600 — default file permissions apply
       expect(mode).not.toBe(0o600);

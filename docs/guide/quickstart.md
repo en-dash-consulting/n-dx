@@ -16,10 +16,15 @@ Navigate to your project and run:
 ndx init .
 ```
 
-You'll be asked to choose an LLM provider (Claude or Codex). The init command sets up everything — analysis metadata, PRD storage, and agent configuration.
+You'll be asked to choose an LLM provider (Claude or Codex). The init command sets up everything — analysis metadata, PRD storage, agent configuration, and assistant-specific artifacts:
+
+- **Claude**: `CLAUDE.md`, `.claude/skills/`, `.claude/settings.local.json`, MCP server registration
+- **Codex**: `AGENTS.md`, `.agents/skills/`, `.codex/config.toml`
+
+By default both surfaces are provisioned. Use `--claude-only` or `--codex-only` to limit to one assistant.
 
 ::: tip Already initialized?
-Running `ndx init` again is safe. It detects existing configuration and reuses it without prompting.
+Running `ndx init` again is safe. It detects existing assistant surfaces and reuses them. If only one assistant's artifacts exist, re-init skips the other unless you explicitly request it.
 :::
 
 ## 3. Analyze your codebase
@@ -64,9 +69,11 @@ Opens a web dashboard at `http://localhost:3117` with interactive views of your 
 
 ## What's next?
 
+- **Open your assistant**: `claude` or `codex` — your assistant reads its instruction file and discovers skills automatically
 - **Add your own ideas**: `ndx add "Add SSO support with Google" .`
 - **Run multiple tasks**: `ndx work --auto --iterations=4 .`
 - **Self-healing loop**: `ndx self-heal 3 .` (analyze → recommend → work, repeated)
 - **Submit feedback**: `/ndx-feedback "description"` — files a GitHub issue with context
+- **Assistant surfaces**: [Getting Started — Assistant Surfaces](./getting-started#assistant-surfaces)
 - **Full command reference**: [Commands](./commands)
 - **Workflow guide**: [Workflow](./workflow)

@@ -22,7 +22,8 @@ import { getCurrentHead, execShellCmd } from "../../process/index.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
-import { buildSystemPrompt } from "../planning/prompt.js";
+import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
+import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { saveRun, persistRunLog } from "../../store/index.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
@@ -69,6 +70,8 @@ export interface PreparedBrief {
   taskId: string;
   briefText: string;
   systemPrompt: string;
+  /** Structured prompt envelope with tagged sections. */
+  envelope: PromptEnvelope;
 }
 
 /** Additional display options for brief preparation. */
@@ -96,6 +99,7 @@ export async function prepareBrief(
   const { brief, taskId: resolvedTaskId } = await assembleTaskBrief(store, taskId, options);
   const briefText = formatTaskBrief(brief);
   const systemPrompt = buildSystemPrompt(brief.project, config);
+  const envelope = buildPromptEnvelope(brief, config);
 
   const reason: SelectionReason = taskId ? "explicit" : "auto";
 
@@ -123,7 +127,7 @@ export async function prepareBrief(
 
   displayTaskInfo(brief, reason, explanation, priorAttempts);
 
-  return { brief, taskId: resolvedTaskId, briefText, systemPrompt };
+  return { brief, taskId: resolvedTaskId, briefText, systemPrompt, envelope };
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +244,14 @@ export interface InitRunOptions {
   taskTitle: string;
   model: string;
   henchDir: string;
+  /** LLM vendor for this run (e.g. "claude", "codex"). Captured in diagnostics. */
+  vendor?: string;
+  /** Sandbox mode in effect (e.g. "workspace-write"). Captured in diagnostics. */
+  sandbox?: string;
+  /** Approval policy in effect (e.g. "never"). Captured in diagnostics. */
+  approvals?: string;
+  /** Output parse mode (e.g. "stream-json", "api-sdk"). Captured in diagnostics. */
+  parseMode?: string;
 }
 
 /**
@@ -269,6 +281,19 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     toolCalls: [],
     model: opts.model,
   };
+
+  // Capture initial runtime diagnostics snapshot when identity fields are provided.
+  // tokenDiagnosticStatus starts as "unavailable" and is updated at run end.
+  if (opts.vendor || opts.parseMode) {
+    run.diagnostics = {
+      tokenDiagnosticStatus: "unavailable",
+      parseMode: opts.parseMode ?? "unknown",
+      notes: [],
+      vendor: opts.vendor,
+      sandbox: opts.sandbox,
+      approvals: opts.approvals,
+    };
+  }
 
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
@@ -490,6 +515,24 @@ export interface FinalizeRunOptions {
 }
 
 /**
+ * Derive the diagnostic status from per-turn token usage data.
+ * Priority: unavailable > partial > complete.
+ * Returns "complete" if no diagnostic statuses are set.
+ */
+export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete" | "partial" | "unavailable" {
+  // unavailable takes precedence
+  if (turns.some((t) => t.diagnosticStatus === "unavailable")) {
+    return "unavailable";
+  }
+  // partial takes precedence over complete
+  if (turns.some((t) => t.diagnosticStatus === "partial")) {
+    return "partial";
+  }
+  // All others (including undefined) default to complete
+  return "complete";
+}
+
+/**
  * Finalize a run: build structured summary, capture memory stats,
  * run post-task tests, retrieve Codex tokens if applicable, set timestamps,
  * and persist. Called at the end of both loops.
@@ -498,6 +541,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx, selfHeal } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
+
+  // Update token diagnostic status from per-turn data
+  if (run.diagnostics && run.turnTokenUsage) {
+    run.diagnostics.tokenDiagnosticStatus =
+      deriveTokenDiagnosticStatus(run.turnTokenUsage);
+  }
 
   // Assemble memory stats if context was captured at init
   if (memoryCtx) {

@@ -1,7 +1,28 @@
+/**
+ * CLI agent loop — spawns a vendor CLI subprocess and processes its output.
+ *
+ * This module orchestrates the full lifecycle of a single CLI agent run:
+ * brief assembly → vendor CLI spawn → output parsing → result processing →
+ * retry management → finalization.
+ *
+ * ## Adapter-based dispatch
+ *
+ * Vendor-specific logic (Claude vs Codex) is encapsulated in VendorAdapter
+ * modules. The generic `spawnWithAdapter` function drives the spawn–parse–
+ * accumulate cycle using three adapter methods:
+ *
+ * 1. `adapter.buildSpawnConfig()` → SpawnConfig (binary, args, env, stdin)
+ * 2. `adapter.parseEvent()` → RuntimeEvent per output line
+ * 3. `adapter.classifyError()` → FailureCategory for error classification
+ *
+ * The `resolveVendorAdapter(vendor)` factory selects the correct adapter.
+ *
+ * @see packages/hench/src/agent/lifecycle/vendor-adapter.ts — VendorAdapter interface
+ * @see packages/hench/src/agent/lifecycle/adapters/ — adapter implementations
+ * @see packages/hench/src/agent/lifecycle/event-accumulator.ts — legacy mutation-based parsers
+ */
+
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
@@ -21,6 +42,14 @@ import {
 } from "../../store/project-config.js";
 import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS } from "../../prd/llm-gateway.js";
 import {
+  createPromptEnvelope,
+  DEFAULT_EXECUTION_POLICY,
+  type ExecutionPolicy,
+  type RuntimeEvent,
+  type PromptSection,
+  type PromptSectionName,
+} from "../../prd/llm-gateway.js";
+import {
   prepareBrief,
   executeDryRun,
   transitionToInProgress,
@@ -31,6 +60,13 @@ import {
   handleRunFailure,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
+import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
+import { resolveVendorAdapter } from "./adapters/index.js";
+import { EventAccumulator } from "./event-accumulator.js";
+import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
+import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/v1.js";
+
+// ── Types ─────────────────────────────────────────────────────────────────
 
 export interface CliLoopOptions extends SharedLoopOptions {}
 
@@ -38,7 +74,33 @@ export interface CliLoopResult {
   run: RunRecord;
 }
 
+// ── Internal types (used by spawnWithAdapter + main loop) ────────────────
+
+/**
+ * Intermediate result shape used during the spawn–parse–accumulate cycle.
+ * Equivalent to the deprecated CliRunResult but kept as a private type
+ * since the production path uses it internally.
+ */
+interface SpawnResult {
+  turns: number;
+  toolCalls: ToolCallRecord[];
+  tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
+  turnTokenUsage: TurnTokenUsage[];
+  summary?: string;
+  error?: string;
+  costUsd?: number;
+}
+
+interface SpawnTokenMetadata {
+  vendor: LLMVendor;
+  model: string;
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────
+
 const MAX_SUMMARY_LENGTH = 500;
+
+// ── Transient error detection & retry helpers ─────────────────────────────
 
 const TRANSIENT_PATTERNS = [
   /\b500\b/,
@@ -90,57 +152,267 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** File tools that Claude CLI should auto-approve (scoped to cwd). */
-const CLI_FILE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep"];
+// ── RuntimeEvent → SpawnResult bridge ─────────────────────────────────────
 
 /**
- * Build the `--allowed-tools` list for the Claude CLI.
+ * Apply a single RuntimeEvent to a mutable SpawnResult.
  *
- * Maps the guard's `allowedCommands` (e.g. `["npm", "git"]`) to Claude CLI's
- * tool pattern format (e.g. `["Bash(npm:*)", "Bash(git:*)"]`), and includes
- * file tools that are inherently scoped to `cwd` by Claude CLI.
- *
- * This replaces `--dangerously-skip-permissions` so that:
- * - Listed tools are auto-approved (no interactive prompts → autonomous execution)
- * - Claude CLI's directory scoping stays active (file access restricted to cwd)
- * - Bash is restricted to the same commands the API provider's guard allows
+ * This bridge converts the adapter's normalized RuntimeEvent into the
+ * mutation-based accumulation that the rest of cli-loop expects. It also
+ * emits stream output for the dashboard/CLI UI.
  */
-export function buildAllowedTools(allowedCommands: string[]): string[] {
-  const bashTools = allowedCommands.map((cmd) => `Bash(${cmd}:*)`);
-  return [...bashTools, ...CLI_FILE_TOOLS];
+function applyRuntimeEvent(
+  event: RuntimeEvent,
+  result: SpawnResult,
+  turnCounter: { value: number },
+): void {
+  switch (event.type) {
+    case "assistant": {
+      turnCounter.value++;
+      if (event.text) {
+        stream("Agent", event.text);
+        result.summary = event.text.slice(0, MAX_SUMMARY_LENGTH);
+      }
+      break;
+    }
+
+    case "tool_use": {
+      const toolName = event.toolCall?.tool ?? "unknown";
+      const toolInput = event.toolCall?.input ?? {};
+      stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
+      result.toolCalls.push({
+        turn: turnCounter.value || 1,
+        tool: toolName,
+        input: toolInput,
+        output: "",
+        durationMs: 0,
+      });
+      // If the event also carried assistant text, update summary
+      if (event.text) {
+        result.summary = event.text.slice(0, MAX_SUMMARY_LENGTH);
+      }
+      break;
+    }
+
+    case "tool_result": {
+      const output = event.toolResult?.output ?? "";
+      if (result.toolCalls.length > 0) {
+        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+      }
+      const preview = output.slice(0, 200);
+      stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
+      break;
+    }
+
+    case "completion": {
+      if (event.completionSummary) {
+        result.summary = event.completionSummary;
+      }
+      break;
+    }
+
+    case "failure": {
+      result.error = event.failure?.message ?? "Unknown error";
+      break;
+    }
+
+    default:
+      break;
+  }
 }
 
-/** @internal Exported for testing. */
-export interface CliRunResult {
-  turns: number;
-  toolCalls: ToolCallRecord[];
-  tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
-  turnTokenUsage: TurnTokenUsage[];
-  summary?: string;
-  error?: string;
-  costUsd?: number;
+// ── Event pipeline helpers ─────────────────────────────────────────────────
+
+/**
+ * Emit UI stream output for a RuntimeEvent.
+ *
+ * Pure side-effect function: writes to the dashboard/CLI output stream.
+ * Used by the event pipeline path where `applyRuntimeEvent` is replaced
+ * by `EventAccumulator.push()` (which doesn't emit UI output).
+ *
+ * @internal Exported for testing.
+ */
+export function emitStreamOutput(event: RuntimeEvent): void {
+  switch (event.type) {
+    case "assistant": {
+      if (event.text) stream("Agent", event.text);
+      break;
+    }
+    case "tool_use": {
+      const toolName = event.toolCall?.tool ?? "unknown";
+      const toolInput = event.toolCall?.input ?? {};
+      stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
+      break;
+    }
+    case "tool_result": {
+      const output = event.toolResult?.output ?? "";
+      const preview = output.slice(0, 200);
+      stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
+      break;
+    }
+    case "failure": {
+      // Failures are logged elsewhere; no stream emission needed
+      break;
+    }
+    default:
+      break;
+  }
 }
 
-interface TokenEventMetadata {
-  vendor: LLMVendor;
-  model: string;
+/**
+ * Convert a `RuntimeEvent` (readonly, from `@n-dx/llm-client`) into
+ * a `PersistedRuntimeEvent` (plain, JSON-serializable) for storage
+ * on the run record.
+ *
+ * @internal Exported for testing.
+ */
+export function toPersistedEvent(event: RuntimeEvent): PersistedRuntimeEvent {
+  const persisted: PersistedRuntimeEvent = {
+    type: event.type,
+    vendor: event.vendor,
+    turn: event.turn,
+    timestamp: event.timestamp,
+  };
+  if (event.text !== undefined) persisted.text = event.text;
+  if (event.toolCall) persisted.toolCall = { tool: event.toolCall.tool, input: { ...event.toolCall.input } };
+  if (event.toolResult) persisted.toolResult = { tool: event.toolResult.tool, output: event.toolResult.output, durationMs: event.toolResult.durationMs };
+  if (event.tokenUsage) persisted.tokenUsage = { ...event.tokenUsage };
+  if (event.failure) {
+    persisted.failure = { category: event.failure.category, message: event.failure.message };
+    if (event.failure.vendorDetail !== undefined) persisted.failure.vendorDetail = event.failure.vendorDetail;
+  }
+  if (event.completionSummary !== undefined) persisted.completionSummary = event.completionSummary;
+  return persisted;
 }
 
-function resolveCliEventModel(
-  vendor: LLMVendor,
-  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
-  _configuredModel: string,
-  modelOverride?: string,
-): string {
-  if (modelOverride) return modelOverride;
-  return resolveVendorModel(vendor, llmConfig);
+/**
+ * Convert raw JSON token usage into a `token_usage` RuntimeEvent.
+ *
+ * Checks the standard locations where vendors embed usage data
+ * (`event.usage`, `event.message.usage`) and returns a RuntimeEvent
+ * for accumulation, or `null` if no usage was found.
+ *
+ * @internal Exported for testing.
+ */
+export function rawJsonToTokenUsageEvent(
+  rawJson: Record<string, unknown>,
+  turn: number,
+  metadata: SpawnTokenMetadata,
+): RuntimeEvent | null {
+  let usage: Record<string, unknown> | undefined;
+
+  if (rawJson.usage && typeof rawJson.usage === "object") {
+    usage = rawJson.usage as Record<string, unknown>;
+  } else if (rawJson.message && typeof rawJson.message === "object") {
+    const msg = rawJson.message as Record<string, unknown>;
+    if (msg.usage && typeof msg.usage === "object") {
+      usage = msg.usage as Record<string, unknown>;
+    }
+  }
+
+  if (!usage) return null;
+
+  const { usage: parsed } = parseTokenUsageWithDiagnostic(usage);
+
+  return {
+    type: "token_usage",
+    vendor: metadata.vendor,
+    turn: turn || 1,
+    timestamp: new Date().toISOString(),
+    tokenUsage: parsed,
+  };
 }
+
+// ── Token usage extraction from raw JSON ──────────────────────────────────
+
+/**
+ * Extract token usage from a raw JSON event object.
+ *
+ * Both Claude and Codex embed token usage in event payloads at predictable
+ * locations (`event.usage`, `event.message.usage`). This function checks
+ * those locations and accumulates usage into the SpawnResult.
+ */
+function extractTokenUsage(
+  rawJson: Record<string, unknown>,
+  result: SpawnResult,
+  turnCounter: { value: number },
+  tokenMetadata: SpawnTokenMetadata,
+): void {
+  let usage: Record<string, unknown> | undefined;
+
+  // Direct usage field (both vendors)
+  if (rawJson.usage && typeof rawJson.usage === "object") {
+    usage = rawJson.usage as Record<string, unknown>;
+  }
+  // Nested message.usage (Claude "assistant" events)
+  else if (rawJson.message && typeof rawJson.message === "object") {
+    const msg = rawJson.message as Record<string, unknown>;
+    if (msg.usage && typeof msg.usage === "object") {
+      usage = msg.usage as Record<string, unknown>;
+    }
+  }
+
+  if (!usage) return;
+
+  const { usage: parsed, diagnosticStatus } = parseTokenUsageWithDiagnostic(usage);
+
+  result.tokenUsage.input += parsed.input;
+  result.tokenUsage.output += parsed.output;
+
+  const turnUsage: TurnTokenUsage = {
+    turn: turnCounter.value || 1,
+    input: parsed.input,
+    output: parsed.output,
+    diagnosticStatus,
+    vendor: tokenMetadata.vendor,
+    model: tokenMetadata.model,
+  };
+
+  if (parsed.cacheCreationInput) {
+    result.tokenUsage.cacheCreationInput = (result.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
+    turnUsage.cacheCreationInput = parsed.cacheCreationInput;
+  }
+  if (parsed.cacheReadInput) {
+    result.tokenUsage.cacheReadInput = (result.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
+    turnUsage.cacheReadInput = parsed.cacheReadInput;
+  }
+
+  result.turnTokenUsage.push(turnUsage);
+}
+
+/**
+ * Handle metadata from "result" / completion events that RuntimeEvent
+ * does not carry (num_turns, cost_usd, fallback token usage).
+ */
+function extractCompletionMetadata(
+  rawJson: Record<string, unknown>,
+  result: SpawnResult,
+): void {
+  if (typeof rawJson.num_turns === "number") {
+    result.turns = rawJson.num_turns;
+  }
+  if (typeof rawJson.cost_usd === "number") {
+    result.costUsd = rawJson.cost_usd;
+  }
+  // Fallback token usage from completion event (if per-turn not available)
+  if (rawJson.usage && typeof rawJson.usage === "object") {
+    if (result.tokenUsage.input === 0 && result.tokenUsage.output === 0) {
+      const fallback = parseStreamTokenUsage(rawJson);
+      if (fallback) {
+        result.tokenUsage.input = fallback.input;
+        result.tokenUsage.output = fallback.output;
+      }
+    }
+  }
+}
+
+// ── Token usage arithmetic ────────────────────────────────────────────────
 
 function addTokenUsage(
-  total: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number },
-  increment: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number },
-): { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number } {
-  const next: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number } = {
+  total: SpawnResult["tokenUsage"],
+  increment: SpawnResult["tokenUsage"],
+): SpawnResult["tokenUsage"] {
+  const next: SpawnResult["tokenUsage"] = {
     input: total.input + increment.input,
     output: total.output + increment.output,
   };
@@ -160,406 +432,71 @@ function addTokenUsage(
   return next;
 }
 
-export interface NormalizedCodexToolEvent {
-  tool: string;
-  input: Record<string, unknown>;
-  output?: string;
-  status?: string;
-  eventType: string;
+// ── Generic adapter-based spawn ───────────────────────────────────────────
+
+interface SpawnWithAdapterOptions {
+  adapter: VendorAdapter;
+  spawnConfig: SpawnConfig;
+  cliBinary: string;
+  cliEnv?: NodeJS.ProcessEnv;
+  cwd: string;
+  tokenMetadata: SpawnTokenMetadata;
+  /** When true, use EventAccumulator instead of inline SpawnResult mutation. */
+  useEventPipeline?: boolean;
+  /** Caller-provided accumulator — events are pushed here when useEventPipeline is true. */
+  accumulator?: EventAccumulator;
 }
 
-export interface NormalizedCodexResponse {
-  status: "completed" | "error" | "in_progress" | "unknown";
-  assistantText: string;
-  toolEvents: NormalizedCodexToolEvent[];
-  warnings: string[];
-  error?: string;
-}
+/**
+ * Spawn a vendor CLI process using the adapter pattern.
+ *
+ * This replaces the old `spawnClaude` and `spawnCodex` functions with a
+ * single generic implementation that delegates all vendor-specific logic
+ * to the adapter:
+ *
+ * 1. SpawnConfig determines the process args, env, and stdin behavior
+ * 2. adapter.parseEvent() normalizes each output line into a RuntimeEvent
+ * 3. applyRuntimeEvent() bridges RuntimeEvents into SpawnResult mutations
+ *    (legacy path), OR events are pushed into an EventAccumulator (event
+ *    pipeline path, gated by `useEventPipeline`)
+ * 4. Token usage is extracted from raw JSON in parallel
+ *
+ * The function also handles:
+ * - Whole-output heuristic fallback (when no structured events are parsed)
+ * - Summary fallback from raw stdout
+ * - ENOENT error messages with vendor-appropriate help text
+ * - Non-zero exit code error reporting
+ *
+ * ## Event pipeline mode (`useEventPipeline: true`)
+ *
+ * When enabled, `adapter.parseEvent()` output and raw JSON token usage are
+ * converted to RuntimeEvents and pushed into the caller-provided
+ * `EventAccumulator`. On process close, `SpawnResult` is derived from
+ * `accumulator.toCliRunResult()` instead of inline mutation. This produces
+ * equivalent run records while operating entirely on the RuntimeEvent stream.
+ */
+function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
+  const {
+    adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
+    useEventPipeline, accumulator,
+  } = opts;
 
-function parseMaybeJson(value: unknown): unknown {
-  if (typeof value !== "string") {
-    return value;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  if (
-    !(trimmed.startsWith("{") && trimmed.endsWith("}")) &&
-    !(trimmed.startsWith("[") && trimmed.endsWith("]"))
-  ) {
-    return value;
-  }
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return value;
-  }
-}
-
-function getBlockType(block: Record<string, unknown>): string | undefined {
-  const type = block.type ?? block.kind ?? block.event ?? block.block_type ?? block.role;
-  return typeof type === "string" ? type : undefined;
-}
-
-function collectCodexBlocks(payload: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(payload)) {
-    return payload.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null);
-  }
-  if (!payload || typeof payload !== "object") {
-    return [];
-  }
-
-  const obj = payload as Record<string, unknown>;
-  const candidates = [
-    obj.content,
-    obj.blocks,
-    obj.events,
-    obj.output,
-    obj.items,
-    obj.response,
-    obj.data,
-    obj.message && typeof obj.message === "object" ? (obj.message as Record<string, unknown>).content : undefined,
-  ];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null);
-    }
-  }
-  return [];
-}
-
-function extractText(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (!value || typeof value !== "object") return "";
-  const obj = value as Record<string, unknown>;
-  if (typeof obj.text === "string") return obj.text;
-  if (typeof obj.content === "string") return obj.content;
-  if (typeof obj.delta === "string") return obj.delta;
-  if (typeof obj.output_text === "string") return obj.output_text;
-  return "";
-}
-
-/** @internal Exported for testing. */
-export function normalizeCodexResponse(raw: unknown): NormalizedCodexResponse {
-  const warnings: string[] = [];
-  const textParts: string[] = [];
-  const toolEvents: NormalizedCodexToolEvent[] = [];
-
-  const parsedRaw = parseMaybeJson(raw);
-  const parsed = typeof parsedRaw === "string" ? parseMaybeJson(parsedRaw.trim()) : parsedRaw;
-
-  if (typeof parsed === "string") {
-    return {
-      status: "completed",
-      assistantText: parsed,
-      toolEvents,
-      warnings,
-    };
-  }
-
-  if (!parsed || typeof parsed !== "object") {
-    return {
-      status: "unknown",
-      assistantText: "",
-      toolEvents,
-      warnings,
-    };
-  }
-
-  const obj = parsed as Record<string, unknown>;
-  const topLevelText = [obj.text, obj.output_text, obj.result, obj.summary, obj.message]
-    .map(extractText)
-    .find((text) => text.trim().length > 0);
-  if (topLevelText) {
-    textParts.push(topLevelText);
-  }
-
-  const blocks = collectCodexBlocks(obj);
-  for (const block of blocks) {
-    const type = getBlockType(block);
-    const normalizedType = type?.toLowerCase();
-
-    if (!normalizedType) {
-      warnings.push("Codex block missing type; ignoring block.");
-      continue;
-    }
-
-    if (normalizedType === "text" || normalizedType === "output_text" || normalizedType === "assistant_text" || normalizedType === "text_delta") {
-      const text = extractText(block);
-      if (text) {
-        textParts.push(text);
-      }
-      continue;
-    }
-
-    if (normalizedType === "tool_use" || normalizedType === "tool_call" || normalizedType === "function_call") {
-      const toolName = typeof block.name === "string"
-        ? block.name
-        : typeof block.tool === "string"
-          ? block.tool
-          : "unknown";
-      const inputCandidate = parseMaybeJson(block.input ?? block.arguments);
-      toolEvents.push({
-        tool: toolName,
-        input: inputCandidate && typeof inputCandidate === "object"
-          ? inputCandidate as Record<string, unknown>
-          : { value: inputCandidate },
-        status: typeof block.status === "string" ? block.status : "started",
-        eventType: normalizedType,
-      });
-      continue;
-    }
-
-    if (normalizedType === "tool_result" || normalizedType === "function_result") {
-      const outputText = extractText(block.output ?? block.content ?? block.result ?? block);
-      const toolName = typeof block.name === "string"
-        ? block.name
-        : typeof block.tool === "string"
-          ? block.tool
-          : "unknown";
-      toolEvents.push({
-        tool: toolName,
-        input: {},
-        output: outputText,
-        status: typeof block.status === "string" ? block.status : "completed",
-        eventType: normalizedType,
-      });
-      continue;
-    }
-
-    if (
-      normalizedType === "completion" ||
-      normalizedType === "completed" ||
-      normalizedType === "result" ||
-      normalizedType === "final"
-    ) {
-      const text = extractText(block.result ?? block.message ?? block);
-      if (text) {
-        textParts.push(text);
-      }
-      continue;
-    }
-
-    warnings.push(`Unknown Codex block type "${type}" ignored.`);
-  }
-
-  let status: NormalizedCodexResponse["status"] = "unknown";
-  if (obj.is_error === true || typeof obj.error === "string") {
-    status = "error";
-  } else if (typeof obj.status === "string") {
-    const s = obj.status.toLowerCase();
-    if (s.includes("error") || s.includes("failed")) status = "error";
-    else if (s.includes("complete") || s === "ok") status = "completed";
-    else if (s.includes("progress") || s.includes("running")) status = "in_progress";
-  } else if (typeof obj.stop_reason === "string") {
-    status = obj.stop_reason === "end_turn" ? "completed" : "in_progress";
-  } else if (textParts.length > 0 || toolEvents.length > 0) {
-    status = "completed";
-  }
-
-  const assistantText = textParts
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
-    .join("\n");
-
-  const error = typeof obj.error === "string"
-    ? obj.error
-    : obj.is_error
-      ? extractText(obj.result) || "Codex response indicated an error"
-      : undefined;
-
-  return {
-    status,
-    assistantText,
-    toolEvents,
-    warnings,
-    error,
-  };
-}
-
-/** @internal Exported for testing. */
-export function processStreamLine(
-  line: string,
-  result: CliRunResult,
-  turnCounter: { value: number },
-  tokenMetadata?: TokenEventMetadata,
-): void {
-  if (!line.trim()) return;
-
-  let event: Record<string, unknown>;
-  try {
-    event = JSON.parse(line);
-  } catch {
-    // Not JSON — print raw output for visibility
-    info(line);
-    return;
-  }
-
-  const type = event.type as string | undefined;
-
-  switch (type) {
-    case "assistant": {
-      turnCounter.value++;
-
-      // Extract text from message — may be a string, object with content blocks, or absent
-      const message = event.message;
-      if (typeof message === "string") {
-        stream("Agent", message);
-        result.summary = message.slice(0, MAX_SUMMARY_LENGTH);
-      } else if (message && typeof message === "object") {
-        const msg = message as Record<string, unknown>;
-        const blocks = msg.content as Array<{ type: string; text?: string }> | undefined;
-        if (Array.isArray(blocks)) {
-          for (const block of blocks) {
-            if (block.type === "text" && block.text) {
-              stream("Agent", block.text);
-              result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
-            } else if (block.type === "tool_use") {
-              const b = block as { name?: string; input?: Record<string, unknown> };
-              const toolName = b.name || "unknown";
-              const toolInput = b.input || {};
-              stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-              result.toolCalls.push({
-                turn: turnCounter.value,
-                tool: toolName,
-                input: toolInput,
-                output: "",
-                durationMs: 0,
-              });
-            }
-          }
-        }
-
-        // Extract per-turn token usage from message.usage
-        if (msg.usage && typeof msg.usage === "object") {
-          const parsed = parseTokenUsage(msg.usage as Record<string, unknown>);
-
-          result.tokenUsage.input += parsed.input;
-          result.tokenUsage.output += parsed.output;
-
-          const turnUsage: TurnTokenUsage = {
-            turn: turnCounter.value,
-            input: parsed.input,
-            output: parsed.output,
-            ...(tokenMetadata ? { vendor: tokenMetadata.vendor, model: tokenMetadata.model } : {}),
-          };
-
-          if (parsed.cacheCreationInput) {
-            result.tokenUsage.cacheCreationInput = (result.tokenUsage.cacheCreationInput ?? 0) + parsed.cacheCreationInput;
-            turnUsage.cacheCreationInput = parsed.cacheCreationInput;
-          }
-          if (parsed.cacheReadInput) {
-            result.tokenUsage.cacheReadInput = (result.tokenUsage.cacheReadInput ?? 0) + parsed.cacheReadInput;
-            turnUsage.cacheReadInput = parsed.cacheReadInput;
-          }
-
-          result.turnTokenUsage.push(turnUsage);
-        }
-      }
-
-      // Also check top-level content (some event shapes put it here)
-      const content = event.content as Array<{ type: string; text?: string }> | undefined;
-      if (Array.isArray(content) && !event.message) {
-        for (const block of content) {
-          if (block.type === "text" && block.text) {
-            stream("Agent", block.text);
-            result.summary = block.text.slice(0, MAX_SUMMARY_LENGTH);
-          } else if (block.type === "tool_use") {
-            const b = block as { name?: string; input?: Record<string, unknown> };
-            const toolName = b.name || "unknown";
-            const toolInput = b.input || {};
-            stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-            result.toolCalls.push({
-              turn: turnCounter.value,
-              tool: toolName,
-              input: toolInput,
-              output: "",
-              durationMs: 0,
-            });
-          }
-        }
-      }
-      break;
-    }
-
-    case "tool_use": {
-      const toolName = (event.tool as string) || (event.name as string) || "unknown";
-      const toolInput = (event.input as Record<string, unknown>) || {};
-      stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-      result.toolCalls.push({
-        turn: turnCounter.value,
-        tool: toolName,
-        input: toolInput,
-        output: "",
-        durationMs: 0,
-      });
-      break;
-    }
-
-    case "tool_result": {
-      const output = (event.output as string) || (event.content as string) || "";
-      // Attach output to the last tool call if available
-      if (result.toolCalls.length > 0) {
-        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
-      }
-      const preview = output.slice(0, 200);
-      stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
-      break;
-    }
-
-    case "result": {
-      if (event.is_error) {
-        result.error = (event.result as string) || "Unknown error";
-      } else if (event.result) {
-        result.summary = (event.result as string).slice(0, MAX_SUMMARY_LENGTH);
-      }
-      if (typeof event.num_turns === "number") {
-        result.turns = event.num_turns;
-      }
-      if (typeof event.cost_usd === "number") {
-        result.costUsd = event.cost_usd;
-      }
-      // Extract total token usage from result event (fallback if per-turn not available)
-      if (result.tokenUsage.input === 0 && result.tokenUsage.output === 0) {
-        const fallback = parseStreamTokenUsage(event);
-        if (fallback) {
-          result.tokenUsage.input = fallback.input;
-          result.tokenUsage.output = fallback.output;
-        }
-      }
-      break;
-    }
-
-    default:
-      // Unknown event type — ignore silently
-      break;
-  }
-}
-
-function spawnClaude(
-  args: string[],
-  stdinContent: string,
-  cwd: string,
-  tokenMetadata: TokenEventMetadata,
-  cliBinary = "claude",
-  env?: NodeJS.ProcessEnv,
-): Promise<CliRunResult> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cliBinary, args, {
+    const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
+    const proc = spawn(cliBinary, [...spawnConfig.args], {
       cwd,
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
       shell: process.platform === "win32",
-      env: env ?? process.env,
+      env: cliEnv ?? process.env,
     });
 
-    // Write prompt (and optionally system prompt) to stdin and close.
-    // This avoids passing long/complex text as CLI args, which breaks on
-    // Windows where shell:true routes through cmd.exe without arg quoting.
-    proc.stdin.write(stdinContent, "utf-8");
-    proc.stdin.end();
+    // Write stdin content if the adapter requires it (Claude: pipe-based prompt)
+    if (spawnConfig.stdinContent !== null && proc.stdin) {
+      proc.stdin.write(spawnConfig.stdinContent, "utf-8");
+      proc.stdin.end();
+    }
 
-    const result: CliRunResult = {
+    const result: SpawnResult = {
       turns: 0,
       toolCalls: [],
       tokenUsage: { input: 0, output: 0 },
@@ -569,61 +506,287 @@ function spawnClaude(
     const turnCounter = { value: 0 };
     let lineBuffer = "";
     let stderr = "";
+    let fullStdout = "";
+    let eventCount = 0;
 
-    proc.stdout.on("data", (chunk: Buffer) => {
-      lineBuffer += chunk.toString();
+    // Event pipeline: track completion metadata from raw JSON since
+    // RuntimeEvent doesn't carry num_turns or cost_usd.
+    let completionTurns: number | undefined;
+    let completionCostUsd: number | undefined;
+
+    const vendorLabel = adapter.vendor === "codex" ? "Codex" : "Agent";
+
+    proc.stdout!.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      fullStdout += text;
+      lineBuffer += text;
       const lines = lineBuffer.split("\n");
       lineBuffer = lines.pop()!; // Keep incomplete last line in buffer
 
       for (const line of lines) {
-        processStreamLine(line, result, turnCounter, tokenMetadata);
+        processLine(line);
       }
     });
 
-    proc.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
+    proc.stderr!.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      stderr += text;
+      // Stream stderr lines for visibility
+      const lines = text.split("\n");
+      for (const line of lines) {
+        if (line.trim()) stream(vendorLabel, line.trim());
+      }
     });
 
     proc.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        reject(new Error(
-          "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code\n" +
-            "Or switch to the API provider: n-dx config hench.provider api",
-        ));
-      } else {
-        reject(err);
+        const message = adapter.vendor === "codex"
+          ? "Codex CLI not found. Configure with: n-dx config llm.codex.cli_path /path/to/codex"
+          : "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code\n" +
+            "Or switch to the API provider: n-dx config hench.provider api";
+        reject(new Error(message));
+        return;
       }
+      reject(err);
     });
 
     proc.on("close", (code) => {
-      // Process any remaining buffered output
+      // Flush remaining buffered output
       if (lineBuffer.trim()) {
-        processStreamLine(lineBuffer, result, turnCounter, tokenMetadata);
+        processLine(lineBuffer);
       }
 
-      if (result.turns === 0) {
-        result.turns = turnCounter.value;
+      if (useEventPipeline && accumulator) {
+        // ── Event pipeline close path ──────────────────────────────────
+
+        // Whole-output heuristic fallback
+        if (eventCount === 0 && fullStdout.trim()) {
+          const fallbackEvent = adapter.parseEvent(fullStdout, 1, {});
+          if (fallbackEvent) {
+            accumulator.push(fallbackEvent);
+            emitStreamOutput(fallbackEvent);
+          }
+
+          // Codex-specific: extract token usage from raw stdout
+          if (adapter.vendor === "codex") {
+            try {
+              const raw = JSON.parse(fullStdout);
+              const codexMapping = mapCodexUsageToTokenUsage(raw);
+              if (codexMapping.diagnosticStatus !== "unavailable") {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: codexMapping.usage,
+                });
+              }
+            } catch {
+              // Non-JSON stdout — no token usage to extract
+            }
+          }
+        }
+
+        // Codex token usage fallback: structured events parsed but no usage
+        if (eventCount > 0 && accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
+          if (adapter.vendor === "codex") {
+            try {
+              const raw = JSON.parse(fullStdout);
+              const codexMapping = mapCodexUsageToTokenUsage(raw);
+              if (codexMapping.diagnosticStatus !== "unavailable") {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: codexMapping.usage,
+                });
+              }
+            } catch {
+              // Non-JSON stdout
+            }
+          }
+        }
+
+        // Derive SpawnResult from accumulator
+        const derived = accumulator.toCliRunResult();
+        result.turns = completionTurns ?? derived.turns;
+        result.toolCalls = derived.toolCalls;
+        result.tokenUsage = derived.tokenUsage;
+        result.turnTokenUsage = derived.turnTokenUsage;
+        result.summary = derived.summary;
+        result.error = derived.error;
+        result.costUsd = completionCostUsd;
+
+        // Ensure turns is at least 1 for heuristic fallback
+        if (result.turns === 0 && eventCount === 0 && fullStdout.trim()) {
+          result.turns = 1;
+        }
+        // Ensure turns is at least the turn counter
+        if (result.turns === 0) {
+          result.turns = turnCounter.value || (eventCount > 0 ? 1 : 0);
+        }
+
+        // Summary fallback from raw stdout
+        if (!result.summary && fullStdout.trim()) {
+          result.summary = fullStdout.trim().slice(0, MAX_SUMMARY_LENGTH);
+        }
+
+        // Enrich per-turn usage with model (not carried by RuntimeEvent)
+        for (const tu of result.turnTokenUsage) {
+          if (!tu.model) tu.model = tokenMetadata.model;
+        }
+      } else {
+        // ── Legacy close path (inline mutation) ────────────────────────
+
+        // Whole-output heuristic fallback: if no structured events were parsed
+        // line-by-line, try the entire stdout as a single input to the adapter.
+        // This handles older Codex versions that output non-JSONL responses.
+        if (eventCount === 0 && fullStdout.trim()) {
+          const fallbackEvent = adapter.parseEvent(fullStdout, 1, {});
+          if (fallbackEvent) {
+            applyRuntimeEvent(fallbackEvent, result, turnCounter);
+          }
+
+          // Codex-specific: extract token usage from raw stdout via heuristic mapping
+          if (adapter.vendor === "codex") {
+            try {
+              const raw = JSON.parse(fullStdout);
+              const codexMapping = mapCodexUsageToTokenUsage(raw);
+              if (codexMapping.diagnosticStatus !== "unavailable") {
+                result.tokenUsage = codexMapping.usage;
+                result.turnTokenUsage.push({
+                  turn: 1,
+                  input: codexMapping.usage.input,
+                  output: codexMapping.usage.output,
+                  vendor: tokenMetadata.vendor,
+                  model: tokenMetadata.model,
+                });
+              }
+            } catch {
+              // Non-JSON stdout — no token usage to extract
+            }
+          }
+
+          // Ensure at least 1 turn for heuristic fallback
+          if (result.turns === 0) result.turns = 1;
+        }
+
+        // Ensure turns is at least the turn counter
+        if (result.turns === 0) {
+          result.turns = turnCounter.value || (eventCount > 0 ? 1 : 0);
+        }
+
+        // Summary fallback from raw stdout
+        if (!result.summary && fullStdout.trim()) {
+          result.summary = fullStdout.trim().slice(0, MAX_SUMMARY_LENGTH);
+        }
+
+        // Token usage fallback: structured events were parsed but no usage found
+        if (eventCount > 0 && result.tokenUsage.input === 0 && result.tokenUsage.output === 0) {
+          if (adapter.vendor === "codex") {
+            try {
+              const raw = JSON.parse(fullStdout);
+              const codexMapping = mapCodexUsageToTokenUsage(raw);
+              if (codexMapping.diagnosticStatus !== "unavailable") {
+                result.tokenUsage = codexMapping.usage;
+              }
+            } catch {
+              // Non-JSON stdout
+            }
+          }
+        }
       }
 
       if (code !== 0 && !result.error) {
-        result.error = stderr.trim() || `claude exited with code ${code}`;
+        result.error = stderr.trim() || `${adapter.vendor} exited with code ${code}`;
       }
 
       resolve(result);
     });
+
+    // ── Line processing helper ──────────────────────────────────────────
+
+    function processLine(line: string): void {
+      // Step 1: Parse the line through the adapter for event classification
+      const event = adapter.parseEvent(line, turnCounter.value + 1, {});
+
+      if (useEventPipeline && accumulator) {
+        // ── Event pipeline: push to accumulator + emit UI ──
+        if (event) {
+          eventCount++;
+          accumulator.push(event);
+          emitStreamOutput(event);
+          if (event.type === "assistant") turnCounter.value++;
+        }
+
+        // Step 2: Extract token usage → RuntimeEvent → accumulator
+        if (line.trim()) {
+          try {
+            const rawJson = JSON.parse(line);
+            const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata);
+            if (tokenEvent) accumulator.push(tokenEvent);
+
+            // Extract completion metadata (num_turns, cost_usd) from raw JSON
+            const type = rawJson.type as string | undefined;
+            if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
+              if (typeof rawJson.num_turns === "number") completionTurns = rawJson.num_turns;
+              if (typeof rawJson.cost_usd === "number") completionCostUsd = rawJson.cost_usd;
+
+              // Fallback token usage from completion event
+              if (rawJson.usage && typeof rawJson.usage === "object") {
+                if (accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
+                  const fallback = parseStreamTokenUsage(rawJson);
+                  if (fallback) {
+                    accumulator.push({
+                      type: "token_usage",
+                      vendor: tokenMetadata.vendor,
+                      turn: turnCounter.value || 1,
+                      timestamp: new Date().toISOString(),
+                      tokenUsage: fallback,
+                    });
+                  }
+                }
+              }
+            }
+          } catch {
+            if (!event && line.trim()) {
+              info(line);
+            }
+          }
+        }
+      } else {
+        // ── Legacy: inline mutation ──
+        if (event) {
+          eventCount++;
+          applyRuntimeEvent(event, result, turnCounter);
+        }
+
+        // Step 2: Extract token usage from raw JSON (parallel to event parsing)
+        // Token usage lives in the raw JSON payload, not in RuntimeEvent.
+        if (line.trim()) {
+          try {
+            const rawJson = JSON.parse(line);
+            extractTokenUsage(rawJson, result, turnCounter, tokenMetadata);
+
+            // Extract completion metadata (num_turns, cost_usd, fallback usage)
+            const type = rawJson.type as string | undefined;
+            if (type === "result" || type === "summary" || type === "response.completed" || type === "done" || type === "complete") {
+              extractCompletionMetadata(rawJson, result);
+            }
+          } catch {
+            // Not JSON — stream raw output for visibility if adapter didn't handle it
+            if (!event && line.trim()) {
+              info(line);
+            }
+          }
+        }
+      }
+    }
   });
 }
 
-async function spawnCodex(
-  prompt: string,
-  cwd: string,
-  model: string | undefined,
-  tokenMetadata: TokenEventMetadata,
-  cliBinary = "codex",
-  env?: NodeJS.ProcessEnv,
-): Promise<CliRunResult> {
-  const tmpDir = await mkdtemp(join(tmpdir(), "hench-codex-"));
-  const outputPath = join(tmpDir, "last-message.txt");
+// ── LLM config helpers ────────────────────────────────────────────────────
 
   try {
     return await new Promise<CliRunResult>((resolve, reject) => {
@@ -782,15 +945,13 @@ async function spawnCodex(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Accumulated retry state — bundles mutable counters across retry attempts
-// ---------------------------------------------------------------------------
+// ── Accumulated retry state ───────────────────────────────────────────────
 
 interface AccumulatedState {
   turns: number;
   toolCalls: ToolCallRecord[];
   turnTokenUsage: TurnTokenUsage[];
-  tokenUsage: CliRunResult["tokenUsage"];
+  tokenUsage: SpawnResult["tokenUsage"];
 }
 
 function createAccumulatedState(): AccumulatedState {
@@ -802,7 +963,7 @@ function createAccumulatedState(): AccumulatedState {
   };
 }
 
-function accumulateResult(state: AccumulatedState, result: CliRunResult): void {
+function accumulateResult(state: AccumulatedState, result: SpawnResult): void {
   state.turns += result.turns;
   state.toolCalls = state.toolCalls.concat(result.toolCalls);
   state.turnTokenUsage = state.turnTokenUsage.concat(result.turnTokenUsage);
@@ -822,100 +983,14 @@ function syncRunFromAccumulated(
   run.retryAttempts = attempt > 0 ? attempt : undefined;
 }
 
-// ---------------------------------------------------------------------------
-// CLI arg construction (platform-aware)
-// ---------------------------------------------------------------------------
-
-interface ClaudeCliInput {
-  systemPrompt: string;
-  promptText: string;
-  allowedTools: string[];
-  modelOverride?: string;
-}
-
-/**
- * Build the Claude CLI args and stdin content.
- * Handles Windows cmd.exe escaping quirks.
- */
-function buildClaudeCliArgs(input: ClaudeCliInput): { args: string[]; stdinContent: string } {
-  const isWindows = process.platform === "win32";
-
-  // On Windows, cmd.exe can't handle multi-line strings or special chars
-  // like ( ) & | in CLI args. Embed system prompt in stdin instead.
-  const stdinContent = isWindows
-    ? `${input.systemPrompt}\n\n---\n\n${input.promptText}`
-    : input.promptText;
-
-  const args = [
-    "-p",  // print mode; prompt is read from stdin
-    "--output-format", "stream-json",
-    "--verbose",
-    ...(isWindows ? [] : ["--system-prompt", input.systemPrompt]),
-    "--allowed-tools",
-    // On Windows: join as a single comma-separated arg wrapped in cmd.exe quotes.
-    // Bash(cmd:*) patterns contain ( ) which are special to cmd.exe without quoting.
-    ...(isWindows ? [`"${input.allowedTools.join(",")}"`] : input.allowedTools),
-    ...(input.modelOverride ? ["--model", input.modelOverride] : []),
-  ];
-
-  return { args, stdinContent };
-}
-
-// ---------------------------------------------------------------------------
-// Vendor dispatch — choose between Claude and Codex CLI
-// ---------------------------------------------------------------------------
-
-interface VendorDispatchOptions {
-  vendor: LLMVendor;
-  systemPrompt: string;
-  promptText: string;
-  allowedTools: string[];
-  projectDir: string;
-  tokenMetadata: TokenEventMetadata;
-  cliBinary: string;
-  cliEnv?: NodeJS.ProcessEnv;
-  modelOverride?: string;
-}
-
-async function dispatchVendorSpawn(opts: VendorDispatchOptions): Promise<CliRunResult> {
-  if (opts.vendor === "codex") {
-    return spawnCodex(
-      `SYSTEM:\n${opts.systemPrompt}\n\nTASK:\n${opts.promptText}`,
-      opts.projectDir,
-      opts.modelOverride,
-      opts.tokenMetadata,
-      opts.cliBinary,
-      opts.cliEnv,
-    );
-  }
-
-  const { args, stdinContent } = buildClaudeCliArgs({
-    systemPrompt: opts.systemPrompt,
-    promptText: opts.promptText,
-    allowedTools: opts.allowedTools,
-    modelOverride: opts.modelOverride,
-  });
-
-  return spawnClaude(
-    args,
-    stdinContent,
-    opts.projectDir,
-    opts.tokenMetadata,
-    opts.cliBinary,
-    opts.cliEnv,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Successful result processing — spin detection, validation, budget, review
-// ---------------------------------------------------------------------------
+// ── Successful result processing ──────────────────────────────────────────
 
 /** Return value from processSuccessfulResult indicating whether the loop should break. */
 type SuccessAction = "break" | "continue";
 
 interface SuccessContext {
   run: RunRecord;
-  result: CliRunResult;
+  result: SpawnResult;
   accumulated: AccumulatedState;
   attempt: number;
   store: PRDStore;
@@ -926,20 +1001,36 @@ interface SuccessContext {
   tokenBudget?: number;
   review?: boolean;
   selfHeal?: boolean;
+  /** Per-attempt EventAccumulator (event pipeline path). */
+  attemptAccumulator?: EventAccumulator;
+  /** Cross-retry EventAccumulator (event pipeline path). */
+  runAccumulator?: EventAccumulator;
 }
 
 /**
  * Process a CLI result that completed without a process-level error.
  * Handles spin detection, completion validation, budget checks, and review gating.
+ *
+ * When `attemptAccumulator` and `runAccumulator` are provided (event pipeline
+ * path), spin detection and budget checking operate directly on the
+ * RuntimeEvent stream via the accumulators instead of the legacy SpawnResult.
  */
 async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessAction> {
   const { run, result, accumulated, attempt, store, taskId, projectDir } = ctx;
 
   // Post-run spin detection: many turns with zero tool calls
-  if (isSpinningRun(result.turns, result.toolCalls.length)) {
+  // Event pipeline: use accumulator-derived counts directly
+  const spinTurns = ctx.attemptAccumulator
+    ? ctx.attemptAccumulator.maxTurn
+    : result.turns;
+  const spinToolCount = ctx.attemptAccumulator
+    ? ctx.attemptAccumulator.toolCalls.count
+    : result.toolCalls.length;
+
+  if (isSpinningRun(spinTurns, spinToolCount)) {
     syncRunFromAccumulated(run, accumulated, attempt);
     run.status = "failed";
-    run.error = `Agent spin detected: ${result.turns} turns with 0 tool calls.`;
+    run.error = `Agent spin detected: ${spinTurns} turns with 0 tool calls.`;
     info(`\n${run.error}`);
     await handleRunFailure(store, taskId, "deferred", "spin_detected", run.error);
     return "break";
@@ -955,7 +1046,11 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
   syncRunFromAccumulated(run, accumulated, attempt);
 
   // Post-run token budget check (CLI provider can only check after run)
-  const budgetCheck = checkTokenBudget(run.tokenUsage, ctx.tokenBudget);
+  // Event pipeline: use cross-retry accumulator totals directly
+  const budgetUsage = ctx.runAccumulator
+    ? ctx.runAccumulator.tokenUsage.total
+    : run.tokenUsage;
+  const budgetCheck = checkTokenBudget(budgetUsage, ctx.tokenBudget);
   if (budgetCheck.exceeded) {
     run.status = "budget_exceeded";
     run.summary = result.summary;
@@ -996,16 +1091,14 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
   return "break";
 }
 
-// ---------------------------------------------------------------------------
-// Error result processing — transient vs non-transient
-// ---------------------------------------------------------------------------
+// ── Error result processing ───────────────────────────────────────────────
 
 /** Return value from processErrorResult indicating whether the loop should break. */
 type ErrorAction = "break" | "retry";
 
 interface ErrorContext {
   run: RunRecord;
-  result: CliRunResult;
+  result: SpawnResult;
   accumulated: AccumulatedState;
   attempt: number;
   store: PRDStore;
@@ -1058,9 +1151,7 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
   return "break";
 }
 
-// ---------------------------------------------------------------------------
-// Main CLI loop — orchestrates brief → spawn → result processing
-// ---------------------------------------------------------------------------
+// ── Main CLI loop ─────────────────────────────────────────────────────────
 
 export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const { config, store, projectDir, henchDir, dryRun } = opts;
@@ -1069,8 +1160,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const vendor = resolveLLMVendor(llmConfig);
   const eventModel = resolveCliEventModel(vendor, llmConfig, model, opts.model);
 
-  // Shared: assemble brief, format, build system prompt, display task info
-  const { brief, taskId, briefText, systemPrompt } = await prepareBrief(
+  // Resolve the vendor adapter — replaces the old dispatchVendorSpawn switch
+  const adapter = resolveVendorAdapter(vendor);
+
+  // Shared: assemble brief, format, build system prompt + envelope, display task info
+  const { brief, taskId, briefText, systemPrompt, envelope: baseEnvelope } = await prepareBrief(
     store, config, opts.taskId,
     { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
@@ -1102,12 +1196,22 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Shared: transition task to in_progress
   await transitionToInProgress(store, taskId, brief.task.status);
 
+  // Build the execution policy from guard config (needed for diagnostics at init)
+  const policy: ExecutionPolicy = {
+    ...DEFAULT_EXECUTION_POLICY,
+    allowedCommands: config.guard.allowedCommands,
+  };
+
   // Shared: initialize run record + capture start memory snapshot
   const { run, memoryCtx } = await initRunRecord({
     taskId,
     taskTitle: brief.task.title,
     model,
     henchDir,
+    vendor,
+    sandbox: policy.sandbox,
+    approvals: policy.approvals,
+    parseMode: adapter.parseMode,
   });
 
   // CLI-specific: load config for CLI path and env resolution
@@ -1123,14 +1227,21 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     maxDelayMs: 30000,
   };
 
-  // CLI-specific: build --allowed-tools from guard config
-  const allowedTools = buildAllowedTools(config.guard.allowedCommands);
   const accumulated = createAccumulatedState();
-  const tokenMetadata: TokenEventMetadata = { vendor, model: eventModel };
+  const tokenMetadata: SpawnTokenMetadata = { vendor, model: eventModel };
+  const useEventPipeline = config.useEventPipeline ?? false;
+
+  // Event pipeline: cross-retry accumulator that collects events from all attempts.
+  // Spin detection uses the per-attempt accumulator; budget checking uses this
+  // cross-retry accumulator so it sees total token usage across all retries.
+  const runAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
 
   // Start heartbeat — writes lastActivityAt to disk periodically so the CLI
   // subprocess doesn't appear stale to the web dashboard during long tool calls.
   const heartbeat = startHeartbeat(henchDir, run);
+
+  // Prompt section diagnostics — captured on first attempt, stored on run record.
+  let promptSectionDiagnostics: PromptSectionDiagnostic[] | undefined;
 
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
@@ -1138,20 +1249,50 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         ? boundedBriefText
         : boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns);
 
+      // Build the per-attempt PromptEnvelope. On the first attempt we use
+      // the base envelope from prepareBrief directly. On retries we replace
+      // the "brief" section with the retry-augmented prompt text.
+      const envelope = attempt === 0
+        ? baseEnvelope
+        : createPromptEnvelope([
+            { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
+            { name: "brief" as PromptSectionName, content: promptText } as PromptSection,
+          ]);
+
+      // Use the adapter to build the vendor-specific spawn configuration
+      const spawnConfig = adapter.buildSpawnConfig(envelope, policy, opts.model);
+
+      // Capture prompt section diagnostics on the first attempt for run-level storage.
+      // Log section names and byte sizes on every attempt for CLI observability.
+      const sectionDiags = extractPromptSectionDiagnostics(envelope);
+      if (attempt === 0) {
+        promptSectionDiagnostics = sectionDiags;
+      }
+
       section(`Agent Run${opts.model ? ` (${opts.model})` : ""}${attempt > 0 ? ` (retry ${attempt}/${retryConfig.maxRetries})` : ""}`);
       stream("CLI", `Spawning ${vendor}${opts.model ? ` (model: ${opts.model})` : ""}...`);
+      logPromptSections(sectionDiags);
 
-      const result = await dispatchVendorSpawn({
-        vendor,
-        systemPrompt,
-        promptText,
-        allowedTools,
-        projectDir,
-        tokenMetadata,
+      // Event pipeline: create a per-attempt accumulator. Events from this
+      // attempt are pushed here, then merged into runAccumulator after spawn.
+      const attemptAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
+
+      // Generic adapter-based spawn — replaces dispatchVendorSpawn
+      const result = await spawnWithAdapter({
+        adapter,
+        spawnConfig,
         cliBinary,
         cliEnv,
-        modelOverride: opts.model,
+        cwd: projectDir,
+        tokenMetadata,
+        useEventPipeline,
+        accumulator: attemptAccumulator,
       });
+
+      // Merge per-attempt events into the cross-retry accumulator
+      if (useEventPipeline && attemptAccumulator && runAccumulator) {
+        runAccumulator.push(...attemptAccumulator.events);
+      }
 
       accumulateResult(accumulated, result);
 
@@ -1163,6 +1304,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           tokenBudget: config.tokenBudget,
           review: opts.review,
           selfHeal: config.selfHeal,
+          attemptAccumulator,
+          runAccumulator,
         });
         if (action === "break") break;
       } else {
@@ -1189,6 +1332,25 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // Stop heartbeat before finalization
   heartbeat.stop();
+
+  // Attach accumulated events to the run record when the event pipeline is active.
+  // This enables post-hoc debugging via `hench show --events <run-id>`.
+  if (useEventPipeline && runAccumulator && runAccumulator.eventCount > 0) {
+    run.events = runAccumulator.events.map(toPersistedEvent);
+  }
+
+  // Attach prompt section diagnostics to the run record.
+  // Initialize diagnostics if not already present, then populate promptSections.
+  if (promptSectionDiagnostics) {
+    if (!run.diagnostics) {
+      run.diagnostics = {
+        tokenDiagnosticStatus: "unavailable",
+        parseMode: adapter.parseMode,
+        notes: [],
+      };
+    }
+    run.diagnostics.promptSections = promptSectionDiagnostics;
+  }
 
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
   await finalizeRun({

@@ -51,6 +51,6 @@ features:
     link: /packages/web
   - icon: "🔌"
     title: MCP Integration
-    details: Rex and SourceVision expose MCP servers for Claude Code — use AI tools to query your codebase and manage your PRD directly.
+    details: Rex and SourceVision expose MCP servers for Claude Code and Codex — use AI tools to query your codebase and manage your PRD directly.
     link: /guide/mcp
 ---

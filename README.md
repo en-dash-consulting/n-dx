@@ -150,30 +150,35 @@ Both `n-dx` and `ndx` work identically. `sv` is an alias for `sourcevision`.
 
 ## MCP Servers
 
-Rex and SourceVision expose MCP servers for Claude Code tool use.
+Rex and SourceVision expose MCP servers for any MCP-compatible assistant (Claude Code, Codex, etc.).
 
 ### HTTP transport (recommended)
 
 ```sh
 ndx start .
+# Claude example:
 claude mcp add --transport http rex http://localhost:3117/mcp/rex
 claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
 ```
 
 ### stdio transport
 
-After installing `@n-dx/core`, the `rex` and `sv` commands are available:
+`ndx init` auto-registers stdio MCP servers for both Claude Code and Codex. After init, MCP works out of the box.
+
+Manual Claude registration:
 
 ```sh
 claude mcp add rex -- rex mcp .
 claude mcp add sourcevision -- sv mcp .
 ```
 
+Codex reads `.codex/config.toml` automatically — no manual registration required.
+
 ### Tools
 
-**Rex:** `rex_status`, `rex_next`, `rex_add`, `rex_update`, `rex_validate`, `rex_analyze`, `rex_recommend`
+**Rex:** `get_prd_status`, `get_next_task`, `add_item`, `update_task_status`, `edit_item`, `get_item`, `move_item`, `merge_items`, `get_recommendations`, `verify_criteria`, `reorganize`, `health`, `facets`, `append_log`, `sync_with_remote`, `get_capabilities`
 
-**SourceVision:** `sv_inventory`, `sv_imports`, `sv_zones`, `sv_components`, `sv_context`
+**SourceVision:** `get_overview`, `get_next_steps`, `get_zone`, `get_findings`, `get_file_info`, `search_files`, `get_imports`, `get_classifications`, `set_file_archetype`, `get_route_tree`
 
 ## Packages
 

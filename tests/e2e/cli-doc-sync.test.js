@@ -1,16 +1,18 @@
 /**
- * CLI documentation sync test — guards against CLAUDE.md listing commands
- * that no longer exist in the actual CLI.
+ * CLI documentation sync test — guards against CLAUDE.md / AGENTS.md listing
+ * commands that no longer exist in the actual CLI.
  *
- * Reads the "Direct Tool Access" command lists from CLAUDE.md and verifies
- * every listed command appears in the corresponding tool's --help output.
- * Also verifies every ndx orchestration command appears in `ndx help` output.
+ * Reads the "Direct Tool Access" command lists from CLAUDE.md and AGENTS.md
+ * and verifies every listed command appears in the corresponding tool's
+ * --help output. Also verifies every ndx orchestration command appears in
+ * `ndx help` output.
  *
  * When you add or remove a command from a tool CLI:
- *   1. Update the command list in CLAUDE.md (and CODEX.md per SYNC NOTICE).
+ *   1. Update the command list in CLAUDE.md and AGENTS.md (they are generated
+ *      from assistant-assets/project-guidance.md — edit the shared source).
  *   2. Run this test to confirm the docs match the new CLI surface.
  *
- * The test does NOT fail when the CLI has commands that CLAUDE.md omits —
+ * The test does NOT fail when the CLI has commands that the docs omit —
  * that is a gap, not a staleness problem. It only catches stale references
  * (commands documented but removed from the CLI).
  */
@@ -94,7 +96,7 @@ function parseOrchestrationCommands(content) {
 // ── Read docs once ────────────────────────────────────────────────────────
 
 const claudeMd = readFileSync(join(root, "CLAUDE.md"), "utf-8");
-const codexMd = readFileSync(join(root, "CODEX.md"), "utf-8");
+const agentsMd = readFileSync(join(root, "AGENTS.md"), "utf-8");
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
@@ -188,16 +190,16 @@ describe("cli-doc-sync: CLAUDE.md command lists match CLI --help", () => {
   });
 });
 
-// ── CODEX.md must mirror CLAUDE.md command lists ──────────────────────────
+// ── AGENTS.md must mirror CLAUDE.md command lists ─────────────────────────
 
-describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
+describe("cli-doc-sync: AGENTS.md command lists match CLI --help", () => {
   // ── ndx orchestration commands ──────────────────────────────────────────
 
   describe("ndx orchestration commands", () => {
-    const documented = parseOrchestrationCommands(codexMd);
+    const documented = parseOrchestrationCommands(agentsMd);
     const helpOutput = getHelpOutput("packages/core", ["help"]);
 
-    it("parses at least 10 orchestration commands from CODEX.md", () => {
+    it("parses at least 10 orchestration commands from AGENTS.md", () => {
       expect(documented.length).toBeGreaterThanOrEqual(10);
     });
 
@@ -205,8 +207,8 @@ describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
       it(`"${cmd}" appears in ndx help output`, () => {
         expect(
           helpOutput.includes(cmd),
-          `CODEX.md lists "ndx ${cmd}" but it does not appear in \`ndx help\` output.\n` +
-            `Update CODEX.md (and CLAUDE.md per SYNC NOTICE) to reflect the current CLI surface.\n\n` +
+          `AGENTS.md lists "ndx ${cmd}" but it does not appear in \`ndx help\` output.\n` +
+            `Update assistant-assets/project-guidance.md and regenerate via 'ndx init'.\n\n` +
             `ndx help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
         ).toBe(true);
       });
@@ -216,10 +218,10 @@ describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
   // ── rex subcommands ──────────────────────────────────────────────────────
 
   describe("rex subcommands", () => {
-    const documented = parseDocCommandList(codexMd, "Rex");
+    const documented = parseDocCommandList(agentsMd, "Rex");
     const helpOutput = getHelpOutput("packages/rex");
 
-    it("parses at least 10 rex commands from CODEX.md", () => {
+    it("parses at least 10 rex commands from AGENTS.md", () => {
       expect(documented.length).toBeGreaterThanOrEqual(10);
     });
 
@@ -227,8 +229,8 @@ describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
       it(`"${cmd}" appears in rex --help output`, () => {
         expect(
           helpOutput.includes(cmd),
-          `CODEX.md lists rex command "${cmd}" but it does not appear in \`rex --help\` output.\n` +
-            `Update CODEX.md (and CLAUDE.md per SYNC NOTICE) to reflect the current CLI surface.\n\n` +
+          `AGENTS.md lists rex command "${cmd}" but it does not appear in \`rex --help\` output.\n` +
+            `Update assistant-assets/project-guidance.md and regenerate via 'ndx init'.\n\n` +
             `rex --help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
         ).toBe(true);
       });
@@ -238,10 +240,10 @@ describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
   // ── sourcevision subcommands ─────────────────────────────────────────────
 
   describe("sourcevision subcommands", () => {
-    const documented = parseDocCommandList(codexMd, "Sourcevision");
+    const documented = parseDocCommandList(agentsMd, "Sourcevision");
     const helpOutput = getHelpOutput("packages/sourcevision");
 
-    it("parses at least 6 sourcevision commands from CODEX.md", () => {
+    it("parses at least 6 sourcevision commands from AGENTS.md", () => {
       expect(documented.length).toBeGreaterThanOrEqual(6);
     });
 
@@ -249,8 +251,8 @@ describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
       it(`"${cmd}" appears in sourcevision --help output`, () => {
         expect(
           helpOutput.includes(cmd),
-          `CODEX.md lists sourcevision command "${cmd}" but it does not appear in \`sourcevision --help\` output.\n` +
-            `Update CODEX.md (and CLAUDE.md per SYNC NOTICE) to reflect the current CLI surface.\n\n` +
+          `AGENTS.md lists sourcevision command "${cmd}" but it does not appear in \`sourcevision --help\` output.\n` +
+            `Update assistant-assets/project-guidance.md and regenerate via 'ndx init'.\n\n` +
             `sourcevision --help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
         ).toBe(true);
       });
@@ -260,10 +262,10 @@ describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
   // ── hench subcommands ────────────────────────────────────────────────────
 
   describe("hench subcommands", () => {
-    const documented = parseDocCommandList(codexMd, "Hench");
+    const documented = parseDocCommandList(agentsMd, "Hench");
     const helpOutput = getHelpOutput("packages/hench");
 
-    it("parses at least 4 hench commands from CODEX.md", () => {
+    it("parses at least 4 hench commands from AGENTS.md", () => {
       expect(documented.length).toBeGreaterThanOrEqual(4);
     });
 
@@ -271,8 +273,8 @@ describe("cli-doc-sync: CODEX.md command lists match CLI --help", () => {
       it(`"${cmd}" appears in hench --help output`, () => {
         expect(
           helpOutput.includes(cmd),
-          `CODEX.md lists hench command "${cmd}" but it does not appear in \`hench --help\` output.\n` +
-            `Update CODEX.md (and CLAUDE.md per SYNC NOTICE) to reflect the current CLI surface.\n\n` +
+          `AGENTS.md lists hench command "${cmd}" but it does not appear in \`hench --help\` output.\n` +
+            `Update assistant-assets/project-guidance.md and regenerate via 'ndx init'.\n\n` +
             `hench --help output (first 1200 chars):\n${helpOutput.slice(0, 1200)}`,
         ).toBe(true);
       });

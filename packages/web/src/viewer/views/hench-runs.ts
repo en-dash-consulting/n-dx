@@ -56,6 +56,20 @@ interface RunSummary {
       toolCallsTotal: number;
     };
   };
+  /** Vendor active for this run (e.g. "claude", "codex"). */
+  vendor?: string;
+  /** Token diagnostic status: complete, partial, or unavailable. */
+  tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
+}
+
+interface RunDiagnosticsData {
+  tokenDiagnosticStatus: "complete" | "partial" | "unavailable";
+  parseMode: string;
+  notes: string[];
+  promptSections?: Array<{ name: string; byteLength: number }>;
+  vendor?: string;
+  sandbox?: string;
+  approvals?: string;
 }
 
 interface RunDetail extends RunSummary {
@@ -67,6 +81,7 @@ interface RunDetail extends RunSummary {
     cacheCreationInput?: number;
     cacheReadInput?: number;
   }>;
+  diagnostics?: RunDiagnosticsData;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -123,6 +138,23 @@ const STATUS_CONFIG: Record<string, { icon: string; label: string; color: string
 
 function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] ?? { icon: "○", label: status, color: "var(--text-dim)" };
+}
+
+const TOKEN_DIAG_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
+  complete: { icon: "●", label: "Complete", color: "var(--green)" },
+  partial: { icon: "◐", label: "Partial", color: "var(--orange)" },
+  unavailable: { icon: "○", label: "Unavailable", color: "var(--text-dim)" },
+};
+
+function getTokenDiagConfig(status?: string) {
+  if (!status) return null;
+  return TOKEN_DIAG_CONFIG[status] ?? null;
+}
+
+function fmtBytes(n: number): string {
+  if (n >= 1_048_576) return `${(n / 1_048_576).toFixed(1)} MB`;
+  if (n >= 1_024) return `${(n / 1_024).toFixed(1)} KB`;
+  return `${n} B`;
 }
 
 const STALE_THRESHOLD_MS = 5 * 60 * 1000;
@@ -235,6 +267,18 @@ function RunCard({ run, isSelected, isHighlighted, onClick, navigateTo, cardRef 
       h("span", { class: "hench-run-chip" }, `${run.turns} turns`),
       h("span", { class: "hench-run-chip" }, fmtTokens(totalTokens) + " tokens"),
       h("span", { class: `hench-run-model hench-run-model-${run.model}` }, run.model),
+      run.vendor
+        ? h("span", { class: `hench-run-vendor hench-run-vendor-${run.vendor}` }, run.vendor)
+        : null,
+      (() => {
+        const diag = getTokenDiagConfig(run.tokenDiagnosticStatus);
+        return diag
+          ? h("span", {
+              class: `hench-run-token-diag hench-run-token-diag-${run.tokenDiagnosticStatus}`,
+              title: `Token data: ${diag.label}`,
+            }, `${diag.icon} ${diag.label}`)
+          : null;
+      })(),
       counts && counts.filesChanged > 0
         ? h("span", { class: "hench-run-chip" },
             `${counts.filesChanged} file${counts.filesChanged === 1 ? "" : "s"} changed`,
@@ -399,6 +443,75 @@ function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: ()
       ),
     ),
 
+    // Vendor Diagnostics
+    run.diagnostics
+      ? h("div", { class: "hench-detail-section" },
+          h("h3", null, "Vendor Diagnostics"),
+          h("div", { class: "hench-diagnostics-grid" },
+            run.diagnostics.vendor
+              ? h("div", { class: "hench-diag-item" },
+                  h("span", { class: "hench-diag-label" }, "Vendor"),
+                  h("span", { class: `hench-diag-value hench-diag-vendor hench-diag-vendor-${run.diagnostics.vendor}` },
+                    run.diagnostics.vendor,
+                  ),
+                )
+              : null,
+            h("div", { class: "hench-diag-item" },
+              h("span", { class: "hench-diag-label" }, "Token Status"),
+              (() => {
+                const diag = getTokenDiagConfig(run.diagnostics.tokenDiagnosticStatus);
+                return diag
+                  ? h("span", {
+                      class: `hench-diag-value hench-diag-token-status hench-diag-token-status-${run.diagnostics.tokenDiagnosticStatus}`,
+                    }, `${diag.icon} ${diag.label}`)
+                  : h("span", { class: "hench-diag-value" }, "—");
+              })(),
+            ),
+            h("div", { class: "hench-diag-item" },
+              h("span", { class: "hench-diag-label" }, "Parse Mode"),
+              h("span", { class: "hench-diag-value hench-diag-mono" }, run.diagnostics.parseMode),
+            ),
+            run.diagnostics.sandbox
+              ? h("div", { class: "hench-diag-item" },
+                  h("span", { class: "hench-diag-label" }, "Sandbox"),
+                  h("span", { class: "hench-diag-value" }, run.diagnostics.sandbox),
+                )
+              : null,
+            run.diagnostics.approvals
+              ? h("div", { class: "hench-diag-item" },
+                  h("span", { class: "hench-diag-label" }, "Approvals"),
+                  h("span", { class: "hench-diag-value" }, run.diagnostics.approvals),
+                )
+              : null,
+          ),
+          // Diagnostic notes
+          run.diagnostics.notes && run.diagnostics.notes.length > 0
+            ? h("div", { class: "hench-diag-notes" },
+                h("span", { class: "hench-diag-notes-label" }, "Notes"),
+                h("ul", { class: "hench-diag-notes-list" },
+                  run.diagnostics.notes.map((note, i) =>
+                    h("li", { key: i }, note),
+                  ),
+                ),
+              )
+            : null,
+          // Prompt sections
+          run.diagnostics.promptSections && run.diagnostics.promptSections.length > 0
+            ? h("div", { class: "hench-diag-prompt-sections" },
+                h("span", { class: "hench-diag-prompt-label" }, "Prompt Sections"),
+                h("div", { class: "hench-diag-prompt-grid" },
+                  run.diagnostics.promptSections.map((section, i) =>
+                    h("div", { key: i, class: "hench-diag-prompt-item" },
+                      h("span", { class: "hench-diag-prompt-name" }, section.name),
+                      h("span", { class: "hench-diag-prompt-size" }, fmtBytes(section.byteLength)),
+                    ),
+                  ),
+                ),
+              )
+            : null,
+        )
+      : null,
+
     // Error message
     run.error
       ? h("div", { class: "hench-detail-section" },
@@ -462,6 +575,8 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
   const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [modelFilter, setModelFilter] = useState<string>("all");
   const [deepLinkError, setDeepLinkError] = useState<string | null>(null);
   /** Tracks the run ID that was deep-linked to, for highlight animation. */
   const [highlightedRunId, setHighlightedRunId] = useState<string | null>(null);
@@ -574,14 +689,28 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
     );
   }, []);
 
-  // Filter runs by status
+  // Filter runs by status, vendor, and model
   const filteredRuns = useMemo(() => {
-    if (statusFilter === "all") return runs;
-    if (statusFilter === "failed") {
-      return runs.filter((r) => r.status === "failed" || r.status === "error");
-    }
-    return runs.filter((r) => r.status === statusFilter);
-  }, [runs, statusFilter]);
+    return runs.filter((r) => {
+      // Status filter
+      if (statusFilter !== "all") {
+        if (statusFilter === "failed") {
+          if (r.status !== "failed" && r.status !== "error") return false;
+        } else if (r.status !== statusFilter) {
+          return false;
+        }
+      }
+      // Vendor filter
+      if (vendorFilter !== "all") {
+        if ((r.vendor ?? "unknown") !== vendorFilter) return false;
+      }
+      // Model filter
+      if (modelFilter !== "all") {
+        if (r.model !== modelFilter) return false;
+      }
+      return true;
+    });
+  }, [runs, statusFilter, vendorFilter, modelFilter]);
 
   // Status counts for the filter buttons
   const statusCounts = useMemo(() => {
@@ -592,6 +721,19 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       else if (r.status === "running" || r.status === "in_progress") counts.running++;
     }
     return counts;
+  }, [runs]);
+
+  // Unique vendors and models for filter dropdowns
+  const uniqueVendors = useMemo(() => {
+    const vendors = new Set<string>();
+    for (const r of runs) vendors.add(r.vendor ?? "unknown");
+    return Array.from(vendors).sort();
+  }, [runs]);
+
+  const uniqueModels = useMemo(() => {
+    const models = new Set<string>();
+    for (const r of runs) models.add(r.model);
+    return Array.from(models).sort();
   }, [runs]);
 
   // Scroll the deep-linked run card into view when it renders
@@ -728,6 +870,34 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
             : null,
         ),
       ),
+      // Vendor filter — only show when multiple vendors exist
+      uniqueVendors.length > 1
+        ? h("select", {
+            class: "hench-filter-select",
+            value: vendorFilter,
+            onChange: (e: Event) => setVendorFilter((e.target as HTMLSelectElement).value),
+            "aria-label": "Filter by vendor",
+          },
+            h("option", { value: "all" }, "All Vendors"),
+            uniqueVendors.map((v) =>
+              h("option", { key: v, value: v }, v),
+            ),
+          )
+        : null,
+      // Model filter — only show when multiple models exist
+      uniqueModels.length > 1
+        ? h("select", {
+            class: "hench-filter-select",
+            value: modelFilter,
+            onChange: (e: Event) => setModelFilter((e.target as HTMLSelectElement).value),
+            "aria-label": "Filter by model",
+          },
+            h("option", { value: "all" }, "All Models"),
+            uniqueModels.map((m) =>
+              h("option", { key: m, value: m }, m),
+            ),
+          )
+        : null,
     ),
 
     // Runs list

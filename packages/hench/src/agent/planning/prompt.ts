@@ -1,4 +1,7 @@
-import type { HenchConfig, TaskBriefProject } from "../../schema/index.js";
+import type { HenchConfig, TaskBrief, TaskBriefProject } from "../../schema/index.js";
+import type { PromptEnvelope } from "../../prd/llm-gateway.js";
+import { createPromptEnvelope } from "../../prd/llm-gateway.js";
+import { buildBriefSections } from "./brief.js";
 
 // ---------------------------------------------------------------------------
 // Go-specific prompt context
@@ -133,4 +136,40 @@ export function buildSystemPrompt(
   }
 
   return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Prompt envelope builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a complete {@link PromptEnvelope} from a task brief and agent config.
+ *
+ * Composes:
+ * - **system** section from {@link buildSystemPrompt}
+ * - **brief** (and future: workflow, files, validation, completion) sections
+ *   from {@link buildBriefSections}
+ *
+ * Empty sections are filtered out by {@link createPromptEnvelope}, so only
+ * populated sections appear in the envelope. Section names follow the
+ * canonical set: system, workflow, brief, files, validation, completion.
+ *
+ * The returned envelope is a structured intermediate representation.
+ * Vendor adapters translate it into their native delivery format via
+ * {@link assemblePrompt} (from runtime-contract.ts).
+ *
+ * @see buildBriefSections in brief.ts — brief-side section contribution
+ * @see createPromptEnvelope in runtime-contract.ts — factory with empty-section filtering
+ */
+export function buildPromptEnvelope(
+  brief: TaskBrief,
+  config: HenchConfig,
+): PromptEnvelope {
+  const systemContent = buildSystemPrompt(brief.project, config);
+  const briefSections = buildBriefSections(brief);
+
+  return createPromptEnvelope([
+    { name: "system", content: systemContent },
+    ...briefSections,
+  ]);
 }

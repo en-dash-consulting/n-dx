@@ -72,7 +72,7 @@
           "output": 100
         },
         "total": 350,
-        "diagnostic": null
+        "diagnosticStatus": "complete"
       }
     },
     {
@@ -91,11 +91,11 @@
           "output": 8
         },
         "total": 50,
-        "diagnostic": null
+        "diagnosticStatus": "complete"
       }
     },
     {
-      "name": "missing_usage_returns_zero_with_diagnostic",
+      "name": "missing_usage_returns_zero_with_unavailable_status",
       "payload": {
         "status": "completed",
         "result": "done"
@@ -106,11 +106,11 @@
           "output": 0
         },
         "total": 0,
-        "diagnostic": "codex_usage_missing"
+        "diagnosticStatus": "unavailable"
       }
     },
     {
-      "name": "empty_usage_object_returns_zero_with_diagnostic",
+      "name": "empty_usage_object_returns_zero_with_unavailable_status",
       "payload": {
         "response": {
           "usage": {}
@@ -122,7 +122,7 @@
           "output": 0
         },
         "total": 0,
-        "diagnostic": "codex_usage_missing"
+        "diagnosticStatus": "unavailable"
       }
     }
   ]

@@ -90,6 +90,24 @@ export interface HenchConfig {
   selfHeal?: boolean;
   /** Detected project language. Drives guard defaults during init. */
   language?: ProjectLanguage;
+  /**
+   * When true, the CLI loop uses EventAccumulator for result accumulation
+   * instead of inline SpawnResult mutation. Spin detection and token budget
+   * checks operate on the RuntimeEvent stream via the accumulator.
+   *
+   * This is a migration flag — both paths produce equivalent run records.
+   * Will be removed once the event pipeline is validated in production.
+   */
+  useEventPipeline?: boolean;
+  /**
+   * When true, the API loop resolves the LLM provider via ProviderRegistry
+   * instead of a hardcoded Claude vendor check. Enables registry-based
+   * provider resolution for future multi-vendor API support.
+   *
+   * This is a migration flag — both paths produce identical results for
+   * Claude. Will be removed once the registry path is validated.
+   */
+  useRegistryProvider?: boolean;
   /** Discovered claude CLI path, persisted by ndx init to avoid re-discovery on every run. */
   claudePath?: string;
 }
@@ -188,6 +206,13 @@ export interface TurnTokenUsage {
   vendor?: string;
   /** Model used for this token event. */
   model?: string;
+  /**
+   * Diagnostic status of token usage data for this turn.
+   * - `complete` — both input and output fields were present and numeric
+   * - `partial` — only one of input/output was present; the other was backfilled to 0
+   * - `unavailable` — neither field was present; values are synthetic zeros
+   */
+  diagnosticStatus?: "complete" | "partial" | "unavailable";
 }
 
 export interface CommandRecord {

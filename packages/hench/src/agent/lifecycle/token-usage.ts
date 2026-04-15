@@ -1,13 +1,43 @@
+/**
+ * Token usage utilities for the hench agent loop.
+ *
+ * This module re-exports canonical parsing functions from @n-dx/llm-client
+ * via the llm-gateway, and provides hench-specific aggregation and
+ * formatting utilities.
+ *
+ * ## Vendor-neutral diagnostics
+ *
+ * Token parsing uses the shared {@link TokenDiagnosticStatus} type from
+ * `@n-dx/llm-client/runtime-contract` instead of hench-local string
+ * literals. The `CodexTokenMapping` type is re-exported from the foundation
+ * layer and uses `diagnosticStatus` instead of the previous `diagnostic`
+ * field, making Codex usage diagnostics part of the same taxonomy as
+ * Claude's diagnostic-aware parsers.
+ */
+
 import type { TokenUsage } from "../../schema/index.js";
+import type { TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping } from "../../prd/llm-gateway.js";
 import {
   parseApiTokenUsage as parseTokenUsage,
+  parseApiTokenUsageWithDiagnostic as parseTokenUsageWithDiagnostic,
   parseStreamTokenUsage,
+  parseStreamTokenUsageWithDiagnostic,
+  mapCodexUsageToTokenUsage,
 } from "../../prd/llm-gateway.js";
 
 // Re-export parsing functions from the canonical source (@n-dx/llm-client).
 // `parseTokenUsage` is an alias for `parseApiTokenUsage` — same function,
 // kept here for backward-compatible imports within hench.
-export { parseTokenUsage, parseStreamTokenUsage };
+export {
+  parseTokenUsage,
+  parseTokenUsageWithDiagnostic,
+  parseStreamTokenUsage,
+  parseStreamTokenUsageWithDiagnostic,
+  mapCodexUsageToTokenUsage,
+};
+
+// Re-export diagnostic types for consumers within hench.
+export type { TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping };
 
 // ── Aggregate token usage ──
 
@@ -18,72 +48,6 @@ export interface AggregateTokenUsage {
   outputTokens: number;
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
-}
-
-export type CodexUsageDiagnostic = "codex_usage_missing";
-
-export interface CodexTokenMapping {
-  usage: TokenUsage;
-  total: number;
-  diagnostic?: CodexUsageDiagnostic;
-}
-
-function asUsageRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
-}
-
-function readNumber(obj: Record<string, unknown>, keys: string[]): number | undefined {
-  for (const key of keys) {
-    const value = obj[key];
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Map Codex usage payload fields into Hench's shared token usage shape.
- *
- * Explicit field mapping:
- * - input: `input_tokens` | `prompt_tokens`
- * - output: `output_tokens` | `completion_tokens`
- * - total: `total_tokens` fallback, otherwise `input + output`
- *
- * When usage is missing, returns zeros and a non-fatal diagnostic flag.
- */
-export function mapCodexUsageToTokenUsage(raw: unknown): CodexTokenMapping {
-  const top = asUsageRecord(raw);
-  const usage = asUsageRecord(top?.usage)
-    ?? asUsageRecord(asUsageRecord(top?.response)?.usage)
-    ?? asUsageRecord(asUsageRecord(top?.data)?.usage);
-
-  if (!usage && !top) {
-    return {
-      usage: { input: 0, output: 0 },
-      total: 0,
-      diagnostic: "codex_usage_missing",
-    };
-  }
-
-  const source = usage ?? top ?? {};
-
-  const input = readNumber(source, ["input_tokens", "prompt_tokens", "input"]) ?? 0;
-  const output = readNumber(source, ["output_tokens", "completion_tokens", "output"]) ?? 0;
-  const total = readNumber(source, ["total_tokens", "total"]) ?? (input + output);
-
-  const hasUsageFields = usage
-    ? input > 0 || output > 0 || total > 0
-    : readNumber(source, ["input_tokens", "prompt_tokens", "output_tokens", "completion_tokens", "total_tokens"]) !== undefined;
-
-  return {
-    usage: { input, output },
-    total,
-    ...(hasUsageFields ? {} : { diagnostic: "codex_usage_missing" }),
-  };
 }
 
 /** Create an empty AggregateTokenUsage accumulator. */

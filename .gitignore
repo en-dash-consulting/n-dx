@@ -6,6 +6,7 @@ package-lock.json
 .hench/locks/
 .run-logs/
 .n-dx.json
+.n-dx.local.json
 .n-dx2.json
 .n-dx-web.pid
 .n-dx-web.port
@@ -21,6 +22,7 @@ packages/rex/.rex/execution-log*.jsonl
 ndx-export/
 .ndx-deploy-tmp/
 .claude/settings.local.json
+.claude/skills/
 .claude/worktrees/
 docs/.vitepress/dist/
 docs/.vitepress/cache/

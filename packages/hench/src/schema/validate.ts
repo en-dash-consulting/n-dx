@@ -67,6 +67,8 @@ export const HenchConfigSchema = z.object({
   loopPauseMs: z.number().int().nonnegative().optional().default(2000),
   maxFailedAttempts: z.number().int().positive().optional().default(3),
   language: ProjectLanguageSchema,
+  useEventPipeline: z.boolean().optional(),
+  useRegistryProvider: z.boolean().optional(),
   claudePath: z.string().optional(),
 });
 
@@ -87,6 +89,8 @@ const TokenUsageSchema = z.object({
   cacheReadInput: z.number().optional(),
 });
 
+const TokenDiagnosticStatusSchema = z.enum(["complete", "partial", "unavailable"]);
+
 const TurnTokenUsageSchema = z.object({
   turn: z.number(),
   input: z.number(),
@@ -95,6 +99,7 @@ const TurnTokenUsageSchema = z.object({
   cacheReadInput: z.number().optional(),
   vendor: z.string().optional(),
   model: z.string().optional(),
+  diagnosticStatus: TokenDiagnosticStatusSchema.optional(),
 });
 
 const CommandRecordSchema = z.object({
@@ -143,6 +148,45 @@ const RunMemoryStatsSchema = z.object({
   systemTotalBytes: z.number(),
 });
 
+const PromptSectionDiagnosticSchema = z.object({
+  name: z.string(),
+  byteLength: z.number().int().nonnegative(),
+});
+
+const RunDiagnosticsSchema = z.object({
+  tokenDiagnosticStatus: TokenDiagnosticStatusSchema,
+  parseMode: z.string(),
+  notes: z.array(z.string()),
+  promptSections: z.array(PromptSectionDiagnosticSchema).optional(),
+  vendor: z.string().optional(),
+  sandbox: z.string().optional(),
+  approvals: z.string().optional(),
+});
+
+const PersistedRuntimeEventSchema = z.object({
+  type: z.string(),
+  vendor: z.string(),
+  turn: z.number(),
+  timestamp: z.string(),
+  text: z.string().optional(),
+  toolCall: z.object({
+    tool: z.string(),
+    input: z.record(z.unknown()),
+  }).optional(),
+  toolResult: z.object({
+    tool: z.string(),
+    output: z.string(),
+    durationMs: z.number(),
+  }).optional(),
+  tokenUsage: TokenUsageSchema.optional(),
+  failure: z.object({
+    category: z.string(),
+    message: z.string(),
+    vendorDetail: z.string().optional(),
+  }).optional(),
+  completionSummary: z.string().optional(),
+});
+
 export const RunRecordSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -161,6 +205,8 @@ export const RunRecordSchema = z.object({
   retryAttempts: z.number().int().nonnegative().optional(),
   structuredSummary: RunSummaryDataSchema.optional(),
   memoryStats: RunMemoryStatsSchema.optional(),
+  diagnostics: RunDiagnosticsSchema.optional(),
+  events: z.array(PersistedRuntimeEventSchema).optional(),
 });
 
 export function validateConfig(

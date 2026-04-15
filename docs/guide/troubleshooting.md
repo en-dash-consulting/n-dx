@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Common issues and how to fix them. If your issue isn't listed here, use `/ndx-feedback` in Claude Code to report it — it'll file a GitHub issue with your environment details automatically.
+Common issues and how to fix them. If your issue isn't listed here, use the `/ndx-feedback` skill in your assistant (Claude Code or Codex) to report it — it'll file a GitHub issue with your environment details automatically.
 
 ## "Unknown command" when running rex/sourcevision/hench commands
 
@@ -91,7 +91,7 @@ ndx start stop .
 
 ## MCP tools not updating after rebuild
 
-**Problem**: After rebuilding packages, MCP tools in Claude Code still show old schemas or behavior.
+**Problem**: After rebuilding packages, MCP tools in Claude Code or Codex still show old schemas or behavior.
 
 **Cause**: The HTTP MCP server caches tool schemas at startup. Rebuilding packages doesn't automatically reload them.
 
@@ -101,11 +101,16 @@ ndx start stop .
 ndx start .
 ```
 
-If using stdio MCP transport, remove and re-add the servers:
+If using stdio MCP transport, re-run init to regenerate configs:
+```sh
+ndx init .   # re-registers Claude MCP servers, regenerates .codex/config.toml
+```
+
+For Claude Code specifically, you can also remove and re-add servers manually:
 ```sh
 claude mcp remove rex
 claude mcp remove sourcevision
-ndx init .   # re-registers MCP servers
+ndx init .
 ```
 
 ## Analysis takes a long time

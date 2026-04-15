@@ -535,9 +535,10 @@ function logStartup(
   if (ctx.scope) console.log(`Scope: ${ctx.scope} (standalone mode)`);
   if (ctx.dev) console.log("Dev mode: live reload enabled");
   console.log("");
-  console.log("Claude Code MCP setup:");
-  console.log(`  claude mcp add --transport http rex http://localhost:${actualPort}/mcp/rex`);
-  console.log(`  claude mcp add --transport http sourcevision http://localhost:${actualPort}/mcp/sourcevision`);
+  console.log("MCP setup:");
+  console.log("  Claude:  claude mcp add --transport http rex http://localhost:" + actualPort + "/mcp/rex");
+  console.log("           claude mcp add --transport http sourcevision http://localhost:" + actualPort + "/mcp/sourcevision");
+  console.log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   console.log("");
   console.log("Press Ctrl+C to stop.");
 }

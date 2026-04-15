@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   parseApiTokenUsage,
+  parseApiTokenUsageWithDiagnostic,
   parseCliTokenUsage,
+  parseCliTokenUsageWithDiagnostic,
   parseStreamTokenUsage,
+  parseStreamTokenUsageWithDiagnostic,
+  mapCodexUsageToTokenUsage,
 } from "../../src/token-usage.js";
 
 // ── parseApiTokenUsage (Anthropic SDK response.usage) ────────────────────────
@@ -260,5 +264,205 @@ describe("parseStreamTokenUsage", () => {
       usage: { total_output_tokens: 300 },
     });
     expect(usage).toEqual({ input: 0, output: 300 });
+  });
+});
+
+// ── Diagnostic-aware parsers ─────────────────────────────────────────────────
+
+describe("parseApiTokenUsageWithDiagnostic", () => {
+  it("returns complete when both fields present", () => {
+    const result = parseApiTokenUsageWithDiagnostic({
+      input_tokens: 100,
+      output_tokens: 50,
+    });
+    expect(result.usage).toEqual({ input: 100, output: 50 });
+    expect(result.diagnosticStatus).toBe("complete");
+  });
+
+  it("returns partial when only input present", () => {
+    const result = parseApiTokenUsageWithDiagnostic({ input_tokens: 100 });
+    expect(result.usage).toEqual({ input: 100, output: 0 });
+    expect(result.diagnosticStatus).toBe("partial");
+  });
+
+  it("returns partial when only output present", () => {
+    const result = parseApiTokenUsageWithDiagnostic({ output_tokens: 50 });
+    expect(result.usage).toEqual({ input: 0, output: 50 });
+    expect(result.diagnosticStatus).toBe("partial");
+  });
+
+  it("returns unavailable when no fields present", () => {
+    const result = parseApiTokenUsageWithDiagnostic({});
+    expect(result.usage).toEqual({ input: 0, output: 0 });
+    expect(result.diagnosticStatus).toBe("unavailable");
+  });
+
+  it("returns unavailable when fields are non-numeric", () => {
+    const result = parseApiTokenUsageWithDiagnostic({
+      input_tokens: "bad" as unknown as number,
+      output_tokens: null as unknown as number,
+    });
+    expect(result.usage).toEqual({ input: 0, output: 0 });
+    expect(result.diagnosticStatus).toBe("unavailable");
+  });
+
+  it("includes cache fields in diagnostic result", () => {
+    const result = parseApiTokenUsageWithDiagnostic({
+      input_tokens: 100,
+      output_tokens: 50,
+      cache_creation_input_tokens: 30,
+    });
+    expect(result.usage.cacheCreationInput).toBe(30);
+    expect(result.diagnosticStatus).toBe("complete");
+  });
+});
+
+describe("parseCliTokenUsageWithDiagnostic", () => {
+  it("returns complete when both fields present", () => {
+    const result = parseCliTokenUsageWithDiagnostic({
+      input_tokens: 1000,
+      output_tokens: 200,
+    });
+    expect(result.usage).toEqual({ input: 1000, output: 200 });
+    expect(result.diagnosticStatus).toBe("complete");
+  });
+
+  it("returns complete with total_ prefixed fields", () => {
+    const result = parseCliTokenUsageWithDiagnostic({
+      total_input_tokens: 2000,
+      total_output_tokens: 500,
+    });
+    expect(result.usage).toEqual({ input: 2000, output: 500 });
+    expect(result.diagnosticStatus).toBe("complete");
+  });
+
+  it("returns unavailable when no token fields present", () => {
+    const result = parseCliTokenUsageWithDiagnostic({ result: "hello" });
+    expect(result.usage).toEqual({ input: 0, output: 0 });
+    expect(result.diagnosticStatus).toBe("unavailable");
+  });
+
+  it("returns partial when only one field present", () => {
+    const result = parseCliTokenUsageWithDiagnostic({ input_tokens: 100 });
+    expect(result.usage).toEqual({ input: 100, output: 0 });
+    expect(result.diagnosticStatus).toBe("partial");
+  });
+});
+
+describe("parseStreamTokenUsageWithDiagnostic", () => {
+  it("returns complete when both fields present", () => {
+    const result = parseStreamTokenUsageWithDiagnostic({
+      input_tokens: 1500,
+      output_tokens: 300,
+    });
+    expect(result.usage).toEqual({ input: 1500, output: 300 });
+    expect(result.diagnosticStatus).toBe("complete");
+  });
+
+  it("returns unavailable when no fields present", () => {
+    const result = parseStreamTokenUsageWithDiagnostic({
+      type: "result",
+      result: "text",
+    });
+    expect(result.usage).toEqual({ input: 0, output: 0 });
+    expect(result.diagnosticStatus).toBe("unavailable");
+  });
+
+  it("returns complete from nested usage object", () => {
+    const result = parseStreamTokenUsageWithDiagnostic({
+      type: "result",
+      usage: {
+        input_tokens: 800,
+        output_tokens: 200,
+      },
+    });
+    expect(result.usage).toEqual({ input: 800, output: 200 });
+    expect(result.diagnosticStatus).toBe("complete");
+  });
+
+  it("returns partial when only one nested field present", () => {
+    const result = parseStreamTokenUsageWithDiagnostic({
+      usage: { total_output_tokens: 300 },
+    });
+    expect(result.usage).toEqual({ input: 0, output: 300 });
+    expect(result.diagnosticStatus).toBe("partial");
+  });
+
+  it("returns unavailable when nested usage is not an object", () => {
+    const result = parseStreamTokenUsageWithDiagnostic({
+      type: "result",
+      usage: "not-an-object",
+    });
+    expect(result.usage).toEqual({ input: 0, output: 0 });
+    expect(result.diagnosticStatus).toBe("unavailable");
+  });
+});
+
+// ── mapCodexUsageToTokenUsage ────────────────────────────────────────────────
+
+describe("mapCodexUsageToTokenUsage", () => {
+  it("maps top-level Codex usage fields with complete status", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      usage: {
+        input_tokens: 1200,
+        output_tokens: 300,
+        total_tokens: 1500,
+      },
+    });
+    expect(mapped.usage).toEqual({ input: 1200, output: 300 });
+    expect(mapped.total).toBe(1500);
+    expect(mapped.diagnosticStatus).toBe("complete");
+  });
+
+  it("maps nested response.usage payloads", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      response: {
+        usage: {
+          prompt_tokens: 800,
+          completion_tokens: 200,
+        },
+      },
+    });
+    expect(mapped.usage).toEqual({ input: 800, output: 200 });
+    expect(mapped.total).toBe(1000);
+    expect(mapped.diagnosticStatus).toBe("complete");
+  });
+
+  it("returns unavailable when usage is absent", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      status: "completed",
+      result: "ok",
+    });
+    expect(mapped.usage).toEqual({ input: 0, output: 0 });
+    expect(mapped.total).toBe(0);
+    expect(mapped.diagnosticStatus).toBe("unavailable");
+  });
+
+  it("returns unavailable when input is null/undefined", () => {
+    const mapped = mapCodexUsageToTokenUsage(null);
+    expect(mapped.diagnosticStatus).toBe("unavailable");
+  });
+
+  it("returns unavailable when usage object is empty", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      response: { usage: {} },
+    });
+    expect(mapped.usage).toEqual({ input: 0, output: 0 });
+    expect(mapped.total).toBe(0);
+    expect(mapped.diagnosticStatus).toBe("unavailable");
+  });
+
+  it("maps data.usage nested path", () => {
+    const mapped = mapCodexUsageToTokenUsage({
+      data: {
+        usage: {
+          input_tokens: 50,
+          output_tokens: 25,
+        },
+      },
+    });
+    expect(mapped.usage).toEqual({ input: 50, output: 25 });
+    expect(mapped.total).toBe(75);
+    expect(mapped.diagnosticStatus).toBe("complete");
   });
 });

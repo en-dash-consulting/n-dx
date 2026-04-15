@@ -49,6 +49,8 @@ import type {
   CliProviderOptions,
   // codex-cli-provider.ts
   CodexCliProviderOptions,
+  // openai-api-provider.ts
+  OpenAiApiProviderOptions,
   // create-client.ts
   CreateClientOptions,
   // auth.ts
@@ -109,6 +111,13 @@ import {
   createCliClient,
   // codex-cli-provider.ts
   createCodexCliClient,
+  compileCodexPolicyFlags,
+  mapSandboxToCodexFlag,
+  mapApprovalToCodexFlag,
+  // openai-api-provider.ts
+  createOpenAiApiProvider,
+  resolveOpenAiApiKey,
+  parseOpenAiTokenUsage,
   // create-client.ts
   createClient,
   detectAuthMode,
@@ -206,6 +215,30 @@ describe("public API — function exports", () => {
 
   it("exports createCodexCliClient as a function", () => {
     expect(typeof createCodexCliClient).toBe("function");
+  });
+
+  it("exports compileCodexPolicyFlags as a function", () => {
+    expect(typeof compileCodexPolicyFlags).toBe("function");
+  });
+
+  it("exports mapSandboxToCodexFlag as a function", () => {
+    expect(typeof mapSandboxToCodexFlag).toBe("function");
+  });
+
+  it("exports mapApprovalToCodexFlag as a function", () => {
+    expect(typeof mapApprovalToCodexFlag).toBe("function");
+  });
+
+  it("exports createOpenAiApiProvider as a function", () => {
+    expect(typeof createOpenAiApiProvider).toBe("function");
+  });
+
+  it("exports resolveOpenAiApiKey as a function", () => {
+    expect(typeof resolveOpenAiApiKey).toBe("function");
+  });
+
+  it("exports parseOpenAiTokenUsage as a function", () => {
+    expect(typeof parseOpenAiTokenUsage).toBe("function");
   });
 
   it("exports loadClaudeConfig as a function", () => {

@@ -13,7 +13,7 @@ Welcome to the n-dx documentation. Use the sidebar or links below to navigate.
 - [Workflow](/guide/workflow) — The analyze-recommend-work loop
 - [Commands](/guide/commands) — Full command reference
 - [Configuration](/guide/configuration) — LLM vendor and tool settings
-- [MCP Integration](/guide/mcp) — Claude Code MCP server setup
+- [MCP Integration](/guide/mcp) — MCP server setup for Claude Code and Codex
 - [Self-Heal Loop](/guide/self-heal) — Automated iterative improvement
 - [Codebase Onboarding](/guide/onboarding) — Understand an unfamiliar codebase in under 30 minutes
 - [Run While You Sleep](/guide/overnight) — Autonomous overnight operation with guardrails

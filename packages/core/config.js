@@ -20,7 +20,21 @@ import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
-const LOCAL_PROJECT_CONFIG_FILE = ".n-dx.local.json";
+const LOCAL_CONFIG_FILE = ".n-dx.local.json";
+
+/**
+ * Keys that are machine-specific and should be written to .n-dx.local.json
+ * instead of .n-dx.json. These are settings that contain absolute paths or
+ * other values that differ per developer machine.
+ *
+ * Format: "section.dotted.path" — the section is the top-level key
+ * (e.g., "claude") and the dotted path is the setting within it.
+ */
+const MACHINE_LOCAL_KEYS = new Set([
+  "claude.cli_path",
+  "llm.claude.cli_path",
+  "llm.codex.cli_path",
+]);
 
 const PACKAGES = {
   rex: { dir: ".rex", file: "config.json" },
@@ -134,7 +148,7 @@ async function loadProjectConfigFile(dir, fileName) {
 
 async function loadProjectConfigLayers(dir) {
   const shared = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
-  const local = await loadProjectConfigFile(dir, LOCAL_PROJECT_CONFIG_FILE);
+  const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
   return {
     shared,
     local,
@@ -215,6 +229,40 @@ function isLocalProjectSetting(pkg, settingPath) {
   if (pkg === "claude") return settingPath === "cli_path";
   if (pkg === "llm") return settingPath.endsWith(".cli_path");
   return false;
+}
+
+/**
+ * Load the local .n-dx.local.json config from the project root.
+ * Returns an empty object if the file doesn't exist or is invalid.
+ * Missing file is a silent no-op.
+ */
+async function loadLocalConfig(dir) {
+  const configPath = join(dir, LOCAL_CONFIG_FILE);
+  if (!(await fileExists(configPath))) return {};
+  try {
+    return await loadJSON(configPath);
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Load the effective project config: .n-dx.json deep-merged with
+ * .n-dx.local.json (local wins).
+ */
+async function loadEffectiveProjectConfig(dir) {
+  const projectConfig = await loadProjectConfig(dir);
+  const localConfig = await loadLocalConfig(dir);
+  if (Object.keys(localConfig).length === 0) return projectConfig;
+  if (Object.keys(projectConfig).length === 0) return localConfig;
+  return deepMerge(projectConfig, localConfig);
+}
+
+/**
+ * Check if a key (in "section.path" format) should be written to .n-dx.local.json.
+ */
+function isMachineLocalKey(keyArg) {
+  return MACHINE_LOCAL_KEYS.has(keyArg);
 }
 
 /**
@@ -916,9 +964,14 @@ Project config (.n-dx.json):
       "llm":    { "vendor": "claude" }
     }
 
-  Machine-local overrides:
-  Place a .n-dx.local.json file at the project root for machine-specific settings
-  such as CLI binary paths. It deep-merges over .n-dx.json and should be gitignored.
+Local overrides (.n-dx.local.json):
+  Place a .n-dx.local.json file at the project root for machine-specific
+  settings (e.g. CLI paths with absolute locations). This file is gitignored
+  by default (added during ndx init) so each developer can have their own
+  settings without conflicts. Deep-merged over .n-dx.json (local wins).
+
+  Machine-specific keys (claude.cli_path, llm.claude.cli_path, llm.codex.cli_path)
+  are automatically written to .n-dx.local.json instead of .n-dx.json.
 
 Options:
   --json                   Output as JSON
@@ -1023,7 +1076,7 @@ async function resolvePositionalArgs(positional) {
 
 /** Load all package configs and project-level overrides. */
 async function loadAllConfigs(dir) {
-  const projectConfig = await loadProjectConfig(dir);
+  const projectConfig = await loadEffectiveProjectConfig(dir);
   const configs = {};
   const rawConfigs = {};
 
@@ -1217,7 +1270,7 @@ async function handleSetProjectSection(
   setByPath(configs[pkg], settingPath, coerced);
 
   const targetFile = isLocalProjectSetting(pkg, settingPath)
-    ? LOCAL_PROJECT_CONFIG_FILE
+    ? LOCAL_CONFIG_FILE
     : PROJECT_CONFIG_FILE;
   const configPath = join(dir, targetFile);
   const current = await loadProjectConfigFile(dir, targetFile);
@@ -1278,6 +1331,7 @@ async function handleSetProjectSection(
     setByPath(current.claude, legacySetting, coerced);
   }
 
+  // Write back to the appropriate file (local or project)
   await saveProjectJSON(configPath, current);
   console.log(`${keyArg} = ${formatValue(coerced)}`);
 

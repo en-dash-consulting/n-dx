@@ -92,10 +92,12 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "info, model, timing, turns, token usage, and the outcome.",
     options: [
       { flag: "--format=json", description: "Output as JSON" },
+      { flag: "--events", description: "Display the RuntimeEvent stream (requires useEventPipeline)" },
     ],
     examples: [
       { command: "hench show abc123", description: "Show run details" },
       { command: "hench show abc123 --format=json", description: "JSON output for scripting" },
+      { command: "hench show abc123 --events", description: "Display event stream for debugging" },
     ],
     related: ["status"],
   },

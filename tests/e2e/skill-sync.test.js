@@ -1,5 +1,5 @@
 /**
- * Validates that skill definitions in claude-integration.js stay in sync
+ * Validates that skill definitions in the assistant-assets manifest stay in sync
  * with the local .claude/skills/ files.
  *
  * When a skill is updated in one place but not the other, this test fails
@@ -7,117 +7,108 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { join } from "path";
+import {
+  getManifest,
+  getSkillNames,
+  getSkillBody,
+} from "../../assistant-assets/index.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
 /**
- * Extract the SKILLS object entries from claude-integration.js.
- * Evaluates the SKILLS constant to get properly rendered content.
- * Returns a Map of skill name → content string.
+ * List skill names from the assistant-assets/skills/ directory.
+ * Skills are stored as flat <name>.md files (e.g., ndx-plan.md).
  */
-function extractSkillsFromCI() {
-  const src = readFileSync(join(ROOT, "packages/core/claude-integration.js"), "utf-8");
-
-  const start = src.indexOf("const SKILLS = {");
-  if (start === -1) throw new Error("Could not find SKILLS object in claude-integration.js");
-
-  // Find the closing `};` for the SKILLS object
-  const end = src.indexOf("\n};", start) + 3;
-  const skillsSrc = src.substring(start, end);
-
-  // Evaluate to get rendered content (template literals resolved)
-  const SKILLS = new Function(skillsSrc.replace("const SKILLS =", "return"))();
-
-  const skills = new Map();
-  for (const [name, content] of Object.entries(SKILLS)) {
-    skills.set(name, String(content).trim());
-  }
-
-  return skills;
+function listSkillFiles() {
+  const skillsDir = join(ROOT, "assistant-assets", "skills");
+  if (!existsSync(skillsDir)) return [];
+  return readdirSync(skillsDir, { withFileTypes: true })
+    .filter((d) => d.isFile() && d.name.endsWith(".md"))
+    .map((d) => d.name.replace(/\.md$/, ""));
 }
 
-/**
- * Read all local skill files from .claude/skills/.
- * Returns a Map of skill name → content string.
- */
-function readLocalSkills() {
-  const skillsDir = join(ROOT, ".claude", "skills");
-  if (!existsSync(skillsDir)) return new Map();
+// ── Manifest structure validation ───────────────────────────────────────────
 
-  const skills = new Map();
-  for (const dir of readdirSync(skillsDir, { withFileTypes: true })) {
-    if (!dir.isDirectory()) continue;
-    const skillFile = join(skillsDir, dir.name, "SKILL.md");
-    if (existsSync(skillFile)) {
-      skills.set(dir.name, readFileSync(skillFile, "utf-8").trim());
+describe("assistant-assets manifest structure", () => {
+  const manifest = getManifest();
+
+  it("manifest has required top-level keys", () => {
+    expect(manifest).toHaveProperty("skills");
+    expect(manifest).toHaveProperty("mcpServers");
+    expect(manifest).toHaveProperty("vendors");
+  });
+
+  it("skills section has at least one entry", () => {
+    expect(Object.keys(manifest.skills).length).toBeGreaterThan(0);
+  });
+
+  it("every skill has a non-empty description", () => {
+    const bad = Object.entries(manifest.skills)
+      .filter(([, meta]) => !meta.description || meta.description.trim() === "")
+      .map(([name]) => name);
+    if (bad.length > 0) {
+      expect.fail(`Skills missing description: ${bad.join(", ")}`);
     }
-  }
+  });
 
-  return skills;
-}
+  it("every skill body file exists and is non-empty", () => {
+    const empty = [];
+    for (const name of getSkillNames()) {
+      const body = getSkillBody(name);
+      if (body.trim().length === 0) {
+        empty.push(name);
+      }
+    }
+    if (empty.length > 0) {
+      expect.fail(`Empty skill bodies: ${empty.join(", ")}`);
+    }
+  });
+
+  it("every skill file has a manifest entry", () => {
+    const fileNames = listSkillFiles();
+    const missing = fileNames.filter((f) => !manifest.skills[f]);
+    if (missing.length > 0) {
+      expect.fail(
+        `Skill files without manifest entries: ${missing.join(", ")}\n` +
+        "Add entries to assistant-assets/manifest.json.",
+      );
+    }
+  });
+});
 
 describe("skill file sync", () => {
-  const ciSkills = extractSkillsFromCI();
-  const localSkills = readLocalSkills();
+  const canonicalSkills = new Set(listSkillFiles());
+  const manifestSkillNames = new Set(getSkillNames());
 
-  it("claude-integration.js has entries for all local skills", () => {
+  it("canonical skill files exist for all manifest entries", () => {
     const missing = [];
-    for (const name of localSkills.keys()) {
-      if (!ciSkills.has(name) && name.includes("ndx")) {
+    for (const name of manifestSkillNames) {
+      if (!canonicalSkills.has(name)) {
         missing.push(name);
       }
     }
     if (missing.length > 0) {
       expect.fail(
-        `Local skills not in claude-integration.js: ${missing.join(", ")}\n` +
-        "Add them to the SKILLS object so ndx init installs them for all users.",
+        `Skills in manifest but not in assistant-assets/skills/: ${missing.join(", ")}\n` +
+        "Create matching assistant-assets/skills/<name>.md files.",
       );
     }
   });
 
-  it("local skills exist for all claude-integration.js entries", () => {
+  it("manifest has entries for all canonical skill files", () => {
     const missing = [];
-    for (const name of ciSkills.keys()) {
-      if (!localSkills.has(name)) {
+    for (const name of canonicalSkills) {
+      if (!manifestSkillNames.has(name)) {
         missing.push(name);
       }
     }
     if (missing.length > 0) {
       expect.fail(
-        `Skills in claude-integration.js but not in .claude/skills/: ${missing.join(", ")}\n` +
-        "Create matching .claude/skills/<name>/SKILL.md files.",
+        `Canonical skill files not in manifest: ${missing.join(", ")}\n` +
+        "Add them to assistant-assets/manifest.json so ndx init installs them for all users.",
       );
     }
   });
-
-  for (const [name] of localSkills) {
-    if (!ciSkills.has(name)) continue;
-
-    it(`"${name}" content matches between local and claude-integration.js`, () => {
-      const local = localSkills.get(name);
-      const ci = ciSkills.get(name);
-
-      // Normalize: arrow characters (→ vs ->), line endings, trailing whitespace
-      const normalize = (s) => s.replace(/→/g, "->").replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "");
-
-      if (normalize(local) !== normalize(ci)) {
-        // Find first difference for a useful error
-        const localLines = normalize(local).split("\n");
-        const ciLines = normalize(ci).split("\n");
-        let diffLine = -1;
-        for (let i = 0; i < Math.max(localLines.length, ciLines.length); i++) {
-          if (localLines[i] !== ciLines[i]) {
-            diffLine = i + 1;
-            break;
-          }
-        }
-        expect.fail(
-          `Skill "${name}" is out of sync (first difference at line ${diffLine}).\n` +
-          `Update claude-integration.js or .claude/skills/${name}/SKILL.md to match.`,
-        );
-      }
-    });
-  }
 });

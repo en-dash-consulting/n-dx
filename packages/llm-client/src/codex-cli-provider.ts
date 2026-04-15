@@ -3,6 +3,16 @@
  *
  * This provider implements the same client contract used by Claude providers:
  * a `complete()` method returning plain text and optional token usage.
+ *
+ * ## Execution policy compilation
+ *
+ * The provider compiles an {@link ExecutionPolicy} into Codex-specific CLI
+ * flags (`--sandbox`, `--approval-policy`) instead of relying on the
+ * `--full-auto` preset alias. This keeps the n-dx policy object as the
+ * single source of truth for permission intent.
+ *
+ * @see packages/llm-client/src/runtime-contract.ts — policy types
+ * @see docs/analysis/claude-codex-runtime-identity-discovery.md §7.1
  */
 
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -16,6 +26,8 @@ import type {
 } from "./types.js";
 import { ClaudeClientError } from "./types.js";
 import type { CodexConfig } from "./llm-types.js";
+import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-contract.js";
+import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
 import { NEWEST_MODELS } from "./config.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
@@ -38,13 +50,79 @@ const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_DELAY_MS = 10000;
 const DEFAULT_CODEX_BINARY = "codex";
-const DEFAULT_CODEX_MODEL = NEWEST_MODELS.codex;
+/**
+ * Default Codex model ID used when no model is explicitly configured.
+ *
+ * Exported so the catalog-runtime contract test can cross-reference this
+ * value against the orchestration-tier model catalog's `recommended` entry.
+ * @see tests/e2e/catalog-runtime-contract.test.js
+ */
+export const DEFAULT_CODEX_MODEL = NEWEST_MODELS.codex;
 
 export interface CodexCliProviderOptions {
   codexConfig?: CodexConfig;
+  /** Execution policy to compile into Codex CLI flags. Defaults to DEFAULT_EXECUTION_POLICY. */
+  policy?: ExecutionPolicy;
   maxRetries?: number;
   baseDelayMs?: number;
   maxDelayMs?: number;
+}
+
+// ── Policy flag compilation ──────────────────────────────────────────────
+
+/**
+ * Map an n-dx {@link SandboxMode} to the Codex CLI `--sandbox` flag value.
+ *
+ * @see docs/analysis/claude-codex-runtime-identity-discovery.md §6.3
+ */
+export function mapSandboxToCodexFlag(mode: SandboxMode): string {
+  switch (mode) {
+    case "read-only":
+      return "read-only";
+    case "workspace-write":
+      return "workspace-write";
+    case "danger-full-access":
+      return "full-access";
+  }
+}
+
+/**
+ * Map an n-dx {@link ApprovalPolicy} to the Codex CLI `--approval-policy` value.
+ *
+ * Mapping:
+ * - `"on-request"` → `"auto-edit"` (auto-apply edits, ask for shell commands)
+ * - `"never"` → `"full-auto"` (auto-approve everything — unattended execution)
+ */
+export function mapApprovalToCodexFlag(policy: ApprovalPolicy): string {
+  switch (policy) {
+    case "on-request":
+      return "auto-edit";
+    case "never":
+      return "full-auto";
+  }
+}
+
+/**
+ * Compile an n-dx {@link ExecutionPolicy} into Codex CLI flags.
+ *
+ * Replaces the `--full-auto` preset alias with explicit `--sandbox` and
+ * `--approval-policy` flags derived from the normalized policy object.
+ * This ensures the n-dx policy is the single source of truth — Codex CLI
+ * presets cannot silently override the intended execution envelope.
+ *
+ * @example
+ * ```ts
+ * compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)
+ * // → ["--sandbox", "workspace-write", "--approval-policy", "full-auto"]
+ * ```
+ */
+export function compileCodexPolicyFlags(policy: ExecutionPolicy): string[] {
+  return [
+    "--sandbox",
+    mapSandboxToCodexFlag(policy.sandbox),
+    "--approval-policy",
+    mapApprovalToCodexFlag(policy.approvals),
+  ];
 }
 
 function isDebugEnabled(): boolean {
@@ -93,13 +171,17 @@ async function spawnOnce(
   request: CompletionRequest,
   codexConfig?: CodexConfig,
   envOverride?: NodeJS.ProcessEnv,
+  policy?: ExecutionPolicy,
 ): Promise<CompletionResult> {
   const dir = await mkdtemp(join(tmpdir(), "ndx-codex-"));
   const outputPath = join(dir, "last-message.txt");
 
   try {
+    const effectivePolicy = policy ?? DEFAULT_EXECUTION_POLICY;
+    const policyFlags = compileCodexPolicyFlags(effectivePolicy);
     const args = [
       "exec",
+      ...policyFlags,
       "--skip-git-repo-check",
       "-m",
       request.model || resolveCodexModel(codexConfig),
@@ -193,7 +275,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         debugLog(`complete attempt=${attempt + 1}/${maxRetries + 1} model="${finalRequest.model}"`);
         try {
-          return await spawnOnce(cliBinary, finalRequest, options.codexConfig);
+          return await spawnOnce(cliBinary, finalRequest, options.codexConfig, undefined, options.policy);
         } catch (err) {
           lastError = err as Error;
           if (err instanceof ClaudeClientError) {
@@ -219,7 +301,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
             const env = { ...process.env };
             delete env.OPENAI_API_KEY;
             try {
-              return await spawnOnce(cliBinary, finalRequest, options.codexConfig, env);
+              return await spawnOnce(cliBinary, finalRequest, options.codexConfig, env, options.policy);
             } catch (retryErr) {
               lastError = retryErr as Error;
               debugLog(`retry without OPENAI_API_KEY failed: ${(retryErr as Error).message}`);

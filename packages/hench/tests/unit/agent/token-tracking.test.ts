@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   processStreamLine,
   type CliRunResult,
-} from "../../../src/agent/lifecycle/cli-loop.js";
+} from "../../../src/agent/lifecycle/event-accumulator.js";
 import type { TurnTokenUsage } from "../../../src/schema/v1.js";
 
 function makeResult(): CliRunResult {
@@ -50,6 +50,7 @@ describe("processStreamLine token tracking", () => {
       turn: 1,
       input: 1000,
       output: 500,
+      diagnosticStatus: "complete",
     });
   });
 
@@ -70,6 +71,7 @@ describe("processStreamLine token tracking", () => {
       turn: 1,
       input: 200,
       output: 100,
+      diagnosticStatus: "complete",
       vendor: "codex",
       model: "gpt-5-codex",
     });

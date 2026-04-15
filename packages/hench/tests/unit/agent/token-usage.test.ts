@@ -261,7 +261,7 @@ describe("mapCodexUsageToTokenUsage", () => {
 
     expect(mapped.usage).toEqual({ input: 1200, output: 300 });
     expect(mapped.total).toBe(1500);
-    expect(mapped.diagnostic).toBeUndefined();
+    expect(mapped.diagnosticStatus).toBe("complete");
   });
 
   it("maps nested response.usage payloads", () => {
@@ -276,7 +276,7 @@ describe("mapCodexUsageToTokenUsage", () => {
 
     expect(mapped.usage).toEqual({ input: 800, output: 200 });
     expect(mapped.total).toBe(1000);
-    expect(mapped.diagnostic).toBeUndefined();
+    expect(mapped.diagnosticStatus).toBe("complete");
   });
 
   it("uses top-level usage fields when usage object is absent", () => {
@@ -287,10 +287,10 @@ describe("mapCodexUsageToTokenUsage", () => {
 
     expect(mapped.usage).toEqual({ input: 55, output: 45 });
     expect(mapped.total).toBe(100);
-    expect(mapped.diagnostic).toBeUndefined();
+    expect(mapped.diagnosticStatus).toBe("complete");
   });
 
-  it("returns zero usage with diagnostic when usage is absent", () => {
+  it("returns zero usage with unavailable status when usage is absent", () => {
     const mapped = mapCodexUsageToTokenUsage({
       status: "completed",
       result: "ok",
@@ -298,10 +298,10 @@ describe("mapCodexUsageToTokenUsage", () => {
 
     expect(mapped.usage).toEqual({ input: 0, output: 0 });
     expect(mapped.total).toBe(0);
-    expect(mapped.diagnostic).toBe("codex_usage_missing");
+    expect(mapped.diagnosticStatus).toBe("unavailable");
   });
 
-  it("returns zero usage with diagnostic when usage object exists but is empty", () => {
+  it("returns zero usage with unavailable status when usage object exists but is empty", () => {
     const mapped = mapCodexUsageToTokenUsage({
       response: {
         usage: {},
@@ -311,7 +311,7 @@ describe("mapCodexUsageToTokenUsage", () => {
 
     expect(mapped.usage).toEqual({ input: 0, output: 0 });
     expect(mapped.total).toBe(0);
-    expect(mapped.diagnostic).toBe("codex_usage_missing");
+    expect(mapped.diagnosticStatus).toBe("unavailable");
   });
 });
 

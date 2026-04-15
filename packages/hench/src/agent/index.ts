@@ -27,6 +27,20 @@ export type { AgentLoopOptions, AgentLoopResult } from "./lifecycle/loop.js";
 export { cliLoop } from "./lifecycle/cli-loop.js";
 export type { CliLoopOptions, CliLoopResult } from "./lifecycle/cli-loop.js";
 
+// Vendor adapter interface
+export type { VendorAdapter, SpawnConfig } from "./lifecycle/vendor-adapter.js";
+
+// Vendor adapter factory + implementations
+export { resolveVendorAdapter, claudeCliAdapter, codexCliAdapter } from "./lifecycle/adapters/index.js";
+
+// Event accumulator
+export { EventAccumulator } from "./lifecycle/event-accumulator.js";
+export type {
+  AccumulatedTokenUsage,
+  AccumulatedToolCalls,
+  AccumulatedFailure,
+} from "./lifecycle/event-accumulator.js";
+
 // Token budget
 export { checkTokenBudget } from "./lifecycle/token-budget.js";
 export type { TokenBudgetResult } from "./lifecycle/token-budget.js";
@@ -51,14 +65,15 @@ export type { CodexCliTokenUsage } from "./lifecycle/codex-cli-token-parser.js";
 export {
   assembleTaskBrief,
   formatTaskBrief,
+  buildBriefSections,
   getActionableTasks,
   collectEpicTaskIds,
   TaskNotActionableError,
 } from "./planning/brief.js";
 export type { AssembleBriefOptions, ActionableTask } from "./planning/brief.js";
 
-// System prompt
-export { buildSystemPrompt } from "./planning/prompt.js";
+// System prompt + prompt envelope
+export { buildSystemPrompt, buildPromptEnvelope } from "./planning/prompt.js";
 
 // ── Analysis ──
 // Re-exported from analysis barrel (review, summary, stuck, spin, adaptive, workflow)

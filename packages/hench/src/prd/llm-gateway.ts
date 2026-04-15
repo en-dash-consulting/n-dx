@@ -107,7 +107,10 @@ export {
 // ---- Token usage parsing ----------------------------------------------------
 export {
   parseApiTokenUsage,
+  parseApiTokenUsageWithDiagnostic,
   parseStreamTokenUsage,
+  parseStreamTokenUsageWithDiagnostic,
+  mapCodexUsageToTokenUsage,
 } from "@n-dx/llm-client";
 
 // ---- Model resolution -------------------------------------------------------
@@ -125,7 +128,46 @@ export type { VendorModelResetResult } from "@n-dx/llm-client";
 // ---- Usage formatting -------------------------------------------------------
 export { formatUsage } from "@n-dx/llm-client";
 
+// ---- Runtime contract -------------------------------------------------------
+export {
+  DEFAULT_EXECUTION_POLICY,
+  CANONICAL_PROMPT_SECTIONS,
+  ALL_FAILURE_CATEGORIES,
+  createPromptEnvelope,
+  assemblePrompt,
+  mapErrorReasonToFailureCategory,
+  mapRunFailureToCategory,
+  classifyVendorError,
+  failureCategoryLabel,
+} from "@n-dx/llm-client";
+
+// ---- Codex policy compilation -----------------------------------------------
+export {
+  compileCodexPolicyFlags,
+  mapSandboxToCodexFlag,
+  mapApprovalToCodexFlag,
+} from "@n-dx/llm-client";
+
+// ---- Vendor-neutral tool schema ---------------------------------------------
+export {
+  toAnthropicToolDef,
+  toAnthropicToolDefs,
+  toOpenAiToolDef,
+  toOpenAiToolDefs,
+} from "@n-dx/llm-client";
+
+// ---- Provider registry ------------------------------------------------------
+export {
+  ProviderRegistry,
+  defaultRegistry,
+} from "@n-dx/llm-client";
+
 // ---- Type re-exports --------------------------------------------------------
+export type {
+  LLMProvider,
+  ProviderInfo,
+} from "@n-dx/llm-client";
+
 export type {
   ClaudeConfig,
   LLMConfig,
@@ -136,4 +178,22 @@ export type {
   SpawnToolResult,
   ManagedChild,
   HelpDefinition,
+  PromptSectionName,
+  PromptSection,
+  PromptEnvelope,
+  SandboxMode,
+  ApprovalPolicy,
+  ExecutionPolicy,
+  RuntimeEventType,
+  RuntimeEvent,
+  FailureCategory,
+  TokenDiagnosticStatus,
+  RuntimeDiagnostics,
+  TokenParseResult,
+  CodexTokenMapping,
+  ToolDefinition,
+  ToolInputSchema,
+  ToolPropertySchema,
+  AnthropicToolDef,
+  OpenAiToolDef,
 } from "@n-dx/llm-client";

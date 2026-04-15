@@ -55,6 +55,8 @@
     "export.js",
     "claude-integration.js",
     "refresh-validate.js",
+    "init-llm.js",
+    "llm-model-catalog.js",
     "child-lifecycle.js",
     "cli-timeout.js",
     "update-check.js"
@@ -68,6 +70,7 @@
     "@n-dx/rex": "workspace:*",
     "@n-dx/sourcevision": "workspace:*",
     "@n-dx/web": "workspace:*",
+    "enquirer": "^2.4.1",
     "htm": "^3.1.1",
     "ink": "^6.8.0",
     "react": "^19.2.4"

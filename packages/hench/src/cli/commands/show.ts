@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { PersistedRuntimeEvent } from "../../schema/index.js";
 import { loadRun } from "../../store/index.js";
 import { HENCH_DIR } from "./constants.js";
 import { info, result } from "../output.js";
@@ -13,6 +14,22 @@ export async function cmdShow(
 ): Promise<void> {
   const henchDir = join(dir, HENCH_DIR);
   const run = await loadRun(henchDir, runId);
+
+  // --events mode: display the event stream and exit
+  if (flags.events !== undefined) {
+    if (!run.events || run.events.length === 0) {
+      result(`Run ${run.id}: no events recorded.`);
+      info("Events are only captured when useEventPipeline is enabled in hench config.");
+      return;
+    }
+
+    result(`Run: ${run.id}`);
+    result(`Events (${run.events.length}):\n`);
+    for (const event of run.events) {
+      result(formatEvent(event));
+    }
+    return;
+  }
 
   if (flags.format === "json") {
     result(JSON.stringify(run, null, 2));
@@ -89,6 +106,26 @@ export async function cmdShow(
     }
   }
 
+  // Runtime diagnostics snapshot
+  const diag = run.diagnostics;
+  if (diag) {
+    info(`\nDiagnostics:`);
+    if (diag.vendor) info(`  Vendor: ${diag.vendor}`);
+    info(`  Parse mode: ${diag.parseMode}`);
+    if (diag.sandbox) info(`  Sandbox: ${diag.sandbox}`);
+    if (diag.approvals) info(`  Approvals: ${diag.approvals}`);
+    info(`  Token status: ${diag.tokenDiagnosticStatus}`);
+    if (diag.notes.length > 0) {
+      info(`  Notes: ${diag.notes.join(", ")}`);
+    }
+    if (diag.promptSections && diag.promptSections.length > 0) {
+      info(`  Prompt sections:`);
+      for (const ps of diag.promptSections) {
+        info(`    ${ps.name}: ${ps.byteLength} bytes`);
+      }
+    }
+  }
+
   if (run.toolCalls.length > 0) {
     info(`\nTool Calls (${run.toolCalls.length}):`);
     for (const call of run.toolCalls) {
@@ -111,5 +148,52 @@ export async function cmdShow(
       }
       info(line);
     }
+  }
+
+  // Event count hint (when events are present but not displayed)
+  if (run.events && run.events.length > 0) {
+    info(`\nEvents: ${run.events.length} captured (use --events to display)`);
+  }
+}
+
+/**
+ * Format a persisted runtime event into a human-readable string for display.
+ * Handles all event types: assistant, tool_use, tool_result, token_usage, failure, completion.
+ */
+export function formatEvent(event: PersistedRuntimeEvent): string {
+  const prefix = `[${event.turn}] ${event.vendor}:`;
+
+  switch (event.type) {
+    case "assistant":
+      // Truncate long text at 200 chars
+      const text = event.text || "";
+      const truncated = text.length > 200 ? text.slice(0, 200) + "..." : text;
+      return `${prefix} assistant — "${truncated}"`;
+
+    case "tool_use":
+      const toolName = event.toolCall?.tool || "unknown";
+      return `${prefix} tool_use — ${toolName}`;
+
+    case "tool_result":
+      const resultTool = event.toolResult?.tool || "unknown";
+      const duration = event.toolResult?.durationMs ? `${event.toolResult.durationMs}ms` : "?ms";
+      return `${prefix} tool_result — ${resultTool} (${duration})`;
+
+    case "token_usage":
+      const input = event.tokenUsage?.input ?? 0;
+      const output = event.tokenUsage?.output ?? 0;
+      return `${prefix} token_usage — ${input} in / ${output} out`;
+
+    case "completion":
+      const summary = event.completionSummary || "no summary";
+      return `${prefix} completion — ${summary}`;
+
+    case "failure":
+      const category = event.failure?.category || "unknown";
+      const message = event.failure?.message || "no details";
+      return `${prefix} failure [${category}] — ${message}`;
+
+    default:
+      return `${prefix} unknown event type`;
   }
 }

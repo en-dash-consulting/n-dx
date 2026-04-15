@@ -77,3 +77,20 @@ Zones are detected using Louvain community detection on the import graph, then r
 For a thorough explanation of the Louvain algorithm, findings system, risk assessment, and all configuration options, see [SourceVision Analysis Deep Dive](./sourcevision-analysis).
 
 See [Zone Naming Conventions](/architecture/zone-naming-conventions) for naming standards.
+
+## MCP Tools
+
+Available via `sourcevision mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes these as `mcp__sourcevision__{tool}`; Codex uses bare names.
+
+| Tool | Description |
+|------|-------------|
+| `get_overview` | Project summary statistics |
+| `get_next_steps` | Prioritized improvement recommendations |
+| `get_zone` | Architectural zone details |
+| `get_findings` | Analysis findings (anti-patterns, suggestions, observations) |
+| `get_file_info` | File inventory entry, zone, and imports |
+| `search_files` | Search inventory by path, role, or language |
+| `get_imports` | Import graph edges |
+| `get_classifications` | File archetype classifications |
+| `set_file_archetype` | Override archetype classification for a file |
+| `get_route_tree` | Route structure (pages, API routes, layouts) |

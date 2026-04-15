@@ -144,6 +144,7 @@ export type { CreateLLMClientOptions } from "./llm-client.js";
 
 // Config
 export {
+  DEFAULT_CLAUDE_MODEL,
   loadClaudeConfig,
   resolveApiKey,
   resolveCliPath,
@@ -157,8 +158,17 @@ export {
 // Token usage parsing
 export {
   parseApiTokenUsage,
+  parseApiTokenUsageWithDiagnostic,
   parseCliTokenUsage,
+  parseCliTokenUsageWithDiagnostic,
   parseStreamTokenUsage,
+  parseStreamTokenUsageWithDiagnostic,
+  mapCodexUsageToTokenUsage,
+} from "./token-usage.js";
+
+export type {
+  TokenParseResult,
+  CodexTokenMapping,
 } from "./token-usage.js";
 
 // Providers
@@ -168,8 +178,21 @@ export type { ApiProviderOptions } from "./api-provider.js";
 export { createCliClient } from "./cli-provider.js";
 export type { CliProviderOptions } from "./cli-provider.js";
 
-export { createCodexCliClient } from "./codex-cli-provider.js";
+export {
+  DEFAULT_CODEX_MODEL,
+  createCodexCliClient,
+  compileCodexPolicyFlags,
+  mapSandboxToCodexFlag,
+  mapApprovalToCodexFlag,
+} from "./codex-cli-provider.js";
 export type { CodexCliProviderOptions } from "./codex-cli-provider.js";
+
+export {
+  createOpenAiApiProvider,
+  resolveOpenAiApiKey,
+  parseOpenAiTokenUsage,
+} from "./openai-api-provider.js";
+export type { OpenAiApiProviderOptions } from "./openai-api-provider.js";
 
 // Factory
 export {
@@ -254,6 +277,50 @@ export {
   suggestCommands,
   formatTypoSuggestion,
 } from "./suggest.js";
+
+// Runtime contract (normalized Claude/Codex execution contract)
+export type {
+  PromptSectionName,
+  PromptSection,
+  PromptEnvelope,
+  SandboxMode,
+  ApprovalPolicy,
+  ExecutionPolicy,
+  RuntimeEventType,
+  RuntimeEvent,
+  FailureCategory,
+  TokenDiagnosticStatus,
+  RuntimeDiagnostics,
+} from "./runtime-contract.js";
+
+export {
+  DEFAULT_EXECUTION_POLICY,
+  CANONICAL_PROMPT_SECTIONS,
+  ALL_FAILURE_CATEGORIES,
+  createPromptEnvelope,
+  assemblePrompt,
+  mapErrorReasonToFailureCategory,
+  mapRunFailureToCategory,
+  classifyVendorError,
+  failureCategoryLabel,
+} from "./runtime-contract.js";
+
+// Vendor-neutral tool schema
+export type {
+  JsonSchemaType,
+  ToolPropertySchema,
+  ToolInputSchema,
+  ToolDefinition,
+  AnthropicToolDef,
+  OpenAiToolDef,
+} from "./tool-schema.js";
+
+export {
+  toAnthropicToolDef,
+  toAnthropicToolDefs,
+  toOpenAiToolDef,
+  toOpenAiToolDefs,
+} from "./tool-schema.js";
 
 // Deprecation warning filter (CLI entry points)
 export { suppressKnownDeprecations } from "./suppress-deprecations.js";

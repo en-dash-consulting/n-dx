@@ -53,6 +53,9 @@ export type {
   TestGateResult,
   TestPackageResult,
   RunSummaryData,
+  RunDiagnostics,
+  PromptSectionDiagnostic,
+  PersistedRuntimeEvent,
 } from "./schema/v1.js";
 
 // ---- Task brief types ------------------------------------------------------

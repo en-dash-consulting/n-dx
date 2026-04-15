@@ -18,6 +18,7 @@ import type {
   TaskBriefRequirement,
 } from "../../schema/index.js";
 import { CLIError } from "../../prd/llm-gateway.js";
+import type { PromptSection } from "../../prd/llm-gateway.js";
 
 export interface AssembleBriefOptions {
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
@@ -265,6 +266,31 @@ export async function getActionableTasks(
     parentChain: e.parents.map((p) => p.title).join(" > "),
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Prompt section contribution
+// ---------------------------------------------------------------------------
+
+/**
+ * Build {@link PromptSection}s from a {@link TaskBrief}.
+ *
+ * Contributes sections to the prompt envelope. Currently produces a single
+ * "brief" section whose content is identical to {@link formatTaskBrief}.
+ * Future work may split the brief into finer-grained sections (e.g.
+ * separating workflow or file context).
+ *
+ * @see buildPromptEnvelope in prompt.ts — composes these sections with the
+ *      system section into a complete PromptEnvelope.
+ */
+export function buildBriefSections(brief: TaskBrief): PromptSection[] {
+  return [
+    { name: "brief", content: formatTaskBrief(brief) },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Brief text formatting (backward-compatible flat string)
+// ---------------------------------------------------------------------------
 
 export function formatTaskBrief(brief: TaskBrief): string {
   const sections: string[] = [];

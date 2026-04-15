@@ -10,13 +10,19 @@ import { homedir } from "os";
 import { join } from "path";
 
 // Hoist mocks before importing the module under test.
+// Asset-loading paths (assistant-assets/) fall through to the real fs so that
+// the module-load chain (claude-integration → assistant-assets/index.js) works.
 vi.mock("fs", async (importOriginal) => {
   const original = await importOriginal();
+  const isAssetPath = (p) => typeof p === "string" && p.includes("assistant-assets");
   return {
     ...original,
-    existsSync: vi.fn(() => false),
-    readdirSync: vi.fn(() => []),
-    readFileSync: vi.fn(() => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); }),
+    existsSync: vi.fn((p) => isAssetPath(p) ? original.existsSync(p) : false),
+    readdirSync: vi.fn((p, opts) => isAssetPath(p) ? original.readdirSync(p, opts) : []),
+    readFileSync: vi.fn((p, opts) => {
+      if (isAssetPath(p)) return original.readFileSync(p, opts);
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    }),
     writeFileSync: vi.fn(),
   };
 });

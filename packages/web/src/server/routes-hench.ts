@@ -108,6 +108,10 @@ interface RunSummary {
       toolCallsTotal: number;
     };
   };
+  /** Vendor active for this run (e.g. "claude", "codex"). */
+  vendor?: string;
+  /** Token diagnostic status: complete, partial, or unavailable. */
+  tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
 }
 
 /** Config field metadata for the UI. */
@@ -274,6 +278,7 @@ function loadRunFile(runsDir: string, id: string): Record<string, unknown> | nul
 /** Strip heavy fields to produce a lightweight summary for list views. */
 function toRunSummary(run: Record<string, unknown>): RunSummary {
   const structured = run.structuredSummary as Record<string, unknown> | undefined;
+  const diagnostics = run.diagnostics as Record<string, unknown> | undefined;
   return {
     id: run.id as string,
     taskId: run.taskId as string,
@@ -290,6 +295,8 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
     structuredSummary: structured
       ? { counts: structured.counts as RunSummary["structuredSummary"] extends { counts?: infer C } ? C : never }
       : undefined,
+    vendor: diagnostics?.vendor as string | undefined,
+    tokenDiagnosticStatus: diagnostics?.tokenDiagnosticStatus as RunSummary["tokenDiagnosticStatus"],
   };
 }
 

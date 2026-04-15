@@ -68,12 +68,27 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 ### init
 
 ```sh
-ndx init .                    # interactive provider selection
-ndx init --provider=claude .  # skip prompt, use Claude
-ndx init --provider=codex .   # skip prompt, use Codex
+ndx init .                       # interactive provider selection, both assistants
+ndx init --provider=claude .     # skip prompt, use Claude as LLM
+ndx init --provider=codex .      # skip prompt, use Codex as LLM
+ndx init --claude-only .         # provision only Claude surfaces
+ndx init --codex-only .          # provision only Codex surfaces
+ndx init --assistants=claude .   # equivalent to --claude-only
+ndx init --no-codex .            # skip Codex provisioning
 ```
 
-Initializes the project: creates analysis metadata, PRD storage, and agent configuration. On re-run, detects existing state and reuses it.
+Initializes the project: creates analysis metadata (`.sourcevision/`), PRD storage (`.rex/`), agent configuration (`.hench/`), and assistant-specific artifacts. By default both Claude and Codex surfaces are provisioned.
+
+On re-run, detects existing assistant surfaces and narrows provisioning to match. If only Claude artifacts exist, Codex is skipped (and vice versa) unless you explicitly pass an assistant flag.
+
+Generated assistant artifacts:
+
+| Claude | Codex |
+|--------|-------|
+| `CLAUDE.md` | `AGENTS.md` |
+| `.claude/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` |
+| `.claude/settings.local.json` | `.codex/config.toml` |
+| MCP servers via `claude mcp add` | MCP servers via `.codex/config.toml` |
 
 ### analyze
 

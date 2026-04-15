@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { CLI_ERROR_CODES } from "@n-dx/llm-client";
 import { CLIError, formatCLIError, handleCLIError, requireHenchDir, requireClaudeCLI } from "../../../src/cli/errors.js";
 import { TaskNotActionableError } from "../../../src/agent/planning/brief.js";
+import { ClaudeClientError } from "../../../src/prd/llm-gateway.js";
 
 describe("CLIError", () => {
   it("stores message and suggestion", () => {
@@ -90,6 +91,53 @@ describe("formatCLIError", () => {
   it("falls back to generic message for unknown errors", () => {
     const err = new Error("some weird internal error");
     expect(formatCLIError(err)).toBe(`Error: [${CLI_ERROR_CODES.GENERIC}] some weird internal error`);
+  });
+
+  // ── Vendor-neutral ClaudeClientError formatting ──
+
+  it("formats ClaudeClientError with auth reason using category label", () => {
+    const err = new ClaudeClientError("Error: invalid api key", "auth", false);
+    const result = formatCLIError(err);
+    expect(result).toContain("[authentication failure]");
+    expect(result).toContain("invalid api key");
+    expect(result).toContain("Hint:");
+  });
+
+  it("formats ClaudeClientError with rate-limit reason using category label", () => {
+    const err = new ClaudeClientError("429 Too Many Requests", "rate-limit", true);
+    const result = formatCLIError(err);
+    expect(result).toContain("[rate limit exceeded]");
+    expect(result).toContain("Hint:");
+  });
+
+  it("formats ClaudeClientError with timeout reason using category label", () => {
+    const err = new ClaudeClientError("codex exec timed out after 30000ms", "timeout", true);
+    const result = formatCLIError(err);
+    expect(result).toContain("[operation timed out]");
+    expect(result).toContain("Hint:");
+  });
+
+  it("formats ClaudeClientError with unknown reason without hint", () => {
+    const err = new ClaudeClientError("something unexpected", "unknown", false);
+    const result = formatCLIError(err);
+    expect(result).toContain("[unexpected error]");
+    expect(result).not.toContain("Hint:");
+  });
+
+  // ── Codex-specific error patterns ──
+
+  it("matches codex not found pattern", () => {
+    const err = new Error("codex: not found");
+    const result = formatCLIError(err);
+    expect(result).toContain("Codex CLI not found");
+    expect(result).toContain("Hint:");
+  });
+
+  it("matches OPENAI_API_KEY pattern", () => {
+    const err = new Error("Missing OPENAI_API_KEY environment variable");
+    const result = formatCLIError(err);
+    expect(result).toContain("OpenAI API key not configured");
+    expect(result).toContain("Hint:");
   });
 
   it("formats TaskNotActionableError for completed tasks", () => {

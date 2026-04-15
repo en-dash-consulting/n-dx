@@ -94,12 +94,23 @@ This prevents existing code from appearing as a wall of pending tasks.
 
 ## MCP Tools
 
+Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes these as `mcp__rex__{tool}`; Codex uses bare names.
+
 | Tool | Description |
 |------|-------------|
-| `rex_status` | PRD tree with completion stats |
-| `rex_next` | Next actionable task |
-| `rex_add` | Add epic/feature/task/subtask |
-| `rex_update` | Update item status/priority/title |
-| `rex_validate` | Check PRD integrity |
-| `rex_analyze` | Scan project and propose PRD items |
-| `rex_recommend` | Get SourceVision-based recommendations |
+| `get_prd_status` | PRD title, overall stats, and per-epic stats |
+| `get_next_task` | Next actionable task based on priority and dependencies |
+| `update_task_status` | Update item status |
+| `add_item` | Add epic/feature/task/subtask |
+| `edit_item` | Edit item content (title, description, priority, tags) |
+| `get_item` | Full item details with parent chain |
+| `move_item` | Reparent an item in the PRD tree |
+| `merge_items` | Consolidate duplicate sibling items |
+| `get_recommendations` | SourceVision-based recommendations |
+| `verify_criteria` | Map acceptance criteria to test files |
+| `reorganize` | Detect and fix structural issues |
+| `health` | PRD structure health score |
+| `facets` | List configured facets with distribution |
+| `append_log` | Write structured log entry |
+| `sync_with_remote` | Sync with remote adapter (e.g. Notion) |
+| `get_capabilities` | Server capabilities and configuration |

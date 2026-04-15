@@ -14,7 +14,8 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel } from "../../prd/llm-gateway.js";
+import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY } from "../../prd/llm-gateway.js";
+import type { LLMProvider } from "../../prd/llm-gateway.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
@@ -95,15 +96,23 @@ function pruneMessages(messages: Anthropic.MessageParam[]): void {
 /** Resolved API resources needed for the agent turn loop. */
 interface ApiResources {
   client: Anthropic;
+  /** Resolved LLM provider from the registry. */
+  provider: LLMProvider;
   vendor: string;
   toolCtx: ToolContext;
 }
 
 /**
- * Validate vendor, resolve API key, construct the Anthropic client,
- * guard rails, memory monitor, and tool context.
+ * Initialize API resources from a resolved LLM provider.
+ *
+ * Accepts any {@link LLMProvider} from the registry. Currently the API loop
+ * requires the raw Anthropic SDK for its multi-turn tool-use pattern, so
+ * only Claude-compatible providers are supported. Non-Claude providers will
+ * be supported when the loop is refactored to use the generic LLMProvider
+ * completion interface with tool schemas.
  */
 async function initApiResources(
+  provider: LLMProvider,
   config: HenchConfig,
   henchDir: string,
   projectDir: string,
@@ -112,12 +121,15 @@ async function initApiResources(
   testCommand: string | undefined,
   startingHead: string | undefined,
 ): Promise<ApiResources> {
-  const llmConfig = await loadLLMConfig(henchDir);
-  const vendor = resolveLLMVendor(llmConfig);
+  const vendor = provider.info.vendor;
+
+  // The API loop currently requires the raw Anthropic SDK for multi-turn
+  // tool-use. Non-Claude providers will be supported when the loop is
+  // refactored to use LLMProvider.complete() with tool schemas.
   if (vendor !== "claude") {
     throw new Error(
-      `Hench API mode requires llm.vendor=claude. Current vendor: ${vendor}. ` +
-      "Use provider=cli for Codex.",
+      `Hench API loop requires a Claude-compatible provider (got "${vendor}"). ` +
+      "Non-Claude API providers are not yet supported. Use provider=cli for non-Claude vendors.",
     );
   }
 
@@ -149,7 +161,7 @@ async function initApiResources(
     selfHeal: config.selfHeal,
   };
 
-  return { client, vendor, toolCtx };
+  return { client, provider, vendor, toolCtx };
 }
 
 /**
@@ -292,10 +304,30 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Shared: transition task to in_progress
   await transitionToInProgress(store, taskId, brief.task.status);
 
-  // API-specific: resolve vendor, API key, build client and tool context
+  // API-specific: resolve provider, API key, build client and tool context
   const startingHead = captureStartingHead(projectDir);
+
+  // Resolve provider — registry or legacy path based on config flag
+  const llmConfig = await loadLLMConfig(henchDir);
+  let provider: LLMProvider;
+
+  if (config.useRegistryProvider) {
+    // New path: ProviderRegistry resolution
+    provider = defaultRegistry.getActiveProvider(llmConfig);
+  } else {
+    // Legacy path: manual vendor check with original error message
+    const legacyVendor = resolveLLMVendor(llmConfig);
+    if (legacyVendor !== "claude") {
+      throw new Error(
+        `Hench API mode requires llm.vendor=claude. Current vendor: ${legacyVendor}. ` +
+        "Use provider=cli for Codex.",
+      );
+    }
+    provider = defaultRegistry.create("claude", llmConfig);
+  }
+
   const { client, vendor, toolCtx } = await initApiResources(
-    config, henchDir, projectDir, store, taskId,
+    provider, config, henchDir, projectDir, store, taskId,
     brief.project.testCommand, startingHead,
   );
 
@@ -305,6 +337,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     taskTitle: brief.task.title,
     model,
     henchDir,
+    vendor,
+    sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
+    approvals: DEFAULT_EXECUTION_POLICY.approvals,
+    parseMode: "api-sdk",
   });
 
   const messages: Anthropic.MessageParam[] = [

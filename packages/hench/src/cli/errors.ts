@@ -3,6 +3,15 @@
  *
  * Hench's CLIError extends the foundation CLIError from @n-dx/llm-client,
  * providing a consistent error hierarchy across all n-dx packages.
+ *
+ * ## Vendor-neutral failure taxonomy
+ *
+ * Raw errors from both Claude and Codex are classified into the shared
+ * {@link FailureCategory} taxonomy via {@link classifyVendorError} (from
+ * the runtime contract in @n-dx/llm-client). The `formatCLIError` function
+ * uses this classification to produce vendor-agnostic user-facing messages,
+ * while `ERROR_HINTS` provides additional pattern-matched suggestions for
+ * common operational problems from either vendor.
  */
 
 import { existsSync } from "node:fs";
@@ -10,10 +19,14 @@ import { join } from "node:path";
 import {
   CLI_ERROR_CODES,
   CLIError as BaseCLIError,
+  ClaudeClientError,
   type CLIErrorCode,
   PROJECT_DIRS,
   isExecutableOnPath,
+  classifyVendorError,
+  failureCategoryLabel,
 } from "../prd/llm-gateway.js";
+import type { FailureCategory } from "../prd/llm-gateway.js";
 
 const HENCH_DIR = PROJECT_DIRS.HENCH;
 
@@ -58,6 +71,10 @@ export class EpicNotFoundError extends CLIError {
 /**
  * Known error patterns mapped to user-friendly messages and suggestions.
  * Each entry: [regex to match, stable code, user-friendly message, suggestion].
+ *
+ * These patterns cover operational errors (file system, config, binary lookup)
+ * from both Claude and Codex vendors. For semantic error classification
+ * (auth, rate-limit, timeout), use {@link classifyVendorError} instead.
  */
 const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
   [
@@ -117,6 +134,7 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
     "Failed to parse JSON file.",
     "Check for syntax errors in the file, or re-initialize with 'n-dx init'.",
   ],
+  // Claude CLI
   [
     /claude.*not found|ENOENT.*claude/i,
     CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
@@ -129,6 +147,20 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
     "Anthropic API key not configured.",
     "Set it via 'n-dx config claude.api_key <key>', the ANTHROPIC_API_KEY environment variable, or use 'n-dx config hench.provider cli' for Claude CLI mode.",
   ],
+  // Codex CLI
+  [
+    /codex.*not found|ENOENT.*codex/i,
+    CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
+    "Codex CLI not found.",
+    "Install Codex CLI and/or set a custom path: n-dx config llm.codex.cli_path /path/to/codex",
+  ],
+  [
+    /OPENAI_API_KEY/,
+    CLI_ERROR_CODES.API_KEY_MISSING,
+    "OpenAI API key not configured.",
+    "Set it via 'n-dx config llm.codex.api_key <key>' or the OPENAI_API_KEY environment variable.",
+  ],
+  // Generic not-found (must come after vendor-specific patterns)
   [
     /not found/i,
     CLI_ERROR_CODES.RESOURCE_NOT_FOUND,
@@ -146,8 +178,35 @@ function renderCLIError(code: CLIErrorCode, message: string, suggestion?: string
 }
 
 /**
+ * Per-category user-facing suggestions keyed by {@link FailureCategory}.
+ *
+ * These are shown alongside the classified error label when the error came
+ * from a {@link ClaudeClientError} (which both Claude and Codex providers
+ * throw). Entries for categories already covered by ERROR_HINTS regex
+ * patterns are intentionally omitted — the regex path takes priority for
+ * those because it produces more context-specific messages.
+ */
+const CATEGORY_SUGGESTIONS: Partial<Record<FailureCategory, string>> = {
+  auth: "Check your API key configuration: n-dx config",
+  rate_limit: "Wait a moment and try again, or reduce concurrency.",
+  timeout: "The operation timed out. Try increasing the timeout or simplifying the task.",
+  budget_exceeded: "Token budget exhausted. Increase with: n-dx config hench.tokenBudget <number>",
+  transient_exhausted: "Retries exhausted due to transient failures. Check network connectivity and try again.",
+};
+
+/**
  * Format an error for CLI output. Returns lines to print to stderr.
  * Never includes stack traces in the output.
+ *
+ * Classification strategy:
+ * 1. {@link BaseCLIError} instances (hench CLIError, TaskNotActionableError)
+ *    — use the error's own message and suggestion.
+ * 2. {@link ClaudeClientError} instances (from Claude/Codex providers)
+ *    — classify via {@link classifyVendorError} and show a category label
+ *    with a category-specific suggestion.
+ * 3. Pattern matching against {@link ERROR_HINTS} — operational errors
+ *    (file system, config, binary lookup).
+ * 4. Generic fallback — show the raw message.
  */
 export function formatCLIError(err: unknown): string {
   // CLIError hierarchy — catches both hench CLIError and TaskNotActionableError
@@ -157,6 +216,18 @@ export function formatCLIError(err: unknown): string {
       ? err.code as CLIErrorCode
       : CLI_ERROR_CODES.GENERIC;
     return renderCLIError(code, err.message, err.suggestion);
+  }
+
+  // ClaudeClientError (from Claude/Codex providers) — classify into taxonomy
+  if (err instanceof ClaudeClientError) {
+    const category = classifyVendorError(err);
+    const label = failureCategoryLabel(category);
+    let msg = `Error [${label}]: ${err.message}`;
+    const suggestion = CATEGORY_SUGGESTIONS[category];
+    if (suggestion) {
+      msg += `\nHint: ${suggestion}`;
+    }
+    return msg;
   }
 
   const message = err instanceof Error ? err.message : String(err);
