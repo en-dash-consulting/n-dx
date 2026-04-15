@@ -17,7 +17,10 @@
 // ── Color support ──────────────────────────────────────────────────────
 
 function supportsColor() {
-  if (process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0") {
+  if (
+    process.env.FORCE_COLOR !== undefined &&
+    process.env.FORCE_COLOR !== "0"
+  ) {
     return true;
   }
   if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
@@ -48,11 +51,21 @@ function ansi(code, text, reset) {
   return `\x1b[${code}m${text}\x1b[${reset}m`;
 }
 
-export function purple(text) { return ansi("35", text, "39"); }
-export function green(text) { return ansi("32", text, "39"); }
-export function red(text) { return ansi("31", text, "39"); }
-export function bold(text) { return ansi("1", text, "22"); }
-export function dim(text) { return ansi("2", text, "22"); }
+export function purple(text) {
+  return ansi("35", text, "39");
+}
+export function green(text) {
+  return ansi("32", text, "39");
+}
+export function red(text) {
+  return ansi("31", text, "39");
+}
+export function bold(text) {
+  return ansi("1", text, "22");
+}
+export function dim(text) {
+  return ansi("2", text, "22");
+}
 
 const isTTY = () => !!(process.stdout && process.stdout.isTTY);
 
@@ -92,8 +105,8 @@ const DINO_LEGS = [
 000022222211111220000000
 000002222221112220000000
 000000022211122220000000
-0000000222200002220000
-00000000211000002110000`,
+000000022220000222000000
+000000002110000021100000`,
   // Frame 1 — reference: packages/rex/Rex.png (stride phase 2; right leg stepped one pixel forward — ▄ at tip)
   `
 000000022221221222000000
@@ -104,12 +117,16 @@ const DINO_LEGS = [
 000022222211111220000000
 000002222221112220000000
 000000022211122220000000
-0000000022220022200000
-00000000021100021100000`,
+000000002222002220000000
+000000000211000211000000`,
 ];
 
 // True-color ANSI codes for the shaded palette
-const FG = { 1: "\x1b[38;2;180;80;255m", 2: "\x1b[38;2;100;30;160m", 3: "\x1b[38;2;255;255;255m" };
+const FG = {
+  1: "\x1b[38;2;180;80;255m",
+  2: "\x1b[38;2;100;30;160m",
+  3: "\x1b[38;2;255;255;255m",
+};
 const BG = { 1: "\x1b[48;2;180;80;255m", 2: "\x1b[48;2;100;30;160m" };
 const RS = "\x1b[0m";
 
@@ -122,7 +139,10 @@ function halfBlock(top, bot) {
 }
 
 function pixelsToLines(pixelStr) {
-  const g = pixelStr.trim().split("\n").map((r) => [...r].map(Number));
+  const g = pixelStr
+    .trim()
+    .split("\n")
+    .map((r) => [...r].map(Number));
   const lines = [];
   for (let y = 0; y < g.length; y += 2) {
     let s = "";
@@ -140,22 +160,35 @@ export const LEGS = DINO_LEGS.map((l) => pixelsToLines(l));
 
 /** Monochrome fallback for non-TTY (no true-color). Uses simple purple ANSI. */
 const QUADRANT_BODY = [
-  "          ▗████▖",
-  "         ▗████▜▝",
-  "         ▟████▛▘",
-  "        ▟█████▌",
-  " ▜▖  ▗▟████████▌",
-  " ▐████████████▛▘",
-  " ▝▜███████████▘",
-  "   ▝▜███▘  ▜██▀",
+  "                        ",
+  "          █████         ",
+  "        ████████████    ",
+  "        ███ ████████    ",
+  "       █████████████    ",
+  "      ████ █ ███████    ",
+  "      ██          █     ",
+  "       ██        █      ",
+  "       ████ ██ ███      ",
+  "      █████   █████     ",
+  "  █████████    ████     ",
+  "  ██████████   ██       ",
+  "   ██████ ██   ██       ",
+  "    ██████     ██       ",
+  "     ██████   ███       ",
+  "       ███   ████       ",
 ];
 // Frame 0 — reference: packages/rex/Rex-F.png (both legs planted — █ █ double-support)
 // Frame 1 — reference: packages/rex/Rex.png (left leg fully planted — █ solid; right leg in stride)
-const QUADRANT_LEGS = [["      █     █"], ["      █     ▐▌"]];
+const QUADRANT_LEGS = [
+  ["        ████  ███       "],
+  ["       ████    ███      "],
+];
 
 /** Static mascot string for non-TTY / test use (monochrome quadrant fallback). */
 export function getMascot() {
-  return [...QUADRANT_BODY, ...QUADRANT_LEGS[0]].map((l) => purple(l)).join("\n");
+  return [...QUADRANT_BODY, ...QUADRANT_LEGS[0]]
+    .map((l) => purple(l))
+    .join("\n");
 }
 
 /**
@@ -184,27 +217,41 @@ export function createSpinner(text) {
 
   return {
     start() {
-      if (!isTTY()) { console.log(`  ${dim("▸")} ${text}`); return this; }
+      if (!isTTY()) {
+        console.log(`  ${dim("▸")} ${text}`);
+        return this;
+      }
       process.stdout.write(`  ${purple(SPINNER_FRAMES[0])} ${text}`);
       timer = setInterval(() => {
         frame = (frame + 1) % SPINNER_FRAMES.length;
-        process.stdout.write(`\r\x1b[K  ${purple(SPINNER_FRAMES[frame])} ${text}`);
+        process.stdout.write(
+          `\r\x1b[K  ${purple(SPINNER_FRAMES[frame])} ${text}`,
+        );
       }, TICK_MS);
       return this;
     },
     success(msg, detail) {
-      if (timer) { clearInterval(timer); timer = null; }
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
       if (isTTY()) process.stdout.write("\r\x1b[K");
       const d = detail ? ` ${dim("(" + detail + ")")}` : "";
       console.log(`  ${green("✓")} ${msg}${d}`);
     },
     fail(msg) {
-      if (timer) { clearInterval(timer); timer = null; }
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
       if (isTTY()) process.stdout.write("\r\x1b[K");
       console.log(`  ${red("✗")} ${msg}`);
     },
     stop() {
-      if (timer) { clearInterval(timer); timer = null; }
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
       if (isTTY()) process.stdout.write("\r\x1b[K");
     },
   };
@@ -213,22 +260,37 @@ export function createSpinner(text) {
 // ── Init phase messages ────────────────────────────────────────────────
 
 export const INIT_PHASES = {
-  sourcevision: { spinner: "Mapping your codebase...",      success: "Codebase mapped" },
-  rex:          { spinner: "Setting up the task den...",    success: "Task den ready" },
-  hench:        { spinner: "Waking the agent...",           success: "Agent standing by" },
-  claude:       { spinner: "Teaching Claude new tricks...", success: "Skills installed" },
+  sourcevision: {
+    spinner: "Mapping your codebase...",
+    success: "Codebase mapped",
+  },
+  rex: { spinner: "Setting up the task den...", success: "Task den ready" },
+  hench: { spinner: "Waking the agent...", success: "Agent standing by" },
+  claude: {
+    spinner: "Teaching Claude new tricks...",
+    success: "Skills installed",
+  },
 };
 
 // ── Static formatters (non-TTY fallback and tests) ─────────────────────
 
 export function formatInitBanner() {
   const mascot = getMascot();
-  return mascot + "\n\n  " + bold(purple(BRAND_NAME)) + "\n  " + dim(TOOL_NAME + " init") + "\n";
+  return (
+    mascot +
+    "\n\n  " +
+    bold(purple(BRAND_NAME)) +
+    "\n  " +
+    dim(TOOL_NAME + " init") +
+    "\n"
+  );
 }
 
 export function formatRecap(results) {
   return [
-    "", `  ${green("◆")} ${bold("Project initialized!")}`, "",
+    "",
+    `  ${green("◆")} ${bold("Project initialized!")}`,
+    "",
     `  .sourcevision/  ${results.sourcevision}`,
     `  .rex/           ${results.rex}`,
     `  .hench/         ${results.hench}`,

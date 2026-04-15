@@ -28854,9 +28854,11 @@
     {
       "id": "61746a37-64cd-4291-802e-aa54e969ec4e",
       "title": "Local Testing Infrastructure and Gauntlet Config Validation",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-15T15:21:22.274Z",
+      "completedAt": "2026-04-15T15:21:22.274Z",
       "children": [
         {
           "id": "220368bf-084e-4fbe-931a-a18112fcc33e",
@@ -28941,10 +28943,12 @@
         {
           "id": "45e10546-807f-4ea1-a88d-d7739c6667ed",
           "title": "Claude and Codex Config Validation in Gauntlet",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Add Claude and Codex configuration validation tests to the gauntlet test suite. These tests verify config presence, format, authentication, and vendor-specific behavior before allowing pipeline progression.",
           "source": "smart-add",
+          "startedAt": "2026-04-15T15:21:21.845Z",
+          "completedAt": "2026-04-15T15:21:21.845Z",
           "children": [
             {
               "id": "1c3f1456-1a2f-4c63-9dcb-8af4d417f60b",
@@ -28997,7 +29001,7 @@
             {
               "id": "f0645116-8597-4efc-8a1f-6b171e91d122",
               "title": "Integrate config validation tests into CI/CD gauntlet stage",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Wire Claude and Codex config validation tests into the CI/CD pipeline's gauntlet stage so they run before other stages and gate progression on validation success.",
               "acceptanceCriteria": [
@@ -29014,7 +29018,162 @@
                 "automation"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-15T15:19:31.543Z"
+              "startedAt": "2026-04-15T15:19:31.543Z",
+              "completedAt": "2026-04-15T15:21:21.316Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "d2635b48-f2a7-43c6-985c-c20b6479dd8f",
+      "title": "Task-Weight-Aware Model Tiering",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "405c9fcf-2258-472f-8eb7-30d5b7ae0b8a",
+          "title": "Model Tier Registry and Weight-Aware Resolution",
+          "status": "completed",
+          "level": "feature",
+          "description": "Extend the centralized model resolver in llm-client to support task-weight-based model selection. Light tasks (single-turn proposals, simple classification) resolve to cheaper/faster models (haiku, gpt-5.4mini), while standard tasks (multi-turn agents, deep analysis) resolve to full-capability models (sonnet, gpt-5.4codex). Ambiguous or uncategorizable work defaults to standard tier.",
+          "source": "smart-add",
+          "startedAt": "2026-04-15T17:25:49.451Z",
+          "completedAt": "2026-04-15T17:25:49.451Z",
+          "children": [
+            {
+              "id": "084b2529-7458-4255-bc7b-18b6388932e9",
+              "title": "Define TaskWeight type and per-vendor tier model constants in llm-client",
+              "status": "completed",
+              "level": "task",
+              "description": "Add a TaskWeight discriminated type ('light' | 'standard') to llm-types.ts and a TIER_MODELS constant mapping each vendor × weight to a concrete model string. This is the single source of truth for which model serves each tier — analogous to how NEWEST_MODELS is the single source for default models today. The 'standard' tier should map to the current NEWEST_MODELS values (sonnet, gpt-5.4codex) so existing behavior is preserved when no weight is specified.",
+              "acceptanceCriteria": [
+                "TaskWeight type exported from llm-client public API with values 'light' and 'standard'",
+                "TIER_MODELS constant maps claude→light to haiku, claude→standard to sonnet, codex→light to gpt-5.4mini, codex→standard to gpt-5.4codex",
+                "TIER_MODELS[vendor]['standard'] equals NEWEST_MODELS[vendor] for both vendors",
+                "resolveVendorModel accepts optional TaskWeight parameter; when 'light' is passed it resolves to TIER_MODELS[vendor].light instead of the default",
+                "When TaskWeight is omitted or 'standard', resolveVendorModel behaves identically to current implementation (backward compatible)",
+                "Explicit --model CLI flag or config model override still takes precedence over tier-based selection"
+              ],
+              "priority": "critical",
+              "tags": [
+                "llm-client",
+                "model-resolution",
+                "foundation"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-15T17:16:45.191Z",
+              "completedAt": "2026-04-15T17:20:53.465Z"
+            },
+            {
+              "id": "2e1d7e90-5f15-49bf-a919-0e4faa742105",
+              "title": "Add per-tier model override fields to LLMConfig schema and config loader",
+              "status": "completed",
+              "level": "task",
+              "description": "Extend ClaudeConfig and CodexConfig interfaces to support tier-specific model overrides (e.g., llm.claude.lightModel, llm.codex.lightModel) in .n-dx.json. Update loadLLMConfig and resolveVendorModel to consult these fields so users can customize which model serves each tier without changing the defaults. The resolution order becomes: CLI --model flag → config tier-specific model → TIER_MODELS default → NEWEST_MODELS fallback.",
+              "acceptanceCriteria": [
+                "ClaudeConfig and CodexConfig interfaces gain optional lightModel field",
+                "loadLLMConfig reads lightModel from .n-dx.json when present",
+                "resolveVendorModel(vendor, config, 'light') uses config.claude.lightModel (or codex equivalent) when set, falling back to TIER_MODELS[vendor].light",
+                "ndx config --help documents the new lightModel field with example values",
+                "Unit tests cover: config override present, config override absent (falls back to TIER_MODELS), explicit --model flag overrides tier config"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm-client",
+                "config",
+                "schema"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-15T17:20:54.496Z",
+              "completedAt": "2026-04-15T17:25:49.092Z"
+            }
+          ]
+        },
+        {
+          "id": "effae917-a7c4-4c7a-a0f8-2b8dce95ca58",
+          "title": "Per-Command Task Weight Classification and Integration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Classify each LLM-calling command by its natural task weight and wire that weight through to the model resolver. Commands doing single-turn proposal generation or lightweight classification use 'light'; commands doing multi-turn agent loops, deep analysis, or ambiguous work use 'standard' (the default). This makes token-cost optimization automatic and transparent.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "891e3a9b-8082-4ce5-8a6b-7c5897e38b59",
+              "title": "Wire light-tier model selection into rex smart-add and lightweight analysis paths",
+              "status": "pending",
+              "level": "task",
+              "description": "Rex smart-add (reasonFromDescriptions, reasonFromIdeasFile in reason.ts) generates proposals from natural language — a bounded single-turn LLM call well-suited for lighter models. Pass TaskWeight 'light' through the smart-add call chain so resolveVendorModel selects haiku/gpt-5.4mini instead of sonnet/gpt-5.4codex. The model parameter plumbing already exists (spawnClaude accepts an optional model), so the change is in how the model is resolved, not in how it's passed.",
+              "acceptanceCriteria": [
+                "smart-add.ts resolves its model via resolveVendorModel(vendor, config, 'light') instead of resolveVendorModel(vendor, config)",
+                "ndx add 'some description' uses haiku (Claude) or gpt-5.4mini (Codex) by default, visible in vendor header output",
+                "Explicit --model flag on ndx add overrides the light-tier selection",
+                "rex analyze and rex reorganize continue using standard-tier models (unchanged behavior)",
+                "sourcevision analyze continues using standard-tier models (unchanged behavior)"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "smart-add",
+                "model-resolution"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "565c00fb-4271-4187-a75e-2a10c0cb060a",
+              "title": "Surface active model tier in vendor header output and log task weight reasoning",
+              "status": "pending",
+              "level": "task",
+              "description": "Update printVendorModelHeader in vendor-header.ts to display the active tier alongside the resolved model, so operators can see at a glance whether a command is running on the light or standard tier and why. When a tier override is active (via config lightModel), show that it's a configured override. This makes the cost optimization visible and debuggable.",
+              "acceptanceCriteria": [
+                "Vendor header output includes tier label, e.g. 'Vendor: claude  Model: claude-haiku-4-5 (light tier)' for smart-add",
+                "Standard-tier commands show 'Vendor: claude  Model: claude-sonnet-4-6 (standard tier)' or omit tier label if desired for backward compatibility",
+                "When lightModel config override is active, header shows '(light tier, configured)' to distinguish from default",
+                "Tier label does not appear when --model flag is used (explicit model takes precedence over tier semantics)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm-client",
+                "cli-output",
+                "observability"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:08f6d0b0-9462-494e-adf9-2830113caede",
+                "matchedItemId": "08f6d0b0-9462-494e-adf9-2830113caede",
+                "matchedItemTitle": "Surface active vendor and model in ndx console output",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-04-15T17:16:24.162Z"
+              }
+            },
+            {
+              "id": "00b9416d-868f-4c13-93f5-9507096d46d7",
+              "title": "Add unit and integration tests for weight-aware model resolution across packages",
+              "status": "completed",
+              "level": "task",
+              "description": "Verify that the task-weight-aware model tiering works end-to-end: the correct tier is applied per command, config overrides take precedence, CLI flags override everything, and the vendor header displays the right tier label. Cover both Claude and Codex vendors, both light and standard tiers, and the fallback chain (flag → config tier → TIER_MODELS → NEWEST_MODELS).",
+              "acceptanceCriteria": [
+                "Unit tests in llm-client cover: resolveVendorModel with light weight returns haiku/gpt-5.4mini, with standard returns sonnet/gpt-5.4codex, with no weight returns standard default",
+                "Unit tests cover config override: lightModel in config takes precedence over TIER_MODELS default",
+                "Unit tests cover precedence: explicit model string overrides tier-based selection for both weights",
+                "Integration test verifies smart-add command resolves to light-tier model by inspecting resolved model before LLM call",
+                "Integration test verifies analyze command resolves to standard-tier model",
+                "Vendor header output tests verify tier label rendering for light, standard, configured-override, and flag-override scenarios"
+              ],
+              "priority": "high",
+              "tags": [
+                "testing",
+                "llm-client",
+                "rex",
+                "regression"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-15T17:25:50.449Z",
+              "completedAt": "2026-04-15T17:33:33.089Z"
             }
           ]
         }
