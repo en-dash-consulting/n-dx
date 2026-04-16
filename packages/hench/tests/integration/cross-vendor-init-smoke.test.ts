@@ -216,18 +216,15 @@ describe("cross-vendor init-to-run smoke", () => {
     it("default execution policy compiles to valid Codex flags", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
 
-      expect(flags).toContain("--sandbox");
-      expect(flags).toContain("workspace-write");
-      expect(flags).toContain("--approval-policy");
-      expect(flags).toContain("full-auto");
-      expect(flags).toHaveLength(4);
+      expect(flags).not.toContain("--approval-policy");
+      expect(flags).toContain("--full-auto");
+      expect(flags).toHaveLength(1);
     });
 
-    it("compiled flags do not include deprecated --full-auto standalone", () => {
+    it("compiled flags use the current standalone --full-auto preset", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
-      // --full-auto should only appear as the VALUE of --approval-policy
       const standaloneFlagIndex = flags.indexOf("--full-auto");
-      expect(standaloneFlagIndex).toBe(-1);
+      expect(standaloneFlagIndex).toBe(0);
     });
   });
 

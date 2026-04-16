@@ -115,21 +115,15 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
     expect(config.args).toContain("--skip-git-repo-check");
   });
 
-  it("compiles policy to --sandbox and --approval-policy flags", () => {
+  it("compiles default policy to the supported --full-auto preset", () => {
     const config = codexCliAdapter.buildSpawnConfig(
       createMinimalEnvelope(),
       DEFAULT_EXECUTION_POLICY,
       undefined,
     );
 
-    expect(config.args).toContain("--sandbox");
-    expect(config.args).toContain("--approval-policy");
-
-    // DEFAULT_EXECUTION_POLICY: sandbox = "workspace-write", approvals = "never"
-    const sandboxIdx = config.args.indexOf("--sandbox");
-    expect(config.args[sandboxIdx + 1]).toBe("workspace-write");
-    const approvalIdx = config.args.indexOf("--approval-policy");
-    expect(config.args[approvalIdx + 1]).toBe("full-auto");
+    expect(config.args).toContain("--full-auto");
+    expect(config.args).not.toContain("--approval-policy");
   });
 
   it("compiles read-only policy correctly", () => {
@@ -141,8 +135,7 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
 
     const sandboxIdx = config.args.indexOf("--sandbox");
     expect(config.args[sandboxIdx + 1]).toBe("read-only");
-    const approvalIdx = config.args.indexOf("--approval-policy");
-    expect(config.args[approvalIdx + 1]).toBe("auto-edit");
+    expect(config.args).not.toContain("--approval-policy");
   });
 
   it("compiles full-access policy correctly", () => {
@@ -152,10 +145,8 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
       undefined,
     );
 
-    const sandboxIdx = config.args.indexOf("--sandbox");
-    expect(config.args[sandboxIdx + 1]).toBe("full-access");
-    const approvalIdx = config.args.indexOf("--approval-policy");
-    expect(config.args[approvalIdx + 1]).toBe("full-auto");
+    expect(config.args).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(config.args).not.toContain("--approval-policy");
   });
 
   it("places model override as -m flag", () => {
@@ -236,8 +227,7 @@ describe("CodexCliAdapter: snapshot parity", () => {
     const argsWithoutPrompt = config.args.slice(0, -1);
     expect(argsWithoutPrompt).toEqual([
       "exec",
-      "--sandbox", "workspace-write",
-      "--approval-policy", "full-auto",
+      "--full-auto",
       "--json",
       "--skip-git-repo-check",
     ]);
@@ -253,8 +243,7 @@ describe("CodexCliAdapter: snapshot parity", () => {
     const argsWithoutPrompt = config.args.slice(0, -1);
     expect(argsWithoutPrompt).toEqual([
       "exec",
-      "--sandbox", "workspace-write",
-      "--approval-policy", "full-auto",
+      "--full-auto",
       "--json",
       "--skip-git-repo-check",
       "-m", "gpt-5-codex",

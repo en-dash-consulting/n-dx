@@ -29270,6 +29270,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-16T15:06:34.573Z",
+      "completedAt": "2026-04-16T15:06:34.573Z",
       "children": [
         {
           "id": "405c9fcf-2258-472f-8eb7-30d5b7ae0b8a",

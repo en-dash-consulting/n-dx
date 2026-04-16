@@ -141,38 +141,29 @@ describe("cross-vendor execution policy parity", () => {
 
   it("standard policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(STANDARD_POLICY);
-    expect(flags).toEqual([
-      "--sandbox", "workspace-write",
-      "--approval-policy", "full-auto",
-    ]);
+    expect(flags).toEqual(["--full-auto"]);
   });
 
   it("read-only policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(READONLY_POLICY);
-    expect(flags).toEqual([
-      "--sandbox", "read-only",
-      "--approval-policy", "auto-edit",
-    ]);
+    expect(flags).toEqual(["--sandbox", "read-only"]);
   });
 
   it("full-access policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(FULL_ACCESS_POLICY);
-    expect(flags).toEqual([
-      "--sandbox", "full-access",
-      "--approval-policy", "full-auto",
-    ]);
+    expect(flags).toEqual(["--dangerously-bypass-approvals-and-sandbox"]);
   });
 
   it("every SandboxMode maps to a Codex flag", () => {
     const modes = ["read-only", "workspace-write", "danger-full-access"] as const;
-    const expected = ["read-only", "workspace-write", "full-access"];
+    const expected = ["read-only", "workspace-write", "danger-full-access"];
     modes.forEach((mode, i) => {
       expect(mapSandboxToCodexFlag(mode)).toBe(expected[i]);
     });
   });
 
   it("every ApprovalPolicy maps to a Codex flag", () => {
-    expect(mapApprovalToCodexFlag("on-request")).toBe("auto-edit");
+    expect(mapApprovalToCodexFlag("on-request")).toBe("default");
     expect(mapApprovalToCodexFlag("never")).toBe("full-auto");
   });
 

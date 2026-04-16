@@ -97,7 +97,7 @@ export interface PromptEnvelope {
  *
  * These map to vendor-specific CLI flags:
  * - Claude: permission rules (`allow`, `ask`, `deny`) per tool category
- * - Codex: `--sandbox` flag (`read-only`, `workspace-write`, `full-access`)
+ * - Codex: `--sandbox` flag (`read-only`, `workspace-write`, `danger-full-access`)
  */
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 
@@ -109,7 +109,8 @@ export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access"
  *
  * These map to vendor-specific CLI flags:
  * - Claude: `--allowed-tools` allowlist (tools not listed require approval)
- * - Codex: `--approval-policy` flag (`suggest`, `auto-edit`, `full-auto`)
+ * - Codex: `--full-auto` / `--dangerously-bypass-approvals-and-sandbox`
+ *   presets where supported, otherwise plain `--sandbox`
  */
 export type ApprovalPolicy = "on-request" | "never";
 
@@ -268,7 +269,7 @@ export interface RuntimeDiagnostics {
  *
  * Maps to:
  * - Claude: `--allowed-tools` with the listed file tools + `Bash(cmd:*)` patterns
- * - Codex: `--sandbox workspace-write --approval-policy auto-edit`
+ * - Codex: `--full-auto`
  */
 export const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = {
   sandbox: "workspace-write",
