@@ -94,6 +94,12 @@ import {
 } from "./child-lifecycle.js";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
+import {
+  readRexTestCommand,
+  resolveReviewerVendor,
+  runCrossVendorReview,
+  formatReviewBanner,
+} from "./pair-programming.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -1777,6 +1783,65 @@ async function handleSingleCommand(rest) {
   exitWithCleanup(0);
 }
 
+async function handlePairProgramming(rest) {
+  const flags = extractFlags(rest);
+  const positionals = rest.filter((a) => !a.startsWith("-"));
+  const description = positionals[0] ?? null;
+
+  if (!description) {
+    console.error("Error: missing required argument <description>");
+    console.error('Usage: ndx pair-programming "<description>" [dir]');
+    console.error('       ndx bicker "<description>" [dir]');
+    console.error('Example: ndx pair-programming "fix failing tests"');
+    exitWithCleanup(1);
+    return;
+  }
+
+  const dir = positionals.length >= 2 ? positionals[positionals.length - 1] : process.cwd();
+  requireInit(dir, [".hench"]);
+
+  const isDryRun = flags.includes("--dry-run");
+  const skipReview = flags.includes("--skip-review");
+
+  const primaryVendor = readLLMVendor(dir);
+  if (!isDryRun && !primaryVendor) {
+    console.error("Error: No LLM vendor configured for this project.");
+    console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+    exitWithCleanup(1);
+  }
+
+  // Remove description and --skip-review from the args forwarded to hench
+  let descriptionRemoved = false;
+  const henchArgs = rest.filter((a) => {
+    if (!descriptionRemoved && !a.startsWith("-") && a === description) {
+      descriptionRemoved = true;
+      return false;
+    }
+    return a !== "--skip-review";
+  });
+
+  // ── Step 1: primary vendor work ──────────────────────────────────────────
+  const primaryCode = await run(tools.hench, ["run", `--freeform=${description}`, ...henchArgs]);
+  if (primaryCode !== 0) {
+    exitWithCleanup(primaryCode);
+    return;
+  }
+
+  // ── Step 2: cross-vendor review ──────────────────────────────────────────
+  if (!isDryRun && !skipReview && primaryVendor) {
+    const reviewer = resolveReviewerVendor(primaryVendor);
+    const testCommand = readRexTestCommand(dir);
+    const result = await runCrossVendorReview({ dir, reviewer, testCommand });
+    process.stdout.write(formatReviewBanner(reviewer, result) + "\n");
+    if (!result.skipped && !result.passed) {
+      exitWithCleanup(1);
+      return;
+    }
+  }
+
+  exitWithCleanup(0);
+}
+
 function handleHelp(rest) {
   const query = rest.filter((a) => !a.startsWith("-")).join(" ");
   if (!query) {
@@ -1972,6 +2037,10 @@ async function main() {
       // ── Freeform single-shot execution ──
       case "single-command":
       case "sc":          return handleSingleCommand(rest);
+
+      // ── Pair-programming (cross-vendor review) ──
+      case "pair-programming":
+      case "bicker":      return handlePairProgramming(rest);
     }
 
     // ── Tool delegation ─────────────────────────────────────────────────────

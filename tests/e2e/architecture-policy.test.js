@@ -46,6 +46,7 @@ const ALLOWED = new Set([
   "packages/core/web.js",
   "packages/core/config.js",
   "packages/core/export.js",
+  "packages/core/pair-programming.js",
   "pr-check.js",
   // Development scripts
   "packages/web/dev.js",
