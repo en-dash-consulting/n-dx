@@ -14,7 +14,7 @@
         {
           "id": "5dd63e4e-1bbb-47a8-a0fa-754bc142a377",
           "title": "Hot-reload MCP tool schemas on HTTP transport without server restart",
-          "status": "deferred",
+          "status": "pending",
           "level": "feature",
           "description": "The HTTP MCP server holds tool schemas in memory from startup. When rex or sourcevision are rebuilt with new/changed tool parameters, the running server still serves the old schemas. Users must restart the server to pick up changes. This is a friction point during development — stdio MCP doesn't have this problem since each invocation spawns fresh.\n\nOptions: file-watch the dist/ directories and re-initialize MCP servers on change, or add an admin endpoint to trigger reload.",
           "acceptanceCriteria": [
@@ -53,7 +53,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "deferred",
+          "status": "pending",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
@@ -83,7 +83,7 @@
             {
               "id": "7ed4c848-e4be-4f6e-b495-5d70a9457fec",
               "title": "Inventory duplicated unit-test constants across suites",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Review unit test files to identify repeated constants that appear in more than four files and record where they are used so consolidation candidates are explicitly defined.",
               "acceptanceCriteria": [
@@ -103,7 +103,7 @@
             {
               "id": "9311f36a-e0e4-4275-90f7-badca8d60ee6",
               "title": "Update unit test callers to use shared utilities",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Refactor existing unit test files to consume the new shared helpers and constants while preserving existing assertions, names, and suite intent.",
               "acceptanceCriteria": [
@@ -123,7 +123,7 @@
             {
               "id": "4094dafb-78c0-462f-bc09-dd5a630762bb",
               "title": "Validate behavioral equivalence after test utility extraction",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Run the refactored unit suites and compare outcomes against the pre-refactor baseline to confirm that the shared utility extraction did not alter behavior or coverage.",
               "acceptanceCriteria": [
@@ -155,7 +155,7 @@
             {
               "id": "ece5c797-5a9d-4272-96f9-1fceffde9204",
               "title": "Run project-wide test commands and compare against baseline coverage",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Validate the completed fixes by running both required test commands and confirming that the total executed test count still matches the pre-refactor baseline.",
               "acceptanceCriteria": [
@@ -202,7 +202,7 @@
             {
               "id": "80abb312-bf55-45c1-836b-a176715bddbf",
               "title": "Fix suggestion in sourcevision-2: Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pi",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "- Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
@@ -245,7 +245,7 @@
             {
               "id": "d4bc1bc9-5b60-40fb-9719-9120ac718065",
               "title": "Fix suggestion in sourcevision-3: Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pi",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "- Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
@@ -288,7 +288,7 @@
             {
               "id": "81b1d6f0-2f8a-46e2-b195-473450489779",
               "title": "Fix move-file in web-viewer: File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zon",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "- File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
               "priority": "high",
@@ -331,7 +331,7 @@
             {
               "id": "c434442f-7856-4ed8-ba18-e9c664b22593",
               "title": "Fix anti-pattern in global: God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts c (+1 more)",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "- God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts calls 41 unique functions — consider decomposing into smaller, focused functions\n- God function: runCI in packages/core/ci.js calls 39 unique functions — consider decomposing into smaller, focused functions",
               "priority": "high",
@@ -389,7 +389,7 @@
             {
               "id": "4b559467-5391-4612-ab7d-27b71daac4dc",
               "title": "Expose timeout configuration in .n-dx.json schema and ndx config command",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Add `cli.timeoutMs` and `cli.timeouts.*` keys to the .n-dx.json config schema with documentation, validation, and support through `ndx config get/set`. Ensure `ndx config --help` describes the timeout keys and their defaults.",
               "acceptanceCriteria": [
@@ -411,7 +411,7 @@
             {
               "id": "1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
               "title": "Add timeout configuration panel to web settings UI",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Surface the CLI timeout settings in the n-dx web dashboard settings panel so users can view and update timeouts without touching the CLI. The panel should show the current global default and any per-command overrides, with save/reset controls that write back to .n-dx.json via the existing config API.",
               "acceptanceCriteria": [
@@ -456,7 +456,7 @@
             {
               "id": "bb5f0641-67a7-43d2-b0fe-186faf73c0bc",
               "title": "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "The ndx init dinosaur ASCII art was redesigned and corrected in a prior sprint (proportions fixed, animation frames sourced from Rex-F.png). The E2E brand test at tests/e2e/cli-brand.test.js still asserts against the old dinosaur output, causing it to fail or carry a stale snapshot. Update the expected output in the test to match the current canonical dinosaur so the suite is green and serves as an accurate regression guard going forward.",
               "acceptanceCriteria": [
@@ -532,7 +532,7 @@
             {
               "id": "db8cf9f9-7ecf-4100-8f8e-533b7a104d3c",
               "title": "Fix suggestion in token: Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "- Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0.65) — requires refactoring before new feature development",
               "priority": "high",
@@ -575,7 +575,7 @@
             {
               "id": "77111aec-d990-4b9c-82cb-47c60fc195df",
               "title": "Fix suggestion in web-2: Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its fil",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "- Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
@@ -631,7 +631,7 @@
             {
               "id": "9c999a92-f89f-469c-a527-5e4aaae920bf",
               "title": "Fix Codex output parser to capture next-line token count after 'tokens used' label",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "The existing Codex token extraction logic looks for a token count on the same line as the 'tokens used' marker. Codex actually prints 'tokens used' as a standalone label and puts the integer count on the line immediately following it. Update the parser to handle this two-line pattern: detect the 'tokens used' sentinel, then read the next non-empty line as the count. The fix should be backward-compatible in case future Codex versions collapse this back to one line.",
               "acceptanceCriteria": [
