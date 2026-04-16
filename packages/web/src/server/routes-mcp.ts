@@ -8,20 +8,18 @@
  * Sessions are stateful (session ID generated per initialize request).
  *
  * Unlike the REST API routes (which read JSON files from disk and shell
- * out to CLIs), MCP routes require the actual MCP server factory
- * functions at runtime.  These are the **only** cross-package runtime
- * imports in the web package, isolated in gateway modules.
+ * out to CLIs), MCP routes require the actual MCP server factory functions
+ * at runtime.  The factories are injected via {@link initMcpRoutes} so that
+ * this module has no compile-time dependency on specific gateway modules.
  *
- * @see ./rex-gateway.ts — Rex runtime gateway
- * @see ./domain-gateway.ts — Sourcevision runtime gateway
+ * @see ./rex-gateway.ts — Rex runtime gateway (wired in start.ts)
+ * @see ./domain-gateway.ts — Sourcevision runtime gateway (wired in start.ts)
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { createRexMcpServer } from "./rex-gateway.js";
-import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import type { ServerContext } from "./types.js";
 
 const MCP_REX_PATH = "/mcp/rex";
@@ -81,13 +79,31 @@ function ensureSweepTimer(): void {
 
 type McpServerFactory = (ctx: ServerContext) => McpServer | Promise<McpServer>;
 
-/** Factory that creates a Rex MCP server instance. */
-const createRexServer: McpServerFactory = async (ctx) =>
-  createRexMcpServer(ctx.projectDir);
+/**
+ * Factory functions for MCP server creation.
+ * Set once via {@link initMcpRoutes} before the HTTP server handles requests.
+ * @see packages/web/src/server/start.ts — production wiring
+ */
+export interface McpRouteFactories {
+  /** Factory that creates a Rex MCP server instance. */
+  rex: McpServerFactory;
+  /** Factory that creates a Sourcevision MCP server instance. */
+  sv: McpServerFactory;
+}
 
-/** Factory that creates a Sourcevision MCP server instance. */
-const createSvServer: McpServerFactory = (ctx) =>
-  createSourcevisionMcpServer(ctx.projectDir);
+/** Module-level factories — populated by {@link initMcpRoutes}. */
+let configuredFactories: McpRouteFactories | null = null;
+
+/**
+ * Wire the MCP server factory functions. Must be called once before the first
+ * request reaches {@link handleMcpRoute}.
+ *
+ * This is an injection seam — callers (start.ts) own the factory wiring so
+ * routes-mcp.ts has no compile-time dependency on specific gateway modules.
+ */
+export function initMcpRoutes(factories: McpRouteFactories): void {
+  configuredFactories = factories;
+}
 
 /**
  * Create a new MCP session: transport + server, connected but not yet handling requests.
@@ -193,15 +209,20 @@ export async function handleMcpRoute(
   // Strip query string for path matching
   const path = url.split("?")[0];
 
+  // Only claim MCP paths; non-MCP paths fall through to other handlers.
+  if (path !== MCP_REX_PATH && path !== MCP_SV_PATH) return false;
+
+  if (!configuredFactories) {
+    res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "MCP routes not initialised — call initMcpRoutes() at server startup." }));
+    return true;
+  }
+
   if (path === MCP_REX_PATH) {
-    return handleMcpRequest(req, res, ctx, rexSessions, createRexServer);
+    return handleMcpRequest(req, res, ctx, rexSessions, configuredFactories.rex);
   }
 
-  if (path === MCP_SV_PATH) {
-    return handleMcpRequest(req, res, ctx, svSessions, createSvServer);
-  }
-
-  return false;
+  return handleMcpRequest(req, res, ctx, svSessions, configuredFactories.sv);
 }
 
 /**

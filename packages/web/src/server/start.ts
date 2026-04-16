@@ -16,10 +16,11 @@ import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync } from "./prd-io.js";
-import { collectAllIds } from "./rex-gateway.js";
+import { collectAllIds, createRexMcpServer } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
-import { handleMcpRoute } from "./routes-mcp.js";
+import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
+import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleStatusRoute, clearStatusCache } from "./routes-status.js";
 import { handleConfigRoute } from "./routes-config.js";
@@ -637,6 +638,12 @@ export async function startServer(
   // metrics to all connected dashboard clients.
   const wsHealthInterval = startWsHealthBroadcast(ws.broadcast, wsHealthTracker, ws.clientCount);
   watcherHandles.monitorIntervals.push(wsHealthInterval);
+
+  // Wire MCP route factories — must run before the first request is handled.
+  initMcpRoutes({
+    rex: (rctx) => createRexMcpServer(rctx.projectDir),
+    sv: (rctx) => createSourcevisionMcpServer(rctx.projectDir),
+  });
 
   const server = createHttpServer(ctx, watcher, ws, assets, wsHealthTracker);
 

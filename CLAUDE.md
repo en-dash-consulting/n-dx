@@ -137,6 +137,7 @@ Some cross-zone dependencies use callback injection rather than gateway imports.
 | Injection site | Target module | Injected callbacks | Interface type |
 |----------------|---------------|--------------------|----------------|
 | `web/src/server/start.ts` | `web/src/server/register-scheduler.ts` | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
+| `web/src/server/start.ts` | `web/src/server/routes-mcp.ts` | `rex`, `sv` (McpServerFactory callbacks) | `McpRouteFactories` |
 
 Rules:
 - **Prefer injection over import** when the target module would otherwise need to import from a higher-tier zone (e.g., scheduler importing from dashboard wiring).

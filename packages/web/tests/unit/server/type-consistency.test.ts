@@ -12,8 +12,13 @@
  * These tests verify those viewer mirrors stay in sync with canonical
  * Rex definitions, and that the gateway re-exports are correct.
  *
+ * Also covers the domain-gateway contract (web→sourcevision import seam):
+ * a silent rename in sourcevision's public API would break MCP routes at
+ * runtime — this test catches such breakage at CI time.
+ *
  * @see packages/rex/src/schema/v1.ts — canonical definitions
- * @see packages/web/src/server/rex-gateway.ts — gateway (re-exports from rex)
+ * @see packages/web/src/server/rex-gateway.ts — rex gateway (re-exports from rex)
+ * @see packages/web/src/server/domain-gateway.ts — sourcevision gateway
  * @see packages/web/src/viewer/components/prd-tree/types.ts — viewer type mirrors
  */
 
@@ -219,5 +224,24 @@ describe("Viewer type mirrors match canonical definitions", () => {
     expect(priorities).toHaveLength(4);
     expect(categories).toHaveLength(6);
     expect(validationTypes).toHaveLength(3);
+  });
+});
+
+// ── Domain gateway contract ──────────────────────────────────────────────────
+//
+// domain-gateway.ts is the sole runtime import point from sourcevision into the
+// web package. A silent rename or removal in sourcevision's public API would
+// break MCP route handling at runtime. These tests catch such breakage at CI.
+
+import { createSourcevisionMcpServer } from "../../../src/server/domain-gateway.js";
+
+describe("domain-gateway contract", () => {
+  it("re-exports createSourcevisionMcpServer as a function", () => {
+    expect(typeof createSourcevisionMcpServer).toBe("function");
+  });
+
+  it("re-exports match canonical sourcevision exports", async () => {
+    const canonical = await import("../../../../sourcevision/src/public.js");
+    expect(createSourcevisionMcpServer).toBe(canonical.createSourcevisionMcpServer);
   });
 });
