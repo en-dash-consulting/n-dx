@@ -60,11 +60,11 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 
 | Zone | Package | Cohesion | Coupling | Notes |
 |------|---------|----------|----------|-------|
-| `web-shared` | web | 0.36 | 0.64 | Foundation layer; 3 files (metrics unreliable at this size); two-consumer rule enforced by `boundary-check.test.ts` |
+| `web-shared` | web | 0.36 | 0.64 | Foundation layer; 5 files (metrics unreliable at this size); two-consumer rule enforced by `boundary-check.test.ts` |
 | `rex-cli` | rex | 0.25 | 0.75 | 27+ command files in flat directory; high coupling to core |
 | `prd-fix-command` | rex | 0.25 | 0.75 | Satellite CLI zone; 2 files with tight core coupling |
 | `crash` | web | 0.50 | unidirectional (web-viewer → crash) | At threshold boundary — crash imports web-shared directly (documented bypass), not web-viewer |
-| `web-dashboard-platform` | web | 0.53 | — | Watch designation; 33 files (metrics reliable); 0.03 above dual-fragility threshold — baseline documented for regression tracking |
+| `viewer-ui-hub` | web | 0.38 | 0.63 | Viewer composition hub; 5 files; structurally expected for a UI composition root — documented in `viewer-ui-hub` governance section |
 
 **Universal governance rules** (apply to all dual-fragility zones):
 - **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
@@ -73,7 +73,7 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 
 ##### web-shared addition policy
 
-`web-shared` has low cohesion (0.36) and high coupling (0.64). The zone contains only 3 files (below the 5-file threshold for reliable metrics), so the measured values reflect the inherent low internal relationship between its two modules (data-file constants vs view identifiers) rather than structural decay. In addition to the universal governance rules above:
+`web-shared` has low cohesion (0.36) and high coupling (0.64). The zone contains 5 files (below the 5-file threshold for reliable metrics), so the measured values reflect the inherent low internal relationship between its modules (data-file constants, feature flags, view identifiers, routing helpers) rather than structural decay. Note: Louvain may merge this zone into `web-viewer` when shared imports create a strong bridge to viewer files — if that happens, pin the shared files back to `web-shared` on the next analysis. In addition to the universal governance rules above:
 
 - **Framework-agnostic only:** `web-shared` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
 - **Barrel import enforcement:** Consumers must import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Enforced by `boundary-check.test.ts`.
@@ -89,6 +89,23 @@ Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` wit
 ##### crash zone proactive governance
 
 `crash` (cohesion 0.5, unidirectional coupling: web-viewer → crash) sits at the dual-fragility threshold boundary. Crash imports web-shared directly (documented bypass) rather than web-viewer. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
+
+##### viewer-ui-hub governance
+
+`viewer-ui-hub` (cohesion 0.38, coupling 0.63) is the intentional Preact UI composition hub — it assembles sidebar, config-footer, faq, and logos components. Its dual-fragility metrics are **structurally expected** for a UI composition root: it imports broadly from `web-viewer` (high coupling) while its internal files serve distinct UI concerns (low cohesion). In addition to the universal governance rules:
+
+- **No domain logic:** This zone must contain only UI composition components and their direct rendering helpers. Data fetching and state management belong in hooks or views.
+- **Monitor fan-out:** The bidirectional 74-edge coupling with the web dashboard platform zone is the largest cross-zone relationship in the web package — audit import direction periodically to ensure inbound imports enter through `api.ts` or composition-root wiring rather than ad-hoc leaf reach-ins.
+- **Satellite consolidation:** Three micro-zones (theme-toggle, search-overlay, graph-view-tests) are community-detection artifacts pointing at this hub — consolidating them reduces zone noise without losing architectural boundaries.
+
+##### web-server zone stability
+
+`web-server` (composition root — Express routes, gateways, MCP handlers) is prone to dissolving into `web-viewer` in Louvain analysis because server files import from `packages/web/src/shared/` (required by the barrel-import policy), and shared files are also imported by viewer files, creating a Louvain connectivity bridge. If the zone dissolves:
+
+1. Check `stability.reassignedFiles` in `.sourcevision/zones.json` for `[file, "web-server", "web-viewer"]` entries
+2. Update `.sourcevision/hints.md` with re-analysis guidance
+3. The zone pins in `.n-dx.json` targeting `"web-server"` are no-ops when the zone is absent — they will re-activate if the zone re-appears in Louvain output
+4. The actual server/viewer boundary is enforced by `boundary-check.test.ts` regardless of zone detection — zone dissolution is a metrics artifact, not an architectural violation
 
 ##### hench-agent internal governance
 
