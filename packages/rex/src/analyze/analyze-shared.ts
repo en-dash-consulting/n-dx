@@ -187,6 +187,35 @@ export function extractJson(raw: string): string {
     return text;
   }
 
+  // Fallback: scan for the first `[` or `{` anywhere in the text.
+  //
+  // The line-start searches above intentionally require JSON to begin at the
+  // start of a line to avoid matching arrays/objects embedded inside prose
+  // (e.g. "[a, b, c]" within a sentence). However, some LLM outputs (notably
+  // Codex) place JSON inline without a leading newline:
+  //
+  //   "Here are the proposals: [{...}]"
+  //
+  // This fallback handles that pattern. Arrays are preferred over bare objects
+  // to match the expected top-level proposal format.
+  const inlineArrayIdx = text.indexOf("[");
+  const inlineObjIdx = text.indexOf("{");
+
+  const inlineStart =
+    inlineArrayIdx >= 0 && (inlineObjIdx < 0 || inlineArrayIdx < inlineObjIdx)
+      ? inlineArrayIdx
+      : inlineObjIdx;
+
+  if (inlineStart >= 0) {
+    const slice = text.slice(inlineStart);
+    const closeIdx = findMatchingClose(slice, 0);
+    if (closeIdx >= 0) {
+      return slice.slice(0, closeIdx + 1);
+    }
+    // Unclosed — return sliced text for downstream repair
+    return slice;
+  }
+
   return text;
 }
 

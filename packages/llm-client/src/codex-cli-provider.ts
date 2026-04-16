@@ -252,9 +252,33 @@ async function spawnOnce(
       });
     });
 
-    const text = await readFile(outputPath, "utf-8");
-    debugLog(`spawn success outputChars=${text.trim().length}`);
-    return { text: text.trim() };
+    let rawText: string;
+    try {
+      rawText = await readFile(outputPath, "utf-8");
+    } catch (err) {
+      const nodeErr = err as NodeJS.ErrnoException;
+      if (nodeErr.code === "ENOENT") {
+        throw new ClaudeClientError(
+          "codex exec exited successfully but did not write output file",
+          "unknown",
+          true,
+        );
+      }
+      throw err;
+    }
+
+    const text = rawText.trim();
+    debugLog(`spawn success outputChars=${text.length}`);
+
+    if (text.length === 0) {
+      throw new ClaudeClientError(
+        "codex exec produced empty output",
+        "unknown",
+        true,
+      );
+    }
+
+    return { text };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
