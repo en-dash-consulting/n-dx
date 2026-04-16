@@ -340,260 +340,200 @@ export interface ImportsOptions {
   language?: string;
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// ── analyzeImports helpers ───────────────────────────────────────────────────
 
-export async function analyzeImports(
+/** Resolve effective language config from manifest, options, or auto-detection. */
+async function resolveLanguageConfig(
   targetDir: string,
-  inventory: Inventory,
-  options?: ImportsOptions
-): Promise<Imports> {
-  const fileSet = new Set(inventory.files.map((f) => f.path));
-  const tsconfigPaths = await readTsconfigPaths(targetDir);
-  const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
-
-  // ── Resolve language → build parseable extension set ──────────────────────
-  // Use all detected languages (from manifest.languages) so mixed projects
-  // produce import edges for both Go and TypeScript files.
-  let langConfig: LanguageConfig | undefined;
-  const manifest = readManifest(targetDir);
+  manifest: ReturnType<typeof readManifest>,
+  options?: ImportsOptions,
+): Promise<LanguageConfig> {
   if (manifest.languages && manifest.languages.length > 0) {
     const configs = manifest.languages
       .map((id) => getLanguageConfig(id))
       .filter((c): c is NonNullable<typeof c> => c != null);
-    if (configs.length > 0) {
-      langConfig = mergeLanguageConfigs(configs);
-    }
+    if (configs.length > 0) return mergeLanguageConfigs(configs);
   }
-  if (!langConfig && options?.language) {
-    langConfig = getLanguageConfig(options.language);
+  if (options?.language) {
+    const config = getLanguageConfig(options.language);
+    if (config) return config;
   }
-  if (!langConfig && manifest.language) {
-    langConfig = getLanguageConfig(manifest.language);
+  if (manifest.language) {
+    const config = getLanguageConfig(manifest.language);
+    if (config) return config;
   }
-  if (!langConfig) {
-    langConfig = mergeLanguageConfigs(await detectLanguages(targetDir));
-  }
+  return mergeLanguageConfigs(await detectLanguages(targetDir));
+}
 
-  // Always include JS/TS for backward compatibility; add resolved language extensions.
-  const parseableExts = new Set<string>(JS_TS_EXTENSIONS);
-  for (const ext of langConfig.parseableExtensions) parseableExts.add(ext);
+interface IncrementalState {
+  edgeMap: Map<string, ImportEdge>;
+  externalMap: Map<string, ExternalImport>;
+  unchangedExternalFiles: Set<string>;
+}
 
-  // ── Read go.mod once if any Go files exist in the inventory ───────────────
-  const hasGoFiles = inventory.files.some((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
-  const goModulePath = hasGoFiles ? await readGoModulePath(targetDir) : null;
-
-  const prev = options?.previousImports;
-  const changedFiles = options?.changedFiles;
-  const fileSetChanged = options?.fileSetChanged ?? true;
-
-  // Incremental path: no adds/deletes, have previous, have change list
-  const canIncremental = prev && changedFiles && !fileSetChanged;
-
-  // Collect edges keyed for dedup
+/**
+ * Build starting edge/external maps from a previous run, carrying forward only
+ * the entries for unchanged files. Files in changedFiles are excluded so they
+ * can be re-parsed fresh.
+ */
+function buildIncrementalState(prev: Imports, changedFiles: Set<string>): IncrementalState {
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();
-
-  // Track which unchanged files need external symbol re-extraction
   const unchangedExternalFiles = new Set<string>();
 
-  if (canIncremental) {
-    // Keep all edges FROM unchanged files
-    for (const edge of prev.edges) {
-      if (!changedFiles.has(edge.from)) {
-        const key = `${edge.from}\0${edge.to}\0${edge.type}`;
-        edgeMap.set(key, edge);
-      }
-    }
-
-    // Keep external imports from unchanged files (importedBy only, symbols rebuilt below)
-    for (const ext of prev.external) {
-      const unchangedImporters = ext.importedBy.filter((f) => !changedFiles.has(f));
-      const hasChangedImporters = unchangedImporters.length < ext.importedBy.length;
-      if (unchangedImporters.length > 0) {
-        if (hasChangedImporters) {
-          // Mixed importers: need to re-extract symbols from unchanged files
-          for (const f of unchangedImporters) unchangedExternalFiles.add(f);
-          externalMap.set(ext.package, {
-            package: ext.package,
-            importedBy: [...unchangedImporters],
-            symbols: [], // rebuilt below
-          });
-        } else {
-          // All importers unchanged: symbols are accurate
-          externalMap.set(ext.package, {
-            package: ext.package,
-            importedBy: [...unchangedImporters],
-            symbols: [...ext.symbols],
-          });
-        }
-      }
+  for (const edge of prev.edges) {
+    if (!changedFiles.has(edge.from)) {
+      edgeMap.set(`${edge.from}\0${edge.to}\0${edge.type}`, edge);
     }
   }
 
-  // Re-extract external symbols from unchanged files that share packages with changed files
-  if (unchangedExternalFiles.size > 0) {
-    for (const filePath of unchangedExternalFiles) {
-      const fullPath = join(targetDir, filePath);
-      let sourceText: string;
-      try {
-        sourceText = await readFile(fullPath, "utf-8");
-      } catch {
-        continue;
-      }
+  for (const ext of prev.external) {
+    const unchangedImporters = ext.importedBy.filter((f) => !changedFiles.has(f));
+    if (unchangedImporters.length === 0) continue;
 
-      const fileExt = extname(filePath).toLowerCase();
-      if (fileExt === GO_EXTENSION) {
-        // Go file: re-extract external imports using Go parser
-        const goResult = extractGoImports(sourceText, filePath, goModulePath);
-        for (const goExt of goResult.external) {
-          const existing = externalMap.get(goExt.package);
-          if (existing) {
-            const symbols = new Set([...existing.symbols, ...goExt.symbols]);
-            existing.symbols = Array.from(symbols);
-          }
-        }
-      } else {
-        // JS/TS file: existing logic
-        const rawImports = extractImports(sourceText, filePath);
-        for (const raw of rawImports) {
-          if (raw.specifier.startsWith("node:") || raw.specifier.startsWith(".")) continue;
-          const pkg = extractPackageName(raw.specifier);
-          const existing = externalMap.get(pkg);
-          if (existing) {
-            const symbols = new Set([...existing.symbols, ...raw.symbols]);
-            existing.symbols = Array.from(symbols);
-          }
-        }
-      }
+    const hasChangedImporters = unchangedImporters.length < ext.importedBy.length;
+    if (hasChangedImporters) {
+      // Mixed importers: symbols must be re-extracted from unchanged files
+      for (const f of unchangedImporters) unchangedExternalFiles.add(f);
+      externalMap.set(ext.package, { package: ext.package, importedBy: [...unchangedImporters], symbols: [] });
+    } else {
+      // All importers unchanged: symbols are accurate as-is
+      externalMap.set(ext.package, { package: ext.package, importedBy: [...unchangedImporters], symbols: [...ext.symbols] });
     }
   }
 
-  // Determine which files to parse
-  const parseable = inventory.files.filter((f) => {
-    const ext = extname(f.path).toLowerCase();
-    if (!parseableExts.has(ext)) return false;
-    if (canIncremental) return changedFiles.has(f.path);
-    return true;
-  });
+  return { edgeMap, externalMap, unchangedExternalFiles };
+}
 
-  // Partition into JS/TS and Go files to prevent cross-language contamination
-  const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
-  const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
-
-  // ── Process JS/TS files ───────────────────────────────────────────────────
-  for (const file of jsTsFiles) {
-    const fullPath = join(targetDir, file.path);
+/**
+ * Re-extract external symbols from unchanged files that share a package with
+ * at least one changed importer. Mutates externalMap in place.
+ */
+async function reExtractUnchangedExternals(
+  unchangedExternalFiles: Set<string>,
+  targetDir: string,
+  goModulePath: string | null,
+  externalMap: Map<string, ExternalImport>,
+): Promise<void> {
+  for (const filePath of unchangedExternalFiles) {
     let sourceText: string;
     try {
-      sourceText = await readFile(fullPath, "utf-8");
+      sourceText = await readFile(join(targetDir, filePath), "utf-8");
+    } catch {
+      continue;
+    }
+
+    if (extname(filePath).toLowerCase() === GO_EXTENSION) {
+      for (const goExt of extractGoImports(sourceText, filePath, goModulePath).external) {
+        const existing = externalMap.get(goExt.package);
+        if (existing) {
+          existing.symbols = Array.from(new Set([...existing.symbols, ...goExt.symbols]));
+        }
+      }
+    } else {
+      for (const raw of extractImports(sourceText, filePath)) {
+        if (raw.specifier.startsWith("node:") || raw.specifier.startsWith(".")) continue;
+        const existing = externalMap.get(extractPackageName(raw.specifier));
+        if (existing) {
+          existing.symbols = Array.from(new Set([...existing.symbols, ...raw.symbols]));
+        }
+      }
+    }
+  }
+}
+
+/** Parse JS/TS files and append edges and external imports to the provided maps. */
+async function processJsTsFiles(
+  files: Inventory["files"],
+  targetDir: string,
+  resolver: Resolver,
+  edgeMap: Map<string, ImportEdge>,
+  externalMap: Map<string, ExternalImport>,
+): Promise<void> {
+  for (const file of files) {
+    let sourceText: string;
+    try {
+      sourceText = await readFile(join(targetDir, file.path), "utf-8");
     } catch {
       continue; // skip unreadable files
     }
 
-    const rawImports = extractImports(sourceText, file.path);
-
-    for (const raw of rawImports) {
-      // Skip Node.js builtins
-      if (raw.specifier.startsWith("node:")) {
-        continue;
-      }
+    for (const raw of extractImports(sourceText, file.path)) {
+      if (raw.specifier.startsWith("node:")) continue;
 
       const resolved = resolver.resolve(raw.specifier, file.path);
-
       if (resolved) {
-        // Internal edge
         const key = `${file.path}\0${resolved}\0${raw.type}`;
         const existing = edgeMap.get(key);
         if (existing) {
-          const merged = new Set([...existing.symbols, ...raw.symbols]);
-          edgeMap.set(key, { ...existing, symbols: Array.from(merged) });
+          edgeMap.set(key, { ...existing, symbols: Array.from(new Set([...existing.symbols, ...raw.symbols])) });
         } else {
-          edgeMap.set(key, {
-            from: file.path,
-            to: resolved,
-            type: raw.type,
-            symbols: [...raw.symbols],
-          });
+          edgeMap.set(key, { from: file.path, to: resolved, type: raw.type, symbols: [...raw.symbols] });
         }
       } else if (!raw.specifier.startsWith(".")) {
         // External package
         const pkg = extractPackageName(raw.specifier);
         const existing = externalMap.get(pkg);
         if (existing) {
-          const importedBy = new Set([...existing.importedBy, file.path]);
-          const symbols = new Set([...existing.symbols, ...raw.symbols]);
           externalMap.set(pkg, {
             package: pkg,
-            importedBy: Array.from(importedBy),
-            symbols: Array.from(symbols),
+            importedBy: Array.from(new Set([...existing.importedBy, file.path])),
+            symbols: Array.from(new Set([...existing.symbols, ...raw.symbols])),
           });
         } else {
-          externalMap.set(pkg, {
-            package: pkg,
-            importedBy: [file.path],
-            symbols: [...raw.symbols],
-          });
+          externalMap.set(pkg, { package: pkg, importedBy: [file.path], symbols: [...raw.symbols] });
         }
       }
       // Unresolved relative imports are silently skipped
     }
   }
+}
 
-  // ── Process Go files ──────────────────────────────────────────────────────
-  for (const file of goParseableFiles) {
-    const fullPath = join(targetDir, file.path);
+/** Parse Go files and append edges and external imports to the provided maps. */
+async function processGoFiles(
+  files: Inventory["files"],
+  targetDir: string,
+  goModulePath: string | null,
+  edgeMap: Map<string, ImportEdge>,
+  externalMap: Map<string, ExternalImport>,
+): Promise<void> {
+  for (const file of files) {
     let sourceText: string;
     try {
-      sourceText = await readFile(fullPath, "utf-8");
+      sourceText = await readFile(join(targetDir, file.path), "utf-8");
     } catch {
       continue;
     }
 
     const goResult = extractGoImports(sourceText, file.path, goModulePath);
 
-    // Merge Go internal edges
     for (const edge of goResult.edges) {
       const key = `${edge.from}\0${edge.to}\0${edge.type}`;
       const existing = edgeMap.get(key);
       if (existing) {
-        const merged = new Set([...existing.symbols, ...edge.symbols]);
-        edgeMap.set(key, { ...existing, symbols: Array.from(merged) });
+        edgeMap.set(key, { ...existing, symbols: Array.from(new Set([...existing.symbols, ...edge.symbols])) });
       } else {
         edgeMap.set(key, edge);
       }
     }
 
-    // Merge Go external imports
     for (const goExt of goResult.external) {
       const existing = externalMap.get(goExt.package);
       if (existing) {
-        const importedBy = new Set([...existing.importedBy, ...goExt.importedBy]);
-        const symbols = new Set([...existing.symbols, ...goExt.symbols]);
         externalMap.set(goExt.package, {
           package: goExt.package,
-          importedBy: Array.from(importedBy),
-          symbols: Array.from(symbols),
+          importedBy: Array.from(new Set([...existing.importedBy, ...goExt.importedBy])),
+          symbols: Array.from(new Set([...existing.symbols, ...goExt.symbols])),
         });
       } else {
         externalMap.set(goExt.package, { ...goExt });
       }
     }
   }
+}
 
-  // If incremental, clean up external symbols: rebuild symbols from only the packages
-  // that still have importers
-  if (canIncremental) {
-    for (const [pkg, ext] of externalMap) {
-      if (ext.importedBy.length === 0) {
-        externalMap.delete(pkg);
-      }
-    }
-  }
-
-  const edges = Array.from(edgeMap.values());
-  const external = Array.from(externalMap.values());
-
-  // Always recompute summary
+/** Compute ImportsSummary statistics from collected edges and external packages. */
+function buildImportSummary(edges: ImportEdge[], external: ExternalImport[]): ImportsSummary {
   // Exclude type-only imports from mostImported: they don't create runtime
   // dependencies and inflate rankings for schema/type-definition files.
   const importCounts = new Map<string, number>();
@@ -607,16 +547,13 @@ export async function analyzeImports(
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
 
-  const filesWith = new Set<string>();
-  for (const e of edges) {
-    filesWith.add(e.from);
-  }
+  const filesWith = new Set(edges.map((e) => e.from));
   const avgImportsPerFile =
     filesWith.size > 0 ? Math.round((edges.length / filesWith.size) * 100) / 100 : 0;
 
   const circulars = detectCirculars(edges);
 
-  const summary: ImportsSummary = {
+  return {
     totalEdges: edges.length,
     totalExternal: external.length,
     circularCount: circulars.length,
@@ -624,6 +561,69 @@ export async function analyzeImports(
     mostImported,
     avgImportsPerFile,
   };
+}
 
-  return sortImports({ edges, external, summary });
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+export async function analyzeImports(
+  targetDir: string,
+  inventory: Inventory,
+  options?: ImportsOptions
+): Promise<Imports> {
+  const fileSet = new Set(inventory.files.map((f) => f.path));
+  const tsconfigPaths = await readTsconfigPaths(targetDir);
+  const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
+
+  const manifest = readManifest(targetDir);
+  const langConfig = await resolveLanguageConfig(targetDir, manifest, options);
+
+  // Always include JS/TS for backward compatibility; add resolved language extensions.
+  const parseableExts = new Set<string>(JS_TS_EXTENSIONS);
+  for (const ext of langConfig.parseableExtensions) parseableExts.add(ext);
+
+  // Read go.mod once if any Go files exist in the inventory.
+  const hasGoFiles = inventory.files.some((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
+  const goModulePath = hasGoFiles ? await readGoModulePath(targetDir) : null;
+
+  const prev = options?.previousImports;
+  const changedFiles = options?.changedFiles;
+  const fileSetChanged = options?.fileSetChanged ?? true;
+  // Incremental path: no adds/deletes, have previous, have change list
+  const canIncremental = prev && changedFiles && !fileSetChanged;
+
+  const edgeMap = new Map<string, ImportEdge>();
+  const externalMap = new Map<string, ExternalImport>();
+
+  if (canIncremental) {
+    const state = buildIncrementalState(prev, changedFiles);
+    for (const [k, v] of state.edgeMap) edgeMap.set(k, v);
+    for (const [k, v] of state.externalMap) externalMap.set(k, v);
+    await reExtractUnchangedExternals(state.unchangedExternalFiles, targetDir, goModulePath, externalMap);
+  }
+
+  // Determine which files to parse
+  const parseable = inventory.files.filter((f) => {
+    const ext = extname(f.path).toLowerCase();
+    if (!parseableExts.has(ext)) return false;
+    if (canIncremental) return changedFiles.has(f.path);
+    return true;
+  });
+
+  // Partition into JS/TS and Go to prevent cross-language contamination
+  const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
+  const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
+
+  await processJsTsFiles(jsTsFiles, targetDir, resolver, edgeMap, externalMap);
+  await processGoFiles(goParseableFiles, targetDir, goModulePath, edgeMap, externalMap);
+
+  // Incremental cleanup: remove packages whose importers were all changed
+  if (canIncremental) {
+    for (const [pkg, ext] of externalMap) {
+      if (ext.importedBy.length === 0) externalMap.delete(pkg);
+    }
+  }
+
+  const edges = Array.from(edgeMap.values());
+  const external = Array.from(externalMap.values());
+  return sortImports({ edges, external, summary: buildImportSummary(edges, external) });
 }

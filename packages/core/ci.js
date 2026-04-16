@@ -52,6 +52,378 @@ function runCapture(script, args, spawnFn) {
   });
 }
 
+// ── CI phases ────────────────────────────────────────────────────────────────
+// Each phase runs a cohesive group of CI steps and returns { ok, steps }.
+// runCI orchestrates the phases and assembles the final report.
+
+/**
+ * Phase: documentation checks.
+ * Steps: community files, architecture docs freshness, guide docs freshness, docs build.
+ */
+async function runDocsPhase(dir, info, isJSON, spawnTracked) {
+  const steps = [];
+  let allOk = true;
+
+  // Step 0: community files
+  info("── community files ──");
+  const communityResult = checkCommunityFiles(dir);
+  if (!communityResult.ok) allOk = false;
+  steps.push({
+    name: "community-files",
+    ok: communityResult.ok,
+    detail: communityResult.ok
+      ? `${communityResult.checked} community file(s) present`
+      : `${communityResult.missing.length} required community file(s) missing or empty`,
+    ...(communityResult.missing.length > 0 ? { missing: communityResult.missing } : {}),
+  });
+  if (communityResult.ok) {
+    info(`  ✓ community files (${communityResult.checked} checked)`);
+  } else {
+    info(`  ✗ community files`);
+    if (!isJSON) {
+      for (const m of communityResult.missing) info(`    ✗ ${m}`);
+    }
+  }
+
+  // Step 0a: architecture docs freshness (warn-only)
+  info("── architecture docs freshness ──");
+  const archDocsResult = checkArchitectureDocsFreshness(dir);
+  steps.push({
+    name: "architecture-docs-freshness",
+    ok: true,
+    detail: archDocsResult.stale.length === 0
+      ? `${archDocsResult.checked} architecture doc(s) up to date`
+      : `${archDocsResult.stale.length} architecture doc(s) may be stale`,
+    ...(archDocsResult.stale.length > 0 ? { stale: archDocsResult.stale } : {}),
+  });
+  if (archDocsResult.stale.length === 0) {
+    info(`  ✓ architecture docs freshness (${archDocsResult.checked} checked)`);
+  } else {
+    info(`  ⚠ architecture docs freshness`);
+    if (!isJSON) {
+      for (const s of archDocsResult.stale) info(`    ⚠ ${s}`);
+    }
+  }
+
+  // Step 0b: guide docs freshness (warn-only)
+  info("── guide docs freshness ──");
+  const guideDocsResult = checkDocsFreshness(dir, "guide", GUIDE_SOURCE_FILES);
+  steps.push({
+    name: "guide-docs-freshness",
+    ok: true,
+    detail: guideDocsResult.stale.length === 0
+      ? `${guideDocsResult.checked} guide doc(s) up to date`
+      : `${guideDocsResult.stale.length} guide doc(s) may be stale`,
+    ...(guideDocsResult.stale.length > 0 ? { stale: guideDocsResult.stale } : {}),
+  });
+  if (guideDocsResult.stale.length === 0) {
+    info(`  ✓ guide docs freshness (${guideDocsResult.checked} checked)`);
+  } else {
+    info(`  ⚠ guide docs freshness`);
+    if (!isJSON) {
+      for (const s of guideDocsResult.stale) info(`    ⚠ ${s}`);
+    }
+  }
+
+  // Step 0c: docs build
+  info("── docs build ──");
+  const docsBuild = await new Promise((res) => {
+    const child = spawnTracked("pnpm", ["docs:build"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => { stdout += d; });
+    child.stderr.on("data", (d) => { stderr += d; });
+    child.on("close", (code) => res({ code: code ?? 1, stdout, stderr }));
+  });
+  const docsBuildOk = docsBuild.code === 0;
+  // docs-build failure is recorded but does not fail the pipeline —
+  // the step is informational (catches regressions) but not a gate.
+  steps.push({
+    name: "docs-build",
+    ok: docsBuildOk,
+    detail: docsBuildOk ? "docs site builds successfully" : "docs build failed",
+    ...(docsBuildOk ? {} : { stderr: docsBuild.stderr.slice(-500) }),
+  });
+  if (docsBuildOk) {
+    info("  ✓ docs build");
+  } else {
+    info("  ✗ docs build failed");
+    if (!isJSON) {
+      const lines = docsBuild.stderr.split("\n").filter((l) => l.includes("dead link") || l.includes("error"));
+      for (const l of lines.slice(0, 10)) info(`    ${l.trim()}`);
+    }
+  }
+
+  return { ok: allOk, steps };
+}
+
+/**
+ * Phase: sourcevision analysis.
+ * Steps: sourcevision analyze, sourcevision validate.
+ */
+async function runAnalysisPhase(dir, info, isJSON, tools, spawnTracked) {
+  const steps = [];
+  let allOk = true;
+
+  // Step 1: sourcevision analyze
+  info("── sourcevision analyze ──");
+  const svAnalyze = await runCapture(tools.sourcevision, ["analyze", "--fast", "--quiet", dir], spawnTracked);
+  const svOk = svAnalyze.code === 0;
+  if (!svOk) allOk = false;
+  steps.push({
+    name: "sourcevision",
+    ok: svOk,
+    detail: svOk ? "Analysis complete" : trimOutput(svAnalyze.stderr || svAnalyze.stdout),
+  });
+  if (svOk) {
+    info("  ✓ sourcevision analyze");
+  } else {
+    info(`  ✗ sourcevision analyze`);
+    if (!isJSON) printIndented(svAnalyze.stderr || svAnalyze.stdout, info);
+  }
+
+  // Step 2: sourcevision validate
+  info("── sourcevision validate ──");
+  const svValidate = await runCapture(tools.sourcevision, ["validate", "--quiet", dir], spawnTracked);
+  const svValOk = svValidate.code === 0;
+  if (!svValOk) allOk = false;
+  steps.push({
+    name: "sourcevision-validate",
+    ok: svValOk,
+    detail: svValOk ? "All modules valid" : trimOutput(svValidate.stdout || svValidate.stderr),
+  });
+  if (svValOk) {
+    info("  ✓ sourcevision validate");
+  } else {
+    info(`  ✗ sourcevision validate`);
+    if (!isJSON) printIndented(svValidate.stdout || svValidate.stderr, info);
+  }
+
+  return { ok: allOk, steps };
+}
+
+/**
+ * Phase: architectural boundary checks (synchronous).
+ * Steps: zone health, zone ID consistency, gateway imports, architecture policy, data-layer contract.
+ */
+function runBoundaryPhase(dir, info, isJSON) {
+  const steps = [];
+  let allOk = true;
+
+  // Step 3: zone health
+  info("── zone health ──");
+  const zoneHealth = checkZoneHealth(dir);
+  if (!zoneHealth.ok) allOk = false;
+  steps.push({
+    name: "zone-health",
+    ok: zoneHealth.ok,
+    detail: zoneHealth.ok
+      ? `${zoneHealth.checked} zones checked, all within thresholds`
+      : `${zoneHealth.violations.length} zone(s) exceed health thresholds`,
+    ...(zoneHealth.violations.length > 0 ? { violations: zoneHealth.violations } : {}),
+  });
+  if (zoneHealth.ok) {
+    const phantomNote = zoneHealth.phantomSkipped > 0 ? `, ${zoneHealth.phantomSkipped} phantom zone(s) excluded` : "";
+    info(`  ✓ zone health (${zoneHealth.checked} zones checked${phantomNote})`);
+  } else {
+    info(`  ✗ zone health`);
+    if (!isJSON) {
+      for (const v of zoneHealth.violations) {
+        info(`    ✗ ${v.id}: cohesion=${v.cohesion.toFixed(2)}, coupling=${v.coupling.toFixed(2)}`);
+      }
+    }
+  }
+
+  // Step 3a: zone ID consistency
+  info("── zone ID consistency ──");
+  const zoneConsistency = checkZoneIdConsistency(dir);
+  if (!zoneConsistency.ok) allOk = false;
+  steps.push({
+    name: "zone-id-consistency",
+    ok: zoneConsistency.ok,
+    detail: zoneConsistency.ok
+      ? `${zoneConsistency.checked} zone IDs consistent across zones.json and zone output directories`
+      : `${zoneConsistency.mismatches.length} zone ID inconsistency(ies) found`,
+    ...(zoneConsistency.mismatches.length > 0 ? { mismatches: zoneConsistency.mismatches } : {}),
+  });
+  if (zoneConsistency.ok) {
+    info(`  ✓ zone ID consistency (${zoneConsistency.checked} zones checked)`);
+  } else {
+    info(`  ✗ zone ID consistency`);
+    if (!isJSON) {
+      for (const m of zoneConsistency.mismatches) info(`    ✗ ${m}`);
+    }
+  }
+
+  // Step 3b: gateway imports
+  info("── gateway imports ──");
+  const gatewayResult = checkGatewayImports(dir);
+  if (!gatewayResult.ok) allOk = false;
+  steps.push({
+    name: "gateway-imports",
+    ok: gatewayResult.ok,
+    detail: gatewayResult.ok
+      ? `${gatewayResult.checked} files checked, all cross-package imports use gateways`
+      : `${gatewayResult.violations.length} file(s) bypass gateway pattern`,
+    ...(gatewayResult.violations.length > 0 ? { violations: gatewayResult.violations } : {}),
+  });
+  if (gatewayResult.ok) {
+    info(`  ✓ gateway imports (${gatewayResult.checked} files checked)`);
+  } else {
+    info(`  ✗ gateway imports`);
+    if (!isJSON) {
+      for (const v of gatewayResult.violations) info(`    ✗ ${v.file}:${v.line} — ${v.message}`);
+    }
+  }
+
+  // Step 3c: architecture policy
+  info("── architecture policy ──");
+  const archResult = checkArchitecturePolicy(dir);
+  if (!archResult.ok) allOk = false;
+  steps.push({
+    name: "architecture-policy",
+    ok: archResult.ok,
+    detail: archResult.ok
+      ? `${archResult.checked} files checked, no unauthorized child_process imports`
+      : `${archResult.violations.length} unauthorized child_process import(s) found`,
+    ...(archResult.violations.length > 0 ? { violations: archResult.violations } : {}),
+  });
+  if (archResult.ok) {
+    info(`  ✓ architecture policy (${archResult.checked} files checked)`);
+  } else {
+    info(`  ✗ architecture policy`);
+    if (!isJSON) {
+      for (const v of archResult.violations) info(`    ✗ ${v}`);
+    }
+  }
+
+  // Step 3d: data-layer contract
+  info("── data-layer contract ──");
+  const dataLayerResult = checkDataLayerContract(dir);
+  if (!dataLayerResult.ok) allOk = false;
+  steps.push({
+    name: "data-layer-contract",
+    ok: dataLayerResult.ok,
+    detail: dataLayerResult.ok
+      ? `${dataLayerResult.checked} files checked, no imports from data directories`
+      : `${dataLayerResult.violations.length} file(s) import from data directories`,
+    ...(dataLayerResult.violations.length > 0 ? { violations: dataLayerResult.violations } : {}),
+  });
+  if (dataLayerResult.ok) {
+    info(`  ✓ data-layer contract (${dataLayerResult.checked} files checked)`);
+  } else {
+    info(`  ✗ data-layer contract`);
+    if (!isJSON) {
+      for (const v of dataLayerResult.violations) info(`    ✗ ${v.file}:${v.line} — ${v.message}`);
+    }
+  }
+
+  return { ok: allOk, steps };
+}
+
+/**
+ * Phase: rex PRD checks.
+ * Steps: rex validate, structure health, rex status.
+ */
+async function runRexPhase(dir, info, isJSON, tools, spawnTracked) {
+  const steps = [];
+  let allOk = true;
+
+  // Step 4: rex validate
+  info("── rex validate ──");
+  const rexValidate = await runCapture(tools.rex, ["validate", "--format=json", dir], spawnTracked);
+  let validateChecks = [];
+  try {
+    const parsed = JSON.parse(rexValidate.stdout);
+    if (parsed && typeof parsed === "object" && "checks" in parsed) {
+      validateChecks = parsed.checks;
+    } else if (Array.isArray(parsed)) {
+      validateChecks = parsed;
+    }
+  } catch {
+    // Could not parse — treat as opaque output
+  }
+  const rexValOk = rexValidate.code === 0;
+  if (!rexValOk) allOk = false;
+  steps.push({
+    name: "validate",
+    ok: rexValOk,
+    checks: validateChecks,
+    detail: rexValOk
+      ? `${validateChecks.length} checks passed`
+      : trimOutput(rexValidate.stdout || rexValidate.stderr),
+  });
+  if (rexValOk) {
+    info(`  ✓ rex validate (${validateChecks.length} checks passed)`);
+  } else {
+    info(`  ✗ rex validate`);
+    if (!isJSON) {
+      for (const check of validateChecks) {
+        if (!check.pass && check.severity !== "warn") {
+          info(`    ✗ ${check.name}`);
+          for (const err of check.errors) info(`      ${err}`);
+        }
+      }
+    }
+  }
+
+  // Step 4b: structure health
+  info("── structure health ──");
+  const rexHealth = await runCapture(tools.rex, ["health", "--format=json", dir], spawnTracked);
+  let healthOk = rexHealth.code === 0;
+  let healthData = null;
+  try {
+    healthData = JSON.parse(rexHealth.stdout);
+    if (healthData && healthData.overall < 50) healthOk = false;
+  } catch {
+    // Could not parse
+  }
+  if (!healthOk) allOk = false;
+  steps.push({
+    name: "structure-health",
+    ok: healthOk,
+    detail: healthData
+      ? `score: ${healthData.overall}/100${healthData.suggestions?.length ? ` (${healthData.suggestions.length} suggestions)` : ""}`
+      : trimOutput(rexHealth.stdout || rexHealth.stderr),
+  });
+  if (healthOk) {
+    info(`  ✓ structure health (score: ${healthData?.overall ?? "?"})`);
+  } else {
+    info(`  ✗ structure health (score: ${healthData?.overall ?? "?"} — below threshold)`);
+    if (!isJSON && healthData?.suggestions) {
+      for (const s of healthData.suggestions) info(`    ⚠ ${s}`);
+    }
+  }
+
+  // Step 5: rex status
+  info("── rex status ──");
+  const rexStatus = await runCapture(tools.rex, ["status", "--format=json", dir], spawnTracked);
+  const statusOk = rexStatus.code === 0;
+  let statusData = null;
+  try {
+    statusData = JSON.parse(rexStatus.stdout);
+  } catch {
+    // Could not parse
+  }
+  const stats = statusData?.items ? computeStats(statusData.items) : null;
+  steps.push({
+    name: "status",
+    ok: statusOk,
+    data: stats,
+    detail: stats
+      ? `${stats.completed}/${stats.total} complete (${stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%)`
+      : trimOutput(rexStatus.stderr || rexStatus.stdout),
+  });
+  if (stats) {
+    const pct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+    info(`  ${pct}% complete (${stats.completed}/${stats.total})`);
+    if (stats.inProgress > 0) info(`  ${stats.inProgress} in progress`);
+    if (stats.blocked > 0) info(`  ${stats.blocked} blocked`);
+  }
+
+  return { ok: allOk, steps };
+}
+
 /**
  * Run the CI pipeline. Returns true if all steps pass.
  *
@@ -71,448 +443,31 @@ export async function runCI(dir, flags, { run, tools, spawnTracked = spawn }) {
     const error = `Missing ${missingDirs.join(", ")} in ${dir}`;
     const hint = `Run 'ndx init${dir === process.cwd() ? "" : " " + dir}' to set up the project.`;
     if (isJSON) {
-      const report = {
-        timestamp: new Date().toISOString(),
-        ok: false,
-        error,
-        hint,
-        steps: [],
-      };
-      console.log(JSON.stringify(report, null, 2));
+      console.log(JSON.stringify({ timestamp: new Date().toISOString(), ok: false, error, hint, steps: [] }, null, 2));
       return false;
     }
-    // Text mode: the caller (cli.js) handles this via requireInit
     throw new Error(error);
   }
-
-  const steps = [];
-  let allOk = true;
 
   function info(...args) {
     if (!isQuiet && !isJSON) console.log(...args);
   }
 
-  // ── Step 0: community files check ─────────────────────────────────────
-  // Verify that required community files (CODE_OF_CONDUCT.md) exist and are
-  // non-empty. Prevents accidental deletion of governance documents.
-  info("── community files ──");
-  const communityResult = checkCommunityFiles(dir);
-  if (!communityResult.ok) allOk = false;
+  const docsPhase = await runDocsPhase(dir, info, isJSON, spawnTracked);
+  const analysisPhase = await runAnalysisPhase(dir, info, isJSON, tools, spawnTracked);
+  const boundaryPhase = runBoundaryPhase(dir, info, isJSON);
+  const rexPhase = await runRexPhase(dir, info, isJSON, tools, spawnTracked);
 
-  steps.push({
-    name: "community-files",
-    ok: communityResult.ok,
-    detail: communityResult.ok
-      ? `${communityResult.checked} community file(s) present`
-      : `${communityResult.missing.length} required community file(s) missing or empty`,
-    ...(communityResult.missing.length > 0 ? { missing: communityResult.missing } : {}),
-  });
+  const allOk = docsPhase.ok && analysisPhase.ok && boundaryPhase.ok && rexPhase.ok;
+  const steps = [...docsPhase.steps, ...analysisPhase.steps, ...boundaryPhase.steps, ...rexPhase.steps];
 
-  if (communityResult.ok) {
-    info(`  ✓ community files (${communityResult.checked} checked)`);
-  } else {
-    info(`  ✗ community files`);
-    if (!isJSON) {
-      for (const m of communityResult.missing) {
-        info(`    ✗ ${m}`);
-      }
-    }
-  }
-
-  // ── Step 0a: architecture docs freshness ────────────────────────────────
-  // Detects docs/architecture/ files that haven't been updated since the
-  // source-of-truth files they document (CLAUDE.md, gateway-rules.json)
-  // were last changed. Warns-only — does not fail the pipeline.
-  info("── architecture docs freshness ──");
-  const archDocsResult = checkArchitectureDocsFreshness(dir);
-
-  steps.push({
-    name: "architecture-docs-freshness",
-    ok: true, // warn-only, never fails the pipeline
-    detail: archDocsResult.stale.length === 0
-      ? `${archDocsResult.checked} architecture doc(s) up to date`
-      : `${archDocsResult.stale.length} architecture doc(s) may be stale`,
-    ...(archDocsResult.stale.length > 0 ? { stale: archDocsResult.stale } : {}),
-  });
-
-  if (archDocsResult.stale.length === 0) {
-    info(`  ✓ architecture docs freshness (${archDocsResult.checked} checked)`);
-  } else {
-    info(`  ⚠ architecture docs freshness`);
-    if (!isJSON) {
-      for (const s of archDocsResult.stale) {
-        info(`    ⚠ ${s}`);
-      }
-    }
-  }
-
-  // ── Step 0b: guide docs freshness ─────────────────────────────────────
-  // Detects docs/guide/ files that haven't been updated since CLI source
-  // files (cli.js, help.js, CLAUDE.md) were last changed.
-  info("── guide docs freshness ──");
-  const guideDocsResult = checkDocsFreshness(dir, "guide", GUIDE_SOURCE_FILES);
-
-  steps.push({
-    name: "guide-docs-freshness",
-    ok: true, // warn-only, never fails the pipeline
-    detail: guideDocsResult.stale.length === 0
-      ? `${guideDocsResult.checked} guide doc(s) up to date`
-      : `${guideDocsResult.stale.length} guide doc(s) may be stale`,
-    ...(guideDocsResult.stale.length > 0 ? { stale: guideDocsResult.stale } : {}),
-  });
-
-  if (guideDocsResult.stale.length === 0) {
-    info(`  ✓ guide docs freshness (${guideDocsResult.checked} checked)`);
-  } else {
-    info(`  ⚠ guide docs freshness`);
-    if (!isJSON) {
-      for (const s of guideDocsResult.stale) {
-        info(`    ⚠ ${s}`);
-      }
-    }
-  }
-
-  // ── Step 0c: docs build ────────────────────────────────────────────────
-  // Verifies the VitePress docs site builds without errors (dead links,
-  // broken markdown, etc.). Catches documentation regressions before merge.
-  info("── docs build ──");
-  const docsBuild = await new Promise((res) => {
-    const child = spawnTracked("pnpm", ["docs:build"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => { stdout += d; });
-    child.stderr.on("data", (d) => { stderr += d; });
-    child.on("close", (code) => res({ code: code ?? 1, stdout, stderr }));
-  });
-  const docsBuildOk = docsBuild.code === 0;
-
-  steps.push({
-    name: "docs-build",
-    ok: docsBuildOk,
-    detail: docsBuildOk ? "docs site builds successfully" : "docs build failed",
-    ...(docsBuildOk ? {} : { stderr: docsBuild.stderr.slice(-500) }),
-  });
-
-  if (docsBuildOk) {
-    info("  ✓ docs build");
-  } else {
-    info("  ✗ docs build failed");
-    if (!isJSON) {
-      const lines = docsBuild.stderr.split("\n").filter((l) => l.includes("dead link") || l.includes("error"));
-      for (const l of lines.slice(0, 10)) {
-        info(`    ${l.trim()}`);
-      }
-    }
-  }
-
-  // ── Step 1: sourcevision analyze ────────────────────────────────────────
-  info("── sourcevision analyze ──");
-  const svAnalyze = await runCapture(tools.sourcevision, ["analyze", "--fast", "--quiet", dir], spawnTracked);
-  const svOk = svAnalyze.code === 0;
-  if (!svOk) allOk = false;
-
-  steps.push({
-    name: "sourcevision",
-    ok: svOk,
-    detail: svOk ? "Analysis complete" : trimOutput(svAnalyze.stderr || svAnalyze.stdout),
-  });
-
-  if (svOk) {
-    info("  ✓ sourcevision analyze");
-  } else {
-    info(`  ✗ sourcevision analyze`);
-    if (!isJSON) printIndented(svAnalyze.stderr || svAnalyze.stdout, info);
-  }
-
-  // ── Step 2: sourcevision validate ───────────────────────────────────────
-  info("── sourcevision validate ──");
-  const svValidate = await runCapture(tools.sourcevision, ["validate", "--quiet", dir], spawnTracked);
-  const svValOk = svValidate.code === 0;
-  if (!svValOk) allOk = false;
-
-  steps.push({
-    name: "sourcevision-validate",
-    ok: svValOk,
-    detail: svValOk
-      ? "All modules valid"
-      : trimOutput(svValidate.stdout || svValidate.stderr),
-  });
-
-  if (svValOk) {
-    info("  ✓ sourcevision validate");
-  } else {
-    info(`  ✗ sourcevision validate`);
-    if (!isJSON) printIndented(svValidate.stdout || svValidate.stderr, info);
-  }
-
-  // ── Step 3: zone health check ───────────────────────────────────────────
-  info("── zone health ──");
-  const zoneHealth = checkZoneHealth(dir);
-  if (!zoneHealth.ok) allOk = false;
-
-  steps.push({
-    name: "zone-health",
-    ok: zoneHealth.ok,
-    detail: zoneHealth.ok
-      ? `${zoneHealth.checked} zones checked, all within thresholds`
-      : `${zoneHealth.violations.length} zone(s) exceed health thresholds`,
-    ...(zoneHealth.violations.length > 0 ? { violations: zoneHealth.violations } : {}),
-  });
-
-  if (zoneHealth.ok) {
-    const phantomNote = zoneHealth.phantomSkipped > 0 ? `, ${zoneHealth.phantomSkipped} phantom zone(s) excluded` : "";
-    info(`  ✓ zone health (${zoneHealth.checked} zones checked${phantomNote})`);
-  } else {
-    info(`  ✗ zone health`);
-    if (!isJSON) {
-      for (const v of zoneHealth.violations) {
-        info(`    ✗ ${v.id}: cohesion=${v.cohesion.toFixed(2)}, coupling=${v.coupling.toFixed(2)}`);
-      }
-    }
-  }
-
-  // ── Step 3a: zone ID consistency ─────────────────────────────────────────
-  info("── zone ID consistency ──");
-  const zoneConsistency = checkZoneIdConsistency(dir);
-  if (!zoneConsistency.ok) allOk = false;
-
-  steps.push({
-    name: "zone-id-consistency",
-    ok: zoneConsistency.ok,
-    detail: zoneConsistency.ok
-      ? `${zoneConsistency.checked} zone IDs consistent across zones.json and zone output directories`
-      : `${zoneConsistency.mismatches.length} zone ID inconsistency(ies) found`,
-    ...(zoneConsistency.mismatches.length > 0 ? { mismatches: zoneConsistency.mismatches } : {}),
-  });
-
-  if (zoneConsistency.ok) {
-    info(`  ✓ zone ID consistency (${zoneConsistency.checked} zones checked)`);
-  } else {
-    info(`  ✗ zone ID consistency`);
-    if (!isJSON) {
-      for (const m of zoneConsistency.mismatches) {
-        info(`    ✗ ${m}`);
-      }
-    }
-  }
-
-  // ── Step 3b: gateway import boundary ────────────────────────────────────
-  info("── gateway imports ──");
-  const gatewayResult = checkGatewayImports(dir);
-  if (!gatewayResult.ok) allOk = false;
-
-  steps.push({
-    name: "gateway-imports",
-    ok: gatewayResult.ok,
-    detail: gatewayResult.ok
-      ? `${gatewayResult.checked} files checked, all cross-package imports use gateways`
-      : `${gatewayResult.violations.length} file(s) bypass gateway pattern`,
-    ...(gatewayResult.violations.length > 0 ? { violations: gatewayResult.violations } : {}),
-  });
-
-  if (gatewayResult.ok) {
-    info(`  ✓ gateway imports (${gatewayResult.checked} files checked)`);
-  } else {
-    info(`  ✗ gateway imports`);
-    if (!isJSON) {
-      for (const v of gatewayResult.violations) {
-        info(`    ✗ ${v.file}:${v.line} — ${v.message}`);
-      }
-    }
-  }
-
-  // ── Step 3c: architecture policy (redundant enforcement) ───────────────
-  // Enforces the four-tier hierarchy's child_process restriction directly
-  // in CI, providing a redundant check alongside architecture-policy.test.js.
-  // If the test file is skipped or broken, this CI step still catches violations.
-  info("── architecture policy ──");
-  const archResult = checkArchitecturePolicy(dir);
-  if (!archResult.ok) allOk = false;
-
-  steps.push({
-    name: "architecture-policy",
-    ok: archResult.ok,
-    detail: archResult.ok
-      ? `${archResult.checked} files checked, no unauthorized child_process imports`
-      : `${archResult.violations.length} unauthorized child_process import(s) found`,
-    ...(archResult.violations.length > 0 ? { violations: archResult.violations } : {}),
-  });
-
-  if (archResult.ok) {
-    info(`  ✓ architecture policy (${archResult.checked} files checked)`);
-  } else {
-    info(`  ✗ architecture policy`);
-    if (!isJSON) {
-      for (const v of archResult.violations) {
-        info(`    ✗ ${v}`);
-      }
-    }
-  }
-
-  // ── Step 3d: data-layer contract ────────────────────────────────────────
-  // Enforces that no source file imports from the .rex/ data directory at
-  // runtime. The .rex/ directory is a data layer (JSON state files read/written
-  // via CLI or filesystem I/O) — direct module imports would create a fragile
-  // coupling between source code and on-disk state layout.
-  info("── data-layer contract ──");
-  const dataLayerResult = checkDataLayerContract(dir);
-  if (!dataLayerResult.ok) allOk = false;
-
-  steps.push({
-    name: "data-layer-contract",
-    ok: dataLayerResult.ok,
-    detail: dataLayerResult.ok
-      ? `${dataLayerResult.checked} files checked, no imports from data directories`
-      : `${dataLayerResult.violations.length} file(s) import from data directories`,
-    ...(dataLayerResult.violations.length > 0 ? { violations: dataLayerResult.violations } : {}),
-  });
-
-  if (dataLayerResult.ok) {
-    info(`  ✓ data-layer contract (${dataLayerResult.checked} files checked)`);
-  } else {
-    info(`  ✗ data-layer contract`);
-    if (!isJSON) {
-      for (const v of dataLayerResult.violations) {
-        info(`    ✗ ${v.file}:${v.line} — ${v.message}`);
-      }
-    }
-  }
-
-  // ── Step 4: rex validate ────────────────────────────────────────────────
-  info("── rex validate ──");
-  const rexValidate = await runCapture(tools.rex, ["validate", "--format=json", dir], spawnTracked);
-
-  let validateChecks = [];
-  let validateReport = null;
-  try {
-    const parsed = JSON.parse(rexValidate.stdout);
-    // Handle structured report format (has .ok and .checks) or bare array
-    if (parsed && typeof parsed === "object" && "checks" in parsed) {
-      validateReport = parsed;
-      validateChecks = parsed.checks;
-    } else if (Array.isArray(parsed)) {
-      validateChecks = parsed;
-    }
-  } catch {
-    // Could not parse — treat as opaque output
-  }
-
-  // rex validate --format=json now exits non-zero on failure.
-  // Use exit code as primary signal; fall back to check analysis.
-  const rexValOk = rexValidate.code === 0;
-  if (!rexValOk) allOk = false;
-
-  steps.push({
-    name: "validate",
-    ok: rexValOk,
-    checks: validateChecks,
-    detail: rexValOk
-      ? `${validateChecks.length} checks passed`
-      : trimOutput(rexValidate.stdout || rexValidate.stderr),
-  });
-
-  if (rexValOk) {
-    info(`  ✓ rex validate (${validateChecks.length} checks passed)`);
-  } else {
-    info(`  ✗ rex validate`);
-    if (!isJSON) {
-      for (const check of validateChecks) {
-        if (!check.pass && check.severity !== "warn") {
-          info(`    ✗ ${check.name}`);
-          for (const err of check.errors) {
-            info(`      ${err}`);
-          }
-        }
-      }
-    }
-  }
-
-  // ── Step 4b: structure health ─────────────────────────────────────────
-  info("── structure health ──");
-  const rexHealth = await runCapture(tools.rex, ["health", "--format=json", dir], spawnTracked);
-  let healthOk = rexHealth.code === 0;
-  let healthData = null;
-  try {
-    healthData = JSON.parse(rexHealth.stdout);
-    // Fail if overall health score is critically low
-    if (healthData && healthData.overall < 50) {
-      healthOk = false;
-    }
-  } catch {
-    // Could not parse
-  }
-
-  if (!healthOk) allOk = false;
-
-  steps.push({
-    name: "structure-health",
-    ok: healthOk,
-    detail: healthData
-      ? `score: ${healthData.overall}/100${healthData.suggestions?.length ? ` (${healthData.suggestions.length} suggestions)` : ""}`
-      : trimOutput(rexHealth.stdout || rexHealth.stderr),
-  });
-
-  if (healthOk) {
-    info(`  ✓ structure health (score: ${healthData?.overall ?? "?"})`);
-  } else {
-    info(`  ✗ structure health (score: ${healthData?.overall ?? "?"} — below threshold)`);
-    if (!isJSON && healthData?.suggestions) {
-      for (const s of healthData.suggestions) {
-        info(`    ⚠ ${s}`);
-      }
-    }
-  }
-
-  // ── Step 5: rex status ──────────────────────────────────────────────────
-  info("── rex status ──");
-  const rexStatus = await runCapture(tools.rex, ["status", "--format=json", dir], spawnTracked);
-  const statusOk = rexStatus.code === 0;
-
-  let statusData = null;
-  try {
-    statusData = JSON.parse(rexStatus.stdout);
-  } catch {
-    // Could not parse
-  }
-
-  // Compute stats from status data
-  let stats = null;
-  if (statusData && statusData.items) {
-    stats = computeStats(statusData.items);
-  }
-
-  steps.push({
-    name: "status",
-    ok: statusOk,
-    data: stats,
-    detail: stats
-      ? `${stats.completed}/${stats.total} complete (${stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%)`
-      : trimOutput(rexStatus.stderr || rexStatus.stdout),
-  });
-
-  if (stats) {
-    const pct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-    info(`  ${pct}% complete (${stats.completed}/${stats.total})`);
-    if (stats.inProgress > 0) info(`  ${stats.inProgress} in progress`);
-    if (stats.blocked > 0) info(`  ${stats.blocked} blocked`);
-  }
-
-  // ── Report ──────────────────────────────────────────────────────────────
-  const report = {
-    timestamp: new Date().toISOString(),
-    ok: allOk,
-    steps,
-  };
+  const report = { timestamp: new Date().toISOString(), ok: allOk, steps };
 
   if (isJSON) {
     console.log(JSON.stringify(report, null, 2));
   } else {
     info("");
-    if (allOk) {
-      info("CI pipeline passed.");
-    } else {
-      info("CI pipeline failed.");
-    }
+    info(allOk ? "CI pipeline passed." : "CI pipeline failed.");
   }
 
   return allOk;

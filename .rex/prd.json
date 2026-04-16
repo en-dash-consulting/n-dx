@@ -155,7 +155,7 @@
             {
               "id": "ece5c797-5a9d-4272-96f9-1fceffde9204",
               "title": "Run project-wide test commands and compare against baseline coverage",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Validate the completed fixes by running both required test commands and confirming that the total executed test count still matches the pre-refactor baseline.",
               "acceptanceCriteria": [
@@ -171,7 +171,8 @@
                 "regression"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-02T17:06:58.905Z"
+              "startedAt": "2026-04-02T17:06:58.905Z",
+              "completedAt": "2026-04-16T18:23:36.115Z"
             }
           ]
         }
@@ -331,7 +332,7 @@
             {
               "id": "c434442f-7856-4ed8-ba18-e9c664b22593",
               "title": "Fix anti-pattern in global: God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts c (+1 more)",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "- God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts calls 41 unique functions — consider decomposing into smaller, focused functions\n- God function: runCI in packages/core/ci.js calls 39 unique functions — consider decomposing into smaller, focused functions",
               "priority": "high",
@@ -532,12 +533,13 @@
             {
               "id": "db8cf9f9-7ecf-4100-8f8e-533b7a104d3c",
               "title": "Fix suggestion in token: Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0.65) — requires refactoring before new feature development",
               "priority": "high",
               "source": "sourcevision",
               "startedAt": "2026-04-13T21:59:32.028Z",
+              "completedAt": "2026-04-16T18:32:08.390Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "6e7913c87be3"
@@ -575,12 +577,13 @@
             {
               "id": "77111aec-d990-4b9c-82cb-47c60fc195df",
               "title": "Fix suggestion in web-2: Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its fil",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
               "source": "sourcevision",
               "startedAt": "2026-04-13T21:59:39.597Z",
+              "completedAt": "2026-04-16T18:34:06.117Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "878fba44f7c4"
