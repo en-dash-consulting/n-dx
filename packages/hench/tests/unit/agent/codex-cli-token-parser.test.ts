@@ -197,6 +197,20 @@ Tokens used: 1234 in, 567 out
       const result = parseCodexCliTokenUsage(output);
       expect(result).toEqual({ input: 1234, output: 567 });
     });
+
+    it("returns null when only the label line is present (no following count line)", () => {
+      // Confirms no premature token result before the count line arrives —
+      // if budget were checked per-line, this ensures it sees null rather than
+      // a stale or zero count.
+      const output = "tokens used";
+      expect(parseCodexCliTokenUsage(output)).toBeNull();
+    });
+
+    it("returns null when the line following the label is empty", () => {
+      // Empty next line does not satisfy the count pattern.
+      const output = "tokens used\n";
+      expect(parseCodexCliTokenUsage(output)).toBeNull();
+    });
   });
 
   describe("edge cases", () => {
