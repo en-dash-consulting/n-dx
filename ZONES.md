@@ -104,8 +104,9 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
 
 Files pinned to keep critical modules stable across re-analyses regardless of import topology changes.
 
-- `packages/sourcevision/tests/fixtures/go-project/internal/service/user.go` → `sv-fixtures` — Overflow community (sourcevision-4); Go fixture file belongs with other sourcevision test fixtures
-- `packages/sourcevision/tests/fixtures/go-project/internal/service/user_test.go` → `sv-fixtures` — Overflow community (sourcevision-4); Go fixture file belongs with other sourcevision test fixtures
+- `packages/sourcevision/tests/fixtures/go-project/internal/service/user.go` → `sourcevision` — Overflow community (sourcevision-4); Go fixture file; pinned to base zone because `sv-fixtures` zone never forms naturally (Louvain produces `sourcevision-fixtures` for this path prefix)
+- `packages/sourcevision/tests/fixtures/go-project/internal/service/user_test.go` → `sourcevision` — Same reason as above
+- `packages/sourcevision/vitest.config.ts` → `sourcevision` — Zero import edges; isolated; path derives zone ID `sourcevision` with no unique sub-segment (all segments after `sourcevision` are either `src` or absent and thus skippable). Was `sourcevision-2` overflow in analyses at SHA 7b8ac4e–d4bf436a.
 - `packages/hench/src/tools/test-runner.ts` → `hench-agent` — Overflow community (hench-4); tool file belongs with other hench tools
 - `packages/hench/tests/unit/tools/go-test-runner.test.ts` → `hench-agent` — Test for test-runner.ts; follows source file pin
 - `packages/hench/tests/unit/tools/test-runner.test.ts` → `hench-agent` — Test for test-runner.ts; follows source file pin

@@ -124,14 +124,14 @@
         "packages/rex/tests/helpers/rex-dir-test-support.ts": "rex-unit",
         "packages/rex/tests/unit/cli/commands/next-colors.test.ts": "rex-unit",
         "packages/rex/tests/unit/cli/commands/usage.test.ts": "rex-unit",
-        "packages/sourcevision/tests/fixtures/go-project/internal/service/user.go": "sv-fixtures",
-        "packages/sourcevision/tests/fixtures/go-project/internal/service/user_test.go": "sv-fixtures"
+        "packages/sourcevision/tests/fixtures/go-project/internal/service/user.go": "sourcevision",
+        "packages/sourcevision/tests/fixtures/go-project/internal/service/user_test.go": "sourcevision",
+        "packages/sourcevision/vitest.config.ts": "sourcevision"
       },
       "types": {
         "e2e": "test",
         "e2e-test-suite": "test",
         "fixtures": "test",
-        "sv-fixtures": "test",
         "integration": "test",
         "repo-ops-shell": "infrastructure",
         "root": "infrastructure",
