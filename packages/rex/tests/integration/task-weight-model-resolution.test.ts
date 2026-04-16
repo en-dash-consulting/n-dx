@@ -1,19 +1,13 @@
 /**
  * Integration tests for task-weight-aware model resolution in rex commands.
  *
- * These tests verify that rex commands use the correct model tier based on
- * their task weight classification:
+ * These tests verify that rex commands use the correct model resolution path:
  *
- * - smart-add: 'light' weight → should resolve to TIER_MODELS.claude.light (haiku)
+ * - smart-add: standard/default weight → should resolve to the vendor default model
  * - analyze: 'standard' weight → should resolve to TIER_MODELS.claude.standard (sonnet)
  *
  * The tests inspect the model passed to the LLM bridge before the actual API call,
  * allowing verification without making real LLM requests.
- *
- * Dependencies:
- * - Requires sibling task "Wire light-tier model selection into rex smart-add and
- *   lightweight analysis paths" to be completed for smart-add tests to pass.
- * - Standard-tier tests should pass with current implementation (default behavior).
  *
  * @see packages/llm-client/tests/integration/weight-aware-model-resolution.test.ts
  *   for lower-level config → resolver chain tests.
@@ -23,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { TIER_MODELS, NEWEST_MODELS } from "@n-dx/llm-client";
+import { NEWEST_MODELS } from "@n-dx/llm-client";
 import { cmdInit } from "../../src/cli/commands/init.js";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -114,16 +108,16 @@ describe("task-weight model resolution in rex commands", () => {
     vi.clearAllMocks();
   });
 
-  // ── smart-add light-tier tests ─────────────────────────────────────────────
+  // ── smart-add default-model tests ──────────────────────────────────────────
 
-  describe("smart-add command (light tier)", () => {
-    it("uses lightModel from config when configured for claude", async () => {
+  describe("smart-add command", () => {
+    it("uses llm.claude.model when configured for claude", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),
         JSON.stringify({
           llm: {
             vendor: "claude",
-            claude: { lightModel: "claude-haiku-4-20250414" },
+            claude: { model: "claude-opus-4-20250514" },
           },
         }),
         "utf-8",
@@ -132,18 +126,16 @@ describe("task-weight model resolution in rex commands", () => {
       await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
 
       expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-      // Once wiring is complete, this should use the configured lightModel
-      // For now, verify the mock was called (model resolution depends on wiring)
-      expect(capturedSmartAddModels.length).toBe(1);
+      expect(capturedSmartAddModels[0]).toBe("claude-opus-4-20250514");
     });
 
-    it("uses lightModel from config when configured for codex", async () => {
+    it("uses llm.codex.model when configured for codex", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),
         JSON.stringify({
           llm: {
             vendor: "codex",
-            codex: { lightModel: "gpt-4o-mini" },
+            codex: { model: "gpt-4o" },
           },
         }),
         "utf-8",
@@ -152,16 +144,16 @@ describe("task-weight model resolution in rex commands", () => {
       await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
 
       expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-      expect(capturedSmartAddModels.length).toBe(1);
+      expect(capturedSmartAddModels[0]).toBe("gpt-4o");
     });
 
-    it("CLI --model flag overrides lightModel config", async () => {
+    it("CLI --model flag overrides configured vendor model", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),
         JSON.stringify({
           llm: {
             vendor: "claude",
-            claude: { lightModel: "claude-haiku-4-20250414" },
+            claude: { model: "claude-sonnet-4-6" },
           },
         }),
         "utf-8",
@@ -171,7 +163,6 @@ describe("task-weight model resolution in rex commands", () => {
       await cmdSmartAdd(tmpDir, "Add user authentication", { model: "claude-opus-4-20250514" }, {});
 
       expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-      // CLI flag should override configured lightModel
       expect(capturedSmartAddModels[0]).toBe("claude-opus-4-20250514");
     });
   });
@@ -179,13 +170,13 @@ describe("task-weight model resolution in rex commands", () => {
   // ── Config precedence tests ────────────────────────────────────────────────
 
   describe("config precedence", () => {
-    it("llm.claude.lightModel takes precedence over legacy rex config model", async () => {
+    it("llm.claude.model takes precedence over legacy rex config model", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),
         JSON.stringify({
           llm: {
             vendor: "claude",
-            claude: { lightModel: "claude-haiku-4-20250414" },
+            claude: { model: "claude-sonnet-4-6" },
           },
         }),
         "utf-8",
@@ -205,8 +196,7 @@ describe("task-weight model resolution in rex commands", () => {
       await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
 
       expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-      // Verify config was read (model passed to mock)
-      expect(capturedSmartAddModels.length).toBe(1);
+      expect(capturedSmartAddModels[0]).toBe("claude-sonnet-4-6");
     });
 
     it("CLI flag overrides both llm config and rex config", async () => {
@@ -215,7 +205,7 @@ describe("task-weight model resolution in rex commands", () => {
         JSON.stringify({
           llm: {
             vendor: "claude",
-            claude: { lightModel: "claude-haiku-4-20250414" },
+            claude: { model: "claude-sonnet-4-6" },
           },
         }),
         "utf-8",
@@ -240,22 +230,19 @@ describe("task-weight model resolution in rex commands", () => {
   // ── Fallback chain tests ───────────────────────────────────────────────────
 
   describe("fallback chain", () => {
-    it("falls back to default model when no config provided", async () => {
-      // No .n-dx.json, just rex init defaults
+    it("falls back to Claude Sonnet when no config provided", async () => {
       await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
 
       expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-      // Without config, should use default resolution
-      expect(capturedSmartAddModels.length).toBe(1);
+      expect(capturedSmartAddModels[0]).toBe(NEWEST_MODELS.claude);
     });
 
-    it("falls back to TIER_MODELS when lightModel not in config", async () => {
+    it("falls back to Codex default when no codex model is configured", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),
         JSON.stringify({
           llm: {
             vendor: "claude",
-            // No lightModel configured — should fall back to TIER_MODELS.claude.light
           },
         }),
         "utf-8",
@@ -264,8 +251,24 @@ describe("task-weight model resolution in rex commands", () => {
       await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
 
       expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-      // Once wiring is complete, this should be TIER_MODELS.claude.light
-      expect(capturedSmartAddModels.length).toBe(1);
+      expect(capturedSmartAddModels[0]).toBe(NEWEST_MODELS.claude);
+    });
+
+    it("falls back to gpt-5-codex when vendor=codex and no codex model is configured", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          llm: {
+            vendor: "codex",
+          },
+        }),
+        "utf-8",
+      );
+
+      await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
+
+      expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
+      expect(capturedSmartAddModels[0]).toBe(NEWEST_MODELS.codex);
     });
   });
 });

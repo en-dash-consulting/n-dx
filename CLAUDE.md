@@ -66,8 +66,6 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 | `crash` | web | 0.50 | unidirectional (web-viewer → crash) | At threshold boundary — crash imports web-shared directly (documented bypass), not web-viewer |
 | `web-dashboard-platform` | web | 0.53 | — | Watch designation; 33 files (metrics reliable); 0.03 above dual-fragility threshold — baseline documented for regression tracking |
 
-> **Test zone exclusion:** The "production zones" qualifier is intentional. Zones classified as `test` in `sourcevision.zones.types` (`.n-dx.json`) are excluded from dual-fragility governance. Test zones' cohesion/coupling metrics reflect fixture dependencies rather than architectural design choices, making the thresholds non-actionable. `packages-web:unit-server` (cohesion 0.45, coupling 0.55) meets both numeric thresholds but is exempt under this policy. To verify a zone's classification, check the `types` map in `.n-dx.json`.
-
 **Universal governance rules** (apply to all dual-fragility zones):
 - **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
 - **Addition review required:** Treat these as risk zones requiring active review on additions. Changes have a wide blast radius.
@@ -88,64 +86,9 @@ Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` wit
 - **CLI-only content:** These zones must contain only CLI command handlers and their direct support modules. Domain logic belongs in `rex-prd-engine` (e.g., `src/core/`).
 - **Subdirectory convention:** Satellite zone files should be grouped into subdirectories under `packages/rex/src/cli/commands/` to make zone boundaries visible in the file tree.
 
-##### rex CLI two-tier API pattern
-
-Rex exposes two distinct consumer surfaces:
-
-- **Public API** (`src/public.ts`) — for library consumers (hench, web, external packages). Curated, stable, intentionally narrow.
-- **CLI internal imports** — `src/cli/commands/` files may import directly from internal sub-zone barrels when the operation is too fine-grained or CLI-specific for the public API.
-
-This is a **privileged-consumer pattern**: CLI commands are the only non-test code permitted to bypass `public.ts`. All other packages must go through the gateway.
-
-**Approved internal import paths for CLI commands:**
-
-| Path | Used by | Purpose |
-|------|---------|---------|
-| `../../analyze/index.js` | `analyze.ts` | Full analyze pipeline (scan, reconcile, propose) |
-| `../../analyze/acknowledge.js` | `recommend.ts` | Acknowledgment state for recommendations |
-| `../../store/index.js` | `analyze.ts`, `fix.ts`, `recommend.ts` | PRD store resolution |
-| `../../store/atomic-write.js` | `analyze.ts` | Atomic JSON writes for intermediate state |
-| `../../store/project-config.js` | `analyze.ts` | Claude/LLM config loading |
-| `../../fix/index.js` | `fix.ts` | Issue detection and repair |
-| `../../recommend/create-from-recommendations.js` | `recommend.ts` | Recommendation → PRD item pipeline |
-| `../../recommend/conflict-detection.js` | `recommend.ts` | Conflict/duplicate detection |
-| `../../schema/index.js` | `analyze.ts`, `recommend.ts` | Schema types and constants |
-
-**Rules:**
-- **No new internal paths without a table entry.** Adding an import from a sub-zone not listed above requires adding a row to this table.
-- **No domain logic in CLI files.** CLI commands are orchestration only. New domain behavior belongs in the sub-zone, not in the command handler.
-- **Library consumers use `public.ts` only.** If a function needed by hench or web isn't in `public.ts`, add it there — don't create a second internal import path from outside the package.
-
 ##### crash zone proactive governance
 
 `crash` (cohesion 0.5, unidirectional coupling: web-viewer → crash) sits at the dual-fragility threshold boundary. Crash imports web-shared directly (documented bypass) rather than web-viewer. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
-
-##### Confirmed zone-level cycles
-
-Zones with confirmed bidirectional dependencies require separate governance from the metric-based dual-fragility table. A zone can have cohesion 1 and coupling 0 yet still participate in a genuine cycle with a peer zone — the threshold conditions are simply never met, so the zone is invisible to fragility governance.
-
-| Pair | Evidence | Blast radius | Resolution path |
-|------|---------|-------------|----------------|
-| `web-viewer-search-overlay` ↔ `web-viewer` | `search-overlay.ts` imports `getLevelEmoji` (runtime) from `prd-tree/levels.ts` and `NavigateTo` (type) from `types.ts`, both in web-viewer; `components/index.ts` imports `search-overlay.ts` back | Any change to `levels.ts` or `NavigateTo` in web-viewer breaks the component — equivalent to a circular module dependency | Absorb `search-overlay.ts` into `web-viewer` (preferred); alternatively inject `getLevelEmoji` as a prop and move `NavigateTo` to `web-shared`. Moving `levels.ts` alone is insufficient — `NavigateTo` type import preserves the cycle edge. |
-
-> **Governance rule:** New zones must not introduce zone-level cycles. Any finding of confirmed bidirectional zone coupling requires a PRD task before the change is merged. Cycles are not governed by fragility thresholds and will not appear in the dual-fragility table.
-
-##### Zone ID naming convention
-
-Zone IDs must encode their package to prevent cross-package prefix collisions in zone-filter queries and zone reports:
-
-| Prefix | Package | Example |
-|--------|---------|---------|
-| `sv-` | packages/sourcevision/ | `sv-analyzer` |
-| `rex-` | packages/rex/ | `rex-cli` |
-| `hench-` | packages/hench/ | `hench-agent` |
-| `web-server-` | web server zones | `web-server-gateway` |
-| `web-viewer-` | web viewer zones | `web-viewer-hub` |
-| `web-sv-` | web zones rendering sourcevision data | `web-sv-view-tests` |
-
-The `sourcevision-view-tests` zone violated this convention — it was in the web package but used the `sourcevision-` prefix. It has been corrected to `web-sv-view-tests` via zone pins in `.n-dx.json` (see `ZONES.md` for the pin manifest).
-
-See also: `ZONES.md` for the zone promotion checklist.
 
 ##### hench-agent internal governance
 
@@ -193,28 +136,12 @@ Some cross-zone dependencies use callback injection rather than gateway imports.
 
 | Injection site | Target module | Injected callbacks | Interface type |
 |----------------|---------------|--------------------|----------------|
-| `web/src/server/start.ts` | `web/src/server/task-usage/register-scheduler.ts` | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
-| `web/src/server/start.ts` | `web/src/server/routes-hench.ts` | `onStatusInvalidate` | `HenchRouteOptions` |
-| `web/src/viewer/bootstrap.ts` | `web/src/viewer/polling/polling-restart.ts` | `onDegradationChange`, `isFeatureDisabled` | `PollingRestartOptions` |
+| `web/src/server/start.ts` | `web/src/server/register-scheduler.ts` | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
 
 Rules:
 - **Prefer injection over import** when the target module would otherwise need to import from a higher-tier zone (e.g., scheduler importing from dashboard wiring).
 - **Document the interface type** — every injection seam must have a named TypeScript interface (not inline parameter types) so that refactoring either side triggers a type error.
 - **New seams** require an entry in this table and a named interface type in the target module.
-
-#### Governance list completeness audit
-
-The following manually maintained governance lists currently have no automated exhaustiveness check. Each is a silent drift risk as the codebase grows:
-
-| List | Location | Drift risk | Automated? |
-|------|----------|------------|------------|
-| Injection seam registry | CLAUDE.md (above) | New seams added without table entry | ❌ None |
-| Gateway table | CLAUDE.md (above) | New gateways added without table entry | ❌ None |
-| `SHARED_LEAF_FILES` | `boundary-check.test.ts` | New shared/ leaf files bypass barrel enforcement | ⚠️ Partially (two-consumer rule covers existing files) |
-| `BARREL_ZONES` | `boundary-check.test.ts` | New sub-zones bypass barrel enforcement | ❌ None |
-| Zone pins | `.n-dx.json` | Zone additions without pin documentation | ❌ No reason field; see `ZONES.md` for the pin manifest |
-
-Until automated checks are added, treat these lists as requiring active review on every PR that touches the relevant infrastructure. The gateway table and injection seam registry are especially prone to drift because their entries are widely separated from the code they describe.
 
 ### Tier boundary crossing: spawn vs gateway
 
@@ -343,15 +270,15 @@ sv <command> [args]               # alias for sourcevision
 
 ### Rex commands
 
-`init`, `status`, `next`, `add`, `update`, `move`, `remove`, `reshape`, `prune`, `validate`, `fix`, `sync`, `usage`, `report`, `verify`, `recommend`, `analyze`, `reorganize`, `health`, `adapter`, `mcp`
+`init`, `status`, `next`, `add`, `remove`, `update`, `validate`, `analyze`, `recommend`, `mcp`
 
 ### Sourcevision commands
 
-`init`, `analyze`, `serve`, `validate`, `export-pdf`, `pr-markdown`, `git-credential-helper`, `reset`, `workspace`, `mcp`
+`init`, `analyze`, `serve`, `validate`, `reset`, `mcp`
 
 ### Hench commands
 
-`init`, `run`, `config`, `template`, `status`, `show`
+`init`, `run`, `status`, `show`
 
 ## MCP Servers
 
@@ -458,69 +385,3 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
-| `ZONES.md` | Zone promotion checklist, zone ID naming convention, and zone-pin manifest |
-
-
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

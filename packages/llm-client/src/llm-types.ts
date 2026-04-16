@@ -25,7 +25,7 @@ export type { LLMVendor };
 /**
  * Task weight for model tier selection.
  *
- * - `light` — single-turn proposals, simple classification, low-complexity work
+ * - `light` — simple classification and other explicitly low-complexity work
  * - `standard` — multi-turn agents, deep analysis, full-capability tasks
  *
  * Used by `resolveVendorModel()` to select the appropriate model tier.

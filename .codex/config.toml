@@ -3,8 +3,8 @@
 
 [mcp_servers.rex]
 command = "node"
-args = ["/Users/ryankeith/ndx/n-dx-internal/packages/rex/dist/cli/index.js", "mcp", "/Users/ryankeith/ndx/n-dx-internal"]
+args = ["/Users/hal/Documents/VSCodeProjects/n-dx-internal/packages/rex/dist/cli/index.js", "mcp", "/Users/hal/Documents/VSCodeProjects/n-dx-internal"]
 
 [mcp_servers.sourcevision]
 command = "node"
-args = ["/Users/ryankeith/ndx/n-dx-internal/packages/sourcevision/dist/cli/index.js", "mcp", "/Users/ryankeith/ndx/n-dx-internal"]
+args = ["/Users/hal/Documents/VSCodeProjects/n-dx-internal/packages/sourcevision/dist/cli/index.js", "mcp", "/Users/hal/Documents/VSCodeProjects/n-dx-internal"]

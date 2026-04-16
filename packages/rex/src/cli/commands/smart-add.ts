@@ -1135,14 +1135,13 @@ function parseSmartAddInput(
 }
 
 /**
- * Determine model source for light-tier commands.
- * Returns "configured" if lightModel is set in config, "default" otherwise.
+ * Determine whether smart-add is using an explicit vendor model override.
  */
-function determineLightTierModelSource(vendor: LLMVendor, llmConfig: LLMConfig): "configured" | "default" {
-  if (vendor === "claude" && llmConfig.claude?.lightModel) {
+function determineSmartAddModelSource(vendor: LLMVendor, llmConfig: LLMConfig): "configured" | "default" {
+  if (vendor === "claude" && llmConfig.claude?.model) {
     return "configured";
   }
-  if (vendor === "codex" && llmConfig.codex?.lightModel) {
+  if (vendor === "codex" && llmConfig.codex?.model) {
     return "configured";
   }
   return "default";
@@ -1158,14 +1157,15 @@ async function initializeSmartAddLLM(dir: string, format?: string): Promise<void
   const vendor = getLLMVendor();
   llmDebug(`resolved vendor=${vendor ?? "unknown"} configDir=${rexConfigDir}`);
   if (vendor) {
-    // Smart-add uses light tier for cost optimization
-    const resolvedModel = resolveVendorModel(vendor, llmConfig, "light");
-    const modelSource = determineLightTierModelSource(vendor, llmConfig);
+    const resolvedModel = await resolveSmartAddModel(dir);
+    const defaultModel = resolveVendorModel(vendor, llmConfig);
+    const modelSource = resolvedModel && resolvedModel !== defaultModel
+      ? "configured"
+      : determineSmartAddModelSource(vendor, llmConfig);
     printVendorModelHeader(vendor, llmConfig, {
       format,
       resolvedModel,
       modelSource,
-      tier: "light",
     });
   }
   if (format !== "json") {
@@ -1218,14 +1218,26 @@ async function resolveSmartAddModel(
 
   try {
     const rexDir = join(dir, REX_DIR);
+    const llmConfig = await loadLLMConfig(rexDir);
+    const vendor = llmConfig.vendor ?? getLLMVendor() ?? "claude";
+    const configuredModel = resolveVendorModel(vendor, llmConfig);
+    const hasVendorModelOverride =
+      (vendor === "claude" && typeof llmConfig.claude?.model === "string" && llmConfig.claude.model.trim().length > 0) ||
+      (vendor === "codex" && typeof llmConfig.codex?.model === "string" && llmConfig.codex.model.trim().length > 0);
+
+    if (hasVendorModelOverride) {
+      llmDebug(`effective model=${configuredModel}`);
+      return configuredModel;
+    }
+
     const store = await resolveStore(rexDir);
     const config = await store.loadConfig();
-    const vendor = getLLMVendor() ?? "claude";
     const model = resolveVendorCompatibleRexModel(vendor, config.model);
-    llmDebug(`effective model=${model ?? resolveConfiguredModel(undefined, "light")}`);
-    return model;
+    const effectiveModel = model ?? configuredModel;
+    llmDebug(`effective model=${effectiveModel}`);
+    return effectiveModel;
   } catch {
-    const resolvedModel = resolveConfiguredModel(undefined, "light");
+    const resolvedModel = resolveConfiguredModel();
     llmDebug(`effective model=${resolvedModel}`);
     return resolvedModel;
   }
@@ -1271,7 +1283,7 @@ async function generateSmartAddProposals(params: {
   isJson: boolean;
 }): Promise<Proposal[]> {
   const { dir, existing, parentId, model, descList, filePaths, isJson } = params;
-  const effectiveModel = resolveConfiguredModel(model, "light");
+  const effectiveModel = resolveConfiguredModel(model);
 
   if (filePaths.length > 0) {
     const resolved = filePaths.map((fp) => resolve(dir, fp));

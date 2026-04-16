@@ -91,7 +91,7 @@ describe("vendor-scoped model selection in rex add", () => {
     vi.clearAllMocks();
   });
 
-  it("uses light-tier default when legacy Claude rex config model is incompatible with vendor=codex", async () => {
+  it("uses the codex default when legacy Claude rex config model is incompatible with vendor=codex", async () => {
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({ llm: { vendor: "codex" } }),
@@ -111,8 +111,7 @@ describe("vendor-scoped model selection in rex add", () => {
     await cmdSmartAdd(tmpDir, "Add authentication", {}, {});
 
     expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-    // Smart-add uses light tier — falls back to codex light-tier model when legacy model is incompatible
-    expect(capturedModels).toEqual(["gpt-5.4mini"]);
+    expect(capturedModels).toEqual(["gpt-5-codex"]);
   });
 
   it("keeps compatible rex config model for the active vendor", async () => {
@@ -136,5 +135,18 @@ describe("vendor-scoped model selection in rex add", () => {
 
     expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
     expect(capturedModels).toEqual(["gpt-4o"]);
+  });
+
+  it("uses Claude Sonnet by default for base smart-add requests", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "claude" } }),
+      "utf-8",
+    );
+
+    await cmdSmartAdd(tmpDir, "Add authentication", {}, {});
+
+    expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
+    expect(capturedModels).toEqual(["claude-sonnet-4-6"]);
   });
 });

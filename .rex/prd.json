@@ -28784,17 +28784,32 @@
                 "Unit test covers nominal two-line 'tokens used \\n <number>' extraction and returns the correct integer",
                 "Unit test covers legacy same-line format without regression",
                 "Unit test covers blank lines between label and count (should still resolve correctly or return null safely)",
-                "Integration test verifies the extracted count reaches the run-level token accumulator"
+                "Integration test verifies the extracted count reaches the run-level token accumulator",
+                "Unit test confirms no validation callback fires before run completion for a multi-turn Codex run",
+                "Integration test verifies cumulative token totals at run end match the sum of per-turn counts",
+                "Test covers the scenario where a mid-turn count would have previously triggered a budget warning but end-of-run total does not"
               ],
               "priority": "high",
               "tags": [
                 "codex",
                 "token-usage",
-                "tests"
+                "tests",
+                "tokens"
               ],
               "source": "smart-add",
               "startedAt": "2026-04-14T20:40:35.085Z",
-              "completedAt": "2026-04-14T20:46:56.170Z"
+              "completedAt": "2026-04-16T14:36:20.074Z",
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:0:2",
+                  "proposalTitle": "Add regression tests for deferred Codex token validation behavior",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.6537709497206704,
+                  "mergedAt": "2026-04-16T14:29:29.383Z",
+                  "source": "smart-add"
+                }
+              ]
             }
           ]
         }
@@ -29093,6 +29108,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-15T17:52:01.299Z",
+      "completedAt": "2026-04-15T17:52:01.299Z",
       "children": [
         {
           "id": "405c9fcf-2258-472f-8eb7-30d5b7ae0b8a",
