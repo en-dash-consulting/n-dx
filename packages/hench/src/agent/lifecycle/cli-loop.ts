@@ -1273,6 +1273,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     heartbeat,
     memoryCtx,
     selfHeal: config.selfHeal,
+    rollbackOnFailure: opts.rollbackOnFailure,
   });
 
   return { run };

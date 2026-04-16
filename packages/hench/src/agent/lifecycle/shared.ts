@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
-import { getCurrentHead, execShellCmd } from "../../process/index.js";
+import { getCurrentHead, execShellCmd, execStdout } from "../../process/index.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
@@ -59,6 +59,11 @@ export interface SharedLoopOptions {
   priorAttempts?: PriorAttemptInfo;
   /** Run records for computing prior attempts when task is auto-selected. */
   runHistory?: RunRecord[];
+  /**
+   * Automatically revert uncommitted file changes on run failure.
+   * Default: true. Pass false (via --no-rollback) to leave changes in place.
+   */
+  rollbackOnFailure?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -512,7 +517,55 @@ export interface FinalizeRunOptions {
   memoryCtx?: MemoryContext;
   /** Whether in self-heal mode (triggers mandatory test gate). */
   selfHeal?: boolean;
+  /**
+   * Automatically revert uncommitted file changes on run failure.
+   * Default: true. Pass false (via --no-rollback) to leave changes in place.
+   */
+  rollbackOnFailure?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Git rollback helpers
+// ---------------------------------------------------------------------------
+
+/** Run statuses that indicate the run ended in failure. */
+const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient"]);
+
+/**
+ * Return the list of entries reported by `git status --porcelain`.
+ * Each non-blank line represents a modified, staged, or untracked path.
+ * Returns an empty array when the working tree is clean or git is unavailable.
+ */
+async function listDirtyPaths(projectDir: string): Promise<string[]> {
+  try {
+    const output = await execStdout("git", ["status", "--porcelain"], {
+      cwd: projectDir,
+      timeout: 15_000,
+    });
+    return output.trim().split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Revert all uncommitted changes introduced during the run.
+ * Skips silently when the working tree is already clean.
+ * Prints the number of reverted paths on completion.
+ */
+async function performRollbackIfNeeded(projectDir: string): Promise<void> {
+  const dirtyPaths = await listDirtyPaths(projectDir);
+  if (dirtyPaths.length === 0) {
+    return;
+  }
+  info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
+  await revertChanges(projectDir);
+  info(`Rollback complete — ${dirtyPaths.length} file(s) reverted.`);
+}
+
+// ---------------------------------------------------------------------------
+// Token diagnostic helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Derive the diagnostic status from per-turn token usage data.
@@ -668,6 +721,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Validate token reporting for Codex runs.
   // This is a non-blocking post-run check that logs warnings but never fails the run.
   validateRunTokensPostRun(run, true);
+
+  // Rollback uncommitted changes when the run failed (unless suppressed).
+  // Runs after test gates so the working tree reflects the agent's final state.
+  // Skips silently when nothing is dirty (no-op for already-clean trees).
+  if (opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
+    await performRollbackIfNeeded(projectDir);
+  }
 
   run.finishedAt = new Date().toISOString();
   run.lastActivityAt = run.finishedAt;
