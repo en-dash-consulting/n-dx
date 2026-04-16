@@ -23,8 +23,7 @@ export function errorResponse(
   status: number,
   message: string,
 ): void {
-  res.writeHead(status, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: message }));
+  jsonResponse(res, status, { error: message });
 }
 
 /** Read the full request body as a string. */

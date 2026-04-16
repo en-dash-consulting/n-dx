@@ -295,6 +295,7 @@
               "priority": "high",
               "source": "sourcevision",
               "startedAt": "2026-04-03T14:34:57.156Z",
+              "completedAt": "2026-04-16T19:06:20.783Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "8024b2fa4d12"
@@ -304,8 +305,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "completedAt": "2026-04-16T19:06:20.783Z"
+              }
             }
           ],
           "recommendationMeta": {
@@ -715,8 +715,96 @@
           "completedAt": "2026-04-14T21:36:07.553Z",
           "children": [
             {
-              "id": "1f2e1438-4f55-4ac3-9061-23b01e5d92aa",
-              "title": "Audit self-heal batch pipeline for Codex incompatibilities",
+              "id": "28f2690f-c4c8-436f-90f8-73acaa380b5c",
+              "title": "Fix observation in cleanup: High coupling (0.67) — 2 imports target \"web-server\"",
+              "status": "completed",
+              "level": "task",
+              "description": "- High coupling (0.67) — 2 imports target \"web-server\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-16T17:21:04.652Z",
+              "completedAt": "2026-04-16T19:24:31.715Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "1c7dd205b80d"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "1c7dd205b80d"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "31008a00-b60a-418d-9b6b-b3817aeebcb1",
+          "title": "Fix observation in domain-gateway-routes-mcp (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- High coupling (0.6) — 4 imports target \"web-server\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-16T17:26:05.067Z",
+          "completedAt": "2026-04-16T17:26:05.067Z",
+          "children": [
+            {
+              "id": "530da894-f1f4-428b-a7dd-460f9ba52138",
+              "title": "Fix observation in domain-gateway-routes-mcp: High coupling (0.6) — 4 imports target \"web-server\"",
+              "status": "completed",
+              "level": "task",
+              "description": "- High coupling (0.6) — 4 imports target \"web-server\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-16T17:26:00.847Z",
+              "completedAt": "2026-04-16T19:55:36.174Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "11f49a5aca47"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "11f49a5aca47"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "1e94a947-26f6-4e13-b517-06005ed53afb",
+          "title": "Fix observation in global (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Bidirectional coupling: \"web-server\" ↔ \"web-viewer\" (31+72 crossings) — consider extracting shared interface",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-16T17:33:49.851Z",
+          "completedAt": "2026-04-16T17:33:49.851Z",
+          "children": [
+            {
+              "id": "03832394-1df4-4f12-82c5-b55a9d76914a",
+              "title": "Fix observation in global: Bidirectional coupling: \"web-server\" ↔ \"web-viewer\" (31+72 crossings) — consider",
               "status": "completed",
               "level": "task",
               "description": "Trace the full self-heal batch execution path — from batch construction through LLM invocation to result parsing — and document every assumption that holds only for Claude (API response shape, tool-use availability, streaming format, token field names). Reproduce the Codex failure mode with a minimal fixture and attach the error context to inform the fix.",
@@ -818,8 +906,305 @@
       "completedAt": "2026-04-15T15:21:22.274Z",
       "children": [
         {
-          "id": "220368bf-084e-4fbe-931a-a18112fcc33e",
-          "title": "Windows Docker Testing Environment for ndx Gauntlet",
+          "id": "5ed3d9e2-a27a-46ec-81da-2f80d3b0729f",
+          "title": "Fix observation in rex-2 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Generic zone name \"Rex 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-16T19:59:41.694Z",
+          "completedAt": "2026-04-16T19:59:41.694Z",
+          "children": [
+            {
+              "id": "7174bd2c-7cce-42a2-ae85-83065ccd8e3a",
+              "title": "Fix observation in rex-2: Generic zone name \"Rex 2\" — enrichment did not assign a meaningful name reflecti",
+              "status": "completed",
+              "level": "task",
+              "description": "- Generic zone name \"Rex 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-16T19:55:38.508Z",
+              "completedAt": "2026-04-16T19:59:41.668Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "fbeb2da4ffbe"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "fbeb2da4ffbe"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "17537d98-1b67-41d7-923c-d5b688af0260",
+          "title": "Fix observation in sourcevision-3 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Generic zone name \"Sourcevision 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-16T20:02:14.565Z",
+          "completedAt": "2026-04-16T20:02:14.565Z",
+          "children": [
+            {
+              "id": "4aa3a181-0cad-474b-826d-dfb50d11ae96",
+              "title": "Fix observation in sourcevision-3: Generic zone name \"Sourcevision 3\" — enrichment did not assign a meaningful name",
+              "status": "completed",
+              "level": "task",
+              "description": "- Generic zone name \"Sourcevision 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-16T19:59:43.967Z",
+              "completedAt": "2026-04-16T20:02:14.537Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "c174926b23be"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "c174926b23be"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "a4cb2ced-93b6-4dac-b6d5-6c75baa0b141",
+          "title": "Fix observation in sourcevision-4 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Generic zone name \"Sourcevision 4\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-16T20:02:43.943Z",
+          "completedAt": "2026-04-16T20:02:43.943Z",
+          "children": [
+            {
+              "id": "24735cc5-fcc2-4bc5-b429-8a020bd929b4",
+              "title": "Fix observation in sourcevision-4: Generic zone name \"Sourcevision 4\" — enrichment did not assign a meaningful name",
+              "status": "completed",
+              "level": "task",
+              "description": "- Generic zone name \"Sourcevision 4\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-16T20:02:16.823Z",
+              "completedAt": "2026-04-16T20:02:43.917Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "333aeb070bda"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "333aeb070bda"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "e8465f1c-41fa-43e8-ba6f-a3708f353318",
+          "title": "Fix observation in web-server (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Low cohesion (0.33) — files are loosely related, consider splitting this zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-16T20:10:52.701Z",
+          "completedAt": "2026-04-16T20:10:52.701Z",
+          "children": [
+            {
+              "id": "19f2f8e1-b352-4650-9482-25a8091efd7d",
+              "title": "Fix observation in web-server: Low cohesion (0.33) — files are loosely related, consider splitting this zone",
+              "status": "completed",
+              "level": "task",
+              "description": "- Low cohesion (0.33) — files are loosely related, consider splitting this zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-16T20:02:46.148Z",
+              "completedAt": "2026-04-16T20:10:52.670Z",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "dd3ec1f88070"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "dd3ec1f88070"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "79b805a8-b1a1-404d-a103-93559bb69554",
+          "title": "Fix observation in web-unit (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.6) — 5 imports target \"web-server\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "67634a37-89b5-487f-a30d-f46f3a6c2464",
+              "title": "Fix observation in web-unit: High coupling (0.6) — 5 imports target \"web-server\"",
+              "status": "in_progress",
+              "level": "task",
+              "description": "- High coupling (0.6) — 5 imports target \"web-server\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "7b2e9824569c"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              },
+              "startedAt": "2026-04-16T20:10:54.955Z"
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "7b2e9824569c"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "52ecd173-5437-47fe-b9b7-48b0c930d187",
+          "title": "Fix suggestion in global (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Hub function: jsonResponse in packages/web/src/server/response-utils.ts is called from 22 files — changes here have wide impact, consider if responsibilities can be narrowed",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "d99f1ed5-40c7-4709-8f89-aceeb7ee3231",
+              "title": "Fix suggestion in global: Hub function: jsonResponse in packages/web/src/server/response-utils.ts is calle",
+              "status": "pending",
+              "level": "task",
+              "description": "- Hub function: jsonResponse in packages/web/src/server/response-utils.ts is called from 22 files — changes here have wide impact, consider if responsibilities can be narrowed",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "d43e8c4185f3"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "d43e8c4185f3"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "17c57599-62fc-4365-b493-c12bfc0d912c",
+          "title": "Fix suggestion in web-server (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone \"Web Server\" (web-server) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "0ee4d183-b49b-472f-aa63-b796165fc901",
+              "title": "Fix suggestion in web-server: Zone \"Web Server\" (web-server) has critical risk (score: 0.67, cohesion: 0.33, c",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone \"Web Server\" (web-server) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "0a546d7ac061"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "0a546d7ac061"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "c7df08dc-dcfe-40bd-87de-62734cc58581",
+          "title": "Fix move-file in web-server (1 finding)",
           "status": "completed",
           "level": "feature",
           "description": "Create a local Docker-based testing infrastructure that allows developers to run ndx gauntlet tests on Windows without native Windows environments. The .local_testing folder serves as a git-ignored workspace for Docker configurations and test artifacts.",

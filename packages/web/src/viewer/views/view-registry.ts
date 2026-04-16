@@ -155,4 +155,4 @@ export function renderActiveView(view: ViewId, ctx: ViewRenderContext): Componen
   return renderer ? renderer(ctx) : null;
 }
 
-export { buildValidViews } from "../../shared/view-routing.js";
+export { buildValidViews } from "../external.js";
