@@ -19,8 +19,108 @@
  */
 
 import { spawn, execFileSync } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
+import { tmpdir } from "os";
+
+// ---------------------------------------------------------------------------
+// NDX context assembly
+// ---------------------------------------------------------------------------
+
+/**
+ * Read CONTEXT.md from .sourcevision/.
+ * Returns the file content string, or null if the file does not exist.
+ *
+ * @param {string} dir  Project root directory.
+ * @returns {{ content: string | null; warning?: string }}
+ */
+export function readContextMd(dir) {
+  const contextPath = join(dir, ".sourcevision", "CONTEXT.md");
+  if (!existsSync(contextPath)) {
+    return { content: null, warning: "CONTEXT.md not found in .sourcevision/ — skipping codebase context" };
+  }
+  try {
+    return { content: readFileSync(contextPath, "utf-8") };
+  } catch (err) {
+    return { content: null, warning: `Could not read .sourcevision/CONTEXT.md: ${err.message}` };
+  }
+}
+
+/**
+ * Build a compact PRD status excerpt from .rex/prd.json.
+ * Includes only epic/feature/task titles and their statuses — no descriptions
+ * or acceptance criteria, to keep the payload small.
+ *
+ * @param {string} dir  Project root directory.
+ * @returns {{ content: string | null; warning?: string }}
+ */
+export function buildPrdStatusExcerpt(dir) {
+  const prdPath = join(dir, ".rex", "prd.json");
+  if (!existsSync(prdPath)) {
+    return { content: null, warning: "PRD not found at .rex/prd.json — skipping PRD context" };
+  }
+  try {
+    const doc = JSON.parse(readFileSync(prdPath, "utf-8"));
+    const lines = [`# PRD: ${doc.title ?? "untitled"}`];
+    const formatItems = (items, depth = 0) => {
+      if (!Array.isArray(items)) return;
+      for (const item of items) {
+        const indent = "  ".repeat(depth);
+        const marker = item.status === "completed" ? "[x]" : "[ ]";
+        lines.push(`${indent}${marker} ${item.title} (${item.level}, ${item.status})`);
+        if (item.children?.length) {
+          formatItems(item.children, depth + 1);
+        }
+      }
+    };
+    formatItems(doc.items ?? []);
+    return { content: lines.join("\n") };
+  } catch (err) {
+    return { content: null, warning: `Could not read .rex/prd.json: ${err.message}` };
+  }
+}
+
+/**
+ * Assemble the full NDX context payload from available sources.
+ *
+ * Reads CONTEXT.md and the PRD status excerpt. Missing files produce warnings
+ * but do not prevent execution. An empty result (no sources available) returns
+ * null text so callers can skip context injection entirely.
+ *
+ * @param {string} dir  Project root directory.
+ * @returns {{ text: string | null; warnings: string[] }}
+ */
+export function assembleNdxContext(dir) {
+  const warnings = [];
+  const parts = [];
+
+  const contextMd = readContextMd(dir);
+  if (contextMd.warning) warnings.push(contextMd.warning);
+  if (contextMd.content) parts.push(contextMd.content);
+
+  const prdExcerpt = buildPrdStatusExcerpt(dir);
+  if (prdExcerpt.warning) warnings.push(prdExcerpt.warning);
+  if (prdExcerpt.content) parts.push(prdExcerpt.content);
+
+  return {
+    text: parts.length > 0 ? parts.join("\n\n---\n\n") : null,
+    warnings,
+  };
+}
+
+/**
+ * Write a context payload to a temporary file and return its path.
+ * The caller is responsible for deleting the file when done.
+ *
+ * @param {string} text  Context text to write.
+ * @returns {string}  Path to the temporary file.
+ */
+export function writeNdxContextFile(text) {
+  const tmpDir = mkdtempSync(join(tmpdir(), "ndx-ctx-"));
+  const filePath = join(tmpDir, "context.md");
+  writeFileSync(filePath, text, "utf-8");
+  return filePath;
+}
 
 // ---------------------------------------------------------------------------
 // Config helpers
@@ -161,12 +261,13 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000) {
 
 /**
  * @typedef {Object} ReviewResult
- * @property {boolean} skipped         True when the review step was not executed.
- * @property {string}  [reason]        Human-readable reason for skipping.
- * @property {boolean} [passed]        True when tests passed. Present only when !skipped.
- * @property {string}  [command]       The test command that was run.
- * @property {string}  [output]        Combined stdout + stderr of the test run.
- * @property {number}  [exitCode]      Exit code of the test command.
+ * @property {boolean}  skipped          True when the review step was not executed.
+ * @property {string}   [reason]         Human-readable reason for skipping.
+ * @property {boolean}  [passed]         True when tests passed. Present only when !skipped.
+ * @property {string}   [command]        The test command that was run.
+ * @property {string}   [output]         Combined stdout + stderr of the test run.
+ * @property {number}   [exitCode]       Exit code of the test command.
+ * @property {string[]} [contextFiles]   Context file paths forwarded from the primary run.
  */
 
 /**
@@ -177,15 +278,19 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000) {
  * 3. If no test command is configured, skip with a warning-level result.
  * 4. Run the test command and return a structured verdict.
  *
+ * The `contextFiles` array (if provided) is stored on the result so future
+ * reviewer LLM invocations can forward the same context to the reviewer model.
+ *
  * @param {{
  *   dir: string;
  *   reviewer: "claude" | "codex";
  *   testCommand?: string;
  *   timeout?: number;
+ *   contextFiles?: string[];
  * }} options
  * @returns {Promise<ReviewResult>}
  */
-export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout }) {
+export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout, contextFiles }) {
   const cliPath = resolveVendorCliPath(dir, reviewer);
   const { available } = checkReviewerAvailability(cliPath);
 
@@ -210,6 +315,7 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
     command: testCommand,
     output,
     exitCode,
+    ...(contextFiles?.length ? { contextFiles } : {}),
   };
 }
 

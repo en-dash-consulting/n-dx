@@ -285,6 +285,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     store, config, opts.taskId,
     { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
+    opts.extraContext,
   );
 
   // Shared: dry run path
@@ -461,6 +462,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     memoryCtx,
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
+    store,
   });
 
   return { run };

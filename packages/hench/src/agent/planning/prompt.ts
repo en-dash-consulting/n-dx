@@ -164,6 +164,7 @@ export function buildSystemPrompt(
 export function buildPromptEnvelope(
   brief: TaskBrief,
   config: HenchConfig,
+  extraContext?: string,
 ): PromptEnvelope {
   const systemContent = buildSystemPrompt(brief.project, config);
   const briefSections = buildBriefSections(brief);
@@ -171,5 +172,6 @@ export function buildPromptEnvelope(
   return createPromptEnvelope([
     { name: "system", content: systemContent },
     ...briefSections,
+    ...(extraContext ? [{ name: "context" as const, content: extraContext }] : []),
   ]);
 }

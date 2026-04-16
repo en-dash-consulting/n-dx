@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { RunRecord, ToolCallRecord } from "../../schema/index.js";
@@ -613,6 +614,7 @@ async function runOne(
   epicId?: string,
   runHistory?: RunRecord[],
   rollbackOnFailure?: boolean,
+  extraContext?: string,
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
@@ -641,6 +643,7 @@ async function runOne(
         epicId,
         runHistory: runs,
         rollbackOnFailure,
+        extraContext,
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -657,6 +660,7 @@ async function runOne(
         epicId,
         runHistory: runs,
         rollbackOnFailure,
+        extraContext,
       });
 
   const { run } = result;
@@ -859,6 +863,22 @@ export async function cmdRun(
   // Valid values: critical, high, medium, low.
   const priorityOverride = flags.priority;
 
+  // --context-file flag: read extra project context (injected by pair-programming).
+  // If the file is absent or unreadable, warn and continue without context.
+  let extraContext: string | undefined;
+  const contextFilePath = flags["context-file"];
+  if (contextFilePath) {
+    if (existsSync(contextFilePath)) {
+      try {
+        extraContext = readFileSync(contextFilePath, "utf-8");
+      } catch (err) {
+        info(`⚠ Could not read context file "${contextFilePath}": ${(err as Error).message}`);
+      }
+    } else {
+      info(`⚠ Context file not found: "${contextFilePath}" — proceeding without context`);
+    }
+  }
+
   // --epic-by-epic and --epic are mutually exclusive
   if (epicByEpic && flags.epic) {
     throw new CLIError(
@@ -953,7 +973,7 @@ export async function cmdRun(
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride, rollbackOnFailure);
+      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride, rollbackOnFailure, extraContext);
       return;
     }
 
@@ -967,9 +987,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride, rollbackOnFailure);
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride, rollbackOnFailure, extraContext);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, rollbackOnFailure);
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, rollbackOnFailure, extraContext);
     }
   } finally {
     await limiter.release();
@@ -996,6 +1016,7 @@ async function runIterations(
   review: boolean,
   epicId?: string,
   rollbackOnFailure?: boolean,
+  extraContext?: string,
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
     if (iterations > 1) {
@@ -1019,6 +1040,7 @@ async function runIterations(
       epicId,
       undefined,
       rollbackOnFailure,
+      extraContext,
     );
 
     // Emit quota log line(s) at the inter-run boundary.
@@ -1060,6 +1082,7 @@ async function runLoop(
   queue?: ExecutionQueue,
   priorityOverride?: string,
   rollbackOnFailure?: boolean,
+  extraContext?: string,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -1129,6 +1152,7 @@ async function runLoop(
             epicId,
             undefined,
             rollbackOnFailure,
+            extraContext,
           );
           status = result.status;
         } finally {
@@ -1237,6 +1261,7 @@ async function runEpicByEpic(
   queue?: ExecutionQueue,
   priorityOverride?: string,
   rollbackOnFailure?: boolean,
+  extraContext?: string,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -1364,6 +1389,7 @@ async function runEpicByEpic(
               epic.id,
               undefined,
               rollbackOnFailure,
+              extraContext,
             );
             status = result.status;
           } finally {

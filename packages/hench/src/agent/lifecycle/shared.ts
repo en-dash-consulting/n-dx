@@ -64,6 +64,11 @@ export interface SharedLoopOptions {
    * Default: true. Pass false (via --no-rollback) to leave changes in place.
    */
   rollbackOnFailure?: boolean;
+  /**
+   * Additional project context to append to the prompt (e.g. CONTEXT.md +
+   * PRD status excerpt injected by the pair-programming command).
+   */
+  extraContext?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,11 +105,12 @@ export async function prepareBrief(
   taskId?: string,
   options?: AssembleBriefOptions,
   displayOptions?: PrepareBriefDisplayOptions,
+  extraContext?: string,
 ): Promise<PreparedBrief> {
   const { brief, taskId: resolvedTaskId } = await assembleTaskBrief(store, taskId, options);
   const briefText = formatTaskBrief(brief);
   const systemPrompt = buildSystemPrompt(brief.project, config);
-  const envelope = buildPromptEnvelope(brief, config);
+  const envelope = buildPromptEnvelope(brief, config, extraContext);
 
   const reason: SelectionReason = taskId ? "explicit" : "auto";
 
@@ -522,6 +528,13 @@ export interface FinalizeRunOptions {
    * Default: true. Pass false (via --no-rollback) to leave changes in place.
    */
   rollbackOnFailure?: boolean;
+  /**
+   * PRD store used to reset task status to pending on failure.
+   * When provided, if the run fails and the task is still in_progress,
+   * it is reset to pending so it reappears as actionable. This occurs
+   * independently of rollbackOnFailure.
+   */
+  store?: PRDStore;
 }
 
 // ---------------------------------------------------------------------------
@@ -561,6 +574,38 @@ async function performRollbackIfNeeded(projectDir: string): Promise<void> {
   info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
   await revertChanges(projectDir);
   info(`Rollback complete — ${dirtyPaths.length} file(s) reverted.`);
+}
+
+// ---------------------------------------------------------------------------
+// PRD task reset helper
+// ---------------------------------------------------------------------------
+
+/**
+ * After a failed run, reset the active task from in_progress back to pending
+ * so it reappears as actionable without manual PRD editing.
+ *
+ * Only resets when the task is still in_progress — specific failure handlers
+ * (e.g. handleRunFailure) may have already moved it to pending or deferred,
+ * in which case this is a no-op.
+ *
+ * Runs independently of rollbackOnFailure so the PRD is always cleaned up
+ * even when git rollback is suppressed with --no-rollback.
+ */
+async function resetInProgressTaskIfFailed(
+  store: PRDStore,
+  run: RunRecord,
+): Promise<void> {
+  if (!FAILURE_STATUSES.has(run.status) || !run.taskId) {
+    return;
+  }
+
+  const item = await store.getItem(run.taskId);
+  if (!item || item.status !== "in_progress") {
+    return;
+  }
+
+  await toolRexUpdateStatus(store, run.taskId, { status: "pending" });
+  info(`\nTask reset to pending: [${run.taskId}] ${run.taskTitle ?? "unknown"}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -727,6 +772,14 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Skips silently when nothing is dirty (no-op for already-clean trees).
   if (opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
     await performRollbackIfNeeded(projectDir);
+  }
+
+  // Reset task to pending when run failed and task is still in_progress.
+  // Runs independently of rollbackOnFailure — PRD cleanup always occurs.
+  // A no-op when a specific failure handler already moved the task to
+  // pending or deferred.
+  if (opts.store) {
+    await resetInProgressTaskIfFailed(opts.store, run);
   }
 
   run.finishedAt = new Date().toISOString();

@@ -31,6 +31,10 @@ const {
   runShellTestCommand,
   runCrossVendorReview,
   formatReviewBanner,
+  readContextMd,
+  buildPrdStatusExcerpt,
+  assembleNdxContext,
+  writeNdxContextFile,
 } = await import(
   "../../packages/core/pair-programming.js"
 );
@@ -332,5 +336,179 @@ describe("formatReviewBanner", () => {
     const reviewer = resolveReviewerVendor("claude");
     const output = formatReviewBanner(reviewer, { skipped: true, reason: "x" });
     expect(output).toContain("Reviewer (codex)");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readContextMd
+// ---------------------------------------------------------------------------
+
+describe("readContextMd", () => {
+  it("returns null with warning when .sourcevision/CONTEXT.md does not exist", () => {
+    const result = readContextMd(tmpDir);
+    expect(result.content).toBeNull();
+    expect(result.warning).toContain("CONTEXT.md not found");
+  });
+
+  it("returns file content when CONTEXT.md exists", () => {
+    const svDir = join(tmpDir, ".sourcevision");
+    mkdirSync(svDir, { recursive: true });
+    writeFileSync(join(svDir, "CONTEXT.md"), "# Codebase\nSome context here.", "utf-8");
+    const result = readContextMd(tmpDir);
+    expect(result.content).toBe("# Codebase\nSome context here.");
+    expect(result.warning).toBeUndefined();
+  });
+
+  it("returns null with warning when .sourcevision dir exists but file is absent", () => {
+    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    const result = readContextMd(tmpDir);
+    expect(result.content).toBeNull();
+    expect(result.warning).toMatch(/CONTEXT\.md not found/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildPrdStatusExcerpt
+// ---------------------------------------------------------------------------
+
+describe("buildPrdStatusExcerpt", () => {
+  it("returns null with warning when .rex/prd.json does not exist", () => {
+    const result = buildPrdStatusExcerpt(tmpDir);
+    expect(result.content).toBeNull();
+    expect(result.warning).toContain("PRD not found");
+  });
+
+  it("returns compact title tree from a valid prd.json", () => {
+    const rexDir = join(tmpDir, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    const prd = {
+      schema: "rex/v1",
+      title: "My Project",
+      items: [
+        {
+          id: "e1",
+          title: "Epic One",
+          status: "in_progress",
+          level: "epic",
+          children: [
+            { id: "t1", title: "Task A", status: "pending", level: "task", children: [] },
+            { id: "t2", title: "Task B", status: "completed", level: "task", children: [] },
+          ],
+        },
+      ],
+    };
+    writeFileSync(join(rexDir, "prd.json"), JSON.stringify(prd), "utf-8");
+    const result = buildPrdStatusExcerpt(tmpDir);
+    expect(result.content).toContain("# PRD: My Project");
+    expect(result.content).toContain("Epic One");
+    expect(result.content).toContain("Task A");
+    expect(result.content).toContain("Task B");
+    // Completed tasks get [x] marker
+    expect(result.content).toContain("[x] Task B");
+    // Pending tasks get [ ] marker
+    expect(result.content).toContain("[ ] Task A");
+    expect(result.warning).toBeUndefined();
+  });
+
+  it("returns null with warning for malformed JSON", () => {
+    const rexDir = join(tmpDir, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    writeFileSync(join(rexDir, "prd.json"), "not valid json", "utf-8");
+    const result = buildPrdStatusExcerpt(tmpDir);
+    expect(result.content).toBeNull();
+    expect(result.warning).toContain("Could not read");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assembleNdxContext
+// ---------------------------------------------------------------------------
+
+describe("assembleNdxContext", () => {
+  it("returns null text with two warnings when neither source exists", () => {
+    const result = assembleNdxContext(tmpDir);
+    expect(result.text).toBeNull();
+    expect(result.warnings).toHaveLength(2);
+  });
+
+  it("returns only CONTEXT.md content when PRD is absent", () => {
+    const svDir = join(tmpDir, ".sourcevision");
+    mkdirSync(svDir, { recursive: true });
+    writeFileSync(join(svDir, "CONTEXT.md"), "codebase summary", "utf-8");
+    const result = assembleNdxContext(tmpDir);
+    expect(result.text).toContain("codebase summary");
+    expect(result.warnings).toHaveLength(1); // PRD warning only
+  });
+
+  it("returns only PRD excerpt when CONTEXT.md is absent", () => {
+    const rexDir = join(tmpDir, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    const prd = { schema: "rex/v1", title: "Proj", items: [] };
+    writeFileSync(join(rexDir, "prd.json"), JSON.stringify(prd), "utf-8");
+    const result = assembleNdxContext(tmpDir);
+    expect(result.text).toContain("# PRD: Proj");
+    expect(result.warnings).toHaveLength(1); // CONTEXT.md warning only
+  });
+
+  it("combines both sources with a separator when both exist", () => {
+    const svDir = join(tmpDir, ".sourcevision");
+    mkdirSync(svDir, { recursive: true });
+    writeFileSync(join(svDir, "CONTEXT.md"), "codebase summary", "utf-8");
+    const rexDir = join(tmpDir, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    const prd = { schema: "rex/v1", title: "Proj", items: [] };
+    writeFileSync(join(rexDir, "prd.json"), JSON.stringify(prd), "utf-8");
+    const result = assembleNdxContext(tmpDir);
+    expect(result.text).toContain("codebase summary");
+    expect(result.text).toContain("# PRD: Proj");
+    expect(result.text).toContain("---"); // separator
+    expect(result.warnings).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// writeNdxContextFile
+// ---------------------------------------------------------------------------
+
+describe("writeNdxContextFile", () => {
+  it("writes text to a temp file and returns a valid path", async () => {
+    const { existsSync, readFileSync, rmSync } = await import("node:fs");
+    const path = writeNdxContextFile("hello context");
+    try {
+      expect(existsSync(path)).toBe(true);
+      expect(readFileSync(path, "utf-8")).toBe("hello context");
+    } finally {
+      try { rmSync(path, { force: true }); } catch { /* ignore */ }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runCrossVendorReview — contextFiles forwarding
+// ---------------------------------------------------------------------------
+
+describe("runCrossVendorReview — contextFiles stored in result", () => {
+  it("includes contextFiles in result when tests pass and contextFiles provided", async () => {
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: process.execPath } } });
+    const result = await runCrossVendorReview({
+      dir: tmpDir,
+      reviewer: "codex",
+      testCommand: `${process.execPath} -e "process.exit(0)"`,
+      contextFiles: ["/tmp/context.md"],
+    });
+    expect(result.skipped).toBe(false);
+    expect(result.passed).toBe(true);
+    expect(result.contextFiles).toEqual(["/tmp/context.md"]);
+  });
+
+  it("does not add contextFiles property when no contextFiles provided", async () => {
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: process.execPath } } });
+    const result = await runCrossVendorReview({
+      dir: tmpDir,
+      reviewer: "codex",
+      testCommand: `${process.execPath} -e "process.exit(0)"`,
+    });
+    expect(result.skipped).toBe(false);
+    expect(result.contextFiles).toBeUndefined();
   });
 });

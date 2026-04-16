@@ -35,7 +35,7 @@
  */
 
 import { spawn } from "child_process";
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -99,6 +99,8 @@ import {
   resolveReviewerVendor,
   runCrossVendorReview,
   formatReviewBanner,
+  assembleNdxContext,
+  writeNdxContextFile,
 } from "./pair-programming.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -1837,6 +1839,7 @@ async function handlePairProgramming(rest) {
 
   const isDryRun = flags.includes("--dry-run");
   const skipReview = flags.includes("--skip-review");
+  const noContext = flags.includes("--no-context");
 
   const primaryVendor = readLLMVendor(dir);
   if (!isDryRun && !primaryVendor) {
@@ -1845,32 +1848,61 @@ async function handlePairProgramming(rest) {
     exitWithCleanup(1);
   }
 
-  // Remove description and --skip-review from the args forwarded to hench
+  // ── Context assembly ─────────────────────────────────────────────────────
+  let contextFilePath = null;
+  if (!noContext) {
+    const { text, warnings } = assembleNdxContext(dir);
+    for (const w of warnings) {
+      process.stderr.write(`⚠ pair-programming: ${w}\n`);
+    }
+    if (text) {
+      contextFilePath = writeNdxContextFile(text);
+    }
+  }
+
+  // Remove description, --skip-review, and --no-context from the args forwarded to hench
   let descriptionRemoved = false;
   const henchArgs = rest.filter((a) => {
     if (!descriptionRemoved && !a.startsWith("-") && a === description) {
       descriptionRemoved = true;
       return false;
     }
-    return a !== "--skip-review";
+    return a !== "--skip-review" && a !== "--no-context";
   });
 
-  // ── Step 1: primary vendor work ──────────────────────────────────────────
-  const primaryCode = await run(tools.hench, ["run", `--freeform=${description}`, ...henchArgs]);
-  if (primaryCode !== 0) {
-    exitWithCleanup(primaryCode);
-    return;
+  // Inject context file path into hench args
+  if (contextFilePath) {
+    henchArgs.push(`--context-file=${contextFilePath}`);
   }
 
-  // ── Step 2: cross-vendor review ──────────────────────────────────────────
-  if (!isDryRun && !skipReview && primaryVendor) {
-    const reviewer = resolveReviewerVendor(primaryVendor);
-    const testCommand = readRexTestCommand(dir);
-    const result = await runCrossVendorReview({ dir, reviewer, testCommand });
-    process.stdout.write(formatReviewBanner(reviewer, result) + "\n");
-    if (!result.skipped && !result.passed) {
-      exitWithCleanup(1);
+  try {
+    // ── Step 1: primary vendor work ────────────────────────────────────────
+    const primaryCode = await run(tools.hench, ["run", `--freeform=${description}`, ...henchArgs]);
+    if (primaryCode !== 0) {
+      exitWithCleanup(primaryCode);
       return;
+    }
+
+    // ── Step 2: cross-vendor review ──────────────────────────────────────────
+    if (!isDryRun && !skipReview && primaryVendor) {
+      const reviewer = resolveReviewerVendor(primaryVendor);
+      const testCommand = readRexTestCommand(dir);
+      const result = await runCrossVendorReview({
+        dir,
+        reviewer,
+        testCommand,
+        contextFiles: contextFilePath ? [contextFilePath] : undefined,
+      });
+      process.stdout.write(formatReviewBanner(reviewer, result) + "\n");
+      if (!result.skipped && !result.passed) {
+        exitWithCleanup(1);
+        return;
+      }
+    }
+  } finally {
+    // Clean up temp context file regardless of outcome
+    if (contextFilePath) {
+      try { rmSync(contextFilePath, { force: true }); } catch { /* ignore */ }
     }
   }
 

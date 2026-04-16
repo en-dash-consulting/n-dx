@@ -1185,6 +1185,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     options: [
       { flag: "--dry-run", description: "Print the brief without calling the agent or running tests" },
       { flag: "--skip-review", description: "Skip the cross-vendor review step" },
+      { flag: "--no-context", description: "Skip context injection (CONTEXT.md + PRD status) — useful for debugging or CI" },
       { flag: "--max-turns=<n>", description: "Override max agent turns" },
       { flag: "--model=<model>", description: "Override the configured LLM model" },
       { flag: "--token-budget=<n>", description: "Cap total tokens (0 = unlimited)" },

@@ -1080,6 +1080,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     store, config, opts.taskId,
     { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
+    opts.extraContext,
   );
 
   // Bound the brief text to the vendor's effective context character limit.
@@ -1274,6 +1275,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     memoryCtx,
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
+    store,
   });
 
   return { run };
