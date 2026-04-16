@@ -9,7 +9,7 @@
  * the Preact hook (`useDOMPerformanceMonitor`) is provided separately.
  *
  * @see ./memory-monitor.ts — complementary heap-level memory monitoring
- * @see ./components/progressive-loader.ts — progressive load integration
+ * @see ../views/progressive-loader.ts — progressive load integration
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────

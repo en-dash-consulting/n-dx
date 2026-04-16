@@ -1092,6 +1092,77 @@ async function handleInit(rest) {
     recordInitVersion(dir, version);
   } catch { /* non-fatal */ }
 
+  // ── Ink animated UI (TTY) vs static fallback (non-TTY / quiet) ────
+  const useTUI = !quiet && process.stdout.isTTY;
+
+  if (useTUI) {
+    let inkResult;
+    try {
+      const { renderInit } = await import("./cli-ink.js");
+      inkResult = await renderInit({
+        dir,
+        flags,
+        provider: selectedProvider,
+        providerSource,
+        noClaude: !assistantEnabled.claude,
+        tools,
+        runInitCapture,
+      });
+    } catch (err) {
+      console.error(err.message || err);
+    }
+    if (inkResult) {
+      if (inkResult.code !== 0) {
+        if (inkResult.error) console.error(inkResult.error);
+        exitWithCleanup(1);
+      }
+      // Ink handled sub-package inits + claude integration display.
+      // Run codex integration if enabled (Ink only handles claude).
+      if (assistantEnabled.codex) {
+        setupAssistantIntegrations(dir, { claude: false, codex: true });
+      }
+      exitWithCleanup(0);
+    }
+    // Ink failed — fall through to static path
+  }
+
+  // ── Static path (non-TTY, --quiet, or Ink failed) ─────────────────
+
+  async function staticPhase(name, work, detail) {
+    const phase = INIT_PHASES[name];
+    if (!quiet) {
+      const spinner = createSpinner(phase.spinner);
+      spinner.start();
+      const result = await work();
+      if (result.code !== 0) {
+        spinner.fail(`${name} failed`);
+        console.error(result.stderr || result.stdout);
+        exitWithCleanup(1);
+      }
+      spinner.success(phase.success, detail);
+    } else {
+      const result = await work();
+      if (result.code !== 0) {
+        console.error(result.stderr || result.stdout);
+        exitWithCleanup(1);
+      }
+    }
+  }
+
+  await staticPhase("sourcevision",
+    async () => {
+      const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+      if (initResult.code !== 0) return initResult;
+      return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
+    },
+    svExists ? "reused — .sourcevision/ already present" : undefined);
+  await staticPhase("rex",
+    () => runInitCapture(tools.rex, ["init", ...flags, dir]),
+    rexExists ? "reused — .rex/ already present" : undefined);
+  await staticPhase("hench",
+    () => runInitCapture(tools.hench, ["init", ...flags, dir]),
+    henchExists ? "reused — .hench/ already present" : undefined);
+
   // Assistant integrations (vendor-neutral dispatch)
   const assistantResults = setupAssistantIntegrations(dir, assistantEnabled);
 

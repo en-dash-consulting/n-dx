@@ -289,7 +289,7 @@
             {
               "id": "81b1d6f0-2f8a-46e2-b195-473450489779",
               "title": "Fix move-file in web-viewer: File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zon",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
               "priority": "high",
@@ -304,7 +304,8 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              }
+              },
+              "completedAt": "2026-04-16T19:06:20.783Z"
             }
           ],
           "recommendationMeta": {
@@ -332,12 +333,13 @@
             {
               "id": "c434442f-7856-4ed8-ba18-e9c664b22593",
               "title": "Fix anti-pattern in global: God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts c (+1 more)",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts calls 41 unique functions — consider decomposing into smaller, focused functions\n- God function: runCI in packages/core/ci.js calls 39 unique functions — consider decomposing into smaller, focused functions",
               "priority": "high",
               "source": "sourcevision",
               "startedAt": "2026-04-03T14:34:50.151Z",
+              "completedAt": "2026-04-16T18:53:47.303Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "264b6245baa8",
