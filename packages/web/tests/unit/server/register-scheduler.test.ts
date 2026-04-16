@@ -5,7 +5,7 @@
  * startUsageCleanupScheduler with the expected arguments and
  * returns a clearable interval handle.
  *
- * @see packages/web/src/server/register-scheduler.ts
+ * @see packages/web/src/server/task-usage/register-scheduler.ts
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
