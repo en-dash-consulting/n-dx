@@ -10,6 +10,7 @@ import { access, readFile } from "node:fs/promises";
 import { deepMerge } from "./project-config.js";
 import type { LLMConfig, LLMVendor, CodexConfig } from "./llm-types.js";
 import type { ClaudeConfig } from "./types.js";
+import { normalizeCodexModel } from "./config.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
@@ -43,8 +44,8 @@ function extractCodexConfig(value: unknown): CodexConfig | undefined {
   if (typeof v.cli_path === "string" && v.cli_path) cfg.cli_path = v.cli_path;
   if (typeof v.api_key === "string" && v.api_key) cfg.api_key = v.api_key;
   if (typeof v.api_endpoint === "string" && v.api_endpoint) cfg.api_endpoint = v.api_endpoint;
-  if (typeof v.model === "string" && v.model) cfg.model = v.model;
-  if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
+  if (typeof v.model === "string" && v.model) cfg.model = normalizeCodexModel(v.model);
+  if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = normalizeCodexModel(v.lightModel);
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 

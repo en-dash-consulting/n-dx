@@ -21,6 +21,10 @@
 import { getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";
 
 const SUPPORTED_PROVIDERS = ["codex", "claude"];
+const LEGACY_CATALOG_MODEL_ALIASES = {
+  codex: ["gpt-5-codex"],
+  claude: [],
+};
 
 /**
  * Friendly display labels for each supported provider.
@@ -310,6 +314,12 @@ export async function promptLLMSelection(resolution, options = {}) {
 export function validateInitFlags({ provider, model, claudeModel, codexModel }) {
   const errors = [];
   const warnings = [];
+  const isKnownModel = (vendor, value) => {
+    const catalog = getModelsForVendor(vendor);
+    if (!catalog) return false;
+    if (catalog.some((m) => m.id === value)) return true;
+    return (LEGACY_CATALOG_MODEL_ALIASES[vendor] ?? []).includes(value);
+  };
 
   // ── Incompatible flag combinations ──────────────────────────────────────
 
@@ -331,7 +341,7 @@ export function validateInitFlags({ provider, model, claudeModel, codexModel }) 
   if (errors.length === 0) {
     if (claudeModel) {
       const catalog = getModelsForVendor("claude");
-      if (catalog && !catalog.some((m) => m.id === claudeModel)) {
+      if (catalog && !isKnownModel("claude", claudeModel)) {
         warnings.push(
           `Unknown model "${claudeModel}" for claude. ` +
           `Known models: ${catalog.map((m) => m.id).join(", ")}. Proceeding anyway.`,
@@ -341,7 +351,7 @@ export function validateInitFlags({ provider, model, claudeModel, codexModel }) 
 
     if (codexModel) {
       const catalog = getModelsForVendor("codex");
-      if (catalog && !catalog.some((m) => m.id === codexModel)) {
+      if (catalog && !isKnownModel("codex", codexModel)) {
         warnings.push(
           `Unknown model "${codexModel}" for codex. ` +
           `Known models: ${catalog.map((m) => m.id).join(", ")}. Proceeding anyway.`,
@@ -354,7 +364,7 @@ export function validateInitFlags({ provider, model, claudeModel, codexModel }) 
       const effectiveProvider = provider || (claudeModel ? "claude" : codexModel ? "codex" : undefined);
       if (effectiveProvider) {
         const catalog = getModelsForVendor(effectiveProvider);
-        if (catalog && !catalog.some((m) => m.id === model)) {
+        if (catalog && !isKnownModel(effectiveProvider, model)) {
           warnings.push(
             `Unknown model "${model}" for ${effectiveProvider}. ` +
             `Known models: ${catalog.map((m) => m.id).join(", ")}. Proceeding anyway.`,

@@ -1,3 +1,8 @@
+---
+name: ndx-reshape
+description: Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers
+---
+
 Restructure the PRD hierarchy to keep it organized as a coherent product spec.
 
 Use this when the PRD has grown organically and needs cleanup: too many top-level epics, features that should be tasks, overlapping areas that should be merged, or items that belong under different parents.

@@ -1,3 +1,8 @@
+---
+name: ndx-plan
+description: Analyze the codebase and propose PRD updates
+---
+
 Analyze the codebase and propose PRD updates.
 
 1. Call `get_overview` (sourcevision MCP) to understand current project state

@@ -742,9 +742,9 @@ describe("LLM_MODEL_CATALOG", () => {
     expect(recommended.id).toBe("claude-sonnet-4-6");
   });
 
-  it("recommended Codex model is gpt-5-codex", () => {
+  it("recommended Codex model is gpt-5.1-codex-max", () => {
     const recommended = LLM_MODEL_CATALOG.codex.find((m) => m.recommended);
-    expect(recommended.id).toBe("gpt-5-codex");
+    expect(recommended.id).toBe("gpt-5.1-codex-max");
   });
 });
 
@@ -776,7 +776,7 @@ describe("getRecommendedModel", () => {
     const recommended = getRecommendedModel("codex");
     expect(recommended).toBeDefined();
     expect(recommended.recommended).toBe(true);
-    expect(recommended.id).toBe("gpt-5-codex");
+    expect(recommended.id).toBe("gpt-5.1-codex-max");
   });
 
   it("returns undefined for unknown vendor", () => {
@@ -788,8 +788,7 @@ describe("getRecommendedModel", () => {
 
 describe("promptLLMSelection model prompt integration", () => {
   describe("default model prompt returns model from catalog", () => {
-    it("returns model ID for single-model vendor without interactive prompt", async () => {
-      // Codex has one model — defaultPromptModel auto-returns it
+    it("returns the recommended Codex model without interactive prompt in non-TTY mode", async () => {
       const resolution = {
         provider: "codex",
         model: undefined,
@@ -798,9 +797,8 @@ describe("promptLLMSelection model prompt integration", () => {
         needsProviderPrompt: false,
         needsModelPrompt: true,
       };
-      // Use default model prompt (no override) — single-model vendors auto-select
       const result = await promptLLMSelection(resolution);
-      expect(result.model).toBe("gpt-5-codex");
+      expect(result.model).toBe("gpt-5.1-codex-max");
       expect(result.modelSource).toBe("prompt");
     });
   });
@@ -818,10 +816,10 @@ describe("promptLLMSelection model prompt integration", () => {
       // Inject provider prompt but use default model prompt
       const result = await promptLLMSelection(resolution, {
         promptProvider: async () => "codex",
-        // No promptModel override — uses default, which auto-selects for single-model vendor
+        // No promptModel override — uses default, which selects the recommended catalog model
       });
       expect(result.provider).toBe("codex");
-      expect(result.model).toBe("gpt-5-codex");
+      expect(result.model).toBe("gpt-5.1-codex-max");
       expect(result.modelSource).toBe("prompt");
     });
   });

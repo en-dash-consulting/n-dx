@@ -1,3 +1,9 @@
+---
+name: ndx-feedback
+description: Submit feedback, bug reports, or feature requests for n-dx
+argument-hint: "[description]"
+---
+
 Submit feedback about n-dx — bug reports, feature requests, suggestions, or general observations.
 
 ## Process

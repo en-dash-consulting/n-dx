@@ -254,7 +254,7 @@ describe("task-weight model resolution in rex commands", () => {
       expect(capturedSmartAddModels[0]).toBe(NEWEST_MODELS.claude);
     });
 
-    it("falls back to gpt-5-codex when vendor=codex and no codex model is configured", async () => {
+    it("falls back to the current Codex default when vendor=codex and no codex model is configured", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),
         JSON.stringify({

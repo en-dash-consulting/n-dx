@@ -605,6 +605,7 @@ async function runOne(
   taskId: string | undefined,
   dryRun: boolean,
   model: string | undefined,
+  spawnModel: string | undefined,
   maxTurns: number | undefined,
   tokenBudget: number | undefined,
   review: boolean,
@@ -633,6 +634,7 @@ async function runOne(
         taskId,
         dryRun,
         model,
+        spawnModel,
         review,
         excludeTaskIds,
         epicId,
@@ -784,6 +786,9 @@ export async function cmdRun(
   const dryRun = flags["dry-run"] === "true";
   const review = flags.review === "true";
   const model = resolvedModel;
+  const spawnModel = llmVendor === "codex" && !cliModelOverride
+    ? undefined
+    : resolvedModel;
   const auto = flags.auto === "true";
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";
@@ -944,7 +949,7 @@ export async function cmdRun(
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride);
+      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride);
       return;
     }
 
@@ -958,9 +963,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride);
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId);
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId);
     }
   } finally {
     await limiter.release();
@@ -979,6 +984,7 @@ async function runIterations(
   taskId: string | undefined,
   dryRun: boolean,
   model: string | undefined,
+  spawnModel: string | undefined,
   maxTurns: number | undefined,
   tokenBudget: number | undefined,
   iterations: number,
@@ -997,12 +1003,12 @@ async function runIterations(
       ? await loadStuckTaskIds(henchDir, maxFailedAttempts)
       : undefined;
 
-    const { status } = await runOne(
+      const { status } = await runOne(
       dir, henchDir, rexDir, provider,
       // Only use the explicit taskId for the first iteration;
       // subsequent iterations autoselect the next task
       i === 0 ? taskId : undefined,
-      dryRun, model, maxTurns, tokenBudget,
+      dryRun, model, spawnModel, maxTurns, tokenBudget,
       review,
       stuckIds,
       epicId,
@@ -1037,6 +1043,7 @@ async function runLoop(
   taskId: string | undefined,
   dryRun: boolean,
   model: string | undefined,
+  spawnModel: string | undefined,
   maxTurns: number | undefined,
   tokenBudget: number | undefined,
   pauseMs: number,
@@ -1108,7 +1115,7 @@ async function runLoop(
             dir, henchDir, rexDir, provider,
             // Only use explicit taskId on the very first iteration
             effectiveTaskId,
-            dryRun, model, maxTurns, tokenBudget,
+            dryRun, model, spawnModel, maxTurns, tokenBudget,
             review,
             stuckIds,
             epicId,
@@ -1211,6 +1218,7 @@ async function runEpicByEpic(
   provider: "cli" | "api",
   dryRun: boolean,
   model: string | undefined,
+  spawnModel: string | undefined,
   maxTurns: number | undefined,
   tokenBudget: number | undefined,
   pauseMs: number,
@@ -1339,7 +1347,7 @@ async function runEpicByEpic(
             const result = await runOne(
               dir, henchDir, rexDir, provider,
               undefined, // autoselect within epic
-              dryRun, model, maxTurns, tokenBudget,
+              dryRun, model, spawnModel, maxTurns, tokenBudget,
               review,
               stuckIds,
               epic.id,

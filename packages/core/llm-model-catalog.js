@@ -32,7 +32,8 @@
 /** @type {Record<string, ModelEntry[]>} */
 export const LLM_MODEL_CATALOG = {
   codex: [
-    { id: "gpt-5-codex", label: "GPT-5 Codex", recommended: true },
+    { id: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max", recommended: true },
+    { id: "gpt-5.1-codex-mini", label: "GPT-5.1 Codex Mini", recommended: false },
   ],
   claude: [
     { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", recommended: true },

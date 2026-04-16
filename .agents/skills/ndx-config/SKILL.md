@@ -1,3 +1,9 @@
+---
+name: ndx-config
+description: View or change n-dx configuration with guided assistance
+argument-hint: "[key] [value]"
+---
+
 View or change n-dx configuration with guided assistance.
 
 Available configuration areas:

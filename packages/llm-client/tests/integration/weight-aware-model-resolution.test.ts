@@ -4,7 +4,7 @@
  * Verifies the full resolution chain: loadLLMConfig → resolveVendorModel
  * with the TaskWeight parameter. Tests cover:
  *
- * - Light weight returns tier-appropriate models (haiku, gpt-5.4mini)
+ * - Light weight returns tier-appropriate models (haiku, gpt-5.1-codex-mini)
  * - Standard weight returns full-capability models (sonnet, gpt-5)
  * - Config override: lightModel takes precedence for light weight
  * - Config override: model takes precedence for standard weight
@@ -52,7 +52,7 @@ describe("weight-aware model resolution chain", () => {
       const config = await loadLLMConfig(tmpDir);
       const model = resolveVendorModel("codex", config, "light");
       expect(model).toBe(TIER_MODELS.codex.light);
-      expect(model).toBe("gpt-5.4mini");
+      expect(model).toBe("gpt-5.1-codex-mini");
     });
 
     it("uses lightModel from config when weight is light for claude", async () => {

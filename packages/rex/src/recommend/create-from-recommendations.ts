@@ -212,6 +212,12 @@ export async function createItemsFromRecommendations(
 
   // 1. Load current document for validation and conflict detection
   const doc = await store.loadDocument();
+  const existingDagResult = validateDAG(doc.items);
+  if (!existingDagResult.valid) {
+    throw new Error(
+      `Existing PRD DAG is invalid before adding recommendations: ${existingDagResult.errors.join("; ")}. Run 'rex fix' to repair orphan blockedBy references or other DAG issues before accepting recommendations.`,
+    );
+  }
 
   // 2. Run conflict detection when strategy is not "force"
   let conflictReport: ConflictReport | undefined;

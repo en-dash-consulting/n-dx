@@ -1,3 +1,9 @@
+---
+name: ndx-work
+description: Pick up a task from the PRD and begin working on it
+argument-hint: "[task-id]"
+---
+
 Pick up a task from the PRD and begin working on it.
 
 1. Read `.rex/workflow.md` for the project's execution workflow. Follow its instructions — they define the expected discipline for task execution (TDD, validation, commit conventions, etc.)

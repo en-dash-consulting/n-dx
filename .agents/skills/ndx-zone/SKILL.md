@@ -1,3 +1,9 @@
+---
+name: ndx-zone
+description: Deep-dive into an architectural zone's structure and health
+argument-hint: "[zone-id]"
+---
+
 Deep-dive into an architectural zone's structure and health.
 
 1. If no zone-id given, call `get_overview` (sourcevision MCP) and list available zones with brief descriptions. Ask which to explore.

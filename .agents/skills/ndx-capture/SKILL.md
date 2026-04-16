@@ -1,3 +1,9 @@
+---
+name: ndx-capture
+description: Capture a requirement, feature idea, or task from conversation context
+argument-hint: "[description]"
+---
+
 Capture a requirement, feature idea, or task from conversation context.
 
 1. If a description is provided, use it. Otherwise, review recent conversation for feature requests, requirements, or product decisions

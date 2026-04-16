@@ -54,9 +54,9 @@ describe("catalog-runtime default alignment", () => {
     expect(recommended.id).toBe("claude-sonnet-4-6");
   });
 
-  it("catalog recommended Codex model is gpt-5-codex", () => {
+  it("catalog recommended Codex model is gpt-5.1-codex-max", () => {
     const recommended = LLM_MODEL_CATALOG.codex.find((m) => m.recommended);
-    expect(recommended.id).toBe("gpt-5-codex");
+    expect(recommended.id).toBe("gpt-5.1-codex-max");
   });
 
   it("runtime DEFAULT_CLAUDE_MODEL is claude-sonnet-4-6", () => {
@@ -64,7 +64,7 @@ describe("catalog-runtime default alignment", () => {
     expect(DEFAULT_CLAUDE_MODEL).toBe("claude-sonnet-4-6");
   });
 
-  it("runtime DEFAULT_CODEX_MODEL is gpt-5-codex", () => {
-    expect(DEFAULT_CODEX_MODEL).toBe("gpt-5-codex");
+  it("runtime DEFAULT_CODEX_MODEL is gpt-5.1-codex-max", () => {
+    expect(DEFAULT_CODEX_MODEL).toBe("gpt-5.1-codex-max");
   });
 });

@@ -2,7 +2,10 @@
   "llm": {
     "vendor": "codex",
     "model": "claude-sonnet-4-6",
-    "claude": {}
+    "claude": {},
+    "codex": {
+      "model": "gpt-5.1-codex-max"
+    }
   },
   "sourcevision": {
     "zones": {

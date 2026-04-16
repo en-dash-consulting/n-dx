@@ -34,7 +34,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-4-6",
-  codex: "gpt-5-codex",
+  codex: "gpt-5.1-codex-max",
 };
 
 /**
@@ -52,9 +52,14 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
     standard: NEWEST_MODELS.claude,
   },
   codex: {
-    light: "gpt-5.4mini",
+    light: "gpt-5.1-codex-mini",
     standard: NEWEST_MODELS.codex,
   },
+};
+
+const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
+  "gpt-5-codex": NEWEST_MODELS.codex,
+  "gpt-5.4mini": TIER_MODELS.codex.light,
 };
 
 /**
@@ -132,6 +137,10 @@ export function resolveModel(model: string): string {
   return MODEL_ALIASES[model] ?? model;
 }
 
+export function normalizeCodexModel(model: string): string {
+  return LEGACY_CODEX_MODEL_ALIASES[model] ?? model;
+}
+
 /**
  * Resolve the canonical model string for a given vendor, consulting the
  * project config first and falling back to the tier-appropriate model.
@@ -145,7 +154,7 @@ export function resolveModel(model: string): string {
  * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
- * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.4mini)
+ * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.1-codex-mini)
  * - `'standard'` or omitted — resolves to full-capability models (sonnet, gpt-5)
  *
  * For the 'light' weight, if `lightModel` is configured, it takes precedence
@@ -183,13 +192,13 @@ export function resolveVendorModel(
     if (weight === "light") {
       // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
       if (config?.codex?.lightModel) {
-        return config.codex.lightModel;
+        return normalizeCodexModel(config.codex.lightModel);
       }
       return TIER_MODELS.codex.light;
     }
     // Standard tier: model can override, then fall back to TIER_MODELS.standard
     if (config?.codex?.model) {
-      return config.codex.model;
+      return normalizeCodexModel(config.codex.model);
     }
     return TIER_MODELS.codex.standard;
   }

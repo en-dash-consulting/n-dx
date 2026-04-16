@@ -1,3 +1,8 @@
+---
+name: ndx-status
+description: Show comprehensive project status combining PRD progress and codebase health
+---
+
 Show comprehensive project status combining PRD progress and codebase health.
 
 1. Call `get_prd_status` (rex MCP) for PRD tree with completion stats

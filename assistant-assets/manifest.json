@@ -95,7 +95,7 @@
     "codex": {
       "skillDir": ".agents/skills",
       "skillFile": "SKILL.md",
-      "skillWrapper": "plain",
+      "skillWrapper": "yaml-frontmatter",
       "toolPrefix": null,
       "instructionFile": "AGENTS.md"
     }

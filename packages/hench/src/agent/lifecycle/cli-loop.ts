@@ -93,7 +93,9 @@ export function normalizeCodexResponse(output: string): {
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
-export interface CliLoopOptions extends SharedLoopOptions {}
+export interface CliLoopOptions extends SharedLoopOptions {
+  spawnModel?: string;
+}
 
 export interface CliLoopResult {
   run: RunRecord;
@@ -848,11 +850,11 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
 function resolveCliEventModel(
   vendor: LLMVendor,
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
-  _configuredModel: string,
+  configuredModel: string,
   modelOverride?: string,
 ): string {
   if (modelOverride) return modelOverride;
-  return resolveVendorModel(vendor, llmConfig);
+  return configuredModel || resolveVendorModel(vendor, llmConfig);
 }
 
 // ── Accumulated retry state ───────────────────────────────────────────────
@@ -1068,7 +1070,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const model = opts.model ?? config.model;
   const llmConfig = await loadLLMConfig(henchDir);
   const vendor = resolveLLMVendor(llmConfig);
-  const eventModel = resolveCliEventModel(vendor, llmConfig, model, opts.model);
+  const eventModel = resolveCliEventModel(vendor, llmConfig, model, opts.spawnModel);
 
   // Resolve the vendor adapter — replaces the old dispatchVendorSpawn switch
   const adapter = resolveVendorAdapter(vendor);
@@ -1170,7 +1172,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           ]);
 
       // Use the adapter to build the vendor-specific spawn configuration
-      const spawnConfig = adapter.buildSpawnConfig(envelope, policy, opts.model);
+      const spawnConfig = adapter.buildSpawnConfig(envelope, policy, opts.spawnModel);
 
       // Capture prompt section diagnostics on the first attempt for run-level storage.
       // Log section names and byte sizes on every attempt for CLI observability.
@@ -1179,8 +1181,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         promptSectionDiagnostics = sectionDiags;
       }
 
-      section(`Agent Run${opts.model ? ` (${opts.model})` : ""}${attempt > 0 ? ` (retry ${attempt}/${retryConfig.maxRetries})` : ""}`);
-      stream("CLI", `Spawning ${vendor}${opts.model ? ` (model: ${opts.model})` : ""}...`);
+      section(`Agent Run${opts.spawnModel ? ` (${opts.spawnModel})` : ""}${attempt > 0 ? ` (retry ${attempt}/${retryConfig.maxRetries})` : ""}`);
+      stream("CLI", `Spawning ${vendor}${opts.spawnModel ? ` (model: ${opts.spawnModel})` : ""}...`);
       logPromptSections(sectionDiags);
 
       // Event pipeline: create a per-attempt accumulator. Events from this
