@@ -335,6 +335,70 @@ function parseCodexJsonLine(
   const vendor: LLMVendor = "codex";
 
   switch (type) {
+    case "item.started": {
+      const item = event.item as Record<string, unknown> | undefined;
+      if (!item) return null;
+
+      const itemType = typeof item.type === "string" ? item.type : undefined;
+      const timestamp = new Date().toISOString();
+
+      if (itemType === "command_execution" && typeof item.command === "string") {
+        return {
+          type: "tool_use" as RuntimeEventType,
+          vendor,
+          turn,
+          timestamp,
+          toolCall: {
+            tool: "shell",
+            input: { command: item.command },
+          },
+        };
+      }
+
+      return null;
+    }
+
+    case "item.completed": {
+      const item = event.item as Record<string, unknown> | undefined;
+      if (!item) return null;
+
+      const itemType = typeof item.type === "string" ? item.type : undefined;
+      const timestamp = new Date().toISOString();
+
+      if (itemType === "agent_message" && typeof item.text === "string") {
+        return {
+          type: "assistant" as RuntimeEventType,
+          vendor,
+          turn,
+          timestamp,
+          text: item.text.slice(0, MAX_SUMMARY_LENGTH),
+        };
+      }
+
+      if (itemType === "command_execution") {
+        const outputCandidate =
+          (typeof item.output === "string" && item.output) ||
+          (typeof item.stdout === "string" && item.stdout) ||
+          (typeof item.result === "string" && item.result) ||
+          (typeof item.text === "string" && item.text) ||
+          "";
+
+        return {
+          type: "tool_result" as RuntimeEventType,
+          vendor,
+          turn,
+          timestamp,
+          toolResult: {
+            tool: "shell",
+            output: outputCandidate.slice(0, 2000),
+            durationMs: 0,
+          },
+        };
+      }
+
+      return null;
+    }
+
     case "message": {
       // Extract text from content blocks (array of { type, text } objects)
       const content = event.content as Array<{
@@ -431,6 +495,24 @@ function parseCodexJsonLine(
 
     case "error": {
       const message = (event.message as string) || (event.error as string) || "Unknown error";
+      return {
+        type: "failure" as RuntimeEventType,
+        vendor,
+        turn,
+        timestamp,
+        failure: {
+          category: "unknown" as FailureCategory,
+          message,
+        },
+      };
+    }
+
+    case "turn.failed": {
+      const error = event.error as Record<string, unknown> | undefined;
+      const message =
+        (error && typeof error.message === "string" ? error.message : undefined) ||
+        (typeof event.message === "string" ? event.message : undefined) ||
+        "Unknown error";
       return {
         type: "failure" as RuntimeEventType,
         vendor,

@@ -5,7 +5,7 @@ import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
-import { cascadeParentReset } from "../../core/index.js";
+import { cascadeParentReset } from "../../core/parent-reset.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";

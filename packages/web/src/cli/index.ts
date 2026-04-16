@@ -10,7 +10,7 @@
 import { resolve } from "node:path";
 import { suppressKnownDeprecations } from "@n-dx/llm-client";
 import { startServer } from "../server/start.js";
-import type { ViewerScope } from "../server/types.js";
+import type { ViewerScope } from "../shared/view-routing.js";
 
 suppressKnownDeprecations();
 

@@ -483,6 +483,73 @@ describe("CodexCliAdapter: parseEvent (structured JSONL)", () => {
     expect(event!.failure!.message).toBe("API rate limit");
   });
 
+  it("parses item.completed agent_message events as assistant output", () => {
+    const line = JSON.stringify({
+      type: "item.completed",
+      item: {
+        type: "agent_message",
+        text: "I checked the task and started validation.",
+      },
+    });
+
+    const event = codexCliAdapter.parseEvent(line, 1, {});
+
+    expect(event).not.toBeNull();
+    expect(event!.type).toBe("assistant");
+    expect(event!.text).toBe("I checked the task and started validation.");
+  });
+
+  it("parses item.started command_execution events as shell tool_use", () => {
+    const line = JSON.stringify({
+      type: "item.started",
+      item: {
+        type: "command_execution",
+        command: "/bin/zsh -lc \"pnpm test\"",
+      },
+    });
+
+    const event = codexCliAdapter.parseEvent(line, 1, {});
+
+    expect(event).not.toBeNull();
+    expect(event!.type).toBe("tool_use");
+    expect(event!.toolCall).toEqual({
+      tool: "shell",
+      input: { command: "/bin/zsh -lc \"pnpm test\"" },
+    });
+  });
+
+  it("parses item.completed command_execution events as shell tool_result", () => {
+    const line = JSON.stringify({
+      type: "item.completed",
+      item: {
+        type: "command_execution",
+        stdout: "tests passed",
+      },
+    });
+
+    const event = codexCliAdapter.parseEvent(line, 1, {});
+
+    expect(event).not.toBeNull();
+    expect(event!.type).toBe("tool_result");
+    expect(event!.toolResult!.tool).toBe("shell");
+    expect(event!.toolResult!.output).toBe("tests passed");
+  });
+
+  it("parses turn.failed events as failures", () => {
+    const line = JSON.stringify({
+      type: "turn.failed",
+      error: {
+        message: "sandbox denied write to .git/index.lock",
+      },
+    });
+
+    const event = codexCliAdapter.parseEvent(line, 1, {});
+
+    expect(event).not.toBeNull();
+    expect(event!.type).toBe("failure");
+    expect(event!.failure!.message).toBe("sandbox denied write to .git/index.lock");
+  });
+
   it("parses summary event as completion", () => {
     const line = JSON.stringify({
       type: "summary",

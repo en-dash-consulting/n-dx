@@ -10,7 +10,6 @@ import { h } from "preact";
 import type { ComponentChild, VNode } from "preact";
 import type { ViewId, NavigateTo, DetailItem, LoadedData } from "../types.js";
 import type { DegradableFeature } from "../performance/index.js";
-import { SOURCEVISION_TAB_IDS } from "./sourcevision-tabs.js";
 
 // ── View component imports (via domain barrels) ────────────────
 //
@@ -156,22 +155,4 @@ export function renderActiveView(view: ViewId, ctx: ViewRenderContext): Componen
   return renderer ? renderer(ctx) : null;
 }
 
-// ── Scope & valid-view helpers ─────────────────────────────────
-
-/** All known views grouped by product scope. */
-const VIEWS_BY_SCOPE: Record<string, ViewId[]> = {
-  sourcevision: SOURCEVISION_TAB_IDS,
-  rex: ["rex-dashboard", "prd", "validation", "notion-config", "integrations"],
-  hench: ["hench-runs", "hench-audit", "hench-config", "hench-templates", "hench-optimization"],
-};
-
-/** Cross-cutting views available in all scopes. */
-const CROSS_CUTTING_VIEWS: ViewId[] = ["token-usage", "feature-toggles", "cli-timeouts"];
-
-const ALL_VIEWS = new Set<ViewId>([...Object.values(VIEWS_BY_SCOPE).flat(), ...CROSS_CUTTING_VIEWS] as ViewId[]);
-
-/** Build the valid view set based on an optional scope. */
-export function buildValidViews(scope: string | null): Set<ViewId> {
-  if (!scope || scope === "all") return ALL_VIEWS;
-  return new Set<ViewId>([...(VIEWS_BY_SCOPE[scope] ?? []), ...CROSS_CUTTING_VIEWS] as ViewId[]);
-}
+export { buildValidViews } from "../../shared/view-routing.js";

@@ -7,6 +7,7 @@ import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
+import { isKnownViewPath } from "../shared/view-routing.js";
 
 const LIVE_RELOAD_SNIPPET = `<script>
 (function(){
@@ -126,14 +127,6 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
   };
 }
 
-// Known SPA view paths — keep in sync with ViewId in types.ts
-const SPA_VIEWS = new Set([
-  "overview", "graph", "zones", "files", "routes", "architecture",
-  "problems", "suggestions", "rex-dashboard", "prd",
-  "token-usage", "validation", "hench-runs", "hench-audit",
-  "hench-config", "hench-templates", "hench-optimization",
-]);
-
 /** Check if the project has been initialized (any tool directory exists). */
 export function isProjectInitialized(ctx: ServerContext): boolean {
   return existsSync(join(ctx.svDir, "manifest.json")) || existsSync(join(ctx.rexDir, "prd.json"));
@@ -193,7 +186,7 @@ export function handleStaticRoute(
   // Also match deep-link paths like "hench-runs/RUNID"
   const segment = url.slice(1).split("?")[0];
   const baseSegment = segment.split("/")[0];
-  if (SPA_VIEWS.has(segment) || SPA_VIEWS.has(baseSegment)) {
+  if (isKnownViewPath(segment) || isKnownViewPath(baseSegment)) {
     res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
     res.end(assets.getViewerHtml());
     return true;

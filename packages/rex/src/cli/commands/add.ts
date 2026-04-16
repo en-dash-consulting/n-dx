@@ -5,7 +5,7 @@ import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js
 import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";
 import { REX_DIR } from "./constants.js";
-import { cascadeParentReset } from "../../core/index.js";
+import { cascadeParentReset } from "../../core/parent-reset.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../../schema/index.js";

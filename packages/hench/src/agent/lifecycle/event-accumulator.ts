@@ -576,6 +576,58 @@ export function processCodexJsonLine(
   if (!type) return false;
 
   switch (type) {
+    case "item.started": {
+      const item = event.item as Record<string, unknown> | undefined;
+      if (!item) return false;
+
+      const itemType = typeof item.type === "string" ? item.type : undefined;
+      if (itemType === "command_execution" && typeof item.command === "string") {
+        stream("Tool", `shell(${JSON.stringify({ command: item.command }).slice(0, 100)})`);
+        result.toolCalls.push({
+          turn: turnCounter.value || 1,
+          tool: "shell",
+          input: { command: item.command },
+          output: "",
+          durationMs: 0,
+        });
+        return true;
+      }
+
+      return false;
+    }
+
+    case "item.completed": {
+      const item = event.item as Record<string, unknown> | undefined;
+      if (!item) return false;
+
+      const itemType = typeof item.type === "string" ? item.type : undefined;
+      if (itemType === "agent_message" && typeof item.text === "string") {
+        turnCounter.value++;
+        stream("Agent", item.text);
+        result.summary = item.text.slice(0, MAX_SUMMARY_LENGTH);
+        return true;
+      }
+
+      if (itemType === "command_execution") {
+        const output =
+          (typeof item.output === "string" && item.output) ||
+          (typeof item.stdout === "string" && item.stdout) ||
+          (typeof item.result === "string" && item.result) ||
+          (typeof item.text === "string" && item.text) ||
+          "";
+        if (result.toolCalls.length > 0) {
+          result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+        }
+        const preview = output.slice(0, 200);
+        if (preview) {
+          stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
+        }
+        return true;
+      }
+
+      return false;
+    }
+
     case "message": {
       turnCounter.value++;
 
@@ -659,6 +711,15 @@ export function processCodexJsonLine(
 
     case "error": {
       result.error = (event.message as string) || (event.error as string) || "Unknown error";
+      return true;
+    }
+
+    case "turn.failed": {
+      const error = event.error as Record<string, unknown> | undefined;
+      result.error =
+        (error && typeof error.message === "string" ? error.message : undefined) ||
+        (event.message as string) ||
+        "Unknown error";
       return true;
     }
 

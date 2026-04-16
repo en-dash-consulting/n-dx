@@ -3,9 +3,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-
-/** Valid scope identifiers for standalone package viewers. */
-export type ViewerScope = "sourcevision" | "rex" | "hench";
+import type { ViewerScope } from "../shared/view-routing.js";
+export type { ViewerScope } from "../shared/view-routing.js";
 
 /** Server configuration passed to route handlers. */
 export interface ServerContext {

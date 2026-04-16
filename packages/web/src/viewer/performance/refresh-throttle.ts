@@ -15,7 +15,7 @@
  * the Preact hook (`useRefreshThrottle`) is provided separately.
  */
 
-import type { MemoryLevel } from "./memory-monitor.js";
+import type { MemoryLevel } from "./refresh-throttle-memory.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

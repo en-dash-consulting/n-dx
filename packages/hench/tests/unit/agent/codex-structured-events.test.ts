@@ -229,6 +229,21 @@ describe("processCodexJsonLine", () => {
       expect(parsed).toBe(true);
       expect(result.error).toBe("Auth failed");
     });
+
+    it("records error from turn.failed nested error payload", () => {
+      const result = createResult();
+      const turnCounter = { value: 0 };
+
+      const line = JSON.stringify({
+        type: "turn.failed",
+        error: { message: "sandbox denied write to .git/index.lock" },
+      });
+
+      const parsed = processCodexJsonLine(line, result, turnCounter);
+
+      expect(parsed).toBe(true);
+      expect(result.error).toBe("sandbox denied write to .git/index.lock");
+    });
   });
 
   describe("completion events", () => {
@@ -412,6 +427,54 @@ describe("processCodexJsonLine", () => {
       expect(result.turnTokenUsage).toHaveLength(2);
       expect(result.turns).toBe(2);
       expect(result.summary).toBe("Changes applied successfully");
+    });
+
+    it("parses modern item.started/item.completed Codex event streams", () => {
+      const result = createResult();
+      const turnCounter = { value: 0 };
+
+      processCodexJsonLine(
+        JSON.stringify({
+          type: "item.completed",
+          item: {
+            type: "agent_message",
+            text: "Using ndx-work to inspect the task.",
+          },
+        }),
+        result,
+        turnCounter,
+      );
+
+      processCodexJsonLine(
+        JSON.stringify({
+          type: "item.started",
+          item: {
+            type: "command_execution",
+            command: "/bin/zsh -lc \"pnpm test\"",
+          },
+        }),
+        result,
+        turnCounter,
+      );
+
+      processCodexJsonLine(
+        JSON.stringify({
+          type: "item.completed",
+          item: {
+            type: "command_execution",
+            stdout: "tests passed",
+          },
+        }),
+        result,
+        turnCounter,
+      );
+
+      expect(turnCounter.value).toBe(1);
+      expect(result.summary).toBe("Using ndx-work to inspect the task.");
+      expect(result.toolCalls).toHaveLength(1);
+      expect(result.toolCalls[0].tool).toBe("shell");
+      expect(result.toolCalls[0].input).toEqual({ command: "/bin/zsh -lc \"pnpm test\"" });
+      expect(result.toolCalls[0].output).toBe("tests passed");
     });
   });
 });

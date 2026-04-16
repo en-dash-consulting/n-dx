@@ -5,13 +5,10 @@
  * for each SourceVision view. This is sourcevision domain config, not a
  * generic infrastructure primitive.
  */
-import type { ViewId } from "../types.js";
+import type { SourcevisionScopeViewId } from "../../shared/view-routing.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 
-export type SourceVisionTabId = Extract<
-  ViewId,
-  "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown"
->;
+export type SourceVisionTabId = SourcevisionScopeViewId;
 
 export interface SourceVisionTab {
   id: SourceVisionTabId;
