@@ -1735,6 +1735,48 @@ async function handleShow(rest) {
   exitWithCleanup(0);
 }
 
+async function handleSingleCommand(rest) {
+  const flags = extractFlags(rest);
+  const positionals = rest.filter((a) => !a.startsWith("-"));
+  const description = positionals[0] ?? null;
+
+  if (!description) {
+    console.error("Error: missing required argument <description>");
+    console.error("Usage: ndx single-command \"<description>\" [dir]");
+    console.error("       ndx sc \"<description>\" [dir]");
+    console.error("Example: ndx single-command \"fix failing tests\"");
+    exitWithCleanup(1);
+    return;
+  }
+
+  // Dir is the second non-flag positional (if present), else cwd
+  const dir = positionals.length >= 2 ? positionals[positionals.length - 1] : process.cwd();
+  requireInit(dir, [".hench"]);
+
+  const isDryRun = flags.includes("--dry-run");
+  if (!isDryRun) {
+    const vendor = readLLMVendor(dir);
+    if (!vendor) {
+      console.error("Error: No LLM vendor configured for this project.");
+      console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+      exitWithCleanup(1);
+    }
+  }
+
+  // Remove the description from rest so we can pass the remaining flags + dir
+  let descriptionRemoved = false;
+  const restWithoutDescription = rest.filter((a) => {
+    if (!descriptionRemoved && !a.startsWith("-") && a === description) {
+      descriptionRemoved = true;
+      return false;
+    }
+    return true;
+  });
+
+  await runOrDie(tools.hench, ["run", `--freeform=${description}`, ...restWithoutDescription]);
+  exitWithCleanup(0);
+}
+
 function handleHelp(rest) {
   const query = rest.filter((a) => !a.startsWith("-")).join(" ");
   if (!query) {
@@ -1926,6 +1968,10 @@ async function main() {
 
       // ── Delegated hench commands ──
       case "show":        return handleShow(rest);
+
+      // ── Freeform single-shot execution ──
+      case "single-command":
+      case "sc":          return handleSingleCommand(rest);
     }
 
     // ── Tool delegation ─────────────────────────────────────────────────────

@@ -202,6 +202,20 @@ const COMMAND_REGISTRY = [
     keywords: ["heal", "iterate", "loop", "improve", "analyze", "recommend", "accept", "agent", "autonomous"],
     related: ["plan", "work", "refresh"],
   },
+  {
+    name: "single-command",
+    category: "Orchestration",
+    summary: "Run agent on a freeform description (alias: sc)",
+    keywords: ["freeform", "single", "shot", "description", "agent", "quick", "focused", "task", "sc"],
+    related: ["work", "self-heal"],
+  },
+  {
+    name: "sc",
+    category: "Orchestration",
+    summary: "Alias for single-command",
+    keywords: ["freeform", "single", "shot", "description", "agent", "quick"],
+    related: ["single-command", "work"],
+  },
   // ── Manage commands (delegated from rex) ──
   {
     name: "validate",
@@ -1140,6 +1154,45 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["work", "status"],
   },
+  "single-command": {
+    summary: "run agent on a freeform description",
+    description:
+      "One-shot agent invocation that accepts a freeform description and runs\n" +
+      "the agent against it directly, without requiring a PRD task, TDD loop,\n" +
+      "or epic scope. Intended for quick, focused work like resolving test\n" +
+      "failures or applying small targeted changes.\n\n" +
+      "Leverages existing project documents (CONTEXT.md, llms.txt, prd.json)\n" +
+      "as prompt context and records the run to .hench/runs/ without mutating\n" +
+      "PRD state.\n\n" +
+      "Alias: sc",
+    usage: [
+      'ndx single-command "<description>" [options] [dir]',
+      'ndx sc "<description>" [options] [dir]',
+    ],
+    options: [
+      { flag: "--dry-run", description: "Print the brief without calling the agent" },
+      { flag: "--max-turns=<n>", description: "Override max agent turns" },
+      { flag: "--model=<model>", description: "Override the configured LLM model" },
+      { flag: "--token-budget=<n>", description: "Cap total tokens (0 = unlimited)" },
+    ],
+    examples: [
+      { command: 'ndx single-command "fix failing tests"', description: "Run agent on freeform description" },
+      { command: 'ndx sc "fix failing tests"', description: "Same via alias" },
+      { command: 'ndx single-command "remove unused exports" .', description: "Specify project directory" },
+      { command: 'ndx single-command "fix failing tests" --dry-run', description: "Preview brief without execution" },
+    ],
+    related: ["work", "self-heal"],
+  },
+  sc: {
+    summary: "alias for single-command",
+    description: "Alias for 'ndx single-command'. See 'ndx single-command --help' for full details.",
+    usage: 'ndx sc "<description>" [options] [dir]',
+    examples: [
+      { command: 'ndx sc "fix failing tests"', description: "Run agent on freeform description" },
+      { command: 'ndx sc "fix failing tests" --dry-run', description: "Preview brief without execution" },
+    ],
+    related: ["single-command", "work"],
+  },
   "self-heal": {
     summary: "iterative codebase improvement loop",
     description:
@@ -1290,6 +1343,7 @@ export function formatMainHelp() {
 
   section("EXECUTE", [
     ["work [dir]", "Run next task autonomously (--task=ID, --auto, --loop)"],
+    ['single-command "<desc>"', "One-shot agent run from freeform description (alias: sc)"],
     ["self-heal [N] [dir]", "Iterative improvement loop (analyze, recommend, execute)"],
   ], pad);
 
