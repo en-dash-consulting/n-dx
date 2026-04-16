@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { NEWEST_MODELS } from "@n-dx/llm-client";
 import { cmdInit } from "../../src/cli/commands/init.js";
 
 const {
@@ -111,7 +112,7 @@ describe("vendor-scoped model selection in rex add", () => {
     await cmdSmartAdd(tmpDir, "Add authentication", {}, {});
 
     expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-    expect(capturedModels).toEqual(["gpt-5-codex"]);
+    expect(capturedModels).toEqual([NEWEST_MODELS.codex]);
   });
 
   it("keeps compatible rex config model for the active vendor", async () => {

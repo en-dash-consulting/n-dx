@@ -73,6 +73,13 @@ export interface CliProviderOptions extends ClaudeClientOptions {
   baseDelayMs?: number;
   /** Maximum delay in ms for backoff (default: 10000). */
   maxDelayMs?: number;
+  /**
+   * Called before each rate-limit retry sleep.
+   * Receives the upcoming attempt number (1-based, so 2 = first retry),
+   * the total attempt count, and the delay in milliseconds.
+   * When omitted, a default message is written to stderr.
+   */
+  onRetry?: (attempt: number, maxAttempts: number, delayMs: number) => void;
 }
 
 /**
@@ -222,11 +229,17 @@ function parseStreamOutput(stdout: string): CompletionResult {
  * Claude CLI authenticates through a browser session that cannot be probed
  * programmatically without making a real completion request.
  */
+function defaultRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
+  const delaySec = Math.round(delayMs / 1000);
+  process.stderr.write(`Rate limited — retrying in ${delaySec}s… (attempt ${attempt} of ${maxAttempts})\n`);
+}
+
 export function createCliClient(options: CliProviderOptions): ClaudeClient & LLMProvider {
   const cliBinary = resolveCliPath(options.claudeConfig);
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxDelayMs = options.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
+  const onRetry = options.onRetry ?? defaultRateLimitOnRetry;
 
   const info: ProviderInfo = {
     vendor: "claude",
@@ -259,9 +272,27 @@ export function createCliClient(options: CliProviderOptions): ClaudeClient & LLM
           // Don't retry on last attempt
           if (attempt < maxRetries) {
             const delay = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
+
+            // Surface a user-visible message for rate-limit retries so the
+            // command doesn't appear hung. Other transient errors retry silently.
+            if (err instanceof ClaudeClientError && err.reason === "rate-limit") {
+              onRetry(attempt + 2, maxRetries + 1, delay);
+            }
+
             await new Promise((r) => setTimeout(r, delay));
           }
         }
+      }
+
+      // When all retries are exhausted due to rate limiting, throw an
+      // actionable error rather than re-surfacing the raw provider message.
+      if (lastError instanceof ClaudeClientError && lastError.reason === "rate-limit") {
+        throw new ClaudeClientError(
+          `Claude rate limit exceeded — all ${maxRetries + 1} attempts failed. ` +
+          "Wait a few minutes and try again, or reduce request frequency.",
+          "rate-limit",
+          false,
+        );
       }
 
       throw lastError;

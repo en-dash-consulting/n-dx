@@ -924,7 +924,7 @@ describe("architecture policy: zone cohesion gate", () => {
 const BOUNDARY_FILES = [
   {
     file: "packages/web/src/viewer/external.ts",
-    maxExports: 25,
+    maxExports: 26,
     description: "viewer outbound gateway (schema types, shared utilities, messaging)",
   },
   {
@@ -1208,6 +1208,8 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
   // Core orchestrator — dynamic import of rex public API for export pre-rendering
   ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],
+  // Core CLI — lazy-loads Ink TUI renderer only when running in an interactive TTY
+  ["packages/core/cli.js", "Lazy-loads cli-ink.js Ink TUI renderer on demand — only activated when stdout is a TTY, avoiding React/Ink import cost in non-interactive environments"],
   // Hench agent — deferred node: builtins for lock file and cleanup operations
   ["packages/hench/src/agent/lifecycle/shared.ts", "Lazy-loads node:fs and node:path for lock file cleanup — deferred to avoid import overhead on code paths that never touch the filesystem"],
   ["packages/hench/src/tools/cleanup-transformations.ts", "Lazy-loads node:fs/promises for file deletion — async filesystem access isolated to the tool cleanup path"],

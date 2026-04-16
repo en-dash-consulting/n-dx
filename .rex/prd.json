@@ -203,12 +203,15 @@
             {
               "id": "80abb312-bf55-45c1-836b-a176715bddbf",
               "title": "Fix suggestion in sourcevision-2: Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pi",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Zone \"sourcevision-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
               "source": "sourcevision",
               "startedAt": "2026-04-03T14:35:03.990Z",
+              "completedAt": "2026-04-16T20:39:18.824Z",
+              "resolutionType": "config-override",
+              "resolutionDetail": "Fixed broken sv-fixtures zone pins (target zone never forms naturally); redirected to existing sourcevision zone. Pinned vitest.config.ts which was the unzoned sourcevision-2 overflow file. Updated ZONES.md manifest.",
               "recommendationMeta": {
                 "findingHashes": [
                   "2ad43ef6f0af"
@@ -246,12 +249,15 @@
             {
               "id": "d4bc1bc9-5b60-40fb-9719-9120ac718065",
               "title": "Fix suggestion in sourcevision-3: Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pi",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Zone \"sourcevision-3\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
               "priority": "high",
               "source": "sourcevision",
               "startedAt": "2026-04-03T14:35:10.827Z",
+              "completedAt": "2026-04-16T20:48:21.503Z",
+              "resolutionType": "acknowledgment",
+              "resolutionDetail": "sourcevision-3 overflow zone does not exist in current codebase or any historical snapshot. The previous session's pins (vitest.config.ts, user.go, user_test.go → sourcevision) eliminated all sourcevision overflow communities. Current zones.json, .sourcevision/zones/, and CONTEXT.md confirm no sourcevision-[0-9] zones. Task was pre-resolved.",
               "recommendationMeta": {
                 "findingHashes": [
                   "36620e61fa42"
@@ -636,7 +642,7 @@
             {
               "id": "9c999a92-f89f-469c-a527-5e4aaae920bf",
               "title": "Fix Codex output parser to capture next-line token count after 'tokens used' label",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The existing Codex token extraction logic looks for a token count on the same line as the 'tokens used' marker. Codex actually prints 'tokens used' as a standalone label and puts the integer count on the line immediately following it. Update the parser to handle this two-line pattern: detect the 'tokens used' sentinel, then read the next non-empty line as the count. The fix should be backward-compatible in case future Codex versions collapse this back to one line.",
               "acceptanceCriteria": [
@@ -652,7 +658,53 @@
                 "parser"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-14T20:49:56.016Z"
+              "startedAt": "2026-04-14T20:49:56.016Z",
+              "completedAt": "2026-04-16T21:15:25.839Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "11312d55-399a-4130-b04c-e356d0fb007b",
+      "title": "Hench",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-16T15:21:00.810Z",
+      "completedAt": "2026-04-16T15:21:00.810Z",
+      "children": [
+        {
+          "id": "3415b5f0-3496-4813-8cc9-9f571044d49c",
+          "title": "Run Failure Recovery and Rollback",
+          "status": "completed",
+          "level": "feature",
+          "description": "When an ndx work run fails, automatically revert uncommitted file changes and reset the PRD task status back to pending so the user can retry without manual cleanup.",
+          "source": "smart-add",
+          "startedAt": "2026-04-16T15:21:00.385Z",
+          "completedAt": "2026-04-16T15:21:00.385Z",
+          "children": [
+            {
+              "id": "a6199e02-a954-44dd-b49f-c6519fa673e4",
+              "title": "Implement git change rollback on failed hench runs",
+              "status": "pending",
+              "level": "task",
+              "description": "When a hench work run ends in failure, detect the failure condition and revert uncommitted file changes introduced during the run. Capture a pre-run git state marker (stash ref or HEAD SHA) before hench begins modifying files, then perform a targeted rollback on failure. A --no-rollback flag allows the user to inspect partial changes instead of reverting.",
+              "acceptanceCriteria": [
+                "A pre-run git state marker is captured before hench modifies any files",
+                "On run failure, all uncommitted changes introduced during the run are reverted to the pre-run state",
+                "A --no-rollback flag suppresses automatic rollback and leaves changes in place",
+                "Rollback result (number of files reverted) is printed to the console after a failed run",
+                "If no changes were made during the run, the rollback step is skipped silently"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "git",
+                "recovery"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-16T15:12:12.343Z"
             },
             {
               "id": "c57e4a98-4567-4caa-ad64-1dd6667e7316",
@@ -661,13 +713,171 @@
               "level": "task",
               "description": "Add unit and integration tests that assert the parser correctly extracts token counts from the two-line Codex format. Tests should cover: the nominal two-line case, the legacy same-line case, empty or malformed lines between the label and the count, and whitespace-padded counts. Use the existing Codex fixture infrastructure in hench's test suite.",
               "acceptanceCriteria": [
-                "Unit test covers nominal two-line 'tokens used \\n <number>' extraction and returns the correct integer",
-                "Unit test covers legacy same-line format without regression",
-                "Unit test covers blank lines between label and count (should still resolve correctly or return null safely)",
-                "Integration test verifies the extracted count reaches the run-level token accumulator",
-                "Unit test confirms no validation callback fires before run completion for a multi-turn Codex run",
-                "Integration test verifies cumulative token totals at run end match the sum of per-turn counts",
-                "Test covers the scenario where a mid-turn count would have previously triggered a budget warning but end-of-run total does not"
+                "Task status is reset from 'in-progress' to 'pending' when a run exits with failure",
+                "Reset applies only to the specific task that was active at failure time",
+                "Console output confirms the reset: task ID, title, and restored status",
+                "PRD reset occurs regardless of whether --no-rollback suppresses git rollback",
+                "PRD file is persisted atomically after the status reset using the existing file-lock path"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "rex",
+                "recovery"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-16T15:16:59.565Z"
+            },
+            {
+              "id": "03d9f52f-7ec7-452d-9d62-5c391269c2c5",
+              "title": "Add rollback configuration, confirmation UX, and regression tests",
+              "status": "pending",
+              "level": "task",
+              "description": "Expose rollback behavior as a configurable option in .n-dx.json (hench.rollbackOnFailure, default: true). In interactive mode, prompt the user to confirm before reverting. In non-interactive/CI mode (TTY absent or --yes flag), proceed automatically. Add integration tests covering rollback, --no-rollback suppression, PRD reset, and CI auto-confirm.",
+              "acceptanceCriteria": [
+                "hench.rollbackOnFailure config key defaults to true and is documented in ndx config --help",
+                "In interactive mode, a confirmation prompt is shown before changes are reverted",
+                "In non-interactive mode (no TTY or --yes flag), rollback proceeds without a prompt",
+                "ndx work --no-rollback overrides config and skips file rollback for a single run",
+                "Integration test verifies uncommitted changes are reverted after a simulated run failure",
+                "Integration test verifies PRD task status is reset to pending after failure",
+                "Integration test verifies --no-rollback leaves files in place while still resetting PRD status",
+                "All new tests pass in CI without requiring a live LLM or git remote"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "config",
+                "ux",
+                "testing"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-16T15:20:54.970Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "294d6dd5-b412-496d-86bf-2035b228690f",
+      "title": "CLI & Developer Tools",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-16T16:56:22.800Z",
+      "completedAt": "2026-04-16T16:56:22.800Z",
+      "children": [
+        {
+          "id": "8a8661f8-f768-412e-afda-f603f604f2fb",
+          "title": "Pair-Programming Command Mode",
+          "status": "completed",
+          "level": "feature",
+          "source": "smart-add",
+          "startedAt": "2026-04-16T16:56:22.389Z",
+          "completedAt": "2026-04-16T16:56:22.389Z",
+          "children": [
+            {
+              "id": "55b88bcd-8e8a-474a-9053-7e0ceba66ebe",
+              "title": "Inject ndx project context into pair-programming primary and reviewer executions",
+              "status": "pending",
+              "level": "task",
+              "description": "The pair-programming command currently passes the user's description to hench as a bare --freeform string with no project context. The primary and reviewer models should receive ndx's accumulated knowledge — CONTEXT.md, a PRD status excerpt, and recent hench run summaries — so both models understand the codebase before acting. This context should be assembled from the local ndx data files and passed as a system-level or file-context argument to each vendor CLI invocation.",
+              "acceptanceCriteria": [
+                "CONTEXT.md is read from .sourcevision/ and passed to the primary hench run when the file exists",
+                "A compact PRD status excerpt (epic/feature/task titles only) is included in the context payload",
+                "The reviewer vendor CLI invocation receives the same context files",
+                "When any context file is missing the command proceeds without it, logging a warning but not failing",
+                "A --no-context flag suppresses context injection for debugging or CI use"
+              ],
+              "priority": "high",
+              "tags": [
+                "pair-programming",
+                "context",
+                "cli"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-16T16:56:03.913Z"
+            },
+            {
+              "id": "3a80b875-f796-476f-b456-912b2ae1604a",
+              "title": "Invoke the reviewer LLM with a validation-only constraint prompt",
+              "status": "pending",
+              "level": "task",
+              "description": "The current cross-vendor review step only runs the project's shell test command — it never invokes the reviewer LLM. The reviewer should be called via its CLI with a targeted prompt that instructs it to: check the changed files for syntax and logic errors, run the test command, and report findings. Critically, the reviewer's prompt must constrain it to small, targeted fixes only (e.g. fixing a broken import or a one-line syntax error) and must explicitly prohibit large refactors or architectural changes. This keeps the reviewer in a QA role rather than turning it into a second implementer.",
+              "acceptanceCriteria": [
+                "The reviewer vendor CLI is invoked with an LLM prompt after the primary completes, not just a shell test run",
+                "The reviewer prompt explicitly instructs the model to validate only and limit changes to under 20 lines across any single file",
+                "The reviewer prompt includes the list of files modified by the primary run (sourced from the work summary or git diff)",
+                "If the reviewer CLI is unavailable the step is skipped with a warning, preserving existing behavior",
+                "The review banner distinguishes between LLM-review-passed, shell-test-only-passed, and skipped states"
+              ],
+              "priority": "high",
+              "tags": [
+                "pair-programming",
+                "review",
+                "llm"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-16T16:56:11.179Z"
+            },
+            {
+              "id": "75c7df48-1438-4a03-8467-34bc0de734ae",
+              "title": "Implement structured inter-model handoff so reviewer findings are fed back to the primary",
+              "status": "pending",
+              "level": "task",
+              "description": "After the reviewer LLM runs its validation pass, its findings (errors found, test verdict, suggested micro-fixes) should be captured as a structured artifact and fed back to the primary model as a follow-up turn. This creates the 'bickering pair' dynamic where models actually exchange information: the primary does the work, the reviewer audits it, and if issues remain the primary gets one remediation pass with the reviewer's specific feedback. The loop should be bounded (at most one feedback round) to prevent infinite back-and-forth.",
+              "acceptanceCriteria": [
+                "Reviewer output is parsed into a structured ReviewFeedback object with fields: passed (bool), errors (string[]), suggestedFixes (string[]), testVerdict (passed|failed|skipped)",
+                "When the reviewer finds errors, a second primary invocation is triggered with the reviewer's findings appended as context",
+                "The remediation pass uses the same constraint framing: fix reviewer-identified issues only, no new features",
+                "The feedback loop executes at most once (primary → reviewer → primary-remediation); no further cycles",
+                "The final exit code reflects the outcome of the last reviewer pass, not the primary's initial run",
+                "A --skip-feedback flag disables the feedback loop for faster one-shot use"
+              ],
+              "priority": "medium",
+              "tags": [
+                "pair-programming",
+                "handoff",
+                "feedback-loop"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-16T16:56:18.148Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2e70fa19-0875-4c5e-82c4-cd33bfb12c37",
+      "title": "Rex",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-16T16:55:59.938Z",
+      "completedAt": "2026-04-16T16:55:59.938Z",
+      "children": [
+        {
+          "id": "089d9bc8-d815-4227-85d4-5c53d0621985",
+          "title": "Codex-Compatible PRD Authoring and Proposal Generation",
+          "status": "completed",
+          "level": "feature",
+          "description": "Fix Codex compatibility failures in the rex add and related PRD authoring CLI commands. Codex currently cannot complete proposals due to rate limiting errors and response parsing failures that Claude does not trigger.",
+          "source": "smart-add",
+          "startedAt": "2026-04-16T16:55:58.881Z",
+          "completedAt": "2026-04-16T16:55:58.881Z",
+          "children": [
+            {
+              "id": "7ad24227-1245-46bf-99e5-7ece2f6aca8c",
+              "title": "Implement Codex rate limiting detection and retry in rex LLM call paths",
+              "status": "completed",
+              "level": "task",
+              "description": "Add explicit detection of Codex rate limit responses (HTTP 429 and equivalent CLI-level error messages) across all rex LLM call sites, including rex add, rex analyze, and rex recommend. Implement exponential backoff retry logic so transient rate limits do not abort the command outright. Surface a clear in-progress message to the user during retries and exit with actionable guidance after the retry budget is exhausted.",
+              "acceptanceCriteria": [
+                "Rate limit responses from Codex are detected and classified separately from hard errors",
+                "LLM call paths retry automatically with exponential backoff on a detected rate limit",
+                "User sees a retry progress message (e.g., 'Rate limited — retrying in Xs…') during backoff",
+                "Command exits with a clear actionable error after max retries are exceeded",
+                "Retry logic does not fire on non-rate-limit errors (e.g., auth failures, parse errors)"
               ],
               "priority": "high",
               "tags": [
@@ -677,32 +887,25 @@
                 "tokens"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-14T20:40:35.085Z",
-              "completedAt": "2026-04-16T14:36:20.074Z",
-              "mergedProposals": [
-                {
-                  "proposalNodeKey": "p0:task:0:2",
-                  "proposalTitle": "Add regression tests for deferred Codex token validation behavior",
-                  "proposalKind": "task",
-                  "reason": "content_overlap",
-                  "score": 0.6537709497206704,
-                  "mergedAt": "2026-04-16T14:29:29.383Z",
-                  "source": "smart-add"
-                }
-              ]
+              "startedAt": "2026-04-16T16:54:20.429Z",
+              "completedAt": "2026-04-16T21:29:18.611Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added onRetry callback to CodexCliProviderOptions and CliProviderOptions. Default writes 'Rate limited — retrying in Xs… (attempt N of M)' to stderr before each rate-limit retry sleep. After exhausting retries on rate-limit, throws actionable ClaudeClientError with guidance instead of raw provider message. Added 4 targeted tests in codex-cli-provider.test.ts."
             }
           ]
         }
       ]
     },
     {
-      "id": "5d5d463c-30c6-4216-a5bc-523a5fb8666d",
-      "title": "Self-Heal Pipeline Enhancements",
+      "id": "0de5be78-d295-4f71-be5d-38594a355240",
+      "title": "Code Health: 14 findings across 11 zones",
       "status": "completed",
       "level": "epic",
-      "source": "smart-add",
-      "startedAt": "2026-04-14T21:36:07.688Z",
-      "completedAt": "2026-04-14T21:36:07.688Z",
+      "description": "Automated recommendations from SourceVision analysis. 14 zone+category groups covering 14 total findings.",
+      "priority": "high",
+      "source": "sourcevision",
+      "startedAt": "2026-04-16T21:08:47.246Z",
+      "completedAt": "2026-04-16T21:08:47.246Z",
       "children": [
         {
           "id": "e0d22237-06af-4147-a3d7-c3a95c202d59",
@@ -1084,20 +1287,24 @@
         {
           "id": "79b805a8-b1a1-404d-a103-93559bb69554",
           "title": "Fix observation in web-unit (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.6) — 5 imports target \"web-server\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-16T20:18:38.726Z",
+          "completedAt": "2026-04-16T20:18:38.726Z",
           "children": [
             {
               "id": "67634a37-89b5-487f-a30d-f46f3a6c2464",
               "title": "Fix observation in web-unit: High coupling (0.6) — 5 imports target \"web-server\"",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.6) — 5 imports target \"web-server\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-16T20:10:54.955Z",
+              "completedAt": "2026-04-16T20:18:38.693Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "7b2e9824569c"
@@ -1107,8 +1314,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-16T20:10:54.955Z"
+              }
             }
           ],
           "recommendationMeta": {
@@ -1125,20 +1331,26 @@
         {
           "id": "52ecd173-5437-47fe-b9b7-48b0c930d187",
           "title": "Fix suggestion in global (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Hub function: jsonResponse in packages/web/src/server/response-utils.ts is called from 22 files — changes here have wide impact, consider if responsibilities can be narrowed",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-16T20:25:18.971Z",
+          "completedAt": "2026-04-16T20:25:18.971Z",
           "children": [
             {
               "id": "d99f1ed5-40c7-4709-8f89-aceeb7ee3231",
               "title": "Fix suggestion in global: Hub function: jsonResponse in packages/web/src/server/response-utils.ts is calle",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Hub function: jsonResponse in packages/web/src/server/response-utils.ts is called from 22 files — changes here have wide impact, consider if responsibilities can be narrowed",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-16T20:18:40.981Z",
+              "completedAt": "2026-04-16T20:25:18.949Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Made errorResponse delegate to jsonResponse (fixes missing Cache-Control header). Added SourcevisionScopeViewId/buildValidViews to external.ts gateway and routed two direct shared/view-routing.js imports through it. Added response-utils.test.ts (8 tests).",
               "recommendationMeta": {
                 "findingHashes": [
                   "d43e8c4185f3"
@@ -1165,20 +1377,26 @@
         {
           "id": "17c57599-62fc-4365-b493-c12bfc0d912c",
           "title": "Fix suggestion in web-server (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Zone \"Web Server\" (web-server) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-16T21:08:47.234Z",
+          "completedAt": "2026-04-16T21:08:47.234Z",
           "children": [
             {
               "id": "0ee4d183-b49b-472f-aa63-b796165fc901",
               "title": "Fix suggestion in web-server: Zone \"Web Server\" (web-server) has critical risk (score: 0.67, cohesion: 0.33, c",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Zone \"Web Server\" (web-server) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-16T20:51:51.246Z",
+              "completedAt": "2026-04-16T21:08:47.209Z",
+              "resolutionType": "acknowledgment",
+              "resolutionDetail": "web-server zone dissolved into web-viewer in latest Louvain analysis (stability.reassignedFiles shows 30+ server files moved). Root cause: server files import from packages/web/src/shared/ (required by barrel-import policy), and shared/ is also imported by viewer files, creating a Louvain bridge that merges the communities. Actual server/viewer boundary is intact (boundary-check.test.ts passes). Fix: (1) documented viewer-ui-hub in CLAUDE.md fragility governance table as requested by sourcevision, (2) added web-server zone stability section explaining the dissolution pattern and recovery steps, (3) updated hints.md with zone structure guidance for future analyses, (4) corrected web-shared file count (3→5 files) in governance docs.",
               "recommendationMeta": {
                 "findingHashes": [
                   "0a546d7ac061"
