@@ -33,9 +33,9 @@
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import type { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
-import type { TaskUsageAccumulator, CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "../shared-types.js";
+import type { TaskUsageAccumulator, CollectAllIdsFn, LoadPRDFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "../shared-types.js";
 
-export type { CollectAllIdsFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "../shared-types.js";
+export type { CollectAllIdsFn, LoadPRDFn, OrphanedEntry, CleanupResult, CleanupLogEntry, CleanupConfig } from "../shared-types.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -123,10 +123,7 @@ interface PRDShape {
   items?: unknown[];
 }
 
-// CollectAllIdsFn is imported from shared-types.ts and re-exported above.
-
-/** Signature for PRD loaders compatible with `loadPRDSync`. */
-export type LoadPRDFn = (rexDir: string) => unknown;
+// CollectAllIdsFn and LoadPRDFn are imported from shared-types.ts and re-exported above.
 
 /**
  * Load valid task IDs from the PRD file.

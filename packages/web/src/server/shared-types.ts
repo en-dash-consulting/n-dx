@@ -50,6 +50,15 @@ export interface TaskUsageAccumulator {
  */
 export type CollectAllIdsFn = (items: unknown[]) => Set<string>;
 
+/**
+ * Signature for PRD loaders compatible with `loadPRDSync`.
+ *
+ * Injected by the caller to avoid cross-zone coupling between the cleanup
+ * scheduler and the rex gateway. Defined here alongside CollectAllIdsFn
+ * so both injection-seam types share a neutral home.
+ */
+export type LoadPRDFn = (rexDir: string) => unknown;
+
 /** A single orphaned usage entry identified during cleanup. */
 export interface OrphanedEntry {
   taskId: string;

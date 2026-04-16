@@ -13,8 +13,7 @@
 
 import type { IncrementalTaskUsageAggregator } from "./incremental-task-usage.js";
 import { startUsageCleanupScheduler } from "./usage-cleanup-scheduler.js";
-import type { LoadPRDFn } from "./usage-cleanup-scheduler.js";
-import type { CollectAllIdsFn } from "../shared-types.js";
+import type { CollectAllIdsFn, LoadPRDFn } from "../shared-types.js";
 
 /** Options for registering the usage cleanup scheduler. */
 export interface RegisterSchedulerOptions {
