@@ -213,6 +213,142 @@ export function checkReviewerAvailability(cliPath) {
 }
 
 // ---------------------------------------------------------------------------
+// Changed-file discovery
+// ---------------------------------------------------------------------------
+
+/**
+ * Return a deduplicated list of file paths that changed relative to HEAD.
+ * Combines files from the most recent commit and currently dirty files.
+ * Returns an empty array when git is unavailable or the directory is not
+ * inside a git repository.
+ *
+ * @param {string} dir  Project root directory.
+ * @returns {string[]}
+ */
+export function getChangedFiles(dir) {
+  /** @param {string[]} args */
+  const runGit = (args) => {
+    try {
+      return execFileSync("git", args, {
+        cwd: dir,
+        encoding: "utf-8",
+        timeout: 10_000,
+        stdio: "pipe",
+      }).trim();
+    } catch {
+      return "";
+    }
+  };
+
+  // Files touched in the most recent commit, including the initial commit.
+  // --name-only lists only file names; --format= suppresses the commit header.
+  const fromLastCommit = runGit(["show", "--name-only", "--format=", "HEAD"])
+    .split("\n")
+    .filter(Boolean);
+
+  // Files currently staged or unstaged (columns 0-2 of porcelain output are status codes)
+  const fromStatus = runGit(["status", "--porcelain"])
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.slice(3).trim());
+
+  return [...new Set([...fromLastCommit, ...fromStatus])];
+}
+
+// ---------------------------------------------------------------------------
+// Reviewer prompt builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a constrained validation-only prompt for the reviewer LLM.
+ *
+ * The prompt tells the reviewer to check for syntax/logic errors and run
+ * the test command, while explicitly capping any fixes at 20 lines per file
+ * and prohibiting refactors or architectural changes.
+ *
+ * @param {{
+ *   changedFiles: string[];
+ *   testCommand?: string;
+ * }} options
+ * @returns {string}
+ */
+export function buildReviewerPrompt({ changedFiles, testCommand }) {
+  const fileList =
+    changedFiles.length > 0
+      ? changedFiles.map((f) => `  - ${f}`).join("\n")
+      : "  (no specific files identified — perform a general validation pass)";
+
+  const testSection = testCommand
+    ? `\n3. Run the test command and verify it passes:\n   ${testCommand}\n`
+    : "";
+
+  return `You are a code reviewer validating changes made by a peer AI assistant. Your role is QA only.
+
+Your task:
+1. Inspect the changed files listed below for syntax errors, logic errors, and broken imports
+2. Check that the code changes are consistent and complete${testSection}
+Changed files to review:
+${fileList}
+
+STRICT CONSTRAINTS — you MUST follow these exactly:
+- You MAY make small, targeted fixes only (e.g. fixing a broken import, correcting a one-line syntax error, or fixing a mismatched variable name)
+- Any single fix must change fewer than 20 lines in a single file
+- You MUST NOT perform refactors, renames, module restructuring, or architectural changes
+- You MUST NOT rewrite working code even if you think it could be improved
+- If you find an issue that requires more than 20 lines of changes, report it but do NOT attempt to fix it
+
+After reviewing, output a brief summary. State PASS if everything looks correct (and tests pass, if applicable). State FAIL and list specific findings if issues were found.`;
+}
+
+// ---------------------------------------------------------------------------
+// Reviewer LLM invocation
+// ---------------------------------------------------------------------------
+
+/**
+ * Invoke the reviewer vendor CLI with the given prompt.
+ * Inherits the current process's stdio so the user can observe the review
+ * in real time. Returns the process exit code and whether it timed out.
+ *
+ * @param {{
+ *   cliPath: string;
+ *   prompt: string;
+ *   dir: string;
+ *   timeout?: number;
+ * }} options
+ * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
+ */
+export function runReviewerLlm({ cliPath, prompt, dir, timeout = 300_000 }) {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(cliPath, [prompt], {
+        cwd: dir,
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+    } catch (err) {
+      resolve({ exitCode: 1, timedOut: false, spawnError: err.message });
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      resolve({ exitCode: 1, timedOut: true });
+    }, timeout);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ exitCode: code ?? 1, timedOut: false });
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ exitCode: 1, timedOut: false, spawnError: err.message });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Test command runner
 // ---------------------------------------------------------------------------
 
@@ -261,12 +397,14 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000) {
 
 /**
  * @typedef {Object} ReviewResult
+ * @property {"llm-review"|"shell-test-only"|"skipped"} mode  Review mode.
  * @property {boolean}  skipped          True when the review step was not executed.
  * @property {string}   [reason]         Human-readable reason for skipping.
- * @property {boolean}  [passed]         True when tests passed. Present only when !skipped.
- * @property {string}   [command]        The test command that was run.
- * @property {string}   [output]         Combined stdout + stderr of the test run.
- * @property {number}   [exitCode]       Exit code of the test command.
+ * @property {boolean}  [passed]         True when review passed. Present only when !skipped.
+ * @property {string}   [command]        The test command run (shell-test-only mode).
+ * @property {string}   [output]         Combined stdout + stderr of the test run (shell-test-only).
+ * @property {number}   [exitCode]       Exit code of the reviewer process.
+ * @property {string[]} [changedFiles]   Files identified as changed by the LLM reviewer.
  * @property {string[]} [contextFiles]   Context file paths forwarded from the primary run.
  */
 
@@ -275,11 +413,10 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000) {
  *
  * 1. Resolve the reviewer's CLI binary.
  * 2. If the binary is unavailable, skip with a warning-level result.
- * 3. If no test command is configured, skip with a warning-level result.
- * 4. Run the test command and return a structured verdict.
- *
- * The `contextFiles` array (if provided) is stored on the result so future
- * reviewer LLM invocations can forward the same context to the reviewer model.
+ * 3. Collect changed files from git and build a constrained review prompt.
+ * 4. Invoke the reviewer LLM with the prompt (mode = "llm-review").
+ * 5. If the LLM fails to spawn, fall back to running the shell test command
+ *    directly (mode = "shell-test-only") when a test command is configured.
  *
  * @param {{
  *   dir: string;
@@ -294,28 +431,52 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
   const cliPath = resolveVendorCliPath(dir, reviewer);
   const { available } = checkReviewerAvailability(cliPath);
 
+  const ctx = contextFiles?.length ? { contextFiles } : {};
+
   if (!available) {
     return {
+      mode: "skipped",
       skipped: true,
       reason: `${reviewer} CLI not found (tried: ${cliPath}). Install or configure llm.${reviewer}.cli_path.`,
+      ...ctx,
     };
   }
 
-  if (!testCommand) {
+  const changedFiles = getChangedFiles(dir);
+  const prompt = buildReviewerPrompt({ changedFiles, testCommand });
+  const llmTimeout = timeout ?? 300_000;
+
+  const llmResult = await runReviewerLlm({ cliPath, prompt, dir, timeout: llmTimeout });
+
+  if (llmResult.spawnError) {
+    // LLM failed to start — fall back to shell tests when a test command is available
+    if (testCommand) {
+      const { exitCode, output } = await runShellTestCommand(testCommand, dir, 120_000);
+      return {
+        mode: "shell-test-only",
+        skipped: false,
+        passed: exitCode === 0,
+        command: testCommand,
+        output,
+        exitCode,
+        ...ctx,
+      };
+    }
     return {
+      mode: "skipped",
       skipped: true,
-      reason: "no test command configured in .rex/config.json (set the `test` field to enable review)",
+      reason: `${reviewer} reviewer failed to start: ${llmResult.spawnError}`,
+      ...ctx,
     };
   }
 
-  const { exitCode, output } = await runShellTestCommand(testCommand, dir, timeout);
   return {
+    mode: "llm-review",
     skipped: false,
-    passed: exitCode === 0,
-    command: testCommand,
-    output,
-    exitCode,
-    ...(contextFiles?.length ? { contextFiles } : {}),
+    passed: llmResult.exitCode === 0,
+    exitCode: llmResult.exitCode,
+    ...(changedFiles.length ? { changedFiles } : {}),
+    ...ctx,
   };
 }
 
@@ -328,29 +489,54 @@ const BORDER = "─".repeat(60);
 /**
  * Format a ReviewResult for terminal display.
  *
+ * Distinguishes three outcome states:
+ *   - llm-review       The reviewer LLM was invoked (primary path).
+ *   - shell-test-only  LLM spawn failed; fell back to running shell tests.
+ *   - skipped          Reviewer CLI unavailable or nothing to run.
+ *
  * @param {"claude" | "codex"} reviewer
  * @param {ReviewResult} result
  * @returns {string}
  */
 export function formatReviewBanner(reviewer, result) {
-  const lines = [
-    "",
-    BORDER,
-    `Reviewer (${reviewer})`,
-    BORDER,
-  ];
+  const lines = ["", BORDER, `Reviewer (${reviewer})`, BORDER];
 
   if (result.skipped) {
     lines.push(`⚠  Review skipped: ${result.reason}`);
-  } else if (result.passed) {
-    lines.push("✓  All tests passed");
-    if (result.command) lines.push(`   Command: ${result.command}`);
+  } else if (result.mode === "llm-review") {
+    if (result.passed) {
+      lines.push("✓  LLM review passed");
+      if (result.changedFiles?.length) {
+        lines.push(`   Reviewed ${result.changedFiles.length} file(s): ${result.changedFiles.join(", ")}`);
+      }
+    } else {
+      lines.push("✗  LLM review: issues found or reviewer exited with errors");
+      lines.push(`   Exit code: ${result.exitCode}`);
+    }
+  } else if (result.mode === "shell-test-only") {
+    if (result.passed) {
+      lines.push("✓  Tests passed (shell-test-only — LLM reviewer unavailable)");
+      if (result.command) lines.push(`   Command: ${result.command}`);
+    } else {
+      lines.push("✗  Tests failed (shell-test-only — LLM reviewer unavailable)");
+      if (result.command) lines.push(`   Command: ${result.command}`);
+      if (result.output?.trim()) {
+        lines.push("");
+        lines.push(result.output.trim());
+      }
+    }
   } else {
-    lines.push("✗  Tests failed");
-    if (result.command) lines.push(`   Command: ${result.command}`);
-    if (result.output?.trim()) {
-      lines.push("");
-      lines.push(result.output.trim());
+    // Legacy path: result has no mode field (backward compatibility)
+    if (result.passed) {
+      lines.push("✓  All tests passed");
+      if (result.command) lines.push(`   Command: ${result.command}`);
+    } else {
+      lines.push("✗  Tests failed");
+      if (result.command) lines.push(`   Command: ${result.command}`);
+      if (result.output?.trim()) {
+        lines.push("");
+        lines.push(result.output.trim());
+      }
     }
   }
 

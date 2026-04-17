@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -28,6 +28,9 @@ const {
   resolveReviewerVendor,
   resolveVendorCliPath,
   checkReviewerAvailability,
+  getChangedFiles,
+  buildReviewerPrompt,
+  runReviewerLlm,
   runShellTestCommand,
   runCrossVendorReview,
   formatReviewBanner,
@@ -61,6 +64,26 @@ function writeRexConfig(dir, config) {
 
 function writeNdxConfig(dir, config) {
   writeFileSync(join(dir, ".n-dx.json"), JSON.stringify(config), "utf-8");
+}
+
+/**
+ * Write an executable mock reviewer script that exits with the given code.
+ * The script accepts any arguments (including a prompt string) and ignores them.
+ *
+ * @param {string} dir       Directory to write the script into.
+ * @param {number} exitCode  Exit code the script should produce.
+ * @returns {string}         Absolute path to the script.
+ */
+function writeMockReviewer(dir, exitCode) {
+  const scriptPath = join(dir, "mock-reviewer.js");
+  writeFileSync(
+    scriptPath,
+    // Exit 0 for --version probe (availability check); exit configured code otherwise
+    `#!/usr/bin/env node\n// Mock LLM reviewer\nif (process.argv[2] === '--version') { console.log('mock 1.0.0'); process.exit(0); }\nprocess.exit(${exitCode});\n`,
+    "utf-8",
+  );
+  chmodSync(scriptPath, 0o755);
+  return scriptPath;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,30 +208,18 @@ describe("runShellTestCommand", () => {
 
 describe("runCrossVendorReview — codex primary / claude reviewer", () => {
   it("skips when reviewer CLI is unavailable", async () => {
-    writeRexConfig(tmpDir, { test: "node -e \"process.exit(0)\"" });
     // Claude binary deliberately set to a path that does not exist
     writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/nonexistent/claude-xxx" } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
       reviewer: "claude",
-      testCommand: "node -e \"process.exit(0)\"",
+      testCommand: `${process.execPath} -e "process.exit(0)"`,
     });
 
     expect(result.skipped).toBe(true);
+    expect(result.mode).toBe("skipped");
     expect(result.reason).toContain("claude");
-  });
-
-  it("skips when no test command is provided", async () => {
-    // Even if claude were available, no testCommand → skip
-    const result = await runCrossVendorReview({
-      dir: tmpDir,
-      reviewer: "claude",
-      testCommand: undefined,
-    });
-
-    expect(result.skipped).toBe(true);
-    expect(result.reason).toContain("test command");
   });
 });
 
@@ -219,35 +230,23 @@ describe("runCrossVendorReview — claude primary / codex reviewer", () => {
     const result = await runCrossVendorReview({
       dir: tmpDir,
       reviewer: "codex",
-      testCommand: "node -e \"process.exit(0)\"",
+      testCommand: `${process.execPath} -e "process.exit(0)"`,
     });
 
     expect(result.skipped).toBe(true);
+    expect(result.mode).toBe("skipped");
     expect(result.reason).toContain("codex");
-  });
-
-  it("skips when no test command is provided", async () => {
-    const result = await runCrossVendorReview({
-      dir: tmpDir,
-      reviewer: "codex",
-      testCommand: undefined,
-    });
-
-    expect(result.skipped).toBe(true);
-    expect(result.reason).toContain("test command");
   });
 });
 
 // ---------------------------------------------------------------------------
-// runCrossVendorReview — real test execution (using 'node' as proxy binary)
+// runCrossVendorReview — LLM reviewer invocation (using mock reviewer scripts)
 // ---------------------------------------------------------------------------
 
-describe("runCrossVendorReview — real test execution when reviewer is available", () => {
-  it("returns passed=true when test command succeeds", async () => {
-    // Override reviewer CLI path to 'node --version' which succeeds
-    // and the test command is a passing node script.
-    // We use 'node' as the mock reviewer binary (it responds to --version).
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: process.execPath } } });
+describe("runCrossVendorReview — LLM reviewer invocation", () => {
+  it("returns mode=llm-review and passed=true when mock reviewer exits 0", async () => {
+    const scriptPath = writeMockReviewer(tmpDir, 0);
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -256,27 +255,30 @@ describe("runCrossVendorReview — real test execution when reviewer is availabl
     });
 
     expect(result.skipped).toBe(false);
+    expect(result.mode).toBe("llm-review");
     expect(result.passed).toBe(true);
     expect(result.exitCode).toBe(0);
   });
 
-  it("returns passed=false when test command fails", async () => {
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: process.execPath } } });
+  it("returns mode=llm-review and passed=false when mock reviewer exits 1", async () => {
+    const scriptPath = writeMockReviewer(tmpDir, 1);
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
       reviewer: "codex",
-      testCommand: `${process.execPath} -e "process.stderr.write('FAIL: 2 tests failed\\n'); process.exit(1)"`,
+      testCommand: `${process.execPath} -e "process.exit(0)"`,
     });
 
     expect(result.skipped).toBe(false);
+    expect(result.mode).toBe("llm-review");
     expect(result.passed).toBe(false);
     expect(result.exitCode).toBe(1);
-    expect(result.output).toContain("FAIL");
   });
 
   it("same behaviour for claude reviewer direction", async () => {
-    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: process.execPath } } });
+    const scriptPath = writeMockReviewer(tmpDir, 0);
+    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -285,6 +287,22 @@ describe("runCrossVendorReview — real test execution when reviewer is availabl
     });
 
     expect(result.skipped).toBe(false);
+    expect(result.mode).toBe("llm-review");
+    expect(result.passed).toBe(true);
+  });
+
+  it("invokes LLM even when no test command is configured", async () => {
+    const scriptPath = writeMockReviewer(tmpDir, 0);
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+
+    const result = await runCrossVendorReview({
+      dir: tmpDir,
+      reviewer: "codex",
+      testCommand: undefined,
+    });
+
+    expect(result.skipped).toBe(false);
+    expect(result.mode).toBe("llm-review");
     expect(result.passed).toBe(true);
   });
 });
@@ -301,7 +319,63 @@ describe("formatReviewBanner", () => {
     expect(output).toContain("CLI not found");
   });
 
-  it("shows passing verdict", () => {
+  it("shows llm-review passed verdict", () => {
+    const output = formatReviewBanner("codex", {
+      mode: "llm-review",
+      skipped: false,
+      passed: true,
+      exitCode: 0,
+      changedFiles: ["src/foo.ts", "src/bar.ts"],
+    });
+    expect(output).toContain("Reviewer (codex)");
+    expect(output).toContain("LLM review passed");
+    expect(output).toContain("src/foo.ts");
+    expect(output).toContain("2 file(s)");
+  });
+
+  it("shows llm-review failed verdict", () => {
+    const output = formatReviewBanner("claude", {
+      mode: "llm-review",
+      skipped: false,
+      passed: false,
+      exitCode: 1,
+    });
+    expect(output).toContain("Reviewer (claude)");
+    expect(output).toContain("LLM review");
+    expect(output).toContain("issues found");
+    expect(output).toContain("Exit code: 1");
+  });
+
+  it("shows shell-test-only passed verdict", () => {
+    const output = formatReviewBanner("codex", {
+      mode: "shell-test-only",
+      skipped: false,
+      passed: true,
+      command: "pnpm test",
+    });
+    expect(output).toContain("Reviewer (codex)");
+    expect(output).toContain("Tests passed");
+    expect(output).toContain("shell-test-only");
+    expect(output).toContain("pnpm test");
+  });
+
+  it("shows shell-test-only failed verdict with output", () => {
+    const output = formatReviewBanner("claude", {
+      mode: "shell-test-only",
+      skipped: false,
+      passed: false,
+      command: "npm test",
+      output: "AssertionError: expected 1 to equal 2",
+      exitCode: 1,
+    });
+    expect(output).toContain("Reviewer (claude)");
+    expect(output).toContain("Tests failed");
+    expect(output).toContain("shell-test-only");
+    expect(output).toContain("AssertionError");
+    expect(output).toContain("npm test");
+  });
+
+  it("legacy (no mode) shows passing verdict for backward compat", () => {
     const output = formatReviewBanner("codex", {
       skipped: false,
       passed: true,
@@ -312,7 +386,7 @@ describe("formatReviewBanner", () => {
     expect(output).toContain("pnpm test");
   });
 
-  it("shows failing verdict with output", () => {
+  it("legacy (no mode) shows failing verdict for backward compat", () => {
     const output = formatReviewBanner("claude", {
       skipped: false,
       passed: false,
@@ -488,8 +562,9 @@ describe("writeNdxContextFile", () => {
 // ---------------------------------------------------------------------------
 
 describe("runCrossVendorReview — contextFiles stored in result", () => {
-  it("includes contextFiles in result when tests pass and contextFiles provided", async () => {
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: process.execPath } } });
+  it("includes contextFiles in result when reviewer passes and contextFiles provided", async () => {
+    const scriptPath = writeMockReviewer(tmpDir, 0);
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
     const result = await runCrossVendorReview({
       dir: tmpDir,
       reviewer: "codex",
@@ -497,12 +572,14 @@ describe("runCrossVendorReview — contextFiles stored in result", () => {
       contextFiles: ["/tmp/context.md"],
     });
     expect(result.skipped).toBe(false);
+    expect(result.mode).toBe("llm-review");
     expect(result.passed).toBe(true);
     expect(result.contextFiles).toEqual(["/tmp/context.md"]);
   });
 
   it("does not add contextFiles property when no contextFiles provided", async () => {
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: process.execPath } } });
+    const scriptPath = writeMockReviewer(tmpDir, 0);
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
     const result = await runCrossVendorReview({
       dir: tmpDir,
       reviewer: "codex",
@@ -510,5 +587,121 @@ describe("runCrossVendorReview — contextFiles stored in result", () => {
     });
     expect(result.skipped).toBe(false);
     expect(result.contextFiles).toBeUndefined();
+  });
+
+  it("includes contextFiles in skipped result when reviewer CLI unavailable", async () => {
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: "/nonexistent/codex-xxx" } } });
+    const result = await runCrossVendorReview({
+      dir: tmpDir,
+      reviewer: "codex",
+      testCommand: `${process.execPath} -e "process.exit(0)"`,
+      contextFiles: ["/tmp/ctx.md"],
+    });
+    expect(result.skipped).toBe(true);
+    expect(result.contextFiles).toEqual(["/tmp/ctx.md"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getChangedFiles
+// ---------------------------------------------------------------------------
+
+describe("getChangedFiles", () => {
+  it("returns empty array in a non-git directory", () => {
+    // tmpDir has no .git — git commands fail silently
+    const files = getChangedFiles(tmpDir);
+    expect(Array.isArray(files)).toBe(true);
+    expect(files).toHaveLength(0);
+  });
+
+  it("returns files from the last commit in a git repository", async () => {
+    const { execFileSync: exec } = await import("node:child_process");
+    // Bootstrap a minimal git repo with one commit
+    exec("git", ["init"], { cwd: tmpDir, stdio: "pipe" });
+    exec("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, stdio: "pipe" });
+    exec("git", ["config", "user.name", "Test"], { cwd: tmpDir, stdio: "pipe" });
+    writeFileSync(join(tmpDir, "hello.txt"), "hello", "utf-8");
+    exec("git", ["add", "hello.txt"], { cwd: tmpDir, stdio: "pipe" });
+    exec("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "pipe" });
+
+    const files = getChangedFiles(tmpDir);
+    expect(files).toContain("hello.txt");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildReviewerPrompt
+// ---------------------------------------------------------------------------
+
+describe("buildReviewerPrompt", () => {
+  it("includes changed files in the prompt", () => {
+    const prompt = buildReviewerPrompt({
+      changedFiles: ["src/foo.ts", "src/bar.ts"],
+      testCommand: "pnpm test",
+    });
+    expect(prompt).toContain("src/foo.ts");
+    expect(prompt).toContain("src/bar.ts");
+  });
+
+  it("includes the test command when provided", () => {
+    const prompt = buildReviewerPrompt({
+      changedFiles: [],
+      testCommand: "pnpm test",
+    });
+    expect(prompt).toContain("pnpm test");
+  });
+
+  it("omits test section when testCommand is absent", () => {
+    const prompt = buildReviewerPrompt({
+      changedFiles: ["src/foo.ts"],
+      testCommand: undefined,
+    });
+    expect(prompt).not.toContain("Run the test command");
+  });
+
+  it("includes 20-line constraint", () => {
+    const prompt = buildReviewerPrompt({ changedFiles: [], testCommand: undefined });
+    expect(prompt).toContain("20 lines");
+  });
+
+  it("explicitly prohibits refactors", () => {
+    const prompt = buildReviewerPrompt({ changedFiles: [], testCommand: undefined });
+    expect(prompt).toMatch(/MUST NOT.*refactor/i);
+  });
+
+  it("uses fallback message when no changed files provided", () => {
+    const prompt = buildReviewerPrompt({ changedFiles: [], testCommand: undefined });
+    expect(prompt).toContain("no specific files identified");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runReviewerLlm
+// ---------------------------------------------------------------------------
+
+describe("runReviewerLlm", () => {
+  it("returns exitCode 0 when mock reviewer script exits 0", async () => {
+    const scriptPath = writeMockReviewer(tmpDir, 0);
+    const result = await runReviewerLlm({ cliPath: scriptPath, prompt: "review this", dir: tmpDir });
+    expect(result.exitCode).toBe(0);
+    expect(result.timedOut).toBe(false);
+    expect(result.spawnError).toBeUndefined();
+  });
+
+  it("returns exitCode 1 when mock reviewer script exits 1", async () => {
+    const scriptPath = writeMockReviewer(tmpDir, 1);
+    const result = await runReviewerLlm({ cliPath: scriptPath, prompt: "review this", dir: tmpDir });
+    expect(result.exitCode).toBe(1);
+    expect(result.timedOut).toBe(false);
+  });
+
+  it("returns spawnError when binary does not exist", async () => {
+    const result = await runReviewerLlm({
+      cliPath: "/nonexistent/binary-that-does-not-exist-xyz",
+      prompt: "review",
+      dir: tmpDir,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.spawnError).toBeDefined();
   });
 });

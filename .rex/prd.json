@@ -14,7 +14,7 @@
         {
           "id": "5dd63e4e-1bbb-47a8-a0fa-754bc142a377",
           "title": "Hot-reload MCP tool schemas on HTTP transport without server restart",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The HTTP MCP server holds tool schemas in memory from startup. When rex or sourcevision are rebuilt with new/changed tool parameters, the running server still serves the old schemas. Users must restart the server to pick up changes. This is a friction point during development — stdio MCP doesn't have this problem since each invocation spawns fresh.\n\nOptions: file-watch the dist/ directories and re-initialize MCP servers on change, or add an admin endpoint to trigger reload.",
           "acceptanceCriteria": [
@@ -26,7 +26,11 @@
             "web",
             "mcp",
             "dx"
-          ]
+          ],
+          "startedAt": "2026-04-17T04:37:35.876Z",
+          "completedAt": "2026-04-17T05:02:17.402Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Implemented file-watching + subprocess proxy hot-reload for MCP tool schemas. Three new files + modifications to routes-mcp.ts and start.ts."
         }
       ]
     },
@@ -53,7 +57,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "pending",
+          "status": "deferred",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
@@ -83,7 +87,7 @@
             {
               "id": "7ed4c848-e4be-4f6e-b495-5d70a9457fec",
               "title": "Inventory duplicated unit-test constants across suites",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Review unit test files to identify repeated constants that appear in more than four files and record where they are used so consolidation candidates are explicitly defined.",
               "acceptanceCriteria": [
@@ -103,7 +107,7 @@
             {
               "id": "9311f36a-e0e4-4275-90f7-badca8d60ee6",
               "title": "Update unit test callers to use shared utilities",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Refactor existing unit test files to consume the new shared helpers and constants while preserving existing assertions, names, and suite intent.",
               "acceptanceCriteria": [
@@ -123,7 +127,7 @@
             {
               "id": "4094dafb-78c0-462f-bc09-dd5a630762bb",
               "title": "Validate behavioral equivalence after test utility extraction",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Run the refactored unit suites and compare outcomes against the pre-refactor baseline to confirm that the shared utility extraction did not alter behavior or coverage.",
               "acceptanceCriteria": [
@@ -398,7 +402,7 @@
             {
               "id": "4b559467-5391-4612-ab7d-27b71daac4dc",
               "title": "Expose timeout configuration in .n-dx.json schema and ndx config command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add `cli.timeoutMs` and `cli.timeouts.*` keys to the .n-dx.json config schema with documentation, validation, and support through `ndx config get/set`. Ensure `ndx config --help` describes the timeout keys and their defaults.",
               "acceptanceCriteria": [
@@ -415,12 +419,15 @@
                 "timeout"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-03T19:06:47.150Z"
+              "startedAt": "2026-04-03T19:06:47.150Z",
+              "completedAt": "2026-04-17T04:37:07.922Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added validateTimeoutMs export, CLI_VALIDATORS wired via getValidator(), handleGet defaults for unset cli.timeoutMs, improved help text, and new unit tests."
             },
             {
               "id": "1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
               "title": "Add timeout configuration panel to web settings UI",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Surface the CLI timeout settings in the n-dx web dashboard settings panel so users can view and update timeouts without touching the CLI. The panel should show the current global default and any per-command overrides, with save/reset controls that write back to .n-dx.json via the existing config API.",
               "acceptanceCriteria": [
@@ -465,7 +472,7 @@
             {
               "id": "bb5f0641-67a7-43d2-b0fe-186faf73c0bc",
               "title": "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "The ndx init dinosaur ASCII art was redesigned and corrected in a prior sprint (proportions fixed, animation frames sourced from Rex-F.png). The E2E brand test at tests/e2e/cli-brand.test.js still asserts against the old dinosaur output, causing it to fail or carry a stale snapshot. Update the expected output in the test to match the current canonical dinosaur so the suite is green and serves as an accurate regression guard going forward.",
               "acceptanceCriteria": [
@@ -729,12 +736,13 @@
                 "recovery"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-16T15:16:59.565Z"
+              "startedAt": "2026-04-16T15:16:59.565Z",
+              "completedAt": "2026-04-16T21:51:28.054Z"
             },
             {
               "id": "03d9f52f-7ec7-452d-9d62-5c391269c2c5",
               "title": "Add rollback configuration, confirmation UX, and regression tests",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Expose rollback behavior as a configurable option in .n-dx.json (hench.rollbackOnFailure, default: true). In interactive mode, prompt the user to confirm before reverting. In non-interactive/CI mode (TTY absent or --yes flag), proceed automatically. Add integration tests covering rollback, --no-rollback suppression, PRD reset, and CI auto-confirm.",
               "acceptanceCriteria": [
@@ -782,7 +790,7 @@
             {
               "id": "55b88bcd-8e8a-474a-9053-7e0ceba66ebe",
               "title": "Inject ndx project context into pair-programming primary and reviewer executions",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The pair-programming command currently passes the user's description to hench as a bare --freeform string with no project context. The primary and reviewer models should receive ndx's accumulated knowledge — CONTEXT.md, a PRD status excerpt, and recent hench run summaries — so both models understand the codebase before acting. This context should be assembled from the local ndx data files and passed as a system-level or file-context argument to each vendor CLI invocation.",
               "acceptanceCriteria": [
@@ -799,12 +807,15 @@
                 "cli"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-16T16:56:03.913Z"
+              "startedAt": "2026-04-16T16:56:03.913Z",
+              "completedAt": "2026-04-16T22:07:19.810Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added context assembly pipeline in pair-programming.js and threaded extraContext through hench's run/loop stack into buildPromptEnvelope."
             },
             {
               "id": "3a80b875-f796-476f-b456-912b2ae1604a",
               "title": "Invoke the reviewer LLM with a validation-only constraint prompt",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "The current cross-vendor review step only runs the project's shell test command — it never invokes the reviewer LLM. The reviewer should be called via its CLI with a targeted prompt that instructs it to: check the changed files for syntax and logic errors, run the test command, and report findings. Critically, the reviewer's prompt must constrain it to small, targeted fixes only (e.g. fixing a broken import or a one-line syntax error) and must explicitly prohibit large refactors or architectural changes. This keeps the reviewer in a QA role rather than turning it into a second implementer.",
               "acceptanceCriteria": [
@@ -826,7 +837,7 @@
             {
               "id": "75c7df48-1438-4a03-8467-34bc0de734ae",
               "title": "Implement structured inter-model handoff so reviewer findings are fed back to the primary",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "After the reviewer LLM runs its validation pass, its findings (errors found, test verdict, suggested micro-fixes) should be captured as a structured artifact and fed back to the primary model as a follow-up turn. This creates the 'bickering pair' dynamic where models actually exchange information: the primary does the work, the reviewer audits it, and if issues remain the primary gets one remediation pass with the reviewer's specific feedback. The loop should be bounded (at most one feedback round) to prevent infinite back-and-forth.",
               "acceptanceCriteria": [
