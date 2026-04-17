@@ -971,6 +971,44 @@ async function handleInit(rest) {
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
 
+  // Spawn sub-package inits. Each tool's own init handles reuse of existing
+  // state, so we run unconditionally and let the tool decide. Sourcevision
+  // also runs a fast analyze after init to populate inventory artifacts.
+  async function runSubInitPhase(name, work, detail) {
+    const phase = INIT_PHASES[name];
+    if (!quiet && phase) {
+      const spinner = createSpinner(phase.spinner);
+      spinner.start();
+      const result = await work();
+      if (result.code !== 0) {
+        spinner.fail(`${name} failed`);
+        console.error(result.stderr || result.stdout);
+        exitWithCleanup(1);
+      }
+      spinner.success(phase.success, detail);
+    } else {
+      const result = await work();
+      if (result.code !== 0) {
+        console.error(result.stderr || result.stdout);
+        exitWithCleanup(1);
+      }
+    }
+  }
+
+  await runSubInitPhase("sourcevision",
+    async () => {
+      const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+      if (initResult.code !== 0) return initResult;
+      return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
+    },
+    svExists ? "reused — .sourcevision/ already present" : undefined);
+  await runSubInitPhase("rex",
+    () => runInitCapture(tools.rex, ["init", ...flags, dir]),
+    rexExists ? "reused — .rex/ already present" : undefined);
+  await runSubInitPhase("hench",
+    () => runInitCapture(tools.hench, ["init", ...flags, dir]),
+    henchExists ? "reused — .hench/ already present" : undefined);
+
   // Ensure .n-dx.local.json is in .gitignore (machine-specific config)
   ensureGitignoreEntry(dir, ".n-dx.local.json");
 
