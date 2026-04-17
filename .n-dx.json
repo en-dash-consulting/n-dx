@@ -126,7 +126,10 @@
         "packages/rex/tests/unit/cli/commands/usage.test.ts": "rex-unit",
         "packages/sourcevision/tests/fixtures/go-project/internal/service/user.go": "sourcevision",
         "packages/sourcevision/tests/fixtures/go-project/internal/service/user_test.go": "sourcevision",
-        "packages/sourcevision/vitest.config.ts": "sourcevision"
+        "packages/sourcevision/vitest.config.ts": "sourcevision",
+        "packages/hench/src/agent/lifecycle/token-usage.ts": "hench-token-usage",
+        "packages/hench/tests/unit/agent/token-usage-regression.test.ts": "hench-token-usage",
+        "packages/hench/tests/unit/agent/token-usage.test.ts": "hench-token-usage"
       },
       "types": {
         "e2e": "test",

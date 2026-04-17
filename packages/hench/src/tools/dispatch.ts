@@ -5,7 +5,7 @@
  * package:
  *
  *   **agent-core (hench zone)** — agent lifecycle, schema, process execution
- *   **guard+tools (hench-2 zone)** — GuardRails, filesystem/shell/git tool impls
+ *   **guard+tools (hench zone)** — GuardRails, filesystem/shell/git tool impls
  *
  * The coupling between these zones is intentional and managed:
  *

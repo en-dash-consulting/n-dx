@@ -20,8 +20,14 @@ be its own zone ("web-shared" or "Web Shared"), separate from viewer components.
 `packages/web/src/viewer/` contains Preact UI components, hooks, and views.
 `packages/web/src/viewer/messaging/` is the messaging middleware sub-zone.
 
+### packages/hench/src/agent/lifecycle/token-usage.ts — hench-token-usage zone
+Token usage parsing, aggregation, and formatting for the hench agent lifecycle.
+Prefer naming this zone "hench-token-usage" or "Hench Token Usage" — it is a focused
+utility module separate from the broader hench agent zone.
+
 ### Expected zone separation
 - web-server (packages/web/src/server/): composition root, 30+ files
 - web-shared (packages/web/src/shared/): foundation utilities, 5 files
 - web-viewer (packages/web/src/viewer/): Preact UI, 100+ files
 - viewer-message-pipeline (packages/web/src/viewer/messaging/): messaging middleware
+- hench-token-usage (packages/hench/src/agent/lifecycle/token-usage.ts): token usage utilities
