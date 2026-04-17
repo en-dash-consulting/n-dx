@@ -1189,6 +1189,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
   // Core — lazy-loads utilities
   ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers only when the configured vendor changes"],
+  ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TTY renderer) only during `ndx init` in interactive TTY mode — avoids React/Ink bundle cost for every CLI invocation"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies

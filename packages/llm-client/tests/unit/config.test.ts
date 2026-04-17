@@ -300,7 +300,7 @@ describe("resolveVendorModel", () => {
   it("expands claude model aliases from config", () => {
     expect(
       resolveVendorModel("claude", { claude: { model: "opus" } }),
-    ).toBe("claude-opus-4-20250514");
+    ).toBe("claude-opus-4-7");
   });
 
   it("expands 'sonnet' alias to full claude model ID", () => {
