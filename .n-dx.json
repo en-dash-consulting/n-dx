@@ -125,6 +125,7 @@
       },
       "types": {
         "e2e": "test",
+        "e2e-test-suite": "test",
         "fixtures": "test",
         "sv-fixtures": "test",
         "integration": "test",
@@ -138,7 +139,8 @@
         "packages-web-unit-server": "test",
         "sourcevision-view-tests": "test",
         "domain-gateway-routes-mcp": "test",
-        "web-unit": "test"
+        "web-unit": "test",
+        "web-4": "test"
       }
     }
   },

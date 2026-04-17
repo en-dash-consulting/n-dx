@@ -816,11 +816,13 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["refresh-throttle-pipeline", "Tiny refresh throttle pipeline zone; the scheduler and throttle helpers form a narrow satellite with sparse internal edges, making the cohesion score noisy at this size."],
-  ["prd-status-reset", "Small 3-file zone (below the 5-file threshold for reliable metrics); cascade-reset and parent-reset are sibling utilities for bidirectional status propagation — they work at the same level without calling each other, so internal edges are sparse despite a coherent responsibility."],
-  ["cleanup", "Small 3-file zone created by task-usage refactoring; the backward-compat shim at server root and the real implementation in task-usage/ subdirectory have only one directed edge between them, making the cohesion score unreliable. Zone will consolidate once the shim is removed."],
-  ["register", "Small 3-file zone created by task-usage refactoring; same shim/implementation split as 'cleanup' — backward-compat shim at server root and real file in task-usage/. Zone will consolidate once the shim is removed."],
-  ["web-server", "Large 45-file zone covering diverse server responsibilities (routes, aggregation, gateways, process management); broad scope inherently limits internal edge density. Governed as a dual-fragility zone per CLAUDE.md."],
+  ["health", "Small 3-file zone (below the 5-file threshold for reliable metrics); one CLI command, one core structure-health analyzer, and its test — a narrow satellite with sparse internal edges."],
+  ["polling", "5-file zone at the boundary of reliable metrics; two polling source files plus three tests. Tests don't import each other, which drives cohesion down despite a coherent purpose."],
+  ["project-status-hooks", "Small 3-file zone (below the 5-file threshold); two React hooks (use-polling, use-project-status) and one test. The hooks are sibling utilities invoked independently by views, so internal edges are sparse."],
+  ["refresh", "Small 3-file zone (below the 5-file threshold); a viewer refresh-throttle hook, its performance-module implementation, and one test — narrow satellite with sparse internal edges."],
+  ["rex-chunked-review", "Rex satellite CLI zone governed by the rex-satellite zone policy (see CLAUDE.md); 4 files covering chunked-review command handlers plus tests. By policy these zones carry high coupling to rex-prd-engine and low cohesion."],
+  ["rex-recommend", "Small 3-file zone (below the 5-file threshold); conflict-detection, shared types, and one test. The types module is a leaf imported by the detector, giving only one directed internal edge."],
+  ["web-2", "Small 3-file zone (below the 5-file threshold); tree-search component, use-facet-state hook, and the tree-search test. Component and hook are sibling viewer utilities that don't call each other directly."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
