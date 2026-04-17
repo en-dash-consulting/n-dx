@@ -833,7 +833,16 @@ function runInitCapture(toolPath, args) {
   });
 }
 
-async function handleInit(rest) {
+/**
+ * Parse and validate all init-specific flags from raw CLI args.
+ * Exits with code 1 if any validation fails.
+ *
+ * @param {string[]} rest
+ * @returns {{ providerFromFlag: string|undefined, modelFromFlag: string|undefined,
+ *   claudeModelFromFlag: string|undefined, codexModelFromFlag: string|undefined,
+ *   effectiveProvider: string|undefined, effectiveModel: string|undefined }}
+ */
+function parseInitFlagSet(rest) {
   const providerFromFlag = extractInitProvider(rest);
   const modelFromFlag = extractInitModel(rest);
   const claudeModelFromFlag = extractInitClaudeModel(rest);
@@ -863,7 +872,17 @@ async function handleInit(rest) {
     console.warn(`Warning: ${warn}`);
   }
 
-  // Resolve effective provider and model from vendor-specific flags.
+  // Validate --assistants= values early (value errors reported here; resolution happens later)
+  const assistantsSet = extractAssistantsFlag(rest);
+  if (assistantsSet) {
+    const invalid = [...assistantsSet].filter((v) => !SUPPORTED_PROVIDERS.includes(v));
+    if (invalid.length > 0) {
+      console.error(`Error: Unknown assistant${invalid.length > 1 ? "s" : ""}: ${invalid.join(", ")}. Expected: claude, codex.`);
+      process.exit(1);
+    }
+  }
+
+  // Resolve effective provider:
   // A lone vendor-specific flag implies the provider (e.g. --claude-model=X → provider=claude).
   // When both vendor-specific flags are present, --provider is required to set the active vendor.
   const effectiveProvider = providerFromFlag
@@ -876,27 +895,26 @@ async function handleInit(rest) {
     || (effectiveProvider === "claude" ? claudeModelFromFlag : undefined)
     || (effectiveProvider === "codex" ? codexModelFromFlag : undefined);
 
-  // Validate --assistants= values
-  const assistantsSet = extractAssistantsFlag(rest);
-  if (assistantsSet) {
-    const invalid = [...assistantsSet].filter((v) => !SUPPORTED_PROVIDERS.includes(v));
-    if (invalid.length > 0) {
-      console.error(`Error: Unknown assistant${invalid.length > 1 ? "s" : ""}: ${invalid.join(", ")}. Expected: claude, codex.`);
-      process.exit(1);
-    }
-  }
+  return { providerFromFlag, modelFromFlag, claudeModelFromFlag, codexModelFromFlag, effectiveProvider, effectiveModel };
+}
 
-  // Resolve assistant-selection flags (--assistants= > --*-only > --no-* > default)
-  let assistantEnabled = resolveAssistantFlags(rest);
+/**
+ * Strip all init-specific flag prefixes from args before forwarding to sub-commands.
+ * @param {string[]} rest
+ * @returns {string[]}
+ */
+function buildInitArgs(rest) {
+  return stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest))));
+}
 
-  const initArgs = stripAssistantFlags(stripInitVendorModelFlags(stripInitModelFlag(stripInitProviderFlag(rest))));
-  const dir = resolveDir(initArgs);
-  const flags = extractFlags(initArgs);
-  const quiet = flags.includes("--quiet") || flags.includes("-q");
-
-  // Repair known-numeric config values that may have been stored as strings
-  // by earlier versions (e.g. cli.timeouts.work = "14400000"). Runs before
-  // anything reads the config so sub-package inits see well-typed values.
+/**
+ * Repair known-numeric config values before sub-package inits read config.
+ * Non-fatal — repair failure never blocks init.
+ *
+ * @param {string} dir
+ * @param {boolean} quiet
+ */
+async function repairInitConfig(dir, quiet) {
   try {
     const { repairs } = await repairProjectConfig(dir);
     if (repairs.length > 0 && !quiet) {
@@ -908,21 +926,28 @@ async function handleInit(rest) {
   } catch {
     // Non-fatal — repair failure never blocks init.
   }
+}
 
-  // ── Backward-compatibility: re-init detection ─────────────────────────────
-  //
-  // When no explicit assistant flags are passed and the project already has
-  // surfaces from a prior init, only re-provision the surfaces that already
-  // exist.  This prevents existing Claude-only users from unexpectedly
-  // receiving Codex artifacts (AGENTS.md, .codex/, .agents/) on upgrade.
-  //
-  // First-time init (no existing surfaces) provisions both vendors by default.
+/**
+ * Resolve which assistants are enabled for this init run.
+ *
+ * Applies backward-compatibility re-init detection when no explicit assistant
+ * flags are present: if the project already has surfaces from a prior init,
+ * only re-provision those surfaces (prevents Claude-only users from
+ * unexpectedly receiving Codex artifacts on upgrade).
+ *
+ * @param {string[]} rest  Raw CLI args
+ * @param {string} dir  Project directory
+ * @returns {{ claude: boolean, codex: boolean }}
+ */
+function resolveInitAssistants(rest, dir) {
+  let assistantEnabled = resolveAssistantFlags(rest);
+
   if (!hasExplicitAssistantFlags(rest)) {
     const claudePresent = existsSync(join(dir, ".claude")) || existsSync(join(dir, "CLAUDE.md"));
     const codexPresent = existsSync(join(dir, ".codex")) || existsSync(join(dir, ".agents")) || existsSync(join(dir, "AGENTS.md"));
 
     // When a prior init provisioned only one vendor, keep only that one enabled.
-    // When both or neither exist, the defaults apply (both enabled unless overridden elsewhere).
     if (claudePresent && !codexPresent) {
       assistantEnabled = { claude: true, codex: false };
     } else if (!claudePresent && codexPresent) {
@@ -930,11 +955,28 @@ async function handleInit(rest) {
     }
   }
 
-  // Resolve LLM provider via init-llm.js (flag > config > prompt precedence).
-  // Pass real TTY state: enquirer's keyboard-driven Select prompt requires a
-  // real TTY. In non-TTY environments (piped input, CI), if no --provider flag
-  // or config is present, the prompt is skipped and init exits with a clear
-  // message asking the user to re-run with --provider=.
+  return assistantEnabled;
+}
+
+/**
+ * Run the LLM provider/model selection workflow for init.
+ *
+ * Reads existing config, shows the banner, prompts the user (when TTY),
+ * and resolves source-labels for the summary. Non-TTY with no flag/config
+ * returns { selectedProvider: undefined, llmSkipped: false } — the caller
+ * must exit with a clear message in that case.
+ *
+ * @param {string} dir
+ * @param {string|undefined} effectiveProvider
+ * @param {string|undefined} effectiveModel
+ * @param {boolean} quiet
+ * @param {{ providerFromFlag?: string, claudeModelFromFlag?: string, codexModelFromFlag?: string }} vendorFlags
+ * @returns {Promise<{ selectedProvider: string|undefined, selection: object,
+ *   llmSkipped: boolean, providerSource: string, modelSource: string }>}
+ */
+async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, vendorFlags = {}) {
+  const { providerFromFlag, claudeModelFromFlag, codexModelFromFlag } = vendorFlags;
+
   const existingVendor = readLLMVendor(dir);
   const existingModel = readLLMModel(dir, effectiveProvider || existingVendor);
   const resolution = resolveInitLLMSelection({
@@ -953,16 +995,7 @@ async function handleInit(rest) {
     console.log("LLM configuration skipped.");
   }
 
-  // When no provider is available and it wasn't a user cancellation (e.g.
-  // non-TTY with no flags or config), exit with a clear message.
-  if (!selectedProvider && !llmSkipped) {
-    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
-    exitWithCleanup(1);
-  }
-
   // Map providerSource / modelSource to user-facing labels for the summary.
-  // Use the actual flag name when a vendor-specific model flag was used.
-  // When the active model came from a vendor-specific flag, name that flag in the label.
   const modelFlagLabel = (selection.model === claudeModelFromFlag && claudeModelFromFlag) ? "--claude-model"
     : (selection.model === codexModelFromFlag && codexModelFromFlag) ? "--codex-model"
       : "--model";
@@ -974,12 +1007,135 @@ async function handleInit(rest) {
   const providerSource = PROVIDER_SOURCE_LABELS[selection.providerSource] ?? "selected";
   const modelSource = MODEL_SOURCE_LABELS[selection.modelSource] ?? "";
 
-  // Check pre-existing state for status reporting
+  return { selectedProvider, selection, llmSkipped, providerSource, modelSource };
+}
+
+/**
+ * Run a single sub-package init phase, with spinner feedback in interactive mode.
+ * Exits with code 1 on failure.
+ *
+ * @param {string} name  Phase key (matched against INIT_PHASES for spinner config)
+ * @param {() => Promise<{code: number, stdout: string, stderr: string}>} work
+ * @param {string|undefined} detail  Optional text appended to the success spinner
+ * @param {boolean} quiet
+ */
+async function runSubInitPhase(name, work, detail, quiet) {
+  const phase = INIT_PHASES[name];
+  if (!quiet && phase) {
+    const spinner = createSpinner(phase.spinner);
+    spinner.start();
+    const result = await work();
+    if (result.code !== 0) {
+      spinner.fail(`${name} failed`);
+      console.error(result.stderr || result.stdout);
+      exitWithCleanup(1);
+    }
+    spinner.success(phase.success, detail);
+  } else {
+    const result = await work();
+    if (result.code !== 0) {
+      console.error(result.stderr || result.stdout);
+      exitWithCleanup(1);
+    }
+  }
+}
+
+/**
+ * Persist LLM vendor/model selection to .n-dx.json after sub-package inits.
+ *
+ * Skipped entirely when the user cancelled an interactive prompt — no partial
+ * config should be written on cancellation. runConfig("llm.vendor", ...) runs
+ * auth preflight; if preflight fails it calls process.exit(1) so the model
+ * key is never written.
+ *
+ * @param {string} dir
+ * @param {{ llmSkipped: boolean, selectedProvider: string|undefined,
+ *   selectedModel: string|undefined, claudeModelFromFlag: string|undefined,
+ *   codexModelFromFlag: string|undefined }} opts
+ */
+async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag }) {
+  if (!llmSkipped && selectedProvider) {
+    const origLog = console.log;
+    console.log = () => {};
+    try {
+      await runConfig(["llm.vendor", selectedProvider, dir]);
+      if (selectedModel) {
+        await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
+      }
+      // Persist vendor-specific models independently.
+      // --claude-model always writes to llm.claude.model, --codex-model to
+      // llm.codex.model, even when the active vendor is different. This
+      // enables CI scripts that configure both vendors in a single init call.
+      if (claudeModelFromFlag && selectedProvider !== "claude") {
+        await runConfig(["llm.claude.model", claudeModelFromFlag, dir]);
+      }
+      if (codexModelFromFlag && selectedProvider !== "codex") {
+        await runConfig(["llm.codex.model", codexModelFromFlag, dir]);
+      }
+    } finally {
+      console.log = origLog;
+    }
+  }
+}
+
+/**
+ * Print the post-init summary to stdout (static / non-TUI path).
+ *
+ * @param {{ svExists: boolean, rexExists: boolean, henchExists: boolean,
+ *   llmSkipped: boolean, selectedProvider: string|undefined, selection: object,
+ *   providerSource: string, modelSource: string, assistantResults: object }} opts
+ */
+function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults }) {
+  console.log("");
+  console.log("n-dx initialized");
+  console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
+  console.log(`  .rex/           ${rexExists ? "already exists (reused)" : "created"}`);
+  console.log(`  .hench/         ${henchExists ? "already exists (reused)" : "created"}`);
+  console.log("  LLM configuration");
+  if (llmSkipped) {
+    console.log("    Provider      skipped");
+  } else {
+    console.log(`    Provider      ${selectedProvider} (${providerSource})`);
+    const selectedModel = selection.model;
+    if (selectedModel) {
+      const modelLabel = modelSource ? `${selectedModel} (${modelSource})` : selectedModel;
+      console.log(`    Model         ${modelLabel}`);
+    } else {
+      console.log("    Model         not set");
+    }
+  }
+  for (const line of formatInitReport(assistantResults, { activeVendor: selectedProvider })) {
+    console.log(line);
+  }
+  console.log("");
+}
+
+async function handleInit(rest) {
+  const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
+
+  const initArgs = buildInitArgs(rest);
+  const dir = resolveDir(initArgs);
+  const flags = extractFlags(initArgs);
+  const quiet = flags.includes("--quiet") || flags.includes("-q");
+
+  await repairInitConfig(dir, quiet);
+
+  const assistantEnabled = resolveInitAssistants(rest, dir);
+  const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
+    providerFromFlag, claudeModelFromFlag, codexModelFromFlag,
+  });
+  const { selectedProvider, selection, llmSkipped, providerSource, modelSource } = llmResult;
+
+  // When no provider is available and it wasn't a user cancellation (e.g.
+  // non-TTY with no flags or config), exit with a clear message.
+  if (!selectedProvider && !llmSkipped) {
+    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
+    exitWithCleanup(1);
+  }
+
   const svExists = existsSync(join(dir, ".sourcevision"));
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
-
-  // Ensure .n-dx.local.json is in .gitignore (machine-specific config)
   ensureGitignoreEntry(dir, ".n-dx.local.json");
 
   // ── Ink animated UI (TTY, non-quiet) vs static fallback ───────────
@@ -1023,104 +1179,38 @@ async function handleInit(rest) {
   }
 
   // ── Static fallback (non-TTY, --quiet, or Ink unavailable) ────────
-  async function runSubInitPhase(name, work, detail) {
-    const phase = INIT_PHASES[name];
-    if (!quiet && phase) {
-      const spinner = createSpinner(phase.spinner);
-      spinner.start();
-      const result = await work();
-      if (result.code !== 0) {
-        spinner.fail(`${name} failed`);
-        console.error(result.stderr || result.stdout);
-        exitWithCleanup(1);
-      }
-      spinner.success(phase.success, detail);
-    } else {
-      const result = await work();
-      if (result.code !== 0) {
-        console.error(result.stderr || result.stdout);
-        exitWithCleanup(1);
-      }
-    }
-  }
-
   await runSubInitPhase("sourcevision",
     async () => {
       const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
       if (initResult.code !== 0) return initResult;
       return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
     },
-    svExists ? "reused — .sourcevision/ already present" : undefined);
+    svExists ? "reused — .sourcevision/ already present" : undefined,
+    quiet);
   await runSubInitPhase("rex",
     () => runInitCapture(tools.rex, ["init", ...flags, dir]),
-    rexExists ? "reused — .rex/ already present" : undefined);
+    rexExists ? "reused — .rex/ already present" : undefined,
+    quiet);
   await runSubInitPhase("hench",
     () => runInitCapture(tools.hench, ["init", ...flags, dir]),
-    henchExists ? "reused — .hench/ already present" : undefined);
+    henchExists ? "reused — .hench/ already present" : undefined,
+    quiet);
 
-  // Persist LLM selection (suppress output). Vendor first, then model.
-  // Skip entirely when the user cancelled an interactive prompt — no partial
-  // config should be written on cancellation.
-  // runConfig("llm.vendor", ...) runs auth preflight. If preflight fails,
-  // it calls process.exit(1) so the model key is never written.
-  if (!llmSkipped && selectedProvider) {
-    const selectedModel = selection.model;
-    const origLog = console.log;
-    console.log = () => {};
-    try {
-      await runConfig(["llm.vendor", selectedProvider, dir]);
-      if (selectedModel) {
-        await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
-      }
+  await persistInitLLMConfig(dir, {
+    llmSkipped, selectedProvider, selectedModel: selection.model,
+    claudeModelFromFlag, codexModelFromFlag,
+  });
 
-      // Persist vendor-specific models independently.
-      // --claude-model always writes to llm.claude.model, --codex-model to
-      // llm.codex.model, even when the active vendor is different. This
-      // enables CI scripts that configure both vendors in a single init call.
-      if (claudeModelFromFlag && selectedProvider !== "claude") {
-        await runConfig(["llm.claude.model", claudeModelFromFlag, dir]);
-      }
-      if (codexModelFromFlag && selectedProvider !== "codex") {
-        await runConfig(["llm.codex.model", codexModelFromFlag, dir]);
-      }
-    } finally {
-      console.log = origLog;
-    }
-  }
-
-  // Record the current n-dx version so future stale-check runs can report it.
   try {
     const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
     recordInitVersion(dir, version);
   } catch { /* non-fatal */ }
 
-  // Assistant integrations (vendor-neutral dispatch)
   const assistantResults = setupAssistantIntegrations(dir, assistantEnabled);
-
-  // Print unified summary
-  console.log("");
-  console.log("n-dx initialized");
-  console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
-  console.log(`  .rex/           ${rexExists ? "already exists (reused)" : "created"}`);
-  console.log(`  .hench/         ${henchExists ? "already exists (reused)" : "created"}`);
-  console.log("  LLM configuration");
-  if (llmSkipped) {
-    console.log("    Provider      skipped");
-  } else {
-    console.log(`    Provider      ${selectedProvider} (${providerSource})`);
-    const selectedModel = selection.model;
-    if (selectedModel) {
-      const modelLabel = modelSource ? `${selectedModel} (${modelSource})` : selectedModel;
-      console.log(`    Model         ${modelLabel}`);
-    } else {
-      console.log("    Model         not set");
-    }
-  }
-  for (const line of formatInitReport(assistantResults, { activeVendor: selectedProvider })) {
-    console.log(line);
-  }
-  console.log("");
-
+  printStaticInitSummary({
+    svExists, rexExists, henchExists, llmSkipped, selectedProvider,
+    selection, providerSource, modelSource, assistantResults,
+  });
   exitWithCleanup(0);
 }
 
