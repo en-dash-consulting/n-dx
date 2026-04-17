@@ -7,6 +7,13 @@
  * across the viewer tree.
  *
  * Pattern reference: CLAUDE.md § Gateway modules
+ *
+ * Zone pin note: This file is pinned to "web-viewer" in .n-dx.json.
+ * Without the pin, Louvain places it near "web-server" because this file
+ * imports from shared/ and schema/ — both also imported by server files —
+ * creating a connectivity bridge (same mechanism as the web-server zone
+ * dissolution documented in CLAUDE.md § web-server zone stability). The pin
+ * is correct: all 21 importers of this file are viewer files.
  */
 
 // ── Schema types (re-exported for viewer consumption) ──────────────────────
