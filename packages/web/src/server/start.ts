@@ -20,6 +20,7 @@ import { collectAllIds, createRexMcpServer } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
+import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleStatusRoute, clearStatusCache } from "./routes-status.js";
@@ -644,6 +645,13 @@ export async function startServer(
     rex: (rctx) => createRexMcpServer(rctx.projectDir),
     sv: (rctx) => createSourcevisionMcpServer(rctx.projectDir),
   });
+
+  // Start MCP schema watcher — replaces factories with subprocess proxies when
+  // either package's dist/ directory changes after a rebuild.  New MCP sessions
+  // created after a rebuild will serve the updated tool schemas; active sessions
+  // are unaffected and continue with their existing McpServer instances.
+  const mcpSchemaWatchers = startMcpSchemaWatcher();
+  for (const w of mcpSchemaWatchers) watcherHandles.watchers.push(w);
 
   const server = createHttpServer(ctx, watcher, ws, assets, wsHealthTracker);
 

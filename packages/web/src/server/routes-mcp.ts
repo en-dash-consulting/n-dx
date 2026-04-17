@@ -34,6 +34,22 @@ interface McpSession {
   server: McpServer;
   /** Timestamp of last activity (Date.now()), used for TTL-based cleanup. */
   lastActivityAt: number;
+  /**
+   * Optional cleanup invoked when the session is destroyed.
+   * Used by subprocess-backed proxy servers to terminate the child process.
+   */
+  cleanup?: () => Promise<void>;
+}
+
+/**
+ * Extended factory result that includes an optional lifecycle cleanup.
+ * Factories that spawn subprocesses return this form so the session
+ * manager can terminate child processes when sessions expire or close.
+ */
+export interface McpServerWithLifecycle {
+  server: McpServer;
+  /** Called once when the session using this server is destroyed. */
+  cleanup?: () => Promise<void>;
 }
 
 /** Session maps keyed by session ID. */
@@ -48,12 +64,23 @@ const SESSION_TTL_MS = 15 * 60 * 1000;
 /** How often to sweep for stale sessions (5 minutes). */
 const SESSION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
+/**
+ * Close a session's transport.
+ *
+ * The `cleanup` callback (if any) is invoked via `transport.onclose` —
+ * not called here — so that cleanup fires exactly once regardless of which
+ * code path (TTL sweep, graceful shutdown, client DELETE) closes the transport.
+ */
+function closeSession(session: McpSession): void {
+  session.transport.close().catch(() => {});
+}
+
 /** Sweep a session map, closing sessions idle longer than SESSION_TTL_MS. */
 function sweepStaleSessions(sessions: Map<string, McpSession>): void {
   const now = Date.now();
   for (const [sid, session] of sessions) {
     if (now - session.lastActivityAt > SESSION_TTL_MS) {
-      session.transport.close().catch(() => {});
+      closeSession(session);
       sessions.delete(sid);
     }
   }
@@ -77,7 +104,7 @@ function ensureSweepTimer(): void {
   if (sweepTimer.unref) sweepTimer.unref();
 }
 
-type McpServerFactory = (ctx: ServerContext) => McpServer | Promise<McpServer>;
+type McpServerFactory = (ctx: ServerContext) => McpServer | McpServerWithLifecycle | Promise<McpServer | McpServerWithLifecycle>;
 
 /**
  * Factory functions for MCP server creation.
@@ -106,6 +133,27 @@ export function initMcpRoutes(factories: McpRouteFactories): void {
 }
 
 /**
+ * Replace one or both MCP server factories at runtime.
+ *
+ * Called by the MCP schema watcher ({@link mcp-schema-watcher.ts}) after a
+ * package rebuild is detected. Factories are swapped atomically — sessions
+ * already in progress continue with their existing McpServer instances;
+ * only new sessions (POST without a session header) will use the updated
+ * factories and therefore serve the freshly compiled tool schemas.
+ */
+export function reloadMcpFactories(updates: Partial<McpRouteFactories>): void {
+  if (!configuredFactories) return;
+  if (updates.rex !== undefined) configuredFactories.rex = updates.rex;
+  if (updates.sv !== undefined) configuredFactories.sv = updates.sv;
+}
+
+/** Unpack a factory result into { server, cleanup }. */
+function unpackFactory(result: McpServer | McpServerWithLifecycle): { server: McpServer; cleanup?: () => Promise<void> } {
+  if ("server" in result) return result as McpServerWithLifecycle;
+  return { server: result as McpServer };
+}
+
+/**
  * Create a new MCP session: transport + server, connected but not yet handling requests.
  * The session is registered in the session map once the transport assigns a session ID
  * (which happens during the first handleRequest call for the initialize request).
@@ -115,17 +163,21 @@ async function createSession(
   sessions: Map<string, McpSession>,
   factory: McpServerFactory,
 ): Promise<McpSession> {
-  const server = await factory(ctx);
+  const { server, cleanup } = unpackFactory(await factory(ctx));
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
   });
   transport.onclose = () => {
     const sid = transport.sessionId;
-    if (sid) sessions.delete(sid);
+    if (sid) {
+      const existing = sessions.get(sid);
+      if (existing?.cleanup) existing.cleanup().catch(() => {});
+      sessions.delete(sid);
+    }
   };
   await server.connect(transport);
   ensureSweepTimer();
-  return { transport, server, lastActivityAt: Date.now() };
+  return { transport, server, lastActivityAt: Date.now(), cleanup };
 }
 
 /**
@@ -235,10 +287,8 @@ export async function closeAllMcpSessions(): Promise<void> {
     sweepTimer = null;
   }
   const closers: Promise<void>[] = [];
-  for (const session of rexSessions.values()) {
-    closers.push(session.transport.close());
-  }
-  for (const session of svSessions.values()) {
+  // transport.close() fires onclose synchronously, which calls session.cleanup() if set.
+  for (const session of [...rexSessions.values(), ...svSessions.values()]) {
     closers.push(session.transport.close());
   }
   await Promise.allSettled(closers);

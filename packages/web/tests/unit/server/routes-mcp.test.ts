@@ -9,13 +9,18 @@
  * @see tests/e2e/mcp-transport.test.js — full server lifecycle + real tool calls
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleMcpRoute, closeAllMcpSessions, initMcpRoutes } from "../../../src/server/routes-mcp.js";
+import {
+  handleMcpRoute,
+  closeAllMcpSessions,
+  initMcpRoutes,
+  reloadMcpFactories,
+} from "../../../src/server/routes-mcp.js";
 
 /** Minimal MCP server with a single no-op tool — enough to complete MCP init. */
 function createMockMcpServer(): McpServer {
@@ -137,6 +142,76 @@ describe("MCP routes", () => {
     expect(result.tools.map((t) => t.name)).toContain("ping");
 
     await client.close();
+  });
+
+  it("reloadMcpFactories swaps rex factory; new sessions use the new factory", async () => {
+    // The initial factory creates a server with a "ping" tool.
+    // After reload, the new factory creates a server with an "updated_tool".
+    const updatedServer = new McpServer({ name: "updated", version: "1.0.0" });
+    updatedServer.tool("updated_tool", {}, async () => ({
+      content: [{ type: "text" as const, text: "updated" }],
+    }));
+
+    reloadMcpFactories({ rex: () => updatedServer });
+
+    const client = new Client({ name: "test-reload", version: "1.0.0" });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://localhost:${port}/mcp/rex`),
+    );
+    await client.connect(transport);
+
+    const result = await client.listTools();
+    expect(result.tools.map((t) => t.name)).toContain("updated_tool");
+    expect(result.tools.map((t) => t.name)).not.toContain("ping");
+
+    await client.close();
+  });
+
+  it("reloadMcpFactories leaves sv factory unchanged when only rex is updated", async () => {
+    const updatedRex = new McpServer({ name: "rex-v2", version: "1.0.0" });
+    updatedRex.tool("rex_v2_tool", {}, async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+    }));
+
+    reloadMcpFactories({ rex: () => updatedRex });
+
+    // sv factory should still return the original "ping" tool
+    const client = new Client({ name: "test-sv-unchanged", version: "1.0.0" });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://localhost:${port}/mcp/sourcevision`),
+    );
+    await client.connect(transport);
+
+    const result = await client.listTools();
+    expect(result.tools.map((t) => t.name)).toContain("ping");
+
+    await client.close();
+  });
+
+  it("reloadMcpFactories is a no-op before initMcpRoutes", () => {
+    // Simulate the edge case where reload is called before init.
+    // It should not throw; the factories remain whatever was set by initMcpRoutes.
+    // We can't reset module state here, so just verify it doesn't throw.
+    expect(() => reloadMcpFactories({ rex: () => createMockMcpServer() })).not.toThrow();
+  });
+
+  it("session cleanup callback fires when server closes the session", async () => {
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+
+    // Factory returns McpServerWithLifecycle so the session stores a cleanup fn
+    reloadMcpFactories({ rex: () => ({ server: createMockMcpServer(), cleanup }) });
+
+    const client = new Client({ name: "test-cleanup", version: "1.0.0" });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://localhost:${port}/mcp/rex`),
+    );
+    await client.connect(transport);
+    await client.listTools(); // ensure session is registered
+
+    // Trigger server-side session teardown (e.g. graceful shutdown path)
+    await closeAllMcpSessions();
+
+    expect(cleanup).toHaveBeenCalledOnce();
   });
 
   it("multiple concurrent MCP sessions work independently", async () => {
