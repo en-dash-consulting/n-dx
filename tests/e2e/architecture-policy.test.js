@@ -817,13 +817,13 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["health", "Small 3-file zone (below the 5-file threshold for reliable metrics); one CLI command, one core structure-health analyzer, and its test — a narrow satellite with sparse internal edges."],
+  [".local-testing", "Infrastructure-only zone; 5 standalone Docker/shell files (.dockerignore, Dockerfiles, run-gauntlet scripts) with no code-level imports between them — zero internal edges is structurally expected for a build-tooling directory."],
   ["polling", "5-file zone at the boundary of reliable metrics; two polling source files plus three tests. Tests don't import each other, which drives cohesion down despite a coherent purpose."],
-  ["project-status-hooks", "Small 3-file zone (below the 5-file threshold); two React hooks (use-polling, use-project-status) and one test. The hooks are sibling utilities invoked independently by views, so internal edges are sparse."],
-  ["refresh", "Small 3-file zone (below the 5-file threshold); a viewer refresh-throttle hook, its performance-module implementation, and one test — narrow satellite with sparse internal edges."],
-  ["rex-chunked-review", "Rex satellite CLI zone governed by the rex-satellite zone policy (see CLAUDE.md); 4 files covering chunked-review command handlers plus tests. By policy these zones carry high coupling to rex-prd-engine and low cohesion."],
-  ["rex-recommend", "Small 3-file zone (below the 5-file threshold); conflict-detection, shared types, and one test. The types module is a leaf imported by the detector, giving only one directed internal edge."],
-  ["web-2", "Small 3-file zone (below the 5-file threshold); tree-search component, use-facet-state hook, and the tree-search test. Component and hook are sibling viewer utilities that don't call each other directly."],
+  ["rex-core", "Small 3-file zone (below the 5-file threshold); fix.ts source split across two directory levels plus one test. Louvain grouped a cross-directory pair; sparse internal edges are expected at this size."],
+  ["rex-fix", "Small 4-file zone (below the 5-file threshold); tree.ts + types.ts implementation files plus their individual tests. Tests don't import each other, leaving only 1-2 directed internal edges."],
+  ["theme-toggle", "Single-file zone (trivially cohesion 0); one Preact component isolated by Louvain community detection. A single file has no internal edges by definition — merge candidate if a sibling zone forms."],
+  ["viewer-ui-hub", "Intentional Preact UI composition hub (see CLAUDE.md viewer-ui-hub governance); assembles sidebar, config-footer, faq, and logos components. Dual-fragility metrics are structurally expected for a UI composition root — imports broadly from web-viewer (high coupling) while internal files serve distinct UI concerns (low cohesion)."],
+  ["web-3", "Small 3-file zone (below the 5-file threshold); views/index.ts barrel plus two unrelated viewer tests (enrichment-thresholds, sourcevision-tabs). Tests don't import each other, leaving at most one internal edge."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
