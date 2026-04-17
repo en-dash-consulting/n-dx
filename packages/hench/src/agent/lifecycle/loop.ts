@@ -459,6 +459,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     testCommand: brief.project.testCommand,
     heartbeat,
     memoryCtx,
+    selfHeal: config.selfHeal,
   });
 
   return { run };

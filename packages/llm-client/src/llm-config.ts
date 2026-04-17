@@ -31,6 +31,7 @@ function extractClaudeConfig(value: unknown): ClaudeConfig | undefined {
   if (typeof v.api_key === "string" && v.api_key) cfg.api_key = v.api_key;
   if (typeof v.api_endpoint === "string" && v.api_endpoint) cfg.api_endpoint = v.api_endpoint;
   if (typeof v.model === "string" && v.model) cfg.model = v.model;
+  if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
@@ -43,6 +44,7 @@ function extractCodexConfig(value: unknown): CodexConfig | undefined {
   if (typeof v.api_key === "string" && v.api_key) cfg.api_key = v.api_key;
   if (typeof v.api_endpoint === "string" && v.api_endpoint) cfg.api_endpoint = v.api_endpoint;
   if (typeof v.model === "string" && v.model) cfg.model = v.model;
+  if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 

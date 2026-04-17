@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
-import { getCurrentHead } from "../../process/index.js";
+import { getCurrentHead, execShellCmd } from "../../process/index.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
@@ -27,7 +27,7 @@ import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { saveRun, persistRunLog } from "../../store/index.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
-import { runPostTaskTests } from "../../tools/index.js";
+import { runPostTaskTests, runTestGate } from "../../tools/index.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
 import { displayTaskInfo } from "./task-display.js";
@@ -491,6 +491,18 @@ async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): 
 // Run finalization (identical in both loops)
 // ---------------------------------------------------------------------------
 
+/**
+ * Format a duration in milliseconds as a human-readable string.
+ * e.g., 5000 → "5s", 65000 → "1m 5s"
+ */
+function formatDurationMs(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${minutes}m ${remaining}s`;
+}
+
 export interface FinalizeRunOptions {
   run: RunRecord;
   henchDir: string;
@@ -498,6 +510,8 @@ export interface FinalizeRunOptions {
   testCommand?: string;
   heartbeat?: Heartbeat;
   memoryCtx?: MemoryContext;
+  /** Whether in self-heal mode (triggers mandatory test gate). */
+  selfHeal?: boolean;
 }
 
 /**
@@ -524,7 +538,7 @@ export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete"
  * and persist. Called at the end of both loops.
  */
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
-  const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx } = opts;
+  const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx, selfHeal } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
 
@@ -553,6 +567,94 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       systemAvailableAtEndBytes,
       systemTotalBytes: memoryCtx.systemTotalBytes,
     };
+  }
+
+  // Load pending dependency audit result if it exists (pre-loop audit from run.ts)
+  if (selfHeal && run.structuredSummary) {
+    let auditResult = undefined;
+    try {
+      const { readFileSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const auditFile = join(henchDir, ".pending-audit.json");
+      const content = readFileSync(auditFile, "utf-8");
+      auditResult = JSON.parse(content);
+      // Delete after reading so subsequent runs don't use it
+      try {
+        const { unlinkSync } = await import("node:fs");
+        unlinkSync(auditFile);
+      } catch {
+        // Ignore if we can't delete
+      }
+    } catch {
+      // Audit file doesn't exist or can't be read
+    }
+
+    if (auditResult) {
+      run.dependencyAudit = auditResult;
+    }
+  }
+
+  // When the agent loop produced no tool call records (e.g. Codex CLI, which
+  // emits verbose text rather than structured tool events), fall back to
+  // `git diff --name-only HEAD` to discover which files were actually changed.
+  // This ensures the self-heal test gate runs even for vendors that do not
+  // emit structured tool events.  The check is intentionally vendor-agnostic:
+  // it activates whenever toolCalls is empty, regardless of which vendor ran.
+  if (selfHeal && run.structuredSummary && run.toolCalls.length === 0) {
+    try {
+      const { stdout } = await execShellCmd("git diff --name-only HEAD", {
+        cwd: projectDir,
+        timeout: 10_000,
+      });
+      const gitChangedFiles = stdout.trim().split("\n").filter(Boolean);
+      if (gitChangedFiles.length > 0) {
+        run.structuredSummary.filesChanged = gitChangedFiles;
+        run.structuredSummary.counts = {
+          ...run.structuredSummary.counts,
+          filesChanged: gitChangedFiles.length,
+        };
+      }
+    } catch {
+      // Best-effort: if git is unavailable, the test gate falls back to
+      // the existing filesChanged (empty), which causes it to skip.
+    }
+  }
+
+  // Run test suite gate in self-heal mode (mandatory full test validation)
+  if (selfHeal && run.structuredSummary) {
+    subsection("Test Suite Gate");
+    const testGate = await runTestGate({
+      projectDir,
+      filesChanged: run.structuredSummary.filesChanged,
+    });
+
+    run.testGate = testGate;
+
+    if (testGate.ran) {
+      const packageCount = testGate.packages.length;
+      const passCount = testGate.packages.filter((p) => p.passed).length;
+
+      if (testGate.passed) {
+        stream("Test Gate", `✓ All ${packageCount} package(s) passed`);
+        if (testGate.totalDurationMs != null) {
+          detail(`Elapsed: ${formatDurationMs(testGate.totalDurationMs)}`);
+        }
+      } else {
+        // Mark run as failed to trigger remediation loop
+        run.status = "failed";
+        const failedPackages = testGate.packages.filter((p) => !p.passed).map((p) => p.name);
+        run.error = `Test gate failed: ${failedPackages.join(", ")}`;
+        stream("Test Gate", `✗ ${packageCount - passCount}/${packageCount} package(s) failed`);
+
+        // Show failure details from first failed package
+        const firstFailure = testGate.packages.find((p) => p.failureOutput);
+        if (firstFailure?.failureOutput) {
+          detail(firstFailure.failureOutput);
+        }
+      }
+    } else if (testGate.skipReason) {
+      detail(`Skipped: ${testGate.skipReason}`);
+    }
   }
 
   await runPostTaskTestsIfNeeded(run, projectDir, testCommand);

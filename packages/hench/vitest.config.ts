@@ -20,5 +20,12 @@ export default defineConfig({
       { find: /^(\..+)\.js$/, replacement: "$1.ts" },
     ],
   },
-  test: { include: ["tests/**/*.test.ts"] },
+  test: {
+    include: ["tests/**/*.test.ts"],
+    // Raised from 5000ms: integration tests that spawn mocked CLIs, do dynamic
+    // imports of @anthropic-ai/sdk, or call vi.resetModules() take 2-4 seconds
+    // on their own. Under full-monorepo parallel load (pnpm -r test) the first
+    // module-load per worker can push past 5 s, causing spurious timeouts.
+    testTimeout: 30_000,
+  },
 });

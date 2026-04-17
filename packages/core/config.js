@@ -878,6 +878,10 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Override the default model used by all packages.
                                     Examples: claude-sonnet-4-6, claude-opus-4-20250514
                                     Default: claude-sonnet-4-6
+  claude.lightModel        string    Model override for light-weight tasks (optional)
+                                    When set, light-tier tasks use this model instead of
+                                    the default haiku. Use for cost/latency optimization.
+                                    Example: claude-haiku-4-20250414
 
 LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendor setup):
   llm.vendor               string    Active LLM vendor: "claude" or "codex"
@@ -887,11 +891,18 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.claude.api_key       string    Claude API key (optional)
   llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
   llm.claude.model         string    Claude default model (optional)
+  llm.claude.lightModel    string    Claude model for light-weight tasks (optional)
+                                    When set, light-tier tasks (single-turn proposals,
+                                    simple classification) use this model. Falls back
+                                    to claude-haiku-4-20250414 if not set.
   llm.codex.cli_path       string    Codex CLI path (optional; validated executable)
                                     Stored in .n-dx.local.json.
   llm.codex.api_key        string    Codex API key (optional)
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
   llm.codex.model          string    Codex default model (optional)
+  llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
+                                    When set, light-tier tasks use this model.
+                                    Falls back to gpt-5.4mini if not set.
 
 Claude preflight error codes:
   NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED  Claude CLI is not installed; install it before retrying

@@ -53,6 +53,35 @@ describe("isTransientError", () => {
     });
   });
 
+  describe("vendor CLI non-zero exits", () => {
+    it("returns true for 'codex exited with code 1'", () => {
+      expect(isTransientError("codex exited with code 1")).toBe(true);
+    });
+
+    it("returns true for 'codex exited with code 137' (OOM kill)", () => {
+      expect(isTransientError("codex exited with code 137")).toBe(true);
+    });
+
+    it("returns true for 'claude exited with code 1'", () => {
+      expect(isTransientError("claude exited with code 1")).toBe(true);
+    });
+
+    it("returns true for 'claude exited with code 143' (SIGTERM)", () => {
+      expect(isTransientError("claude exited with code 143")).toBe(true);
+    });
+
+    it("matches the pattern case-insensitively", () => {
+      expect(isTransientError("Codex Exited With Code 2")).toBe(true);
+      expect(isTransientError("Claude Exited With Code 2")).toBe(true);
+    });
+
+    it("does not match unrelated 'exited with code' text", () => {
+      // Avoids false positives for arbitrary processes
+      expect(isTransientError("python exited with code 1")).toBe(false);
+      expect(isTransientError("node exited with code 1")).toBe(false);
+    });
+  });
+
   describe("non-transient errors", () => {
     it.each([
       ["Invalid API key", "auth error"],

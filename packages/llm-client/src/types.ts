@@ -43,6 +43,12 @@ export interface ClaudeConfig {
   api_endpoint?: string;
   /** Default Claude model name. When set, used instead of the default model. */
   model?: string;
+  /**
+   * Model override for the 'light' task weight tier.
+   * When set, resolveVendorModel uses this model for light-weight tasks
+   * instead of TIER_MODELS.claude.light.
+   */
+  lightModel?: string;
 }
 
 // ── Provider types ───────────────────────────────────────────────────────────

@@ -787,6 +787,7 @@ export async function cmdRun(
   const auto = flags.auto === "true";
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";
+  const skipDeps = flags["skip-deps"] === "true";
 
   // Apply self-heal mode to config so it flows through to prompt building
   if (selfHeal) {
@@ -883,6 +884,64 @@ export async function cmdRun(
     // The queue limits concurrent task runs within this process
     // (loop mode, epic-by-epic).
     const queue = createExecutionQueue(config.guard.maxConcurrentProcesses);
+
+    // Run dependency audit in self-heal mode (once per hench invocation, before task loop)
+    if (selfHeal && !skipDeps && !dryRun) {
+      const { runDependencyAudit } = await import("../../tools/index.js");
+      const { writeFileSync } = await import("node:fs");
+      const { join } = await import("node:path");
+
+      info("\n[Dependency Audit]");
+      const audit = await runDependencyAudit({
+        projectDir: dir,
+        timeout: 60_000,
+      });
+
+      // Store audit result to a temp file so the first run can include it
+      const auditFile = join(henchDir, ".pending-audit.json");
+      try {
+        writeFileSync(auditFile, JSON.stringify(audit, null, 2));
+      } catch {
+        // Ignore if we can't write the temp file
+      }
+
+      if (audit.ran) {
+        const vulnCount =
+          audit.vulnerabilities.critical +
+          audit.vulnerabilities.high +
+          audit.vulnerabilities.moderate +
+          audit.vulnerabilities.low;
+        const outdatedCount =
+          audit.outdated.major.length +
+          audit.outdated.minor.length +
+          audit.outdated.patch.length;
+
+        if (vulnCount === 0 && outdatedCount === 0) {
+          info("✓ No vulnerabilities or outdated packages found");
+        } else {
+          if (vulnCount > 0) {
+            info(
+              `Found ${vulnCount} vulnerabilities: ${audit.vulnerabilities.critical} critical, ` +
+              `${audit.vulnerabilities.high} high, ${audit.vulnerabilities.moderate} moderate, ` +
+              `${audit.vulnerabilities.low} low`,
+            );
+          }
+          if (outdatedCount > 0) {
+            info(
+              `Found ${outdatedCount} outdated packages: ${audit.outdated.major.length} major, ` +
+              `${audit.outdated.minor.length} minor, ${audit.outdated.patch.length} patch`,
+            );
+          }
+        }
+        if (audit.totalDurationMs != null) {
+          info(`Audit completed in ${Math.round(audit.totalDurationMs / 1000)}s`);
+        }
+      } else if (audit.skipped && audit.skipReason) {
+        info(`Skipped: ${audit.skipReason}`);
+      } else if (audit.error) {
+        info(`Audit error: ${audit.error}`);
+      }
+    }
 
     if (epicByEpic) {
       await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride);

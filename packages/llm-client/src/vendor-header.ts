@@ -12,7 +12,7 @@
  * config files, and spot unexpected model changes between runs.
  */
 
-import type { LLMVendor, LLMConfig } from "./llm-types.js";
+import type { LLMVendor, LLMConfig, TaskWeight } from "./llm-types.js";
 import { resolveVendorModel, resolveModel } from "./config.js";
 import { info, warn } from "./output.js";
 
@@ -38,6 +38,17 @@ export interface VendorModelHeaderOptions {
    * Used to label the model display appropriately.
    */
   modelSource?: "cli-override" | "configured" | "default";
+  /**
+   * Task weight tier being used. When provided, includes tier label in output:
+   * - "light" → "(light tier)" or "(light tier, configured)"
+   * - "standard" → "(standard tier)"
+   *
+   * When modelSource is "cli-override", tier label is omitted (explicit model
+   * takes precedence over tier semantics).
+   *
+   * When not provided, falls back to legacy format for backward compatibility.
+   */
+  tier?: TaskWeight;
 }
 
 /**
@@ -63,7 +74,7 @@ export function printVendorModelHeader(
   const resolved = options?.resolvedModel || resolveVendorModel(vendor, config);
 
   // Use provided source if available, otherwise determine from config
-  let source: string = options?.modelSource || "default";
+  let source: "cli-override" | "configured" | "default" = options?.modelSource || "default";
   if (!options?.modelSource) {
     const configModel = vendor === "claude"
       ? config?.claude?.model
@@ -75,7 +86,18 @@ export function printVendorModelHeader(
     }
   }
 
-  info(`Vendor: ${vendor}  Model: ${resolved} (${source})`);
+  // Format label based on tier and source
+  // - When tier is provided and source is not cli-override, show tier-aware label
+  // - When tier is not provided or source is cli-override, use legacy format
+  let label: string;
+  if (options?.tier && source !== "cli-override") {
+    const tierLabel = options.tier === "light" ? "light tier" : "standard tier";
+    label = source === "configured" ? `${tierLabel}, configured` : tierLabel;
+  } else {
+    label = source;
+  }
+
+  info(`Vendor: ${vendor}  Model: ${resolved} (${label})`);
 
   if (options?.lastModel) {
     const resolvedLast = resolveModel(options.lastModel);

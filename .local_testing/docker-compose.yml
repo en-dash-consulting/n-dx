@@ -1,0 +1,15 @@
+version: '3.9'
+
+services:
+  ndx-windows:
+    build:
+      context: ..
+      dockerfile: .local_testing/Dockerfile.windows
+    container_name: ndx-windows-test
+    environment:
+      - NODE_ENV=test
+    working_dir: /ndx
+    volumes:
+      - ./test-results:/ndx/test-results
+    entrypoint: powershell
+    command: ["-Command", "pnpm test"]

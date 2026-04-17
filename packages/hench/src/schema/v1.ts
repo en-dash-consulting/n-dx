@@ -215,64 +215,6 @@ export interface TurnTokenUsage {
   diagnosticStatus?: "complete" | "partial" | "unavailable";
 }
 
-export interface CommandRecord {
-  command: string;
-  exitStatus: "ok" | "error" | "timeout" | "blocked";
-  durationMs: number;
-}
-
-export interface TestRecord {
-  command: string;
-  passed: boolean;
-  durationMs: number;
-}
-
-export interface SummaryCounts {
-  filesRead: number;
-  filesChanged: number;
-  commandsExecuted: number;
-  testsRun: number;
-  toolCallsTotal: number;
-}
-
-export interface PostRunTestRecord {
-  /** Whether tests were executed. */
-  ran: boolean;
-  /** Whether all tests passed. */
-  passed: boolean;
-  /** The command that was executed. */
-  command?: string;
-  /** Human-readable test output (truncated). */
-  output?: string;
-  /** Duration in ms. */
-  durationMs?: number;
-  /** Test files that were specifically targeted. Empty if full suite. */
-  targetedFiles: string[];
-  /** Error message if tests couldn't be run. */
-  error?: string;
-}
-
-export interface RunSummaryData {
-  filesChanged: string[];
-  filesRead: string[];
-  commandsExecuted: CommandRecord[];
-  testsRun: TestRecord[];
-  /** Automatic post-task test results. */
-  postRunTests?: PostRunTestRecord;
-  counts: SummaryCounts;
-}
-
-export interface RunMemoryStats {
-  /** Peak RSS of the hench process during this run (bytes). */
-  peakRssBytes: number;
-  /** System available memory at run start (bytes). -1 if unavailable. */
-  systemAvailableAtStartBytes: number;
-  /** System available memory at run end (bytes). -1 if unavailable. */
-  systemAvailableAtEndBytes: number;
-  /** System total memory (bytes). */
-  systemTotalBytes: number;
-}
-
 /**
  * Diagnostic metadata for a single prompt section.
  *
@@ -389,6 +331,204 @@ export interface PersistedRuntimeEvent {
   completionSummary?: string;
 }
 
+export interface CommandRecord {
+  command: string;
+  exitStatus: "ok" | "error" | "timeout" | "blocked";
+  durationMs: number;
+}
+
+export interface TestRecord {
+  command: string;
+  passed: boolean;
+  durationMs: number;
+}
+
+export interface SummaryCounts {
+  filesRead: number;
+  filesChanged: number;
+  commandsExecuted: number;
+  testsRun: number;
+  toolCallsTotal: number;
+}
+
+export interface PostRunTestRecord {
+  /** Whether tests were executed. */
+  ran: boolean;
+  /** Whether all tests passed. */
+  passed: boolean;
+  /** The command that was executed. */
+  command?: string;
+  /** Human-readable test output (truncated). */
+  output?: string;
+  /** Duration in ms. */
+  durationMs?: number;
+  /** Test files that were specifically targeted. Empty if full suite. */
+  targetedFiles: string[];
+  /** Error message if tests couldn't be run. */
+  error?: string;
+}
+
+export interface RunSummaryData {
+  filesChanged: string[];
+  filesRead: string[];
+  commandsExecuted: CommandRecord[];
+  testsRun: TestRecord[];
+  /** Automatic post-task test results. */
+  postRunTests?: PostRunTestRecord;
+  counts: SummaryCounts;
+}
+
+export interface RunMemoryStats {
+  /** Peak RSS of the hench process during this run (bytes). */
+  peakRssBytes: number;
+  /** System available memory at run start (bytes). -1 if unavailable. */
+  systemAvailableAtStartBytes: number;
+  /** System available memory at run end (bytes). -1 if unavailable. */
+  systemAvailableAtEndBytes: number;
+  /** System total memory (bytes). */
+  systemTotalBytes: number;
+}
+
+export interface TestPackageResult {
+  /** Package name/path (e.g., "packages/hench", "packages/rex") */
+  name: string;
+  /** Whether tests passed for this package */
+  passed: boolean;
+  /** Total number of tests run */
+  testCount?: number;
+  /** Number of failed tests */
+  failureCount?: number;
+  /** Abbreviated error output (last 500 chars) */
+  failureOutput?: string;
+  /** Elapsed time for this package (ms) */
+  durationMs?: number;
+}
+
+export interface TestGateResult {
+  /** Whether the test gate ran at all */
+  ran: boolean;
+  /** Overall pass/fail (all packages must pass) */
+  passed: boolean;
+  /** Per-package results */
+  packages: TestPackageResult[];
+  /** Reason gate was skipped if applicable */
+  skipReason?: string;
+  /** The full pnpm test command executed */
+  command?: string;
+  /** Total elapsed time (ms) */
+  totalDurationMs?: number;
+  /** Error if test gate itself failed (e.g., timeout) */
+  error?: string;
+}
+
+export interface DependencyVulnerability {
+  /** Package name */
+  name: string;
+  /** Current version */
+  version: string;
+  /** Severity level */
+  severity: "critical" | "high" | "moderate" | "low";
+}
+
+export interface DependencyOutdated {
+  /** Package name */
+  name: string;
+  /** Current version */
+  current: string;
+  /** Latest available version */
+  latest: string;
+  /** Type of update: major, minor, or patch */
+  type: "major" | "minor" | "patch";
+}
+
+export interface DependencyAuditPackageResult {
+  /** Workspace package name or path */
+  name: string;
+  /** Number of vulnerabilities found */
+  vulnerabilityCount: number;
+  /** Number of outdated packages */
+  outdatedCount: number;
+}
+
+export interface DependencyAuditResult {
+  /** Whether the audit ran at all */
+  ran: boolean;
+  /** Whether the audit was skipped */
+  skipped: boolean;
+  /** Reason audit was skipped if applicable */
+  skipReason?: string;
+  /** ISO timestamp when audit started */
+  startedAt: string;
+  /** ISO timestamp when audit finished */
+  finishedAt: string;
+  /** Total elapsed time (ms) */
+  totalDurationMs: number;
+  /** Aggregated vulnerability counts by severity */
+  vulnerabilities: {
+    critical: number;
+    high: number;
+    moderate: number;
+    low: number;
+    packages: DependencyVulnerability[];
+  };
+  /** Aggregated outdated package counts by update type */
+  outdated: {
+    major: string[];
+    minor: string[];
+    patch: string[];
+  };
+  /** Per-workspace-package results */
+  perPackage: DependencyAuditPackageResult[];
+  /** Commands executed during audit */
+  commands?: {
+    audit?: { command: string; exitCode: number };
+    outdated?: { command: string; exitCode: number };
+  };
+  /** Error if audit itself failed */
+  error?: string;
+}
+
+export interface CleanupTransformationRecord {
+  /** Type of transformation applied. */
+  type: "dead_export_removal" | "unused_import_prune" | "utility_consolidation";
+  /** File path (relative to project root). */
+  file: string;
+  /** Start line (1-indexed). */
+  startLine: number;
+  /** End line (1-indexed). */
+  endLine: number;
+  /** Human-readable description. */
+  description: string;
+  /** The removed/modified code snippet. */
+  removedCode?: string;
+}
+
+export interface CleanupBatchRecord {
+  /** Transformations in this batch. */
+  transformations: CleanupTransformationRecord[];
+  /** Whether tsc validated the batch. */
+  validated: boolean;
+  /** Whether the batch was rolled back. */
+  rolledBack: boolean;
+  /** Error message if validation failed. */
+  error?: string;
+}
+
+export interface CleanupTransformationResult {
+  /** Whether cleanup ran at all */
+  ran: boolean;
+  /** Number of transformations successfully applied */
+  appliedCount: number;
+  /** Number of transformations rolled back due to validation failure */
+  rolledBackCount: number;
+  /** All transformation batches (for logging) */
+  batches: CleanupBatchRecord[];
+  /** Total elapsed time (ms) */
+  totalDurationMs: number;
+  /** Error if cleanup itself failed */
+  error?: string;
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -411,6 +551,12 @@ export interface RunRecord {
   structuredSummary?: RunSummaryData;
   /** Memory usage statistics captured during the run. */
   memoryStats?: RunMemoryStats;
+  /** Full test suite gate results (self-heal mode only). */
+  testGate?: TestGateResult;
+  /** Dependency audit results (self-heal mode only). */
+  dependencyAudit?: DependencyAuditResult;
+  /** Cleanup transformation results (self-heal mode only). */
+  cleanupTransformations?: CleanupTransformationResult;
   /** Run-level diagnostics for token parsing and vendor observability. */
   diagnostics?: RunDiagnostics;
   /**

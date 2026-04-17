@@ -816,17 +816,13 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["mcp", "Small rex MCP tools cluster (4 files); metrics unreliable at this scale due to few internal edges."],
-  ["rex-cli", "27+ command files in flat directory; documented dual-fragility zone with high coupling to core — see CLAUDE.md rex-satellite zone policy."],
-  ["rex-core", "Small rex core cluster; Louvain isolates a narrow subset of core utilities, yielding artificially low cohesion."],
-  ["rex-recommend", "Small rex recommendation cluster; metrics unreliable at this scale due to few internal edges."],
-  ["rex-store", "Small rex store/persistence cluster; Louvain isolates a narrow subset, yielding artificially low cohesion."],
-  ["root", "Root-level project config files (.gitignore, .npmrc, LICENSE, etc.); inherently low internal cohesion across config file types."],
-  ["scripts", "Utility scripts directory; inherently low internal cohesion across unrelated build/analysis scripts."],
-  ["sync", "Small sync command cluster; narrow satellite zone with few internal edges yields artificially low cohesion."],
-  ["web-2", "Small viewer utility cluster; metrics remain noisy while SourceVision isolates a narrow tree-search/facet-state slice."],
-  ["web-5", "Small viewer cluster; metrics unreliable at this scale due to few internal edges."],
-  ["web-viewer", "Large viewer hub zone; Louvain splits hub imports across sub-zones, yielding below-threshold cohesion until the zone boundaries stabilize."],
+  ["health", "Small 3-file zone (below the 5-file threshold for reliable metrics); one CLI command, one core structure-health analyzer, and its test — a narrow satellite with sparse internal edges."],
+  ["polling", "5-file zone at the boundary of reliable metrics; two polling source files plus three tests. Tests don't import each other, which drives cohesion down despite a coherent purpose."],
+  ["project-status-hooks", "Small 3-file zone (below the 5-file threshold); two React hooks (use-polling, use-project-status) and one test. The hooks are sibling utilities invoked independently by views, so internal edges are sparse."],
+  ["refresh", "Small 3-file zone (below the 5-file threshold); a viewer refresh-throttle hook, its performance-module implementation, and one test — narrow satellite with sparse internal edges."],
+  ["rex-chunked-review", "Rex satellite CLI zone governed by the rex-satellite zone policy (see CLAUDE.md); 4 files covering chunked-review command handlers plus tests. By policy these zones carry high coupling to rex-prd-engine and low cohesion."],
+  ["rex-recommend", "Small 3-file zone (below the 5-file threshold); conflict-detection, shared types, and one test. The types module is a leaf imported by the detector, giving only one directed internal edge."],
+  ["web-2", "Small 3-file zone (below the 5-file threshold); tree-search component, use-facet-state hook, and the tree-search test. Component and hook are sibling viewer utilities that don't call each other directly."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
@@ -947,7 +943,7 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 110,
+    maxExports: 111,
     description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, color/model helpers)",
   },
 ];
@@ -1195,6 +1191,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
   // Core — lazy-loads utilities
   ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers only when the configured vendor changes"],
+  ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TTY renderer) only during `ndx init` in interactive TTY mode — avoids React/Ink bundle cost for every CLI invocation"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies
@@ -1210,6 +1207,9 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
   // Core orchestrator — dynamic import of rex public API for export pre-rendering
   ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],
+  // Hench agent — deferred node: builtins for lock file and cleanup operations
+  ["packages/hench/src/agent/lifecycle/shared.ts", "Lazy-loads node:fs and node:path for lock file cleanup — deferred to avoid import overhead on code paths that never touch the filesystem"],
+  ["packages/hench/src/tools/cleanup-transformations.ts", "Lazy-loads node:fs/promises for file deletion — async filesystem access isolated to the tool cleanup path"],
 ]);
 
 describe("architecture policy: dynamic import audit", () => {

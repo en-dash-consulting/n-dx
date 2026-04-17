@@ -32,6 +32,15 @@ export type {
   TaskBriefProject,
   TaskBriefLogEntry,
   TaskBriefRequirement,
+  TestGateResult,
+  TestPackageResult,
+  DependencyVulnerability,
+  DependencyOutdated,
+  DependencyAuditPackageResult,
+  DependencyAuditResult,
+  CleanupTransformationRecord,
+  CleanupBatchRecord,
+  CleanupTransformationResult,
 } from "./v1.js";
 
 export {

@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { readFile, access } from "node:fs/promises";
 import { deepMerge } from "./project-config.js";
 import type { ClaudeConfig } from "./types.js";
-import type { LLMVendor, LLMConfig } from "./llm-types.js";
+import type { LLMVendor, LLMConfig, TaskWeight } from "./llm-types.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
@@ -38,12 +38,49 @@ export const NEWEST_MODELS: Record<LLMVendor, string> = {
 };
 
 /**
+ * Per-tier model mapping for task-weight-aware model selection.
+ *
+ * The `standard` tier always equals NEWEST_MODELS for backward compatibility —
+ * existing code that omits the weight parameter continues to use the default model.
+ * The `light` tier maps to cheaper/faster models for simple tasks.
+ *
+ * Invariant: TIER_MODELS[vendor].standard === NEWEST_MODELS[vendor]
+ */
+export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
+  claude: {
+    light: "claude-haiku-4-20250414",
+    standard: NEWEST_MODELS.claude,
+  },
+  codex: {
+    light: "gpt-5.4mini",
+    standard: NEWEST_MODELS.codex,
+  },
+};
+
+/**
+ * Maximum safe prompt size per vendor (in characters).
+ *
+ * Used by the CLI loop to bound the brief text before sending to the
+ * vendor CLI, preventing prompts that exceed the vendor's context window.
+ * Values are conservative — set well below the true context window limit
+ * to leave room for the system prompt, retry notices, and model overhead.
+ *
+ * Approximate derivation (~4 chars per token):
+ *   claude  200K-token window → ~800K chars; cap at 640K (80% utilisation)
+ *   codex   128K-token window → ~512K chars; cap at 400K (78% utilisation)
+ */
+export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
+  claude: 640_000,
+  codex: 400_000,
+};
+
+/**
  * Map of shorthand model aliases to full Anthropic API model IDs.
  * The Claude CLI resolves these internally, but the API requires full IDs.
  */
 const MODEL_ALIASES: Record<string, string> = {
   sonnet: NEWEST_MODELS.claude,
-  opus: "claude-opus-4-20250514",
+  opus: "claude-opus-4-7",
   haiku: "claude-haiku-4-20250414",
 };
 
@@ -60,29 +97,64 @@ export function resolveModel(model: string): string {
 
 /**
  * Resolve the canonical model string for a given vendor, consulting the
- * project config first and falling back to the newest model for that vendor.
+ * project config first and falling back to the tier-appropriate model.
  *
  * This is the single authoritative resolver for vendor/model selection. Use
  * this instead of hardcoding or independently deriving model strings.
  *
  * Resolution order:
- * 1. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
- * 2. Newest model fallback from `NEWEST_MODELS`
+ * 1. Config tier-specific model (`llm.claude.lightModel` when weight='light')
+ * 2. Vendor-specific model from config (`llm.claude.model` / `llm.codex.model`)
+ * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
+ *
+ * The `weight` parameter enables task-weight-aware model tiering:
+ * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.4mini)
+ * - `'standard'` or omitted — resolves to full-capability models (sonnet, gpt-5)
+ *
+ * For the 'light' weight, if `lightModel` is configured, it takes precedence
+ * over both `model` and `TIER_MODELS`. This allows users to customize which
+ * model serves the light tier without affecting the standard tier.
  *
  * For Claude, the result is also passed through `resolveModel()` so that
  * shorthand aliases (e.g. "sonnet") are expanded to full API model IDs.
  *
  * @param vendor  The LLM vendor ("claude" | "codex").
  * @param config  Optional `LLMConfig` loaded from `.n-dx.json`.
+ * @param weight  Optional task weight for tier-based selection. Defaults to 'standard'.
  * @returns       A fully-qualified model string ready for use in API calls.
  */
-export function resolveVendorModel(vendor: LLMVendor, config?: LLMConfig): string {
+export function resolveVendorModel(
+  vendor: LLMVendor,
+  config?: LLMConfig,
+  weight: TaskWeight = "standard",
+): string {
   if (vendor === "claude") {
-    const raw = config?.claude?.model ?? NEWEST_MODELS.claude;
-    return resolveModel(raw);
+    if (weight === "light") {
+      // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
+      if (config?.claude?.lightModel) {
+        return resolveModel(config.claude.lightModel);
+      }
+      return resolveModel(TIER_MODELS.claude.light);
+    }
+    // Standard tier: model can override, then fall back to TIER_MODELS.standard
+    if (config?.claude?.model) {
+      return resolveModel(config.claude.model);
+    }
+    return resolveModel(TIER_MODELS.claude.standard);
   }
   if (vendor === "codex") {
-    return config?.codex?.model ?? NEWEST_MODELS.codex;
+    if (weight === "light") {
+      // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
+      if (config?.codex?.lightModel) {
+        return config.codex.lightModel;
+      }
+      return TIER_MODELS.codex.light;
+    }
+    // Standard tier: model can override, then fall back to TIER_MODELS.standard
+    if (config?.codex?.model) {
+      return config.codex.model;
+    }
+    return TIER_MODELS.codex.standard;
   }
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).
@@ -124,6 +196,9 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
   }
   if (typeof claude.model === "string" && claude.model) {
     result.model = claude.model;
+  }
+  if (typeof claude.lightModel === "string" && claude.lightModel) {
+    result.lightModel = claude.lightModel;
   }
   return Object.keys(result).length > 0 ? result : null;
 }

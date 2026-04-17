@@ -974,6 +974,82 @@ async function handleInit(rest) {
   // Ensure .n-dx.local.json is in .gitignore (machine-specific config)
   ensureGitignoreEntry(dir, ".n-dx.local.json");
 
+  // ── Ink animated UI (TTY, non-quiet) vs static fallback ───────────
+  // Ink owns sub-package inits, LLM config writes, assistant integrations,
+  // and the recap.  When it succeeds, we record the init version and exit.
+  // On Ink failure (missing deps, render error) we fall through to the
+  // static path below.
+  const useTUI = !quiet && process.stdout.isTTY === true;
+  if (useTUI) {
+    let inkResult;
+    try {
+      const { renderInit } = await import("./cli-ink.js");
+      inkResult = await renderInit({
+        dir,
+        flags,
+        provider: selectedProvider,
+        providerSource,
+        model: selection.model,
+        modelSource,
+        assistantEnabled,
+        claudeModelFromFlag,
+        codexModelFromFlag,
+        llmSkipped,
+        tools,
+        runInitCapture,
+      });
+    } catch (err) {
+      console.error(err?.message || err);
+    }
+    if (inkResult) {
+      if (inkResult.code !== 0) {
+        if (inkResult.error) console.error(inkResult.error);
+        exitWithCleanup(1);
+      }
+      try {
+        const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+        recordInitVersion(dir, version);
+      } catch { /* non-fatal */ }
+      exitWithCleanup(0);
+    }
+  }
+
+  // ── Static fallback (non-TTY, --quiet, or Ink unavailable) ────────
+  async function runSubInitPhase(name, work, detail) {
+    const phase = INIT_PHASES[name];
+    if (!quiet && phase) {
+      const spinner = createSpinner(phase.spinner);
+      spinner.start();
+      const result = await work();
+      if (result.code !== 0) {
+        spinner.fail(`${name} failed`);
+        console.error(result.stderr || result.stdout);
+        exitWithCleanup(1);
+      }
+      spinner.success(phase.success, detail);
+    } else {
+      const result = await work();
+      if (result.code !== 0) {
+        console.error(result.stderr || result.stdout);
+        exitWithCleanup(1);
+      }
+    }
+  }
+
+  await runSubInitPhase("sourcevision",
+    async () => {
+      const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+      if (initResult.code !== 0) return initResult;
+      return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
+    },
+    svExists ? "reused — .sourcevision/ already present" : undefined);
+  await runSubInitPhase("rex",
+    () => runInitCapture(tools.rex, ["init", ...flags, dir]),
+    rexExists ? "reused — .rex/ already present" : undefined);
+  await runSubInitPhase("hench",
+    () => runInitCapture(tools.hench, ["init", ...flags, dir]),
+    henchExists ? "reused — .hench/ already present" : undefined);
+
   // Persist LLM selection (suppress output). Vendor first, then model.
   // Skip entirely when the user cancelled an interactive prompt — no partial
   // config should be written on cancellation.

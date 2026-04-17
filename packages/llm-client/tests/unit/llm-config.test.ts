@@ -53,53 +53,77 @@ describe("loadLLMConfig", () => {
     expect(cfg.vendor).toBeUndefined();
   });
 
-  it("merges .n-dx.local.json over .n-dx.json (local wins)", async () => {
+  it("reads lightModel from llm.claude section", async () => {
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({
-        llm: { vendor: "claude", claude: { model: "claude-sonnet-4-6" } },
-      }, null, 2),
-      "utf-8",
-    );
-    await writeFile(
-      join(tmpDir, ".n-dx.local.json"),
-      JSON.stringify({
-        llm: { claude: { cli_path: "/local/claude" } },
+        llm: {
+          claude: {
+            model: "claude-sonnet-4-6",
+            lightModel: "claude-haiku-4-20250414",
+          },
+        },
       }, null, 2),
       "utf-8",
     );
 
     const cfg = await loadLLMConfig(tmpDir);
-    expect(cfg.vendor).toBe("claude");
-    expect(cfg.claude?.cli_path).toBe("/local/claude");
     expect(cfg.claude?.model).toBe("claude-sonnet-4-6");
+    expect(cfg.claude?.lightModel).toBe("claude-haiku-4-20250414");
   });
 
-  it("uses .n-dx.local.json when .n-dx.json is missing", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.local.json"),
-      JSON.stringify({
-        llm: { vendor: "codex", codex: { cli_path: "/local/codex" } },
-      }, null, 2),
-      "utf-8",
-    );
-
-    const cfg = await loadLLMConfig(tmpDir);
-    expect(cfg.vendor).toBe("codex");
-    expect(cfg.codex?.cli_path).toBe("/local/codex");
-  });
-
-  it("silently ignores invalid .n-dx.local.json", async () => {
+  it("reads lightModel from llm.codex section", async () => {
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({
-        llm: { vendor: "claude" },
+        llm: {
+          codex: {
+            model: "gpt-5",
+            lightModel: "gpt-5.4mini",
+          },
+        },
       }, null, 2),
       "utf-8",
     );
-    await writeFile(join(tmpDir, ".n-dx.local.json"), "bad json");
 
     const cfg = await loadLLMConfig(tmpDir);
-    expect(cfg.vendor).toBe("claude");
+    expect(cfg.codex?.model).toBe("gpt-5");
+    expect(cfg.codex?.lightModel).toBe("gpt-5.4mini");
+  });
+
+  it("ignores non-string lightModel values", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          claude: { lightModel: 123 },
+          codex: { lightModel: true },
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.claude?.lightModel).toBeUndefined();
+    expect(cfg.codex?.lightModel).toBeUndefined();
+  });
+
+  it("ignores empty string lightModel values", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          claude: { lightModel: "", model: "sonnet" },
+          codex: { lightModel: "", model: "gpt-5" },
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.claude?.lightModel).toBeUndefined();
+    expect(cfg.claude?.model).toBe("sonnet");
+    expect(cfg.codex?.lightModel).toBeUndefined();
+    expect(cfg.codex?.model).toBe("gpt-5");
   });
 });

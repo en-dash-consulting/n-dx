@@ -21,7 +21,6 @@ import {
   LEGS,
   INIT_PHASES,
 } from "./cli-brand.js";
-import { formatClaudeCliNotFoundError } from "./claude-integration.js";
 
 // ── Subprocess helper (never blocks the main thread) ───────────────────
 
@@ -114,7 +113,15 @@ function PhaseRow({ name, status, detail }) {
 
 // ── Recap ──────────────────────────────────────────────────────────────
 
-function Recap({ sourcevision, rex, hench, provider, claudeCode }) {
+function Recap({
+  sourcevision,
+  rex,
+  hench,
+  llmSkipped,
+  provider,
+  model,
+  assistantLines,
+}) {
   return html`
     <${Box} flexDirection="column" marginTop=${1}>
       <${Box} paddingLeft=${2} gap=${1}>
@@ -124,8 +131,14 @@ function Recap({ sourcevision, rex, hench, provider, claudeCode }) {
       <${Text}>  .sourcevision/  ${sourcevision}<//>
       <${Text}>  .rex/           ${rex}<//>
       <${Text}>  .hench/         ${hench}<//>
-      <${Text}>  LLM provider    ${provider}<//>
-      <${Text}>  Claude Code     ${claudeCode}<//>
+      <${Text}>  LLM configuration<//>
+      ${llmSkipped
+        ? html`<${Text}>    Provider      skipped<//>`
+        : html`<${Box} flexDirection="column">
+            <${Text}>    Provider      ${provider}<//>
+            <${Text}>    Model         ${model ?? "not set"}<//>
+          <//>`}
+      ${assistantLines.map((line, i) => html`<${Text} key=${"ai" + i}>${line}<//>`)}
       <${Text}> <//>
       <${Text} dimColor>  Next steps:<//>
       <${Text} dimColor>    ${TOOL_NAME} start .          spin up the dashboard + MCP servers<//>
@@ -139,7 +152,21 @@ function Recap({ sourcevision, rex, hench, provider, claudeCode }) {
 
 // ── Init app ───────────────────────────────────────────────────────────
 
-function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runInitCapture, onComplete }) {
+function InitApp({
+  dir,
+  flags,
+  provider,
+  providerSource,
+  model,
+  modelSource,
+  assistantEnabled,
+  claudeModelFromFlag,
+  codexModelFromFlag,
+  llmSkipped,
+  tools,
+  runInitCapture,
+  onComplete,
+}) {
   const [phases, setPhases] = useState([]);
   const [recap, setRecap] = useState(null);
   const started = useRef(false);
@@ -189,48 +216,62 @@ function InitApp({ dir, flags, provider, providerSource, noClaude, tools, runIni
       // All remaining work runs as child processes — sync file I/O in
       // the main thread freezes Ink's animation no matter what yielding
       // strategy we use. Subprocesses are truly non-blocking.
-      setPhase("claude", "active");
-
       const cliPath = join(dirname(fileURLToPath(import.meta.url)), "cli.js");
 
-      // provider config — spawn the CLI in a subprocess
-      await spawnAsync("node", [cliPath, "config", "llm.vendor", provider, dir]);
-
-      // claude integration — spawn an inline ESM script as a subprocess
-      let claudeSummary = "skipped";
-      if (!noClaude) {
-        const integrationUrl = new URL("./claude-integration.js", import.meta.url).href;
-        const script = [
-          `import{setupClaudeIntegration,formatClaudeCliNotFoundError}from"${integrationUrl}";`,
-          `try{const r=setupClaudeIntegration(${JSON.stringify(dir)});`,
-          `if(!r.mcp.registered&&r.mcp.searched){process.stdout.write(JSON.stringify({notFound:true,searched:r.mcp.searched}));process.exit(1);}`,
-          `process.stdout.write(JSON.stringify({s:r.skills.written,p:r.settings.total}))}`,
-          `catch(e){process.stdout.write(JSON.stringify({err:String(e)}));process.exit(1)}`,
-        ].join("");
-        const result = await spawnAsync("node", ["--input-type=module", "-e", script], true);
-        try {
-          const data = JSON.parse(result);
-          if (data.notFound) {
-            setPhase("claude", "failed", "not installed");
-            onComplete(1, formatClaudeCliNotFoundError(data.searched));
-            return;
-          }
-          if (data.err) {
-            setPhase("claude", "failed");
-            onComplete(1, data.err);
-            return;
-          }
-          if (data.s !== undefined) claudeSummary = `${data.s} skills, ${data.p} permissions`;
-        } catch { /* keep skipped */ }
+      // LLM config writes — spawn the CLI in a subprocess for each key.
+      if (!llmSkipped && provider) {
+        await spawnAsync("node", [cliPath, "config", "llm.vendor", provider, dir]);
+        if (model) {
+          await spawnAsync("node", [cliPath, "config", `llm.${provider}.model`, model, dir]);
+        }
+        if (claudeModelFromFlag && provider !== "claude") {
+          await spawnAsync("node", [cliPath, "config", "llm.claude.model", claudeModelFromFlag, dir]);
+        }
+        if (codexModelFromFlag && provider !== "codex") {
+          await spawnAsync("node", [cliPath, "config", "llm.codex.model", codexModelFromFlag, dir]);
+        }
       }
-      setPhase("claude", "done", claudeSummary === "skipped" ? "skipped" : claudeSummary);
+
+      // Assistant integrations (vendor-neutral) — inline ESM subprocess
+      // that returns the summary lines from formatInitReport plus any error.
+      setPhase("assistants", "active");
+
+      const aiUrl = new URL("./assistant-integration.js", import.meta.url).href;
+      const script = [
+        `import{setupAssistantIntegrations,formatInitReport}from"${aiUrl}";`,
+        `try{`,
+        `const r=setupAssistantIntegrations(${JSON.stringify(dir)},${JSON.stringify(assistantEnabled ?? {})});`,
+        `const lines=formatInitReport(r,{activeVendor:${JSON.stringify(provider || null)}});`,
+        `process.stdout.write(JSON.stringify({lines,results:r}))`,
+        `}catch(e){process.stdout.write(JSON.stringify({err:String(e&&e.message||e)}));process.exit(1)}`,
+      ].join("");
+      const result = await spawnAsync("node", ["--input-type=module", "-e", script], true);
+
+      let assistantLines = [];
+      let assistantError = null;
+      try {
+        const data = JSON.parse(result);
+        if (data.err) assistantError = data.err;
+        else assistantLines = Array.isArray(data.lines) ? data.lines : [];
+      } catch {
+        assistantError = (result && result.trim()) || "assistant setup failed";
+      }
+
+      if (assistantError) {
+        setPhase("assistants", "failed");
+        onComplete(1, assistantError);
+        return;
+      }
+      setPhase("assistants", "done");
 
       setRecap({
         sourcevision: svExists ? "already exists (reused)" : "created",
         rex: rexExists ? "already exists (reused)" : "created",
         hench: henchExists ? "already exists (reused)" : "created",
+        llmSkipped,
         provider: `${provider} (${providerSource})`,
-        claudeCode: claudeSummary,
+        model: model ? (modelSource ? `${model} (${modelSource})` : model) : null,
+        assistantLines,
       });
 
       // Let the dino keep walking while the user reads the recap

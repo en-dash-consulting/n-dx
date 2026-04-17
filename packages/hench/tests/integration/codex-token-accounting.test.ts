@@ -180,4 +180,186 @@ describe("codex token accounting integration", () => {
     const task = prd.items.find((item) => item.id === "task-1");
     expect(task?.status).toBe("pending");
   });
+
+  it("extracts tokens from text output when JSON usage is absent", async () => {
+    const mockSpawn = vi.fn();
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return {
+        ...actual,
+        spawn: mockSpawn,
+      };
+    });
+
+    // Simulate Codex CLI output with no JSON usage but text token line
+    mockSpawn.mockImplementationOnce(() =>
+      mockCliProcess({
+        stdout: `[Codex] Starting execution...
+[Codex] Running tool: shell
+[Codex] Command completed successfully
+Tokens used: 8,542 in, 2,130 out
+[Codex] Execution complete`,
+        code: 0,
+      }),
+    );
+
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", rexDir);
+
+    const result = await cliLoop({
+      config,
+      store,
+      projectDir,
+      henchDir,
+      taskId: "task-1",
+    });
+
+    // Tokens should be extracted from the text output
+    expect(result.run.tokenUsage).toEqual({ input: 8542, output: 2130 });
+    expect(result.run.turnTokenUsage).toHaveLength(1);
+    expect(result.run.turnTokenUsage[0]).toMatchObject({
+      turn: 1,
+      input: 8542,
+      output: 2130,
+      vendor: "codex",
+    });
+  });
+
+  it("emits no token event when Codex output contains no token line", async () => {
+    const mockSpawn = vi.fn();
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return {
+        ...actual,
+        spawn: mockSpawn,
+      };
+    });
+
+    // Simulate Codex CLI output with no JSON usage and no token line
+    mockSpawn.mockImplementationOnce(() =>
+      mockCliProcess({
+        stdout: `[Codex] Starting execution...
+[Codex] Running tool: shell
+[Codex] Execution complete`,
+        code: 0,
+      }),
+    );
+
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", rexDir);
+
+    const result = await cliLoop({
+      config,
+      store,
+      projectDir,
+      henchDir,
+      taskId: "task-1",
+    });
+
+    // Should default to zero tokens when no usage data is available
+    expect(result.run.tokenUsage).toEqual({ input: 0, output: 0 });
+    expect(result.run.turnTokenUsage[0]).toMatchObject({
+      turn: 1,
+      input: 0,
+      output: 0,
+      vendor: "codex",
+    });
+  });
+
+  it("extracts tokens from two-line Codex format and accumulates in run record", async () => {
+    const mockSpawn = vi.fn();
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return {
+        ...actual,
+        spawn: mockSpawn,
+      };
+    });
+
+    // Two-line format: label on one line, total count on the next.
+    mockSpawn.mockImplementationOnce(() =>
+      mockCliProcess({
+        stdout: `[Codex] Starting execution...
+[Codex] Running tool: shell
+[Codex] Command completed successfully
+tokens used
+8542
+[Codex] Execution complete`,
+        code: 0,
+      }),
+    );
+
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", rexDir);
+
+    const result = await cliLoop({
+      config,
+      store,
+      projectDir,
+      henchDir,
+      taskId: "task-1",
+    });
+
+    // Two-line format yields total count stored as input, output 0.
+    expect(result.run.tokenUsage).toEqual({ input: 8542, output: 0 });
+    expect(result.run.turnTokenUsage).toHaveLength(1);
+    expect(result.run.turnTokenUsage[0]).toMatchObject({
+      turn: 1,
+      input: 8542,
+      output: 0,
+      vendor: "codex",
+    });
+  });
+
+  it("uses last token line occurrence when multiple are present", async () => {
+    const mockSpawn = vi.fn();
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return {
+        ...actual,
+        spawn: mockSpawn,
+      };
+    });
+
+    mockSpawn.mockImplementationOnce(() =>
+      mockCliProcess({
+        stdout: `Processing first chunk...
+Tokens used: 100 in, 50 out
+Processing second chunk...
+Tokens used: 1,234 in, 567 out
+Done.`,
+        code: 0,
+      }),
+    );
+
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", rexDir);
+
+    const result = await cliLoop({
+      config,
+      store,
+      projectDir,
+      henchDir,
+      taskId: "task-1",
+    });
+
+    // Should use the last occurrence
+    expect(result.run.tokenUsage).toEqual({ input: 1234, output: 567 });
+  });
 });

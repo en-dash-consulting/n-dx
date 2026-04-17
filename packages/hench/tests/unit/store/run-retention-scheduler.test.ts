@@ -239,7 +239,7 @@ describe("RunRetentionScheduler", () => {
 
       const broadcasts: unknown[] = [];
 
-      // Use a very short interval for testing
+      // Use a short interval for testing
       const timer = await startRetentionScheduler({
         runsDir,
         projectDir,
@@ -247,8 +247,9 @@ describe("RunRetentionScheduler", () => {
         overrideIntervalMs: 50,
       });
 
-      // Wait for at least one tick
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      // Wait long enough for at least one tick even under full-monorepo
+      // parallel load, where the event loop can be delayed by 100–200 ms.
+      await new Promise((resolve) => setTimeout(resolve, 600));
       clearInterval(timer);
 
       // Should have executed at least once

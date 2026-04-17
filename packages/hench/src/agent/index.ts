@@ -55,6 +55,10 @@ export {
 } from "./lifecycle/token-usage.js";
 export type { AggregateTokenUsage } from "./lifecycle/token-usage.js";
 
+// Codex CLI text-based token extraction
+export { parseCodexCliTokenUsage } from "./lifecycle/codex-cli-token-parser.js";
+export type { CodexCliTokenUsage } from "./lifecycle/codex-cli-token-parser.js";
+
 // ── Planning ──
 
 // Task brief assembly

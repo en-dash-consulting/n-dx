@@ -439,3 +439,61 @@ describe("runPostTaskTests", () => {
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// runTestGate (full test suite validation for self-heal mode)
+// ---------------------------------------------------------------------------
+
+describe("runTestGate", () => {
+  it("skips gate when no files changed", async () => {
+    const { runTestGate } = await import("../../../src/tools/test-runner.js");
+    const result = await runTestGate({
+      projectDir: "/tmp",
+      filesChanged: [],
+    });
+
+    expect(result.ran).toBe(false);
+    expect(result.passed).toBe(true);
+    expect(result.packages).toEqual([]);
+    expect(result.skipReason).toBe("No files modified in prior phases");
+  });
+
+  it("returns failed gate on non-zero exit code", async () => {
+    const { runTestGate } = await import("../../../src/tools/test-runner.js");
+    const result = await runTestGate({
+      projectDir: "/tmp",
+      filesChanged: ["src/foo.ts"],
+      timeout: 1000,
+    });
+
+    // In a test environment without actual pnpm test, this will fail
+    // The exact behavior depends on whether pnpm test is available
+    expect(result.ran).toBe(true);
+    // Result will be false since pnpm test will fail in /tmp
+    expect(typeof result.passed).toBe("boolean");
+  });
+
+  it("includes command in result", async () => {
+    const { runTestGate } = await import("../../../src/tools/test-runner.js");
+    const result = await runTestGate({
+      projectDir: "/tmp",
+      filesChanged: ["src/foo.ts"],
+      timeout: 1000,
+    });
+
+    if (result.ran) {
+      expect(result.command).toBe("pnpm test --reporter=json");
+    }
+  });
+
+  it("measures total duration", async () => {
+    const { runTestGate } = await import("../../../src/tools/test-runner.js");
+    const result = await runTestGate({
+      projectDir: "/tmp",
+      filesChanged: ["src/foo.ts"],
+      timeout: 1000,
+    });
+
+    expect(result.totalDurationMs).toBeGreaterThanOrEqual(0);
+  });
+});

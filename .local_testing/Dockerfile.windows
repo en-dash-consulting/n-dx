@@ -1,0 +1,35 @@
+# Windows Docker container for ndx development and testing
+# Uses official Node.js LTS image based on Windows Server Core
+
+FROM node:20-windowsservercore
+
+# Set working directory
+WORKDIR /ndx
+
+# Install Chocolatey for package management
+RUN powershell -Command \
+    Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+# Install git using Chocolatey
+RUN choco install -y git
+
+# Verify installations
+RUN node --version && npm --version && git --version
+
+# Install pnpm globally
+RUN npm install -g pnpm
+
+# Copy project files
+COPY . .
+
+# Install project dependencies
+RUN pnpm install --frozen-lockfile
+
+# Verify build
+RUN npm run build
+
+# Default command for running tests
+ENTRYPOINT ["powershell", "-Command"]
+CMD ["pnpm test"]

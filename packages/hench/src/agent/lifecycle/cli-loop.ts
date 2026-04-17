@@ -28,7 +28,8 @@ import type { HenchConfig, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsag
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { checkTokenBudget } from "./token-budget.js";
-import { parseTokenUsageWithDiagnostic, parseStreamTokenUsage, mapCodexUsageToTokenUsage } from "./token-usage.js";
+import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
+import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { section, stream, info } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
@@ -39,7 +40,7 @@ import {
   resolveVendorCliPath,
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
-import { resolveVendorModel } from "../../prd/llm-gateway.js";
+import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -64,6 +65,31 @@ import { resolveVendorAdapter } from "./adapters/index.js";
 import { EventAccumulator } from "./event-accumulator.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/v1.js";
+
+// ── normalizeCodexResponse ────────────────────────────────────────────────
+
+/**
+ * Normalize Codex CLI stdout into a structured response object.
+ *
+ * Codex verbose stdout is a human-readable session log, not a structured
+ * event stream. parseMaybeJson() returns it as a plain string, so
+ * toolEvents is always empty regardless of what Codex executed internally.
+ * This is the IC-4 documented limitation — the IC-2 git-diff fallback in
+ * shared.ts compensates at the test-gate level.
+ *
+ * @internal Exported for testing.
+ */
+export function normalizeCodexResponse(output: string): {
+  toolEvents: unknown[];
+  assistantText: string;
+  status: string;
+} {
+  return {
+    toolEvents: [],
+    assistantText: output,
+    status: "completed",
+  };
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -113,6 +139,12 @@ const TRANSIENT_PATTERNS = [
   /ECONNREFUSED/,
   /socket hang up/i,
   /network error/i,
+  // Generic CLI non-zero exits: stderr is often empty when the subprocess is
+  // killed or times out, so the error text is synthesised as
+  // "<vendor> exited with code N". Treat these as transient — permanent
+  // failures (bad auth, missing binary) surface via different error messages.
+  /codex exited with code \d+/i,
+  /claude exited with code \d+/i,
 ];
 
 export function isTransientError(errorText: string): boolean {
@@ -657,7 +689,18 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
                 });
               }
             } catch {
-              // Non-JSON stdout — no token usage to extract
+              // Non-JSON stdout — try text-format token extraction
+              const textTokens = parseCodexCliTokenUsage(fullStdout);
+              if (textTokens) {
+                result.tokenUsage = { input: textTokens.input, output: textTokens.output };
+              }
+              result.turnTokenUsage.push({
+                turn: 1,
+                input: result.tokenUsage.input,
+                output: result.tokenUsage.output,
+                vendor: tokenMetadata.vendor,
+                model: tokenMetadata.model,
+              });
             }
           }
 
@@ -675,9 +718,16 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
           result.summary = fullStdout.trim().slice(0, MAX_SUMMARY_LENGTH);
         }
 
-        // Token usage fallback: structured events were parsed but no usage found
-        if (eventCount > 0 && result.tokenUsage.input === 0 && result.tokenUsage.output === 0) {
-          if (adapter.vendor === "codex") {
+        // Codex text-format token extraction and guaranteed turn entry.
+        // When heuristic fallback events were produced per-line (eventCount > 0),
+        // per-line extractTokenUsage never fires (no JSON lines). Scan fullStdout
+        // here as a post-run pass.  Also runs when eventCount === 0 but the
+        // eventCount === 0 block didn't push an entry (e.g. JSON extraction
+        // returned "unavailable").  Always emits one turnTokenUsage entry per
+        // attempt — zeros when no usage data is available — so callers can
+        // account for every attempt regardless of stdout output.
+        if (adapter.vendor === "codex" && result.turnTokenUsage.length === 0) {
+          if (fullStdout.trim()) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
@@ -685,9 +735,23 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
                 result.tokenUsage = codexMapping.usage;
               }
             } catch {
-              // Non-JSON stdout
+              // Non-JSON stdout — try text-format token extraction
+              const textTokens = parseCodexCliTokenUsage(fullStdout);
+              if (textTokens) {
+                result.tokenUsage = { input: textTokens.input, output: textTokens.output };
+              }
             }
           }
+          result.turnTokenUsage.push({
+            turn: 1,
+            input: result.tokenUsage.input,
+            output: result.tokenUsage.output,
+            vendor: tokenMetadata.vendor,
+            model: tokenMetadata.model,
+            diagnosticStatus: result.tokenUsage.input === 0 && result.tokenUsage.output === 0
+              ? "unavailable"
+              : undefined,
+          });
         }
       }
 
@@ -950,6 +1014,7 @@ interface ErrorContext {
   store: PRDStore;
   taskId: string;
   retryConfig: RetryConfig;
+  vendor: string;
 }
 
 /**
@@ -957,7 +1022,7 @@ interface ErrorContext {
  * Classifies as transient (retry with backoff) or permanent (fail immediately).
  */
 async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
-  const { run, result, accumulated, attempt, store, taskId, retryConfig } = ctx;
+  const { run, result, accumulated, attempt, store, taskId, retryConfig, vendor } = ctx;
 
   if (!isTransientError(result.error!)) {
     // Non-transient error: fail immediately
@@ -969,10 +1034,11 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
     return "break";
   }
 
-  // Transient error — log and decide whether to retry or give up
+  // Transient error — log with vendor, batch identifier, and attempt number
+  // so operators can correlate retries across multi-task self-heal runs.
   await toolRexAppendLog(store, taskId, {
     event: "transient_error",
-    detail: `Attempt ${attempt + 1}: ${result.error}`,
+    detail: `[${vendor}] batch "${taskId}" attempt ${attempt + 1}/${retryConfig.maxRetries + 1}: ${result.error}`,
   });
 
   if (attempt < retryConfig.maxRetries) {
@@ -1013,6 +1079,15 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
   );
+
+  // Bound the brief text to the vendor's effective context character limit.
+  // This prevents the combined prompt (system + brief) from exceeding the
+  // vendor's context window.  Use the vendor/model resolver from llm-gateway
+  // to select the appropriate limit rather than a Claude-specific constant.
+  const contextCharLimit = VENDOR_CONTEXT_CHAR_LIMITS[vendor];
+  const boundedBriefText = briefText.length > contextCharLimit
+    ? briefText.slice(0, contextCharLimit)
+    : briefText;
 
   // Shared: dry run path
   if (dryRun) {
@@ -1081,8 +1156,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
       const promptText = attempt === 0
-        ? briefText
-        : briefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns);
+        ? boundedBriefText
+        : boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns);
 
       // Build the per-attempt PromptEnvelope. On the first attempt we use
       // the base envelope from prepareBrief directly. On retries we replace
@@ -1146,7 +1221,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       } else {
         const action = await processErrorResult({
           run, result, accumulated, attempt,
-          store, taskId, retryConfig,
+          store, taskId, retryConfig, vendor,
         });
         if (action === "break") break;
         // action === "retry" → continue loop
@@ -1195,6 +1270,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     testCommand: brief.project.testCommand,
     heartbeat,
     memoryCtx,
+    selfHeal: config.selfHeal,
   });
 
   return { run };

@@ -91,7 +91,7 @@ describe("vendor-scoped model selection in rex add", () => {
     vi.clearAllMocks();
   });
 
-  it("ignores legacy Claude rex config model when vendor=codex", async () => {
+  it("uses light-tier default when legacy Claude rex config model is incompatible with vendor=codex", async () => {
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({ llm: { vendor: "codex" } }),
@@ -103,7 +103,7 @@ describe("vendor-scoped model selection in rex add", () => {
         schema: "rex/v1",
         project: "test",
         adapter: "file",
-        model: "sonnet",
+        model: "sonnet",  // Claude model incompatible with codex vendor
       }),
       "utf-8",
     );
@@ -111,7 +111,8 @@ describe("vendor-scoped model selection in rex add", () => {
     await cmdSmartAdd(tmpDir, "Add authentication", {}, {});
 
     expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-    expect(capturedModels).toEqual([""]);
+    // Smart-add uses light tier — falls back to codex light-tier model when legacy model is incompatible
+    expect(capturedModels).toEqual(["gpt-5.4mini"]);
   });
 
   it("keeps compatible rex config model for the active vendor", async () => {
