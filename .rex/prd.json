@@ -1762,168 +1762,1400 @@
       ]
     },
     {
-      "id": "d2635b48-f2a7-43c6-985c-c20b6479dd8f",
-      "title": "Task-Weight-Aware Model Tiering",
-      "status": "completed",
+      "id": "f45b09a6-e17e-45c7-b45b-244da0494ee5",
+      "title": "Platform & Prerequisites Documentation",
+      "status": "pending",
       "level": "epic",
       "source": "smart-add",
-      "startedAt": "2026-04-16T15:06:34.573Z",
-      "completedAt": "2026-04-16T15:06:34.573Z",
       "children": [
         {
-          "id": "405c9fcf-2258-472f-8eb7-30d5b7ae0b8a",
-          "title": "Model Tier Registry and Weight-Aware Resolution",
-          "status": "completed",
+          "id": "087ff59e-ba8c-4be6-a975-a5c170362498",
+          "title": "End-User Platform Requirements",
+          "status": "pending",
           "level": "feature",
-          "description": "Extend the centralized model resolver in llm-client to support task-weight-based model selection. Light tasks (single-turn proposals, simple classification) resolve to cheaper/faster models (haiku, gpt-5.4mini), while standard tasks (multi-turn agents, deep analysis) resolve to full-capability models (sonnet, gpt-5.4codex). Ambiguous or uncategorizable work defaults to standard tier.",
+          "description": "Surface clear, accurate OS and runtime version requirements so users know before installing whether their environment is supported.",
           "source": "smart-add",
-          "startedAt": "2026-04-15T17:25:49.451Z",
-          "completedAt": "2026-04-15T17:25:49.451Z",
           "children": [
             {
-              "id": "084b2529-7458-4255-bc7b-18b6388932e9",
-              "title": "Define TaskWeight type and per-vendor tier model constants in llm-client",
-              "status": "completed",
+              "id": "b5b46766-b81c-44ac-b259-9a90ea1f4c43",
+              "title": "Define and document supported OS matrix in README and docs",
+              "status": "pending",
               "level": "task",
-              "description": "Add a TaskWeight discriminated type ('light' | 'standard') to llm-types.ts and a TIER_MODELS constant mapping each vendor × weight to a concrete model string. This is the single source of truth for which model serves each tier — analogous to how NEWEST_MODELS is the single source for default models today. The 'standard' tier should map to the current NEWEST_MODELS values (sonnet, gpt-5.4codex) so existing behavior is preserved when no weight is specified.",
+              "description": "Audit what platforms n-dx actually supports (macOS, Linux, Windows native vs WSL vs Docker) by reviewing CI configuration, existing gauntlet tests, and any known Windows-specific workarounds. Produce a concise support matrix table and place it in the README under a 'Requirements' or 'Platform Support' section. Mark Windows native as unsupported/experimental if appropriate, referencing the Docker path documented in the gauntlet infrastructure work.",
               "acceptanceCriteria": [
-                "TaskWeight type exported from llm-client public API with values 'light' and 'standard'",
-                "TIER_MODELS constant maps claude→light to haiku, claude→standard to sonnet, codex→light to gpt-5.4mini, codex→standard to gpt-5.4codex",
-                "TIER_MODELS[vendor]['standard'] equals NEWEST_MODELS[vendor] for both vendors",
-                "resolveVendorModel accepts optional TaskWeight parameter; when 'light' is passed it resolves to TIER_MODELS[vendor].light instead of the default",
-                "When TaskWeight is omitted or 'standard', resolveVendorModel behaves identically to current implementation (backward compatible)",
-                "Explicit --model CLI flag or config model override still takes precedence over tier-based selection"
+                "README contains a platform support table covering macOS, Linux, and Windows (native and WSL)",
+                "Each OS row states support level: supported, experimental, or unsupported with a brief note",
+                "Windows Docker path is referenced or linked where Windows native is unsupported",
+                "Table matches actual CI/gauntlet configuration — no aspirational claims without test coverage"
               ],
-              "priority": "critical",
+              "priority": "medium",
               "tags": [
-                "llm-client",
-                "model-resolution",
-                "foundation"
+                "docs",
+                "dx"
               ],
-              "source": "smart-add",
-              "startedAt": "2026-04-15T17:16:45.191Z",
-              "completedAt": "2026-04-15T17:20:53.465Z"
+              "source": "smart-add"
             },
             {
-              "id": "2e1d7e90-5f15-49bf-a919-0e4faa742105",
-              "title": "Add per-tier model override fields to LLMConfig schema and config loader",
-              "status": "completed",
+              "id": "ca9e532a-3383-4ae3-9639-99d824d393cb",
+              "title": "Document Node.js and pnpm version prerequisites for end users",
+              "status": "pending",
               "level": "task",
-              "description": "Extend ClaudeConfig and CodexConfig interfaces to support tier-specific model overrides (e.g., llm.claude.lightModel, llm.codex.lightModel) in .n-dx.json. Update loadLLMConfig and resolveVendorModel to consult these fields so users can customize which model serves each tier without changing the defaults. The resolution order becomes: CLI --model flag → config tier-specific model → TIER_MODELS default → NEWEST_MODELS fallback.",
+              "description": "Identify the minimum Node.js and pnpm versions required for end users (not contributors) and add them to the README Quick Start and any relevant docs pages. Cross-reference package.json engines fields if present, or add them if missing, so tooling like volta/nvm can auto-select the right version.",
               "acceptanceCriteria": [
-                "ClaudeConfig and CodexConfig interfaces gain optional lightModel field",
-                "loadLLMConfig reads lightModel from .n-dx.json when present",
-                "resolveVendorModel(vendor, config, 'light') uses config.claude.lightModel (or codex equivalent) when set, falling back to TIER_MODELS[vendor].light",
-                "ndx config --help documents the new lightModel field with example values",
-                "Unit tests cover: config override present, config override absent (falls back to TIER_MODELS), explicit --model flag overrides tier config"
+                "README Quick Start lists minimum Node.js version (e.g. '>=20') and minimum pnpm version",
+                "package.json engines field in @n-dx/core matches the documented requirement",
+                "If a .nvmrc or .node-version file is appropriate, it is added to the repo root",
+                "Docs do not reference npm as the install mechanism if pnpm is required (or clarify the distinction)"
               ],
-              "priority": "high",
+              "priority": "medium",
               "tags": [
-                "llm-client",
-                "config",
-                "schema"
+                "docs",
+                "dx"
               ],
-              "source": "smart-add",
-              "startedAt": "2026-04-15T17:20:54.496Z",
-              "completedAt": "2026-04-15T17:25:49.092Z"
+              "source": "smart-add"
             }
           ]
         },
         {
-          "id": "effae917-a7c4-4c7a-a0f8-2b8dce95ca58",
-          "title": "Per-Command Task Weight Classification and Integration",
-          "status": "completed",
+          "id": "af74f85e-9303-4dba-9b64-97c9b645d432",
+          "title": "Developer Environment Prerequisites Documentation",
+          "status": "pending",
           "level": "feature",
-          "description": "Classify each LLM-calling command by its natural task weight and wire that weight through to the model resolver. Commands doing single-turn proposal generation or lightweight classification use 'light'; commands doing multi-turn agent loops, deep analysis, or ambiguous work use 'standard' (the default). This makes token-cost optimization automatic and transparent.",
+          "description": "Document what contributors need beyond the end-user prerequisites — build toolchain, pnpm workspace setup, and any platform-specific gotchas — so new contributors can get a working dev environment without trial and error.",
           "source": "smart-add",
-          "startedAt": "2026-04-15T17:52:00.764Z",
-          "completedAt": "2026-04-15T17:52:00.764Z",
           "children": [
             {
-              "id": "891e3a9b-8082-4ce5-8a6b-7c5897e38b59",
-              "title": "Wire light-tier model selection into rex smart-add and lightweight analysis paths",
-              "status": "completed",
+              "id": "506bf2d9-72ce-4570-848c-95c464e15840",
+              "title": "Write contributor prerequisites and platform-specific setup guide",
+              "status": "pending",
               "level": "task",
-              "description": "Rex smart-add (reasonFromDescriptions, reasonFromIdeasFile in reason.ts) generates proposals from natural language — a bounded single-turn LLM call well-suited for lighter models. Pass TaskWeight 'light' through the smart-add call chain so resolveVendorModel selects haiku/gpt-5.4mini instead of sonnet/gpt-5.4codex. The model parameter plumbing already exists (spawnClaude accepts an optional model), so the change is in how the model is resolved, not in how it's passed.",
+              "description": "Add a 'Contributing / Development Setup' section (or CONTRIBUTING.md) covering the additional tools required to build and test the monorepo: pnpm version, build commands, and any platform-specific notes (e.g. Windows requires WSL or Docker, macOS may need Xcode CLI tools for native deps). Distinguish clearly between what a user needs versus what a contributor needs.",
               "acceptanceCriteria": [
-                "smart-add.ts resolves its model via resolveVendorModel(vendor, config, 'light') instead of resolveVendorModel(vendor, config)",
-                "ndx add 'some description' uses haiku (Claude) or gpt-5.4mini (Codex) by default, visible in vendor header output",
-                "Explicit --model flag on ndx add overrides the light-tier selection",
-                "rex analyze and rex reorganize continue using standard-tier models (unchanged behavior)",
-                "sourcevision analyze continues using standard-tier models (unchanged behavior)"
+                "A 'Development Setup' section or CONTRIBUTING.md exists and is linked from the README",
+                "Lists contributor-specific prerequisites separate from end-user prerequisites",
+                "Covers pnpm workspace bootstrap (pnpm install), build (pnpm build), and test (pnpm test) commands",
+                "Includes at least one platform-specific callout for Windows (WSL or Docker requirement) and notes any macOS-specific steps",
+                "Node version requirement for development matches the engines field and any .nvmrc added in the user prerequisites task"
               ],
-              "priority": "high",
+              "priority": "low",
               "tags": [
-                "rex",
-                "smart-add",
-                "model-resolution"
+                "docs",
+                "dx",
+                "contributing"
               ],
-              "source": "smart-add",
-              "startedAt": "2026-04-15T17:34:26.554Z",
-              "completedAt": "2026-04-15T17:39:16.385Z"
-            },
-            {
-              "id": "565c00fb-4271-4187-a75e-2a10c0cb060a",
-              "title": "Surface active model tier in vendor header output and log task weight reasoning",
-              "status": "completed",
-              "level": "task",
-              "description": "Update printVendorModelHeader in vendor-header.ts to display the active tier alongside the resolved model, so operators can see at a glance whether a command is running on the light or standard tier and why. When a tier override is active (via config lightModel), show that it's a configured override. This makes the cost optimization visible and debuggable.",
-              "acceptanceCriteria": [
-                "Vendor header output includes tier label, e.g. 'Vendor: claude  Model: claude-haiku-4-5 (light tier)' for smart-add",
-                "Standard-tier commands show 'Vendor: claude  Model: claude-sonnet-4-6 (standard tier)' or omit tier label if desired for backward compatibility",
-                "When lightModel config override is active, header shows '(light tier, configured)' to distinguish from default",
-                "Tier label does not appear when --model flag is used (explicit model takes precedence over tier semantics)"
-              ],
-              "priority": "medium",
-              "tags": [
-                "llm-client",
-                "cli-output",
-                "observability"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-15T17:39:22.834Z",
-              "completedAt": "2026-04-15T17:52:00.239Z",
-              "overrideMarker": {
-                "type": "duplicate_guard_override",
-                "reason": "content_overlap",
-                "reasonRef": "content_overlap:08f6d0b0-9462-494e-adf9-2830113caede",
-                "matchedItemId": "08f6d0b0-9462-494e-adf9-2830113caede",
-                "matchedItemTitle": "Surface active vendor and model in ndx console output",
-                "matchedItemLevel": "task",
-                "matchedItemStatus": "completed",
-                "createdAt": "2026-04-15T17:16:24.162Z"
-              }
-            },
-            {
-              "id": "00b9416d-868f-4c13-93f5-9507096d46d7",
-              "title": "Add unit and integration tests for weight-aware model resolution across packages",
-              "status": "completed",
-              "level": "task",
-              "description": "Verify that the task-weight-aware model tiering works end-to-end: the correct tier is applied per command, config overrides take precedence, CLI flags override everything, and the vendor header displays the right tier label. Cover both Claude and Codex vendors, both light and standard tiers, and the fallback chain (flag → config tier → TIER_MODELS → NEWEST_MODELS).",
-              "acceptanceCriteria": [
-                "Unit tests in llm-client cover: resolveVendorModel with light weight returns haiku/gpt-5.4mini, with standard returns sonnet/gpt-5.4codex, with no weight returns standard default",
-                "Unit tests cover config override: lightModel in config takes precedence over TIER_MODELS default",
-                "Unit tests cover precedence: explicit model string overrides tier-based selection for both weights",
-                "Integration test verifies smart-add command resolves to light-tier model by inspecting resolved model before LLM call",
-                "Integration test verifies analyze command resolves to standard-tier model",
-                "Vendor header output tests verify tier label rendering for light, standard, configured-override, and flag-override scenarios"
-              ],
-              "priority": "high",
-              "tags": [
-                "testing",
-                "llm-client",
-                "rex",
-                "regression"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-15T17:25:50.449Z",
-              "completedAt": "2026-04-15T17:33:33.089Z"
+              "source": "smart-add"
             }
           ]
         }
+      ]
+    },
+    {
+      "id": "6a128173-0145-42a0-99bb-54308b9c0ec1",
+      "title": "Code Health: 33 findings across 19 zones",
+      "status": "pending",
+      "level": "epic",
+      "description": "Automated recommendations from SourceVision analysis. 26 zone+category groups covering 33 total findings.",
+      "priority": "high",
+      "source": "sourcevision",
+      "children": [
+        {
+          "id": "044c0c8e-adda-4265-827c-fa62b78b6dad",
+          "title": "Fix observation in global (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Bidirectional coupling: \"viewer-ui-hub\" ↔ \"web-viewer\" (5+5 crossings) — consider extracting shared interface",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-17T15:47:26.842Z",
+          "completedAt": "2026-04-17T15:47:26.842Z",
+          "children": [
+            {
+              "id": "c45f46d8-4b11-465d-a5ce-b3ca071ae2aa",
+              "title": "Fix observation in global: Bidirectional coupling: \"viewer-ui-hub\" ↔ \"web-viewer\" (5+5 crossings) — conside",
+              "status": "completed",
+              "level": "task",
+              "description": "- Bidirectional coupling: \"viewer-ui-hub\" ↔ \"web-viewer\" (5+5 crossings) — consider extracting shared interface",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-17T15:33:07.453Z",
+              "completedAt": "2026-04-17T15:47:26.536Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Extended api.ts with hooks/component/nav re-exports; sidebar.ts now imports through api.ts instead of 4 direct web-viewer leaf files, reducing outbound zone crossings from 5 targets to 2 (external.ts + api.ts)",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "a708c0568f90"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "a708c0568f90"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "d3b0080a-4418-44e8-a838-2aaef97bf36b",
+          "title": "Fix structural in global (4 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Both rex fix zones fall at or below the dual-fragility threshold simultaneously; per the rex-satellite zone policy, treating them as a single satellite zone with subdirectory conventions would consolidate governance and reduce zone count without losing boundary visibility\n- The web ↔ web-viewer bidirectional coupling (74 total cross-zone imports) is the single highest-risk structural relationship in the codebase; it should be tracked as a metric with a regression threshold to prevent further growth.\n- sourcevision-view-layer is the only zone in this batch meeting the dual-fragility criteria (cohesion < 0.4 AND coupling > 0.6); it should be added to the CLAUDE.md dual-fragility governance table.\n- viewer-ui-hub (cohesion 0.38, coupling 0.63) meets both dual-fragility thresholds and should be added to the CLAUDE.md fragility governance table alongside web-shared and rex-cli to make its baseline explicit and enable regression tracking.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "211f95af-1dba-486c-bd90-538e9a199be8",
+              "title": "Fix structural in global: Both rex fix zones fall at or below the dual-fragility threshold simultaneously; (+3 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- Both rex fix zones fall at or below the dual-fragility threshold simultaneously; per the rex-satellite zone policy, treating them as a single satellite zone with subdirectory conventions would consolidate governance and reduce zone count without losing boundary visibility\n- The web ↔ web-viewer bidirectional coupling (74 total cross-zone imports) is the single highest-risk structural relationship in the codebase; it should be tracked as a metric with a regression threshold to prevent further growth.\n- sourcevision-view-layer is the only zone in this batch meeting the dual-fragility criteria (cohesion < 0.4 AND coupling > 0.6); it should be added to the CLAUDE.md dual-fragility governance table.\n- viewer-ui-hub (cohesion 0.38, coupling 0.63) meets both dual-fragility thresholds and should be added to the CLAUDE.md fragility governance table alongside web-shared and rex-cli to make its baseline explicit and enable regression tracking.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "fbca578dca28",
+                  "5993857fbc11",
+                  "aee5a30e9a51",
+                  "7a9d909a200c"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 4
+                },
+                "findingCount": 4
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "fbca578dca28",
+              "5993857fbc11",
+              "aee5a30e9a51",
+              "7a9d909a200c"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 4
+            },
+            "findingCount": 4
+          }
+        },
+        {
+          "id": "32dd257c-d640-4e8e-a077-232b610fce37",
+          "title": "Fix observation in hench-2 (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- Generic zone name \"Hench 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-17T18:32:36.322Z",
+          "completedAt": "2026-04-17T18:32:36.322Z",
+          "children": [
+            {
+              "id": "cb13bd8c-1c26-4aa3-8d4f-c4ef73a8dc98",
+              "title": "Fix observation in hench-2: Generic zone name \"Hench 2\" — enrichment did not assign a meaningful name reflec",
+              "status": "completed",
+              "level": "task",
+              "description": "- Generic zone name \"Hench 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-17T18:29:31.459Z",
+              "completedAt": "2026-04-17T18:32:36.271Z",
+              "resolutionType": "config-override",
+              "resolutionDetail": "Pinned the 3 token-usage files to zone id \"hench-token-usage\" in .n-dx.json; renamed zone in zones.json from \"Hench 2\" to \"Hench Token Usage\"; added hints.md entry; fixed stale dispatch.ts comment that incorrectly referenced \"hench-2 zone\".",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "f9edb93bbad0"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "f9edb93bbad0"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "e9735e68-f6f5-4328-9bb8-40fadfd265ff",
+          "title": "Fix observation in rex-2 (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Generic zone name \"Rex 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "9dbf4f02-b01a-4cee-8910-6f3118cf53b7",
+              "title": "Fix observation in rex-2: Generic zone name \"Rex 2\" — enrichment did not assign a meaningful name reflecti",
+              "status": "in_progress",
+              "level": "task",
+              "description": "- Generic zone name \"Rex 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "fbeb2da4ffbe"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              },
+              "startedAt": "2026-04-17T18:32:58.135Z"
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "fbeb2da4ffbe"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "0463cb81-0af7-480f-89c3-16d3425e4e83",
+          "title": "Fix observation in rex-core (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.67) — 2 imports target \"rex-fix\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "4099aa58-c7ee-4bcd-96e7-0b563a7aaca8",
+              "title": "Fix observation in rex-core: High coupling (0.67) — 2 imports target \"rex-fix\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.67) — 2 imports target \"rex-fix\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "b65b76f46f1d"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "b65b76f46f1d"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "60bb375f-ea39-45cf-b94c-00d18dad49b8",
+          "title": "Fix observation in rex-fix (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.6) — 1 imports target \"rex\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "8bc5323c-2e1d-46b0-ad0a-55f8b8d9af99",
+              "title": "Fix observation in rex-fix: High coupling (0.6) — 1 imports target \"rex\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.6) — 1 imports target \"rex\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "c8e48c4efdc2"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "c8e48c4efdc2"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "d4b40fac-925e-4578-a37f-f3066399b768",
+          "title": "Fix observation in viewer-ui-hub (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.63) — 5 imports target \"web-viewer\"\n- Low cohesion (0.38) — files are loosely related, consider splitting this zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "6291b72e-8ea9-44b0-9028-9474ca8af4ea",
+              "title": "Fix observation in viewer-ui-hub: High coupling (0.63) — 5 imports target \"web-viewer\" (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.63) — 5 imports target \"web-viewer\"\n- Low cohesion (0.38) — files are loosely related, consider splitting this zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "3e346f75becc",
+                  "c263b203c173"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "3e346f75becc",
+              "c263b203c173"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "bc5defb9-d003-450a-bdba-6bc728c22ff5",
+          "title": "Fix structural in viewer-ui-hub (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Bidirectional 74-edge coupling with Web Dashboard Platform is the largest cross-zone relationship in the web package — a periodic audit of import direction and gateway compliance would reduce risk of eroding the viewer↔server boundary.\n- Zone meets both dual-fragility thresholds (cohesion 0.38 < 0.4, coupling 0.63 > 0.6). As the intentional viewer composition hub, this is structurally expected, but the zone should be baseline-documented in the CLAUDE.md fragility governance table alongside web-shared and rex-cli.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "169b6a3b-5fd8-446e-a84c-858222530b72",
+              "title": "Fix structural in viewer-ui-hub: Bidirectional 74-edge coupling with Web Dashboard Platform is the largest cross- (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- Bidirectional 74-edge coupling with Web Dashboard Platform is the largest cross-zone relationship in the web package — a periodic audit of import direction and gateway compliance would reduce risk of eroding the viewer↔server boundary.\n- Zone meets both dual-fragility thresholds (cohesion 0.38 < 0.4, coupling 0.63 > 0.6). As the intentional viewer composition hub, this is structurally expected, but the zone should be baseline-documented in the CLAUDE.md fragility governance table alongside web-shared and rex-cli.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "dd30313b50be",
+                  "81cdb842b3ff"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "dd30313b50be",
+              "81cdb842b3ff"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "63b7df0c-1509-4e53-b4e5-0daa1f2c7b80",
+          "title": "Fix observation in web-3 (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Generic zone name \"Web 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.67) — 3 imports target \"web-viewer\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "aa55a689-0c4f-4fc4-88b3-c870c56501a0",
+              "title": "Fix observation in web-3: Generic zone name \"Web 3\" — enrichment did not assign a meaningful name reflecti (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- Generic zone name \"Web 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.67) — 3 imports target \"web-viewer\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "ce3af56ad4fa",
+                  "51c8057ce0a9"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "ce3af56ad4fa",
+              "51c8057ce0a9"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "8f25e643-7876-4875-befe-8f7959a2e7de",
+          "title": "Fix suggestion in hench-2 (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone \"hench-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "0638f632-7657-49f9-abb6-2397ff52fffd",
+              "title": "Fix suggestion in hench-2: Zone \"hench-2\" has a numeric suffix indicating an overflow community — pin its f",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone \"hench-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "a7484b75df58"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "a7484b75df58"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "1cc9d3a6-8994-4ac4-a206-7de467ad4440",
+          "title": "Fix suggestion in web-3 (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone \"web-3\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "96f49106-abcc-4a45-83ce-19b11f98875e",
+              "title": "Fix suggestion in web-3: Zone \"web-3\" has a numeric suffix indicating an overflow community — pin its fil",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone \"web-3\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "7b763b98bdc0"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "7b763b98bdc0"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "9590ed82-8bb0-4fff-ade9-35ba977116c0",
+          "title": "Fix move-file in web-viewer (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- File \"packages/web/src/viewer/external.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/ — consider moving to packages/web/src/server/ to align physical location with architectural zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-17T15:32:57.234Z",
+          "completedAt": "2026-04-17T15:32:57.234Z",
+          "children": [
+            {
+              "id": "f85abf7d-3a25-424f-95b6-5d6fccb1340e",
+              "title": "Fix move-file in web-viewer: File \"packages/web/src/viewer/external.ts\" is pinned to zone \"Web Viewer\" but li",
+              "status": "completed",
+              "level": "task",
+              "description": "- File \"packages/web/src/viewer/external.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/ — consider moving to packages/web/src/server/ to align physical location with architectural zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-17T15:30:15.718Z",
+              "completedAt": "2026-04-17T15:32:57.191Z",
+              "resolutionType": "acknowledgment",
+              "resolutionDetail": "Finding is a false positive. Louvain places external.ts near web-server due to shared/schema/ connectivity bridge. All 21 importers are viewer files; pin to web-viewer is correct. Documented the reason inline in external.ts matching the web-server zone stability pattern.",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "ce8cb074d7a3"
+                ],
+                "category": "move-file",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "ce8cb074d7a3"
+            ],
+            "category": "move-file",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "c6ef1df9-b607-415f-81b7-3467a67ba9f6",
+          "title": "Fix structural in autonomous-agent-engine (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- No automated intra-zone boundary assertions exist yet; at 208 files the zone is approaching the scale where sub-zone drift becomes difficult to detect without test-enforced checks.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "593877d6-4afb-41fa-b7c0-4b63bb5562dc",
+              "title": "Fix structural in autonomous-agent-engine: No automated intra-zone boundary assertions exist yet; at 208 files the zone is ",
+              "status": "pending",
+              "level": "task",
+              "description": "- No automated intra-zone boundary assertions exist yet; at 208 files the zone is approaching the scale where sub-zone drift becomes difficult to detect without test-enforced checks.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "7537212f6d52"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "7537212f6d52"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "312ab8e2-ebdc-471b-8690-43ee7fcd033f",
+          "title": "Fix structural in config-validation-gauntlet (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- The gauntlet/ directory sits outside the established e2e/ and integration/ test directory conventions, which may cause it to be excluded from standard test runs if glob patterns are not kept in sync.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "d2cc6bff-e96a-467e-bbd6-37bcf5fdc915",
+              "title": "Fix structural in config-validation-gauntlet: The gauntlet/ directory sits outside the established e2e/ and integration/ test ",
+              "status": "pending",
+              "level": "task",
+              "description": "- The gauntlet/ directory sits outside the established e2e/ and integration/ test directory conventions, which may cause it to be excluded from standard test runs if glob patterns are not kept in sync.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "2252f5212f1d"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "2252f5212f1d"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "98d8a394-b9e6-4248-a2f0-4bf288b1f44e",
+          "title": "Fix structural in e2e-test-infrastructure (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Production entry points (assistant-assets/index.js, packages/core/assistant-integration.js) are grouped into the same zone as test files, suggesting community detection is coupling asset-generation scripts to the test suite via shared import paths.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "99760deb-ff19-46cf-8460-a302f201338e",
+              "title": "Fix structural in e2e-test-infrastructure: Production entry points (assistant-assets/index.js, packages/core/assistant-inte",
+              "status": "pending",
+              "level": "task",
+              "description": "- Production entry points (assistant-assets/index.js, packages/core/assistant-integration.js) are grouped into the same zone as test files, suggesting community detection is coupling asset-generation scripts to the test suite via shared import paths.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "50c98bce080e"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "50c98bce080e"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "29d832fa-e3d5-45e1-91ef-58caba7f899c",
+          "title": "Fix structural in local-docker-harness (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone cohesion is 0 across 5 files — below the 5-file metric-reliability threshold, so the low score reflects the absence of import relationships among infra scripts rather than structural decay.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "6b4127ed-4c0b-4bf4-ae0a-43e6f7e65c8c",
+              "title": "Fix structural in local-docker-harness: Zone cohesion is 0 across 5 files — below the 5-file metric-reliability threshol",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone cohesion is 0 across 5 files — below the 5-file metric-reliability threshold, so the low score reflects the absence of import relationships among infra scripts rather than structural decay.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "0bb958226a82"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "0bb958226a82"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "3dd2ccf4-9126-4b7a-a7f3-976f297488ab",
+          "title": "Fix structural in polling-lifecycle (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Duplicate use-polling-suspension.ts exists in both hooks/ and polling/ directories; one is likely a forwarding re-export creating an invisible seam that can drift out of sync.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "5e3f140b-acca-46ec-ad3f-ecbd273c0acb",
+              "title": "Fix structural in polling-lifecycle: Duplicate use-polling-suspension.ts exists in both hooks/ and polling/ directori",
+              "status": "pending",
+              "level": "task",
+              "description": "- Duplicate use-polling-suspension.ts exists in both hooks/ and polling/ directories; one is likely a forwarding re-export creating an invisible seam that can drift out of sync.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "e052bd3e5666"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "e052bd3e5666"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "cff8b8ab-3ca7-4e84-b377-5dc8856e1a6c",
+          "title": "Fix structural in project-scaffold (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone cohesion is 0 — files share no import relationships, confirming this is an incidental grouping of config, brand, and utility scripts rather than a coherent module.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "ff8800f8-7724-4a29-a553-c7a19f7a8029",
+              "title": "Fix structural in project-scaffold: Zone cohesion is 0 — files share no import relationships, confirming this is an ",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone cohesion is 0 — files share no import relationships, confirming this is an incidental grouping of config, brand, and utility scripts rather than a coherent module.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "085966d72b9a"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "085966d72b9a"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "f2bd0934-032a-4ae8-b03b-f97ec7f122ae",
+          "title": "Fix code in project-scaffold (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- cli-brand.js exists at both the repo root and inside packages/core, creating a duplication risk if one copy diverges silently during future edits.",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-17T15:30:03.343Z",
+          "completedAt": "2026-04-17T15:30:03.343Z",
+          "children": [
+            {
+              "id": "787fdfc1-ef04-45e9-a929-70730f5ea73f",
+              "title": "Fix code in project-scaffold: cli-brand.js exists at both the repo root and inside packages/core, creating a d",
+              "status": "completed",
+              "level": "task",
+              "description": "- cli-brand.js exists at both the repo root and inside packages/core, creating a duplication risk if one copy diverges silently during future edits.",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-17T15:22:45.611Z",
+              "completedAt": "2026-04-17T15:30:03.296Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Deleted root cli-brand.js (dead code, no importers). Updated ORCHESTRATION_PEERS in architecture-policy.test.js from \"cli-brand.js\" to \"packages/core/cli-brand.js\".",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "885fa8859afd"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "885fa8859afd"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "5d586da2-f978-41f3-b5d5-2d25080f865b",
+          "title": "Fix structural in rex-fix-command (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- src/core/fix.ts is separated from the src/fix/ entry point by an artificial directory boundary, lowering cohesion to 0.33 without reflecting a meaningful architectural split",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "b2b4436a-6956-4c00-afac-86d379da88d9",
+              "title": "Fix structural in rex-fix-command: src/core/fix.ts is separated from the src/fix/ entry point by an artificial dire",
+              "status": "pending",
+              "level": "task",
+              "description": "- src/core/fix.ts is separated from the src/fix/ entry point by an artificial directory boundary, lowering cohesion to 0.33 without reflecting a meaningful architectural split",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "7252200c1250"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "7252200c1250"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "4023370f-31f6-4b8d-af9f-9068504e82bb",
+          "title": "Fix structural in rex-fix-data-model (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6); per rex-satellite zone policy, any addition that lowers cohesion requires explicit justification",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "811f832e-6640-429b-8423-b6c032837c7d",
+              "title": "Fix structural in rex-fix-data-model: Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6);",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6); per rex-satellite zone policy, any addition that lowers cohesion requires explicit justification",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "6684b5ca1d8e"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "6684b5ca1d8e"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "59749a83-8ba2-4737-9f91-c1a1f2f0248f",
+          "title": "Fix structural in sourcevision-view-layer (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Cohesion 0.33 and coupling 0.67 qualify this as a dual-fragility zone requiring active governance; additions should require justification and two-consumer verification.\n- The zone's 3 files span two distinct concerns (view entrypoint barrel and threshold constants); splitting them would raise cohesion and reduce coupling to the viewer hub.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "e3105516-6bc0-4abb-b441-612a1962a8e5",
+              "title": "Fix structural in sourcevision-view-layer: Cohesion 0.33 and coupling 0.67 qualify this as a dual-fragility zone requiring  (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- Cohesion 0.33 and coupling 0.67 qualify this as a dual-fragility zone requiring active governance; additions should require justification and two-consumer verification.\n- The zone's 3 files span two distinct concerns (view entrypoint barrel and threshold constants); splitting them would raise cohesion and reduce coupling to the viewer hub.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "81b93bf62c3e",
+                  "a190d4c6faaa"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "81b93bf62c3e",
+              "a190d4c6faaa"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "21c03cb4-f14d-4496-b4aa-649c2bb42672",
+          "title": "Fix structural in theme-toggle (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Single-file micro-zone with cohesion 0 and coupling 1 — an algorithmic artifact. theme-toggle.ts should be classified within viewer-ui-hub to eliminate a spurious zone boundary with no governance value.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "319b1c9b-775a-4891-9ae6-574996ea08e2",
+              "title": "Fix structural in theme-toggle: Single-file micro-zone with cohesion 0 and coupling 1 — an algorithmic artifact.",
+              "status": "pending",
+              "level": "task",
+              "description": "- Single-file micro-zone with cohesion 0 and coupling 1 — an algorithmic artifact. theme-toggle.ts should be classified within viewer-ui-hub to eliminate a spurious zone boundary with no governance value.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "4d6241830c77"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "4d6241830c77"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "3007df6a-0c26-44c6-bb84-c2fe748c822a",
+          "title": "Fix structural in viewer-data-hooks (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Bidirectional imports between this hook zone and the web platform zone (3 edges each direction) suggest the hooks may be reaching back into platform code rather than receiving dependencies via props or context.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "6a22c989-085b-45a3-9a8f-ac785ad2add2",
+              "title": "Fix structural in viewer-data-hooks: Bidirectional imports between this hook zone and the web platform zone (3 edges ",
+              "status": "pending",
+              "level": "task",
+              "description": "- Bidirectional imports between this hook zone and the web platform zone (3 edges each direction) suggest the hooks may be reaching back into platform code rather than receiving dependencies via props or context.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "7b1342896883"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "7b1342896883"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "9ee6a611-4094-4df5-8948-00f4cbdf65af",
+          "title": "Fix anti-pattern in global (1 finding)",
+          "status": "completed",
+          "level": "feature",
+          "description": "- God function: handleInit in packages/core/cli.js calls 40 unique functions — consider decomposing into smaller, focused functions",
+          "priority": "high",
+          "source": "sourcevision",
+          "startedAt": "2026-04-17T15:22:09.583Z",
+          "completedAt": "2026-04-17T15:22:09.583Z",
+          "children": [
+            {
+              "id": "f653153b-52d7-4155-8773-51258364aeda",
+              "title": "Fix anti-pattern in global: God function: handleInit in packages/core/cli.js calls 40 unique functions — con",
+              "status": "completed",
+              "level": "task",
+              "description": "- God function: handleInit in packages/core/cli.js calls 40 unique functions — consider decomposing into smaller, focused functions",
+              "priority": "high",
+              "source": "sourcevision",
+              "startedAt": "2026-04-17T15:11:24.224Z",
+              "completedAt": "2026-04-17T15:22:09.410Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Decomposed handleInit into 8 focused helpers: parseInitFlagSet, buildInitArgs, repairInitConfig, resolveInitAssistants, selectInitLLMProvider, runSubInitPhase (lifted from nested), persistInitLLMConfig, printStaticInitSummary. Reduced from 290 lines/40 unique call sites to ~100 lines/~18 call sites.",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "1aaa331714a7"
+                ],
+                "category": "anti-pattern",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "1aaa331714a7"
+            ],
+            "category": "anti-pattern",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "a1fc3ffa-000f-46fc-b2bf-c5c4b667ef1a",
+          "title": "Fix suggestion in viewer-ui-hub (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Zone \"Viewer UI Hub\" (viewer-ui-hub) has critical risk (score: 0.63, cohesion: 0.38, coupling: 0.63) — requires refactoring before new feature development",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "620bd7ef-e0f8-4dcf-9df4-b7d1da44f13e",
+              "title": "Fix suggestion in viewer-ui-hub: Zone \"Viewer UI Hub\" (viewer-ui-hub) has critical risk (score: 0.63, cohesion: 0",
+              "status": "pending",
+              "level": "task",
+              "description": "- Zone \"Viewer UI Hub\" (viewer-ui-hub) has critical risk (score: 0.63, cohesion: 0.38, coupling: 0.63) — requires refactoring before new feature development",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "f4bee7336ea1"
+                ],
+                "category": "suggestion",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "f4bee7336ea1"
+            ],
+            "category": "suggestion",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        }
       ],
-      "startedAt": "2026-04-15T17:52:01.299Z",
-      "completedAt": "2026-04-15T17:52:01.299Z"
+      "recommendationMeta": {
+        "findingCount": 33
+      }
+    },
+    {
+      "id": "b638da12-7755-49e6-9237-6f11891303b1",
+      "title": "CLI-UI Feature Parity and Settings Completeness",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "749cecdc-4d4c-4468-ae08-5e28e117996c",
+          "title": "CLI Command Coverage Audit and Dashboard Trigger Controls",
+          "status": "pending",
+          "level": "feature",
+          "description": "The web dashboard currently focuses on status views and configuration panels, but provides no way to trigger most ndx CLI commands (analyze, plan, recommend, sync, export, self-heal, refresh, ci). Users must fall back to the terminal for core workflow operations. This feature closes that gap by auditing coverage then implementing trigger controls for high-impact commands.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "400f7e1e-ab50-429d-917b-dc38aa41ff3a",
+              "title": "Audit all ndx CLI commands against web dashboard feature coverage and document gaps",
+              "status": "pending",
+              "level": "task",
+              "description": "Systematically compare every command in the ndx CLI dispatch (init, analyze, recommend, add, plan, work, self-heal, start, status, usage, sync, refresh, dev, ci, config, export, fix, health, validate, report, pair-programming, and rex/sourcevision/hench sub-commands) against what the web dashboard currently exposes — whether as a trigger, a status view, or a configuration panel. Produce a gap inventory with each command rated full/partial/none and ranked by user-facing impact to guide implementation order.",
+              "acceptanceCriteria": [
+                "All ndx CLI commands and significant sub-commands are enumerated and evaluated",
+                "Each command is rated as full / partial / none dashboard coverage with a one-line rationale",
+                "Gap inventory is committed to the repo (e.g., docs/cli-ui-gap.md) or captured as PRD task descriptions",
+                "Gaps are ranked by user impact so the implementation task has a clear priority order"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "cli",
+                "audit"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "5320dc1b-d8d6-483c-8bad-d9b4c6310d0f",
+              "title": "Implement dashboard trigger controls for CLI commands lacking UI representation",
+              "status": "pending",
+              "level": "task",
+              "description": "Based on the audit, add action buttons, panels, or workflow controls for high-impact CLI commands that have no dashboard equivalent. At minimum: ndx analyze (re-scan codebase), ndx plan (analyze + propose PRD changes), ndx sync (push/pull PRD to remote adapter), ndx export (export static dashboard), and ndx self-heal (iterative improvement loop). Each control must invoke the underlying CLI operation via the web server's MCP or REST surface, display real-time status or streaming output, and surface errors clearly.",
+              "acceptanceCriteria": [
+                "All commands ranked high-priority in the gap audit have a corresponding dashboard trigger",
+                "Each trigger invokes the equivalent CLI operation and shows real-time progress or log output",
+                "Long-running commands (analyze, plan, self-heal) display a spinner or log stream and a completion/failure notification",
+                "Destructive or irreversible operations (e.g., plan --accept, self-heal) require a confirmation step before executing",
+                "No high-priority gap command remains inaccessible from the dashboard after implementation"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "cli",
+                "ui"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "dc5e6696-7575-4983-b8c5-a73711bc4d8f",
+          "title": "Settings Page Completeness and Command-Based Reorganization",
+          "status": "pending",
+          "level": "feature",
+          "description": "The settings page currently covers hench execution config and integration (Notion) config, but leaves large portions of the .n-dx.json schema unexposed — including LLM vendor and model selection, CLI timeout overrides, web port, feature flags, sourcevision zone config, and the language override. Additionally, settings are organized by internal implementation concerns rather than by the CLI commands that consume them, making discoverability poor. This feature closes all missing-field gaps and reorganizes the page around the CLI mental model.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "0b6e8b1d-bf43-42b3-91df-74ed3f234c66",
+              "title": "Audit .n-dx.json config schema fields against settings page UI controls and document gaps",
+              "status": "pending",
+              "level": "task",
+              "description": "Enumerate every field in the .n-dx.json and per-package config schemas (rex config, hench config, sourcevision config) and cross-reference against controls currently rendered in the settings page views (hench-config.ts, integration-config.ts, notion-config.ts). Produce a missing-field list annotated with the CLI command(s) each field affects and a suggested UI control type (text, number, select, toggle, list).",
+              "acceptanceCriteria": [
+                "All fields from .n-dx.json, .rex/config.json, and .hench/config.json schemas are enumerated",
+                "Each field is mapped to an existing settings control or flagged as missing",
+                "Recently added fields (cli.timeoutMs, cli.timeouts.*, llm.claude.lightModel, llm.codex.lightModel, per-tier model overrides) are explicitly included",
+                "Missing fields are annotated with the CLI command(s) they affect and a recommended control type",
+                "Fields already covered by hench-config.ts are marked as present and excluded from the gap list"
+              ],
+              "priority": "medium",
+              "tags": [
+                "settings",
+                "config",
+                "audit"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "49f25316-e3df-4362-82dd-28f849a29072",
+              "title": "Implement missing config fields in the settings page UI",
+              "status": "pending",
+              "level": "task",
+              "description": "Add UI controls for all fields identified as absent from the settings page, including: LLM vendor selector (claude/codex), model and light-model selectors for each vendor, CLI global timeout (cli.timeoutMs) and per-command timeout overrides (cli.timeouts.*), web dashboard port (web.port), feature flags (features.rex.*, features.sourcevision.*, features.hench.*), sourcevision zone pins and merge threshold, and the language override. Each control must read from and persist changes to the appropriate config file via the existing config mechanism. This task also closes the deferred 'Add timeout configuration panel to web settings UI' item.",
+              "acceptanceCriteria": [
+                "All fields flagged as missing in the audit have a corresponding settings UI control",
+                "LLM vendor selector (claude/codex) is present and switches the active vendor",
+                "Model and light-model text/select inputs exist for both claude and codex vendor sections",
+                "cli.timeoutMs has a numeric input, and cli.timeouts.* per-command overrides are editable (key-value list or per-command inputs)",
+                "web.port has a numeric input that validates port range",
+                "Feature flag toggles exist for all features.rex.*, features.sourcevision.*, and features.hench.* fields",
+                "All new controls persist changes to .n-dx.json on save and reflect current values on page load"
+              ],
+              "priority": "medium",
+              "tags": [
+                "settings",
+                "config",
+                "web"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
+                "matchedItemId": "1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
+                "matchedItemTitle": "Add timeout configuration panel to web settings UI",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "deferred",
+                "createdAt": "2026-04-17T15:02:47.666Z"
+              }
+            },
+            {
+              "id": "26f04993-67f4-4d3a-a573-fd9d35d448a0",
+              "title": "Reorganize settings page layout to group settings by associated CLI command",
+              "status": "pending",
+              "level": "task",
+              "description": "Redesign the settings page section structure so each section corresponds to the CLI command(s) whose behavior its settings control. Replace the current hench-centric layout with command-centric groupings: a top 'General' section for settings shared by all commands (llm.vendor, language), then sections for ndx work, ndx start, ndx analyze/plan, ndx sync, and ndx init. Settings sections should appear in workflow order (general → init → analyze/plan → work → start → sync → export) to reinforce the ndx workflow mental model. Purely aesthetic reorganization — no functional changes to how settings are saved or applied.",
+              "acceptanceCriteria": [
+                "Settings page has clearly labeled sections corresponding to ndx CLI commands or 'General / All Commands'",
+                "Each setting appears in exactly one section with no duplication across sections",
+                "Section headers show the associated CLI command (e.g., 'ndx work', 'ndx start', 'ndx analyze / plan')",
+                "Settings that affect all commands appear in the top 'General' section",
+                "Sections appear in workflow order: General → ndx init → ndx analyze / plan → ndx work → ndx start → ndx sync → ndx export",
+                "Existing functionality of all settings controls is unchanged after reorganization"
+              ],
+              "priority": "medium",
+              "tags": [
+                "settings",
+                "web",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "43fa4ae8-01a8-4a30-927c-3d1b94116492",
+      "title": "Web Dashboard",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "3319282b-6b83-4d6d-b729-2c7b8526b9a4",
+          "title": "N-Rex Easter Egg — Triple-Click Dino Takeover",
+          "status": "pending",
+          "level": "feature",
+          "description": "Hidden easter egg activated by clicking the rex icon three times within 1.5 seconds, with a 0.271828 (≈1/e) probability gate. On trigger, the UI transitions to a full-page TTY dino animation with a humorous N-eolithic message.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d167596a-802c-4832-b797-b9d6a418774b",
+              "title": "Implement triple-click gesture detector with probabilistic trigger gate on the rex icon",
+              "status": "pending",
+              "level": "task",
+              "description": "Wire a click-sequence tracker to the rex icon component that records timestamp of each click, resets if the gap between any two consecutive clicks exceeds 1.5 seconds, and on the third qualifying click rolls Math.random() < 0.271828 to decide whether to fire the easter egg event. Emit a custom event or call a provided callback when the gate passes so the display layer remains decoupled.",
+              "acceptanceCriteria": [
+                "Three clicks on the rex icon within 1.5 seconds (each gap ≤ 1.5 s) correctly arms the trigger",
+                "A fourth click after the 1.5 s window resets the counter to 1",
+                "The probability gate fires with p ≈ 0.271828 — unit test mocks Math.random to verify both the pass (< 0.271828) and reject (≥ 0.271828) branches",
+                "No easter egg fires on a double-click or on three clicks spread across more than 1.5 s total",
+                "Gesture detection logic is self-contained and does not import rendering code"
+              ],
+              "priority": "low",
+              "tags": [
+                "web",
+                "ui",
+                "easter-egg"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "090749f5-1693-4d49-9a88-47387823670d",
+              "title": "Build full-page N-eolithic dino animation overlay with dismiss interaction",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a full-viewport overlay component that renders the TTY dino animation (reusing or adapting the existing cli-brand dino asset) and displays the caption 'Oops, you clicked so hard you ended up in the N-eolithic age with the N-Rex!' beneath it. The overlay mounts when the gesture detector fires its event, blocks the main UI, and dismisses on any click or keypress — returning the user to normal state.",
+              "acceptanceCriteria": [
+                "Overlay covers the full viewport and sits above all other content (z-index above nav, modals, tooltips)",
+                "TTY dino animation plays immediately on mount using the existing cli-brand dino asset or an equivalent ASCII/SVG reproduction",
+                "Caption text 'Oops, you clicked so hard you ended up in the N-eolithic age with the N-Rex!' is visible below the animation",
+                "Overlay dismisses on any click anywhere or any keypress, returning to the normal view",
+                "Component renders correctly on viewport widths 320 px–2560 px without layout overflow",
+                "No memory leaks: event listeners and animation timers are cleaned up on unmount"
+              ],
+              "priority": "low",
+              "tags": [
+                "web",
+                "ui",
+                "easter-egg",
+                "animation"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

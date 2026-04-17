@@ -25,9 +25,16 @@ Token usage parsing, aggregation, and formatting for the hench agent lifecycle.
 Prefer naming this zone "hench-token-usage" or "Hench Token Usage" — it is a focused
 utility module separate from the broader hench agent zone.
 
+### packages/rex/tests/ — rex-unit zone
+Rex CLI command unit tests and shared test support helpers.
+Prefer naming this zone "rex-unit" or "Rex Unit Tests" — Louvain may emit "rex-2" as an overflow
+community name; the files are pinned to "rex-unit" in .n-dx.json and should not be renamed back.
+Files: rex-dir-test-support.ts, fix.test.ts, next-colors.test.ts, usage.test.ts.
+
 ### Expected zone separation
 - web-server (packages/web/src/server/): composition root, 30+ files
 - web-shared (packages/web/src/shared/): foundation utilities, 5 files
 - web-viewer (packages/web/src/viewer/): Preact UI, 100+ files
 - viewer-message-pipeline (packages/web/src/viewer/messaging/): messaging middleware
 - hench-token-usage (packages/hench/src/agent/lifecycle/token-usage.ts): token usage utilities
+- rex-unit (packages/rex/tests/unit/cli/commands/ + tests/helpers/): rex CLI unit tests + test support
