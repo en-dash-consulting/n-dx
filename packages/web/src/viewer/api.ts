@@ -1,7 +1,7 @@
 /**
  * Viewer inbound API barrel — the sanctioned import surface for
- * sibling zones (crash, route, performance, usage) that consume
- * viewer-internal symbols.
+ * sibling zones (crash, route, performance, usage, viewer-ui-hub) that
+ * consume viewer-internal symbols.
  *
  * This is the inbound counterpart to external.ts (which concentrates
  * viewer's outbound imports from schema/, shared/, and messaging/).
@@ -35,3 +35,19 @@ export {
   parsePathnameRoute,
   resolveLocationRoute,
 } from "./route-state.js";
+
+// --- Hooks consumed by sibling zones (e.g. viewer-ui-hub/sidebar) ---
+export { useProjectMetadata } from "./hooks/index.js";
+export { useFeatureToggle } from "./hooks/index.js";
+export { useProjectStatus } from "./hooks/index.js";
+
+// --- Status indicator components (sidebar badges) ---
+export {
+  SvFreshnessIndicator,
+  RexCompletionIndicator,
+  HenchActivityIndicator,
+} from "./components/status-indicators.js";
+
+// --- Navigation config consumed outside web-viewer ---
+export { SOURCEVISION_TABS } from "./views/sourcevision-tabs.js";
+export type { SourceVisionTab } from "./views/sourcevision-tabs.js";

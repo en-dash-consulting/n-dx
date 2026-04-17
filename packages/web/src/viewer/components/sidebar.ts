@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
 import type { Manifest, Zones } from "../external.js";
-import type { ViewId } from "../types.js";
+import type { ViewId } from "../api.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { SidebarThemeToggle } from "./theme-toggle.js";
 import { GlobalFAQ } from "./faq.js";
@@ -10,10 +10,10 @@ import {
   SvFreshnessIndicator,
   RexCompletionIndicator,
   HenchActivityIndicator,
-} from "./status-indicators.js";
+} from "../api.js";
 import { ConfigFooter } from "./config-footer.js";
-import { useProjectMetadata, useFeatureToggle } from "../hooks/index.js";
-import { SOURCEVISION_TABS } from "../views/sourcevision-tabs.js";
+import { useProjectMetadata, useFeatureToggle } from "../api.js";
+import { SOURCEVISION_TABS } from "../api.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
 
