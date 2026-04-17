@@ -198,7 +198,7 @@ const ORCHESTRATION_FILES = ["packages/core/cli.js", "packages/core/web.js", "pa
  * other orchestration files (peer imports within the same tier).
  */
 const ORCHESTRATION_PEERS = new Set([
-  "cli-brand.js",
+  "packages/core/cli-brand.js",
   "packages/core/config.js",
   "packages/core/web.js",
   "packages/core/ci.js",
