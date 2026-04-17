@@ -971,9 +971,50 @@ async function handleInit(rest) {
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
 
-  // Spawn sub-package inits. Each tool's own init handles reuse of existing
-  // state, so we run unconditionally and let the tool decide. Sourcevision
-  // also runs a fast analyze after init to populate inventory artifacts.
+  // Ensure .n-dx.local.json is in .gitignore (machine-specific config)
+  ensureGitignoreEntry(dir, ".n-dx.local.json");
+
+  // ── Ink animated UI (TTY, non-quiet) vs static fallback ───────────
+  // Ink owns sub-package inits, LLM config writes, assistant integrations,
+  // and the recap.  When it succeeds, we record the init version and exit.
+  // On Ink failure (missing deps, render error) we fall through to the
+  // static path below.
+  const useTUI = !quiet && process.stdout.isTTY === true;
+  if (useTUI) {
+    let inkResult;
+    try {
+      const { renderInit } = await import("./cli-ink.js");
+      inkResult = await renderInit({
+        dir,
+        flags,
+        provider: selectedProvider,
+        providerSource,
+        model: selection.model,
+        modelSource,
+        assistantEnabled,
+        claudeModelFromFlag,
+        codexModelFromFlag,
+        llmSkipped,
+        tools,
+        runInitCapture,
+      });
+    } catch (err) {
+      console.error(err?.message || err);
+    }
+    if (inkResult) {
+      if (inkResult.code !== 0) {
+        if (inkResult.error) console.error(inkResult.error);
+        exitWithCleanup(1);
+      }
+      try {
+        const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+        recordInitVersion(dir, version);
+      } catch { /* non-fatal */ }
+      exitWithCleanup(0);
+    }
+  }
+
+  // ── Static fallback (non-TTY, --quiet, or Ink unavailable) ────────
   async function runSubInitPhase(name, work, detail) {
     const phase = INIT_PHASES[name];
     if (!quiet && phase) {
@@ -1008,9 +1049,6 @@ async function handleInit(rest) {
   await runSubInitPhase("hench",
     () => runInitCapture(tools.hench, ["init", ...flags, dir]),
     henchExists ? "reused — .hench/ already present" : undefined);
-
-  // Ensure .n-dx.local.json is in .gitignore (machine-specific config)
-  ensureGitignoreEntry(dir, ".n-dx.local.json");
 
   // Persist LLM selection (suppress output). Vendor first, then model.
   // Skip entirely when the user cancelled an interactive prompt — no partial

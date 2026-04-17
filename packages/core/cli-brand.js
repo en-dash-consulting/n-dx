@@ -270,6 +270,10 @@ export const INIT_PHASES = {
     spinner: "Teaching Claude new tricks...",
     success: "Skills installed",
   },
+  assistants: {
+    spinner: "Wiring up assistant surfaces...",
+    success: "Assistant surfaces ready",
+  },
 };
 
 // ── Static formatters (non-TTY fallback and tests) ─────────────────────
