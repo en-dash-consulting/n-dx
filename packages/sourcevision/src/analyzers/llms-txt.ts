@@ -31,7 +31,6 @@ export function generateLlmsTxt(
     ...buildFindings(zones),
     ...buildNextSteps(zones),
     ...buildFileInventory(inventory, zones, classifications),
-    ...buildTooling(),
   ];
 
   return lines.join("\n");
@@ -309,18 +308,6 @@ function buildFileInventory(inventory: Inventory, zones: Zones, classifications?
   lines.push("");
 
   return lines;
-}
-
-function buildTooling(): string[] {
-  return [
-    "## Tooling",
-    "",
-    "This project uses n-dx for codebase analysis (Sourcevision) and requirement",
-    "tracking (Rex). MCP tools are available for interactive access to analysis",
-    "data and PRD management. Skills available: /plan, /status, /capture,",
-    "/zone, /work, /configure.",
-    "",
-  ];
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────
