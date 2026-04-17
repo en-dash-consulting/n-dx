@@ -46,7 +46,7 @@ export {
   SvFreshnessIndicator,
   RexCompletionIndicator,
   HenchActivityIndicator,
-} from "./components/status-indicators.js";
+} from "./components/index.js";
 
 // --- Navigation config consumed outside web-viewer ---
 export { SOURCEVISION_TABS } from "./views/sourcevision-tabs.js";

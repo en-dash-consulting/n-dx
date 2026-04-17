@@ -5,7 +5,7 @@ import {
   detectParentChildMisalignment,
   detectIssues,
   applyFixes,
-} from "../../../src/core/fix.js";
+} from "../../../src/fix/index.js";
 
 type PRDItem = {
   id: string;

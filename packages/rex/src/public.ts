@@ -179,8 +179,8 @@ export {
   detectTimestampIssues,
   detectOrphanBlockedBy,
   detectParentChildMisalignment,
-} from "./core/fix.js";
-export type { FixKind, FixAction, FixResult } from "./core/fix.js";
+} from "./fix/index.js";
+export type { FixKind, FixAction, FixResult } from "./fix/index.js";
 
 // ---- Core: verify (acceptance criteria → test file mapping) -----------------
 

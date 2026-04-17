@@ -401,7 +401,6 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
 const CYCLE_EXEMPT_ZONE_TYPES = new Set(["test", "infrastructure"]);
 const CYCLE_EXCEPTIONS = new Map([
   ["mcp", "Rex MCP tools cluster; cycles with the duplicate-named 'web' zone (first file in rex package) making intra-rex edges appear cross-package to the cycle detector."],
-  ["rex-core", "Small rex core cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason — both zones are in the rex package."],
   ["rex-recommend", "Small rex recommendation cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["rex-store", "Rex store/persistence cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["rex-unit", "Small rex unit cluster (src/core/tree.ts); cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
@@ -818,8 +817,6 @@ const COHESION_THRESHOLD = 0.5;
  */
 const COHESION_EXCEPTIONS = new Map([
   ["polling", "5-file zone at the boundary of reliable metrics; two polling source files plus three tests. Tests don't import each other, which drives cohesion down despite a coherent purpose."],
-  ["rex-core", "Small 3-file zone (below the 5-file threshold); fix.ts source split across two directory levels plus one test. Louvain grouped a cross-directory pair; sparse internal edges are expected at this size."],
-  ["rex-fix", "Small 4-file zone (below the 5-file threshold); tree.ts + types.ts implementation files plus their individual tests. Tests don't import each other, leaving only 1-2 directed internal edges."],
   ["web-viewer", "Intentional Preact UI hub — assembles components, hooks, views, graph, and usage modules (see CLAUDE.md web-viewer governance). Low cohesion is structurally expected for a hub that imports from viewer-message-pipeline and web-shared while receiving imports from sub-zones."],
 ]);
 
