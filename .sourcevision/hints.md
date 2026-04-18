@@ -38,6 +38,14 @@ name; the test files are pinned to "web-sv-view-tests" in .n-dx.json with zone t
 The corresponding source files (enrichment-thresholds.ts, sourcevision-tabs.ts, views/index.ts)
 are pinned to "web-viewer".
 
+### repo root — project-scaffold zone
+The repo root collects config files (`.gitignore`, `.npmrc`, `vitest.config.js`), brand assets
+(`cli-brand.js`), and one-off utility scripts (`pr-check.js`, `scan_transcripts.py`,
+`test-token-format.js`). Louvain may name this zone `project-scaffold` or `root` depending on the
+analysis run. Cohesion is 0 because these files have no import relationships — they are an
+incidental grouping, not a coherent module. This is expected and not structural decay. Zone type
+is `infrastructure` in `.n-dx.json` under `"project-scaffold"` and `"root"`.
+
 ### .local_testing/ — local-docker-harness / .local-testing zone
 `.local_testing/` is a **gitignored local Docker testing workspace** — Dockerfiles, shell scripts,
 and PowerShell scripts for running gauntlet tests on Windows. This directory is excluded from
