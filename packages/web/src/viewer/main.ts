@@ -25,12 +25,11 @@ import {
   useCrashRecovery,
   useGracefulDegradation,
   useRefreshThrottle,
-  usePollingSuspension,
 } from "./hooks/index.js";
+import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
-import { startPollingRestart } from "./polling/index.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
 
 if (isDeployedMode()) {
