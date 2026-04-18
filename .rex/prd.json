@@ -29270,10 +29270,12 @@
         {
           "id": "7ccd1f5b-8e7f-4a3a-93ed-147f5ad8eaf3",
           "title": "Implement scoring functions and eval test gate",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "tests/gauntlet/sourcevision-evals/score.ts exports two pure scorers: archetype accuracy (% files where archetype matches golden) and zone partition similarity (avg Jaccard of file sets, zones matched by greatest overlap). Unit-test identity + perturbation cases. evals.test.ts runs sv analyze per fixture, scores vs golden, asserts >= floor (likely 0.9, calibrated during implementation). Wire pnpm gauntlet:evals — NOT in default pnpm gauntlet (LLM cost). Acceptance: passes baseline; perturbing fixture fails.",
-          "priority": "high"
+          "priority": "high",
+          "startedAt": "2026-04-18T05:56:15.891Z",
+          "completedAt": "2026-04-18T05:58:13.548Z"
         },
         {
           "id": "78032008-f730-44ed-9452-566ebc252c84",
