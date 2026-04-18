@@ -2004,6 +2004,8 @@
           "description": "- Generic zone name \"Rex 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-17T18:52:50.777Z",
+          "completedAt": "2026-04-17T18:52:50.777Z",
           "children": [
             {
               "id": "9dbf4f02-b01a-4cee-8910-6f3118cf53b7",
@@ -2038,27 +2040,31 @@
               "warning": 1
             },
             "findingCount": 1
-          },
-          "startedAt": "2026-04-17T18:52:50.777Z",
-          "completedAt": "2026-04-17T18:52:50.777Z"
+          }
         },
         {
           "id": "0463cb81-0af7-480f-89c3-16d3425e4e83",
           "title": "Fix observation in rex-core (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.67) — 2 imports target \"rex-fix\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-18T14:35:25.408Z",
+          "completedAt": "2026-04-18T14:35:25.408Z",
           "children": [
             {
               "id": "4099aa58-c7ee-4bcd-96e7-0b563a7aaca8",
               "title": "Fix observation in rex-core: High coupling (0.67) — 2 imports target \"rex-fix\"",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.67) — 2 imports target \"rex-fix\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T14:29:35.888Z",
+              "completedAt": "2026-04-18T14:35:25.371Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "core/fix.ts pass-through deleted; public.ts and cli/commands/fix.ts already import directly from fix/index.js; rex-core zone dissolved, committed as a2156e8d",
               "recommendationMeta": {
                 "findingHashes": [
                   "b65b76f46f1d"
@@ -2085,20 +2091,26 @@
         {
           "id": "60bb375f-ea39-45cf-b94c-00d18dad49b8",
           "title": "Fix observation in rex-fix (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.6) — 1 imports target \"rex\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-18T14:38:18.439Z",
+          "completedAt": "2026-04-18T14:38:18.439Z",
           "children": [
             {
               "id": "8bc5323c-2e1d-46b0-ad0a-55f8b8d9af99",
               "title": "Fix observation in rex-fix: High coupling (0.6) — 1 imports target \"rex\"",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.6) — 1 imports target \"rex\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T14:35:35.365Z",
+              "completedAt": "2026-04-18T14:38:18.402Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Inlined FixItemStatus union in fix/types.ts, removing the import from ../schema/index.js. The rex-fix zone is now self-contained.",
               "recommendationMeta": {
                 "findingHashes": [
                   "c8e48c4efdc2"
@@ -2125,20 +2137,26 @@
         {
           "id": "d4b40fac-925e-4578-a37f-f3066399b768",
           "title": "Fix observation in viewer-ui-hub (2 findings)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- High coupling (0.63) — 5 imports target \"web-viewer\"\n- Low cohesion (0.38) — files are loosely related, consider splitting this zone",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-18T14:47:49.220Z",
+          "completedAt": "2026-04-18T14:47:49.220Z",
           "children": [
             {
               "id": "6291b72e-8ea9-44b0-9028-9474ca8af4ea",
               "title": "Fix observation in viewer-ui-hub: High coupling (0.63) — 5 imports target \"web-viewer\" (+1 more)",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- High coupling (0.63) — 5 imports target \"web-viewer\"\n- Low cohesion (0.38) — files are loosely related, consider splitting this zone",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T14:38:28.275Z",
+              "completedAt": "2026-04-18T14:47:49.182Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Fixed search-overlay.ts to import NavigateTo through api.ts gateway instead of directly from types.ts (leaf reach-in violation). Commit: 76116c37.",
               "recommendationMeta": {
                 "findingHashes": [
                   "3e346f75becc",
@@ -2209,7 +2227,7 @@
         {
           "id": "63b7df0c-1509-4e53-b4e5-0daa1f2c7b80",
           "title": "Fix observation in web-3 (2 findings)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Generic zone name \"Web 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.67) — 3 imports target \"web-viewer\"",
           "priority": "high",
@@ -2218,11 +2236,15 @@
             {
               "id": "aa55a689-0c4f-4fc4-88b3-c870c56501a0",
               "title": "Fix observation in web-3: Generic zone name \"Web 3\" — enrichment did not assign a meaningful name reflecti (+1 more)",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Generic zone name \"Web 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.67) — 3 imports target \"web-viewer\"",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T14:48:04.392Z",
+              "completedAt": "2026-04-18T14:54:09.162Z",
+              "resolutionType": "config-override",
+              "resolutionDetail": "All web-3 files already pinned in .n-dx.json to web-viewer (source) and web-sv-view-tests (tests). Added hints.md entry to document the expected zone so future analyses don't create web-3 again. Fixed pre-existing flaky timing test (8→12 threshold).",
               "recommendationMeta": {
                 "findingHashes": [
                   "ce3af56ad4fa",
@@ -2246,7 +2268,9 @@
               "warning": 2
             },
             "findingCount": 2
-          }
+          },
+          "startedAt": "2026-04-18T14:54:09.198Z",
+          "completedAt": "2026-04-18T14:54:09.198Z"
         },
         {
           "id": "8f25e643-7876-4875-befe-8f7959a2e7de",

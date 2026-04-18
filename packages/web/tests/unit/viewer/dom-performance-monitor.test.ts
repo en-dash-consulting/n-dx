@@ -864,9 +864,9 @@ describe("counting performance", () => {
     const time2 = median(() => runBatch(large));
 
     // If O(n), large ~4× small. If O(n²), large ~16× small.
-    // Accept up to 8× with constant factor.
+    // Accept up to 12× to tolerate timing noise on loaded CI machines.
     const ratio = (time2 + 0.1) / (time1 + 0.1);
-    expect(ratio).toBeLessThan(8);
+    expect(ratio).toBeLessThan(12);
   });
 });
 

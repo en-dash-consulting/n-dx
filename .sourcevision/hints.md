@@ -31,6 +31,13 @@ Prefer naming this zone "rex-unit" or "Rex Unit Tests" — Louvain may emit "rex
 community name; the files are pinned to "rex-unit" in .n-dx.json and should not be renamed back.
 Files: rex-dir-test-support.ts, fix.test.ts, next-colors.test.ts, usage.test.ts.
 
+### packages/web/tests/unit/viewer/ — web-sv-view-tests zone
+SourceVision viewer unit tests (enrichment-thresholds.test.ts, sourcevision-tabs.test.ts).
+Prefer naming this zone "web-sv-view-tests" — Louvain may emit "web-3" as an overflow community
+name; the test files are pinned to "web-sv-view-tests" in .n-dx.json with zone type "test".
+The corresponding source files (enrichment-thresholds.ts, sourcevision-tabs.ts, views/index.ts)
+are pinned to "web-viewer".
+
 ### Expected zone separation
 - web-server (packages/web/src/server/): composition root, 30+ files
 - web-shared (packages/web/src/shared/): foundation utilities, 5 files
@@ -38,3 +45,4 @@ Files: rex-dir-test-support.ts, fix.test.ts, next-colors.test.ts, usage.test.ts.
 - viewer-message-pipeline (packages/web/src/viewer/messaging/): messaging middleware
 - hench-token-usage (packages/hench/src/agent/lifecycle/token-usage.ts): token usage utilities
 - rex-unit (packages/rex/tests/unit/cli/commands/ + tests/helpers/): rex CLI unit tests + test support
+- web-sv-view-tests (packages/web/tests/unit/viewer/enrichment-thresholds.test.ts + sourcevision-tabs.test.ts): SourceVision viewer unit tests
