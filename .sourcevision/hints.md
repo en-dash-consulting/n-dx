@@ -38,6 +38,14 @@ name; the test files are pinned to "web-sv-view-tests" in .n-dx.json with zone t
 The corresponding source files (enrichment-thresholds.ts, sourcevision-tabs.ts, views/index.ts)
 are pinned to "web-viewer".
 
+### .local_testing/ — local-docker-harness / .local-testing zone
+`.local_testing/` is a **gitignored local Docker testing workspace** — Dockerfiles, shell scripts,
+and PowerShell scripts for running gauntlet tests on Windows. This directory is excluded from
+gitignore and typically absent from sourcevision analysis. If it is detected (e.g., during a
+pre-gitignore analysis), cohesion will be 0 because infra scripts have no import relationships —
+this is expected and not structural decay. Zone type is `infrastructure` in `.n-dx.json` under
+both the `.local-testing` and `local-docker-harness` IDs.
+
 ### Expected zone separation
 - web-server (packages/web/src/server/): composition root, 30+ files
 - web-shared (packages/web/src/shared/): foundation utilities, 5 files

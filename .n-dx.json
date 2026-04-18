@@ -148,6 +148,8 @@
         "e2e-test-suite": "test",
         "fixtures": "test",
         "integration": "test",
+        ".local-testing": "infrastructure",
+        "local-docker-harness": "infrastructure",
         "repo-ops-shell": "infrastructure",
         "root": "infrastructure",
         "scripts": "infrastructure",

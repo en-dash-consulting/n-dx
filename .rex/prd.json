@@ -1907,20 +1907,26 @@
         {
           "id": "d3b0080a-4418-44e8-a838-2aaef97bf36b",
           "title": "Fix structural in global (4 findings)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Both rex fix zones fall at or below the dual-fragility threshold simultaneously; per the rex-satellite zone policy, treating them as a single satellite zone with subdirectory conventions would consolidate governance and reduce zone count without losing boundary visibility\n- The web ↔ web-viewer bidirectional coupling (74 total cross-zone imports) is the single highest-risk structural relationship in the codebase; it should be tracked as a metric with a regression threshold to prevent further growth.\n- sourcevision-view-layer is the only zone in this batch meeting the dual-fragility criteria (cohesion < 0.4 AND coupling > 0.6); it should be added to the CLAUDE.md dual-fragility governance table.\n- viewer-ui-hub (cohesion 0.38, coupling 0.63) meets both dual-fragility thresholds and should be added to the CLAUDE.md fragility governance table alongside web-shared and rex-cli to make its baseline explicit and enable regression tracking.",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-18T15:26:10.947Z",
+          "completedAt": "2026-04-18T15:26:10.947Z",
           "children": [
             {
               "id": "211f95af-1dba-486c-bd90-538e9a199be8",
               "title": "Fix structural in global: Both rex fix zones fall at or below the dual-fragility threshold simultaneously; (+3 more)",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Both rex fix zones fall at or below the dual-fragility threshold simultaneously; per the rex-satellite zone policy, treating them as a single satellite zone with subdirectory conventions would consolidate governance and reduce zone count without losing boundary visibility\n- The web ↔ web-viewer bidirectional coupling (74 total cross-zone imports) is the single highest-risk structural relationship in the codebase; it should be tracked as a metric with a regression threshold to prevent further growth.\n- sourcevision-view-layer is the only zone in this batch meeting the dual-fragility criteria (cohesion < 0.4 AND coupling > 0.6); it should be added to the CLAUDE.md dual-fragility governance table.\n- viewer-ui-hub (cohesion 0.38, coupling 0.63) meets both dual-fragility thresholds and should be added to the CLAUDE.md fragility governance table alongside web-shared and rex-cli to make its baseline explicit and enable regression tracking.",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T15:15:58.986Z",
+              "completedAt": "2026-04-18T15:26:10.910Z",
+              "resolutionType": "config-override",
+              "resolutionDetail": "Updated CLAUDE.md dual-fragility governance table: consolidated rex-satellite zones, added sourcevision-view-layer, formalized 74-edge regression threshold.",
               "recommendationMeta": {
                 "findingHashes": [
                   "fbca578dca28",
@@ -2232,6 +2238,8 @@
           "description": "- Generic zone name \"Web 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.67) — 3 imports target \"web-viewer\"",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-18T14:54:09.198Z",
+          "completedAt": "2026-04-18T14:54:09.198Z",
           "children": [
             {
               "id": "aa55a689-0c4f-4fc4-88b3-c870c56501a0",
@@ -2268,9 +2276,7 @@
               "warning": 2
             },
             "findingCount": 2
-          },
-          "startedAt": "2026-04-18T14:54:09.198Z",
-          "completedAt": "2026-04-18T14:54:09.198Z"
+          }
         },
         {
           "id": "8f25e643-7876-4875-befe-8f7959a2e7de",
@@ -2401,20 +2407,26 @@
         {
           "id": "c6ef1df9-b607-415f-81b7-3467a67ba9f6",
           "title": "Fix structural in autonomous-agent-engine (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- No automated intra-zone boundary assertions exist yet; at 208 files the zone is approaching the scale where sub-zone drift becomes difficult to detect without test-enforced checks.",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-18T15:04:20.413Z",
+          "completedAt": "2026-04-18T15:04:20.413Z",
           "children": [
             {
               "id": "593877d6-4afb-41fa-b7c0-4b63bb5562dc",
               "title": "Fix structural in autonomous-agent-engine: No automated intra-zone boundary assertions exist yet; at 208 files the zone is ",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- No automated intra-zone boundary assertions exist yet; at 208 files the zone is approaching the scale where sub-zone drift becomes difficult to detect without test-enforced checks.",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T14:54:45.786Z",
+              "completedAt": "2026-04-18T15:04:20.376Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added zone-boundary.test.ts with 13 assertions (CLI isolation, infrastructure independence, barrel enforcement) and fixed 8 barrel bypass imports found by the new tests.",
               "recommendationMeta": {
                 "findingHashes": [
                   "7537212f6d52"
@@ -2441,20 +2453,26 @@
         {
           "id": "312ab8e2-ebdc-471b-8690-43ee7fcd033f",
           "title": "Fix structural in config-validation-gauntlet (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- The gauntlet/ directory sits outside the established e2e/ and integration/ test directory conventions, which may cause it to be excluded from standard test runs if glob patterns are not kept in sync.",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-18T15:10:02.147Z",
+          "completedAt": "2026-04-18T15:10:02.147Z",
           "children": [
             {
               "id": "d2cc6bff-e96a-467e-bbd6-37bcf5fdc915",
               "title": "Fix structural in config-validation-gauntlet: The gauntlet/ directory sits outside the established e2e/ and integration/ test ",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- The gauntlet/ directory sits outside the established e2e/ and integration/ test directory conventions, which may cause it to be excluded from standard test runs if glob patterns are not kept in sync.",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T15:04:36.706Z",
+              "completedAt": "2026-04-18T15:10:02.108Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Moved tests/gauntlet/ into tests/integration/, removed gauntlet npm script, updated zone pins.",
               "recommendationMeta": {
                 "findingHashes": [
                   "2252f5212f1d"
@@ -2481,20 +2499,26 @@
         {
           "id": "98d8a394-b9e6-4248-a2f0-4bf288b1f44e",
           "title": "Fix structural in e2e-test-infrastructure (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Production entry points (assistant-assets/index.js, packages/core/assistant-integration.js) are grouped into the same zone as test files, suggesting community detection is coupling asset-generation scripts to the test suite via shared import paths.",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-18T15:15:50.152Z",
+          "completedAt": "2026-04-18T15:15:50.152Z",
           "children": [
             {
               "id": "99760deb-ff19-46cf-8460-a302f201338e",
               "title": "Fix structural in e2e-test-infrastructure: Production entry points (assistant-assets/index.js, packages/core/assistant-inte",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Production entry points (assistant-assets/index.js, packages/core/assistant-integration.js) are grouped into the same zone as test files, suggesting community detection is coupling asset-generation scripts to the test suite via shared import paths.",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T15:10:13.973Z",
+              "completedAt": "2026-04-18T15:15:50.116Z",
+              "resolutionType": "config-override",
+              "resolutionDetail": "Added zone pins in .n-dx.json for assistant-assets/index.js, packages/core/assistant-integration.js, claude-integration.js, and codex-integration.js → core zone, separating them from the e2e test zone.",
               "recommendationMeta": {
                 "findingHashes": [
                   "50c98bce080e"
@@ -2521,7 +2545,7 @@
         {
           "id": "29d832fa-e3d5-45e1-91ef-58caba7f899c",
           "title": "Fix structural in local-docker-harness (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Zone cohesion is 0 across 5 files — below the 5-file metric-reliability threshold, so the low score reflects the absence of import relationships among infra scripts rather than structural decay.",
           "priority": "high",
@@ -2530,11 +2554,15 @@
             {
               "id": "6b4127ed-4c0b-4bf4-ae0a-43e6f7e65c8c",
               "title": "Fix structural in local-docker-harness: Zone cohesion is 0 across 5 files — below the 5-file metric-reliability threshol",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Zone cohesion is 0 across 5 files — below the 5-file metric-reliability threshold, so the low score reflects the absence of import relationships among infra scripts rather than structural decay.",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-18T15:26:24.624Z",
+              "completedAt": "2026-04-18T15:29:56.808Z",
+              "resolutionType": "config-override",
+              "resolutionDetail": "Added zone type overrides for .local-testing and local-docker-harness as infrastructure in .n-dx.json; added hints.md entry explaining the zone and why cohesion 0 is expected for gitignored infra scripts.",
               "recommendationMeta": {
                 "findingHashes": [
                   "0bb958226a82"
@@ -2556,7 +2584,9 @@
               "warning": 1
             },
             "findingCount": 1
-          }
+          },
+          "startedAt": "2026-04-18T15:29:56.845Z",
+          "completedAt": "2026-04-18T15:29:56.845Z"
         },
         {
           "id": "3dd2ccf4-9126-4b7a-a7f3-976f297488ab",
