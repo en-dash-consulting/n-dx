@@ -16,6 +16,7 @@
     "validate": "pnpm -r run validate",
     "verify": "vitest run tests/e2e && node packages/core/ci.js .",
     "gauntlet": "vitest run tests/gauntlet",
+    "gauntlet:evals:record": "node tests/gauntlet/sourcevision-evals/record-goldens.js",
     "pr-check": "node pr-check.js",
     "prepublishOnly": "if [ -z \"$CI\" ]; then pnpm run build && pnpm run typecheck && pnpm run test; fi",
     "prepare": "pnpm run build",

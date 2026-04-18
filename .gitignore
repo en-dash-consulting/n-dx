@@ -19,6 +19,7 @@ package-lock.json
 packages/rex/.rex/execution-log*.jsonl
 .sv2/
 .sv3/
+tests/fixtures/sv-evals/**/.sourcevision/
 ndx-export/
 .ndx-deploy-tmp/
 .claude/settings.local.json

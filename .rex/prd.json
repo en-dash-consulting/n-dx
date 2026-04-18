@@ -29260,10 +29260,12 @@
         {
           "id": "5a86a130-d6ca-4ad1-b251-faac76a6d6b4",
           "title": "Bootstrap eval fixtures and golden recording pipeline",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
           "description": "Add tests/fixtures/sv-evals/toy-app/ and tests/fixtures/sv-evals/medium-app/ checked-in source trees. Add tests/gauntlet/sourcevision-evals/record-goldens.ts that runs sv analyze on each fixture and writes golden.json with per-file archetype + zone partition by file membership only. Wire pnpm gauntlet:evals:record.",
-          "priority": "high"
+          "priority": "high",
+          "startedAt": "2026-04-18T05:48:01.591Z",
+          "completedAt": "2026-04-18T05:55:28.011Z"
         },
         {
           "id": "7ccd1f5b-8e7f-4a3a-93ed-147f5ad8eaf3",
