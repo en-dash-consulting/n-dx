@@ -62,7 +62,8 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 |------|---------|----------|----------|-------|
 | `web-shared` | web | 0.36 | 0.64 | Foundation layer; 5 files (metrics unreliable at this size); two-consumer rule enforced by `boundary-check.test.ts` |
 | `rex-cli` | rex | 0.25 | 0.75 | 27+ command files in flat directory; high coupling to core |
-| `prd-fix-command` | rex | 0.25 | 0.75 | Satellite CLI zone; 2 files with tight core coupling |
+| `rex-satellite` (`chunked-review` + `prd-fix-command`) | rex | 0.25 | 0.75 | Two satellite CLI zones governed together per rex-satellite zone policy; subdirectory conventions reduce zone count without losing boundary visibility |
+| `sourcevision-view-layer` | sourcevision | 0.25 | 0.75 | View/test layer zone; historically detected (may dissolve or rename in re-analysis); high coupling to output modules |
 | `crash` | web | 0.50 | unidirectional (web-viewer → crash) | At threshold boundary — crash imports web-shared directly (documented bypass), not web-viewer |
 | `viewer-ui-hub` | web | 0.38 | 0.63 | Viewer composition hub; 5 files; structurally expected for a UI composition root — documented in `viewer-ui-hub` governance section |
 
@@ -81,7 +82,7 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 
 ##### rex-satellite zone policy
 
-Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` with cohesion 0.25 and coupling 0.75. In addition to the universal governance rules:
+Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` with cohesion 0.25 and coupling 0.75. They are tracked as a single combined entry (`rex-satellite`) in the dual-fragility table above to reduce zone count without losing boundary visibility. In addition to the universal governance rules:
 
 - **CLI-only content:** These zones must contain only CLI command handlers and their direct support modules. Domain logic belongs in `rex-prd-engine` (e.g., `src/core/`).
 - **Subdirectory convention:** Satellite zone files should be grouped into subdirectories under `packages/rex/src/cli/commands/` to make zone boundaries visible in the file tree.
@@ -95,7 +96,7 @@ Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` wit
 `viewer-ui-hub` (cohesion 0.38, coupling 0.63) is the intentional Preact UI composition hub — it assembles sidebar, config-footer, faq, and logos components. Its dual-fragility metrics are **structurally expected** for a UI composition root: it imports broadly from `web-viewer` (high coupling) while its internal files serve distinct UI concerns (low cohesion). In addition to the universal governance rules:
 
 - **No domain logic:** This zone must contain only UI composition components and their direct rendering helpers. Data fetching and state management belong in hooks or views.
-- **Monitor fan-out:** The bidirectional 74-edge coupling with the web dashboard platform zone is the largest cross-zone relationship in the web package — audit import direction periodically to ensure inbound imports enter through `api.ts` or composition-root wiring rather than ad-hoc leaf reach-ins.
+- **Monitor fan-out:** The bidirectional 74-edge coupling with the web dashboard platform zone is the single highest-risk structural relationship in the web package — **regression threshold: cross-zone imports must not exceed 74 without documented justification**. Audit import direction periodically to ensure inbound imports enter through `api.ts` or composition-root wiring rather than ad-hoc leaf reach-ins.
 - **Satellite consolidation:** Three micro-zones (theme-toggle, search-overlay, graph-view-tests) are community-detection artifacts pointing at this hub — consolidating them reduces zone noise without losing architectural boundaries.
 
 ##### web-server zone stability
