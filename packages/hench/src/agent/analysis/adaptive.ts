@@ -6,7 +6,7 @@
  * No I/O or side effects.
  */
 
-import type { RunRecord, HenchConfig } from "../../schema/v1.js";
+import type { RunRecord, HenchConfig } from "../../schema/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@
  * Pure functions operating on RunRecord arrays. No I/O or side effects.
  */
 
-import type { RunRecord, RunStatus, HenchConfig } from "../../schema/v1.js";
+import type { RunRecord, RunStatus, HenchConfig } from "../../schema/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 

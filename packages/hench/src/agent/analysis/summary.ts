@@ -3,7 +3,7 @@ import type {
   RunSummaryData,
   CommandRecord,
   TestRecord,
-} from "../../schema/v1.js";
+} from "../../schema/index.js";
 
 /** Patterns that identify a command as a test invocation. */
 const TEST_PATTERNS = [

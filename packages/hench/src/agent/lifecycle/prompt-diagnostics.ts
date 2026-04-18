@@ -14,7 +14,7 @@
  */
 
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
-import type { PromptSectionDiagnostic } from "../../schema/v1.js";
+import type { PromptSectionDiagnostic } from "../../schema/index.js";
 import { detail } from "../../types/output.js";
 
 /**

@@ -64,7 +64,7 @@ import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
 import { resolveVendorAdapter } from "./adapters/index.js";
 import { EventAccumulator } from "./event-accumulator.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
-import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/v1.js";
+import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/index.js";
 
 // ── normalizeCodexResponse ────────────────────────────────────────────────
 

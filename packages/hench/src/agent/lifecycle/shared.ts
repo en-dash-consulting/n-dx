@@ -19,7 +19,7 @@ import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
 import { getCurrentHead, execShellCmd, execStdout } from "../../process/index.js";
-import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
+import { SystemMemoryMonitor } from "../../process/index.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
