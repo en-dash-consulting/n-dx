@@ -1,13 +1,18 @@
 /**
  * Structural item shape used by the auto-fix engine.
  *
- * This uses the canonical status union from schema so auto-fix stays aligned
- * with the stored document shape as statuses evolve.
+ * FixItemStatus mirrors ItemStatus from the schema. Keep in sync if new
+ * statuses are added to packages/rex/src/schema/v1.ts.
  */
 
-import type { ItemStatus } from "../schema/index.js";
-
-export type FixItemStatus = ItemStatus;
+export type FixItemStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "failing"
+  | "deferred"
+  | "blocked"
+  | "deleted";
 
 export interface FixItem {
   id: string;
