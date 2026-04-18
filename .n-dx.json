@@ -135,7 +135,9 @@
         "packages/sourcevision/vitest.config.ts": "sourcevision",
         "packages/hench/src/agent/lifecycle/token-usage.ts": "hench-token-usage",
         "packages/hench/tests/unit/agent/token-usage-regression.test.ts": "hench-token-usage",
-        "packages/hench/tests/unit/agent/token-usage.test.ts": "hench-token-usage"
+        "packages/hench/tests/unit/agent/token-usage.test.ts": "hench-token-usage",
+        "tests/integration/claude-config-validation.test.js": "integration",
+        "tests/integration/codex-config-validation.test.js": "integration"
       },
       "types": {
         "e2e": "test",

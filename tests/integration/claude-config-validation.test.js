@@ -1,5 +1,5 @@
 /**
- * Gauntlet test suite for Claude configuration validation.
+ * Integration tests for Claude configuration validation.
  *
  * These tests validate Claude API configuration in the context of the full
  * ndx pipeline. They verify:
@@ -9,7 +9,7 @@
  * - Degraded-mode behavior when config is invalid
  * - Clear diagnostics when validation fails
  *
- * Gauntlet tests import from compiled dist/ artifacts to test the real
+ * These tests import from compiled dist/ artifacts to test the real
  * exported API surface — the same contract that external consumers use.
  *
  * @see packages/llm-client/src/auth.ts

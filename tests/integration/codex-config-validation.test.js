@@ -1,5 +1,5 @@
 /**
- * Gauntlet test suite for Codex configuration validation.
+ * Integration tests for Codex configuration validation.
  *
  * These tests validate Codex CLI configuration in the context of the full
  * ndx pipeline. They verify:
@@ -11,7 +11,7 @@
  * - Error classification and actionable diagnostics
  * - Multi-line token output parsing
  *
- * Gauntlet tests import from compiled dist/ artifacts to test the real
+ * These tests import from compiled dist/ artifacts to test the real
  * exported API surface — the same contract that external consumers use.
  *
  * @see packages/llm-client/src/codex-cli-provider.ts
