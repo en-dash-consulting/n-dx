@@ -15,7 +15,7 @@
 import { h, Fragment } from "preact";
 import type { ComponentChild } from "preact";
 import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
-import type { NavigateTo } from "../types.js";
+import type { NavigateTo } from "../api.js";
 
 // ── Level emoji (self-contained mirror of prd-tree/levels.ts — no cross-zone import) ──
 const LEVEL_EMOJI: Record<string, string> = {
