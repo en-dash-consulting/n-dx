@@ -6187,6 +6187,15 @@
       "scope": "root",
       "acknowledgedAt": "2026-04-19T02:40:50.524Z",
       "acknowledgedBy": "hench"
+    },
+    {
+      "hash": "6684b5ca1d8e",
+      "reason": "resolved: misplaced test file (tests/unit/core/fix.test.ts) relocated to tests/unit/fix/index.test.ts, co-locating all fix-zone tests; cohesion improved from 0.4 to 0.5, zone now healthy (riskLevel: healthy). Zone was subsequently renamed rex-fix-data-model → rex-fix in re-analysis.",
+      "text": "Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6); per rex-satellite zone policy, any addition that lowers cohesion requires explicit justification",
+      "type": "structural",
+      "scope": "rex-fix-data-model",
+      "acknowledgedAt": "2026-04-19T03:00:00.000Z",
+      "acknowledgedBy": "hench"
     }
   ]
 }
