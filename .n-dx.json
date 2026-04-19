@@ -12,7 +12,10 @@
       "mergeThreshold": 5,
       "pins": {
         "packages/web/src/viewer/views/hench-runs.ts": "web-dashboard",
-        "packages/web/src/viewer/hooks/use-polling.ts": "web-dashboard",
+        "packages/web/src/viewer/hooks/use-polling.ts": "web-viewer",
+        "packages/web/src/viewer/hooks/use-gateway.ts": "web-viewer",
+        "packages/web/src/viewer/hooks/use-project-status.ts": "web-viewer",
+        "packages/web/tests/unit/viewer/use-project-status.test.ts": "web-viewer",
         "packages/hench/src/prd/rex-gateway.ts": "hench-gateway",
         "packages/web/src/server/rex-gateway.ts": "web-server",
         "packages/web/src/server/domain-gateway.ts": "web-server",
