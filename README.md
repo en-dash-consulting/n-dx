@@ -8,6 +8,21 @@ AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks a
 | **[SourceVision](packages/sourcevision)** | **[Rex](packages/rex)** | **[Hench](packages/hench)** |
 | Static analysis & zone detection | PRD management & task tracking | Autonomous agent execution |
 
+## Requirements
+
+**Node.js ≥ 18** (Node 22 LTS recommended) · **pnpm ≥ 9**
+
+### Platform Support
+
+| Platform | Support | Notes |
+|----------|---------|-------|
+| macOS | ✅ Supported | CI smoke tests on `macos-latest` |
+| Linux | ✅ Supported | Full CI (build, typecheck, unit tests) on `ubuntu-latest` |
+| Windows — WSL2 | ✅ Supported | Runs as Linux; no separate CI coverage needed |
+| Windows — native | ⚠️ Experimental | CLI smoke tests pass in CI with macOS parity checks; process group management and shell spawning differ from POSIX; `ndx work` agent loop has reduced native test coverage |
+
+For a supported Linux environment on Windows, use **WSL2** (recommended) or the Docker infrastructure in [`.local_testing/`](.local_testing/).
+
 ## Quick Start
 
 ```sh
