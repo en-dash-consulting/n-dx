@@ -247,16 +247,17 @@ See the [hench README](packages/hench#security) for the full configuration refer
 
 ## Contributing
 
-### Build from source
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor setup guide,
+including Node.js / pnpm version requirements, workspace bootstrap, platform-
+specific notes (macOS, Linux, Windows/WSL2), and Docker testing infrastructure.
+
+Quick start:
 
 ```sh
 git clone https://github.com/en-dash-consulting/n-dx.git
 cd n-dx
 pnpm install && pnpm build
-cd packages/core && pnpm link --global  # register CLI globally
 ```
-
-When developing locally, link from `packages/core` (not the monorepo root) so the global package name matches the published `@n-dx/core`. Use `pnpm ls -g` to verify.
 
 ### Build & test
 
