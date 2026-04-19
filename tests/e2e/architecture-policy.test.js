@@ -817,7 +817,8 @@ const COHESION_THRESHOLD = 0.5;
  */
 const COHESION_EXCEPTIONS = new Map([
   ["polling", "5-file zone at the boundary of reliable metrics; two polling source files plus three tests. Tests don't import each other, which drives cohesion down despite a coherent purpose."],
-  ["web-viewer", "Intentional Preact UI hub — assembles components, hooks, views, graph, and usage modules (see CLAUDE.md web-viewer governance). Low cohesion is structurally expected for a hub that imports from viewer-message-pipeline and web-shared while receiving imports from sub-zones."],
+  ["theme-toggle", "Single-file zone (theme-toggle.ts); cohesion 0 is inherent for any single-file zone. Pinned to web-viewer in .n-dx.json — will dissolve on next analysis when the pin is applied."],
+  ["viewer-data-loader", "5-file data-loading cluster (loader, schema-compat, validate, use-app-data + one test); the test file imports only loader.ts, reducing measured cohesion below threshold despite a coherent domain purpose."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
