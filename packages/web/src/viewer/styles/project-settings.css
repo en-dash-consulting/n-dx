@@ -57,6 +57,16 @@
   font-size: 1rem;
 }
 
+.ps-section-cmd {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-left: var(--spacing-xs);
+}
+
 .ps-section-desc {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);

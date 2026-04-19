@@ -20,17 +20,17 @@ import type { FeatureToggle, FeaturesResponse } from "../external.js";
 
 const PACKAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   sourcevision: {
-    label: "SourceVision",
+    label: "ndx analyze / plan",
     icon: "\u25A3",
     description: "Static analysis, file inventory, import graph, and zone detection",
   },
   rex: {
-    label: "Rex",
+    label: "ndx work / ndx sync",
     icon: "\u25A8",
-    description: "PRD management, task tracking, and analysis proposals",
+    description: "PRD management, task tracking, analysis proposals, and Notion sync",
   },
   hench: {
-    label: "Hench",
+    label: "ndx work",
     icon: "\u25B6",
     description: "Autonomous agent execution, retry policies, and guard rails",
   },

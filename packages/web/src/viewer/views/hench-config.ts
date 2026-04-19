@@ -607,7 +607,7 @@ export function HenchConfigView() {
 
   if (error && !data) {
     return h("div", { class: "hench-config-container" },
-      h(BrandedHeader, { product: "hench", title: "Workflow Configuration" }),
+      h(BrandedHeader, { product: "hench", title: "ndx work — Workflow Configuration" }),
       h("div", { class: "hench-config-error-state" },
         h("p", null, error),
         h("p", { class: "hench-config-error-hint" },
@@ -636,7 +636,7 @@ export function HenchConfigView() {
 
   return h("div", { class: "hench-config-container" },
     h("div", { class: "hench-config-header" },
-      h(BrandedHeader, { product: "hench", title: "Workflow Configuration" }),
+      h(BrandedHeader, { product: "hench", title: "ndx work — Workflow Configuration" }),
       modifiedCount > 0
         ? h("span", { class: "hench-config-modified-count" },
             `${modifiedCount} field${modifiedCount > 1 ? "s differ" : " differs"} from defaults`,

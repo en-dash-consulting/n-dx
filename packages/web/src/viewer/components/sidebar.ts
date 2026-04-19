@@ -45,22 +45,24 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "rex-dashboard", icon: "\u25A8", label: "Dashboard", minPass: 0 },
   { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
   { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
-  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "Notion", minPass: 0, featureGate: "rex.notionSync" },
   { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0, featureGate: "rex.integrations" },
   { type: "section", label: "HENCH", product: "hench" },
   { type: "item", id: "hench-runs", icon: "\u25B6", label: "Runs", minPass: 0 },
   { type: "item", id: "hench-audit", icon: "\u2638", label: "Audit", minPass: 0 },
-  { type: "item", id: "hench-config", icon: "\u2699", label: "Config", minPass: 0 },
   { type: "item", id: "hench-templates", icon: "\u25A6", label: "Templates", minPass: 0 },
   { type: "item", id: "hench-optimization", icon: "\u26A1", label: "Optimization", minPass: 0 },
   { type: "section", label: "TOKEN USAGE" },
   { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
   { type: "section", label: "SETTINGS" },
-  { type: "item", id: "llm-provider", icon: "\u{1F9E0}", label: "LLM Provider", minPass: 0 },
-  { type: "item", id: "project-settings", icon: "\u2699", label: "Project", minPass: 0 },
+  // Workflow order: General → ndx analyze/plan → ndx work → ndx sync → ndx export
+  { type: "item", id: "llm-provider", icon: "\u{1F9E0}", label: "General", minPass: 0 },
+  { type: "item", id: "project-settings", icon: "\u25A3", label: "ndx analyze / plan", minPass: 0 },
+  { type: "item", id: "hench-config", icon: "\u25B6", label: "ndx work", minPass: 0 },
+  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "ndx sync", minPass: 0, featureGate: "rex.notionSync" },
+  { type: "item", id: "commands", icon: "\u{1F4E4}", label: "ndx export", minPass: 0 },
+  // Cross-cutting settings (affect multiple commands)
   { type: "item", id: "feature-toggles", icon: "\u{1F4CC}", label: "Feature Flags", minPass: 0 },
   { type: "item", id: "cli-timeouts", icon: "\u23F1", label: "CLI Timeouts", minPass: 0 },
-  { type: "item", id: "commands", icon: "\u25B6", label: "Commands", minPass: 0 },
 ];
 
 /** Group flat NAV_ENTRIES into sections with their items */

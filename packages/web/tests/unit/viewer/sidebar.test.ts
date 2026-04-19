@@ -587,8 +587,9 @@ describe("Sidebar", () => {
     it("shows sourcevision nav items + token usage + settings when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 8 sourcevision items (graph is feature-gated, default off) + 1 token usage item + 5 settings items (LLM Provider, Project, Feature Flags, CLI Timeouts, Commands)
-      expect(navItems.length).toBe(14);
+      // 8 sourcevision items (graph is feature-gated, default off) + 1 token usage item + 6 settings items (General, ndx analyze/plan, ndx work, ndx export, Feature Flags, CLI Timeouts)
+      // ndx sync (notion-config) is feature-gated (rex.notionSync=false by default) so not counted
+      expect(navItems.length).toBe(15);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

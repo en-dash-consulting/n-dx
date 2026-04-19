@@ -376,56 +376,23 @@ export function ProjectSettingsView() {
       h("p", { class: "ps-header-subtitle" },
         "Project-level configuration stored in ",
         h("code", null, ".n-dx.json"),
-        ". These settings apply across all n-dx commands for this project.",
+        ". Controls language detection (all commands), zone analysis (",
+        h("code", null, "ndx analyze / plan"),
+        "), and dashboard port (",
+        h("code", null, "ndx start"),
+        ").",
       ),
     ),
 
     // ── Error banner
     error ? h("div", { class: "ps-error-banner" }, error) : null,
 
-    // ── Web section
+    // ── General section (affects all commands)
     h("section", { class: "ps-section" },
       h("h3", { class: "ps-section-title" },
-        h("span", { class: "ps-section-icon" }, "\uD83C\uDF10"),
-        "Web Dashboard",
-      ),
-      h("div", { class: "ps-field" },
-        h("label", { class: "ps-field-label", htmlFor: "ps-port" },
-          "Dashboard port",
-          portDirty ? h("span", { class: "ps-dirty-indicator" }, " \u2022") : null,
-        ),
-        h("p", { class: "ps-field-desc" },
-          `Port the web dashboard listens on. Default: ${DEFAULT_PORT}. `,
-          "Change takes effect after restarting the server (",
-          h("code", null, "ndx start stop && ndx start"),
-          ").",
-        ),
-        h("div", { class: "ps-field-row" },
-          h("input", {
-            id: "ps-port",
-            type: "number",
-            class: `ps-number-input${portError ? " ps-input-error" : ""}`,
-            value: portRaw,
-            min: 1,
-            max: 65535,
-            placeholder: String(DEFAULT_PORT),
-            onInput: (e: Event) => handlePortChange((e.target as HTMLInputElement).value),
-          }),
-          portRaw === "" && !portDirty
-            ? h("span", { class: "ps-field-default" }, `Using default (${DEFAULT_PORT})`)
-            : null,
-        ),
-        portError
-          ? h("p", { class: "ps-field-error" }, portError)
-          : null,
-      ),
-    ),
-
-    // ── Language section
-    h("section", { class: "ps-section" },
-      h("h3", { class: "ps-section-title" },
-        h("span", { class: "ps-section-icon" }, "\uD83D\uDCBB"),
-        "Language Override",
+        h("span", { class: "ps-section-icon" }, "\u2699"),
+        "General",
+        h("span", { class: "ps-section-cmd" }, "all commands"),
       ),
       h("div", { class: "ps-field" },
         h("label", { class: "ps-field-label", htmlFor: "ps-language" },
@@ -449,14 +416,14 @@ export function ProjectSettingsView() {
       ),
     ),
 
-    // ── Sourcevision section
+    // ── ndx analyze / plan section
     h("section", { class: "ps-section" },
       h("h3", { class: "ps-section-title" },
         h("span", { class: "ps-section-icon" }, "\u25A3"),
-        "SourceVision Zone Config",
+        "ndx analyze / plan",
       ),
       h("p", { class: "ps-section-desc" },
-        "Advanced zone detection settings. Applies to ",
+        "Zone detection settings for ",
         h("code", null, "ndx analyze"),
         " and ",
         h("code", null, "ndx plan"),
@@ -502,6 +469,44 @@ export function ProjectSettingsView() {
           pins: data?.sourcevisionPins ?? {},
           onChange: handlePinUpdates,
         }),
+      ),
+    ),
+
+    // ── ndx start section
+    h("section", { class: "ps-section" },
+      h("h3", { class: "ps-section-title" },
+        h("span", { class: "ps-section-icon" }, "\uD83C\uDF10"),
+        "ndx start",
+      ),
+      h("div", { class: "ps-field" },
+        h("label", { class: "ps-field-label", htmlFor: "ps-port" },
+          "Dashboard port",
+          portDirty ? h("span", { class: "ps-dirty-indicator" }, " \u2022") : null,
+        ),
+        h("p", { class: "ps-field-desc" },
+          `Port the web dashboard listens on. Default: ${DEFAULT_PORT}. `,
+          "Change takes effect after restarting the server (",
+          h("code", null, "ndx start stop && ndx start"),
+          ").",
+        ),
+        h("div", { class: "ps-field-row" },
+          h("input", {
+            id: "ps-port",
+            type: "number",
+            class: `ps-number-input${portError ? " ps-input-error" : ""}`,
+            value: portRaw,
+            min: 1,
+            max: 65535,
+            placeholder: String(DEFAULT_PORT),
+            onInput: (e: Event) => handlePortChange((e.target as HTMLInputElement).value),
+          }),
+          portRaw === "" && !portDirty
+            ? h("span", { class: "ps-field-default" }, `Using default (${DEFAULT_PORT})`)
+            : null,
+        ),
+        portError
+          ? h("p", { class: "ps-field-error" }, portError)
+          : null,
       ),
     ),
 
