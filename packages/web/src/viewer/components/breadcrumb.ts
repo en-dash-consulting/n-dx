@@ -67,6 +67,8 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "feature-toggles":     { product: "rex",          label: "Feature Flags",   productLabel: "Settings" },
   "cli-timeouts":        { product: "global",       label: "CLI Timeouts",    productLabel: "Settings" },
   "commands":            { product: "rex",          label: "Commands",        productLabel: "Settings" },
+  "llm-provider":        { product: "global",       label: "LLM Provider",    productLabel: "Settings" },
+  "project-settings":    { product: "global",       label: "Project",         productLabel: "Settings" },
 };
 
 // ---------------------------------------------------------------------------

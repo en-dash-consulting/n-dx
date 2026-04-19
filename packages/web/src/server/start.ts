@@ -31,6 +31,8 @@ import { handleIntegrationRoute } from "./routes-integrations.js";
 import { handleFeaturesRoute } from "./routes-features.js";
 import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
+import { handleLlmRoute } from "./routes-llm.js";
+import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
 import { ALL_DATA_FILES } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
@@ -480,6 +482,8 @@ async function handleApiRoutes(
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleIntegrationRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
+  if (await handleLlmRoute(req, res, ctx)) return true;
+  if (await handleProjectSettingsRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, handleCommandsRoute(req, res, ctx, ws.broadcast))) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;

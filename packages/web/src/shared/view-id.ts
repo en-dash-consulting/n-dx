@@ -29,4 +29,6 @@ export type ViewId =
   | "hench-optimization"
   | "feature-toggles"
   | "cli-timeouts"
-  | "commands";
+  | "commands"
+  | "llm-provider"
+  | "project-settings";

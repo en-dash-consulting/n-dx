@@ -52,6 +52,8 @@ import {
   FeatureTogglesView,
   CliTimeoutsView,
   CommandsView,
+  LlmProviderView,
+  ProjectSettingsView,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -151,6 +153,12 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "commands": () =>
     h(CommandsView, null),
+
+  "llm-provider": () =>
+    h(LlmProviderView, null),
+
+  "project-settings": () =>
+    h(ProjectSettingsView, null),
 };
 
 /** Render the view identified by `view` using props from `ctx`. */

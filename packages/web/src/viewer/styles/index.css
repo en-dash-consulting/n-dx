@@ -32,6 +32,8 @@
 @import "./feature-toggles.css";
 @import "./cli-timeout.css";
 @import "./commands.css";
+@import "./llm-provider.css";
+@import "./project-settings.css";
 @import "./pr-markdown.css";
 @import "./memory-warning.css";
 @import "./crash-recovery.css";

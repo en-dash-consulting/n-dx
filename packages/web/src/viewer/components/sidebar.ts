@@ -56,7 +56,9 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "section", label: "TOKEN USAGE" },
   { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
   { type: "section", label: "SETTINGS" },
-  { type: "item", id: "feature-toggles", icon: "\u2699", label: "Feature Flags", minPass: 0 },
+  { type: "item", id: "llm-provider", icon: "\u{1F9E0}", label: "LLM Provider", minPass: 0 },
+  { type: "item", id: "project-settings", icon: "\u2699", label: "Project", minPass: 0 },
+  { type: "item", id: "feature-toggles", icon: "\u{1F4CC}", label: "Feature Flags", minPass: 0 },
   { type: "item", id: "cli-timeouts", icon: "\u23F1", label: "CLI Timeouts", minPass: 0 },
   { type: "item", id: "commands", icon: "\u25B6", label: "Commands", minPass: 0 },
 ];
