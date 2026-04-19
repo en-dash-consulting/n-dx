@@ -6169,6 +6169,24 @@
       "scope": "rex-recommend",
       "acknowledgedAt": "2026-04-14T02:20:32.877Z",
       "acknowledgedBy": "self-heal"
+    },
+    {
+      "hash": "085966d72b9a",
+      "reason": "expected: infrastructure zone (config files, brand assets, one-off scripts have no import relationships by nature)",
+      "text": "Zone cohesion is 0 — files share no import relationships, confirming this is an incidental grouping of config, brand, and utility scripts rather than a coherent module.",
+      "type": "observation",
+      "scope": "project-scaffold",
+      "acknowledgedAt": "2026-04-19T02:40:50.524Z",
+      "acknowledgedBy": "hench"
+    },
+    {
+      "hash": "731932904f7d",
+      "reason": "expected: infrastructure zone (config files, brand assets, one-off scripts have no import relationships by nature)",
+      "text": "Isolated files — no import edges between 9 files, cohesion is unmeasurable (reported as 0)",
+      "type": "observation",
+      "scope": "root",
+      "acknowledgedAt": "2026-04-19T02:40:50.524Z",
+      "acknowledgedBy": "hench"
     }
   ]
 }
