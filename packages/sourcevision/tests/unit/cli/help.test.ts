@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { showCommandHelp } from "../../../src/cli/help.js";
+import { showCommandHelp, usage } from "../../../src/cli/help.js";
 
 describe("sourcevision CLI help", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
@@ -70,6 +70,17 @@ describe("sourcevision CLI help", () => {
       showCommandHelp("mcp");
       const output = logSpy.mock.calls[0][0] as string;
       expect(output).not.toContain("See also:");
+    });
+  });
+
+  describe("usage()", () => {
+    it("prints top-level usage text to console.log", () => {
+      logSpy.mockClear();
+      usage();
+      expect(logSpy).toHaveBeenCalledOnce();
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).toMatch(/sourcevision/i);
+      expect(output).toMatch(/analyze/);
     });
   });
 

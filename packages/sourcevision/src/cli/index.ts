@@ -15,8 +15,7 @@
  */
 
 import { resolve } from "node:path";
-import { usage } from "./commands/constants.js";
-import { showCommandHelp } from "./help.js";
+import { usage, showCommandHelp } from "./help.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdReset } from "./commands/reset.js";
 import { cmdAnalyze } from "./commands/analyze.js";

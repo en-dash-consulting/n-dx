@@ -118,6 +118,78 @@ function EnvVarHint({ envVar }: { envVar: string | null }) {
   );
 }
 
+// ── Sync Panel ───────────────────────────────────────────────────────
+
+function SyncPanel() {
+  const [syncState, setSyncState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const handleSync = useCallback(async (direction: "push" | "pull" | "sync") => {
+    setSyncState("running");
+    setSyncResult(null);
+    setSyncError(null);
+    try {
+      const res = await fetch("/api/commands/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction }),
+      });
+      const data = await res.json() as Record<string, unknown>;
+      if (!res.ok) {
+        throw new Error((data.error as string) || `HTTP ${res.status}`);
+      }
+      setSyncResult((data.output as string) || `Sync (${direction}) complete.`);
+      setSyncState("done");
+    } catch (err) {
+      setSyncError(String(err));
+      setSyncState("error");
+    }
+  }, []);
+
+  return h("div", { class: "notion-config-section" },
+    h("h3", { class: "notion-config-section-title" },
+      h("span", { class: "notion-config-section-icon" }, "\u{1F504}"),
+      "Sync",
+    ),
+    h("p", { class: "notion-config-field-desc" },
+      "Push local PRD changes to Notion, pull remote changes, or run a two-way sync.",
+    ),
+    h("div", { class: "cmd-sync-row" },
+      h("button", {
+        class: "cmd-sync-btn",
+        onClick: () => handleSync("push"),
+        disabled: syncState === "running",
+      },
+        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "\u2191",
+        " Push",
+      ),
+      h("button", {
+        class: "cmd-sync-btn",
+        onClick: () => handleSync("pull"),
+        disabled: syncState === "running",
+      },
+        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "\u2193",
+        " Pull",
+      ),
+      h("button", {
+        class: "cmd-sync-btn",
+        onClick: () => handleSync("sync"),
+        disabled: syncState === "running",
+      },
+        syncState === "running" ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }) : "\u21C5",
+        " Sync",
+      ),
+    ),
+    syncResult
+      ? h("div", { class: "cmd-sync-result cmd-sync-result-ok" }, syncResult)
+      : null,
+    syncError
+      ? h("div", { class: "cmd-sync-result cmd-sync-result-err" }, syncError)
+      : null,
+  );
+}
+
 // ── Main view ────────────────────────────────────────────────────────
 
 export function NotionConfigView() {
@@ -518,6 +590,11 @@ export function NotionConfigView() {
     h("div", { class: "notion-config-section" },
       h(NotionSchemaWizard, { isConfigured }),
     ),
+
+    // ── Sync panel (only when configured) ────────────────────────────
+    isConfigured
+      ? h(SyncPanel, null)
+      : null,
 
     // ── Help section ────────────────────────────────────────────────────
     h("div", { class: "notion-config-section notion-config-help" },

@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useMemo } from "preact/hooks";
+import { useState, useCallback, useMemo } from "preact/hooks";
 import type { LoadedData } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList } from "../visualization/index.js";
@@ -8,6 +8,53 @@ import { BrandedHeader } from "../components/index.js";
 
 interface SuggestionsProps {
   data: LoadedData;
+}
+
+function RefreshRecommendationsButton() {
+  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleClick = useCallback(async () => {
+    setState("running");
+    setError(null);
+    try {
+      const res = await fetch("/api/commands/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: "Request failed" })) as { error?: string };
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      setState("done");
+      setTimeout(() => setState("idle"), 4000);
+    } catch (err) {
+      setError(String(err));
+      setState("error");
+      setTimeout(() => setState("idle"), 6000);
+    }
+  }, []);
+
+  return h("div", { class: "overview-reanalyze" },
+    h("button", {
+      class: "cmd-inline-trigger",
+      onClick: handleClick,
+      disabled: state === "running",
+      title: "Re-run rex recommend to refresh suggestions",
+    },
+      state === "running"
+        ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" })
+        : "\u{1F504}",
+      state === "running" ? "Refreshing..." : "Refresh Recommendations",
+    ),
+    state === "done"
+      ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, "\u2713 Done")
+      : null,
+    state === "error"
+      ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
+      : null,
+  );
 }
 
 export function SuggestionsView({ data }: SuggestionsProps) {
@@ -54,6 +101,7 @@ export function SuggestionsView({ data }: SuggestionsProps) {
     h("p", { class: "section-sub" },
       `${findings.length} suggestions for improvement`
     ),
+    h(RefreshRecommendationsButton, null),
 
     findings.length > 0
       ? h("div", { class: "stat-grid" },

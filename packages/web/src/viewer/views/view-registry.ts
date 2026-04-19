@@ -51,6 +51,7 @@ import {
   IntegrationConfigView,
   FeatureTogglesView,
   CliTimeoutsView,
+  CommandsView,
 } from "./domain-settings.js";
 
 // ── View render context ────────────────────────────────────────
@@ -147,6 +148,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "cli-timeouts": () =>
     h(CliTimeoutsView, null),
+
+  "commands": () =>
+    h(CommandsView, null),
 };
 
 /** Render the view identified by `view` using props from `ctx`. */

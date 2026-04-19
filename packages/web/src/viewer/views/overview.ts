@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useMemo } from "preact/hooks";
+import { useState, useCallback, useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import {
   BarChart,
@@ -10,6 +10,53 @@ import {
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
 import { BrandedHeader } from "../components/index.js";
+
+function ReanalyzeButton() {
+  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleClick = useCallback(async () => {
+    setState("running");
+    setError(null);
+    try {
+      const res = await fetch("/api/commands/sv-analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: "Analysis failed" })) as { error?: string };
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      setState("done");
+      setTimeout(() => setState("idle"), 4000);
+    } catch (err) {
+      setError(String(err));
+      setState("error");
+      setTimeout(() => setState("idle"), 6000);
+    }
+  }, []);
+
+  return h("div", { class: "overview-reanalyze" },
+    h("button", {
+      class: "cmd-inline-trigger",
+      onClick: handleClick,
+      disabled: state === "running",
+      title: "Re-run sourcevision analyze to refresh all data",
+    },
+      state === "running"
+        ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" })
+        : "\u{1F504}",
+      state === "running" ? "Analyzing..." : "Re-analyze",
+    ),
+    state === "done"
+      ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, "\u2713 Done")
+      : null,
+    state === "error"
+      ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
+      : null,
+  );
+}
 
 interface OverviewProps {
   data: LoadedData;
@@ -153,6 +200,9 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
           ),
         )
       : null,
+
+    // Re-analyze trigger
+    h(ReanalyzeButton, null),
 
     // Main metrics row
     h("div", { class: "overview-metrics" },
