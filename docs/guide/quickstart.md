@@ -2,10 +2,15 @@
 
 Get from zero to a working PRD in under 5 minutes.
 
+## Prerequisites
+
+- **Node.js ≥ 18** (Node 22 LTS recommended)
+- **pnpm ≥ 10** — [install pnpm](https://pnpm.io/installation)
+
 ## 1. Install
 
 ```sh
-npm i -g @n-dx/core
+pnpm add -g @n-dx/core
 ```
 
 ## 2. Initialize

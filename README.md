@@ -10,7 +10,7 @@ AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks a
 
 ## Requirements
 
-**Node.js ≥ 18** (Node 22 LTS recommended) · **pnpm ≥ 9**
+**Node.js ≥ 18** (Node 22 LTS recommended) · **pnpm ≥ 10**
 
 ### Platform Support
 
@@ -24,6 +24,8 @@ AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks a
 For a supported Linux environment on Windows, use **WSL2** (recommended) or the Docker infrastructure in [`.local_testing/`](.local_testing/).
 
 ## Quick Start
+
+**Prerequisites:** Node.js ≥ 18 (22 LTS recommended) and pnpm ≥ 10.
 
 ```sh
 pnpm add -g @n-dx/core      # install from npm
