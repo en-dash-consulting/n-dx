@@ -41,6 +41,7 @@
 @import "./refresh-queue.css";
 @import "./polling-suspension.css";
 @import "./search-overlay.css";
+@import "./neolithic-overlay.css";
 @import "./zone-slideout.css";
 @import "./deployed.css";
 @import "./responsive.css";

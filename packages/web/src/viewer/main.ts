@@ -16,6 +16,8 @@ import {
   PollingSuspensionIndicator,
   SearchOverlay,
   useSearchOverlay,
+  NeolithicOverlay,
+  useNeolithicOverlay,
   initTheme,
 } from "./components/index.js";
 import {
@@ -88,6 +90,7 @@ function App({ scope }: { scope: string | null }) {
   const { state: refreshQueueState } = useRefreshThrottle();
   const { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount } = usePollingSuspension();
   const [searchOpen, , closeSearch] = useSearchOverlay();
+  const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const { data, loading, refreshToast, showDrop } = useAppData({ pausePolling: isFeatureDisabled("autoRefresh") });
   const {
     showRecovery,
@@ -199,6 +202,7 @@ function App({ scope }: { scope: string | null }) {
         )
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
+    h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
   );
 }
 

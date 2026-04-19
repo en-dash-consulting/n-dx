@@ -63,6 +63,15 @@ export {
 export { SearchFilter } from "./search-filter.js";
 export { SearchOverlay, useSearchOverlay } from "./search-overlay.js";
 
+// ── Easter eggs ──────────────────────────────────────────────────────
+
+export {
+  NeolithicOverlay,
+  useNeolithicOverlay,
+  NEOLITHIC_EVENT,
+  type NeolithicOverlayProps,
+} from "./neolithic-overlay.js";
+
 // ── Task link ───────────────────────────────────────────────────────
 
 export {

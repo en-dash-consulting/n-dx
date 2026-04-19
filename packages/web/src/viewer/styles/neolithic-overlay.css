@@ -1,0 +1,60 @@
+/* Neolithic easter egg overlay */
+
+.neolithic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001; /* Above all other layers: search (900), modals (10000) */
+  background: #08040f; /* Near-black with deep purple tint */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: neolithic-fade-in 0.3s ease;
+  overflow: hidden;
+}
+
+@keyframes neolithic-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.degradation-no-animations .neolithic-overlay {
+  animation: none;
+}
+
+.neolithic-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+/* Responsive monospace dino art.
+   clamp: min 8px so art is legible at 320 px; max 28px so it stays contained
+   at wide viewports. The 2vw mid-point scales linearly between those bounds. */
+.neolithic-dino {
+  font-family: "Courier New", Courier, monospace;
+  font-size: clamp(8px, 2vw, 28px);
+  line-height: 1;
+  color: #b450ff;
+  white-space: pre;
+  margin: 0;
+  text-shadow: 0 0 24px rgba(180, 80, 255, 0.55);
+  user-select: none;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.neolithic-caption {
+  font-size: clamp(var(--font-base), 1.6vw, var(--font-xl));
+  color: #c87aff;
+  text-align: center;
+  max-width: min(600px, calc(100vw - 2 * var(--space-8)));
+  font-style: italic;
+  line-height: var(--leading-relaxed);
+  margin: 0;
+  user-select: none;
+}
