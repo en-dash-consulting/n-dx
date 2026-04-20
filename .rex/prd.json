@@ -3978,7 +3978,7 @@
             {
               "id": "11343373-2400-483d-9736-04f42cbce488",
               "title": "Add Local Platform Testing section to main README with prerequisites and run commands",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Insert a 'Local Platform Testing' section in README.md (near the Platform Support table) that documents: (1) prerequisites — Docker Desktop ≥ 20, disk space for images; (2) commands to run the Windows and macOS gauntlet suites; (3) expected output and exit codes; (4) a pointer to .local_testing/README.md for advanced options. Content must be accurate and runnable from the repo root.",
               "acceptanceCriteria": [
@@ -3995,12 +3995,16 @@
                 "testing",
                 "docker"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:33:37.471Z",
+              "completedAt": "2026-04-20T19:34:22.499Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added \"Local Platform Testing\" section to README.md with prerequisites, copy-pasteable commands for Windows/macOS gauntlets, exit codes, and link to .local_testing/README.md for advanced options."
             },
             {
               "id": "5f514493-0b61-4348-b826-fb4d1e3a32cf",
               "title": "Update .local_testing/README.md to cover macOS suite and unify platform guidance",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Once the macOS container exists, update .local_testing/README.md to document the new Dockerfile.macos, docker-compose ndx-macos service, and the macOS runner script. Add a 'Platform comparison' table showing which Dockerfile targets which host OS, and what the base commands under test are for each platform.",
               "acceptanceCriteria": [
@@ -4016,7 +4020,8 @@
                 "docker",
                 "macos"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:40:19.135Z"
             }
           ]
         }
