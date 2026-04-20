@@ -13,3 +13,16 @@ services:
       - ./test-results:/ndx/test-results
     entrypoint: powershell
     command: ["-Command", "pnpm test"]
+
+  ndx-macos:
+    build:
+      context: ..
+      dockerfile: .local_testing/Dockerfile.macos
+    container_name: ndx-macos-test
+    environment:
+      - NODE_ENV=test
+    working_dir: /ndx
+    volumes:
+      - ./test-results:/ndx/test-results
+    entrypoint: /bin/bash
+    command: ["-c", "/ndx/test-base-commands.sh"]

@@ -1,0 +1,38 @@
+# macOS/Linux Docker container for ndx development and testing
+# Uses Ubuntu LTS with Node.js, mirroring the structure of Dockerfile.windows
+
+FROM node:20-ubuntu
+
+# Set working directory
+WORKDIR /ndx
+
+# Install system dependencies using apt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    bash \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify installations
+RUN node --version && npm --version && git --version
+
+# Install pnpm globally
+RUN npm install -g pnpm
+
+# Copy project files
+COPY . .
+
+# Install project dependencies
+RUN pnpm install --frozen-lockfile
+
+# Verify build
+RUN npm run build
+
+# Copy test script
+COPY .local_testing/test-base-commands.sh /ndx/test-base-commands.sh
+RUN chmod +x /ndx/test-base-commands.sh
+
+# Default command for running tests
+ENTRYPOINT ["/bin/bash", "-c"]
+CMD ["/ndx/test-base-commands.sh"]

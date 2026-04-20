@@ -1517,7 +1517,7 @@
             {
               "id": "3321bd74-f5b9-463c-8d2c-752457fe3ac0",
               "title": "Implement local gauntlet test runner script",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Add run-gauntlet-macos.sh (or extend run-gauntlet.sh with a --platform flag) to build and run the macOS container, streaming test output and returning meaningful exit codes. Validate the full flow: build → run → stream output → clean up. Runner should accept --no-build, --keep-container, and --verbose flags matching the existing Windows runner interface.",
               "acceptanceCriteria": [
@@ -1542,6 +1542,9 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-15T14:57:43.008Z",
+              "completedAt": "2026-04-20T19:13:21.724Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Fixed platform-specific shell command selection in run-gauntlet.sh. The script now correctly uses /bin/bash -c for macOS/Linux containers and powershell -Command for Windows containers, matching each platform's Dockerfile entrypoint configuration.",
               "mergedProposals": [
                 {
                   "proposalNodeKey": "p0:task:0:1",
@@ -3938,7 +3941,7 @@
             {
               "id": "c17d8735-2570-4af2-9b47-83a6b751e310",
               "title": "Build Linux/macOS-representative Docker container with ndx base command tests",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Create Dockerfile.macos (Ubuntu/Node LTS base) mirroring the structure of Dockerfile.windows — installs Node.js, pnpm, git, builds the monorepo, and runs the base-command smoke test suite (ndx init, ndx analyze, ndx status, ndx config). Add a corresponding `ndx-macos` service to docker-compose.yml alongside the existing `ndx-windows` service.",
               "acceptanceCriteria": [
@@ -3954,7 +3957,8 @@
                 "macos",
                 "infrastructure"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:13:53.689Z"
             }
           ]
         },
@@ -4052,9 +4056,8 @@
             {
               "id": "6dc86135-1fe7-4570-8988-cf66af659f85",
               "title": "Show rollback prompt on Ctrl+C cancellation and reset PRD task status",
-              "level": "task",
               "status": "pending",
-              "source": "smart-add",
+              "level": "task",
               "description": "After the agent loop exits due to a Ctrl+C cancellation, invoke the same rollback prompt flow that already exists for failed runs. If the user confirms, revert all git-tracked file changes made during the run and reset the PRD task status back to its pre-run value (e.g. 'pending'). If the user declines, leave changes in place and mark the task status appropriately (e.g. 'in_progress' or 'pending'). This reuses the existing rollback infrastructure — the goal is to route the cancellation path through it.",
               "acceptanceCriteria": [
                 "After Ctrl+C cancellation, the terminal displays the rollback confirmation prompt (same prompt shown on run failure)",
@@ -4069,7 +4072,8 @@
                 "rollback",
                 "ux",
                 "prd"
-              ]
+              ],
+              "source": "smart-add"
             }
           ]
         }
