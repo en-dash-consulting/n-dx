@@ -184,7 +184,7 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
   };
 }
 
-export type RunStatus = "running" | "completed" | "failed" | "timeout" | "budget_exceeded" | "error_transient";
+export type RunStatus = "running" | "completed" | "failed" | "timeout" | "budget_exceeded" | "error_transient" | "cancelled";
 
 export interface ToolCallRecord {
   turn: number;

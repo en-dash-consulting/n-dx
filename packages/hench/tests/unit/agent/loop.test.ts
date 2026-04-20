@@ -106,4 +106,43 @@ describe("agentLoop", () => {
       if (origKey) process.env.ANTHROPIC_API_KEY = origKey;
     }
   });
+
+  it("removes SIGINT handler after run completes", async () => {
+    const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../../src/store/config.js");
+
+    const config = await loadConfig(henchDir);
+    const rexDir = join(projectDir, ".rex");
+    const store = createStore("file", rexDir);
+
+    const origKey = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = "test-key-12345";
+
+    try {
+      // Count listeners before
+      const listenersBefore = process.listenerCount("SIGINT");
+
+      // Run dry run (no API calls, quick completion)
+      await agentLoop({
+        config,
+        store,
+        projectDir,
+        henchDir,
+        dryRun: true,
+      });
+
+      // Count listeners after
+      const listenersAfter = process.listenerCount("SIGINT");
+
+      // Should be same as before (handler was removed)
+      expect(listenersAfter).toBe(listenersBefore);
+    } finally {
+      if (origKey) {
+        process.env.ANTHROPIC_API_KEY = origKey;
+      } else {
+        delete process.env.ANTHROPIC_API_KEY;
+      }
+    }
+  });
 });

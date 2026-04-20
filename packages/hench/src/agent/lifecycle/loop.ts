@@ -358,8 +358,27 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   // API-specific: turn-based execution loop
   let consecutiveEmptyTurns = 0;
+
+  // Register SIGINT handler for graceful cancellation
+  let cancelled = false;
+  const handleSignal = () => {
+    if (cancelled) {
+      // Second Ctrl+C: force exit
+      process.exit(1);
+    }
+    cancelled = true;
+  };
+  process.on("SIGINT", handleSignal);
+
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
+      // Check if cancellation was requested
+      if (cancelled) {
+        run.status = "cancelled";
+        stream("Cancelled", "Run interrupted by user");
+        break;
+      }
+
       run.turns = turn + 1;
 
       subsection(`Turn ${turn + 1}/${maxTurns}`);
@@ -444,6 +463,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     console.error(`[Error] ${run.error}`);
 
     await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+  } finally {
+    // Remove SIGINT handler to restore default behavior
+    process.removeListener("SIGINT", handleSignal);
   }
 
   // Stop heartbeat before finalization

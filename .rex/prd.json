@@ -3933,15 +3933,17 @@
         {
           "id": "9dbecc75-f550-4b7b-b3b7-fc2bb3ffef53",
           "title": "macOS Local Docker Test Suite",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Extend the existing Windows Docker gauntlet to include a macOS-representative Linux container that validates base ndx commands on a Unix environment. The Windows Dockerfile targets Windows Server Core; this parallel track creates a Linux-based image (matching macOS runtime behavior) with the same base-command smoke tests, a docker-compose service, and a runner script.",
           "source": "smart-add",
+          "startedAt": "2026-04-20T19:16:21.371Z",
+          "completedAt": "2026-04-20T19:16:21.371Z",
           "children": [
             {
               "id": "c17d8735-2570-4af2-9b47-83a6b751e310",
               "title": "Build Linux/macOS-representative Docker container with ndx base command tests",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Create Dockerfile.macos (Ubuntu/Node LTS base) mirroring the structure of Dockerfile.windows — installs Node.js, pnpm, git, builds the monorepo, and runs the base-command smoke test suite (ndx init, ndx analyze, ndx status, ndx config). Add a corresponding `ndx-macos` service to docker-compose.yml alongside the existing `ndx-windows` service.",
               "acceptanceCriteria": [
@@ -3958,7 +3960,10 @@
                 "infrastructure"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-20T19:13:53.689Z"
+              "startedAt": "2026-04-20T19:13:53.689Z",
+              "completedAt": "2026-04-20T19:16:21.307Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Implemented Dockerfile.macos with Ubuntu LTS base, test-base-commands.sh smoke test script, and ndx-macos docker-compose service. All acceptance criteria met: image builds successfully, runs ndx init/analyze/status/config without errors, docker-compose.yml includes ndx-macos service, proper exit codes on success/failure."
             }
           ]
         },
@@ -4035,7 +4040,7 @@
             {
               "id": "f00023d2-c399-4bd2-beb8-481549a6ad37",
               "title": "Intercept SIGINT during hench run loop and transition to graceful cancellation state",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Register a SIGINT handler at the start of a hench run that prevents abrupt process exit. When Ctrl+C is received, signal the agent loop to stop at the next safe checkpoint (end of the current tool call or LLM turn) rather than mid-operation. Restore the default SIGINT handler after the run completes normally so Ctrl+C during post-run prompts works as expected.",
               "acceptanceCriteria": [
@@ -4051,7 +4056,8 @@
                 "signal-handling",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:16:56.406Z"
             },
             {
               "id": "6dc86135-1fe7-4570-8988-cf66af659f85",
