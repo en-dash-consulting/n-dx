@@ -20,7 +20,7 @@ import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { setupClaudeIntegration } from "../../packages/core/claude-integration.js";
-import { getMcpServers } from "../../assistant-assets/index.js";
+import { getMcpServers } from "../../packages/core/assistant-assets.js";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const SRC = readFileSync(join(ROOT, "packages/core/claude-integration.js"), "utf-8");

@@ -12,7 +12,7 @@
  *
  * @see tests/e2e/instruction-alignment.test.js — heading-level alignment
  * @see packages/hench/tests/unit/agent/prompt-parity.test.ts — PromptEnvelope parity
- * @see assistant-assets/index.js — renderers for CLAUDE.md and AGENTS.md
+ * @see packages/core/assistant-assets.js — renderers for CLAUDE.md and AGENTS.md
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -20,7 +20,7 @@ import {
   renderClaudeMd,
   renderAgentsMd,
   getProjectGuidance,
-} from "../../assistant-assets/index.js";
+} from "../../packages/core/assistant-assets.js";
 
 // ── Helper: parse markdown into section map ──────────────────────────────────
 

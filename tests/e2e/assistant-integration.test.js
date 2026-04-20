@@ -20,7 +20,7 @@ import {
   getSupportedAssistants,
   formatInitReport,
 } from "../../packages/core/assistant-integration.js";
-import { getSkillNames, getMcpServers } from "../../assistant-assets/index.js";
+import { getSkillNames, getMcpServers } from "../../packages/core/assistant-assets.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 

@@ -3619,20 +3619,24 @@
         {
           "id": "6552133b-a754-4087-8824-964204c35ab3",
           "title": "Fix move-file in core (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant-assets/ — consider moving to packages/core/ to align physical location with architectural zone",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-20T15:33:01.191Z",
+          "completedAt": "2026-04-20T15:33:01.191Z",
           "children": [
             {
               "id": "24559322-b6ac-48c2-a1f5-85d19d529d78",
               "title": "Fix move-file in core: File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant-assets/ — consider moving to packages/core/ to align physical location with architectural zone",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-20T15:26:11.821Z",
+              "completedAt": "2026-04-20T15:33:00.951Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "8af54c874140"
@@ -3642,8 +3646,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-20T15:26:11.821Z"
+              }
             }
           ],
           "recommendationMeta": {

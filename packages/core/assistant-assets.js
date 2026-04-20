@@ -2,38 +2,20 @@
  * Vendor-neutral assistant asset manifest and render contract.
  *
  * This module is the programmatic entry point for the canonical asset
- * definitions stored in `assistant-assets/`.  It provides read-only access
+ * definitions stored in `assistant-assets/`. It provides read-only access
  * to skill bodies, MCP server descriptors, vendor delivery targets, and
  * shared project guidance so that vendor-specific integration modules
- * (claude-integration.js, codex-integration.js) can render assistant
- * artifacts from one shared source of truth.
+ * can render assistant artifacts from one shared source of truth.
  *
- * ## Render contract
- *
- * Vendor adapters call {@link renderSkill} or {@link renderAllSkills} with
- * a vendor id ("claude" or "codex").  The manifest defines the shared
- * meaning (skill metadata, MCP tool classification, delivery paths); vendor
- * adapters only adapt file locations and wrapper formatting.
- *
- * ## Instruction file contract
- *
- * Both CLAUDE.md and AGENTS.md are generated from a shared project guidance
- * template (`project-guidance.md`) plus vendor-specific addenda.  This
- * eliminates manual SYNC NOTICE maintenance and ensures both vendors start
- * runs from equivalent repo instructions.
- *
- * - {@link renderClaudeMd} — shared guidance + Claude-specific addendum
- * - {@link renderAgentsMd} — shared guidance + manifest-derived operational
- *   sections + Codex troubleshooting
- *
- * @module assistant-assets
+ * @module n-dx/assistant-assets
  */
 
 import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const ASSET_DIR = resolve(__dir, "../../assistant-assets");
 
 // ── Manifest ─────────────────────────────────────────────────────────────────
 
@@ -43,9 +25,6 @@ let _manifestCache = null;
 /**
  * Load the full asset manifest from `manifest.json`.
  *
- * The manifest is the single source of truth for skills, MCP server
- * descriptors, and vendor delivery targets.
- *
  * @returns {{ skills: Record<string, { description: string, argumentHint?: string }>,
  *             mcpServers: Record<string, object>,
  *             vendors: Record<string, object> }}
@@ -53,7 +32,7 @@ let _manifestCache = null;
 export function getManifest() {
   if (!_manifestCache) {
     _manifestCache = JSON.parse(
-      readFileSync(join(__dir, "manifest.json"), "utf-8"),
+      readFileSync(join(ASSET_DIR, "manifest.json"), "utf-8"),
     );
   }
   return _manifestCache;
@@ -61,9 +40,6 @@ export function getManifest() {
 
 /**
  * Load the skill registry (backward-compatible view of the manifest).
- *
- * Returns the same `{ skills: ... }` shape that registry.json provided.
- * Existing callers that used `getRegistry().skills[name]` continue to work.
  *
  * @returns {{ skills: Record<string, { description: string, argumentHint?: string }> }}
  */
@@ -88,12 +64,11 @@ export function getSkillNames() {
 /**
  * Read the markdown body for a single skill.
  *
- * @param {string} name  Skill name (e.g. "ndx-plan")
- * @returns {string}     Markdown body (no vendor-specific frontmatter)
- * @throws {Error}       If the skill file does not exist
+ * @param {string} name
+ * @returns {string}
  */
 export function getSkillBody(name) {
-  const file = join(__dir, "skills", `${name}.md`);
+  const file = join(ASSET_DIR, "skills", `${name}.md`);
   if (!existsSync(file)) {
     throw new Error(`Skill body not found: ${file}`);
   }
@@ -103,7 +78,7 @@ export function getSkillBody(name) {
 /**
  * Read all skill bodies keyed by name.
  *
- * @returns {Map<string, string>}  skill name -> markdown body
+ * @returns {Map<string, string>}
  */
 export function getAllSkillBodies() {
   const bodies = new Map();
@@ -118,10 +93,6 @@ export function getAllSkillBodies() {
 /**
  * Return the MCP server descriptors from the manifest.
  *
- * Each descriptor contains package location, npm name, CLI entrypoint,
- * and tool lists categorized as `read` (safe to auto-approve) or `write`
- * (require user confirmation).
- *
  * @returns {Record<string, { package: string, npmName: string, entrypoint: string,
  *                            mcpCommand: string, tools: { read: string[], write: string[] } }>}
  */
@@ -132,10 +103,9 @@ export function getMcpServers() {
 /**
  * Return a single MCP server descriptor by name.
  *
- * @param {string} name  Server name (e.g. "rex", "sourcevision")
+ * @param {string} name
  * @returns {{ package: string, npmName: string, entrypoint: string,
  *             mcpCommand: string, tools: { read: string[], write: string[] } }}
- * @throws {Error}  If the server is not in the manifest
  */
 export function getMcpServer(name) {
   const servers = getMcpServers();
@@ -150,16 +120,9 @@ export function getMcpServer(name) {
 /**
  * Render a `.codex/config.toml` file with stdio MCP server definitions.
  *
- * Uses the manifest's MCP server descriptors to produce a TOML config that
- * Codex can read without requiring `ndx start`.  Each server is defined as
- * a `[mcp_servers.<name>]` table with `command` and `args` keys.
- *
- * @param {string} projectDir  Absolute path to the project root (used to
- *                             resolve sub-package CLI paths)
+ * @param {string} projectDir
  * @param {(pkgDir: string, npmName: string) => string} resolveCli
- *   Function that resolves the absolute path to a sub-package CLI entry
- *   point, given its relative package directory and npm name.
- * @returns {string}  Complete TOML file content
+ * @returns {string}
  */
 export function renderCodexConfigToml(projectDir, resolveCli) {
   const servers = getMcpServers();
@@ -172,7 +135,7 @@ export function renderCodexConfigToml(projectDir, resolveCli) {
   for (const [name, descriptor] of Object.entries(servers)) {
     const absEntrypoint = resolveCli(descriptor.package, descriptor.npmName);
     lines.push(`[mcp_servers.${name}]`);
-    lines.push(`command = "node"`);
+    lines.push('command = "node"');
     lines.push(`args = [${tomlStringArray([absEntrypoint, descriptor.mcpCommand, projectDir])}]`);
     lines.push("");
   }
@@ -184,7 +147,7 @@ export function renderCodexConfigToml(projectDir, resolveCli) {
  * Format an array of strings as a TOML inline array.
  *
  * @param {string[]} items
- * @returns {string}  e.g. `"a", "b", "c"`
+ * @returns {string}
  */
 function tomlStringArray(items) {
   return items.map((s) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(", ");
@@ -205,10 +168,9 @@ export function getVendors() {
 /**
  * Return the delivery target descriptor for a specific vendor.
  *
- * @param {string} vendor  Vendor id ("claude" or "codex")
+ * @param {string} vendor
  * @returns {{ skillDir: string, skillFile: string, skillWrapper: string,
  *             toolPrefix: string | null, instructionFile: string }}
- * @throws {Error}  If the vendor is not in the manifest
  */
 export function getVendorTarget(vendor) {
   const vendors = getVendors();
@@ -221,14 +183,11 @@ export function getVendorTarget(vendor) {
 // ── Tool ID derivation ──────────────────────────────────────────────────────
 
 /**
- * Derive the vendor-prefixed tool IDs for a given tier (read or write).
+ * Derive the vendor-prefixed tool IDs for a given tier.
  *
- * For Claude, read tools become `["mcp__rex__get_prd_status", ...]`.
- * For vendors without a prefix (e.g. codex), bare tool names are returned.
- *
- * @param {string} vendor  Vendor id
- * @param {"read" | "write"} tier  Tool tier
- * @returns {string[]}  Vendor-prefixed (or bare) tool IDs
+ * @param {string} vendor
+ * @param {"read" | "write"} tier
+ * @returns {string[]}
  */
 export function getToolIds(vendor, tier) {
   const vendorTarget = getVendorTarget(vendor);
@@ -250,11 +209,9 @@ export function getToolIds(vendor, tier) {
 }
 
 /**
- * Derive the vendor-prefixed read-only tool IDs (suitable for auto-approval).
+ * Derive the vendor-prefixed read-only tool IDs.
  *
- * Convenience wrapper around `getToolIds(vendor, "read")`.
- *
- * @param {string} vendor  Vendor id
+ * @param {string} vendor
  * @returns {string[]}
  */
 export function getAutoApprovedToolIds(vendor) {
@@ -266,17 +223,9 @@ export function getAutoApprovedToolIds(vendor) {
 /**
  * Render a single skill for a specific vendor.
  *
- * This is the primary render contract function.  Vendor adapters call this
- * instead of building skill content themselves.  The manifest controls the
- * wrapper format; vendor adapters only write the returned string to disk.
- *
- * Supported wrappers:
- * - `"yaml-frontmatter"` (Claude): YAML block with name/description/argument-hint + body
- * - `"plain"` (Codex): raw markdown body (no wrapper)
- *
- * @param {string} name    Skill name (e.g. "ndx-plan")
- * @param {string} vendor  Vendor id ("claude" or "codex")
- * @returns {string}       Fully rendered skill content
+ * @param {string} name
+ * @param {string} vendor
+ * @returns {string}
  */
 export function renderSkill(name, vendor) {
   const vendorTarget = getVendorTarget(vendor);
@@ -302,8 +251,8 @@ export function renderSkill(name, vendor) {
 /**
  * Render all skills for a specific vendor.
  *
- * @param {string} vendor  Vendor id ("claude" or "codex")
- * @returns {Record<string, string>}  skill name -> rendered content
+ * @param {string} vendor
+ * @returns {Record<string, string>}
  */
 export function renderAllSkills(vendor) {
   const result = {};
@@ -318,16 +267,8 @@ export function renderAllSkills(vendor) {
 /**
  * Write all rendered skills to disk for a given vendor.
  *
- * This is the canonical generation function — both Claude and Codex init
- * paths should call this instead of reimplementing skill file I/O.  The
- * manifest's vendor delivery target determines the output directory
- * structure and file naming.
- *
- * Output layout:
- *   {projectDir}/{vendorTarget.skillDir}/{skillName}/{vendorTarget.skillFile}
- *
- * @param {string} vendor     Vendor id ("claude" or "codex")
- * @param {string} projectDir Absolute path to the project root
+ * @param {string} vendor
+ * @param {string} projectDir
  * @returns {{ written: number, dir: string }}
  */
 export function writeVendorSkills(vendor, projectDir) {
@@ -351,25 +292,15 @@ export function writeVendorSkills(vendor, projectDir) {
 // ── Claude-specific aliases (backward compatibility) ────────────────────────
 
 /**
- * Render a skill as a Claude Code SKILL.md (YAML frontmatter + body).
- *
- * Equivalent to `renderSkill(name, "claude")`.  Kept for backward
- * compatibility with existing callers and tests.
- *
- * @param {string} name  Skill name
- * @returns {string}     Complete SKILL.md content
+ * @param {string} name
+ * @returns {string}
  */
 export function renderClaudeSkill(name) {
   return renderSkill(name, "claude");
 }
 
 /**
- * Render all skills as Claude Code SKILL.md content.
- *
- * Equivalent to `renderAllSkills("claude")`.  Kept for backward
- * compatibility with existing callers and tests.
- *
- * @returns {Record<string, string>}  skill name -> SKILL.md content
+ * @returns {Record<string, string>}
  */
 export function renderAllClaudeSkills() {
   return renderAllSkills("claude");
@@ -378,11 +309,9 @@ export function renderAllClaudeSkills() {
 // ── Internal renderers ──────────────────────────────────────────────────────
 
 /**
- * Build YAML frontmatter + body for a skill.
- *
- * @param {string} name                   Skill name
- * @param {{ description: string, argumentHint?: string }} meta  Skill metadata
- * @param {string} body                   Markdown body
+ * @param {string} name
+ * @param {{ description: string, argumentHint?: string }} meta
+ * @param {string} body
  * @returns {string}
  */
 function renderYamlFrontmatter(name, meta, body) {
@@ -391,64 +320,38 @@ function renderYamlFrontmatter(name, meta, body) {
     lines.push(`argument-hint: "${meta.argumentHint}"`);
   }
   lines.push("---");
-
-  // Blank line separates YAML frontmatter from body (standard convention)
   return lines.join("\n") + "\n\n" + body;
 }
 
 // ── Shared project guidance ──────────────────────────────────────────────────
 
 /**
- * Read the shared project guidance template.
- *
- * This is the single source of truth for project documentation sections
- * (Packages, Architecture, Commands, MCP, Key Files, etc.) that both
- * CLAUDE.md and AGENTS.md need.  Contains a `<!-- ADDENDUM -->` marker
- * where Claude-specific deep sections are inserted.
- *
- * @returns {string}  Raw markdown content of project-guidance.md
+ * @returns {string}
  */
 export function getProjectGuidance() {
-  return readFileSync(join(__dir, "project-guidance.md"), "utf-8");
+  return readFileSync(join(ASSET_DIR, "project-guidance.md"), "utf-8");
 }
 
 /**
- * Read the Claude-specific addendum (zone governance, gateway details,
- * injection seams, concurrency contract).
- *
- * Inserted at the `<!-- ADDENDUM -->` marker in project-guidance.md when
- * rendering CLAUDE.md.
- *
- * @returns {string}  Raw markdown content of claude-addendum.md
+ * @returns {string}
  */
 export function getClaudeAddendum() {
-  return readFileSync(join(__dir, "claude-addendum.md"), "utf-8");
+  return readFileSync(join(ASSET_DIR, "claude-addendum.md"), "utf-8");
 }
 
 /**
- * Read the Codex troubleshooting section.
- *
- * Appended to AGENTS.md after the manifest-derived operational sections.
- *
- * @returns {string}  Raw markdown content of codex-troubleshooting.md
+ * @returns {string}
  */
 export function getCodexTroubleshooting() {
-  return readFileSync(join(__dir, "codex-troubleshooting.md"), "utf-8");
+  return readFileSync(join(ASSET_DIR, "codex-troubleshooting.md"), "utf-8");
 }
 
 // ── Section filtering ────────────────────────────────────────────────────────
 
 /**
- * Filter a markdown document to exclude top-level sections (## headings)
- * whose names appear in `exclude`.
- *
- * A "section" begins at a `## ` heading and runs until the next `## `
- * heading or end of file.  Sub-headings (###, ####) within a section are
- * included or excluded with their parent.
- *
- * @param {string} content     Markdown content
- * @param {Set<string>} exclude  Set of heading texts to exclude (without the `## ` prefix)
- * @returns {string}  Filtered markdown
+ * @param {string} content
+ * @param {Set<string>} exclude
+ * @returns {string}
  */
 function filterSections(content, exclude) {
   const lines = content.split("\n");
@@ -471,18 +374,7 @@ function filterSections(content, exclude) {
 // ── CLAUDE.md rendering ──────────────────────────────────────────────────────
 
 /**
- * Render the project-local `CLAUDE.md` instruction file.
- *
- * Combines the shared project guidance with the Claude-specific addendum
- * (zone governance, gateway details, injection seams, concurrency contract).
- * The `<!-- ADDENDUM -->` marker in project-guidance.md is replaced with
- * the claude-addendum.md content.
- *
- * The generated file is the Claude-facing surface that Claude Code loads
- * automatically on startup.  It mirrors the same base project guidance
- * that AGENTS.md delivers to Codex, plus Claude-specific deep sections.
- *
- * @returns {string}  Complete CLAUDE.md content
+ * @returns {string}
  */
 export function renderClaudeMd() {
   const guidance = getProjectGuidance();
@@ -499,27 +391,13 @@ export function renderClaudeMd() {
 // ── AGENTS.md rendering ─────────────────────────────────────────────────────
 
 /**
- * Render a project-local `AGENTS.md` for Codex.
- *
- * Combines the shared project guidance (filtering out MCP Servers and
- * Development Workflow — replaced by manifest-derived versions) with
- * manifest-derived operational sections (Workflow, Skills, MCP tool
- * reference, usage guidance) and Codex troubleshooting.
- *
- * The shared guidance ensures Codex receives the same base project
- * documentation (Packages, Architecture, Commands, Key Files) that
- * CLAUDE.md delivers to Claude, eliminating instruction drift between
- * the two assistant surfaces.
- *
- * @returns {string}  Complete AGENTS.md content
+ * @returns {string}
  */
 export function renderAgentsMd() {
   const manifest = getManifest();
   const skills = manifest.skills;
   const servers = manifest.mcpServers;
 
-  // Start with shared project guidance, filtering out sections that are
-  // replaced by manifest-derived equivalents below.
   const guidance = getProjectGuidance();
   const filteredGuidance = filterSections(
     guidance.replace("<!-- ADDENDUM -->\n", ""),
@@ -528,16 +406,13 @@ export function renderAgentsMd() {
 
   const sections = [];
 
-  // ── Header ──────────────────────────────────────────────────────────
   sections.push(
     "<!-- Generated by ndx init — do not edit manually. Re-run `ndx init` to regenerate. -->",
     "",
   );
 
-  // ── Shared project guidance (filtered) ─────────────────────────────
   sections.push(filteredGuidance.trim(), "");
 
-  // ── Workflow ─────────────────────────────────────────────────────────
   sections.push(
     "## Workflow",
     "",
@@ -555,7 +430,6 @@ export function renderAgentsMd() {
     "",
   );
 
-  // ── Skills ──────────────────────────────────────────────────────────
   sections.push(
     "## Available Skills",
     "",
@@ -570,7 +444,6 @@ export function renderAgentsMd() {
   }
   sections.push("");
 
-  // ── MCP servers ─────────────────────────────────────────────────────
   sections.push(
     "## MCP Servers",
     "",
@@ -582,7 +455,6 @@ export function renderAgentsMd() {
   for (const [serverName, descriptor] of Object.entries(servers)) {
     sections.push(`### ${serverName}`, "");
 
-    // Read tools
     if (descriptor.tools.read.length > 0) {
       sections.push(
         "**Read tools** (safe to call frequently, no side effects):",
@@ -594,7 +466,6 @@ export function renderAgentsMd() {
       sections.push("");
     }
 
-    // Write tools
     if (descriptor.tools.write.length > 0) {
       sections.push("**Write tools** (modify project state, use with care):", "");
       for (const tool of descriptor.tools.write) {
@@ -604,7 +475,6 @@ export function renderAgentsMd() {
     }
   }
 
-  // ── When to use each server ─────────────────────────────────────────
   sections.push(
     "## When to Use Each Server",
     "",
@@ -625,7 +495,6 @@ export function renderAgentsMd() {
     "",
   );
 
-  // ── Codex troubleshooting ──────────────────────────────────────────
   const troubleshooting = getCodexTroubleshooting();
   sections.push(troubleshooting.trim(), "");
 
@@ -635,14 +504,10 @@ export function renderAgentsMd() {
 // ── File-system discovery (for test validation) ─────────────────────────────
 
 /**
- * List all `.md` files present in `skills/`, returning their base names
- * (without extension).  This is useful for tests that need to verify the
- * directory contents match the manifest.
- *
  * @returns {string[]}
  */
 export function listSkillFiles() {
-  const dir = join(__dir, "skills");
+  const dir = join(ASSET_DIR, "skills");
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((f) => f.endsWith(".md"))

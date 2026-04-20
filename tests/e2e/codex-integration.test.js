@@ -6,7 +6,7 @@
  *   1. renderAgentsMd() produces correct markdown from manifest data
  *   2. renderCodexConfigToml() produces valid TOML with correct structure
  *   3. setupCodexIntegration() writes config, skills, and AGENTS.md to disk
- *   4. codex-integration.js imports from assistant-assets/ (no inline defs)
+ *   4. codex-integration.js imports from the core assistant-assets module (no inline defs)
  *   5. --no-codex flag suppresses Codex artifact generation during init
  */
 
@@ -22,7 +22,7 @@ import {
   renderCodexConfigToml,
   renderAgentsMd,
   renderClaudeMd,
-} from "../../assistant-assets/index.js";
+} from "../../packages/core/assistant-assets.js";
 import {
   setupCodexIntegration,
   printCodexSetupSummary,
@@ -342,8 +342,8 @@ describe("setupCodexIntegration", () => {
 describe("codex-integration.js uses canonical source", () => {
   const src = readFileSync(join(ROOT, "packages/core/codex-integration.js"), "utf-8");
 
-  it("imports from assistant-assets/", () => {
-    expect(src).toContain('from "../../assistant-assets/index.js"');
+  it("imports from the core assistant-assets module", () => {
+    expect(src).toContain('from "./assistant-assets.js"');
   });
 
   it("imports writeVendorSkills from the render contract", () => {
@@ -362,7 +362,7 @@ describe("codex-integration.js uses canonical source", () => {
     if (/^const SKILLS\s*=\s*\{/m.test(src)) {
       expect.fail(
         "codex-integration.js contains an inline SKILLS object.\n" +
-        "It should import skills from assistant-assets/ instead.",
+        "It should import skills from packages/core/assistant-assets.js instead.",
       );
     }
   });
@@ -372,7 +372,7 @@ describe("codex-integration.js uses canonical source", () => {
     if (/\[mcp_servers\.rex\]/.test(src)) {
       expect.fail(
         "codex-integration.js contains hardcoded TOML server definitions.\n" +
-        "It should use renderCodexConfigToml() from assistant-assets/ instead.",
+        "It should use renderCodexConfigToml() from packages/core/assistant-assets.js instead.",
       );
     }
   });

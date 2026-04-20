@@ -139,7 +139,7 @@
         "packages/hench/tests/unit/agent/token-usage.test.ts": "hench-token-usage",
         "tests/integration/claude-config-validation.test.js": "integration",
         "tests/integration/codex-config-validation.test.js": "integration",
-        "assistant-assets/index.js": "core",
+        "packages/core/assistant-assets.js": "core",
         "packages/core/assistant-integration.js": "core",
         "packages/core/claude-integration.js": "core",
         "packages/core/codex-integration.js": "core"

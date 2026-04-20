@@ -20,7 +20,7 @@ import {
   getSkillNames,
   getVendorTarget,
   listSkillFiles,
-} from "../../assistant-assets/index.js";
+} from "../../packages/core/assistant-assets.js";
 import { setupCodexIntegration } from "../../packages/core/codex-integration.js";
 
 // ── Shared setup: generate all artifacts once ───────────────────────────────

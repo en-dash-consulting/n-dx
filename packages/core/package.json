@@ -54,6 +54,7 @@
     "refresh-plan.js",
     "refresh-artifacts.js",
     "export.js",
+    "assistant-assets.js",
     "claude-integration.js",
     "refresh-validate.js",
     "init-llm.js",

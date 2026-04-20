@@ -26,7 +26,7 @@ import {
   writeVendorSkills,
   renderCodexConfigToml,
   renderAgentsMd,
-} from "../../assistant-assets/index.js";
+} from "./assistant-assets.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const _require = createRequire(import.meta.url);

@@ -28,7 +28,7 @@ import {
   getMcpServers,
   writeVendorSkills,
   renderClaudeMd,
-} from "../../assistant-assets/index.js";
+} from "./assistant-assets.js";
 import { homedir } from "os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));

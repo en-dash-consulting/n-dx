@@ -13,7 +13,7 @@ import {
   getManifest,
   getSkillNames,
   getSkillBody,
-} from "../../assistant-assets/index.js";
+} from "../../packages/core/assistant-assets.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 

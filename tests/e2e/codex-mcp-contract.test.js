@@ -22,7 +22,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { join, resolve, isAbsolute, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { getMcpServers } from "../../assistant-assets/index.js";
+import { getMcpServers } from "../../packages/core/assistant-assets.js";
 import { setupCodexIntegration } from "../../packages/core/codex-integration.js";
 import {
   setupRexDir,
