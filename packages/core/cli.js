@@ -2006,6 +2006,63 @@ function showMainHelp() {
   console.log(formatMainHelp());
 }
 
+// ── Command dispatch map ─────────────────────────────────────────────────────
+
+/**
+ * Maps each CLI command name to its handler.
+ * All handlers accept (rest: string[]) as their sole argument.
+ * Commands that require extra arguments use a wrapper closure.
+ *
+ * Keeping this as a data structure rather than a switch statement limits
+ * the command-dispatch path to a single Map.get + invoke, making it easy
+ * to audit the full command surface and reducing fan-out in main().
+ */
+const COMMAND_DISPATCH = new Map([
+  // ── Core commands ──
+  ["version",           handleVersion],
+  ["help",              handleHelp],
+  ["init",              handleInit],
+  ["analyze",           handleAnalyze],
+  ["recommend",         handleRecommend],
+  ["plan",              handlePlan],
+  ["add",               handleAdd],
+  ["refresh",           handleRefresh],
+  ["work",              handleWork],
+  ["status",            handleStatus],
+  ["usage",             handleUsage],
+  ["sync",              handleSync],
+  ["ci",                handleCI],
+  ["dev",               handleDev],
+  ["start",             (rest) => handleStart(rest, "start")],
+  ["web",               (rest) => handleStart(rest, "web")],
+  ["export",            handleExport],
+  ["config",            handleConfig],
+  ["self-heal",         handleSelfHeal],
+  // ── Delegated rex commands ──
+  ["validate",          handleValidate],
+  ["fix",               handleFix],
+  ["health",            handleHealth],
+  ["report",            handleReport],
+  ["verify",            handleVerify],
+  ["update",            handleUpdate],
+  ["remove",            handleRemove],
+  ["move",              handleMove],
+  ["reshape",           handleReshape],
+  ["reorganize",        handleReorganize],
+  ["prune",             handlePrune],
+  ["next",              handleNext],
+  // ── Delegated sourcevision commands ──
+  ["reset",             handleReset],
+  // ── Delegated hench commands ──
+  ["show",              handleShow],
+  // ── Renamed: single-command / sc → pair-programming / bicker ──
+  ["single-command",    () => handleRenamedCommand("single-command", "pair-programming", "bicker")],
+  ["sc",                () => handleRenamedCommand("sc", "pair-programming", "bicker")],
+  // ── Pair-programming (cross-vendor review) ──
+  ["pair-programming",  handlePairProgramming],
+  ["bicker",            handlePairProgramming],
+]);
+
 // ── Module-level setup ───────────────────────────────────────────────────────
 
 const tools = {
@@ -2119,66 +2176,18 @@ async function main() {
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {
-    switch (command) {
-      case "version":   return handleVersion(rest);
-      case "help":      return handleHelp(rest);
-      case "init":      return handleInit(rest);
-      case "analyze":   return handleAnalyze(rest);
-      case "recommend": return handleRecommend(rest);
-      case "plan":      return handlePlan(rest);
-      case "add":       return handleAdd(rest);
-      case "refresh":   return handleRefresh(rest);
-      case "work":      return handleWork(rest);
-      case "status":  return handleStatus(rest);
-      case "usage":   return handleUsage(rest);
-      case "sync":    return handleSync(rest);
-      case "ci":      return handleCI(rest);
-      case "dev":     return handleDev(rest);
-      case "start":   return handleStart(rest, "start");
-      case "web":     return handleStart(rest, "web");
-      case "export":    return handleExport(rest);
-      case "config":    return handleConfig(rest);
-      case "self-heal": return handleSelfHeal(rest);
-
-      // ── Delegated rex commands ──
-      case "validate":    return handleValidate(rest);
-      case "fix":         return handleFix(rest);
-      case "health":      return handleHealth(rest);
-      case "report":      return handleReport(rest);
-      case "verify":      return handleVerify(rest);
-      case "update":      return handleUpdate(rest);
-      case "remove":      return handleRemove(rest);
-      case "move":        return handleMove(rest);
-      case "reshape":     return handleReshape(rest);
-      case "reorganize":  return handleReorganize(rest);
-      case "prune":       return handlePrune(rest);
-      case "next":        return handleNext(rest);
-
-      // ── Delegated sourcevision commands ──
-      case "reset":       return handleReset(rest);
-
-      // ── Delegated hench commands ──
-      case "show":        return handleShow(rest);
-
-      // ── Renamed: single-command / sc → pair-programming / bicker ──
-      case "single-command": return handleRenamedCommand("single-command", "pair-programming", "bicker");
-      case "sc":             return handleRenamedCommand("sc", "pair-programming", "bicker");
-
-      // ── Pair-programming (cross-vendor review) ──
-      case "pair-programming":
-      case "bicker":      return handlePairProgramming(rest);
-    }
+    const handler = COMMAND_DISPATCH.get(command);
+    if (handler) return handler(rest);
 
     // ── Tool delegation ─────────────────────────────────────────────────────
     if (tools[command]) {
       const code = await run(tools[command], rest);
       exitWithCleanup(code);
+      return;
     }
 
     // ── Unknown command or no command ───────────────────────────────────────
-    if (command) {
-      return handleUnknownCommand(command);
-    }
+    if (command) return handleUnknownCommand(command);
 
     showMainHelp();
     exitWithCleanup(0);

@@ -57,7 +57,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "in_progress",
+          "status": "completed",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
@@ -72,7 +72,10 @@
             "dx"
           ],
           "source": "conversation — hit when Steve's Windows cli_path in .n-dx.json broke ndx init on macOS",
-          "startedAt": "2026-04-02T17:55:34.698Z"
+          "startedAt": "2026-04-02T17:55:34.698Z",
+          "completedAt": "2026-04-20T14:04:53.684Z",
+          "resolutionType": "code-change",
+          "resolutionDetail": "Implementation already present in config.js and cli.js; all tests pass."
         },
         {
           "id": "f9b208b6-43d9-44d3-a1cf-518e956aabd5",
@@ -434,7 +437,7 @@
             {
               "id": "1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
               "title": "Add timeout configuration panel to web settings UI",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Surface the CLI timeout settings in the n-dx web dashboard settings panel so users can view and update timeouts without touching the CLI. The panel should show the current global default and any per-command overrides, with save/reset controls that write back to .n-dx.json via the existing config API.",
               "acceptanceCriteria": [
@@ -452,7 +455,10 @@
                 "settings"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-03T18:58:26.092Z"
+              "startedAt": "2026-04-03T18:58:26.092Z",
+              "completedAt": "2026-04-20T14:09:06.617Z",
+              "resolutionType": "acknowledgment",
+              "resolutionDetail": "Feature fully implemented in packages/web: CliTimeoutsView (cli-timeout.ts), routes-cli-timeout.ts (GET/PUT /api/cli/timeouts), CSS, view registry, server route registration, and unit tests. All 5 ACs satisfied."
             }
           ]
         }
@@ -785,10 +791,11 @@
     {
       "id": "294d6dd5-b412-496d-86bf-2035b228690f",
       "title": "CLI & Developer Tools",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "startedAt": "2026-04-16T16:56:22.800Z",
+      "completedAt": "2026-04-20T14:16:55.985Z",
       "children": [
         {
           "id": "8a8661f8-f768-412e-afda-f603f604f2fb",
@@ -3353,6 +3360,423 @@
           ]
         }
       ]
+    },
+    {
+      "id": "96aed149-3558-4253-a529-7cf3678b1d67",
+      "title": "Code Health: 11 findings across 6 zones",
+      "status": "pending",
+      "level": "epic",
+      "description": "Automated recommendations from SourceVision analysis. 10 zone+category groups covering 11 total findings.",
+      "priority": "high",
+      "source": "sourcevision",
+      "children": [
+        {
+          "id": "b0a511ce-9bfe-47fc-ab6e-1b66d27302d3",
+          "title": "Fix observation in global (2 findings)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-shared\" ↔ \"web-viewer\" (1+11 crossings) — consider extracting shared interface",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "00474be0-22fb-4ea1-802c-f5770696f29a",
+              "title": "Fix observation in global: Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider  (+1 more)",
+              "status": "pending",
+              "level": "task",
+              "description": "- Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-shared\" ↔ \"web-viewer\" (1+11 crossings) — consider extracting shared interface",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "f572756e3ffb",
+                  "63e527229461"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 2
+                },
+                "findingCount": 2
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "f572756e3ffb",
+              "63e527229461"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 2
+            },
+            "findingCount": 2
+          }
+        },
+        {
+          "id": "90170684-ba0b-4cc6-b0a2-3dee79ebd88a",
+          "title": "Fix structural in global (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Three of five zones sit at or below cohesion 0.4; all three (web-3, polling, web-4) live under packages/web/src/viewer/ — the viewer package would benefit from barrel files at the polling/ and loader sub-directories to make public APIs explicit and reduce Louvain boundary ambiguity.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "5831bfa9-0b2e-40b7-ac96-35bce716948f",
+              "title": "Fix structural in global: Three of five zones sit at or below cohesion 0.4; all three (web-3, polling, web",
+              "status": "pending",
+              "level": "task",
+              "description": "- Three of five zones sit at or below cohesion 0.4; all three (web-3, polling, web-4) live under packages/web/src/viewer/ — the viewer package would benefit from barrel files at the polling/ and loader sub-directories to make public APIs explicit and reduce Louvain boundary ambiguity.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "279c04baa6d5"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "279c04baa6d5"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "914b2f99-8e1c-4c9c-a20e-646b2cd878e9",
+          "title": "Fix observation in hench (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- 9 entry points — wide API surface, consider consolidating exports",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "c44226b4-d00c-473b-9c7b-8109d052de08",
+              "title": "Fix observation in hench: 9 entry points — wide API surface, consider consolidating exports",
+              "status": "pending",
+              "level": "task",
+              "description": "- 9 entry points — wide API surface, consider consolidating exports",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "23f3f2dc98c7"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "23f3f2dc98c7"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "9ba16b60-230d-4c2f-a81e-e6606e9c0b52",
+          "title": "Fix observation in viewer-data-loader (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- High coupling (0.6) — 9 imports target \"web-viewer\"",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "b97918ac-e640-4ed3-bac3-fbea90474e04",
+              "title": "Fix observation in viewer-data-loader: High coupling (0.6) — 9 imports target \"web-viewer\"",
+              "status": "pending",
+              "level": "task",
+              "description": "- High coupling (0.6) — 9 imports target \"web-viewer\"",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "df76658aed26"
+                ],
+                "category": "observation",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "df76658aed26"
+            ],
+            "category": "observation",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "15fc8ef8-ac04-4066-b712-9e189d803955",
+          "title": "Fix structural in viewer-data-loader (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Cohesion (0.4) and coupling (0.6) both sit at warning thresholds; the zone mixes a hook, a service, a utility, and a schema validator — consider whether schema-compat and validate belong in a dedicated schema sub-module to raise cohesion.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "506ef736-4331-4f59-8a72-84c6ca8fdd56",
+              "title": "Fix structural in viewer-data-loader: Cohesion (0.4) and coupling (0.6) both sit at warning thresholds; the zone mixes",
+              "status": "pending",
+              "level": "task",
+              "description": "- Cohesion (0.4) and coupling (0.6) both sit at warning thresholds; the zone mixes a hook, a service, a utility, and a schema validator — consider whether schema-compat and validate belong in a dedicated schema sub-module to raise cohesion.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "37c75281a094"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "37c75281a094"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "0ee552a6-b9ba-4e0b-b46a-1ece77055084",
+          "title": "Fix code in viewer-data-loader (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Only one test file (loader-onchange.test.ts) is present for four production files; the core loader.ts load path appears untested.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "3b22f20b-28ae-42d3-9a53-e045b866fbff",
+              "title": "Fix code in viewer-data-loader: Only one test file (loader-onchange.test.ts) is present for four production file",
+              "status": "pending",
+              "level": "task",
+              "description": "- Only one test file (loader-onchange.test.ts) is present for four production files; the core loader.ts load path appears untested.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "de10e1973450"
+                ],
+                "category": "code",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "de10e1973450"
+            ],
+            "category": "code",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "6552133b-a754-4087-8824-964204c35ab3",
+          "title": "Fix move-file in core (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant-assets/ — consider moving to packages/core/ to align physical location with architectural zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "24559322-b6ac-48c2-a1f5-85d19d529d78",
+              "title": "Fix move-file in core: File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant",
+              "status": "pending",
+              "level": "task",
+              "description": "- File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant-assets/ — consider moving to packages/core/ to align physical location with architectural zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "8af54c874140"
+                ],
+                "category": "move-file",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "8af54c874140"
+            ],
+            "category": "move-file",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "573db51d-2b91-4755-8910-48f0b123c2a8",
+          "title": "Fix move-file in web-viewer (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- File \"packages/web/src/viewer/hooks/use-polling.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/hooks/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "26cb2890-9483-4005-a6de-ef83ca613eed",
+              "title": "Fix move-file in web-viewer: File \"packages/web/src/viewer/hooks/use-polling.ts\" is pinned to zone \"Web Viewe",
+              "status": "pending",
+              "level": "task",
+              "description": "- File \"packages/web/src/viewer/hooks/use-polling.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/hooks/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "982af57cac3f"
+                ],
+                "category": "move-file",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "982af57cac3f"
+            ],
+            "category": "move-file",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "40e86ebd-e7be-4c1c-a9bb-4345275afb6a",
+          "title": "Fix structural in viewer-polling-engine (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- Cohesion (0.4) and coupling (0.6) are both at warning thresholds; the three-file split across state, restart, and suspension suggests the zone may be at a natural boundary — add a barrel index.ts to make the public API explicit before adding more files.",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "94bc747b-104f-45d3-a0d4-22e48b415188",
+              "title": "Fix structural in viewer-polling-engine: Cohesion (0.4) and coupling (0.6) are both at warning thresholds; the three-file",
+              "status": "pending",
+              "level": "task",
+              "description": "- Cohesion (0.4) and coupling (0.6) are both at warning thresholds; the three-file split across state, restart, and suspension suggests the zone may be at a natural boundary — add a barrel index.ts to make the public API explicit before adding more files.",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "1d48a1d277b8"
+                ],
+                "category": "structural",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              }
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "1d48a1d277b8"
+            ],
+            "category": "structural",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        },
+        {
+          "id": "f98f84de-abb1-422f-b11f-355f25b95ae9",
+          "title": "Fix anti-pattern in global (1 finding)",
+          "status": "pending",
+          "level": "feature",
+          "description": "- God function: runCommand in packages/core/cli.js calls 38 unique functions — consider decomposing into smaller, focused functions",
+          "priority": "high",
+          "source": "sourcevision",
+          "children": [
+            {
+              "id": "a2d6ca96-f4df-4fe9-ba05-8f7ae39ed639",
+              "title": "Fix anti-pattern in global: God function: runCommand in packages/core/cli.js calls 38 unique functions — con",
+              "status": "in_progress",
+              "level": "task",
+              "description": "- God function: runCommand in packages/core/cli.js calls 38 unique functions — consider decomposing into smaller, focused functions",
+              "priority": "high",
+              "source": "sourcevision",
+              "recommendationMeta": {
+                "findingHashes": [
+                  "730fa50e8d3a"
+                ],
+                "category": "anti-pattern",
+                "severityDistribution": {
+                  "warning": 1
+                },
+                "findingCount": 1
+              },
+              "startedAt": "2026-04-20T14:23:57.385Z"
+            }
+          ],
+          "recommendationMeta": {
+            "findingHashes": [
+              "730fa50e8d3a"
+            ],
+            "category": "anti-pattern",
+            "severityDistribution": {
+              "warning": 1
+            },
+            "findingCount": 1
+          }
+        }
+      ],
+      "recommendationMeta": {
+        "findingCount": 11
+      }
     }
   ]
 }
