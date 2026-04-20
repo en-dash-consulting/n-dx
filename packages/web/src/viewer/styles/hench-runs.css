@@ -523,6 +523,26 @@
   word-break: break-all;
 }
 
+/* Invocation context in info grid */
+.hench-info-invocation {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.hench-info-invocation-cli {
+  color: var(--brand-teal);
+  background: color-mix(in srgb, var(--brand-teal) 10%, transparent);
+}
+
+.hench-info-invocation-api {
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+
 /* Section headers in detail */
 .hench-detail-section {
   margin-bottom: 20px;

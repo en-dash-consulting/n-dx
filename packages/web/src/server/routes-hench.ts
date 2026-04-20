@@ -112,6 +112,8 @@ interface RunSummary {
   vendor?: string;
   /** Token diagnostic status: complete, partial, or unavailable. */
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
+  /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
+  invocationContext?: "cli" | "api";
 }
 
 /** Config field metadata for the UI. */
@@ -297,6 +299,7 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
       : undefined,
     vendor: diagnostics?.vendor as string | undefined,
     tokenDiagnosticStatus: diagnostics?.tokenDiagnosticStatus as RunSummary["tokenDiagnosticStatus"],
+    invocationContext: run.invocationContext as RunSummary["invocationContext"],
   };
 }
 

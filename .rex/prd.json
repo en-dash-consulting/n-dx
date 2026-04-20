@@ -3839,7 +3839,7 @@
             {
               "id": "8f811dac-e4f2-4e47-84ea-8c425a1d6328",
               "title": "Detect and expose invocation context in hench runner",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Modify hench entry points to detect the invocation method (CLI vs API) at run initialization. Add context information to the execution output stream and run metadata so users can clearly see which interface triggered the agent execution.",
               "acceptanceCriteria": [
@@ -3855,12 +3855,15 @@
                 "logging"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-20T18:27:53.277Z"
+              "startedAt": "2026-04-20T18:27:53.277Z",
+              "completedAt": "2026-04-20T18:37:20.851Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added invocationContext field to RunRecord to detect and expose whether hench is invoked via CLI (ndx work) or API (HTTP/MCP). The context is emitted via output stream and persisted in run metadata for both CLI and dashboard visibility."
             },
             {
               "id": "eab9294a-7201-4d16-9031-fda6a89618aa",
               "title": "Display execution context indicator to users in CLI and dashboard",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Surface the invocation context visibly in CLI output when running ndx work, and in the web dashboard when viewing runs. Include the context indicator in run history, active run displays, and real-time output streams.",
               "acceptanceCriteria": [
@@ -3876,7 +3879,8 @@
                 "dashboard",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-20T18:37:35.481Z"
             }
           ]
         }
