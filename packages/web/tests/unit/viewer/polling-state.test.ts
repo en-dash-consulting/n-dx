@@ -26,7 +26,7 @@ import {
   resetPollingState,
   type PollingSourceCallbacks,
   type PollingSourceStatus,
-} from "../../../src/viewer/polling/polling-state.js";
+} from "../../../src/viewer/polling/engine/polling-state.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

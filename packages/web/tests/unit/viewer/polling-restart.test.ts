@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("../../../src/viewer/polling/polling-state.js", () => ({
+vi.mock("../../../src/viewer/polling/engine/polling-state.js", () => ({
   suspendAllSources: vi.fn(),
   resumeAllSources: vi.fn(),
   isGlobalSuspended: vi.fn(() => false),
@@ -20,12 +20,12 @@ import {
   startPollingRestart,
   stopPollingRestart,
   type PollingRestartOptions,
-} from "../../../src/viewer/polling/polling-restart.js";
+} from "../../../src/viewer/polling/engine/polling-restart.js";
 
 import {
   suspendAllSources,
   resumeAllSources,
-} from "../../../src/viewer/polling/polling-state.js";
+} from "../../../src/viewer/polling/engine/polling-state.js";
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 

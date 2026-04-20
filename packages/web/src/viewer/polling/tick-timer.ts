@@ -16,7 +16,7 @@
 
 import {
   registerPollingSource,
-} from "./polling-state.js";
+} from "./engine/index.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

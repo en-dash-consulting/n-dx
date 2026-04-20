@@ -23,7 +23,7 @@ export {
   startPollingRestart,
   stopPollingRestart,
   type PollingRestartOptions,
-} from "./polling-restart.js";
+} from "./engine/index.js";
 
 export {
   createTickVisibilityGate,
@@ -45,21 +45,30 @@ export {
 
 export {
   registerPollingSource,
+  unregisterPollingSource,
+  suspendAllSources,
+  resumeAllSources,
+  disposeAllSources,
+  isGlobalSuspended,
+  getGeneration,
+  isGenerationCurrent,
   onPollingStateChange,
   getPollingState,
   resetPollingState,
   type PollingSourceCallbacks,
   type PollingSourceConfig,
+  type PollingSourceInfo,
+  type PollingSourceStatus,
   type PollingStateSnapshot,
   type PollingStateChangeHandler,
-} from "./polling-state.js";
+} from "./engine/index.js";
 
 // ── Preact hooks ────────────────────────────────────────────────────────────
 
 export {
   usePollingSuspension,
   type UsePollingSuspensionResult,
-} from "./use-polling-suspension.js";
+} from "./engine/index.js";
 
 // ── Tab visibility ──────────────────────────────────────────────────────────
 

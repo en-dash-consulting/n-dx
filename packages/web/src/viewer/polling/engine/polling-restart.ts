@@ -140,4 +140,3 @@ export function stopPollingRestart(): void {
 
   started = false;
 }
-

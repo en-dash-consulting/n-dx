@@ -21,7 +21,7 @@ import {
 import {
   registerPollingSource,
   unregisterPollingSource,
-} from "./polling-state.js";
+} from "./engine/index.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
