@@ -27,7 +27,7 @@ import {
   countVisibleNodes,
   sliceVisibleTree,
   PROGRESSIVE_THRESHOLD,
-} from "../../../src/viewer/views/progressive-loader.js";
+} from "../../../src/viewer/components/prd-tree/progressive-loader.js";
 import {
   computeBranchStats,
   completionRatio,

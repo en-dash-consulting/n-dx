@@ -32,4 +32,17 @@ export type { RawProposal, ProposalEditorProps } from "./proposal-editor.js";
 export { ExecutionPanel } from "./execution-panel.js";
 export type { ExecutionPanelProps } from "./execution-panel.js";
 export { ReorganizePanel } from "./reorganize-panel.js";
+export {
+  countVisibleNodes,
+  sliceVisibleTree,
+  useProgressiveLoader,
+  DEFAULT_CHUNK_SIZE,
+  PROGRESSIVE_THRESHOLD,
+  LoadMoreIndicator,
+} from "./progressive-loader.js";
+export type {
+  ProgressiveSlice,
+  ProgressiveLoaderState,
+  LoadMoreIndicatorProps,
+} from "./progressive-loader.js";
 export type { SearchFacets, SearchItemStatus, SearchablePRDItem } from "./search-types.js";

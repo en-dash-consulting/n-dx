@@ -15,15 +15,15 @@
  * Search and filter operations always work on the **full** item tree —
  * progressive loading only limits the **rendering** pass, not the data.
  *
- * @see ../components/prd-tree/prd-tree.ts   — integrating component
- * @see ../components/prd-tree/compute.ts    — itemMatchesFilter used for visibility checks
+ * @see ./prd-tree.ts   — integrating component
+ * @see ./compute.ts    — itemMatchesFilter used for visibility checks
  */
 
 import { h } from "preact";
 import type { VNode } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
-import type { PRDItemData, ItemStatus } from "../components/prd-tree/types.js";
-import { itemMatchesFilter } from "../components/prd-tree/compute.js";
+import type { PRDItemData, ItemStatus } from "./types.js";
+import { itemMatchesFilter } from "./compute.js";
 
 /** Default number of nodes to render per chunk. */
 export const DEFAULT_CHUNK_SIZE = 50;
@@ -258,8 +258,6 @@ export function useProgressiveLoader(
   };
 }
 
-// ── Load More indicator component ────────────────────────────────────
-
 export interface LoadMoreIndicatorProps {
   /** Number of nodes currently rendered. */
   renderedCount: number;
@@ -293,13 +291,11 @@ export function LoadMoreIndicator({
   return h(
     "div",
     { class: "prd-load-more", role: "status", "aria-live": "polite" },
-    // Progress info
     h(
       "div",
       { class: "prd-load-more-info" },
       `Showing ${renderedCount} of ${totalCount} nodes`,
     ),
-    // Progress bar
     h(
       "div",
       {
@@ -315,7 +311,6 @@ export function LoadMoreIndicator({
         style: `width: ${Math.round((renderedCount / totalCount) * 100)}%`,
       }),
     ),
-    // Action buttons
     h(
       "div",
       { class: "prd-load-more-actions" },
@@ -327,7 +322,7 @@ export function LoadMoreIndicator({
           disabled: isLoading,
           "aria-label": `Load ${nextChunk} more nodes`,
         },
-        isLoading ? "Loading\u2026" : `Load ${nextChunk} more`,
+        isLoading ? "Loading…" : `Load ${nextChunk} more`,
       ),
       h(
         "button",
@@ -337,7 +332,7 @@ export function LoadMoreIndicator({
           disabled: isLoading,
           "aria-label": `Load all ${remaining} remaining nodes`,
         },
-        isLoading ? "Loading\u2026" : `Load all (${remaining})`,
+        isLoading ? "Loading…" : `Load all (${remaining})`,
       ),
     ),
   );
