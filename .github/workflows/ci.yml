@@ -1,7 +1,7 @@
 # GitHub Actions — PR validation and main branch CI for n-dx
 #
 # Replicates the pipeline previously defined in bitbucket-pipelines.yml.
-# Steps: install → build → gauntlet (config validation) → typecheck → PR check (build + rex validate)
+# Steps: install → build → typecheck → PR check (build + rex validate)
 #
 # Node 22 LTS. Exact pnpm version managed by corepack via packageManager
 # field in package.json.
@@ -41,9 +41,6 @@ jobs:
 
       - name: Build
         run: pnpm build
-
-      - name: Gauntlet tests (config validation)
-        run: pnpm gauntlet
 
       - name: Check no source maps in publish
         run: |

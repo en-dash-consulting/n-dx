@@ -348,6 +348,185 @@ export function runReviewerLlm({ cliPath, prompt, dir, timeout = 300_000 }) {
   });
 }
 
+/**
+ * Like runReviewerLlm but pipes stdout/stderr to both the terminal and a
+ * capture buffer so the output can be parsed for structured feedback.
+ *
+ * @param {{
+ *   cliPath: string;
+ *   prompt: string;
+ *   dir: string;
+ *   timeout?: number;
+ * }} options
+ * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
+ */
+export function runReviewerLlmCapturing({ cliPath, prompt, dir, timeout = 300_000 }) {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(cliPath, [prompt], {
+        cwd: dir,
+        stdio: ["inherit", "pipe", "pipe"],
+        shell: process.platform === "win32",
+      });
+    } catch (err) {
+      resolve({ exitCode: 1, timedOut: false, spawnError: err.message, output: "" });
+      return;
+    }
+
+    let output = "";
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+      process.stdout.write(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      output += chunk;
+      process.stderr.write(chunk);
+    });
+
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      resolve({ exitCode: 1, timedOut: true, output });
+    }, timeout);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ exitCode: code ?? 1, timedOut: false, output });
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ exitCode: 1, timedOut: false, spawnError: err.message, output });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ReviewFeedback parser
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {Object} ReviewFeedback
+ * @property {boolean} passed                         True when reviewer found no issues.
+ * @property {string[]} errors                        Issues or errors identified.
+ * @property {string[]} suggestedFixes                Fixes the reviewer recommends.
+ * @property {"passed"|"failed"|"skipped"} testVerdict  Outcome of the test run.
+ */
+
+/**
+ * Parse free-form reviewer LLM output into a structured ReviewFeedback object.
+ *
+ * Heuristics:
+ *  - "PASS" with no "FAIL" → passed: true
+ *  - Bullet/numbered list items are extracted as errors (default) or suggested
+ *    fixes when preceded by a "Suggested fix" / "Fix:" / "Recommendation:" header.
+ *  - Test verdict derived from "tests passed" / "tests failed" keywords.
+ *
+ * @param {string} output  Raw text output from the reviewer LLM.
+ * @returns {ReviewFeedback}
+ */
+export function parseReviewerOutput(output) {
+  const hasFail = /\bFAIL\b/.test(output);
+  const hasPass = /\bPASS\b/.test(output);
+  const passed = hasPass && !hasFail;
+
+  const errors = [];
+  const suggestedFixes = [];
+  let inFixSection = false;
+
+  for (const raw of output.split("\n")) {
+    const line = raw.trim();
+
+    // Section header: "Suggested fix(es)", "Fix:", "Recommendations:"
+    if (/^(?:suggested?\s+fix(?:es)?|fix(?:es)?|recommendation(?:s)?)[:]/i.test(line)) {
+      inFixSection = true;
+      continue;
+    }
+    // Section header: "Issues:", "Errors:", "Findings:" — switch to errors mode
+    if (/^(?:issue(?:s)?|error(?:s)?|finding(?:s)?|problem(?:s)?)[:]/i.test(line)) {
+      inFixSection = false;
+      continue;
+    }
+    // Markdown heading: set mode based on heading text
+    if (/^#{1,3}\s/.test(line)) {
+      inFixSection = /suggest|fix|recommendation/i.test(line);
+      continue;
+    }
+
+    // Bullet or numbered list item
+    const bulletMatch = line.match(/^(?:[-*•]|\d+[.)]) (.+)/);
+    if (bulletMatch) {
+      const content = bulletMatch[1].trim();
+      if (inFixSection) {
+        suggestedFixes.push(content);
+      } else {
+        errors.push(content);
+      }
+    }
+  }
+
+  // Test verdict
+  let testVerdict = /** @type {"passed"|"failed"|"skipped"} */ ("skipped");
+  if (/\btests?\s+passed\b|\ball\s+tests?\s+pass/i.test(output)) {
+    testVerdict = "passed";
+  } else if (/\btests?\s+failed\b|\btest\s+failure/i.test(output)) {
+    testVerdict = "failed";
+  }
+
+  return { passed, errors, suggestedFixes, testVerdict };
+}
+
+// ---------------------------------------------------------------------------
+// Remediation context builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a context payload instructing the primary model to fix only the
+ * reviewer-identified issues. Prepends any existing background context
+ * (e.g. CONTEXT.md + PRD status) so the agent retains project awareness.
+ *
+ * @param {ReviewFeedback} feedback       Parsed reviewer output.
+ * @param {string}         description    Original task description.
+ * @param {string}         [priorContext] Existing background context to prepend.
+ * @returns {string}
+ */
+export function buildRemediationContext(feedback, description, priorContext) {
+  const lines = [];
+
+  if (priorContext) {
+    lines.push(priorContext, "", "---", "");
+  }
+
+  lines.push(
+    "## Code Review Findings — Remediation Pass",
+    "",
+    `Original task: ${description}`,
+    "",
+    "The code reviewer identified the following issues. Fix ONLY these issues.",
+    "Do not add new features, refactor unrelated code, or make architectural changes.",
+    "",
+  );
+
+  if (feedback.errors.length > 0) {
+    lines.push("### Issues to fix:");
+    for (const e of feedback.errors) lines.push(`- ${e}`);
+    lines.push("");
+  }
+
+  if (feedback.suggestedFixes.length > 0) {
+    lines.push("### Reviewer suggested fixes:");
+    for (const f of feedback.suggestedFixes) lines.push(`- ${f}`);
+    lines.push("");
+  }
+
+  lines.push(
+    "Apply the minimum changes needed to address the issues above.",
+    "After fixing, the reviewer will run a final validation pass.",
+  );
+
+  return lines.join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Test command runner
 // ---------------------------------------------------------------------------
@@ -398,14 +577,16 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000) {
 /**
  * @typedef {Object} ReviewResult
  * @property {"llm-review"|"shell-test-only"|"skipped"} mode  Review mode.
- * @property {boolean}  skipped          True when the review step was not executed.
- * @property {string}   [reason]         Human-readable reason for skipping.
- * @property {boolean}  [passed]         True when review passed. Present only when !skipped.
- * @property {string}   [command]        The test command run (shell-test-only mode).
- * @property {string}   [output]         Combined stdout + stderr of the test run (shell-test-only).
- * @property {number}   [exitCode]       Exit code of the reviewer process.
- * @property {string[]} [changedFiles]   Files identified as changed by the LLM reviewer.
- * @property {string[]} [contextFiles]   Context file paths forwarded from the primary run.
+ * @property {boolean}         skipped         True when the review step was not executed.
+ * @property {string}          [reason]        Human-readable reason for skipping.
+ * @property {boolean}         [passed]        True when review passed. Present only when !skipped.
+ * @property {string}          [command]       The test command run (shell-test-only mode).
+ * @property {string}          [output]        Combined stdout + stderr (shell-test-only).
+ * @property {number}          [exitCode]      Exit code of the reviewer process.
+ * @property {string[]}        [changedFiles]  Files identified as changed.
+ * @property {string[]}        [contextFiles]  Context file paths from the primary run.
+ * @property {ReviewFeedback}  [feedback]      Structured parsed feedback (llm-review only).
+ * @property {string}          [reviewOutput]  Raw captured reviewer output (llm-review only).
  */
 
 /**
@@ -446,7 +627,7 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
   const prompt = buildReviewerPrompt({ changedFiles, testCommand });
   const llmTimeout = timeout ?? 300_000;
 
-  const llmResult = await runReviewerLlm({ cliPath, prompt, dir, timeout: llmTimeout });
+  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, timeout: llmTimeout });
 
   if (llmResult.spawnError) {
     // LLM failed to start — fall back to shell tests when a test command is available
@@ -470,11 +651,14 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
     };
   }
 
+  const feedback = parseReviewerOutput(llmResult.output);
   return {
     mode: "llm-review",
     skipped: false,
     passed: llmResult.exitCode === 0,
     exitCode: llmResult.exitCode,
+    feedback,
+    reviewOutput: llmResult.output,
     ...(changedFiles.length ? { changedFiles } : {}),
     ...ctx,
   };

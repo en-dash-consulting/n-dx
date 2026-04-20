@@ -101,6 +101,7 @@ import {
   formatReviewBanner,
   assembleNdxContext,
   writeNdxContextFile,
+  buildRemediationContext,
 } from "./pair-programming.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -1859,6 +1860,7 @@ async function handlePairProgramming(rest) {
   const isDryRun = flags.includes("--dry-run");
   const skipReview = flags.includes("--skip-review");
   const noContext = flags.includes("--no-context");
+  const skipFeedback = flags.includes("--skip-feedback");
 
   const primaryVendor = readLLMVendor(dir);
   if (!isDryRun && !primaryVendor) {
@@ -1879,14 +1881,14 @@ async function handlePairProgramming(rest) {
     }
   }
 
-  // Remove description, --skip-review, and --no-context from the args forwarded to hench
+  // Remove description and pair-programming-specific flags from args forwarded to hench
   let descriptionRemoved = false;
   const henchArgs = rest.filter((a) => {
     if (!descriptionRemoved && !a.startsWith("-") && a === description) {
       descriptionRemoved = true;
       return false;
     }
-    return a !== "--skip-review" && a !== "--no-context";
+    return a !== "--skip-review" && a !== "--no-context" && a !== "--skip-feedback";
   });
 
   // Inject context file path into hench args
@@ -1894,6 +1896,7 @@ async function handlePairProgramming(rest) {
     henchArgs.push(`--context-file=${contextFilePath}`);
   }
 
+  let remediationContextPath = null;
   try {
     // ── Step 1: primary vendor work ────────────────────────────────────────
     const primaryCode = await run(tools.hench, ["run", `--freeform=${description}`, ...henchArgs]);
@@ -1906,22 +1909,59 @@ async function handlePairProgramming(rest) {
     if (!isDryRun && !skipReview && primaryVendor) {
       const reviewer = resolveReviewerVendor(primaryVendor);
       const testCommand = readRexTestCommand(dir);
-      const result = await runCrossVendorReview({
+      const reviewResult = await runCrossVendorReview({
         dir,
         reviewer,
         testCommand,
         contextFiles: contextFilePath ? [contextFilePath] : undefined,
       });
-      process.stdout.write(formatReviewBanner(reviewer, result) + "\n");
-      if (!result.skipped && !result.passed) {
-        exitWithCleanup(1);
+      process.stdout.write(formatReviewBanner(reviewer, reviewResult) + "\n");
+
+      // ── Step 3: feedback loop (at most one remediation pass) ─────────────
+      let finalResult = reviewResult;
+      if (!reviewResult.skipped && !reviewResult.passed && !skipFeedback && reviewResult.feedback) {
+        // Read original context text (if any) to include in remediation context
+        let priorContext;
+        if (contextFilePath) {
+          try { priorContext = readFileSync(contextFilePath, "utf-8"); } catch { /* ignore */ }
+        }
+        const remediationText = buildRemediationContext(reviewResult.feedback, description, priorContext);
+        remediationContextPath = writeNdxContextFile(remediationText);
+
+        const remediationBorder = "─".repeat(60);
+        process.stdout.write(
+          `\n${remediationBorder}\nRemediation Pass — reviewer found issues; invoking primary for corrections\n${remediationBorder}\n\n`,
+        );
+
+        // Build remediation hench args: same as primary but replace context file
+        const remediationArgs = henchArgs
+          .filter((a) => !a.startsWith("--context-file="))
+          .concat(`--context-file=${remediationContextPath}`);
+
+        await run(tools.hench, ["run", `--freeform=${description}`, ...remediationArgs]);
+
+        // ── Step 4: final reviewer pass ──────────────────────────────────
+        process.stdout.write(
+          `\n${remediationBorder}\nFinal Review Pass (${reviewer})\n${remediationBorder}\n\n`,
+        );
+        finalResult = await runCrossVendorReview({
+          dir,
+          reviewer,
+          testCommand,
+          contextFiles: contextFilePath ? [contextFilePath] : undefined,
+        });
+        process.stdout.write(formatReviewBanner(reviewer, finalResult) + "\n");
+      }
+
+      if (!finalResult.skipped && !finalResult.passed) {
+        exitWithCleanup(finalResult.exitCode ?? 1);
         return;
       }
     }
   } finally {
-    // Clean up temp context file regardless of outcome
-    if (contextFilePath) {
-      try { rmSync(contextFilePath, { force: true }); } catch { /* ignore */ }
+    // Clean up all temp context files regardless of outcome
+    for (const p of [contextFilePath, remediationContextPath]) {
+      if (p) { try { rmSync(p, { force: true }); } catch { /* ignore */ } }
     }
   }
 

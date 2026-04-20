@@ -31,6 +31,7 @@ const {
   getChangedFiles,
   buildReviewerPrompt,
   runReviewerLlm,
+  runReviewerLlmCapturing,
   runShellTestCommand,
   runCrossVendorReview,
   formatReviewBanner,
@@ -38,6 +39,8 @@ const {
   buildPrdStatusExcerpt,
   assembleNdxContext,
   writeNdxContextFile,
+  parseReviewerOutput,
+  buildRemediationContext,
 } = await import(
   "../../packages/core/pair-programming.js"
 );
@@ -703,5 +706,293 @@ describe("runReviewerLlm", () => {
     });
     expect(result.exitCode).toBe(1);
     expect(result.spawnError).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runReviewerLlmCapturing
+// ---------------------------------------------------------------------------
+
+describe("runReviewerLlmCapturing", () => {
+  it("returns exitCode 0 and captures output when mock exits 0", async () => {
+    const scriptPath = writeMockReviewer(tmpDir, 0);
+    const result = await runReviewerLlmCapturing({
+      cliPath: scriptPath,
+      prompt: "review this",
+      dir: tmpDir,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.timedOut).toBe(false);
+    expect(result.spawnError).toBeUndefined();
+    expect(typeof result.output).toBe("string");
+  });
+
+  it("returns exitCode 1 and captures output when mock exits 1", async () => {
+    const scriptPath = writeMockReviewer(tmpDir, 1);
+    const result = await runReviewerLlmCapturing({
+      cliPath: scriptPath,
+      prompt: "review this",
+      dir: tmpDir,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(typeof result.output).toBe("string");
+  });
+
+  it("returns spawnError and empty output when binary does not exist", async () => {
+    const result = await runReviewerLlmCapturing({
+      cliPath: "/nonexistent/binary-that-does-not-exist-xyz",
+      prompt: "review",
+      dir: tmpDir,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.spawnError).toBeDefined();
+    expect(result.output).toBe("");
+  });
+
+  it("captures stdout written by the child process", async () => {
+    // Write a script that prints to stdout
+    const scriptPath = join(tmpDir, "output-script.js");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\nAll looks good.\\n');\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+
+    const result = await runReviewerLlmCapturing({
+      cliPath: scriptPath,
+      prompt: "review",
+      dir: tmpDir,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("PASS");
+    expect(result.output).toContain("All looks good.");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseReviewerOutput
+// ---------------------------------------------------------------------------
+
+describe("parseReviewerOutput", () => {
+  it("returns passed=true when output contains PASS with no FAIL", () => {
+    const result = parseReviewerOutput("PASS\nEverything looks correct.");
+    expect(result.passed).toBe(true);
+  });
+
+  it("returns passed=false when output contains FAIL", () => {
+    const result = parseReviewerOutput("FAIL\n- broken import in src/foo.ts");
+    expect(result.passed).toBe(false);
+  });
+
+  it("returns passed=false when output contains both PASS and FAIL", () => {
+    // Reviewer wrote PASS in one place but FAIL in another — conservative: treat as fail
+    const result = parseReviewerOutput("PASS in some files.\nFAIL — broken import found.");
+    expect(result.passed).toBe(false);
+  });
+
+  it("extracts bullet errors", () => {
+    const output = "FAIL\n- Broken import in src/foo.ts\n- Missing semicolon in bar.ts";
+    const result = parseReviewerOutput(output);
+    expect(result.errors).toContain("Broken import in src/foo.ts");
+    expect(result.errors).toContain("Missing semicolon in bar.ts");
+  });
+
+  it("extracts numbered list errors", () => {
+    const output = "FAIL\n1. Type error in auth.ts\n2. Undefined variable in login.ts";
+    const result = parseReviewerOutput(output);
+    expect(result.errors).toContain("Type error in auth.ts");
+    expect(result.errors).toContain("Undefined variable in login.ts");
+  });
+
+  it("extracts suggested fixes after a Suggested fixes: header", () => {
+    const output = [
+      "FAIL",
+      "- Missing return type",
+      "Suggested fixes:",
+      "- Add return type annotation",
+      "- Use strict null checks",
+    ].join("\n");
+    const result = parseReviewerOutput(output);
+    expect(result.suggestedFixes).toContain("Add return type annotation");
+    expect(result.suggestedFixes).toContain("Use strict null checks");
+  });
+
+  it("extracts suggested fixes after a markdown heading", () => {
+    const output = [
+      "FAIL",
+      "- Broken import",
+      "### Suggested Fixes",
+      "- Import from index.ts instead",
+    ].join("\n");
+    const result = parseReviewerOutput(output);
+    expect(result.suggestedFixes).toContain("Import from index.ts instead");
+  });
+
+  it("returns testVerdict=passed when tests passed keywords present", () => {
+    const result = parseReviewerOutput("PASS\nAll tests passed. Everything is fine.");
+    expect(result.testVerdict).toBe("passed");
+  });
+
+  it("returns testVerdict=failed when tests failed keywords present", () => {
+    const result = parseReviewerOutput("FAIL\nTests failed with 3 errors.");
+    expect(result.testVerdict).toBe("failed");
+  });
+
+  it("returns testVerdict=skipped when no test keywords present", () => {
+    const result = parseReviewerOutput("PASS\nCode looks good.");
+    expect(result.testVerdict).toBe("skipped");
+  });
+
+  it("returns empty arrays for errors and fixes when PASS with no issues", () => {
+    const result = parseReviewerOutput("PASS\nCode looks good. No issues found.");
+    expect(result.errors).toEqual([]);
+    expect(result.suggestedFixes).toEqual([]);
+  });
+
+  it("handles empty string gracefully", () => {
+    const result = parseReviewerOutput("");
+    expect(result.passed).toBe(false);
+    expect(result.errors).toEqual([]);
+    expect(result.suggestedFixes).toEqual([]);
+    expect(result.testVerdict).toBe("skipped");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildRemediationContext
+// ---------------------------------------------------------------------------
+
+describe("buildRemediationContext", () => {
+  const feedback = {
+    passed: false,
+    errors: ["Broken import in src/foo.ts", "Missing semicolon"],
+    suggestedFixes: ["Import from index.ts", "Add semicolon on line 42"],
+    testVerdict: "failed",
+  };
+
+  it("includes the original task description", () => {
+    const ctx = buildRemediationContext(feedback, "fix the auth module");
+    expect(ctx).toContain("fix the auth module");
+  });
+
+  it("includes all errors as bullet points", () => {
+    const ctx = buildRemediationContext(feedback, "task");
+    expect(ctx).toContain("- Broken import in src/foo.ts");
+    expect(ctx).toContain("- Missing semicolon");
+  });
+
+  it("includes suggested fixes as bullet points", () => {
+    const ctx = buildRemediationContext(feedback, "task");
+    expect(ctx).toContain("- Import from index.ts");
+    expect(ctx).toContain("- Add semicolon on line 42");
+  });
+
+  it("instructs to fix only reviewer-identified issues", () => {
+    const ctx = buildRemediationContext(feedback, "task");
+    expect(ctx).toMatch(/fix only/i);
+  });
+
+  it("includes prior context when provided", () => {
+    const ctx = buildRemediationContext(feedback, "task", "# Codebase\nSome context.");
+    expect(ctx).toContain("# Codebase");
+    expect(ctx).toContain("Some context.");
+    expect(ctx).toContain("---");
+  });
+
+  it("omits prior context section when not provided", () => {
+    const ctx = buildRemediationContext(feedback, "task");
+    // Should not start with a separator
+    expect(ctx.trimStart()).not.toMatch(/^---/);
+  });
+
+  it("omits errors section when no errors", () => {
+    const noErrors = { passed: false, errors: [], suggestedFixes: ["Add types"], testVerdict: /** @type {"skipped"} */ ("skipped") };
+    const ctx = buildRemediationContext(noErrors, "task");
+    expect(ctx).not.toContain("Issues to fix:");
+    expect(ctx).toContain("Add types");
+  });
+
+  it("omits suggested fixes section when none", () => {
+    const noFixes = { passed: false, errors: ["Type error"], suggestedFixes: [], testVerdict: /** @type {"failed"} */ ("failed") };
+    const ctx = buildRemediationContext(noFixes, "task");
+    expect(ctx).not.toContain("Reviewer suggested fixes:");
+    expect(ctx).toContain("Type error");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runCrossVendorReview — feedback included in llm-review result
+// ---------------------------------------------------------------------------
+
+describe("runCrossVendorReview — feedback in llm-review result", () => {
+  it("includes feedback object in llm-review result", async () => {
+    const scriptPath = join(tmpDir, "feedback-reviewer.js");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\nAll tests passed.\\n');\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+
+    const result = await runCrossVendorReview({
+      dir: tmpDir,
+      reviewer: "codex",
+    });
+
+    expect(result.mode).toBe("llm-review");
+    expect(result.feedback).toBeDefined();
+    expect(typeof result.feedback.passed).toBe("boolean");
+    expect(Array.isArray(result.feedback.errors)).toBe(true);
+    expect(Array.isArray(result.feedback.suggestedFixes)).toBe(true);
+    expect(["passed", "failed", "skipped"]).toContain(result.feedback.testVerdict);
+  });
+
+  it("includes reviewOutput string in llm-review result", async () => {
+    const scriptPath = join(tmpDir, "output-reviewer.js");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\n');\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+
+    const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "codex" });
+
+    expect(result.mode).toBe("llm-review");
+    expect(typeof result.reviewOutput).toBe("string");
+    expect(result.reviewOutput).toContain("PASS");
+  });
+
+  it("feedback.passed is true when reviewer outputs PASS and exits 0", async () => {
+    const scriptPath = join(tmpDir, "pass-reviewer.js");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\n');\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
+
+    const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude" });
+    expect(result.feedback.passed).toBe(true);
+    expect(result.feedback.errors).toEqual([]);
+  });
+
+  it("feedback.passed is false when reviewer outputs FAIL", async () => {
+    const scriptPath = join(tmpDir, "fail-reviewer.js");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('FAIL\\n- broken import\\n');\nprocess.exit(1);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
+
+    const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude" });
+    expect(result.feedback.passed).toBe(false);
+    expect(result.feedback.errors).toContain("broken import");
   });
 });

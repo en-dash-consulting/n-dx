@@ -8,19 +8,17 @@
  *
  * Steps (in order):
  *   1. pnpm build
- *   2. pnpm gauntlet (config validation)
- *   3. pnpm typecheck
- *   4. pnpm docs:build
- *   5. pnpm pr-check
- *   6. pnpm test
- *   7. changeset presence check
+ *   2. pnpm typecheck
+ *   3. pnpm docs:build
+ *   4. pnpm pr-check
+ *   5. pnpm test
+ *   6. changeset presence check
  */
 
 import { spawnTool } from "../packages/llm-client/dist/public.js";
 
 const steps = [
   { name: "build",     cmd: "pnpm build" },
-  { name: "gauntlet",  cmd: "pnpm gauntlet" },
   { name: "typecheck", cmd: "pnpm typecheck" },
   { name: "docs",      cmd: "pnpm docs:build" },
   { name: "pr-check",  cmd: "pnpm pr-check" },

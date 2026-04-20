@@ -479,7 +479,7 @@
             {
               "id": "bb5f0641-67a7-43d2-b0fe-186faf73c0bc",
               "title": "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "The ndx init dinosaur ASCII art was redesigned and corrected in a prior sprint (proportions fixed, animation frames sourced from Rex-F.png). The E2E brand test at tests/e2e/cli-brand.test.js still asserts against the old dinosaur output, causing it to fail or carry a stale snapshot. Update the expected output in the test to match the current canonical dinosaur so the suite is green and serves as an accurate regression guard going forward.",
               "acceptanceCriteria": [
@@ -505,6 +505,9 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-13T16:47:37.099Z",
+              "completedAt": "2026-04-20T13:38:22.140Z",
+              "resolutionType": "acknowledgment",
+              "resolutionDetail": "Test already passes. Snapshot content in cli-brand.test.js matches cli-brand.js byte-for-byte. Verified via hex comparison of all 17 lines across all 3 assertions (getMascot, frame 0, frame 1). No changes needed.",
               "mergedProposals": [
                 {
                   "proposalNodeKey": "p0:task:0:0",
@@ -749,7 +752,7 @@
             {
               "id": "03d9f52f-7ec7-452d-9d62-5c391269c2c5",
               "title": "Add rollback configuration, confirmation UX, and regression tests",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Expose rollback behavior as a configurable option in .n-dx.json (hench.rollbackOnFailure, default: true). In interactive mode, prompt the user to confirm before reverting. In non-interactive/CI mode (TTY absent or --yes flag), proceed automatically. Add integration tests covering rollback, --no-rollback suppression, PRD reset, and CI auto-confirm.",
               "acceptanceCriteria": [
@@ -770,7 +773,10 @@
                 "testing"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-16T15:20:54.970Z"
+              "startedAt": "2026-04-16T15:20:54.970Z",
+              "completedAt": "2026-04-20T13:50:13.888Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added rollbackOnFailure to HenchConfig schema (v1.ts + validate.ts). Updated run.ts to read config.rollbackOnFailure (default true) with --no-rollback always winning. Added --yes flag threading through all run functions to FinalizeRunOptions. Implemented interactive TTY confirmation prompt in performRollbackIfNeeded (skipped in non-TTY/CI or when yes=true). Documented hench.rollbackOnFailure in config.js help text. Added 6 integration tests in rollback-config.test.ts covering config=false suppression, config=true rollback, CI auto-confirm, --yes flag, and --no-rollback + yes with PRD reset."
             }
           ]
         }
@@ -846,7 +852,7 @@
             {
               "id": "75c7df48-1438-4a03-8467-34bc0de734ae",
               "title": "Implement structured inter-model handoff so reviewer findings are fed back to the primary",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "After the reviewer LLM runs its validation pass, its findings (errors found, test verdict, suggested micro-fixes) should be captured as a structured artifact and fed back to the primary model as a follow-up turn. This creates the 'bickering pair' dynamic where models actually exchange information: the primary does the work, the reviewer audits it, and if issues remain the primary gets one remediation pass with the reviewer's specific feedback. The loop should be bounded (at most one feedback round) to prevent infinite back-and-forth.",
               "acceptanceCriteria": [
@@ -864,7 +870,10 @@
                 "feedback-loop"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-16T16:56:18.148Z"
+              "startedAt": "2026-04-16T16:56:18.148Z",
+              "completedAt": "2026-04-20T14:00:04.943Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added ReviewFeedback struct, parseReviewerOutput parser, buildRemediationContext builder, runReviewerLlmCapturing (tee to terminal + capture), wired feedback loop into handlePairProgramming with --skip-feedback flag"
             }
           ]
         }
