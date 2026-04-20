@@ -71,6 +71,11 @@ export {
   NEOLITHIC_EVENT,
   type NeolithicOverlayProps,
 } from "./neolithic-overlay.js";
+export {
+  createTripleClickDetector,
+  TRIPLE_CLICK_PROBABILITY,
+  type TripleClickDetectorOptions,
+} from "./triple-click-detector.js";
 
 // ── Task link ───────────────────────────────────────────────────────
 
