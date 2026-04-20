@@ -155,6 +155,8 @@ describe("server/client boundary", () => {
    *
    * Sub-zones with barrel enforcement:
    * - crash/ — crash recovery (barrel: crash/index.ts)
+   * - loader/ — viewer data loading (barrel: loader/index.ts)
+   * - polling/ — viewer polling lifecycle (barrel: polling/index.ts)
    *
    * Panel is a logical zone (Louvain classification), not a physical directory,
    * so it does not require barrel enforcement.
@@ -164,7 +166,7 @@ describe("server/client boundary", () => {
     const violations: string[] = [];
 
     // Sub-zones with declared barrel files (relative to viewer/)
-    const BARREL_ZONES = ["crash"];
+    const BARREL_ZONES = ["crash", "loader", "polling"];
 
     try {
       for (const file of collectTsFiles(viewerDir)) {

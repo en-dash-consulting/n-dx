@@ -26,7 +26,7 @@ import {
   clearOnChange,
   startPolling,
   stopPolling,
-} from "../loader.js";
+} from "../loader/index.js";
 import { isFeatureDisabled, onDegradationChange } from "../performance/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 

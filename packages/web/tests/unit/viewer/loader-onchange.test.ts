@@ -17,7 +17,7 @@ const manifestFixture = {
 
 async function importLoader() {
   vi.resetModules();
-  return import("../../../src/viewer/loader.js");
+  return import("../../../src/viewer/loader/index.js");
 }
 
 describe("viewer loader", () => {

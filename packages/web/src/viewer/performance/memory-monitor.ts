@@ -62,7 +62,7 @@ export interface MemoryMonitorConfig {
 
 import {
   registerPollingSource,
-} from "../polling/polling-state.js";
+} from "../polling/index.js";
 
 // ─── Chrome-specific type augmentation ───────────────────────────────────────
 

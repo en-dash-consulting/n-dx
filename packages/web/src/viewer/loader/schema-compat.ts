@@ -1,11 +1,11 @@
 /**
- * Schema version migrations.
+ * Schema version migrations for viewer loader data.
  * Ensures older output formats can be rendered by newer viewers.
  */
 
 /** Current schema version. Inlined to avoid runtime import from schema/. */
 const SCHEMA_VERSION = "1.0.0";
-import type { LoadedData } from "./types.js";
+import type { LoadedData } from "../types.js";
 
 type ModuleKey = keyof LoadedData;
 
@@ -37,7 +37,6 @@ export function migrateData(module: string, data: unknown): unknown {
       ? (record.schemaVersion as string | undefined)
       : undefined;
 
-  // If version matches current, no migration needed
   if (dataVersion === SCHEMA_VERSION) return data;
 
   const moduleMigrations = migrations[module as ModuleKey];

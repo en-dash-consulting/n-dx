@@ -8,7 +8,7 @@
  * - Selective refresh: only reload files whose mtime changed
  */
 
-import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "./external.js";
+import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../external.js";
 import {
   validateManifest,
   validateInventory,
@@ -16,11 +16,11 @@ import {
   validateZones,
   validateComponents,
   validateCallGraph,
-} from "./validate.js";
-import { DATA_FILES } from "./external.js";
+} from "../validate.js";
+import { DATA_FILES } from "../external.js";
 import { migrateData } from "./schema-compat.js";
-import type { LoadedData } from "./types.js";
-import { registerPoller, unregisterPoller } from "./polling/polling-manager.js";
+import type { LoadedData } from "../types.js";
+import { registerPoller, unregisterPoller } from "../polling/index.js";
 
 type DataChangeHandler = (data: LoadedData) => void;
 
@@ -219,7 +219,10 @@ export function startPolling(intervalMs: number = 5000): void {
   registerPoller("loader:data-status", pollForChanges, intervalMs);
 }
 
-/** Stop polling for data changes */
+/**
+ * Stop polling for data changes.
+ * Unregisters from the centralized polling manager.
+ */
 export function stopPolling(): void {
   if (!pollingActive) return;
   pollingActive = false;
