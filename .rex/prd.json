@@ -3926,9 +3926,11 @@
     {
       "id": "b7aeaf13-916f-44d7-8b4f-2226d77a5d4e",
       "title": "Local Testing Infrastructure and Gauntlet Config Validation",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-20T19:44:11.415Z",
+      "completedAt": "2026-04-20T19:44:11.415Z",
       "children": [
         {
           "id": "9dbecc75-f550-4b7b-b3b7-fc2bb3ffef53",
@@ -3970,10 +3972,12 @@
         {
           "id": "5a24a938-4bbe-4f27-a036-bfdf08400af8",
           "title": "Local Test Suite Documentation in Main README",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The main README references .local_testing/ in passing but has no dedicated section explaining how to run the Docker-based local test suite, what prerequisites are needed, or what commands to use. Users need a self-contained guide in README.md so they can find and run local platform tests without digging into .local_testing/README.md.",
           "source": "smart-add",
+          "startedAt": "2026-04-20T19:44:11.364Z",
+          "completedAt": "2026-04-20T19:44:11.364Z",
           "children": [
             {
               "id": "11343373-2400-483d-9736-04f42cbce488",
@@ -4004,7 +4008,7 @@
             {
               "id": "5f514493-0b61-4348-b826-fb4d1e3a32cf",
               "title": "Update .local_testing/README.md to cover macOS suite and unify platform guidance",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Once the macOS container exists, update .local_testing/README.md to document the new Dockerfile.macos, docker-compose ndx-macos service, and the macOS runner script. Add a 'Platform comparison' table showing which Dockerfile targets which host OS, and what the base commands under test are for each platform.",
               "acceptanceCriteria": [
@@ -4021,7 +4025,10 @@
                 "macos"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-20T19:40:19.135Z"
+              "startedAt": "2026-04-20T19:40:19.135Z",
+              "completedAt": "2026-04-20T19:44:11.316Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Updated .local_testing/README.md with comprehensive macOS documentation including platform comparison table, updated Container Features section, and Manual Docker Operations with macOS-specific commands. Added .gitignore exceptions to track Docker configs and documentation files."
             }
           ]
         }
