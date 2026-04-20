@@ -108,6 +108,17 @@ describe("hench intra-zone boundaries — CLI isolation", () => {
       "cli/ must be the consumer tier — no domain or infrastructure zone may import from it",
     ).toEqual([]);
   });
+
+  it("cli/errors.ts does not import from prd/", () => {
+    const file = join(HENCH_SRC, "cli", "errors.ts");
+    const violations = extractImportPaths(file)
+      .filter((imp) => importsFromZone(imp, "prd"));
+
+    expect(
+      violations,
+      "cli/errors.ts must not depend on prd/; shared error primitives belong in the foundation tier",
+    ).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------

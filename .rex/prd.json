@@ -3373,7 +3373,7 @@
         {
           "id": "b0a511ce-9bfe-47fc-ab6e-1b66d27302d3",
           "title": "Fix observation in global (2 findings)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-shared\" ↔ \"web-viewer\" (1+11 crossings) — consider extracting shared interface",
           "priority": "high",
@@ -3382,11 +3382,15 @@
             {
               "id": "00474be0-22fb-4ea1-802c-f5770696f29a",
               "title": "Fix observation in global: Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider  (+1 more)",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-shared\" ↔ \"web-viewer\" (1+11 crossings) — consider extracting shared interface",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-20T15:40:01.374Z",
+              "completedAt": "2026-04-20T15:44:55.292Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Detached hench CLI error handling from prd/llm-gateway by importing foundation error primitives directly from @n-dx/llm-client, and added a boundary test to keep cli/errors.ts out of prd/.",
               "recommendationMeta": {
                 "findingHashes": [
                   "f572756e3ffb",
@@ -3410,7 +3414,9 @@
               "warning": 2
             },
             "findingCount": 2
-          }
+          },
+          "startedAt": "2026-04-20T15:45:20.089Z",
+          "completedAt": "2026-04-20T15:45:20.089Z"
         },
         {
           "id": "90170684-ba0b-4cc6-b0a2-3dee79ebd88a",

@@ -25,8 +25,8 @@ import {
   isExecutableOnPath,
   classifyVendorError,
   failureCategoryLabel,
-} from "../prd/llm-gateway.js";
-import type { FailureCategory } from "../prd/llm-gateway.js";
+} from "@n-dx/llm-client";
+import type { FailureCategory } from "@n-dx/llm-client";
 
 const HENCH_DIR = PROJECT_DIRS.HENCH;
 
