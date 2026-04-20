@@ -57,7 +57,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "deferred",
+          "status": "pending",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
@@ -87,7 +87,7 @@
             {
               "id": "7ed4c848-e4be-4f6e-b495-5d70a9457fec",
               "title": "Inventory duplicated unit-test constants across suites",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Review unit test files to identify repeated constants that appear in more than four files and record where they are used so consolidation candidates are explicitly defined.",
               "acceptanceCriteria": [
@@ -107,7 +107,7 @@
             {
               "id": "9311f36a-e0e4-4275-90f7-badca8d60ee6",
               "title": "Update unit test callers to use shared utilities",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Refactor existing unit test files to consume the new shared helpers and constants while preserving existing assertions, names, and suite intent.",
               "acceptanceCriteria": [
@@ -127,7 +127,7 @@
             {
               "id": "4094dafb-78c0-462f-bc09-dd5a630762bb",
               "title": "Validate behavioral equivalence after test utility extraction",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Run the refactored unit suites and compare outcomes against the pre-refactor baseline to confirm that the shared utility extraction did not alter behavior or coverage.",
               "acceptanceCriteria": [
@@ -427,7 +427,7 @@
             {
               "id": "1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
               "title": "Add timeout configuration panel to web settings UI",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Surface the CLI timeout settings in the n-dx web dashboard settings panel so users can view and update timeouts without touching the CLI. The panel should show the current global default and any per-command overrides, with save/reset controls that write back to .n-dx.json via the existing config API.",
               "acceptanceCriteria": [
@@ -472,7 +472,7 @@
             {
               "id": "bb5f0641-67a7-43d2-b0fe-186faf73c0bc",
               "title": "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "The ndx init dinosaur ASCII art was redesigned and corrected in a prior sprint (proportions fixed, animation frames sourced from Rex-F.png). The E2E brand test at tests/e2e/cli-brand.test.js still asserts against the old dinosaur output, causing it to fail or carry a stale snapshot. Update the expected output in the test to match the current canonical dinosaur so the suite is green and serves as an accurate regression guard going forward.",
               "acceptanceCriteria": [
@@ -742,7 +742,7 @@
             {
               "id": "03d9f52f-7ec7-452d-9d62-5c391269c2c5",
               "title": "Add rollback configuration, confirmation UX, and regression tests",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "Expose rollback behavior as a configurable option in .n-dx.json (hench.rollbackOnFailure, default: true). In interactive mode, prompt the user to confirm before reverting. In non-interactive/CI mode (TTY absent or --yes flag), proceed automatically. Add integration tests covering rollback, --no-rollback suppression, PRD reset, and CI auto-confirm.",
               "acceptanceCriteria": [
@@ -772,11 +772,10 @@
     {
       "id": "294d6dd5-b412-496d-86bf-2035b228690f",
       "title": "CLI & Developer Tools",
-      "status": "completed",
+      "status": "pending",
       "level": "epic",
       "source": "smart-add",
       "startedAt": "2026-04-16T16:56:22.800Z",
-      "completedAt": "2026-04-16T16:56:22.800Z",
       "children": [
         {
           "id": "8a8661f8-f768-412e-afda-f603f604f2fb",
@@ -815,7 +814,7 @@
             {
               "id": "3a80b875-f796-476f-b456-912b2ae1604a",
               "title": "Invoke the reviewer LLM with a validation-only constraint prompt",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "The current cross-vendor review step only runs the project's shell test command — it never invokes the reviewer LLM. The reviewer should be called via its CLI with a targeted prompt that instructs it to: check the changed files for syntax and logic errors, run the test command, and report findings. Critically, the reviewer's prompt must constrain it to small, targeted fixes only (e.g. fixing a broken import or a one-line syntax error) and must explicitly prohibit large refactors or architectural changes. This keeps the reviewer in a QA role rather than turning it into a second implementer.",
               "acceptanceCriteria": [
@@ -837,7 +836,7 @@
             {
               "id": "75c7df48-1438-4a03-8467-34bc0de734ae",
               "title": "Implement structured inter-model handoff so reviewer findings are fed back to the primary",
-              "status": "deferred",
+              "status": "pending",
               "level": "task",
               "description": "After the reviewer LLM runs its validation pass, its findings (errors found, test verdict, suggested micro-fixes) should be captured as a structured artifact and fed back to the primary model as a follow-up turn. This creates the 'bickering pair' dynamic where models actually exchange information: the primary does the work, the reviewer audits it, and if issues remain the primary gets one remediation pass with the reviewer's specific feedback. The loop should be bounded (at most one feedback round) to prevent infinite back-and-forth.",
               "acceptanceCriteria": [
@@ -1764,22 +1763,26 @@
     {
       "id": "f45b09a6-e17e-45c7-b45b-244da0494ee5",
       "title": "Platform & Prerequisites Documentation",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-19T04:56:26.493Z",
+      "completedAt": "2026-04-19T04:56:26.493Z",
       "children": [
         {
           "id": "087ff59e-ba8c-4be6-a975-a5c170362498",
           "title": "End-User Platform Requirements",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Surface clear, accurate OS and runtime version requirements so users know before installing whether their environment is supported.",
           "source": "smart-add",
+          "startedAt": "2026-04-19T04:42:32.885Z",
+          "completedAt": "2026-04-19T04:42:32.885Z",
           "children": [
             {
               "id": "b5b46766-b81c-44ac-b259-9a90ea1f4c43",
               "title": "Define and document supported OS matrix in README and docs",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Audit what platforms n-dx actually supports (macOS, Linux, Windows native vs WSL vs Docker) by reviewing CI configuration, existing gauntlet tests, and any known Windows-specific workarounds. Produce a concise support matrix table and place it in the README under a 'Requirements' or 'Platform Support' section. Mark Windows native as unsupported/experimental if appropriate, referencing the Docker path documented in the gauntlet infrastructure work.",
               "acceptanceCriteria": [
@@ -1793,12 +1796,16 @@
                 "docs",
                 "dx"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T04:37:52.665Z",
+              "completedAt": "2026-04-19T04:40:13.435Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added ## Requirements section with platform support table to README.md covering macOS (supported), Linux (supported), Windows WSL2 (supported), and Windows native (experimental)."
             },
             {
               "id": "ca9e532a-3383-4ae3-9639-99d824d393cb",
               "title": "Document Node.js and pnpm version prerequisites for end users",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Identify the minimum Node.js and pnpm versions required for end users (not contributors) and add them to the README Quick Start and any relevant docs pages. Cross-reference package.json engines fields if present, or add them if missing, so tooling like volta/nvm can auto-select the right version.",
               "acceptanceCriteria": [
@@ -1812,22 +1819,28 @@
                 "docs",
                 "dx"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T04:40:31.296Z",
+              "completedAt": "2026-04-19T04:42:32.849Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added Node.js ≥18/pnpm ≥10 prerequisites to README Quick Start, docs/guide/getting-started.md, and docs/guide/quickstart.md; fixed npm→pnpm in quickstart.md; added pnpm to engines in root and core package.json; added .nvmrc with 22."
             }
           ]
         },
         {
           "id": "af74f85e-9303-4dba-9b64-97c9b645d432",
           "title": "Developer Environment Prerequisites Documentation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Document what contributors need beyond the end-user prerequisites — build toolchain, pnpm workspace setup, and any platform-specific gotchas — so new contributors can get a working dev environment without trial and error.",
           "source": "smart-add",
+          "startedAt": "2026-04-19T04:56:26.463Z",
+          "completedAt": "2026-04-19T04:56:26.463Z",
           "children": [
             {
               "id": "506bf2d9-72ce-4570-848c-95c464e15840",
               "title": "Write contributor prerequisites and platform-specific setup guide",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add a 'Contributing / Development Setup' section (or CONTRIBUTING.md) covering the additional tools required to build and test the monorepo: pnpm version, build commands, and any platform-specific notes (e.g. Windows requires WSL or Docker, macOS may need Xcode CLI tools for native deps). Distinguish clearly between what a user needs versus what a contributor needs.",
               "acceptanceCriteria": [
@@ -1843,7 +1856,11 @@
                 "dx",
                 "contributing"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T04:55:04.167Z",
+              "completedAt": "2026-04-19T04:56:26.426Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created CONTRIBUTING.md with contributor prerequisites, pnpm workspace bootstrap, build/test commands, macOS Xcode CLI tool callout, Windows WSL2/Docker notes. Linked from README.md Contributing section."
             }
           ]
         }
@@ -1857,6 +1874,8 @@
       "description": "Automated recommendations from SourceVision analysis. 26 zone+category groups covering 33 total findings.",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-04-19T03:24:10.418Z",
+      "completedAt": "2026-04-19T03:24:10.418Z",
       "children": [
         {
           "id": "044c0c8e-adda-4265-827c-fa62b78b6dad",
@@ -3069,29 +3088,31 @@
       ],
       "recommendationMeta": {
         "findingCount": 33
-      },
-      "startedAt": "2026-04-19T03:24:10.418Z",
-      "completedAt": "2026-04-19T03:24:10.418Z"
+      }
     },
     {
       "id": "b638da12-7755-49e6-9237-6f11891303b1",
       "title": "CLI-UI Feature Parity and Settings Completeness",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-19T04:37:38.193Z",
+      "completedAt": "2026-04-19T04:37:38.193Z",
       "children": [
         {
           "id": "749cecdc-4d4c-4468-ae08-5e28e117996c",
           "title": "CLI Command Coverage Audit and Dashboard Trigger Controls",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The web dashboard currently focuses on status views and configuration panels, but provides no way to trigger most ndx CLI commands (analyze, plan, recommend, sync, export, self-heal, refresh, ci). Users must fall back to the terminal for core workflow operations. This feature closes that gap by auditing coverage then implementing trigger controls for high-impact commands.",
           "source": "smart-add",
+          "startedAt": "2026-04-19T03:56:04.584Z",
+          "completedAt": "2026-04-19T03:56:04.584Z",
           "children": [
             {
               "id": "400f7e1e-ab50-429d-917b-dc38aa41ff3a",
               "title": "Audit all ndx CLI commands against web dashboard feature coverage and document gaps",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Systematically compare every command in the ndx CLI dispatch (init, analyze, recommend, add, plan, work, self-heal, start, status, usage, sync, refresh, dev, ci, config, export, fix, health, validate, report, pair-programming, and rex/sourcevision/hench sub-commands) against what the web dashboard currently exposes — whether as a trigger, a status view, or a configuration panel. Produce a gap inventory with each command rated full/partial/none and ranked by user-facing impact to guide implementation order.",
               "acceptanceCriteria": [
@@ -3106,12 +3127,16 @@
                 "cli",
                 "audit"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T03:35:57.566Z",
+              "completedAt": "2026-04-19T03:39:08.521Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created docs/cli-ui-gap.md: 33 commands enumerated, rated full/partial/none, ranked by impact with implementation estimates."
             },
             {
               "id": "5320dc1b-d8d6-483c-8bad-d9b4c6310d0f",
               "title": "Implement dashboard trigger controls for CLI commands lacking UI representation",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Based on the audit, add action buttons, panels, or workflow controls for high-impact CLI commands that have no dashboard equivalent. At minimum: ndx analyze (re-scan codebase), ndx plan (analyze + propose PRD changes), ndx sync (push/pull PRD to remote adapter), ndx export (export static dashboard), and ndx self-heal (iterative improvement loop). Each control must invoke the underlying CLI operation via the web server's MCP or REST surface, display real-time status or streaming output, and surface errors clearly.",
               "acceptanceCriteria": [
@@ -3127,22 +3152,28 @@
                 "cli",
                 "ui"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T03:39:23.399Z",
+              "completedAt": "2026-04-19T03:56:04.549Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added POST /api/commands/* routes and dashboard UI components for sv-analyze, sync, recommend, export, and self-heal commands. New Commands view, inline triggers in Overview/Suggestions, SyncPanel in Notion config."
             }
           ]
         },
         {
           "id": "dc5e6696-7575-4983-b8c5-a73711bc4d8f",
           "title": "Settings Page Completeness and Command-Based Reorganization",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "The settings page currently covers hench execution config and integration (Notion) config, but leaves large portions of the .n-dx.json schema unexposed — including LLM vendor and model selection, CLI timeout overrides, web port, feature flags, sourcevision zone config, and the language override. Additionally, settings are organized by internal implementation concerns rather than by the CLI commands that consume them, making discoverability poor. This feature closes all missing-field gaps and reorganizes the page around the CLI mental model.",
           "source": "smart-add",
+          "startedAt": "2026-04-19T04:37:38.162Z",
+          "completedAt": "2026-04-19T04:37:38.162Z",
           "children": [
             {
               "id": "0b6e8b1d-bf43-42b3-91df-74ed3f234c66",
               "title": "Audit .n-dx.json config schema fields against settings page UI controls and document gaps",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Enumerate every field in the .n-dx.json and per-package config schemas (rex config, hench config, sourcevision config) and cross-reference against controls currently rendered in the settings page views (hench-config.ts, integration-config.ts, notion-config.ts). Produce a missing-field list annotated with the CLI command(s) each field affects and a suggested UI control type (text, number, select, toggle, list).",
               "acceptanceCriteria": [
@@ -3158,14 +3189,18 @@
                 "config",
                 "audit"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T03:56:20.830Z",
+              "completedAt": "2026-04-19T03:59:49.910Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Produced docs/config-schema-ui-gap.md: 63 user-editable fields enumerated across all three config files; 19 present, 1 partial, 43 missing. P1–P6 priority gap list with control types and CLI commands. View placement recommendations for sibling implementation task."
             },
             {
               "id": "49f25316-e3df-4362-82dd-28f849a29072",
               "title": "Implement missing config fields in the settings page UI",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
-              "description": "Add UI controls for all fields identified as absent from the settings page, including: LLM vendor selector (claude/codex), model and light-model selectors for each vendor, CLI global timeout (cli.timeoutMs) and per-command timeout overrides (cli.timeouts.*), web dashboard port (web.port), feature flags (features.rex.*, features.sourcevision.*, features.hench.*), sourcevision zone pins and merge threshold, and the language override. Each control must read from and persist changes to the appropriate config file via the existing config mechanism. This task also closes the deferred 'Add timeout configuration panel to web settings UI' item.",
+              "description": "Add UI controls for all fields identified as absent from the settings page, including: LLM vendor selector (claude/codex), model and light-model selectors for each vendor, CLI global timeout (cli.timeoutMs) and per-command timeout overrides (cli.timeouts.*), web dashboard port (web.port), feature flags (features.rex.*, features.sourcevision.*, features.hench.*), sourcevision zone pins and merge threshold, and the language override. Each control must read from and persist changes to the appropriate config file via the existing config mechanism. This task also closes the pending 'Add timeout configuration panel to web settings UI' item.",
               "acceptanceCriteria": [
                 "All fields flagged as missing in the audit have a corresponding settings UI control",
                 "LLM vendor selector (claude/codex) is present and switches the active vendor",
@@ -3182,6 +3217,10 @@
                 "web"
               ],
               "source": "smart-add",
+              "startedAt": "2026-04-19T04:00:09.944Z",
+              "completedAt": "2026-04-19T04:23:06.990Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added LlmProviderView and ProjectSettingsView with server routes for GET/PUT /api/llm/config and /api/project-settings. Fields covered: llm.vendor, llm.claude.model, llm.claude.lightModel, llm.codex.model, llm.codex.lightModel, web.port, language, sourcevision.zones.mergeThreshold, sourcevision.zones.pins. All views use batch-save pattern with dirty tracking and toast feedback. ViewId, sidebar, breadcrumb, view-registry, and domain-settings barrel updated. Typecheck passes cleanly.",
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "content_overlap",
@@ -3189,14 +3228,14 @@
                 "matchedItemId": "1160eb2b-e2d9-40ab-8f3a-fade05c697b8",
                 "matchedItemTitle": "Add timeout configuration panel to web settings UI",
                 "matchedItemLevel": "task",
-                "matchedItemStatus": "deferred",
+                "matchedItemStatus": "pending",
                 "createdAt": "2026-04-17T15:02:47.666Z"
               }
             },
             {
               "id": "26f04993-67f4-4d3a-a573-fd9d35d448a0",
               "title": "Reorganize settings page layout to group settings by associated CLI command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Redesign the settings page section structure so each section corresponds to the CLI command(s) whose behavior its settings control. Replace the current hench-centric layout with command-centric groupings: a top 'General' section for settings shared by all commands (llm.vendor, language), then sections for ndx work, ndx start, ndx analyze/plan, ndx sync, and ndx init. Settings sections should appear in workflow order (general → init → analyze/plan → work → start → sync → export) to reinforce the ndx workflow mental model. Purely aesthetic reorganization — no functional changes to how settings are saved or applied.",
               "acceptanceCriteria": [
@@ -3213,7 +3252,11 @@
                 "web",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T04:23:26.685Z",
+              "completedAt": "2026-04-19T04:37:38.124Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Reorganized sidebar SETTINGS section into CLI command order; renamed section headers in project-settings, feature-toggles, llm-provider, hench-config; moved hench-config from HENCH section and notion-config from REX section into SETTINGS."
             }
           ]
         }
@@ -3222,22 +3265,26 @@
     {
       "id": "43fa4ae8-01a8-4a30-927c-3d1b94116492",
       "title": "Web Dashboard",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-19T04:55:01.751Z",
+      "completedAt": "2026-04-19T04:55:01.751Z",
       "children": [
         {
           "id": "3319282b-6b83-4d6d-b729-2c7b8526b9a4",
           "title": "N-Rex Easter Egg — Triple-Click Dino Takeover",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Hidden easter egg activated by clicking the rex icon three times within 1.5 seconds, with a 0.271828 (≈1/e) probability gate. On trigger, the UI transitions to a full-page TTY dino animation with a humorous N-eolithic message.",
           "source": "smart-add",
+          "startedAt": "2026-04-19T04:55:01.717Z",
+          "completedAt": "2026-04-19T04:55:01.717Z",
           "children": [
             {
               "id": "d167596a-802c-4832-b797-b9d6a418774b",
               "title": "Implement triple-click gesture detector with probabilistic trigger gate on the rex icon",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Wire a click-sequence tracker to the rex icon component that records timestamp of each click, resets if the gap between any two consecutive clicks exceeds 1.5 seconds, and on the third qualifying click rolls Math.random() < 0.271828 to decide whether to fire the easter egg event. Emit a custom event or call a provided callback when the gate passes so the display layer remains decoupled.",
               "acceptanceCriteria": [
@@ -3253,12 +3300,14 @@
                 "ui",
                 "easter-egg"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T04:48:04.953Z",
+              "completedAt": "2026-04-19T04:55:01.652Z"
             },
             {
               "id": "090749f5-1693-4d49-9a88-47387823670d",
               "title": "Build full-page N-eolithic dino animation overlay with dismiss interaction",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a full-viewport overlay component that renders the TTY dino animation (reusing or adapting the existing cli-brand dino asset) and displays the caption 'Oops, you clicked so hard you ended up in the N-eolithic age with the N-Rex!' beneath it. The overlay mounts when the gesture detector fires its event, blocks the main UI, and dismisses on any click or keypress — returning the user to normal state.",
               "acceptanceCriteria": [
@@ -3276,7 +3325,11 @@
                 "easter-egg",
                 "animation"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-19T04:42:49.026Z",
+              "completedAt": "2026-04-19T04:47:38.918Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created NeolithicOverlay component with ASCII dino animation, full-viewport styling, dismiss-on-click/keypress, and useNeolithicOverlay hook with custom event seam for gesture detector."
             }
           ]
         }
