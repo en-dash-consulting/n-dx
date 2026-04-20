@@ -57,7 +57,7 @@
         {
           "id": "c1e3e241-33f2-4b49-8d05-c4fcf4b0fac9",
           "title": "Support .n-dx.local.json for machine-specific config overrides",
-          "status": "pending",
+          "status": "in_progress",
           "level": "task",
           "description": "Add support for a .n-dx.local.json file that deep-merges over .n-dx.json at load time. Machine-specific settings (like claude.cli_path with absolute paths) belong in a local, gitignored file — not the shared project config. Discovered when a Windows-specific cli_path from one contributor broke ndx init on another machine.",
           "acceptanceCriteria": [
