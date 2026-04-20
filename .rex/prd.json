@@ -1517,25 +1517,42 @@
             {
               "id": "3321bd74-f5b9-463c-8d2c-752457fe3ac0",
               "title": "Implement local gauntlet test runner script",
-              "status": "completed",
+              "status": "in_progress",
               "level": "task",
-              "description": "Create shell scripts and Docker entrypoint that allow developers to execute gauntlet tests inside the Windows container locally. Output should stream to host terminal with proper exit codes.",
+              "description": "Add run-gauntlet-macos.sh (or extend run-gauntlet.sh with a --platform flag) to build and run the macOS container, streaming test output and returning meaningful exit codes. Validate the full flow: build → run → stream output → clean up. Runner should accept --no-build, --keep-container, and --verbose flags matching the existing Windows runner interface.",
               "acceptanceCriteria": [
                 "Shell script (e.g., run-gauntlet.sh) in .local_testing/ starts container and runs tests",
                 "Test output is readable and includes progress indicators",
                 "Exit codes reflect gauntlet pass/fail status",
                 "Documentation includes command examples and troubleshooting",
-                "Script handles container cleanup on completion"
+                "Script handles container cleanup on completion",
+                "Script builds the macOS Docker image and runs the gauntlet test suite inside it",
+                "Script returns exit code 0 on test pass, non-zero on failure or Docker error",
+                "--no-build, --keep-container, and --verbose flags work as documented",
+                "Script can be run from the repo root on a macOS or Linux host",
+                "Container is automatically removed after tests unless --keep-container is set"
               ],
               "priority": "high",
               "tags": [
                 "testing",
                 "docker",
-                "automation"
+                "automation",
+                "macos",
+                "shell"
               ],
               "source": "smart-add",
               "startedAt": "2026-04-15T14:57:43.008Z",
-              "completedAt": "2026-04-15T15:03:34.730Z"
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:0:1",
+                  "proposalTitle": "Create macOS gauntlet runner script and validate end-to-end locally",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.7030592105263158,
+                  "mergedAt": "2026-04-20T19:07:43.734Z",
+                  "source": "smart-add"
+                }
+              ]
             }
           ]
         },
@@ -3902,6 +3919,161 @@
         "matchedItemStatus": "completed",
         "createdAt": "2026-04-20T18:27:39.672Z"
       }
+    },
+    {
+      "id": "b7aeaf13-916f-44d7-8b4f-2226d77a5d4e",
+      "title": "Local Testing Infrastructure and Gauntlet Config Validation",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "9dbecc75-f550-4b7b-b3b7-fc2bb3ffef53",
+          "title": "macOS Local Docker Test Suite",
+          "status": "pending",
+          "level": "feature",
+          "description": "Extend the existing Windows Docker gauntlet to include a macOS-representative Linux container that validates base ndx commands on a Unix environment. The Windows Dockerfile targets Windows Server Core; this parallel track creates a Linux-based image (matching macOS runtime behavior) with the same base-command smoke tests, a docker-compose service, and a runner script.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "c17d8735-2570-4af2-9b47-83a6b751e310",
+              "title": "Build Linux/macOS-representative Docker container with ndx base command tests",
+              "status": "pending",
+              "level": "task",
+              "description": "Create Dockerfile.macos (Ubuntu/Node LTS base) mirroring the structure of Dockerfile.windows — installs Node.js, pnpm, git, builds the monorepo, and runs the base-command smoke test suite (ndx init, ndx analyze, ndx status, ndx config). Add a corresponding `ndx-macos` service to docker-compose.yml alongside the existing `ndx-windows` service.",
+              "acceptanceCriteria": [
+                "Dockerfile.macos builds successfully and produces a working image",
+                "Image runs ndx init, ndx analyze, ndx status, and ndx config without errors inside the container",
+                "docker-compose.yml includes an ndx-macos service that builds from Dockerfile.macos",
+                "Container exits with code 0 on success and non-zero on any command failure"
+              ],
+              "priority": "high",
+              "tags": [
+                "testing",
+                "docker",
+                "macos",
+                "infrastructure"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "5a24a938-4bbe-4f27-a036-bfdf08400af8",
+          "title": "Local Test Suite Documentation in Main README",
+          "status": "pending",
+          "level": "feature",
+          "description": "The main README references .local_testing/ in passing but has no dedicated section explaining how to run the Docker-based local test suite, what prerequisites are needed, or what commands to use. Users need a self-contained guide in README.md so they can find and run local platform tests without digging into .local_testing/README.md.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "11343373-2400-483d-9736-04f42cbce488",
+              "title": "Add Local Platform Testing section to main README with prerequisites and run commands",
+              "status": "pending",
+              "level": "task",
+              "description": "Insert a 'Local Platform Testing' section in README.md (near the Platform Support table) that documents: (1) prerequisites — Docker Desktop ≥ 20, disk space for images; (2) commands to run the Windows and macOS gauntlet suites; (3) expected output and exit codes; (4) a pointer to .local_testing/README.md for advanced options. Content must be accurate and runnable from the repo root.",
+              "acceptanceCriteria": [
+                "README.md contains a 'Local Platform Testing' section with Windows and macOS run commands",
+                "Prerequisites (Docker Desktop version, disk space) are explicitly listed",
+                "Commands are copy-pasteable from the repo root without modification",
+                "Section links to .local_testing/README.md for advanced options",
+                "Section accurately reflects the actual scripts and Dockerfiles present in .local_testing/"
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
+                "readme",
+                "testing",
+                "docker"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "5f514493-0b61-4348-b826-fb4d1e3a32cf",
+              "title": "Update .local_testing/README.md to cover macOS suite and unify platform guidance",
+              "status": "pending",
+              "level": "task",
+              "description": "Once the macOS container exists, update .local_testing/README.md to document the new Dockerfile.macos, docker-compose ndx-macos service, and the macOS runner script. Add a 'Platform comparison' table showing which Dockerfile targets which host OS, and what the base commands under test are for each platform.",
+              "acceptanceCriteria": [
+                ".local_testing/README.md documents Dockerfile.macos, its purpose, and the run command",
+                "A platform comparison table lists Windows vs macOS containers with Dockerfile names and runner scripts",
+                "The 'Container Features' section is updated to include macOS container capabilities",
+                "Manual Docker operations section includes macOS image build and run commands"
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
+                "testing",
+                "docker",
+                "macos"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eb706a5e-011c-485d-ba5e-a8ffc6f17879",
+      "title": "Hench",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "626d40cf-4513-4cb1-a767-0aabd05a5f7c",
+          "title": "Graceful Cancellation with Rollback Prompt on Ctrl+C",
+          "status": "pending",
+          "level": "feature",
+          "description": "Extend the existing run-failure rollback flow to also trigger when the user cancels a hench run via Ctrl+C (SIGINT). Currently Ctrl+C exits abruptly, leaving the PRD task in an in-progress state and any partial file changes uncommitted. This feature brings parity between the failure-path rollback UX and the user-initiated cancellation path.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "f00023d2-c399-4bd2-beb8-481549a6ad37",
+              "title": "Intercept SIGINT during hench run loop and transition to graceful cancellation state",
+              "status": "pending",
+              "level": "task",
+              "description": "Register a SIGINT handler at the start of a hench run that prevents abrupt process exit. When Ctrl+C is received, signal the agent loop to stop at the next safe checkpoint (end of the current tool call or LLM turn) rather than mid-operation. Restore the default SIGINT handler after the run completes normally so Ctrl+C during post-run prompts works as expected.",
+              "acceptanceCriteria": [
+                "Pressing Ctrl+C during an active agent loop does not exit the process immediately — it sets a cancellation flag",
+                "The agent loop detects the cancellation flag at the next loop iteration boundary and exits cleanly",
+                "Any in-flight tool call or LLM request is allowed to complete before the loop exits (no torn state)",
+                "The default SIGINT handler is restored after the run concludes, whether cancelled or not",
+                "A cancellation message is printed to the terminal indicating the run was interrupted"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "signal-handling",
+                "ux"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "6dc86135-1fe7-4570-8988-cf66af659f85",
+              "title": "Show rollback prompt on Ctrl+C cancellation and reset PRD task status",
+              "level": "task",
+              "status": "pending",
+              "source": "smart-add",
+              "description": "After the agent loop exits due to a Ctrl+C cancellation, invoke the same rollback prompt flow that already exists for failed runs. If the user confirms, revert all git-tracked file changes made during the run and reset the PRD task status back to its pre-run value (e.g. 'pending'). If the user declines, leave changes in place and mark the task status appropriately (e.g. 'in_progress' or 'pending'). This reuses the existing rollback infrastructure — the goal is to route the cancellation path through it.",
+              "acceptanceCriteria": [
+                "After Ctrl+C cancellation, the terminal displays the rollback confirmation prompt (same prompt shown on run failure)",
+                "If the user confirms rollback: all file changes introduced during the run are reverted via git, and the PRD task status is reset to its pre-run state",
+                "If the user declines rollback: file changes are preserved and the task is left in a non-completed state with a terminal message explaining how to resume",
+                "PRD task status is never left as 'in_progress' after a cancelled run regardless of rollback choice",
+                "Rollback on cancellation is covered by at least one regression test that simulates SIGINT mid-run"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "rollback",
+                "ux",
+                "prd"
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -3,13 +3,15 @@
 ##############################################################################
 # ndx Gauntlet Test Runner Script
 #
-# Runs the ndx gauntlet test suite inside a Windows Docker container.
+# Runs the ndx gauntlet test suite inside a Docker container.
+# Supports Windows and macOS/Linux hosts with platform auto-detection.
 # Provides real-time output streaming, proper exit codes, and cleanup.
 #
 # Usage:
 #   ./run-gauntlet.sh [OPTIONS]
 #
 # Options:
+#   --platform=<os>    Target platform: windows, macos, linux, or auto-detect
 #   --no-build         Skip building the Docker image (use existing)
 #   --keep-container   Don't remove container after tests complete
 #   --detach           Run container in background (don't stream output)
@@ -17,6 +19,7 @@
 #   --help             Show this help message
 #
 # Environment Variables:
+#   PLATFORM           Override platform detection (windows, macos, linux)
 #   DOCKER_BUILDKIT    Set to 1 to use BuildKit (faster builds)
 #   CONTAINER_NAME     Override default container name (default: ndx-gauntlet-test)
 #   IMAGE_TAG          Override default image tag (default: ndx-gauntlet:latest)
@@ -35,8 +38,30 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CONTAINER_NAME="${CONTAINER_NAME:-ndx-gauntlet-test}"
 IMAGE_TAG="${IMAGE_TAG:-ndx-gauntlet:latest}"
-DOCKERFILE="${SCRIPT_DIR}/Dockerfile.windows"
 DOCKER_COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.yml"
+
+# Platform detection
+detect_platform() {
+    local uname_output=$(uname -s)
+    case "$uname_output" in
+        Darwin)
+            echo "macos"
+            ;;
+        Linux)
+            echo "linux"
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            echo "windows"
+            ;;
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
+# Set platform (from env or auto-detect)
+PLATFORM="${PLATFORM:-$(detect_platform)}"
+DOCKERFILE="${SCRIPT_DIR}/Dockerfile.${PLATFORM}"
 
 # Flags
 SKIP_BUILD=false
@@ -136,6 +161,7 @@ run_tests() {
 
     log_info "Starting container: $CONTAINER_NAME"
     log_info "Running command: $test_command"
+    log_verbose "Platform: $PLATFORM"
     echo ""
 
     # Prepare docker run options
@@ -151,6 +177,15 @@ run_tests() {
         docker_rm_opt=""
     fi
 
+    # Choose shell command based on platform
+    local shell_cmd="/bin/bash"
+    local shell_arg="-c"
+
+    if [ "$PLATFORM" = "windows" ]; then
+        shell_cmd="powershell"
+        shell_arg="-Command"
+    fi
+
     # Run tests in container
     local exit_code=0
     if ! docker run \
@@ -159,7 +194,7 @@ run_tests() {
         --name "$CONTAINER_NAME" \
         -e NODE_ENV=test \
         "$IMAGE_TAG" \
-        powershell -Command "$test_command"; then
+        $shell_cmd $shell_arg "$test_command"; then
         exit_code=$?
         log_error "Tests failed with exit code $exit_code"
     else
