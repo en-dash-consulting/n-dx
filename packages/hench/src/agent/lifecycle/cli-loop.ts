@@ -1102,6 +1102,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       taskTitle: brief.task.title,
       model,
       extraInfo: [{ heading: "Provider", content: `cli (${vendor} binary)` }],
+      invocationContext: "cli",
     });
     return { run };
   }
@@ -1125,6 +1126,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     sandbox: policy.sandbox,
     approvals: policy.approvals,
     parseMode: adapter.parseMode,
+    invocationContext: "cli",
   });
 
   // CLI-specific: load config for CLI path and env resolution

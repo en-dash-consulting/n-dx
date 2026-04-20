@@ -3369,6 +3369,8 @@
       "description": "Automated recommendations from SourceVision analysis. 10 zone+category groups covering 11 total findings.",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-04-20T16:31:17.920Z",
+      "completedAt": "2026-04-20T16:31:17.920Z",
       "children": [
         {
           "id": "b0a511ce-9bfe-47fc-ab6e-1b66d27302d3",
@@ -3817,9 +3819,78 @@
       ],
       "recommendationMeta": {
         "findingCount": 11
-      },
-      "startedAt": "2026-04-20T16:31:17.920Z",
-      "completedAt": "2026-04-20T16:31:17.920Z"
+      }
+    },
+    {
+      "id": "4d4982c7-dc4c-44c1-82e5-7293e4670510",
+      "title": "Hench Execution Context Visibility",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "28bd8b48-2012-42dd-9148-d844a082cb8b",
+          "title": "API vs CLI Invocation Context Detection and Display",
+          "status": "pending",
+          "level": "feature",
+          "description": "Detect whether hench is being invoked through the CLI (ndx work command) or via HTTP API/MCP and surface this context to the user through output messages, flags, and run metadata.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "8f811dac-e4f2-4e47-84ea-8c425a1d6328",
+              "title": "Detect and expose invocation context in hench runner",
+              "status": "in_progress",
+              "level": "task",
+              "description": "Modify hench entry points to detect the invocation method (CLI vs API) at run initialization. Add context information to the execution output stream and run metadata so users can clearly see which interface triggered the agent execution.",
+              "acceptanceCriteria": [
+                "Hench detects CLI vs HTTP/API invocation context at run start",
+                "Context flag is stored in run metadata and persisted in .hench/runs/",
+                "Context is emitted in the output stream so both CLI and dashboard receive it",
+                "Detection works correctly for all hench invocation paths (ndx work CLI, web HTTP, MCP)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "visibility",
+                "logging"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-20T18:27:53.277Z"
+            },
+            {
+              "id": "eab9294a-7201-4d16-9031-fda6a89618aa",
+              "title": "Display execution context indicator to users in CLI and dashboard",
+              "status": "pending",
+              "level": "task",
+              "description": "Surface the invocation context visibly in CLI output when running ndx work, and in the web dashboard when viewing runs. Include the context indicator in run history, active run displays, and real-time output streams.",
+              "acceptanceCriteria": [
+                "CLI output shows execution context indicator (e.g., badge or message at run start)",
+                "Dashboard run viewer displays context in the run header or metadata panel",
+                "Context is preserved in run transcripts for audit and historical review",
+                "Both CLI and dashboard clearly communicate whether the run was triggered via CLI or API"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "dashboard",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ],
+      "overrideMarker": {
+        "type": "duplicate_guard_override",
+        "reason": "semantic_title",
+        "reasonRef": "semantic_title:11312d55-399a-4130-b04c-e356d0fb007b",
+        "matchedItemId": "11312d55-399a-4130-b04c-e356d0fb007b",
+        "matchedItemTitle": "Hench",
+        "matchedItemLevel": "epic",
+        "matchedItemStatus": "completed",
+        "createdAt": "2026-04-20T18:27:39.672Z"
+      }
     }
   ]
 }

@@ -585,4 +585,98 @@ describe("shared lifecycle", () => {
       vi.restoreAllMocks();
     });
   });
+
+  describe("invocation context detection", () => {
+    it("CLI loop sets invocationContext to 'cli' in dry run", async () => {
+      const { cliLoop } = await import("../../../src/agent/lifecycle/cli-loop.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { loadConfig } = await import("../../../src/store/config.js");
+
+      const config = await loadConfig(henchDir);
+      const rexDir = join(projectDir, ".rex");
+      const store = createStore("file", rexDir);
+
+      vi.spyOn(console, "log");
+
+      const result = await cliLoop({
+        config,
+        store,
+        projectDir,
+        henchDir,
+        dryRun: true,
+        taskId: "task-1",
+      });
+
+      expect(result.run.invocationContext).toBe("cli");
+
+      vi.restoreAllMocks();
+    });
+
+    it("API loop sets invocationContext to 'api' in dry run", async () => {
+      const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { loadConfig } = await import("../../../src/store/config.js");
+
+      const config = await loadConfig(henchDir);
+      const rexDir = join(projectDir, ".rex");
+      const store = createStore("file", rexDir);
+
+      vi.spyOn(console, "log");
+
+      const result = await agentLoop({
+        config,
+        store,
+        projectDir,
+        henchDir,
+        dryRun: true,
+        taskId: "task-1",
+      });
+
+      expect(result.run.invocationContext).toBe("api");
+
+      vi.restoreAllMocks();
+    });
+
+    it("executeDryRun emits invocation context to stream when provided", async () => {
+      const { executeDryRun } = await import("../../../src/agent/lifecycle/shared.js");
+
+      const streamSpy = vi.spyOn(console, "log");
+
+      const run = executeDryRun({
+        label: "Test",
+        briefText: "Test brief",
+        systemPrompt: "Test prompt",
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        invocationContext: "cli",
+      });
+
+      // Check that invocationContext is set
+      expect(run.invocationContext).toBe("cli");
+
+      // Check that stream output was called with context info
+      // (The stream() function writes to console.log in non-TTY mode)
+      const logCalls = streamSpy.mock.calls.map((call) => call[0]?.toString() || "");
+      const contextEmitted = logCalls.some((msg) => msg.includes("CLI (ndx work command)"));
+      expect(contextEmitted).toBe(true);
+
+      streamSpy.mockRestore();
+    });
+
+    it("invocationContext is persisted in run record", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+
+      const result = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "sonnet",
+        henchDir,
+        vendor: "claude",
+        invocationContext: "api",
+      });
+
+      expect(result.run.invocationContext).toBe("api");
+    });
+  });
 });

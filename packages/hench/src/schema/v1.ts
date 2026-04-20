@@ -576,6 +576,13 @@ export interface RunRecord {
    * this field load normally.
    */
   events?: PersistedRuntimeEvent[];
+  /**
+   * Context in which hench was invoked ("cli" for CLI invocation, "api" for HTTP/MCP).
+   *
+   * v1 additive field — no migration needed. Existing records without
+   * this field load normally.
+   */
+  invocationContext?: "cli" | "api";
 }
 
 export interface TaskBriefTask {
