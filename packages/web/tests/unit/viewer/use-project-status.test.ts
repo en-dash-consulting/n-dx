@@ -11,7 +11,7 @@ import { h, render } from "preact";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
-vi.mock("../../../src/viewer/hooks/use-polling.js", () => ({
+vi.mock("../../../src/viewer/views/use-polling.js", () => ({
   usePolling: vi.fn(),
 }));
 
@@ -35,7 +35,7 @@ vi.mock("../../../src/viewer/hooks/use-gateway.js", () => ({
 }));
 
 import { useProjectStatus } from "../../../src/viewer/hooks/use-project-status.js";
-import { usePolling } from "../../../src/viewer/hooks/use-polling.js";
+import { usePolling } from "../../../src/viewer/views/use-polling.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 

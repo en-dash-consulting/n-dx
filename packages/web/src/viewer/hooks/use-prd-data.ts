@@ -21,7 +21,7 @@ import type { PRDDocumentData } from "../components/prd-tree/types.js";
 import type { TaskUsageSummary, WeeklyBudgetResolution } from "../components/prd-tree/types.js";
 import { resolveTaskUtilization } from "../components/prd-tree/task-utilization.js";
 import { diffDocument } from "../components/prd-tree/tree-differ.js";
-import { usePolling } from "./use-polling.js";
+import { usePolling } from "../views/use-polling.js";
 import { createFetchPipeline } from "../messaging/index.js";
 
 /** Shape returned by the incremental /api/hench/task-usage endpoint. */
