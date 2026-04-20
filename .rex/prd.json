@@ -3824,17 +3824,21 @@
     {
       "id": "4d4982c7-dc4c-44c1-82e5-7293e4670510",
       "title": "Hench Execution Context Visibility",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-20T18:43:09.875Z",
+      "completedAt": "2026-04-20T18:43:09.875Z",
       "children": [
         {
           "id": "28bd8b48-2012-42dd-9148-d844a082cb8b",
           "title": "API vs CLI Invocation Context Detection and Display",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Detect whether hench is being invoked through the CLI (ndx work command) or via HTTP API/MCP and surface this context to the user through output messages, flags, and run metadata.",
           "source": "smart-add",
+          "startedAt": "2026-04-20T18:43:09.805Z",
+          "completedAt": "2026-04-20T18:43:09.805Z",
           "children": [
             {
               "id": "8f811dac-e4f2-4e47-84ea-8c425a1d6328",
@@ -3863,7 +3867,7 @@
             {
               "id": "eab9294a-7201-4d16-9031-fda6a89618aa",
               "title": "Display execution context indicator to users in CLI and dashboard",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Surface the invocation context visibly in CLI output when running ndx work, and in the web dashboard when viewing runs. Include the context indicator in run history, active run displays, and real-time output streams.",
               "acceptanceCriteria": [
@@ -3880,7 +3884,10 @@
                 "ux"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-20T18:37:35.481Z"
+              "startedAt": "2026-04-20T18:37:35.481Z",
+              "completedAt": "2026-04-20T18:43:09.749Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Implemented invocation context display in CLI output and dashboard. Added context indicator to run completion output, API responses, and dashboard UI with appropriate styling."
             }
           ]
         }

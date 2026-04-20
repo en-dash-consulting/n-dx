@@ -816,9 +816,7 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["polling", "5-file zone at the boundary of reliable metrics; two polling source files plus three tests. Tests don't import each other, which drives cohesion down despite a coherent purpose."],
-  ["theme-toggle", "Single-file zone (theme-toggle.ts); cohesion 0 is inherent for any single-file zone. Pinned to web-viewer in .n-dx.json — will dissolve on next analysis when the pin is applied."],
-  ["viewer-data-loader", "5-file data-loading cluster (loader, schema-compat, validate, use-app-data + one test); the test file imports only loader.ts, reducing measured cohesion below threshold despite a coherent domain purpose."],
+  ["use", "1-file zone (use-polling.ts) detected by Louvain filename-pattern matching on the 'use-' prefix; cohesion is unreliable at 1 file. Not a real architectural zone — will dissolve into web-viewer on next analysis when files move to a common directory."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
