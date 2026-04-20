@@ -23,6 +23,54 @@ AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks a
 
 For a supported Linux environment on Windows, use **WSL2** (recommended) or the Docker infrastructure in [`.local_testing/`](.local_testing/).
 
+## Local Platform Testing
+
+If you're on **native Windows** or want to test against multiple platforms, use the Docker-based local test suite:
+
+### Prerequisites
+
+- **Docker Desktop** ≥ 20 (download from [docker.com](https://www.docker.com/products/docker-desktop))
+- **Disk space:** ~2GB for Windows Server Core image; Linux image is smaller
+- **Docker daemon must be running** before starting tests
+
+### Quick Test
+
+Run tests in an isolated environment matching native Windows or macOS:
+
+**macOS / Linux (bash):**
+```sh
+./.local_testing/run-gauntlet.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+.\.local_testing\run-gauntlet.ps1
+```
+
+Both scripts:
+- Detect your platform automatically
+- Build the Docker image (cached after first run)
+- Run `pnpm test` inside the container
+- Clean up automatically on completion
+- Return meaningful exit codes
+
+### Exit Codes
+
+- **0** — All tests passed ✓
+- **1** — Tests failed (one or more test case failed)
+- **2** — Docker error (build, run, or daemon issue)
+- **3** — Configuration error (Docker not found, invalid options)
+
+### Advanced Options
+
+See [`.local_testing/README.md`](.local_testing/) for advanced usage:
+- Custom image tags and container names
+- Keeping containers for inspection (`--keep-container`)
+- Background execution (`--detach`)
+- Verbose debugging (`--verbose`)
+- CI/CD pipeline integration examples
+- Troubleshooting Docker and container issues
+
 ## Quick Start
 
 **Prerequisites:** Node.js ≥ 18 (22 LTS recommended) and pnpm ≥ 10.

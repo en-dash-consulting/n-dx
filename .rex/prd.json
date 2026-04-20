@@ -4025,17 +4025,21 @@
     {
       "id": "eb706a5e-011c-485d-ba5e-a8ffc6f17879",
       "title": "Hench",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-20T19:32:34.107Z",
+      "completedAt": "2026-04-20T19:32:34.107Z",
       "children": [
         {
           "id": "626d40cf-4513-4cb1-a767-0aabd05a5f7c",
           "title": "Graceful Cancellation with Rollback Prompt on Ctrl+C",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Extend the existing run-failure rollback flow to also trigger when the user cancels a hench run via Ctrl+C (SIGINT). Currently Ctrl+C exits abruptly, leaving the PRD task in an in-progress state and any partial file changes uncommitted. This feature brings parity between the failure-path rollback UX and the user-initiated cancellation path.",
           "source": "smart-add",
+          "startedAt": "2026-04-20T19:32:34.057Z",
+          "completedAt": "2026-04-20T19:32:34.057Z",
           "children": [
             {
               "id": "f00023d2-c399-4bd2-beb8-481549a6ad37",
@@ -4065,7 +4069,7 @@
             {
               "id": "6dc86135-1fe7-4570-8988-cf66af659f85",
               "title": "Show rollback prompt on Ctrl+C cancellation and reset PRD task status",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "After the agent loop exits due to a Ctrl+C cancellation, invoke the same rollback prompt flow that already exists for failed runs. If the user confirms, revert all git-tracked file changes made during the run and reset the PRD task status back to its pre-run value (e.g. 'pending'). If the user declines, leave changes in place and mark the task status appropriately (e.g. 'in_progress' or 'pending'). This reuses the existing rollback infrastructure — the goal is to route the cancellation path through it.",
               "acceptanceCriteria": [
@@ -4083,7 +4087,10 @@
                 "prd"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-20T19:26:18.902Z"
+              "startedAt": "2026-04-20T19:26:18.902Z",
+              "completedAt": "2026-04-20T19:32:34.014Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added \"cancelled\" status to FAILURE_STATUSES set in shared.ts. This activates existing rollback and task-reset machinery for cancelled runs. Added unit and integration tests for the feature. All acceptance criteria met."
             }
           ]
         }
