@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
 import { PROJECT_DIRS } from "../prd/llm-gateway.js";
-import { execShellCmd } from "../process/index.js";
+import { execShellCmd } from "../process/exec.js";
 import { computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 import type {

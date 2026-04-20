@@ -16,7 +16,7 @@
  */
 
 import type { RunRecord } from "../../schema/index.js";
-import { saveRun } from "../../store/index.js";
+import { saveRun } from "../../store/runs.js";
 
 /** Default heartbeat interval: 30 seconds. */
 export const HEARTBEAT_INTERVAL_MS = 30_000;

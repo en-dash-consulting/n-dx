@@ -3,11 +3,11 @@ import { startHeartbeat, HEARTBEAT_INTERVAL_MS } from "../../../src/agent/lifecy
 import type { RunRecord } from "../../../src/schema/v1.js";
 
 // Mock saveRun
-vi.mock("../../../src/store/index.js", () => ({
+vi.mock("../../../src/store/runs.js", () => ({
   saveRun: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { saveRun } from "../../../src/store/index.js";
+import { saveRun } from "../../../src/store/runs.js";
 const mockSaveRun = vi.mocked(saveRun);
 
 function makeRunRecord(overrides?: Partial<RunRecord>): RunRecord {

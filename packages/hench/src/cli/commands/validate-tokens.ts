@@ -14,7 +14,7 @@
  * Otherwise returns a summary report and exits 0.
  */
 
-import { listRuns } from "../../store/index.js";
+import { listRuns } from "../../store/runs.js";
 import {
   validateTokenReporting,
   validateTokenReportingBatch,

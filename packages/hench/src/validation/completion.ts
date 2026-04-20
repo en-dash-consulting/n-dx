@@ -1,4 +1,4 @@
-import { exec, execShellCmd } from "../process/index.js";
+import { exec, execShellCmd } from "../process/exec.js";
 
 /**
  * Result of completion validation.

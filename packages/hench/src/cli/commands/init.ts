@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { access, readFile } from "node:fs/promises";
-import { ensureHenchDir, configExists, initConfig } from "../../store/index.js";
+import { configExists, ensureHenchDir, initConfig } from "../../store/config.js";
 import { HENCH_DIR } from "./constants.js";
 import { info } from "../output.js";
 import type { ProjectLanguage } from "../../schema/index.js";

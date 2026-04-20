@@ -2,12 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails } from "../../guard/index.js";
-import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/index.js";
+import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
-import { saveRun } from "../../store/index.js";
+import { saveRun } from "../../store/runs.js";
 import { section, subsection, stream, detail } from "../../types/output.js";
-import { SystemMemoryMonitor } from "../../process/index.js";
+import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import {
   loadClaudeConfig,
   loadLLMConfig,

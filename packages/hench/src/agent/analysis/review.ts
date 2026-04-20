@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline";
-import { execStdout } from "../../process/index.js";
+import { execStdout } from "../../process/exec.js";
 import { section, subsection, info } from "../../types/output.js";
 
 /**

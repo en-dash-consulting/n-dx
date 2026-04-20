@@ -17,7 +17,7 @@
 
 import { readFile, writeFile, stat, rename } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
-import { execShellCmd } from "../process/index.js";
+import { execShellCmd } from "../process/exec.js";
 
 // ---------------------------------------------------------------------------
 // Types

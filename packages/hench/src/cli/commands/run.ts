@@ -4,7 +4,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { RunRecord, ToolCallRecord } from "../../schema/index.js";
-import { loadConfig, listRuns } from "../../store/index.js";
+import { loadConfig } from "../../store/config.js";
+import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
@@ -922,7 +923,7 @@ export async function cmdRun(
 
     // Run dependency audit in self-heal mode (once per hench invocation, before task loop)
     if (selfHeal && !skipDeps && !dryRun) {
-      const { runDependencyAudit } = await import("../../tools/index.js");
+      const { runDependencyAudit } = await import("../../tools/test-runner.js");
       const { writeFileSync } = await import("node:fs");
       const { join } = await import("node:path");
 

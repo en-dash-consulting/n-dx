@@ -306,7 +306,7 @@ function goPackagePaths(testFiles: string[]): string[] {
 // Shell execution (via centralized process module)
 // ---------------------------------------------------------------------------
 
-import { execShellCmd } from "../process/index.js";
+import { execShellCmd } from "../process/exec.js";
 
 // ---------------------------------------------------------------------------
 // Main entry point

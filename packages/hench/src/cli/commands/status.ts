@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { listRuns } from "../../store/index.js";
+import { listRuns } from "../../store/runs.js";
 import { HENCH_DIR, safeParseInt } from "./constants.js";
 import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";

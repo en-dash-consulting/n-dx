@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { PersistedRuntimeEvent } from "../../schema/index.js";
-import { loadRun } from "../../store/index.js";
+import { loadRun } from "../../store/runs.js";
 import { HENCH_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";

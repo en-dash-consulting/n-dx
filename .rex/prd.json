@@ -3378,6 +3378,8 @@
           "description": "- Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-shared\" ↔ \"web-viewer\" (1+11 crossings) — consider extracting shared interface",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-20T15:45:20.089Z",
+          "completedAt": "2026-04-20T15:45:20.089Z",
           "children": [
             {
               "id": "00474be0-22fb-4ea1-802c-f5770696f29a",
@@ -3414,9 +3416,7 @@
               "warning": 2
             },
             "findingCount": 2
-          },
-          "startedAt": "2026-04-20T15:45:20.089Z",
-          "completedAt": "2026-04-20T15:45:20.089Z"
+          }
         },
         {
           "id": "90170684-ba0b-4cc6-b0a2-3dee79ebd88a",
@@ -3461,20 +3461,24 @@
         {
           "id": "914b2f99-8e1c-4c9c-a20e-646b2cd878e9",
           "title": "Fix observation in hench (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- 9 entry points — wide API surface, consider consolidating exports",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-20T15:58:34.277Z",
+          "completedAt": "2026-04-20T15:58:34.277Z",
           "children": [
             {
               "id": "c44226b4-d00c-473b-9c7b-8109d052de08",
               "title": "Fix observation in hench: 9 entry points — wide API surface, consider consolidating exports",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- 9 entry points — wide API surface, consider consolidating exports",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-20T15:53:30.161Z",
+              "completedAt": "2026-04-20T15:58:34.224Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "23f3f2dc98c7"
