@@ -1,16 +1,12 @@
 /**
- * Client-side data validation for the sourcevision viewer.
+ * Client-side data validation for the sourcevision viewer loader.
  *
  * Zod schemas that validate JSON fetched from the server or dropped
- * as files. Lives in the viewer layer because the viewer is the sole
- * consumer — the server layer does its own domain-specific validation
- * independently.
+ * as files. Kept with the loader because the loader is the only caller.
  */
 
 import { z } from "zod";
-import type { V1 } from "./external.js";
-
-// ── Manifest ────────────────────────────────────────────────────────────────
+import type { V1 } from "../../external.js";
 
 const ModuleStatusSchema = z.enum(["pending", "running", "complete", "error"]);
 
@@ -31,8 +27,6 @@ const ManifestSchema = z.object({
   targetPath: z.string(),
   modules: z.record(z.string(), ModuleInfoSchema),
 });
-
-// ── Inventory ───────────────────────────────────────────────────────────────
 
 const FileRoleSchema = z.enum([
   "source",
@@ -68,8 +62,6 @@ const InventorySchema = z.object({
   files: z.array(FileEntrySchema),
   summary: InventorySummarySchema,
 });
-
-// ── Imports ─────────────────────────────────────────────────────────────────
 
 const ImportTypeSchema = z.enum([
   "static",
@@ -116,8 +108,6 @@ const ImportsSchema = z.object({
   summary: ImportsSummarySchema,
 });
 
-// ── Findings ─────────────────────────────────────────────────────────────────
-
 const FindingTypeSchema = z.enum([
   "observation",
   "pattern",
@@ -134,12 +124,9 @@ const FindingSchema = z.object({
   text: z.string(),
   severity: z.enum(["info", "warning", "critical"]).optional(),
   related: z.array(z.string()).optional(),
-  // move-file specific fields (optional, present only when type === "move-file")
   from: z.string().optional(),
   to: z.string().optional(),
 });
-
-// ── Zones ───────────────────────────────────────────────────────────────────
 
 const ZoneCrossingSchema = z.object({
   from: z.string(),
@@ -174,8 +161,6 @@ const ZonesSchema = z.object({
   zoneContentHashes: z.record(z.string()).optional(),
   lastReset: z.object({ from: z.number().int().positive(), to: z.number().int().positive() }).optional(),
 });
-
-// ── Components ──────────────────────────────────────────────────────────────
 
 const ComponentKindSchema = z.enum(["function", "arrow", "class", "forwardRef"]);
 
@@ -248,8 +233,6 @@ const ComponentsSchema = z.object({
   summary: ComponentsSummarySchema,
 });
 
-// ── Call Graph ──────────────────────────────────────────────────────────────
-
 const CallTypeSchema = z.enum(["direct", "method", "property-chain", "computed"]);
 
 const FunctionNodeSchema = z.object({
@@ -297,8 +280,6 @@ const CallGraphSchema = z.object({
   edges: z.array(CallEdgeSchema),
   summary: CallGraphSummarySchema,
 });
-
-// ── Validation helpers ──────────────────────────────────────────────────────
 
 export type ValidationResult<T> =
   | { ok: true; data: T }

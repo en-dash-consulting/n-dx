@@ -9,16 +9,16 @@
  */
 
 import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../external.js";
+import { DATA_FILES } from "../external.js";
 import {
+  migrateData,
   validateManifest,
   validateInventory,
   validateImports,
   validateZones,
   validateComponents,
   validateCallGraph,
-} from "../validate.js";
-import { DATA_FILES } from "../external.js";
-import { migrateData } from "./schema-compat.js";
+} from "./schema/index.js";
 import type { LoadedData } from "../types.js";
 import { registerPoller, unregisterPoller } from "../polling/index.js";
 
