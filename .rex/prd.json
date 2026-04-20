@@ -87,7 +87,7 @@
             {
               "id": "7ed4c848-e4be-4f6e-b495-5d70a9457fec",
               "title": "Inventory duplicated unit-test constants across suites",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Review unit test files to identify repeated constants that appear in more than four files and record where they are used so consolidation candidates are explicitly defined.",
               "acceptanceCriteria": [
@@ -814,7 +814,7 @@
             {
               "id": "3a80b875-f796-476f-b456-912b2ae1604a",
               "title": "Invoke the reviewer LLM with a validation-only constraint prompt",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The current cross-vendor review step only runs the project's shell test command — it never invokes the reviewer LLM. The reviewer should be called via its CLI with a targeted prompt that instructs it to: check the changed files for syntax and logic errors, run the test command, and report findings. Critically, the reviewer's prompt must constrain it to small, targeted fixes only (e.g. fixing a broken import or a one-line syntax error) and must explicitly prohibit large refactors or architectural changes. This keeps the reviewer in a QA role rather than turning it into a second implementer.",
               "acceptanceCriteria": [
@@ -831,7 +831,10 @@
                 "llm"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-16T16:56:11.179Z"
+              "startedAt": "2026-04-16T16:56:11.179Z",
+              "completedAt": "2026-04-20T13:10:31.398Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "All five acceptance criteria are met by the existing implementation in packages/core/pair-programming.js and tests/integration/pair-programming.test.js. No code changes required."
             },
             {
               "id": "75c7df48-1438-4a03-8467-34bc0de734ae",
