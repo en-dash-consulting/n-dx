@@ -3575,20 +3575,24 @@
         {
           "id": "0ee552a6-b9ba-4e0b-b46a-1ece77055084",
           "title": "Fix code in viewer-data-loader (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Only one test file (loader-onchange.test.ts) is present for four production files; the core loader.ts load path appears untested.",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-20T15:25:21.043Z",
+          "completedAt": "2026-04-20T15:25:21.043Z",
           "children": [
             {
               "id": "3b22f20b-28ae-42d3-9a53-e045b866fbff",
               "title": "Fix code in viewer-data-loader: Only one test file (loader-onchange.test.ts) is present for four production file",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "- Only one test file (loader-onchange.test.ts) is present for four production files; the core loader.ts load path appears untested.",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-20T15:22:47.656Z",
+              "completedAt": "2026-04-20T15:25:20.989Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "de10e1973450"
@@ -3624,7 +3628,7 @@
             {
               "id": "24559322-b6ac-48c2-a1f5-85d19d529d78",
               "title": "Fix move-file in core: File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "- File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant-assets/ — consider moving to packages/core/ to align physical location with architectural zone",
               "priority": "high",
@@ -3638,7 +3642,8 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              }
+              },
+              "startedAt": "2026-04-20T15:26:11.821Z"
             }
           ],
           "recommendationMeta": {
@@ -3735,20 +3740,24 @@
         {
           "id": "f98f84de-abb1-422f-b11f-355f25b95ae9",
           "title": "Fix anti-pattern in global (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- God function: runCommand in packages/core/cli.js calls 38 unique functions — consider decomposing into smaller, focused functions",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-20T15:22:19.105Z",
+          "completedAt": "2026-04-20T15:22:19.105Z",
           "children": [
             {
               "id": "a2d6ca96-f4df-4fe9-ba05-8f7ae39ed639",
               "title": "Fix anti-pattern in global: God function: runCommand in packages/core/cli.js calls 38 unique functions — con",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- God function: runCommand in packages/core/cli.js calls 38 unique functions — consider decomposing into smaller, focused functions",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-20T14:23:57.385Z",
+              "completedAt": "2026-04-20T15:22:19.051Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "730fa50e8d3a"
@@ -3758,8 +3767,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-20T14:23:57.385Z"
+              }
             }
           ],
           "recommendationMeta": {

@@ -1,10 +1,8 @@
 {
   "llm": {
-    "vendor": "claude",
+    "vendor": "codex",
     "model": "claude-sonnet-4-6",
-    "claude": {
-      "model": "claude-sonnet-4-6"
-    },
+    "claude": {},
     "codex": {}
   },
   "sourcevision": {
@@ -170,7 +168,7 @@
       }
     }
   },
-  "_initVersion": "0.2.3",
+  "_initVersion": "0.3.0",
   "cli": {},
   "claude": {
     "model": "claude-sonnet-4-6"

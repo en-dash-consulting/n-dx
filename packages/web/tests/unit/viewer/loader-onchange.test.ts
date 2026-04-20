@@ -1,42 +1,98 @@
-/**
- * Tests for loader onChange lifecycle (memory leak fix).
- *
- * Covers the handler registration/removal pattern used by
- * the viewer loader to prevent stale handler leaks.
- */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DATA_FILES } from "../../../src/viewer/external.js";
 
-import { describe, it, expect, vi } from "vitest";
+const manifestFixture = {
+  schemaVersion: "1.0.0",
+  toolVersion: "0.1.0",
+  analyzedAt: "2026-04-20T00:00:00.000Z",
+  targetPath: "/repo",
+  modules: {
+    inventory: {
+      status: "complete",
+      startedAt: "2026-04-20T00:00:00.000Z",
+      completedAt: "2026-04-20T00:01:00.000Z",
+    },
+  },
+};
 
-describe("loader onChange lifecycle", () => {
-  it("clearOnChange removes the handler", async () => {
-    const { onDataChange, clearOnChange, getData } = await import(
-      "../../../src/viewer/loader.js"
-    );
+async function importLoader() {
+  vi.resetModules();
+  return import("../../../src/viewer/loader.js");
+}
 
+describe("viewer loader", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("loads uncached modules and notifies listeners with validated data", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => manifestFixture,
+    } as Response);
+
+    const { loadModules, onDataChange, getData } = await importLoader();
     const handler = vi.fn();
     onDataChange(handler);
 
-    // Clear should make future notifications a no-op
-    clearOnChange();
+    const result = await loadModules(["manifest"]);
 
-    // We can't easily trigger notifyChange directly (it's internal),
-    // but we verify the module exports the function and it doesn't throw.
-    expect(typeof clearOnChange).toBe("function");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(`/data/${DATA_FILES.manifest}`);
+    expect(result.manifest).toEqual(manifestFixture);
+    expect(getData().manifest).toEqual(manifestFixture);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith(result);
   });
 
-  it("onDataChange replaces previous handler", async () => {
-    const { onDataChange, clearOnChange } = await import(
-      "../../../src/viewer/loader.js"
-    );
+  it("skips fetches for modules that are already loaded", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => manifestFixture,
+    } as Response);
 
-    const handler1 = vi.fn();
-    const handler2 = vi.fn();
+    const { loadModules, onDataChange } = await importLoader();
+    const handler = vi.fn();
+    onDataChange(handler);
 
-    onDataChange(handler1);
-    onDataChange(handler2);
+    await loadModules(["manifest"]);
+    handler.mockClear();
+    fetchMock.mockClear();
 
-    // Handler1 is no longer registered — only handler2 is
-    // Clean up
-    clearOnChange();
+    const result = await loadModules(["manifest"]);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.manifest).toEqual(manifestFixture);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("leaves invalid modules unloaded and still notifies once for the attempted batch", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ schemaVersion: "1.0.0" }),
+    } as Response);
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { loadModules, onDataChange, getData } = await importLoader();
+    const handler = vi.fn();
+    onDataChange(handler);
+
+    const result = await loadModules(["manifest"]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.manifest).toBeNull();
+    expect(getData().manifest).toBeNull();
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith(result);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(String(warnSpy.mock.calls[0]?.[0])).toContain("Validation failed");
   });
 });
