@@ -1,5 +1,22 @@
 # @n-dx/core
 
+## 0.3.1
+
+### Patch Changes
+
+- [#172](https://github.com/en-dash-consulting/n-dx/pull/172) [`c1e1f5f`](https://github.com/en-dash-consulting/n-dx/commit/c1e1f5f19acba2990c63c3ffc6cb8016d52c233b) Thanks [@dnaniel](https://github.com/dnaniel)! - Fix `ndx` binary crashing on npm install due to missing files in the published tarball
+
+  - `packages/core/package.json` `files` array was missing `assistant-integration.js` and `codex-integration.js`
+  - `cli.js` statically imports `assistant-integration.js`, which in turn statically imports `codex-integration.js`, so the resolution failure happened at module load before any error handling could run
+  - Verified via `npm pack --dry-run`: tarball now ships 25 files, and the transitive static-import graph from `cli.js` resolves cleanly
+
+- Updated dependencies []:
+  - @n-dx/rex@0.3.1
+  - @n-dx/hench@0.3.1
+  - @n-dx/sourcevision@0.3.1
+  - @n-dx/llm-client@0.3.1
+  - @n-dx/web@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

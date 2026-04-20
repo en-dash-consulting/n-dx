@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publishConfig": {
     "access": "public"
   },
@@ -55,7 +55,9 @@
     "refresh-artifacts.js",
     "export.js",
     "assistant-assets.js",
+    "assistant-integration.js",
     "claude-integration.js",
+    "codex-integration.js",
     "refresh-validate.js",
     "init-llm.js",
     "llm-model-catalog.js",
