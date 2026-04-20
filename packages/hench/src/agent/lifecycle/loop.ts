@@ -462,6 +462,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     memoryCtx,
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
+    yes: opts.yes,
     store,
   });
 

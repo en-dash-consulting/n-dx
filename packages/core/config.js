@@ -890,6 +890,9 @@ Hench settings (.hench/config.json):
   hench.maxTokens          number    Max tokens per API request (default: 8192)
   hench.rexDir             string    Path to .rex directory (default: ".rex")
   hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY")
+  hench.rollbackOnFailure  boolean   Revert uncommitted changes when a run fails (default: true)
+                                     Set to false to keep changes in place on failure.
+                                     The --no-rollback flag always overrides this for one run.
 
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths

@@ -1275,6 +1275,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     memoryCtx,
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
+    yes: opts.yes,
     store,
   });
 

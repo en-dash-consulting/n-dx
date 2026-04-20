@@ -110,6 +110,12 @@ export interface HenchConfig {
   useRegistryProvider?: boolean;
   /** Discovered claude CLI path, persisted by ndx init to avoid re-discovery on every run. */
   claudePath?: string;
+  /**
+   * Automatically revert uncommitted file changes when a run fails.
+   * Default: true. Set to false to keep changes in place on failure (equivalent to --no-rollback).
+   * The --no-rollback CLI flag always overrides this setting for a single run.
+   */
+  rollbackOnFailure?: boolean;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────

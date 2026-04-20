@@ -65,6 +65,11 @@ export interface SharedLoopOptions {
    */
   rollbackOnFailure?: boolean;
   /**
+   * Skip the interactive rollback confirmation prompt and proceed automatically.
+   * Set when --yes is passed or when the caller knows it is running non-interactively.
+   */
+  yes?: boolean;
+  /**
    * Additional project context to append to the prompt (e.g. CONTEXT.md +
    * PRD status excerpt injected by the pair-programming command).
    */
@@ -529,6 +534,11 @@ export interface FinalizeRunOptions {
    */
   rollbackOnFailure?: boolean;
   /**
+   * Skip the interactive rollback confirmation prompt and proceed automatically.
+   * Set when --yes is passed or when the caller knows it is running non-interactively.
+   */
+  yes?: boolean;
+  /**
    * PRD store used to reset task status to pending on failure.
    * When provided, if the run fails and the task is still in_progress,
    * it is reset to pending so it reappears as actionable. This occurs
@@ -562,15 +572,47 @@ async function listDirtyPaths(projectDir: string): Promise<string[]> {
 }
 
 /**
+ * Ask the user to confirm rollback via stdin (TTY only).
+ * Returns true when the user accepts (empty input or 'y'/'yes').
+ */
+async function promptRollbackConfirm(count: number): Promise<boolean> {
+  const { createInterface } = await import("node:readline");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise<boolean>((resolve) => {
+    rl.question(`\nRoll back ${count} uncommitted file(s)? [Y/n] `, (answer) => {
+      rl.close();
+      const trimmed = answer.trim().toLowerCase();
+      resolve(trimmed === "" || trimmed === "y" || trimmed === "yes");
+    });
+  });
+}
+
+/**
  * Revert all uncommitted changes introduced during the run.
  * Skips silently when the working tree is already clean.
+ *
+ * In interactive TTY mode (stdin is a terminal and --yes was not passed),
+ * prompts the user to confirm before reverting.
+ * In non-interactive mode (CI, pipe, or --yes) proceeds without a prompt.
+ *
  * Prints the number of reverted paths on completion.
  */
-async function performRollbackIfNeeded(projectDir: string): Promise<void> {
+async function performRollbackIfNeeded(projectDir: string, yes?: boolean): Promise<void> {
   const dirtyPaths = await listDirtyPaths(projectDir);
   if (dirtyPaths.length === 0) {
     return;
   }
+
+  // Prompt only in interactive TTY sessions where --yes was not supplied.
+  const isInteractive = Boolean(process.stdin.isTTY) && !yes;
+  if (isInteractive) {
+    const confirmed = await promptRollbackConfirm(dirtyPaths.length);
+    if (!confirmed) {
+      info(`Rollback skipped — ${dirtyPaths.length} file(s) left unchanged.`);
+      return;
+    }
+  }
+
   info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
   await revertChanges(projectDir);
   info(`Rollback complete — ${dirtyPaths.length} file(s) reverted.`);
@@ -771,7 +813,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Runs after test gates so the working tree reflects the agent's final state.
   // Skips silently when nothing is dirty (no-op for already-clean trees).
   if (opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
-    await performRollbackIfNeeded(projectDir);
+    await performRollbackIfNeeded(projectDir, opts.yes);
   }
 
   // Reset task to pending when run failed and task is still in_progress.

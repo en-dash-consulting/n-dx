@@ -614,6 +614,7 @@ async function runOne(
   epicId?: string,
   runHistory?: RunRecord[],
   rollbackOnFailure?: boolean,
+  yes?: boolean,
   extraContext?: string,
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
@@ -643,6 +644,7 @@ async function runOne(
         epicId,
         runHistory: runs,
         rollbackOnFailure,
+        yes,
         extraContext,
       })
     : await agentLoop({
@@ -660,6 +662,7 @@ async function runOne(
         epicId,
         runHistory: runs,
         rollbackOnFailure,
+        yes,
         extraContext,
       });
 
@@ -792,7 +795,10 @@ export async function cmdRun(
   const provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
   const review = flags.review === "true";
-  const rollbackOnFailure = flags["no-rollback"] !== "true";
+  // --no-rollback always wins; otherwise read config (defaults to true).
+  const rollbackOnFailure = flags["no-rollback"] === "true" ? false : (config.rollbackOnFailure ?? true);
+  // --yes suppresses the interactive confirmation prompt before rollback.
+  const yes = flags["yes"] === "true";
   const model = resolvedModel;
   const spawnModel = llmVendor === "codex" && !cliModelOverride
     ? undefined
@@ -973,7 +979,7 @@ export async function cmdRun(
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride, rollbackOnFailure, extraContext);
+      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride, rollbackOnFailure, yes, extraContext);
       return;
     }
 
@@ -987,9 +993,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride, rollbackOnFailure, extraContext);
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride, rollbackOnFailure, yes, extraContext);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, rollbackOnFailure, extraContext);
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, rollbackOnFailure, yes, extraContext);
     }
   } finally {
     await limiter.release();
@@ -1016,6 +1022,7 @@ async function runIterations(
   review: boolean,
   epicId?: string,
   rollbackOnFailure?: boolean,
+  yes?: boolean,
   extraContext?: string,
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
@@ -1040,6 +1047,7 @@ async function runIterations(
       epicId,
       undefined,
       rollbackOnFailure,
+      yes,
       extraContext,
     );
 
@@ -1082,6 +1090,7 @@ async function runLoop(
   queue?: ExecutionQueue,
   priorityOverride?: string,
   rollbackOnFailure?: boolean,
+  yes?: boolean,
   extraContext?: string,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
@@ -1152,6 +1161,7 @@ async function runLoop(
             epicId,
             undefined,
             rollbackOnFailure,
+            yes,
             extraContext,
           );
           status = result.status;
@@ -1261,6 +1271,7 @@ async function runEpicByEpic(
   queue?: ExecutionQueue,
   priorityOverride?: string,
   rollbackOnFailure?: boolean,
+  yes?: boolean,
   extraContext?: string,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
@@ -1389,6 +1400,7 @@ async function runEpicByEpic(
               epic.id,
               undefined,
               rollbackOnFailure,
+              yes,
               extraContext,
             );
             status = result.status;
