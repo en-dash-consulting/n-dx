@@ -3364,7 +3364,7 @@
     {
       "id": "96aed149-3558-4253-a529-7cf3678b1d67",
       "title": "Code Health: 11 findings across 6 zones",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Automated recommendations from SourceVision analysis. 10 zone+category groups covering 11 total findings.",
       "priority": "high",
@@ -3729,20 +3729,24 @@
         {
           "id": "40e86ebd-e7be-4c1c-a9bb-4345275afb6a",
           "title": "Fix structural in viewer-polling-engine (1 finding)",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "- Cohesion (0.4) and coupling (0.6) are both at warning thresholds; the three-file split across state, restart, and suspension suggests the zone may be at a natural boundary — add a barrel index.ts to make the public API explicit before adding more files.",
           "priority": "high",
           "source": "sourcevision",
+          "startedAt": "2026-04-20T16:31:17.838Z",
+          "completedAt": "2026-04-20T16:31:17.838Z",
           "children": [
             {
               "id": "94bc747b-104f-45d3-a0d4-22e48b415188",
               "title": "Fix structural in viewer-polling-engine: Cohesion (0.4) and coupling (0.6) are both at warning thresholds; the three-file",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "- Cohesion (0.4) and coupling (0.6) are both at warning thresholds; the three-file split across state, restart, and suspension suggests the zone may be at a natural boundary — add a barrel index.ts to make the public API explicit before adding more files.",
               "priority": "high",
               "source": "sourcevision",
+              "startedAt": "2026-04-20T16:26:11.760Z",
+              "completedAt": "2026-04-20T16:31:17.736Z",
               "recommendationMeta": {
                 "findingHashes": [
                   "1d48a1d277b8"
@@ -3752,8 +3756,7 @@
                   "warning": 1
                 },
                 "findingCount": 1
-              },
-              "startedAt": "2026-04-20T16:26:11.760Z"
+              }
             }
           ],
           "recommendationMeta": {
@@ -3814,7 +3817,9 @@
       ],
       "recommendationMeta": {
         "findingCount": 11
-      }
+      },
+      "startedAt": "2026-04-20T16:31:17.920Z",
+      "completedAt": "2026-04-20T16:31:17.920Z"
     }
   ]
 }
