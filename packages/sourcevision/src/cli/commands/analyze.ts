@@ -25,7 +25,7 @@ import {
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { loadLLMConfig, printVendorModelHeader, bold, dim, green, cyan } from "@n-dx/llm-client";
+import { loadLLMConfig, printVendorModelHeader, bold, dim, green, cyan, classifyLLMError, warn } from "@n-dx/llm-client";
 import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
@@ -165,11 +165,34 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
         console.error(`  Phase ${err.phase} requires ${err.requirement}.`);
         if (filter.type === "all") process.exit(1);
       } else if (err instanceof PhaseError) {
-        console.error(`  Phase ${err.phase} failed: ${err.reason}`);
+        // Classify the underlying error for LLM-specific guidance
+        const vendor = getLLMVendor() ?? "claude";
+        const classified = classifyLLMError(
+          new Error(err.reason),
+          vendor,
+          `run phase ${err.phase} (${err.module})`,
+        );
+        if (classified.category !== "unknown") {
+          console.error(`  Phase ${err.phase} failed: ${classified.message}`);
+          warn(`  Hint: ${classified.suggestion}`);
+        } else {
+          console.error(`  Phase ${err.phase} failed: ${err.reason}`);
+        }
         if (critical && filter.type === "all") process.exit(1);
         if (!critical && filter.type !== "all") process.exit(1);
       } else {
-        throw err;
+        // Unrecognized error — try LLM classification before rethrowing
+        const errObj = err instanceof Error ? err : new Error(String(err));
+        const vendor = getLLMVendor() ?? "claude";
+        const classified = classifyLLMError(errObj, vendor);
+        if (classified.category !== "unknown") {
+          console.error(`  Phase ${phase} failed: ${classified.message}`);
+          warn(`  Hint: ${classified.suggestion}`);
+          if (critical && filter.type === "all") process.exit(1);
+          if (!critical && filter.type !== "all") process.exit(1);
+        } else {
+          throw err;
+        }
       }
     }
   }

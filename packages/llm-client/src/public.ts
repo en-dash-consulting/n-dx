@@ -325,6 +325,15 @@ export {
 // Deprecation warning filter (CLI entry points)
 export { suppressKnownDeprecations } from "./suppress-deprecations.js";
 
+// LLM error classification (shared across domain packages)
+export {
+  classifyLLMError,
+} from "./llm-error-classifier.js";
+export type {
+  LLMErrorCategory,
+  LLMErrorClassification,
+} from "./llm-error-classifier.js";
+
 // CLI help formatting
 export {
   isColorEnabled,

@@ -13,9 +13,11 @@ import {
   clearPendingSmartPrune,
 } from "../../core/pending-cache.js";
 import { REX_DIR } from "./constants.js";
-import { CLIError } from "../errors.js";
-import { info, result } from "../output.js";
+import { CLIError, BudgetExceededError } from "../errors.js";
+import { info, warn, result } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
+import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
+import { classifyLLMError } from "../llm-error-classifier.js";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 
@@ -144,12 +146,29 @@ export async function cmdPrune(
     let consolidationTokenUsage: import("../../schema/index.js").AnalyzeTokenUsage | undefined;
     if (!skipConsolidate && doc.items.length > 0) {
       try {
-        const { setLLMConfig, setClaudeConfig } = await import("../../analyze/reason.js");
+        const { setLLMConfig, setClaudeConfig, getLLMVendor } = await import("../../analyze/reason.js");
         const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
         const llmConfig = await loadLLMConfig(rexDir);
         setLLMConfig(llmConfig);
         const claudeConfig = await loadClaudeConfig(rexDir);
         setClaudeConfig(claudeConfig);
+
+        // Pre-flight budget check
+        const budgetResult = await preflightBudgetCheck(rexDir, dir);
+        if (budgetResult) {
+          const budgetLines = formatBudgetWarnings(budgetResult);
+          if (budgetLines.length > 0) {
+            for (const line of budgetLines) warn(line);
+            warn("");
+          }
+          if (budgetResult.severity === "exceeded") {
+            const store2 = await resolveStore(rexDir);
+            const config = await store2.loadConfig();
+            if (config.budget?.abort) {
+              throw new BudgetExceededError(budgetResult.warnings);
+            }
+          }
+        }
 
         const { reasonForReshape, formatReshapeProposal: fmtProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -180,8 +199,17 @@ export async function cmdPrune(
           }
         }
       } catch (err) {
+        if (err instanceof BudgetExceededError) throw err;
         if (flags.format !== "json") {
-          info(`\nConsolidation preview skipped: ${err instanceof Error ? err.message : String(err)}`);
+          const { getLLMVendor } = await import("../../analyze/reason.js");
+          const vendor = getLLMVendor() ?? "claude";
+          const classified = classifyLLMError(
+            err instanceof Error ? err : new Error(String(err)),
+            vendor,
+            "preview consolidation",
+          );
+          warn(`\nConsolidation preview failed: ${classified.message}`);
+          warn(`Hint: ${classified.suggestion}`);
         }
       }
     }
@@ -327,12 +355,29 @@ async function consolidateAfterPrune(
 
   try {
     // Load Claude config
-    const { setLLMConfig, setClaudeConfig } = await import("../../analyze/reason.js");
+    const { setLLMConfig, setClaudeConfig, getLLMVendor } = await import("../../analyze/reason.js");
     const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
     const llmConfig = await loadLLMConfig(rexDir);
     setLLMConfig(llmConfig);
     const claudeConfig = await loadClaudeConfig(rexDir);
     setClaudeConfig(claudeConfig);
+
+    // Pre-flight budget check
+    const budgetResult = await preflightBudgetCheck(rexDir, dir);
+    if (budgetResult) {
+      const budgetLines = formatBudgetWarnings(budgetResult);
+      if (budgetLines.length > 0) {
+        for (const line of budgetLines) warn(line);
+        warn("");
+      }
+      if (budgetResult.severity === "exceeded") {
+        const store2 = await resolveStore(rexDir);
+        const config = await store2.loadConfig();
+        if (config.budget?.abort) {
+          throw new BudgetExceededError(budgetResult.warnings);
+        }
+      }
+    }
 
     const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -425,7 +470,16 @@ async function consolidateAfterPrune(
       archivedCount: reshapeResult.archivedItems.length,
     };
   } catch (err) {
-    info(`\nConsolidation skipped: ${err instanceof Error ? err.message : String(err)}`);
+    if (err instanceof BudgetExceededError) throw err;
+    const { getLLMVendor } = await import("../../analyze/reason.js");
+    const vendor = getLLMVendor() ?? "claude";
+    const classified = classifyLLMError(
+      err instanceof Error ? err : new Error(String(err)),
+      vendor,
+      "consolidate items",
+    );
+    warn(`\nConsolidation failed: ${classified.message}`);
+    warn(`Hint: ${classified.suggestion}`);
     return undefined;
   }
 }
@@ -451,12 +505,28 @@ async function smartPrune(
   }
 
   // Load Claude config
-  const { setLLMConfig, setClaudeConfig } = await import("../../analyze/reason.js");
+  const { setLLMConfig, setClaudeConfig, getLLMVendor } = await import("../../analyze/reason.js");
   const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
   const llmConfig = await loadLLMConfig(rexDir);
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexDir);
   setClaudeConfig(claudeConfig);
+
+  // Pre-flight budget check
+  const budgetResult = await preflightBudgetCheck(rexDir, dir);
+  if (budgetResult) {
+    const budgetLines = formatBudgetWarnings(budgetResult);
+    if (budgetLines.length > 0) {
+      for (const line of budgetLines) warn(line);
+      warn("");
+    }
+    if (budgetResult.severity === "exceeded") {
+      const config = await store.loadConfig();
+      if (config.budget?.abort) {
+        throw new BudgetExceededError(budgetResult.warnings);
+      }
+    }
+  }
 
   const { reasonForReshape, formatReshapeProposal } = await import("../../analyze/reshape-reason.js");
 
@@ -477,11 +547,18 @@ async function smartPrune(
     tokenUsage = undefined;
   } else {
     info("Analyzing PRD for pruning opportunities...");
-    const reshapeResult = await reasonForReshape(doc.items, {
-      dir,
-      model,
-      pruneMode: true,
-    });
+    let reshapeResult: Awaited<ReturnType<typeof reasonForReshape>>;
+    try {
+      reshapeResult = await reasonForReshape(doc.items, {
+        dir,
+        model,
+        pruneMode: true,
+      });
+    } catch (err) {
+      const vendor = getLLMVendor() ?? "claude";
+      const classified = classifyLLMError(err instanceof Error ? err : new Error(String(err)), vendor, "identify prune candidates");
+      throw new CLIError(classified.message, classified.suggestion);
+    }
     proposals = reshapeResult.proposals;
     tokenUsage = reshapeResult.tokenUsage;
 

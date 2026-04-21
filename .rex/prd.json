@@ -32358,7 +32358,7 @@
             {
               "id": "0454e5d5-4f7e-42e8-becd-05c05fdfd2e2",
               "title": "Wire shared error classifier and budget preflight into reshape, reorganize, prune, and sourcevision analyze",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "The reshape (reshape.ts), reorganize (reorganize.ts:49-56), and prune (prune.ts:182-186,427-430) commands have generic try-catch blocks that swallow LLM errors silently or print opaque messages. None perform preflightBudgetCheck before LLM calls (only rex analyze does). SourceVision analyze has minimal phase-level error handling with no LLM-specific classification. Each command should: (1) call preflightBudgetCheck before the first LLM call, (2) wrap LLM calls in try-catch that uses the shared classifyLLMError utility, and (3) print user-facing error messages with actionable suggestions instead of swallowing or rethrowing generic errors.",
               "acceptanceCriteria": [
@@ -32377,7 +32377,8 @@
                 "sourcevision",
                 "error-handling"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-21T16:49:30.563Z"
             },
             {
               "id": "f61ca69b-1aba-4e71-b9df-121025c37d70",
