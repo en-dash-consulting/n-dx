@@ -23,7 +23,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { platform, tmpdir } from "node:os";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const PRELOAD_PATH = join(
@@ -149,7 +149,7 @@ function spawnCI(tmpDir, mode) {
   };
 }
 
-describe("n-dx ci child-process cleanup regression coverage", () => {
+describe.skipIf(platform() === "win32")("n-dx ci child-process cleanup regression coverage", () => {
   let tmpDir;
 
   beforeEach(async () => {

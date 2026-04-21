@@ -79,7 +79,7 @@ describe("rex domain-layer boundary", () => {
       if (!existsSync(dir)) continue;
 
       for (const file of collectTsFiles(dir)) {
-        const rel = relative(REX_SRC, file);
+        const rel = relative(REX_SRC, file).replace(/\\/g, "/");
         for (const imp of extractImportPaths(file)) {
           // Check for imports that reach into cli/ directory
           if (imp.includes("/cli/") || imp.match(/\.\.\/cli\b/)) {

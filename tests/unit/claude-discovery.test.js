@@ -141,7 +141,9 @@ describe("discoverClaudeCli — step 3: system PATH", () => {
     execSync.mockImplementation((cmd) => {
       if (cmd === "claude --version" && first) { first = false; throw new Error("not found"); }
     });
-    const claudeLocal = join(HOME, ".claude", "local", "claude");
+    const claudeLocal = process.platform === "win32"
+      ? join(process.env.APPDATA ?? join(HOME, "AppData", "Roaming"), "npm", "claude.cmd")
+      : join(HOME, ".claude", "local", "claude");
     existsSync.mockImplementation((p) => p === claudeLocal);
     const r = discoverClaudeCli();
     expect(r.found).toBe(true);

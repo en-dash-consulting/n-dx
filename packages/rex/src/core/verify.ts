@@ -119,7 +119,7 @@ export async function findTestFiles(dir: string): Promise<string[]> {
       if (entry.isDirectory()) {
         await walk(fullPath);
       } else if (entry.isFile() && TEST_FILE_RE.test(entry.name)) {
-        results.push(relative(dir, fullPath));
+        results.push(relative(dir, fullPath).replace(/\\/g, "/"));
       }
     }
   }

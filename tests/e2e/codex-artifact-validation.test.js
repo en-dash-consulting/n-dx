@@ -234,7 +234,7 @@ describe("config.toml structural validity", () => {
     for (const name of serverNames) {
       const section = sections.get(`mcp_servers.${name}`);
       const elements = section.args.match(/^\[(.+)\]$/)[1].match(/"([^"]*)"/g);
-      const entrypoint = elements[0].slice(1, -1); // strip quotes
+      const entrypoint = elements[0].slice(1, -1).replace(/\\\\/g, "\\"); // strip quotes + unescape TOML
       expect(entrypoint, `${name} entrypoint path`).toMatch(/dist[/\\]cli[/\\]index\.js$/);
     }
   });
@@ -254,7 +254,7 @@ describe("config.toml structural validity", () => {
     for (const name of serverNames) {
       const section = sections.get(`mcp_servers.${name}`);
       const elements = section.args.match(/^\[(.+)\]$/)[1].match(/"([^"]*)"/g);
-      const projectDir = elements[2].slice(1, -1);
+      const projectDir = elements[2].slice(1, -1).replace(/\\\\/g, "\\");
       expect(projectDir).toBe(tmpDir);
     }
   });

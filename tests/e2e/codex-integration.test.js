@@ -224,7 +224,7 @@ describe("renderCodexConfigToml", () => {
   it("each server section has args with entrypoint, mcp command, and project dir", () => {
     const content = renderCodexConfigToml("/project", fakeResolveCli);
     for (const [name, descriptor] of Object.entries(servers)) {
-      const expectedEntry = join(ROOT, descriptor.package, "dist/cli/index.js");
+      const expectedEntry = join(ROOT, descriptor.package, "dist/cli/index.js").replace(/\\/g, "\\\\");
       expect(content).toContain(expectedEntry);
       expect(content).toContain(descriptor.mcpCommand);
       expect(content).toContain("/project");

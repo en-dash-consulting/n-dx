@@ -1160,7 +1160,7 @@ describe("rex runtime state: PRD write-zone enforcement", () => {
 
     for (const filePath of files) {
       const content = readFileSync(filePath, "utf-8");
-      const relPath = relative(ROOT, filePath);
+      const relPath = relative(ROOT, filePath).replace(/\\/g, "/");
 
       for (const pattern of PRD_WRITE_PATTERNS) {
         if (pattern.test(content)) {
@@ -1198,7 +1198,7 @@ describe("rex runtime state: PRD write-zone enforcement", () => {
 
     for (const [prefix, desc] of Object.entries(ALLOWED_PRD_WRITERS)) {
       const zoneFiles = files.filter((f) =>
-        relative(ROOT, f).startsWith(prefix),
+        relative(ROOT, f).replace(/\\/g, "/").startsWith(prefix),
       );
 
       const hasWriteCode = zoneFiles.some((filePath) => {
