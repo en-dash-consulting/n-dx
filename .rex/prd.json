@@ -32263,7 +32263,7 @@
         {
           "id": "e34e664a-b788-41e5-ad5d-95c94d9abd8a",
           "title": "Centralized Model Resolution and Vendor Visibility Across All LLM Commands",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Several rex commands that make LLM calls (reshape, reorganize, prune) pass the raw --model flag to downstream functions without explicitly calling resolveVendorModel or printing a vendor/model header. SourceVision analyze uses hardcoded DEFAULT_MODEL constants instead of the centralized resolver. This means config changes in .n-dx.json may not take effect uniformly, and users get no feedback about which model is being used.",
           "source": "smart-add",
@@ -32296,7 +32296,7 @@
             {
               "id": "15313bb7-1100-46df-84c7-bbdb8f82c571",
               "title": "Replace hardcoded model defaults in sourcevision analyze with centralized resolveVendorModel",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "sourcevision/src/cli/commands/analyze.ts imports DEFAULT_MODEL and DEFAULT_CODEX_MODEL constants and uses them as fallbacks in resolveAnalyzeTokenEventMetadata (lines 56-77) instead of calling resolveVendorModel from @n-dx/llm-client. This means sourcevision ignores user-configured model overrides and tier-based model selection. The resolution should use the same resolveVendorModel(vendor, llmConfig, weight) call path that rex uses, passing through the already-loaded LLMConfig.",
               "acceptanceCriteria": [
@@ -32312,7 +32312,11 @@
                 "sourcevision",
                 "cli"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-21T17:17:51.175Z",
+              "completedAt": "2026-04-21T17:23:33.325Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Replaced hardcoded DEFAULT_MODEL/DEFAULT_CODEX_MODEL fallbacks in resolveAnalyzeTokenEventMetadata with resolveVendorModel(rawVendor, llmConfig) from @n-dx/llm-client. Removed DEFAULT_MODEL/DEFAULT_CODEX_MODEL imports from analyze.ts. Updated 3 existing unit tests and added 3 new ones (config override, vendor switch). Created integration test (5 cases) verifying .n-dx.json model/vendor config is reflected in token event metadata."
             }
           ],
           "overrideMarker": {
@@ -32324,7 +32328,9 @@
             "matchedItemLevel": "feature",
             "matchedItemStatus": "completed",
             "createdAt": "2026-04-21T16:38:39.363Z"
-          }
+          },
+          "startedAt": "2026-04-21T17:23:33.802Z",
+          "completedAt": "2026-04-21T17:23:33.802Z"
         },
         {
           "id": "0d84e500-04a1-4186-a4ea-6cf98d305920",

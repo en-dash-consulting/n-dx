@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { setLLMConfig, DEFAULT_CODEX_MODEL, DEFAULT_MODEL } from "../../../src/analyzers/claude-client.js";
+import { setLLMConfig } from "../../../src/analyzers/claude-client.js";
+import { resolveVendorModel, NEWEST_MODELS } from "@n-dx/llm-client";
 import { resolveAnalyzeTokenEventMetadata, classifyPrMarkdownError } from "../../../src/cli/commands/analyze.js";
 
 describe("analyze token usage metadata", () => {
@@ -21,26 +22,58 @@ describe("analyze token usage metadata", () => {
     });
   });
 
-  it("falls back to default codex model when codex model is not configured", () => {
+  it("falls back to resolveVendorModel default when codex model is not configured", () => {
     const llmConfig = { vendor: "codex", codex: {} } as const;
     setLLMConfig(llmConfig);
 
     const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
     expect(metadata).toEqual({
       vendor: "codex",
-      model: DEFAULT_CODEX_MODEL,
+      model: resolveVendorModel("codex", llmConfig),
     });
   });
 
-  it("falls back to default claude model when claude model is not configured", () => {
+  it("falls back to resolveVendorModel default when claude model is not configured", () => {
     const llmConfig = { vendor: "claude", claude: {} } as const;
     setLLMConfig(llmConfig);
 
     const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
     expect(metadata).toEqual({
       vendor: "claude",
-      model: DEFAULT_MODEL,
+      model: resolveVendorModel("claude", llmConfig),
     });
+  });
+
+  it("reflects configured claude model from .n-dx.json", () => {
+    const llmConfig = { vendor: "claude", claude: { model: "claude-opus-4-20250514" } } as const;
+    setLLMConfig(llmConfig);
+
+    const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
+    expect(metadata.model).toBe("claude-opus-4-20250514");
+  });
+
+  it("reflects configured codex model from .n-dx.json", () => {
+    const llmConfig = { vendor: "codex", codex: { model: "gpt-5.1-codex-mini" } } as const;
+    setLLMConfig(llmConfig);
+
+    const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
+    expect(metadata.model).toBe("gpt-5.1-codex-mini");
+  });
+
+  it("vendor switch changes resolved model", () => {
+    const claudeConfig = { vendor: "claude", claude: {} } as const;
+    setLLMConfig(claudeConfig);
+    const claudeMetadata = resolveAnalyzeTokenEventMetadata(claudeConfig);
+
+    const codexConfig = { vendor: "codex", codex: {} } as const;
+    setLLMConfig(codexConfig);
+    const codexMetadata = resolveAnalyzeTokenEventMetadata(codexConfig);
+
+    expect(claudeMetadata.vendor).toBe("claude");
+    expect(codexMetadata.vendor).toBe("codex");
+    expect(claudeMetadata.model).toBe(resolveVendorModel("claude", claudeConfig));
+    expect(codexMetadata.model).toBe(resolveVendorModel("codex", codexConfig));
+    expect(claudeMetadata.model).not.toBe(codexMetadata.model);
   });
 });
 

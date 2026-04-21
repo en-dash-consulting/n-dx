@@ -19,13 +19,11 @@ import {
   setLLMConfig,
   getAuthMode,
   getLLMVendor,
-  DEFAULT_MODEL,
-  DEFAULT_CODEX_MODEL,
 } from "../sourcevision-core.js";
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { loadLLMConfig, printVendorModelHeader, bold, dim, green, cyan, classifyLLMError, warn } from "@n-dx/llm-client";
+import { loadLLMConfig, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn } from "@n-dx/llm-client";
 import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
@@ -55,18 +53,13 @@ function normalizeProviderMetadata(value: string | undefined): string | undefine
 export function resolveAnalyzeTokenEventMetadata(
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
 ): { vendor: string; model: string } {
-  const vendor = normalizeProviderMetadata(getLLMVendor()) ?? UNKNOWN_PROVIDER_METADATA;
+  const rawVendor = getLLMVendor();
+  const vendor = normalizeProviderMetadata(rawVendor) ?? UNKNOWN_PROVIDER_METADATA;
 
-  if (vendor === "codex") {
+  if (rawVendor) {
     return {
       vendor,
-      model: normalizeProviderMetadata(llmConfig.codex?.model) ?? DEFAULT_CODEX_MODEL,
-    };
-  }
-  if (vendor === "claude") {
-    return {
-      vendor,
-      model: normalizeProviderMetadata(llmConfig.claude?.model) ?? DEFAULT_MODEL,
+      model: resolveVendorModel(rawVendor, llmConfig),
     };
   }
 
