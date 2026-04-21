@@ -18,6 +18,7 @@ import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
+import { printVendorModelHeader } from "@n-dx/llm-client";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 
@@ -31,13 +32,27 @@ async function runLlmAnalysis(
   flags: Record<string, string>,
 ): Promise<ReshapeProposal[]> {
   try {
-    const { setLLMConfig, setClaudeConfig, getLLMVendor } = await import("../../analyze/reason.js");
+    const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
     const { reasonForReshape } = await import("../../analyze/reshape-reason.js");
 
     const llmConfig = await loadLLMConfig(rexDir);
     setLLMConfig(llmConfig);
     const claudeConfig = await loadClaudeConfig(rexDir);
     setClaudeConfig(claudeConfig);
+
+    // Resolve model: explicit flag > vendor config > default
+    const resolvedModel = resolveConfiguredModel(flags.model);
+    const vendor = getLLMVendor() ?? "claude";
+    const modelSource = flags.model
+      ? "cli-override" as const
+      : llmConfig.claude?.model || llmConfig.codex?.model
+        ? "configured" as const
+        : "default" as const;
+    printVendorModelHeader(vendor, llmConfig, {
+      format: flags.format,
+      resolvedModel,
+      modelSource,
+    });
 
     // Pre-flight budget check
     const budgetResult = await preflightBudgetCheck(rexDir, dir);
@@ -61,13 +76,12 @@ async function runLlmAnalysis(
     try {
       const { proposals } = await reasonForReshape(items, {
         dir,
-        model: flags.model,
+        model: resolvedModel,
       });
       const deduped = deduplicateAgainstProgrammatic(structuralProposals, proposals);
       spinner.stop(`LLM analysis complete — ${deduped.length} proposal${deduped.length === 1 ? "" : "s"}.`);
       return deduped;
     } catch (err) {
-      const vendor = getLLMVendor() ?? "claude";
       const classified = classifyLLMError(
         err instanceof Error ? err : new Error(String(err)),
         vendor,

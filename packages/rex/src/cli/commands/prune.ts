@@ -18,6 +18,7 @@ import { info, warn, result } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
+import { printVendorModelHeader } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 
@@ -146,12 +147,26 @@ export async function cmdPrune(
     let consolidationTokenUsage: import("../../schema/index.js").AnalyzeTokenUsage | undefined;
     if (!skipConsolidate && doc.items.length > 0) {
       try {
-        const { setLLMConfig, setClaudeConfig, getLLMVendor } = await import("../../analyze/reason.js");
+        const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
         const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
         const llmConfig = await loadLLMConfig(rexDir);
         setLLMConfig(llmConfig);
         const claudeConfig = await loadClaudeConfig(rexDir);
         setClaudeConfig(claudeConfig);
+
+        // Resolve model: explicit flag > vendor config > default
+        const resolvedModel = resolveConfiguredModel(flags.model);
+        const dryRunVendor = getLLMVendor() ?? "claude";
+        const dryRunModelSource = flags.model
+          ? "cli-override" as const
+          : llmConfig.claude?.model || llmConfig.codex?.model
+            ? "configured" as const
+            : "default" as const;
+        printVendorModelHeader(dryRunVendor, llmConfig, {
+          format: flags.format,
+          resolvedModel,
+          modelSource: dryRunModelSource,
+        });
 
         // Pre-flight budget check
         const budgetResult = await preflightBudgetCheck(rexDir, dir);
@@ -178,7 +193,7 @@ export async function cmdPrune(
 
         const consolidateResult = await reasonForReshape(doc.items, {
           dir,
-          model: flags.model,
+          model: resolvedModel,
           consolidateMode: true,
         });
         consolidationProposals = consolidateResult.proposals;
@@ -201,11 +216,11 @@ export async function cmdPrune(
       } catch (err) {
         if (err instanceof BudgetExceededError) throw err;
         if (flags.format !== "json") {
-          const { getLLMVendor } = await import("../../analyze/reason.js");
-          const vendor = getLLMVendor() ?? "claude";
+          const { getLLMVendor: getDryRunVendor } = await import("../../analyze/reason.js");
+          const errVendor = getDryRunVendor() ?? "claude";
           const classified = classifyLLMError(
             err instanceof Error ? err : new Error(String(err)),
-            vendor,
+            errVendor,
             "preview consolidation",
           );
           warn(`\nConsolidation preview failed: ${classified.message}`);
@@ -355,12 +370,26 @@ async function consolidateAfterPrune(
 
   try {
     // Load Claude config
-    const { setLLMConfig, setClaudeConfig, getLLMVendor } = await import("../../analyze/reason.js");
+    const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
     const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
     const llmConfig = await loadLLMConfig(rexDir);
     setLLMConfig(llmConfig);
     const claudeConfig = await loadClaudeConfig(rexDir);
     setClaudeConfig(claudeConfig);
+
+    // Resolve model: explicit flag > vendor config > default
+    const resolvedModel = resolveConfiguredModel(flags.model);
+    const vendor = getLLMVendor() ?? "claude";
+    const modelSource = flags.model
+      ? "cli-override" as const
+      : llmConfig.claude?.model || llmConfig.codex?.model
+        ? "configured" as const
+        : "default" as const;
+    printVendorModelHeader(vendor, llmConfig, {
+      format: flags.format,
+      resolvedModel,
+      modelSource,
+    });
 
     // Pre-flight budget check
     const budgetResult = await preflightBudgetCheck(rexDir, dir);
@@ -384,7 +413,7 @@ async function consolidateAfterPrune(
     info("\nAnalyzing remaining items for consolidation...");
     const { proposals, tokenUsage } = await reasonForReshape(doc.items, {
       dir,
-      model: flags.model,
+      model: resolvedModel,
       consolidateMode: true,
     });
 
@@ -471,11 +500,11 @@ async function consolidateAfterPrune(
     };
   } catch (err) {
     if (err instanceof BudgetExceededError) throw err;
-    const { getLLMVendor } = await import("../../analyze/reason.js");
-    const vendor = getLLMVendor() ?? "claude";
+    const { getLLMVendor: getVendor } = await import("../../analyze/reason.js");
+    const errVendor = getVendor() ?? "claude";
     const classified = classifyLLMError(
       err instanceof Error ? err : new Error(String(err)),
-      vendor,
+      errVendor,
       "consolidate items",
     );
     warn(`\nConsolidation failed: ${classified.message}`);
@@ -505,12 +534,26 @@ async function smartPrune(
   }
 
   // Load Claude config
-  const { setLLMConfig, setClaudeConfig, getLLMVendor } = await import("../../analyze/reason.js");
+  const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
   const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
   const llmConfig = await loadLLMConfig(rexDir);
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexDir);
   setClaudeConfig(claudeConfig);
+
+  // Resolve model: explicit flag > vendor config > default
+  const resolvedModel = resolveConfiguredModel(flags.model);
+  const vendor = getLLMVendor() ?? "claude";
+  const modelSource = flags.model
+    ? "cli-override" as const
+    : llmConfig.claude?.model || llmConfig.codex?.model
+      ? "configured" as const
+      : "default" as const;
+  printVendorModelHeader(vendor, llmConfig, {
+    format: flags.format,
+    resolvedModel,
+    modelSource,
+  });
 
   // Pre-flight budget check
   const budgetResult = await preflightBudgetCheck(rexDir, dir);
@@ -532,7 +575,6 @@ async function smartPrune(
 
   const dryRun = flags["dry-run"] === "true";
   const accept = flags.accept === "true";
-  const model = flags.model;
 
   // Check cache before LLM call
   const currentHash = hashPRD(doc.items);
@@ -551,11 +593,10 @@ async function smartPrune(
     try {
       reshapeResult = await reasonForReshape(doc.items, {
         dir,
-        model,
+        model: resolvedModel,
         pruneMode: true,
       });
     } catch (err) {
-      const vendor = getLLMVendor() ?? "claude";
       const classified = classifyLLMError(err instanceof Error ? err : new Error(String(err)), vendor, "identify prune candidates");
       throw new CLIError(classified.message, classified.suggestion);
     }

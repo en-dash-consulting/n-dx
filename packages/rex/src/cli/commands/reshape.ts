@@ -6,8 +6,9 @@ import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { ARCHIVE_FILE, loadArchive, trimArchive } from "../../core/archive.js";
 import { reasonForReshape, formatReshapeProposal } from "../../analyze/reshape-reason.js";
-import { setLLMConfig, setClaudeConfig } from "../../analyze/reason.js";
+import { setLLMConfig, setClaudeConfig, resolveConfiguredModel } from "../../analyze/reason.js";
 import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
+import { printVendorModelHeader } from "@n-dx/llm-client";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result } from "../output.js";
@@ -38,9 +39,22 @@ export async function cmdReshape(
   const claudeConfig = await loadClaudeConfig(rexDir);
   setClaudeConfig(claudeConfig);
 
-  const model = flags.model;
   const dryRun = flags["dry-run"] === "true";
   const accept = flags.accept === "true";
+
+  // Resolve model: explicit flag > vendor config > default
+  const resolvedModel = resolveConfiguredModel(flags.model);
+  const vendor = getLLMVendor() ?? "claude";
+  const modelSource = flags.model
+    ? "cli-override" as const
+    : llmConfig.claude?.model || llmConfig.codex?.model
+      ? "configured" as const
+      : "default" as const;
+  printVendorModelHeader(vendor, llmConfig, {
+    format: flags.format,
+    resolvedModel,
+    modelSource,
+  });
 
   // Pre-flight budget check
   const budgetResult = await preflightBudgetCheck(rexDir, dir);
@@ -64,11 +78,10 @@ export async function cmdReshape(
   let proposals: ReshapeProposal[];
   let tokenUsage: Awaited<ReturnType<typeof reasonForReshape>>["tokenUsage"];
   try {
-    const reshapeResult = await reasonForReshape(doc.items, { dir, model });
+    const reshapeResult = await reasonForReshape(doc.items, { dir, model: resolvedModel });
     proposals = reshapeResult.proposals;
     tokenUsage = reshapeResult.tokenUsage;
   } catch (err) {
-    const vendor = getLLMVendor() ?? "claude";
     const classified = classifyLLMError(err instanceof Error ? err : new Error(String(err)), vendor, "analyze PRD structure");
     throw new CLIError(classified.message, classified.suggestion);
   }

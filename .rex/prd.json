@@ -32271,7 +32271,7 @@
             {
               "id": "11e14b47-8392-42ab-ba33-afc6085807d5",
               "title": "Add explicit resolveVendorModel and vendor/model header to reshape, reorganize, and prune commands",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The reshape (reshape.ts:38), reorganize (reorganize.ts:44), and prune (prune.ts:340,480) commands pass `flags.model` directly to reasonForReshape without calling resolveConfiguredModel first. While the bridge layer eventually resolves a model, this bypasses visible vendor/model header output and makes debugging model selection opaque. Each command should explicitly resolve the model via resolveConfiguredModel (matching smart-add's resolveSmartAddModel pattern) and call printVendorModelHeader before making LLM calls.",
               "acceptanceCriteria": [
@@ -32287,7 +32287,11 @@
                 "rex",
                 "cli"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-21T17:09:01.983Z",
+              "completedAt": "2026-04-21T17:17:09.123Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added resolveConfiguredModel + printVendorModelHeader to reshape, reorganize, and prune commands. 19 integration tests verify precedence (flag > config > default) and header ordering."
             },
             {
               "id": "15313bb7-1100-46df-84c7-bbdb8f82c571",
@@ -32358,7 +32362,7 @@
             {
               "id": "0454e5d5-4f7e-42e8-becd-05c05fdfd2e2",
               "title": "Wire shared error classifier and budget preflight into reshape, reorganize, prune, and sourcevision analyze",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "The reshape (reshape.ts), reorganize (reorganize.ts:49-56), and prune (prune.ts:182-186,427-430) commands have generic try-catch blocks that swallow LLM errors silently or print opaque messages. None perform preflightBudgetCheck before LLM calls (only rex analyze does). SourceVision analyze has minimal phase-level error handling with no LLM-specific classification. Each command should: (1) call preflightBudgetCheck before the first LLM call, (2) wrap LLM calls in try-catch that uses the shared classifyLLMError utility, and (3) print user-facing error messages with actionable suggestions instead of swallowing or rethrowing generic errors.",
               "acceptanceCriteria": [
@@ -32378,7 +32382,10 @@
                 "error-handling"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-21T16:49:30.563Z"
+              "startedAt": "2026-04-21T16:49:30.563Z",
+              "completedAt": "2026-04-21T17:07:20.491Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Moved classifyLLMError to @n-dx/llm-client foundation tier. Wired budget preflight + classified error handling into reshape, reorganize, prune, and sourcevision analyze. 51 new tests across 3 packages."
             },
             {
               "id": "f61ca69b-1aba-4e71-b9df-121025c37d70",
