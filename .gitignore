@@ -32,3 +32,4 @@ scripts/HENCH_CALLGRAPH_FINDINGS.md
 
 *.local.json
 .local_testing/
+.codex/config.toml
