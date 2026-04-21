@@ -332,7 +332,19 @@ export {
 export type {
   LLMErrorCategory,
   LLMErrorClassification,
+  LLMErrorContext,
 } from "./llm-error-classifier.js";
+
+// Rate-limit detection and retry utilities
+export {
+  parseRetryAfterHeader,
+  formatRetryCountdown,
+  shouldAutoRetry,
+  extractRetryAfterMs,
+  classifyTimeout,
+  DEFAULT_AUTO_RETRY_THRESHOLD_MS,
+} from "./rate-limit.js";
+export type { TimeoutKind } from "./rate-limit.js";
 
 // CLI help formatting
 export {

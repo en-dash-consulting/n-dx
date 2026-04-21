@@ -32256,7 +32256,7 @@
     {
       "id": "276aa105-8b1f-4ea5-8250-06a22a1ad42f",
       "title": "Unified LLM Command Consistency and Error Handling",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -32267,6 +32267,8 @@
           "level": "feature",
           "description": "Several rex commands that make LLM calls (reshape, reorganize, prune) pass the raw --model flag to downstream functions without explicitly calling resolveVendorModel or printing a vendor/model header. SourceVision analyze uses hardcoded DEFAULT_MODEL constants instead of the centralized resolver. This means config changes in .n-dx.json may not take effect uniformly, and users get no feedback about which model is being used.",
           "source": "smart-add",
+          "startedAt": "2026-04-21T17:23:33.802Z",
+          "completedAt": "2026-04-21T17:23:33.802Z",
           "children": [
             {
               "id": "11e14b47-8392-42ab-ba33-afc6085807d5",
@@ -32328,17 +32330,17 @@
             "matchedItemLevel": "feature",
             "matchedItemStatus": "completed",
             "createdAt": "2026-04-21T16:38:39.363Z"
-          },
-          "startedAt": "2026-04-21T17:23:33.802Z",
-          "completedAt": "2026-04-21T17:23:33.802Z"
+          }
         },
         {
           "id": "0d84e500-04a1-4186-a4ea-6cf98d305920",
           "title": "Shared LLM Error Classification with Token Exhaustion, Bad Response, and Rate-Limit Diagnostics",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Only smart-add.ts has sophisticated LLM error classification (classifySmartAddError, lines 634-720) that detects rate limits (429), auth failures (401), network errors, malformed responses, and server errors. All other LLM-calling commands (reshape, reorganize, prune, sourcevision analyze) either silently swallow errors or throw generic messages. The ERROR_HINTS array in errors.ts has no LLM-specific patterns. Users hitting token exhaustion, rate limits, or bad responses in these commands get unhelpful stack traces instead of actionable guidance.",
           "source": "smart-add",
+          "startedAt": "2026-04-21T17:39:34.103Z",
+          "completedAt": "2026-04-21T17:39:34.103Z",
           "children": [
             {
               "id": "d8036b40-fcf9-4d56-a89d-d315041e995b",
@@ -32396,7 +32398,7 @@
             {
               "id": "f61ca69b-1aba-4e71-b9df-121025c37d70",
               "title": "Add rate-limit cooldown detection with retry-after countdown and timeout state messaging",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "When the LLM API returns a 429 with a Retry-After header or the user is in a rate-limit cooldown window, commands should detect this proactively (not just reactively after a failed call). The Anthropic API and Codex API both return rate-limit headers that indicate when the user can retry. Commands should parse this, display a human-readable countdown ('Rate limited — retry available in 47s'), and optionally auto-retry if the wait is short (< 60s configurable). For timeout errors (request took too long), commands should distinguish between network timeouts and API processing timeouts and suggest appropriate actions (retry vs. reduce input size).",
               "acceptanceCriteria": [
@@ -32413,11 +32415,17 @@
                 "error-handling",
                 "ux"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-21T17:24:02.504Z",
+              "completedAt": "2026-04-21T17:39:33.708Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added rate-limit.ts with Retry-After header parsing, countdown formatting, auto-retry threshold, SDK error extraction, and timeout classification. Enhanced ClaudeClientError with retryAfterMs field. Updated API provider to extract Retry-After from SDK errors, honor it for delays, and surface onRetry callback. Enhanced classifyLLMError with LLMErrorContext for command/vendor/model suffixes, structured retryAfterSeconds countdown, budget usage vs limit display, and network vs API timeout distinction. 43 new unit tests, 3 downstream test updates."
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-21T17:39:34.467Z",
+      "completedAt": "2026-04-21T17:39:34.467Z"
     }
   ]
 }

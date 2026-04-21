@@ -94,12 +94,21 @@ export class ClaudeClientError extends Error {
   readonly reason: ErrorReason;
   /** Whether this error is transient and the call could be retried. */
   readonly retryable: boolean;
+  /**
+   * When the server specifies a Retry-After delay (e.g. 429 responses),
+   * this holds the parsed value in milliseconds. Consumers can use it
+   * to display a countdown or decide whether to auto-retry.
+   */
+  readonly retryAfterMs?: number;
 
-  constructor(message: string, reason: ErrorReason, retryable: boolean) {
+  constructor(message: string, reason: ErrorReason, retryable: boolean, retryAfterMs?: number) {
     super(message);
     this.name = "ClaudeClientError";
     this.reason = reason;
     this.retryable = retryable;
+    if (retryAfterMs != null && retryAfterMs > 0) {
+      this.retryAfterMs = retryAfterMs;
+    }
   }
 }
 

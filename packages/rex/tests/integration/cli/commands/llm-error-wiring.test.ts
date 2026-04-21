@@ -41,7 +41,7 @@ describe("rate-limit error classification", () => {
   it("extracts retry-after duration when present", () => {
     const r = classifyLLMError(new Error("429 rate limited, retry-after: 30"));
     expect(r.category).toBe("rate-limit");
-    expect(r.suggestion).toContain("30 seconds");
+    expect(r.suggestion).toContain("30s");
   });
 
   it("handles retry-after without specific duration", () => {
@@ -63,7 +63,7 @@ describe("budget-exceeded error classification", () => {
     const r = classifyLLMError(new Error("budget exceeded: token limit reached"));
     expect(r.category).toBe("budget");
     expect(r.message).toContain("budget");
-    expect(r.suggestion).toContain("n-dx config");
+    expect(r.suggestion).toContain("ndx config");
   });
 
   it("classifies token limit exceeded", () => {
@@ -75,7 +75,7 @@ describe("budget-exceeded error classification", () => {
   it("suggests increasing via ndx config", () => {
     const r = classifyLLMError(new Error("budget exhausted, 0 tokens remaining"));
     expect(r.category).toBe("budget");
-    expect(r.suggestion).toMatch(/n-dx config.*budget/i);
+    expect(r.suggestion).toMatch(/ndx config.*budget/i);
   });
 });
 
