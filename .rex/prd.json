@@ -32259,6 +32259,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-21T17:39:34.467Z",
+      "completedAt": "2026-04-21T17:39:34.467Z",
       "children": [
         {
           "id": "e34e664a-b788-41e5-ad5d-95c94d9abd8a",
@@ -32423,9 +32425,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-21T17:39:34.467Z",
-      "completedAt": "2026-04-21T17:39:34.467Z"
+      ]
     }
   ]
 }

@@ -816,7 +816,6 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["use", "Single-file zone (views/use-polling.ts); cohesion 0.36 is inherent for any single-file zone. Pinned to web-viewer in .n-dx.json — will dissolve on next analysis when the pin is applied."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
