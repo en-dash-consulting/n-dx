@@ -3369,6 +3369,8 @@
       "description": "Automated recommendations from SourceVision analysis. 10 zone+category groups covering 11 total findings.",
       "priority": "high",
       "source": "sourcevision",
+      "startedAt": "2026-04-20T16:31:17.920Z",
+      "completedAt": "2026-04-20T16:31:17.920Z",
       "children": [
         {
           "id": "b0a511ce-9bfe-47fc-ab6e-1b66d27302d3",
@@ -3817,9 +3819,7 @@
       ],
       "recommendationMeta": {
         "findingCount": 11
-      },
-      "startedAt": "2026-04-20T16:31:17.920Z",
-      "completedAt": "2026-04-20T16:31:17.920Z"
+      }
     },
     {
       "id": "ebe4c082-7e93-44ee-a286-cf01c05dd907",
@@ -32250,6 +32250,158 @@
           ],
           "startedAt": "2026-03-24T20:36:03.754Z",
           "completedAt": "2026-03-24T20:36:03.754Z"
+        }
+      ]
+    },
+    {
+      "id": "276aa105-8b1f-4ea5-8250-06a22a1ad42f",
+      "title": "Unified LLM Command Consistency and Error Handling",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "e34e664a-b788-41e5-ad5d-95c94d9abd8a",
+          "title": "Centralized Model Resolution and Vendor Visibility Across All LLM Commands",
+          "status": "pending",
+          "level": "feature",
+          "description": "Several rex commands that make LLM calls (reshape, reorganize, prune) pass the raw --model flag to downstream functions without explicitly calling resolveVendorModel or printing a vendor/model header. SourceVision analyze uses hardcoded DEFAULT_MODEL constants instead of the centralized resolver. This means config changes in .n-dx.json may not take effect uniformly, and users get no feedback about which model is being used.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "11e14b47-8392-42ab-ba33-afc6085807d5",
+              "title": "Add explicit resolveVendorModel and vendor/model header to reshape, reorganize, and prune commands",
+              "status": "pending",
+              "level": "task",
+              "description": "The reshape (reshape.ts:38), reorganize (reorganize.ts:44), and prune (prune.ts:340,480) commands pass `flags.model` directly to reasonForReshape without calling resolveConfiguredModel first. While the bridge layer eventually resolves a model, this bypasses visible vendor/model header output and makes debugging model selection opaque. Each command should explicitly resolve the model via resolveConfiguredModel (matching smart-add's resolveSmartAddModel pattern) and call printVendorModelHeader before making LLM calls.",
+              "acceptanceCriteria": [
+                "reshape, reorganize, and prune commands call resolveConfiguredModel with the --model flag before passing to reasonForReshape",
+                "All three commands call printVendorModelHeader before the first LLM call, matching smart-add and analyze behavior",
+                "Running reshape/reorganize/prune without --model respects .n-dx.json llm.vendor and llm.claude.model settings",
+                "Running with --model=<override> still takes precedence over config",
+                "Unit tests verify model resolution precedence: explicit flag > config > default for each command"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "rex",
+                "cli"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "15313bb7-1100-46df-84c7-bbdb8f82c571",
+              "title": "Replace hardcoded model defaults in sourcevision analyze with centralized resolveVendorModel",
+              "status": "pending",
+              "level": "task",
+              "description": "sourcevision/src/cli/commands/analyze.ts imports DEFAULT_MODEL and DEFAULT_CODEX_MODEL constants and uses them as fallbacks in resolveAnalyzeTokenEventMetadata (lines 56-77) instead of calling resolveVendorModel from @n-dx/llm-client. This means sourcevision ignores user-configured model overrides and tier-based model selection. The resolution should use the same resolveVendorModel(vendor, llmConfig, weight) call path that rex uses, passing through the already-loaded LLMConfig.",
+              "acceptanceCriteria": [
+                "resolveAnalyzeTokenEventMetadata uses resolveVendorModel(vendor, llmConfig) instead of hardcoded DEFAULT_MODEL/DEFAULT_CODEX_MODEL",
+                "Changing llm.claude.model in .n-dx.json is reflected in sourcevision analyze token event metadata",
+                "Changing llm.vendor in .n-dx.json switches sourcevision to the correct vendor model",
+                "DEFAULT_MODEL and DEFAULT_CODEX_MODEL imports are removed from analyze.ts if no longer needed",
+                "Integration test verifies sourcevision analyze respects .n-dx.json model config"
+              ],
+              "priority": "high",
+              "tags": [
+                "llm",
+                "sourcevision",
+                "cli"
+              ],
+              "source": "smart-add"
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:e4b6edfe-b8e0-4b6a-87d6-b0a79cca4eeb",
+            "matchedItemId": "e4b6edfe-b8e0-4b6a-87d6-b0a79cca4eeb",
+            "matchedItemTitle": "Consistent Vendor and Model Resolution Across Commands",
+            "matchedItemLevel": "feature",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-04-21T16:38:39.363Z"
+          }
+        },
+        {
+          "id": "0d84e500-04a1-4186-a4ea-6cf98d305920",
+          "title": "Shared LLM Error Classification with Token Exhaustion, Bad Response, and Rate-Limit Diagnostics",
+          "status": "pending",
+          "level": "feature",
+          "description": "Only smart-add.ts has sophisticated LLM error classification (classifySmartAddError, lines 634-720) that detects rate limits (429), auth failures (401), network errors, malformed responses, and server errors. All other LLM-calling commands (reshape, reorganize, prune, sourcevision analyze) either silently swallow errors or throw generic messages. The ERROR_HINTS array in errors.ts has no LLM-specific patterns. Users hitting token exhaustion, rate limits, or bad responses in these commands get unhelpful stack traces instead of actionable guidance.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d8036b40-fcf9-4d56-a89d-d315041e995b",
+              "title": "Extract smart-add error classifier into shared LLM error utility and extend ERROR_HINTS",
+              "status": "completed",
+              "level": "task",
+              "description": "Move the classifySmartAddError logic (smart-add.ts:634-720) into a shared module (e.g., rex/src/cli/llm-error-classifier.ts) that any LLM-calling command can import. Generalize the function signature to accept the raw error and return a structured { message, suggestion, category } result. Add LLM-specific patterns to ERROR_HINTS in errors.ts so the top-level CLI error handler can also provide useful messages for unhandled LLM errors: rate-limit (429/retry-after), token exhaustion (budget exceeded), auth failure (401/invalid key), malformed response (JSON parse failure), and timeout.",
+              "acceptanceCriteria": [
+                "New shared module exports classifyLLMError function that smart-add.ts imports instead of the inline classifier",
+                "classifyLLMError returns structured { message: string, suggestion: string, category: 'rate-limit' | 'auth' | 'budget' | 'parse' | 'network' | 'server' | 'unknown' }",
+                "ERROR_HINTS in errors.ts includes patterns for 429/rate-limit, 401/auth, timeout, and overloaded/529 errors",
+                "smart-add.ts updated to import from shared module with no behavior change (regression test passes)",
+                "Unit tests for classifyLLMError cover all six error categories with representative error strings"
+              ],
+              "priority": "critical",
+              "tags": [
+                "llm",
+                "rex",
+                "error-handling"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-21T16:39:13.741Z",
+              "completedAt": "2026-04-21T16:48:16.941Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Extracted classifySmartAddError into shared classifyLLMError in rex/src/cli/llm-error-classifier.ts. Added 5 new CLI_ERROR_CODES (AUTH_FAILED, LLM_RATE_LIMITED, LLM_SERVER_ERROR, NETWORK_ERROR, TIMEOUT). Extended ERROR_HINTS with 4 LLM patterns. 28 unit tests for the new classifier."
+            },
+            {
+              "id": "0454e5d5-4f7e-42e8-becd-05c05fdfd2e2",
+              "title": "Wire shared error classifier and budget preflight into reshape, reorganize, prune, and sourcevision analyze",
+              "status": "pending",
+              "level": "task",
+              "description": "The reshape (reshape.ts), reorganize (reorganize.ts:49-56), and prune (prune.ts:182-186,427-430) commands have generic try-catch blocks that swallow LLM errors silently or print opaque messages. None perform preflightBudgetCheck before LLM calls (only rex analyze does). SourceVision analyze has minimal phase-level error handling with no LLM-specific classification. Each command should: (1) call preflightBudgetCheck before the first LLM call, (2) wrap LLM calls in try-catch that uses the shared classifyLLMError utility, and (3) print user-facing error messages with actionable suggestions instead of swallowing or rethrowing generic errors.",
+              "acceptanceCriteria": [
+                "reshape, reorganize, prune, and sourcevision analyze call preflightBudgetCheck (or equivalent) before LLM calls when budget config is present",
+                "All four commands catch LLM errors and pass them through classifyLLMError before displaying to user",
+                "Rate-limit errors display the retry-after duration if available and suggest waiting",
+                "Token exhaustion errors display remaining budget and suggest increasing via ndx config",
+                "Malformed response errors display truncated response preview and suggest retrying or reducing PRD size",
+                "reorganize no longer silently returns empty proposals on LLM failure — error is surfaced to user",
+                "Integration tests verify each command produces actionable error output for simulated rate-limit, budget-exceeded, and parse-failure scenarios"
+              ],
+              "priority": "critical",
+              "tags": [
+                "llm",
+                "rex",
+                "sourcevision",
+                "error-handling"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "f61ca69b-1aba-4e71-b9df-121025c37d70",
+              "title": "Add rate-limit cooldown detection with retry-after countdown and timeout state messaging",
+              "status": "pending",
+              "level": "task",
+              "description": "When the LLM API returns a 429 with a Retry-After header or the user is in a rate-limit cooldown window, commands should detect this proactively (not just reactively after a failed call). The Anthropic API and Codex API both return rate-limit headers that indicate when the user can retry. Commands should parse this, display a human-readable countdown ('Rate limited — retry available in 47s'), and optionally auto-retry if the wait is short (< 60s configurable). For timeout errors (request took too long), commands should distinguish between network timeouts and API processing timeouts and suggest appropriate actions (retry vs. reduce input size).",
+              "acceptanceCriteria": [
+                "Rate-limit responses with Retry-After header display countdown in human-readable format (e.g., 'Rate limited — retry in 47s')",
+                "Commands auto-retry once if Retry-After is under the configurable threshold (default 60s) with a visible waiting indicator",
+                "Timeout errors distinguish network timeout ('Check your connection') from API timeout ('Try reducing input size or using a smaller model')",
+                "When token budget is fully exhausted, error message shows current usage vs. budget and the ndx config command to increase it",
+                "All error messages include the command that failed and the vendor/model that was in use at the time of failure",
+                "Unit tests verify retry-after parsing, countdown formatting, and auto-retry threshold logic"
+              ],
+              "priority": "medium",
+              "tags": [
+                "llm",
+                "error-handling",
+                "ux"
+              ],
+              "source": "smart-add"
+            }
+          ]
         }
       ]
     }

@@ -1,8 +1,10 @@
 {
   "llm": {
     "vendor": "claude",
-    "model": "claude-sonnet-4-6",
-    "claude": {},
+    "model": "claude-opus-4-6",
+    "claude": {
+      "model": "claude-sonnet-4-6"
+    },
     "codex": {}
   },
   "sourcevision": {
