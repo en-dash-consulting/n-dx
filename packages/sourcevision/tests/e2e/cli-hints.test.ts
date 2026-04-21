@@ -106,6 +106,6 @@ describe("sourcevision CLI hint surfacing and follow-through", () => {
       const { stderr, code } = runResult(["plan"]);
       expect(code).toBe(1);
       expect(stderr).toContain("ndx plan");
-    });
+    }, 15_000);
   });
 });

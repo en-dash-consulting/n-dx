@@ -4,7 +4,13 @@
     {
       "consumer": "packages/hench/src",
       "externalPackage": "@n-dx/llm-client",
-      "gatewayFiles": ["packages/hench/src/prd/llm-gateway.ts"]
+      "gatewayFiles": ["packages/hench/src/prd/llm-gateway.ts"],
+      "allowedNonGatewayFiles": [
+        {
+          "file": "packages/hench/src/cli/errors.ts",
+          "reason": "cli/errors.ts imports foundation error primitives (CLIError, ClaudeClientError, etc.) directly from @n-dx/llm-client. Routing through prd/llm-gateway.ts would violate the intra-hench rule that cli/ must not depend on prd/ (see packages/hench/tests/integration/zone-boundary.test.ts). Foundation-tier imports are permitted here because they carry no prd-zone coupling."
+        }
+      ]
     },
     {
       "consumer": "packages/hench/src",

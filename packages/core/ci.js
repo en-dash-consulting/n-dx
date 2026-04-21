@@ -764,6 +764,7 @@ const GATEWAY_RULES = _gatewayConfig.gateways.map((g) => ({
   packageDir: g.consumer,
   externalPkg: g.externalPackage,
   gatewayFiles: new Set(g.gatewayFiles),
+  allowedNonGatewayFiles: new Set((g.allowedNonGatewayFiles ?? []).map((e) => e.file)),
 }));
 
 const BOUNDARY_RULES = _gatewayConfig.boundaries.map((b) => ({
@@ -858,6 +859,8 @@ function checkGatewayImports(dir) {
 
       // Skip if this file IS a designated gateway
       if (rule.gatewayFiles.has(relPath)) continue;
+      // Skip explicit per-file allowlist entries (documented in gateway-rules.json)
+      if (rule.allowedNonGatewayFiles.has(relPath)) continue;
 
       let content;
       try {

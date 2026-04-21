@@ -707,6 +707,73 @@ describe("runReviewerLlm", () => {
     expect(result.exitCode).toBe(1);
     expect(result.spawnError).toBeDefined();
   });
+
+  it("prepends 'review' subcommand when reviewer is codex", async () => {
+    // Mock that writes argv to a file so we can inspect what args were passed
+    const scriptPath = join(tmpDir, "argv-capture.js");
+    const argvOutPath = join(tmpDir, "argv.json");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+
+    await runReviewerLlm({
+      cliPath: scriptPath,
+      prompt: "review this code",
+      dir: tmpDir,
+      reviewer: "codex",
+    });
+
+    const { readFileSync } = await import("node:fs");
+    const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
+    expect(capturedArgs[0]).toBe("review");
+    expect(capturedArgs[1]).toBe("review this code");
+  });
+
+  it("passes only the prompt when reviewer is claude", async () => {
+    const scriptPath = join(tmpDir, "argv-capture.js");
+    const argvOutPath = join(tmpDir, "argv.json");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+
+    await runReviewerLlm({
+      cliPath: scriptPath,
+      prompt: "review this code",
+      dir: tmpDir,
+      reviewer: "claude",
+    });
+
+    const { readFileSync } = await import("node:fs");
+    const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
+    expect(capturedArgs).toEqual(["review this code"]);
+  });
+
+  it("passes only the prompt when reviewer is undefined (backward compat)", async () => {
+    const scriptPath = join(tmpDir, "argv-capture.js");
+    const argvOutPath = join(tmpDir, "argv.json");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+
+    await runReviewerLlm({
+      cliPath: scriptPath,
+      prompt: "review this code",
+      dir: tmpDir,
+    });
+
+    const { readFileSync } = await import("node:fs");
+    const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
+    expect(capturedArgs).toEqual(["review this code"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -767,6 +834,51 @@ describe("runReviewerLlmCapturing", () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("PASS");
     expect(result.output).toContain("All looks good.");
+  });
+
+  it("prepends 'review' subcommand when reviewer is codex", async () => {
+    const scriptPath = join(tmpDir, "argv-capture-cap.js");
+    const argvOutPath = join(tmpDir, "argv-cap.json");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+
+    await runReviewerLlmCapturing({
+      cliPath: scriptPath,
+      prompt: "review this",
+      dir: tmpDir,
+      reviewer: "codex",
+    });
+
+    const { readFileSync } = await import("node:fs");
+    const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
+    expect(capturedArgs[0]).toBe("review");
+    expect(capturedArgs[1]).toBe("review this");
+  });
+
+  it("passes only the prompt when reviewer is claude", async () => {
+    const scriptPath = join(tmpDir, "argv-capture-cap.js");
+    const argvOutPath = join(tmpDir, "argv-cap.json");
+    writeFileSync(
+      scriptPath,
+      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
+      "utf-8",
+    );
+    chmodSync(scriptPath, 0o755);
+
+    await runReviewerLlmCapturing({
+      cliPath: scriptPath,
+      prompt: "review this",
+      dir: tmpDir,
+      reviewer: "claude",
+    });
+
+    const { readFileSync } = await import("node:fs");
+    const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
+    expect(capturedArgs).toEqual(["review this"]);
   });
 });
 

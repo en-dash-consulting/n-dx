@@ -313,15 +313,17 @@ After reviewing, output a brief summary. State PASS if everything looks correct 
  *   cliPath: string;
  *   prompt: string;
  *   dir: string;
+ *   reviewer?: "claude" | "codex";
  *   timeout?: number;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export function runReviewerLlm({ cliPath, prompt, dir, timeout = 300_000 }) {
+export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000 }) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(cliPath, [prompt], {
+      const args = reviewer === "codex" ? ["review", prompt] : [prompt];
+      child = spawn(cliPath, args, {
         cwd: dir,
         stdio: "inherit",
         shell: process.platform === "win32",
@@ -356,15 +358,17 @@ export function runReviewerLlm({ cliPath, prompt, dir, timeout = 300_000 }) {
  *   cliPath: string;
  *   prompt: string;
  *   dir: string;
+ *   reviewer?: "claude" | "codex";
  *   timeout?: number;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export function runReviewerLlmCapturing({ cliPath, prompt, dir, timeout = 300_000 }) {
+export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000 }) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(cliPath, [prompt], {
+      const args = reviewer === "codex" ? ["review", prompt] : [prompt];
+      child = spawn(cliPath, args, {
         cwd: dir,
         stdio: ["inherit", "pipe", "pipe"],
         shell: process.platform === "win32",
@@ -627,7 +631,7 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
   const prompt = buildReviewerPrompt({ changedFiles, testCommand });
   const llmTimeout = timeout ?? 300_000;
 
-  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, timeout: llmTimeout });
+  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout: llmTimeout });
 
   if (llmResult.spawnError) {
     // LLM failed to start — fall back to shell tests when a test command is available

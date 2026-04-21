@@ -431,6 +431,7 @@ const GATEWAY_RULES = _gatewayConfig.gateways.map((g) => ({
   packageDir: g.consumer,
   externalPkg: g.externalPackage,
   gatewayFiles: new Set(g.gatewayFiles),
+  allowedNonGatewayFiles: new Set((g.allowedNonGatewayFiles ?? []).map((e) => e.file)),
 }));
 
 describe("architecture policy: gateway enforcement", () => {
@@ -451,6 +452,8 @@ describe("architecture policy: gateway enforcement", () => {
 
         // The gateway itself is allowed
         if (rule.gatewayFiles.has(rel)) continue;
+        // Explicit per-file exceptions (documented in gateway-rules.json)
+        if (rule.allowedNonGatewayFiles.has(rel)) continue;
 
         const content = readFileSync(file, "utf-8");
         if (hasRuntimeImportFrom(content, rule.externalPkg)) {
@@ -504,6 +507,8 @@ describe("architecture policy: gateway enforcement", () => {
 
         // The gateway itself is allowed
         if (rule.gatewayFiles.has(rel)) continue;
+        // Explicit per-file exceptions (documented in gateway-rules.json)
+        if (rule.allowedNonGatewayFiles.has(rel)) continue;
 
         // Exempt directories (viewer can't reach server gateway due to boundary rule)
         let exempt = false;
@@ -874,6 +879,7 @@ describe("architecture policy: gateway enforcement", () => {
 
           const content = readFileSync(file, "utf-8");
           for (const rule of rules) {
+            if (rule.allowedNonGatewayFiles.has(rel)) continue;
             if (hasRuntimeImportFrom(content, rule.externalPkg)) {
               violations.push(`${rel} → ${rule.externalPkg}`);
             }
