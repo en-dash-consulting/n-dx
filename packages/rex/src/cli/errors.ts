@@ -91,6 +91,33 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
     "Failed to parse JSON file.",
     "Check for syntax errors in the file, or re-initialize with 'n-dx init'.",
   ],
+
+  // ── LLM-specific patterns ──────────────────────────────────────────
+  [
+    /\b429\b|rate limit|too many requests/i,
+    CLI_ERROR_CODES.LLM_RATE_LIMITED,
+    "Rate limit exceeded — the API is temporarily throttling requests.",
+    "Wait a few minutes and try again, or use a different model with --model.",
+  ],
+  [
+    /\b401\b|invalid.*api.*key|authentication.*(fail|error|invalid|expired)|unauthorized.*(request|access|error)/i,
+    CLI_ERROR_CODES.AUTH_FAILED,
+    "Authentication failed — your API key or credentials were rejected.",
+    "Verify your API key with: n-dx config claude.apiKey, or check CLI login.",
+  ],
+  [
+    /etimedout|timeout|timed?\s*out/i,
+    CLI_ERROR_CODES.TIMEOUT,
+    "Request timed out before the API responded.",
+    "Retry with a shorter input, or check your network connection.",
+  ],
+  [
+    /\b(529|503)\b|overloaded/i,
+    CLI_ERROR_CODES.LLM_SERVER_ERROR,
+    "The API is temporarily overloaded or experiencing errors.",
+    "Wait a moment and retry. Consider using a different model with --model.",
+  ],
+
   [
     /not found/i,
     CLI_ERROR_CODES.RESOURCE_NOT_FOUND,

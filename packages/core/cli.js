@@ -34,7 +34,7 @@
  * @module n-dx/cli
  */
 
-import { spawn } from "child_process";
+import { spawn, execFileSync } from "child_process";
 import { existsSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
@@ -1421,6 +1421,103 @@ async function handleRefresh(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * Count uncommitted files in a git working tree.
+ * Returns 0 when the directory isn't a git repo or git is unavailable.
+ */
+function countUncommittedFiles(dir) {
+  try {
+    const out = execFileSync("git", ["status", "--porcelain"], {
+      cwd: dir,
+      encoding: "utf-8",
+      stdio: "pipe",
+      timeout: 15_000,
+    });
+    return out.split("\n").filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Revert all uncommitted changes: `git reset HEAD . && git checkout -- . && git clean -fd`. */
+function revertUncommittedChanges(dir) {
+  execFileSync("git", ["reset", "HEAD", "--", "."], { cwd: dir, stdio: "pipe", timeout: 15_000 });
+  execFileSync("git", ["checkout", "--", "."], { cwd: dir, stdio: "pipe", timeout: 15_000 });
+  execFileSync("git", ["clean", "-fd"], { cwd: dir, stdio: "pipe", timeout: 15_000 });
+}
+
+/**
+ * Install a two-stage Ctrl+C handler for long-running work commands.
+ * - First SIGINT: stops hench, prompts the user to revert uncommitted changes, then exits.
+ * - Second SIGINT (during prompt): force-exits immediately, leaving changes on disk.
+ *
+ * @param {string} dir Project directory used for the git revert.
+ * @returns {() => void} Dispose function to remove both stages.
+ */
+function installWorkInterruptHandler(dir) {
+  let handledFirst = false;
+
+  const forceExit = () => {
+    process.stderr.write("\n\nForce canceling — exiting without revert.\n");
+    try { childTracker.cleanup(); } catch { /* ignore */ }
+    process.exit(130);
+  };
+
+  const firstStage = () => {
+    if (handledFirst) return;
+    handledFirst = true;
+
+    // Take over from the global handler so it doesn't race us to exit.
+    signalHandlers.dispose();
+    process.removeListener("SIGINT", firstStage);
+    process.on("SIGINT", forceExit);
+
+    void (async () => {
+      process.stderr.write("\n\n⚠ Interrupt received. Stopping hench...\n");
+      try { await childTracker.cleanup(); } catch { /* ignore */ }
+
+      const count = countUncommittedFiles(dir);
+      let shouldRevert = false;
+
+      if (count === 0) {
+        process.stderr.write("No uncommitted changes to revert.\n");
+      } else if (!process.stdin.isTTY) {
+        process.stderr.write(`${count} uncommitted file(s) left behind (non-interactive — skipping revert prompt).\n`);
+      } else {
+        const rl = createInterface({ input: process.stdin, output: process.stderr });
+        try {
+          const answer = await rl.question(`\nRevert ${count} uncommitted file(s)? [y/N] `);
+          shouldRevert = /^y(es)?$/i.test(answer.trim());
+        } catch {
+          shouldRevert = false;
+        } finally {
+          rl.close();
+        }
+      }
+
+      if (shouldRevert) {
+        try {
+          revertUncommittedChanges(dir);
+          process.stderr.write(`✓ Reverted ${count} uncommitted file(s).\n`);
+        } catch (err) {
+          process.stderr.write(`⚠ Revert failed: ${err.message}\n`);
+        }
+      } else if (count > 0) {
+        process.stderr.write("Changes preserved.\n");
+      }
+
+      process.exit(130);
+    })();
+  };
+
+  process.prependListener("SIGINT", firstStage);
+
+  return () => {
+    process.removeListener("SIGINT", firstStage);
+    process.removeListener("SIGINT", forceExit);
+  };
+}
+
 async function handleWork(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex", ".hench"]);
@@ -1438,7 +1535,12 @@ async function handleWork(rest) {
     }
   }
 
-  await runOrDie(tools.hench, ["run", ...flags, dir]);
+  const disposeInterrupt = isDryRun ? () => {} : installWorkInterruptHandler(dir);
+  try {
+    await runOrDie(tools.hench, ["run", ...flags, dir]);
+  } finally {
+    disposeInterrupt();
+  }
   exitWithCleanup(0);
 }
 
@@ -1897,9 +1999,73 @@ async function handlePairProgramming(rest) {
   }
 
   let remediationContextPath = null;
+  let createdTaskId = null;
   try {
+    // ── Step 0: create temporary task in PRD ────────────────────────────────
+    process.stderr.write("⚠ pair-programming: creating temporary task...\n");
+
+    // Get PRD status to find an epic to use as parent
+    const statusOutput = execFileSync("node", [
+      resolve(__dir, "../rex/dist/cli/index.js"),
+      "status",
+      "--format=json",
+      dir,
+    ], { encoding: "utf-8", stdio: "pipe" });
+    const statusData = JSON.parse(statusOutput);
+    const firstEpic = statusData.items?.find((item) => item.level === "epic");
+    const epicId = firstEpic?.id;
+    if (!epicId) {
+      console.error("Error: no epics found in PRD");
+      exitWithCleanup(1);
+      return;
+    }
+
+    // Create task under the first epic
+    const addCode = await run(tools.rex, [
+      "add",
+      "task",
+      `--title=${description}`,
+      `--parent=${epicId}`,
+      dir,
+    ]);
+    if (addCode !== 0) {
+      console.error("Error: failed to create task in PRD");
+      exitWithCleanup(addCode);
+      return;
+    }
+
+    // Get the task ID by querying the PRD again and finding the newest pending task
+    const updatedStatusOutput = execFileSync("node", [
+      resolve(__dir, "../rex/dist/cli/index.js"),
+      "status",
+      "--format=json",
+      dir,
+    ], { encoding: "utf-8", stdio: "pipe" });
+    const updatedStatusData = JSON.parse(updatedStatusOutput);
+
+    // Find the task we just created by searching through all tasks
+    const findTask = (items) => {
+      if (!Array.isArray(items)) return null;
+      for (const item of items) {
+        if (item.status === "pending" && item.title === description) {
+          return item.id;
+        }
+        const found = findTask(item.children);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    createdTaskId = findTask(updatedStatusData.items);
+    if (!createdTaskId) {
+      console.error("Error: could not determine created task ID");
+      exitWithCleanup(1);
+      return;
+    }
+    process.stderr.write(`✓ created task ${createdTaskId}\n`);
+
     // ── Step 1: primary vendor work ────────────────────────────────────────
-    const primaryCode = await run(tools.hench, ["run", `--freeform=${description}`, ...henchArgs]);
+    const primaryCode = await run(tools.hench, ["run", `--task=${createdTaskId}`, ...henchArgs]);
     if (primaryCode !== 0) {
       exitWithCleanup(primaryCode);
       return;
@@ -1938,7 +2104,7 @@ async function handlePairProgramming(rest) {
           .filter((a) => !a.startsWith("--context-file="))
           .concat(`--context-file=${remediationContextPath}`);
 
-        await run(tools.hench, ["run", `--freeform=${description}`, ...remediationArgs]);
+        await run(tools.hench, ["run", `--task=${createdTaskId}`, ...remediationArgs]);
 
         // ── Step 4: final reviewer pass ──────────────────────────────────
         process.stdout.write(

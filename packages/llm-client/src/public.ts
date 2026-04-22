@@ -325,6 +325,27 @@ export {
 // Deprecation warning filter (CLI entry points)
 export { suppressKnownDeprecations } from "./suppress-deprecations.js";
 
+// LLM error classification (shared across domain packages)
+export {
+  classifyLLMError,
+} from "./llm-error-classifier.js";
+export type {
+  LLMErrorCategory,
+  LLMErrorClassification,
+  LLMErrorContext,
+} from "./llm-error-classifier.js";
+
+// Rate-limit detection and retry utilities
+export {
+  parseRetryAfterHeader,
+  formatRetryCountdown,
+  shouldAutoRetry,
+  extractRetryAfterMs,
+  classifyTimeout,
+  DEFAULT_AUTO_RETRY_THRESHOLD_MS,
+} from "./rate-limit.js";
+export type { TimeoutKind } from "./rate-limit.js";
+
 // CLI help formatting
 export {
   isColorEnabled,

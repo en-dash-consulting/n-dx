@@ -816,7 +816,6 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["use", "1-file zone (use-polling.ts) detected by Louvain filename-pattern matching on the 'use-' prefix; cohesion is unreliable at 1 file. Not a real architectural zone — will dissolve into web-viewer on next analysis when files move to a common directory."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {

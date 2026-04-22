@@ -431,7 +431,7 @@ const GATEWAY_RULES = _gatewayConfig.gateways.map((g) => ({
   packageDir: g.consumer,
   externalPkg: g.externalPackage,
   gatewayFiles: new Set(g.gatewayFiles),
-  exemptFiles: new Set(g.exemptFiles ?? []),
+  allowedNonGatewayFiles: new Set((g.allowedNonGatewayFiles ?? []).map((e) => e.file)),
 }));
 
 describe("architecture policy: gateway enforcement", () => {
@@ -452,6 +452,8 @@ describe("architecture policy: gateway enforcement", () => {
 
         // The gateway itself is allowed
         if (rule.gatewayFiles.has(rel)) continue;
+        // Explicit per-file exceptions (documented in gateway-rules.json)
+        if (rule.allowedNonGatewayFiles.has(rel)) continue;
 
         // Files exempt from gateway routing (e.g. cli/ cannot import prd/)
         if (rule.exemptFiles.has(rel)) continue;
@@ -508,6 +510,8 @@ describe("architecture policy: gateway enforcement", () => {
 
         // The gateway itself is allowed
         if (rule.gatewayFiles.has(rel)) continue;
+        // Explicit per-file exceptions (documented in gateway-rules.json)
+        if (rule.allowedNonGatewayFiles.has(rel)) continue;
 
         // Files exempt from gateway routing (e.g. cli/ cannot import prd/)
         if (rule.exemptFiles.has(rel)) continue;
@@ -882,6 +886,7 @@ describe("architecture policy: gateway enforcement", () => {
 
           const content = readFileSync(file, "utf-8");
           for (const rule of rules) {
+            if (rule.allowedNonGatewayFiles.has(rel)) continue;
             if (hasRuntimeImportFrom(content, rule.externalPkg)) {
               violations.push(`${rel} → ${rule.externalPkg}`);
             }

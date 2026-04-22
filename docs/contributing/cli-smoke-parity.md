@@ -58,6 +58,7 @@ The table below is the maintained reference for exported `CLI_ERROR_CODES`. Test
 | Code | Failure meaning | Comparable across platforms? | Typical remediation |
 | --- | --- | --- | --- |
 | `NDX_CLI_API_KEY_MISSING` | Required API credentials were not configured. | Yes | Set the required API key in environment or project config and rerun. |
+| `NDX_CLI_AUTH_FAILED` | LLM API authentication was rejected (401, invalid key, expired token). | Yes | Verify the API key or CLI credentials and rerun. |
 | `NDX_CLI_BUDGET_EXCEEDED` | Execution was rejected because a configured budget limit was exceeded. | Yes | Raise or reset the relevant budget, or reduce the requested work. |
 | `NDX_CLI_CONCURRENCY_LIMIT` | Execution was blocked by a configured concurrency cap. | Yes | Wait for capacity or lower the number of simultaneous jobs. |
 | `NDX_CLI_CONFIG_NOT_FOUND` | A required config file or config source could not be found. | Yes | Create the missing config or point the command at the correct location. |
@@ -69,12 +70,16 @@ The table below is the maintained reference for exported `CLI_ERROR_CODES`. Test
 | `NDX_CLI_INVALID_RUN_RECORD` | A persisted run record exists but is malformed or unreadable. | Yes | Repair or remove the invalid run record, then rerun. |
 | `NDX_CLI_JSON_PARSE_FAILED` | Structured JSON input or output could not be parsed. | Yes | Inspect the malformed payload, then fix the producer or input file. |
 | `NDX_CLI_LLM_CLI_NOT_FOUND` | An expected external LLM CLI executable could not be resolved. | Yes | Install the CLI or configure the correct executable path. |
+| `NDX_CLI_LLM_RATE_LIMITED` | LLM API rate limit exceeded (429, too many requests, retry-after). | Yes | Wait for the retry-after period and rerun, or switch to a different model. |
+| `NDX_CLI_LLM_SERVER_ERROR` | LLM API returned a server error (500, 503, 529 overloaded). | Yes | Wait and retry; consider switching models if the provider is persistently degraded. |
 | `NDX_CLI_MEMORY_THRESHOLD` | Execution was blocked because memory pressure crossed the configured threshold. | Yes | Free resources, adjust the threshold, or reduce workload size. |
+| `NDX_CLI_NETWORK_ERROR` | A network-level failure prevented reaching the LLM API (DNS, connection refused, fetch failed). | Yes | Check internet connectivity and retry. |
 | `NDX_CLI_NOT_INITIALIZED` | The target workspace is missing required n-dx initialization state. | Yes | Run the relevant init command for the workspace, then retry. |
 | `NDX_CLI_PERMISSION_DENIED` | The process lacks permission to read, write, or execute a required resource. | Yes | Fix filesystem or process permissions and rerun. |
 | `NDX_CLI_PRD_NOT_FOUND` | The expected PRD file or PRD root could not be found. | Yes | Point the command at the correct PRD or create the missing artifact. |
 | `NDX_CLI_RESOURCE_NOT_FOUND` | A requested named resource does not exist. | Yes | Verify the identifier and rerun against an existing resource. |
 | `NDX_CLI_SOURCEVISION_MANIFEST_NOT_FOUND` | SourceVision-specific manifest data is missing. | Yes | Regenerate or supply the manifest before rerunning the command. |
+| `NDX_CLI_TIMEOUT` | An LLM API request or network operation timed out before completing. | Yes | Retry with a shorter input or increase the timeout configuration. |
 | `NDX_CLI_UNKNOWN_COMMAND` | The CLI command or subcommand is not recognized. | Yes | Fix the command spelling or use help output to find the supported command. |
 
 ## Contributor Guidance

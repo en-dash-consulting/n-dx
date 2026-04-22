@@ -94,17 +94,27 @@ export class ClaudeClientError extends Error {
   readonly reason: ErrorReason;
   /** Whether this error is transient and the call could be retried. */
   readonly retryable: boolean;
+  /**
+   * When the server specifies a Retry-After delay (e.g. 429 responses),
+   * this holds the parsed value in milliseconds. Consumers can use it
+   * to display a countdown or decide whether to auto-retry.
+   */
+  readonly retryAfterMs?: number;
 
-  constructor(message: string, reason: ErrorReason, retryable: boolean) {
+  constructor(message: string, reason: ErrorReason, retryable: boolean, retryAfterMs?: number) {
     super(message);
     this.name = "ClaudeClientError";
     this.reason = reason;
     this.retryable = retryable;
+    if (retryAfterMs != null && retryAfterMs > 0) {
+      this.retryAfterMs = retryAfterMs;
+    }
   }
 }
 
 export const CLI_ERROR_CODES = {
   API_KEY_MISSING: "NDX_CLI_API_KEY_MISSING",
+  AUTH_FAILED: "NDX_CLI_AUTH_FAILED",
   BUDGET_EXCEEDED: "NDX_CLI_BUDGET_EXCEEDED",
   CONCURRENCY_LIMIT: "NDX_CLI_CONCURRENCY_LIMIT",
   CONFIG_NOT_FOUND: "NDX_CLI_CONFIG_NOT_FOUND",
@@ -116,12 +126,16 @@ export const CLI_ERROR_CODES = {
   INVALID_RUN_RECORD: "NDX_CLI_INVALID_RUN_RECORD",
   JSON_PARSE_FAILED: "NDX_CLI_JSON_PARSE_FAILED",
   LLM_CLI_NOT_FOUND: "NDX_CLI_LLM_CLI_NOT_FOUND",
+  LLM_RATE_LIMITED: "NDX_CLI_LLM_RATE_LIMITED",
+  LLM_SERVER_ERROR: "NDX_CLI_LLM_SERVER_ERROR",
   MEMORY_THRESHOLD: "NDX_CLI_MEMORY_THRESHOLD",
+  NETWORK_ERROR: "NDX_CLI_NETWORK_ERROR",
   NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
   PERMISSION_DENIED: "NDX_CLI_PERMISSION_DENIED",
   PRD_NOT_FOUND: "NDX_CLI_PRD_NOT_FOUND",
   RESOURCE_NOT_FOUND: "NDX_CLI_RESOURCE_NOT_FOUND",
   SOURCEVISION_MANIFEST_NOT_FOUND: "NDX_CLI_SOURCEVISION_MANIFEST_NOT_FOUND",
+  TIMEOUT: "NDX_CLI_TIMEOUT",
   UNKNOWN_COMMAND: "NDX_CLI_UNKNOWN_COMMAND",
 } as const;
 

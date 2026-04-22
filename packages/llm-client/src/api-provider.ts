@@ -36,11 +36,22 @@ import { ClaudeClientError } from "./types.js";
 import { resolveApiKey, resolveModel } from "./config.js";
 import { parseApiTokenUsage } from "./token-usage.js";
 import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
+import {
+  extractRetryAfterMs,
+  formatRetryCountdown,
+  shouldAutoRetry,
+  DEFAULT_AUTO_RETRY_THRESHOLD_MS,
+} from "./rate-limit.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_TOKENS = 8192;
+
+function defaultApiRateLimitOnRetry(attempt: number, maxAttempts: number, delayMs: number): void {
+  const countdown = formatRetryCountdown(Math.round(delayMs / 1000));
+  process.stderr.write(`Rate limited — retry in ${countdown} (attempt ${attempt} of ${maxAttempts})\n`);
+}
 
 /** Options specific to the API provider. */
 export interface ApiProviderOptions extends ClaudeClientOptions {
@@ -50,6 +61,20 @@ export interface ApiProviderOptions extends ClaudeClientOptions {
   baseDelayMs?: number;
   /** Maximum response tokens (default: 8192). */
   maxTokens?: number;
+  /**
+   * Maximum Retry-After wait (ms) before the provider auto-retries.
+   * When a 429 response includes a Retry-After ≤ this threshold, the
+   * provider waits the specified duration then retries automatically.
+   * Default: 60 000 ms (60 s).
+   */
+  autoRetryThresholdMs?: number;
+  /**
+   * Called before each rate-limit retry sleep.
+   * Receives the upcoming attempt number (1-based, so 2 = first retry),
+   * the total attempt count, and the delay in milliseconds.
+   * When omitted, a default message is written to stderr.
+   */
+  onRetry?: (attempt: number, maxAttempts: number, delayMs: number) => void;
 }
 
 /**
@@ -82,6 +107,8 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
+  const autoRetryThresholdMs = options.autoRetryThresholdMs ?? DEFAULT_AUTO_RETRY_THRESHOLD_MS;
+  const onRetry = options.onRetry ?? defaultApiRateLimitOnRetry;
 
   const info: ProviderInfo = {
     vendor: "claude",
@@ -159,17 +186,34 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
             );
           }
 
+          // For retryable status codes, compute delay — preferring Retry-After
+          // from the response headers over blind exponential backoff.
           if (status && RETRY_STATUS_CODES.has(status) && attempt < maxRetries) {
-            const delay = baseDelayMs * 2 ** attempt;
+            const retryAfterMs = extractRetryAfterMs(err);
+            const backoffDelay = baseDelayMs * 2 ** attempt;
+
+            // If we have a Retry-After header, honor it when within the
+            // auto-retry threshold. Otherwise fall back to exponential backoff.
+            const delay =
+              retryAfterMs != null && shouldAutoRetry(retryAfterMs, autoRetryThresholdMs)
+                ? retryAfterMs
+                : backoffDelay;
+
+            if (status === 429) {
+              onRetry(attempt + 2, maxRetries + 1, delay);
+            }
+
             await new Promise((r) => setTimeout(r, delay));
             continue;
           }
 
           if (status && RETRY_STATUS_CODES.has(status)) {
+            const retryAfterMs = extractRetryAfterMs(err);
             throw new ClaudeClientError(
               (err as Error).message,
               "rate-limit",
               true,
+              retryAfterMs,
             );
           }
 
@@ -179,6 +223,12 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
             false,
           );
         }
+      }
+
+      // When all retries are exhausted due to rate limiting, preserve
+      // any Retry-After metadata on the final error for upstream consumers.
+      if (lastError instanceof ClaudeClientError && lastError.reason === "rate-limit") {
+        throw lastError;
       }
 
       throw lastError;

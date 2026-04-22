@@ -257,6 +257,7 @@ ndx add --file=spec.md    # import ideas from a text file
 ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
 ndx plan --accept [dir]   # ...then accept proposals into PRD
 ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, etc.)
+ndx pair-programming "<desc>" # agent + cross-vendor review (bicker alias)
 ndx self-heal [N] [dir]   # iterative improvement loop (analyze → recommend → execute)
 ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
 ndx status [dir]          # rex status (pass --format=json)
