@@ -32393,6 +32393,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-22T19:12:08.018Z",
+      "completedAt": "2026-04-22T19:12:08.018Z",
       "children": [
         {
           "id": "f648a519-2015-486a-849f-782ba79e970f",
