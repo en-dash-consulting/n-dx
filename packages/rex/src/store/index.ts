@@ -7,6 +7,13 @@ export {
   generatePRDFilename,
   resolvePRDFilename,
 } from "./branch-naming.js";
+export {
+  discoverPRDFiles,
+  parsePRDBranchSegment,
+  findPRDFileForBranch,
+  resolvePRDFile,
+} from "./prd-discovery.js";
+export type { PRDFileResolution } from "./prd-discovery.js";
 export { withLock, acquireLock } from "./file-lock.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";

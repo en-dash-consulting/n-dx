@@ -61,6 +61,16 @@ export {
   resolvePRDFilename,
 } from "./store/branch-naming.js";
 
+// ---- Store: branch-scoped PRD discovery ------------------------------------
+
+export {
+  discoverPRDFiles,
+  parsePRDBranchSegment,
+  findPRDFileForBranch,
+  resolvePRDFile,
+} from "./store/prd-discovery.js";
+export type { PRDFileResolution } from "./store/prd-discovery.js";
+
 // ---- Integration schema system ----------------------------------------------
 
 export {
