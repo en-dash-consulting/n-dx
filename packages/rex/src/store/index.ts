@@ -69,6 +69,8 @@ import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
 import { getDefaultRegistry } from "./adapter-registry.js";
 import { migrateLegacyPRD } from "./prd-migration.js";
+import { resolveGitBranch } from "./branch-naming.js";
+import { findPRDFileForBranch } from "./prd-discovery.js";
 import type { PRDStore } from "./contracts.js";
 import type { NotionAdapterConfig } from "./notion-client.js";
 
@@ -140,9 +142,20 @@ export async function resolveStore(rexDir: string): Promise<PRDStore> {
 
   const store = new FileStore(rexDir);
 
-  // After migration, route new root items to the migrated file
   if (migration.migrated && migration.filename) {
+    // After migration, route new root items to the migrated file
     store.setCurrentBranchFile(migration.filename);
+  } else {
+    // Read-only lookup: find an existing branch file for the current branch.
+    // Does not create files — callers that write should additionally call
+    // resolvePRDFile() to ensure the target file exists.
+    const branch = resolveGitBranch(cwd);
+    if (branch !== "unknown") {
+      const existing = await findPRDFileForBranch(rexDir, branch);
+      if (existing) {
+        store.setCurrentBranchFile(existing);
+      }
+    }
   }
 
   return store;

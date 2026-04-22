@@ -3,7 +3,14 @@ import { access, readFile, unlink } from "node:fs/promises";
 import { atomicWriteJSON } from "../../store/atomic-write.js";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
-import { resolveStore, FileStore } from "../../store/index.js";
+import {
+  resolveStore,
+  FileStore,
+  resolvePRDFile,
+  resolveGitBranch,
+  findPRDFileForBranch,
+  resolvePRDFilename,
+} from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { REX_DIR } from "./constants.js";
@@ -741,6 +748,16 @@ async function acceptProposals(
   } = options;
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Ensure the current branch's PRD file exists and is the write target.
+  if (store instanceof FileStore) {
+    const branch = resolveGitBranch(dir);
+    if (branch !== "unknown") {
+      const resolution = await resolvePRDFile(rexDir, dir);
+      store.setCurrentBranchFile(resolution.filename);
+    }
+  }
+
   const parentLevel = await resolveParentLevel(dir, parentId);
 
   let addedCount = 0;
@@ -1283,8 +1300,9 @@ function renderSmartAddProposals(params: {
   qualityIssues: QualityIssue[];
   isJson: boolean;
   thresholdWeeks?: number;
+  targetFile?: string;
 }): void {
-  const { proposals, parentId, parentLevel, qualityIssues, isJson, thresholdWeeks } = params;
+  const { proposals, parentId, parentLevel, qualityIssues, isJson, thresholdWeeks, targetFile } = params;
   if (isJson) return;
 
   const summary = formatProposalSummary(proposals, parentLevel);
@@ -1294,6 +1312,10 @@ function renderSmartAddProposals(params: {
     info(`\nProposed structure (${summary}):`);
   }
   info(formatProposalTree(proposals, parentLevel, thresholdWeeks));
+
+  if (targetFile && targetFile !== "prd.json") {
+    info(`  Target file: ${targetFile}`);
+  }
 
   if (qualityIssues.length > 0) {
     warn("");
@@ -1677,6 +1699,17 @@ export async function cmdSmartAdd(
     return;
   }
 
+  // Resolve target filename for approval display (read-only, no file creation)
+  let targetFile: string | undefined;
+  {
+    const rexDir = join(dir, REX_DIR);
+    const branch = resolveGitBranch(dir);
+    if (branch !== "unknown") {
+      const existing = await findPRDFileForBranch(rexDir, branch);
+      targetFile = existing ?? resolvePRDFilename(dir);
+    }
+  }
+
   renderSmartAddProposals({
     proposals: proposalsWithReasons,
     parentId: input.parentId,
@@ -1684,6 +1717,7 @@ export async function cmdSmartAdd(
     qualityIssues,
     isJson: input.isJson,
     thresholdWeeks,
+    targetFile,
   });
 
   await finalizeSmartAdd({

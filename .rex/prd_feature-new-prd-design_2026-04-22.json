@@ -32390,7 +32390,7 @@
     {
       "id": "24b988d0-3d52-4354-b74e-23d966bdb9dd",
       "title": "Branch-Scoped Multi-File PRD Management",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -32522,15 +32522,17 @@
         {
           "id": "44c38797-0009-4f44-8adc-38b5bd5a830e",
           "title": "Cross-PRD Duplicate Detection and Merge-Into-Older Semantics",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Extend the ndx add duplicate detection pipeline to operate across multiple PRD files, merging newer duplicate proposals into the older PRD's existing item rather than creating duplicates across branch-scoped files.",
           "source": "smart-add",
+          "startedAt": "2026-04-22T19:12:07.716Z",
+          "completedAt": "2026-04-22T19:12:07.716Z",
           "children": [
             {
               "id": "4f0263fa-8da5-4a83-811c-01da1c4acdf7",
               "title": "Implement cross-PRD duplicate detection with merge-into-older-file resolution",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Extend the existing smart-add duplicate matching to compare proposals against items in all PRD files. When a duplicate is found, determine which PRD file contains the older item (by file creation date from filename) and merge the newer proposal's content into that older item rather than creating a new entry in the current branch's PRD.",
               "acceptanceCriteria": [
@@ -32546,12 +32548,16 @@
                 "smart-add",
                 "dedup"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-22T18:34:12.341Z",
+              "completedAt": "2026-04-22T18:57:05.754Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Cross-PRD duplicate detection with older-file preference via ItemFileMap and comparePRDFileAge"
             },
             {
               "id": "c4b9b3f5-5b3a-43c0-938a-b5cd66810bb1",
               "title": "Update rex add and ndx add pipelines to use branch-scoped PRD file creation and targeting",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Wire the branch resolution and file selection logic into the rex add and ndx add command paths so that new proposals are written to the current branch's PRD file. Ensure the LLM proposal generation, approval flow, file-based import, and piped input all respect the multi-file storage model without changing their user-facing behavior.",
               "acceptanceCriteria": [
@@ -32567,17 +32573,23 @@
                 "cli",
                 "smart-add"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-22T18:57:46.661Z",
+              "completedAt": "2026-04-22T19:12:07.338Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Wired branch resolution into resolveStore, cmdAdd, and acceptProposals; added target file display in approval flow; 9 new integration tests."
             }
           ]
         },
         {
           "id": "65020dbd-1993-4e79-8a34-f4d414a9ec1e",
           "title": "Legacy Migration and Multi-File Integration Validation",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Provide a seamless migration path from the existing single prd.json file to the new branch-scoped multi-file format, and validate all CLI commands, MCP tools, and web dashboard views against the aggregated multi-file backend.",
           "source": "smart-add",
+          "startedAt": "2026-04-22T18:32:21.013Z",
+          "completedAt": "2026-04-22T18:32:21.013Z",
           "children": [
             {
               "id": "e174fb23-4ce0-4377-95ca-250538d7635c",
@@ -32608,7 +32620,7 @@
             {
               "id": "c9867c35-7f69-401d-9908-03bac57a4d6c",
               "title": "Validate all CLI commands, MCP tools, and web dashboard against multi-file PRD backend",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Systematically verify that every command and interface that reads or writes PRD data works correctly with the new multi-file storage. Cover rex CLI commands, ndx orchestration commands, MCP read/write tools, web dashboard PRD tree, and hench task selection. Add integration tests covering multi-branch multi-file scenarios.",
               "acceptanceCriteria": [
@@ -32626,7 +32638,10 @@
                 "integration"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-22T18:12:08.412Z"
+              "startedAt": "2026-04-22T18:12:08.412Z",
+              "completedAt": "2026-04-22T18:32:20.652Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Updated web prd-io.ts for multi-file aggregation, routes-data.ts for aggregated serving, search-index.ts for multi-file mtime tracking. Added 36 tests covering all acceptance criteria."
             }
           ]
         }
