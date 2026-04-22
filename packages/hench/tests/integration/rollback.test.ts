@@ -260,4 +260,45 @@ describe("finalizeRun git rollback", () => {
     const content = await readFile(join(projectDir, "lib.ts"), "utf-8");
     expect(content).toBe(originalContent);
   });
+
+  it("rolls back on cancelled status (Ctrl+C cancellation)", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+
+    const originalContent = "export const cancel = 1;\n";
+    await makeInitialCommit(projectDir, "lib.ts", originalContent);
+    await writeFile(join(projectDir, "lib.ts"), "export const cancel = 999;\n", "utf-8");
+
+    const run = buildMinimalRun("cancelled");
+
+    await finalizeRun({
+      run,
+      henchDir,
+      projectDir,
+      rollbackOnFailure: true,
+    });
+
+    const content = await readFile(join(projectDir, "lib.ts"), "utf-8");
+    expect(content).toBe(originalContent);
+  });
+
+  it("leaves changes in place when cancellation and --no-rollback", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+
+    const originalContent = "export const no_rollback = 1;\n";
+    const modifiedContent = "export const no_rollback = 999;\n";
+    await makeInitialCommit(projectDir, "lib.ts", originalContent);
+    await writeFile(join(projectDir, "lib.ts"), modifiedContent, "utf-8");
+
+    const run = buildMinimalRun("cancelled");
+
+    await finalizeRun({
+      run,
+      henchDir,
+      projectDir,
+      rollbackOnFailure: false,
+    });
+
+    const content = await readFile(join(projectDir, "lib.ts"), "utf-8");
+    expect(content).toBe(modifiedContent);
+  });
 });
