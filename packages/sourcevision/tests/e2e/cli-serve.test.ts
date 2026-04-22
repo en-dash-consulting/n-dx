@@ -7,6 +7,26 @@ import { createServer as createNetServer } from "node:net";
 
 const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");
+const LOOPBACK_PROBE = [
+  "-e",
+  "const { createServer } = require('node:net');" +
+    "const server = createServer();" +
+    "server.once('error', () => process.exit(1));" +
+    "server.listen(0, '127.0.0.1', () => server.close(() => process.exit(0)));",
+];
+
+function canBindLoopbackSync(): boolean {
+  try {
+    execFileSync(process.execPath, LOOPBACK_PROBE, {
+      encoding: "utf-8",
+      stdio: "pipe",
+      timeout: 5_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -50,7 +70,7 @@ function killTree(pid: number): void {
   }
 }
 
-describe("sourcevision serve (e2e)", () => {
+describe.skipIf(!canBindLoopbackSync())("sourcevision serve (e2e)", () => {
   let tmpDir: string;
   let serverProc: ChildProcess | null = null;
 
