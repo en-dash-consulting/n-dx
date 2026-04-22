@@ -1,5 +1,12 @@
 export type { PRDStore, StoreCapabilities } from "./contracts.js";
 export { FileStore, ensureRexDir } from "./file-adapter.js";
+export {
+  sanitizeBranchName,
+  resolveGitBranch,
+  getFirstCommitDate,
+  generatePRDFilename,
+  resolvePRDFilename,
+} from "./branch-naming.js";
 export { withLock, acquireLock } from "./file-lock.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";

@@ -51,6 +51,16 @@
 export { resolveStore } from "./store/index.js";
 export type { PRDStore } from "./store/contracts.js";
 
+// ---- Store: branch-aware PRD naming -----------------------------------------
+
+export {
+  sanitizeBranchName,
+  resolveGitBranch,
+  getFirstCommitDate,
+  generatePRDFilename,
+  resolvePRDFilename,
+} from "./store/branch-naming.js";
+
 // ---- Integration schema system ----------------------------------------------
 
 export {
