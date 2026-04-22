@@ -55,6 +55,7 @@ const ALLOWED = new Set([
   // Process monitoring — needs raw execFile for system commands (vm_stat, sysctl)
   "packages/hench/src/process/memory-monitor.ts",
   // Git operations — need execFileSync for git CLI calls
+  "packages/rex/src/store/branch-naming.ts",
   "packages/sourcevision/src/analyzers/branch-work-collector.ts",
   "packages/sourcevision/src/analyzers/branch-work-filter.ts",
   "packages/sourcevision/src/cli/commands/git-credential-helper.ts",

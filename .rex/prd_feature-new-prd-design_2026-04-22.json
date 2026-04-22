@@ -32462,6 +32462,8 @@
           "level": "feature",
           "description": "Refactor the PRDStore to aggregate items from all PRD files for read operations and route write operations to the correct branch-scoped file, preserving all existing command behavior while operating transparently on multiple underlying storage files.",
           "source": "smart-add",
+          "startedAt": "2026-04-22T17:05:50.268Z",
+          "completedAt": "2026-04-22T17:05:50.268Z",
           "children": [
             {
               "id": "0d771f43-357d-4893-8d41-b33385ca0d30",
@@ -32515,9 +32517,7 @@
               "resolutionType": "code-change",
               "resolutionDetail": "Refactored FileStore to track item-to-file ownership, route all write operations (addItem, updateItem, removeItem, saveDocument) to the correct owning PRD file, and use per-file locking."
             }
-          ],
-          "startedAt": "2026-04-22T17:05:50.268Z",
-          "completedAt": "2026-04-22T17:05:50.268Z"
+          ]
         },
         {
           "id": "44c38797-0009-4f44-8adc-38b5bd5a830e",
@@ -32582,7 +32582,7 @@
             {
               "id": "e174fb23-4ce0-4377-95ca-250538d7635c",
               "title": "Implement automatic migration from single prd.json to branch-scoped multi-file format",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Detect when .rex/prd.json exists as a legacy single-file PRD and automatically migrate it to the new naming convention on first access. The migration determines the current branch and first-commit date, renames the file to prd_{branch}_{date}.json, creates a backup of the original, and ensures all item IDs and parent references remain intact. Fresh rex init creates a branch-scoped file directly.",
               "acceptanceCriteria": [
@@ -32599,7 +32599,11 @@
                 "migration",
                 "storage"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-22T17:13:43.023Z",
+              "completedAt": "2026-04-22T17:44:03.271Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Implemented automatic migration from single prd.json to branch-scoped multi-file format via migrateLegacyPRD() in prd-migration.ts, integrated into resolveStore(). Fresh rex init creates branch-scoped files in git repos."
             },
             {
               "id": "c9867c35-7f69-401d-9908-03bac57a4d6c",

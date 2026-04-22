@@ -71,6 +71,11 @@ export {
 } from "./store/prd-discovery.js";
 export type { PRDFileResolution } from "./store/prd-discovery.js";
 
+// ---- Store: legacy PRD migration -------------------------------------------
+
+export { migrateLegacyPRD } from "./store/prd-migration.js";
+export type { MigrationResult } from "./store/prd-migration.js";
+
 // ---- Integration schema system ----------------------------------------------
 
 export {

@@ -14,6 +14,8 @@ export {
   resolvePRDFile,
 } from "./prd-discovery.js";
 export type { PRDFileResolution } from "./prd-discovery.js";
+export { migrateLegacyPRD } from "./prd-migration.js";
+export type { MigrationResult } from "./prd-migration.js";
 export { withLock, acquireLock } from "./file-lock.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
@@ -60,10 +62,12 @@ export {
 export { notionIntegrationSchema } from "./integration-schemas/notion.js";
 export { jiraIntegrationSchema } from "./integration-schemas/jira.js";
 
+import { dirname } from "node:path";
 import { FileStore } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
 import { getDefaultRegistry } from "./adapter-registry.js";
+import { migrateLegacyPRD } from "./prd-migration.js";
 import type { PRDStore } from "./contracts.js";
 import type { NotionAdapterConfig } from "./notion-client.js";
 
@@ -111,6 +115,12 @@ export function createNotionStore(
  * Always returns a FileStore. Remote adapters (e.g. Notion) are accessed
  * only during explicit sync operations via {@link resolveRemoteStore}.
  *
+ * On first call, automatically migrates a legacy `prd.json` (sole PRD file)
+ * to the branch-scoped naming convention (`prd_{branch}_{date}.json`),
+ * creating a timestamped backup. After migration, the store's
+ * `currentBranchFile` is set to the migrated filename so that new root
+ * items are written to the correct file.
+ *
  * This is the preferred way to obtain a store in CLI commands and tools.
  *
  * @param rexDir  Path to the `.rex/` directory.
@@ -123,7 +133,18 @@ export function createNotionStore(
  * ```
  */
 export async function resolveStore(rexDir: string): Promise<PRDStore> {
-  return new FileStore(rexDir);
+  // Migrate legacy prd.json → prd_{branch}_{date}.json when no branch files exist
+  const cwd = dirname(rexDir);
+  const migration = await migrateLegacyPRD(rexDir, cwd);
+
+  const store = new FileStore(rexDir);
+
+  // After migration, route new root items to the migrated file
+  if (migration.migrated && migration.filename) {
+    store.setCurrentBranchFile(migration.filename);
+  }
+
+  return store;
 }
 
 /**
