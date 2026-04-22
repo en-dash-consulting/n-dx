@@ -12,11 +12,9 @@
  * @module web/server/search-index
  */
 
-import { statSync } from "node:fs";
-import { join } from "node:path";
 import type { PRDItem, PRDDocument } from "./rex-gateway.js";
 import { walkTree } from "./rex-gateway.js";
-import { loadPRDSync } from "./prd-io.js";
+import { loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -155,15 +153,11 @@ export class SearchIndex {
   /** File mtime when the index was last built (for staleness check). */
   private builtAtMtime: number = 0;
 
-  /** Path to prd.json (set once). */
-  private prdPath: string;
-
-  /** Rex directory path for centralized PRD loading. */
+  /** Rex directory path for centralized PRD loading and mtime tracking. */
   private rexDir: string;
 
   constructor(rexDir: string) {
     this.rexDir = rexDir;
-    this.prdPath = join(rexDir, "prd.json");
   }
 
   // ── Public API ─────────────────────────────────────────────────────────
@@ -306,13 +300,9 @@ export class SearchIndex {
     }
   }
 
-  /** Get the PRD file modification time (0 if file doesn't exist). */
+  /** Get the latest modification time across all PRD files. */
   private getPrdMtime(): number {
-    try {
-      return statSync(this.prdPath).mtimeMs;
-    } catch {
-      return 0;
-    }
+    return prdMaxMtimeMs(this.rexDir);
   }
 
   /** Load the PRD document from disk. */

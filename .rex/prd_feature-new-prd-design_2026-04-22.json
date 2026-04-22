@@ -32608,7 +32608,7 @@
             {
               "id": "c9867c35-7f69-401d-9908-03bac57a4d6c",
               "title": "Validate all CLI commands, MCP tools, and web dashboard against multi-file PRD backend",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Systematically verify that every command and interface that reads or writes PRD data works correctly with the new multi-file storage. Cover rex CLI commands, ndx orchestration commands, MCP read/write tools, web dashboard PRD tree, and hench task selection. Add integration tests covering multi-branch multi-file scenarios.",
               "acceptanceCriteria": [
@@ -32625,7 +32625,8 @@
                 "testing",
                 "integration"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-22T18:12:08.412Z"
             }
           ]
         }

@@ -8,7 +8,7 @@ import { join, extname } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
 import { ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/index.js";
-import { prdExists, prdPath } from "./prd-io.js";
+import { prdExists, loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -43,10 +43,11 @@ export function createDataWatcher(ctx: ServerContext, viewerPath?: string): Data
           // File may be mid-write
         }
       }
-      // Track prd.json mtime
+      // Track max mtime across all PRD files (legacy prd.json + branch-scoped)
       try {
-        if (prdExists(ctx.rexDir)) {
-          watcher.fileMtimes["prd.json"] = statSync(prdPath(ctx.rexDir)).mtimeMs;
+        const mtime = prdMaxMtimeMs(ctx.rexDir);
+        if (mtime > 0) {
+          watcher.fileMtimes["prd.json"] = mtime;
         }
       } catch {
         // ignore
@@ -100,17 +101,22 @@ export function handleDataRoute(
   if (url.startsWith("/data/")) {
     const dataFile = url.replace("/data/", "");
 
-    // Serve prd.json from .rex/ directory
+    // Serve aggregated PRD from .rex/ directory (all prd_*.json + legacy prd.json)
     if (dataFile === "prd.json") {
-      const resolvedPrdPath = prdPath(ctx.rexDir);
       if (prdExists(ctx.rexDir)) {
-        const stat = statSync(resolvedPrdPath);
-        res.writeHead(200, {
-          "Content-Type": "application/json",
-          "Content-Length": stat.size,
-          "Cache-Control": "no-cache",
-        });
-        createReadStream(resolvedPrdPath).pipe(res);
+        const doc = loadPRDSync(ctx.rexDir);
+        if (doc) {
+          const body = JSON.stringify(doc);
+          res.writeHead(200, {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(body),
+            "Cache-Control": "no-cache",
+          });
+          res.end(body);
+        } else {
+          res.writeHead(500);
+          res.end("Failed to load PRD");
+        }
       } else {
         res.writeHead(404);
         res.end("Not found");
