@@ -575,7 +575,7 @@ export interface FinalizeRunOptions {
 // ---------------------------------------------------------------------------
 
 /** Run statuses that indicate the run ended in failure. */
-const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient"]);
+const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 /**
  * Return the list of entries reported by `git status --porcelain`.

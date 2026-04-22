@@ -455,9 +455,6 @@ describe("architecture policy: gateway enforcement", () => {
         // Explicit per-file exceptions (documented in gateway-rules.json)
         if (rule.allowedNonGatewayFiles.has(rel)) continue;
 
-        // Files exempt from gateway routing (e.g. cli/ cannot import prd/)
-        if (rule.exemptFiles.has(rel)) continue;
-
         const content = readFileSync(file, "utf-8");
         if (hasRuntimeImportFrom(content, rule.externalPkg)) {
           violations.push(rel);
@@ -512,9 +509,6 @@ describe("architecture policy: gateway enforcement", () => {
         if (rule.gatewayFiles.has(rel)) continue;
         // Explicit per-file exceptions (documented in gateway-rules.json)
         if (rule.allowedNonGatewayFiles.has(rel)) continue;
-
-        // Files exempt from gateway routing (e.g. cli/ cannot import prd/)
-        if (rule.exemptFiles.has(rel)) continue;
 
         // Exempt directories (viewer can't reach server gateway due to boundary rule)
         let exempt = false;
@@ -874,7 +868,6 @@ describe("architecture policy: gateway enforcement", () => {
         const allGateways = new Set();
         for (const r of rules) {
           for (const gw of r.gatewayFiles) allGateways.add(gw);
-          for (const ef of r.exemptFiles) allGateways.add(ef);
         }
 
         const srcFiles = walk(join(ROOT, consumerDir));

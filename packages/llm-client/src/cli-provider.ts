@@ -162,7 +162,12 @@ function spawnOnce(
         return;
       }
 
-      const detail = stderr.trim() || `claude exited with code ${code}`;
+      // When claude exits non-zero it often writes the error payload to stdout
+      // as a JSON envelope ({ is_error: true, api_error_status, result }), not
+      // stderr. Fall back to that so classifyStderr can see the status code
+      // and message and downstream logs show a real reason instead of "unknown".
+      const stdoutError = extractStdoutError(stdout, format);
+      const detail = stderr.trim() || stdoutError || `claude exited with code ${code}`;
 
       // On Windows with shell: true, a missing binary doesn't trigger ENOENT —
       // cmd.exe spawns fine but exits non-zero with a "not recognized" message.
@@ -178,6 +183,46 @@ function spawnOnce(
       reject(new ClaudeClientError(detail, classified.reason, classified.retryable));
     });
   });
+}
+
+/**
+ * Extract a human-readable error detail from stdout when claude exits non-zero.
+ * The CLI emits errors like rate-limits as a JSON envelope on stdout with
+ * `is_error: true`, while stderr stays empty. Returns null if no such envelope
+ * is present.
+ */
+function extractStdoutError(stdout: string, format: "json" | "stream-json"): string | null {
+  const text = stdout.trim();
+  if (!text) return null;
+
+  const fromEnvelope = (obj: unknown): string | null => {
+    if (!obj || typeof obj !== "object") return null;
+    const env = obj as Record<string, unknown>;
+    if (env.is_error !== true) return null;
+    const status = typeof env.api_error_status === "number" ? `HTTP ${env.api_error_status}` : "";
+    const message = typeof env.result === "string" ? env.result.trim() : "";
+    if (message && status) return `${message} (${status})`;
+    return message || status || null;
+  };
+
+  if (format === "json") {
+    try {
+      return fromEnvelope(JSON.parse(text));
+    } catch {
+      return null;
+    }
+  }
+
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const detail = fromEnvelope(JSON.parse(line));
+      if (detail) return detail;
+    } catch {
+      // skip unparseable lines
+    }
+  }
+  return null;
 }
 
 /**
