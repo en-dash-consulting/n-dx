@@ -251,7 +251,7 @@ describe("entrypoint existence", () => {
       const config = parsedServers.get(name);
       expect(config, `${name} missing from parsed config.toml`).toBeDefined();
 
-      const entrypoint = config.args[0];
+      const entrypoint = config.args[0].replace(/\\/g, "/");
       // Both should end with the same relative path
       expect(entrypoint).toContain(descriptor.entrypoint);
     }

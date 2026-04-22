@@ -641,11 +641,18 @@ function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
     legacyClaudeConfig,
   );
   try {
-    execFileSync(binary, args, {
+    // On Windows, shell: true is needed to resolve .cmd shims, but cmd.exe
+    // re-parses arguments, splitting on spaces. Wrap args that contain spaces
+    // in double-quotes so they survive the shell layer.
+    const isWin = process.platform === "win32";
+    const safeArgs = isWin
+      ? args.map((a) => (a.includes(" ") ? `"${a}"` : a))
+      : args;
+    execFileSync(binary, safeArgs, {
       encoding: "utf-8",
       timeout: 15000,
       stdio: "pipe",
-      shell: process.platform === "win32",
+      shell: isWin,
     });
     return { ok: true, binary, args };
   } catch (err) {
