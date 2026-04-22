@@ -32458,7 +32458,7 @@
         {
           "id": "e006db37-8fc4-4380-bc61-78218dd03e18",
           "title": "Multi-File PRD Aggregation and Write Routing Layer",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Refactor the PRDStore to aggregate items from all PRD files for read operations and route write operations to the correct branch-scoped file, preserving all existing command behavior while operating transparently on multiple underlying storage files.",
           "source": "smart-add",
@@ -32492,7 +32492,7 @@
             {
               "id": "88f3b468-8d85-421b-a881-d7d61c8f84ae",
               "title": "Refactor PRDStore write operations to route modifications to the owning PRD file",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Modify the PRDStore's save, update, and remove paths to track which PRD file owns each item and write changes back to the correct file. New items added via the current branch go to that branch's PRD file. Status updates, edits, moves, and removes target the file that contains the item being modified. File locking operates per-file.",
               "acceptanceCriteria": [
@@ -32509,9 +32509,15 @@
                 "storage",
                 "prd-store"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-22T16:46:31.799Z",
+              "completedAt": "2026-04-22T17:05:49.551Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Refactored FileStore to track item-to-file ownership, route all write operations (addItem, updateItem, removeItem, saveDocument) to the correct owning PRD file, and use per-file locking."
             }
-          ]
+          ],
+          "startedAt": "2026-04-22T17:05:50.268Z",
+          "completedAt": "2026-04-22T17:05:50.268Z"
         },
         {
           "id": "44c38797-0009-4f44-8adc-38b5bd5a830e",

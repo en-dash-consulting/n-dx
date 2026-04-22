@@ -373,8 +373,8 @@ describe("PRDStore aggregation", () => {
 
   // ---- withTransaction isolation --------------------------------------------
 
-  describe("withTransaction isolation", () => {
-    it("operates on primary prd.json only", async () => {
+  describe("withTransaction sees aggregated view", () => {
+    it("sees items from all PRD files", async () => {
       await writeFile(
         join(rexDir, "prd.json"),
         toCanonicalJSON(
@@ -391,13 +391,14 @@ describe("PRDStore aggregation", () => {
       );
 
       await store.withTransaction(async (doc) => {
-        // Transaction should only see primary document items
-        expect(doc.items).toHaveLength(1);
-        expect(doc.items[0].id).toBe("e0");
+        // Transaction sees aggregated items from all files
+        expect(doc.items).toHaveLength(2);
+        const ids = doc.items.map((i) => i.id).sort();
+        expect(ids).toEqual(["e0", "e1"]);
       });
     });
 
-    it("does not write branch file items to prd.json", async () => {
+    it("decomposes items back to their owning files on save", async () => {
       await writeFile(
         join(rexDir, "prd.json"),
         toCanonicalJSON(
@@ -421,9 +422,18 @@ describe("PRDStore aggregation", () => {
       const primary = JSON.parse(raw) as PRDDocument;
       expect(primary.items).toHaveLength(1);
       expect(primary.items[0].id).toBe("e0");
+
+      // Verify branch file still has only its original item
+      const branchRaw = await readFile(
+        join(rexDir, "prd_branch_2025-01-01.json"),
+        "utf-8",
+      );
+      const branch = JSON.parse(branchRaw) as PRDDocument;
+      expect(branch.items).toHaveLength(1);
+      expect(branch.items[0].id).toBe("e1");
     });
 
-    it("addItem via transaction writes only to prd.json", async () => {
+    it("addItem without parentId writes to currentBranchFile (defaults to prd.json)", async () => {
       await writeFile(
         join(rexDir, "prd.json"),
         toCanonicalJSON(makeDoc("Primary", [])),
@@ -439,7 +449,7 @@ describe("PRDStore aggregation", () => {
 
       await store.addItem(makeItem("e2", "New Epic"));
 
-      // Verify new item is in prd.json
+      // Verify new item is in prd.json (the default currentBranchFile)
       const raw = await readFile(join(rexDir, "prd.json"), "utf-8");
       const primary = JSON.parse(raw) as PRDDocument;
       expect(primary.items).toHaveLength(1);
