@@ -66,6 +66,7 @@ export {
 export {
   discoverPRDFiles,
   parsePRDBranchSegment,
+  parsePRDFileDate,
   findPRDFileForBranch,
   resolvePRDFile,
 } from "./store/prd-discovery.js";

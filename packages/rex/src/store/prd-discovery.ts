@@ -70,6 +70,17 @@ export function parsePRDBranchSegment(filename: string): string | null {
 }
 
 /**
+ * Extract the creation date from a PRD filename.
+ *
+ * @returns The `YYYY-MM-DD` date string, or `null` for legacy `prd.json`
+ *          and other files that don't match the naming convention.
+ */
+export function parsePRDFileDate(filename: string): string | null {
+  const match = PRD_FILENAME_RE.exec(filename);
+  return match ? match[2] : null;
+}
+
+/**
  * Find an existing PRD file matching the given branch name.
  *
  * The branch name is sanitized before comparison — callers can pass

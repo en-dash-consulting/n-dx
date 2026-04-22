@@ -62,6 +62,17 @@ export class FileStore implements PRDStore {
     return this.currentBranchFile;
   }
 
+  /**
+   * Return a read-only snapshot of the item-to-file ownership map.
+   *
+   * Populated as a side effect of {@link loadDocument}. Returns an empty map
+   * if the document has not been loaded yet. Callers should load the document
+   * first.
+   */
+  getItemFileMap(): ReadonlyMap<string, string> {
+    return this.itemToFile;
+  }
+
   private path(file: string): string {
     return join(this.rexDir, file);
   }
