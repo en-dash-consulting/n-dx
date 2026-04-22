@@ -3,10 +3,11 @@ import { join } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
-import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
+import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWriteJSON } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
+import { discoverPRDFiles } from "./prd-discovery.js";
 import type { PRDStore, StoreCapabilities } from "./contracts.js";
 
 export class FileStore implements PRDStore {
@@ -26,14 +27,102 @@ export class FileStore implements PRDStore {
     return this.path("prd.json.lock");
   }
 
-  async loadDocument(): Promise<PRDDocument> {
-    const raw = await readFile(this.path("prd.json"), "utf-8");
+  /**
+   * Load and validate a single PRD file by filename.
+   * Used internally for both primary and branch-scoped files.
+   */
+  private async loadSingleFile(filename: string): Promise<PRDDocument> {
+    const raw = await readFile(this.path(filename), "utf-8");
     const parsed = JSON.parse(raw);
     const result = validateDocument(parsed);
     if (!result.ok) {
-      throw new Error(`Invalid prd.json: ${result.errors.message}`);
+      throw new Error(`Invalid ${filename}: ${result.errors.message}`);
     }
     return result.data as PRDDocument;
+  }
+
+  /**
+   * Merge multiple PRD documents into a single unified document.
+   * Uses the first source's metadata (schema, title) as the base.
+   * Throws on ID collisions across files.
+   */
+  private mergeDocuments(
+    sources: Array<{ filename: string; doc: PRDDocument }>,
+  ): PRDDocument {
+    const allItems: PRDItem[] = [];
+    const idToFile = new Map<string, string>();
+    const collisions: string[] = [];
+
+    for (const { filename, doc } of sources) {
+      for (const entry of walkTree(doc.items)) {
+        const existing = idToFile.get(entry.item.id);
+        if (existing) {
+          collisions.push(`  ${entry.item.id} in ${existing} and ${filename}`);
+        } else {
+          idToFile.set(entry.item.id, filename);
+        }
+      }
+      allItems.push(...doc.items);
+    }
+
+    if (collisions.length > 0) {
+      throw new Error(`ID collision across PRD files:\n${collisions.join("\n")}`);
+    }
+
+    return {
+      ...sources[0].doc,
+      items: allItems,
+    };
+  }
+
+  /**
+   * Load the full PRD document tree, aggregating items from all PRD files.
+   *
+   * Discovers all `prd_*.json` files in `.rex/` and merges their item trees
+   * with the legacy `prd.json` (if present) into a single unified document.
+   * When only `prd.json` exists (no branch-scoped files), behaves identically
+   * to the original single-file load.
+   *
+   * @throws If no PRD files exist, if any file contains invalid data,
+   *         or if item IDs collide across files.
+   */
+  async loadDocument(): Promise<PRDDocument> {
+    const branchFiles = await discoverPRDFiles(this.rexDir);
+
+    // Fast path: no branch-scoped files, load legacy prd.json directly
+    if (branchFiles.length === 0) {
+      return this.loadSingleFile("prd.json");
+    }
+
+    // Aggregate all PRD sources
+    const sources: Array<{ filename: string; doc: PRDDocument }> = [];
+
+    // Include legacy prd.json if it exists
+    try {
+      const doc = await this.loadSingleFile("prd.json");
+      sources.push({ filename: "prd.json", doc });
+    } catch (err: unknown) {
+      // Tolerate "file not found" — corrupt prd.json should still fail
+      if (
+        !(err instanceof Error) ||
+        !("code" in err) ||
+        (err as NodeJS.ErrnoException).code !== "ENOENT"
+      ) {
+        throw err;
+      }
+    }
+
+    // Load each branch-scoped file
+    for (const filename of branchFiles) {
+      const doc = await this.loadSingleFile(filename);
+      sources.push({ filename, doc });
+    }
+
+    if (sources.length === 1) {
+      return sources[0].doc;
+    }
+
+    return this.mergeDocuments(sources);
   }
 
   async saveDocument(doc: PRDDocument): Promise<void> {
@@ -56,7 +145,10 @@ export class FileStore implements PRDStore {
     return withLock(this.lockPath(), async () => {
       this.inTransaction = true;
       try {
-        const doc = await this.loadDocument();
+        // Load only the primary prd.json — transactions must not pull in
+        // items from branch-scoped files (the sibling write-routing task
+        // will add per-file targeting; until then, writes go to prd.json).
+        const doc = await this.loadSingleFile("prd.json");
         const result = await fn(doc);
         await this.saveDocument(doc);
         return result;
