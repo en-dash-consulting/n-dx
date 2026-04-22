@@ -401,6 +401,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
 const CYCLE_EXEMPT_ZONE_TYPES = new Set(["test", "infrastructure"]);
 const CYCLE_EXCEPTIONS = new Map([
   ["mcp", "Rex MCP tools cluster; cycles with the duplicate-named 'web' zone (first file in rex package) making intra-rex edges appear cross-package to the cycle detector."],
+  ["refresh", "Small viewer refresh-throttle cluster in packages/web/; all observed cycle edges (refresh → web and web → refresh) are intra-packages/web imports, but the multi-package 'web' Louvain zone's first file is in packages/rex so packageFamily('web') resolves to 'rex', making these intra-package edges appear cross-package to the cycle detector."],
   ["rex-recommend", "Small rex recommendation cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["rex-store", "Rex store/persistence cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["rex-unit", "Small rex unit cluster (src/core/tree.ts); cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
@@ -816,6 +817,7 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
+  ["sync", "4-file rex sync cluster (sync.ts, sync-engine.ts + their tests); sync.ts and sync-engine.ts are independent sibling modules that do not import each other — they are separate entry points for sync operations that share rex domain modules (tree, schema, store). No internal edges, so the graph-based cohesion metric reports 0.2."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
