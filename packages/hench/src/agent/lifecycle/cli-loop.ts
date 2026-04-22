@@ -58,6 +58,7 @@ import {
   runReviewGate,
   finalizeRun,
   handleRunFailure,
+  formatModelLabel,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
 import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
@@ -192,12 +193,13 @@ function applyRuntimeEvent(
   event: RuntimeEvent,
   result: SpawnResult,
   turnCounter: { value: number },
+  assistantLabel: string,
 ): void {
   switch (event.type) {
     case "assistant": {
       turnCounter.value++;
       if (event.text) {
-        stream("Agent", event.text);
+        stream(assistantLabel, event.text);
         result.summary = event.text.slice(0, MAX_SUMMARY_LENGTH);
       }
       break;
@@ -259,10 +261,10 @@ function applyRuntimeEvent(
  *
  * @internal Exported for testing.
  */
-export function emitStreamOutput(event: RuntimeEvent): void {
+export function emitStreamOutput(event: RuntimeEvent, assistantLabel = "Agent"): void {
   switch (event.type) {
     case "assistant": {
-      if (event.text) stream("Agent", event.text);
+      if (event.text) stream(assistantLabel, event.text);
       break;
     }
     case "tool_use": {
@@ -541,7 +543,10 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
     let completionTurns: number | undefined;
     let completionCostUsd: number | undefined;
 
-    const vendorLabel = adapter.vendor === "codex" ? "Codex" : "Agent";
+    const vendorLabel = formatModelLabel(
+      tokenMetadata.model,
+      adapter.vendor === "codex" ? "Codex" : "Agent",
+    );
 
     proc.stdout!.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
@@ -591,7 +596,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
           const fallbackEvent = adapter.parseEvent(fullStdout, 1, {});
           if (fallbackEvent) {
             accumulator.push(fallbackEvent);
-            emitStreamOutput(fallbackEvent);
+            emitStreamOutput(fallbackEvent, vendorLabel);
           }
 
           // Codex-specific: extract token usage from raw stdout
@@ -672,7 +677,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         if (eventCount === 0 && fullStdout.trim()) {
           const fallbackEvent = adapter.parseEvent(fullStdout, 1, {});
           if (fallbackEvent) {
-            applyRuntimeEvent(fallbackEvent, result, turnCounter);
+            applyRuntimeEvent(fallbackEvent, result, turnCounter, vendorLabel);
           }
 
           // Codex-specific: extract token usage from raw stdout via heuristic mapping
@@ -775,7 +780,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         if (event) {
           eventCount++;
           accumulator.push(event);
-          emitStreamOutput(event);
+          emitStreamOutput(event, vendorLabel);
           if (event.type === "assistant") turnCounter.value++;
         }
 
@@ -818,7 +823,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         // ── Legacy: inline mutation ──
         if (event) {
           eventCount++;
-          applyRuntimeEvent(event, result, turnCounter);
+          applyRuntimeEvent(event, result, turnCounter, vendorLabel);
         }
 
         // Step 2: Extract token usage from raw JSON (parallel to event parsing)
@@ -1279,6 +1284,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     rollbackOnFailure: opts.rollbackOnFailure,
     yes: opts.yes,
     store,
+    autoCommit: config.autoCommit === true,
   });
 
   return { run };

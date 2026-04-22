@@ -4,6 +4,7 @@ package-lock.json
 *.tsbuildinfo
 .hench/runs/
 .hench/locks/
+.hench-commit-msg.txt
 .run-logs/
 .n-dx.json
 .n-dx.local.json

@@ -116,6 +116,14 @@ export interface HenchConfig {
    * The --no-rollback CLI flag always overrides this setting for a single run.
    */
   rollbackOnFailure?: boolean;
+  /**
+   * When true, the agent performs `git commit` itself at the end of the run
+   * (legacy behavior — Claude CLI does this by default when the prompt tells
+   * it to commit). When false (default), the agent stages changes and writes
+   * its proposed commit message to `.hench-commit-msg.txt`; n-dx then prompts
+   * the user to approve the commit before running `git commit -F <file>`.
+   */
+  autoCommit?: boolean;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────

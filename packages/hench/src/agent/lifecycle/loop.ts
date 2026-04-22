@@ -30,6 +30,7 @@ import {
   finalizeRun,
   handleRunFailure,
   handleBudgetExceeded,
+  formatModelLabel,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
 
@@ -262,10 +263,10 @@ function extractEndTurnSummary(assistantContent: Anthropic.ContentBlock[]): stri
 }
 
 /** Print text blocks from the assistant response. */
-function streamAssistantText(assistantContent: Anthropic.ContentBlock[]): void {
+function streamAssistantText(assistantContent: Anthropic.ContentBlock[], label: string): void {
   for (const block of assistantContent) {
     if (block.type === "text" && block.text) {
-      stream("Agent", block.text);
+      stream(label, block.text);
     }
   }
 }
@@ -407,7 +408,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       const assistantContent = response.content;
       messages.push({ role: "assistant", content: assistantContent });
 
-      streamAssistantText(assistantContent);
+      streamAssistantText(assistantContent, formatModelLabel(model));
 
       // Handle stop reasons
       if (response.stop_reason === "end_turn") {
@@ -488,6 +489,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     rollbackOnFailure: opts.rollbackOnFailure,
     yes: opts.yes,
     store,
+    autoCommit: config.autoCommit === true,
   });
 
   return { run };

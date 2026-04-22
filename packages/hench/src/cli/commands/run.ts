@@ -676,8 +676,8 @@ async function runOne(
 
   // Invocation context
   if (run.invocationContext) {
-    const contextDisplay = run.invocationContext === "cli" ? cyan("CLI") : colorWarn("API");
-    output(`Invocation: ${contextDisplay}`);
+    const label = run.invocationContext === "cli" ? "CLI" : "API";
+    output(colorWarn(`Invocation: ${label}`));
   }
 
   // Duration
