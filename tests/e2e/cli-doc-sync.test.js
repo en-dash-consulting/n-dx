@@ -95,8 +95,8 @@ function parseOrchestrationCommands(content) {
 
 // ── Read docs once ────────────────────────────────────────────────────────
 
-const claudeMd = readFileSync(join(root, "CLAUDE.md"), "utf-8");
-const agentsMd = readFileSync(join(root, "AGENTS.md"), "utf-8");
+const claudeMd = readFileSync(join(root, "CLAUDE.md"), "utf-8").replace(/\r\n/g, "\n");
+const agentsMd = readFileSync(join(root, "AGENTS.md"), "utf-8").replace(/\r\n/g, "\n");
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 

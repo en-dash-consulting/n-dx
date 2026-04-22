@@ -400,14 +400,18 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
  */
 const CYCLE_EXEMPT_ZONE_TYPES = new Set(["test", "infrastructure"]);
 const CYCLE_EXCEPTIONS = new Map([
+  ["incremental", "Small incremental analysis cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
   ["mcp", "Rex MCP tools cluster; cycles with the duplicate-named 'web' zone (first file in rex package) making intra-rex edges appear cross-package to the cycle detector."],
   ["refresh", "Small viewer refresh-throttle cluster in packages/web/; all observed cycle edges (refresh → web and web → refresh) are intra-packages/web imports, but the multi-package 'web' Louvain zone's first file is in packages/rex so packageFamily('web') resolves to 'rex', making these intra-package edges appear cross-package to the cycle detector."],
+  ["rex-core", "Small rex core cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason — both zones are in the rex package."],
   ["rex-recommend", "Small rex recommendation cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["rex-store", "Rex store/persistence cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["rex-unit", "Small rex unit cluster (src/core/tree.ts); cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["sync", "Small sync command cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
+  ["use", "Small hooks/utilities cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
   ["web-2", "Small viewer utility cluster; current SourceVision split still routes shared types through the web hub."],
   ["web-4", "Small viewer data-loading cluster; cycles with the multi-package 'web' zone for the same packageFamily mismatch reason as 'polling'."],
+  ["web-server", "Web server cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
   ["web-viewer-search-overlay", "Search overlay component zone; confirmed genuine cycle with web-viewer — search-overlay.ts imports getLevelEmoji (runtime) and NavigateTo (type) from web-viewer while components/index.ts imports back. Tracked in CLAUDE.md 'Confirmed zone-level cycles' table."],
   ["web-viewer", "Viewer facade cluster; cohesion now meets threshold but still cycles with the multi-package 'web' zone due to the packageFamily mismatch (web zone first file is rex)."],
 ]);

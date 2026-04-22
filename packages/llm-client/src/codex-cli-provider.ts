@@ -210,6 +210,7 @@ async function spawnOnce(
       const proc = spawn(cliBinary, args, {
         stdio: ["ignore", "ignore", "pipe"],
         env: envOverride ?? process.env,
+        shell: process.platform === "win32",
       });
 
       let stderr = "";

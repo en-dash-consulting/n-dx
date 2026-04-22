@@ -90,7 +90,7 @@ async function globFiles(
           await walk(join(current, entry.name));
         }
       } else if (entry.isFile()) {
-        const rel = relative(dir, join(current, entry.name));
+        const rel = relative(dir, join(current, entry.name)).replace(/\\/g, "/");
         if (match(rel)) {
           results.push(join(current, entry.name));
         }
@@ -120,7 +120,7 @@ function toTitleCase(str: string): string {
 }
 
 function inferEpicName(filePath: string, baseDir: string): string {
-  const rel = relative(baseDir, filePath);
+  const rel = relative(baseDir, filePath).replace(/\\/g, "/");
   const parts = dirname(rel).split("/").filter((p) => p !== "." && p !== "");
   // Skip common test root directories
   const meaningful = parts.filter(
@@ -164,7 +164,7 @@ export async function scanTests(
   const epicFiles = new Map<string, string[]>();
 
   for (const filePath of files) {
-    const rel = relative(dir, filePath);
+    const rel = relative(dir, filePath).replace(/\\/g, "/");
     const epicName = inferEpicName(filePath, dir);
 
     const list = epicFiles.get(epicName) ?? [];
@@ -912,7 +912,7 @@ export async function scanPackageJson(
   const results: ScanResult[] = [];
 
   for (const filePath of files) {
-    const rel = relative(dir, filePath);
+    const rel = relative(dir, filePath).replace(/\\/g, "/");
 
     let content: string;
     try {
