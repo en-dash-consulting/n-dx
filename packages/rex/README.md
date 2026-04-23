@@ -249,11 +249,36 @@ The PRD document (`prd.json`) wraps items in:
 ```
 .rex/
   config.json           Project configuration
-  prd.json              PRD tree
+  prd.json              PRD tree (single canonical file)
   execution-log.jsonl   Append-only structured log (current)
   execution-log.1.jsonl Rotated backup (older entries)
   workflow.md           Agent workflow instructions
 ```
+
+### PRD file layout
+
+`.rex/prd.json` is the **single canonical PRD file**. Every reader and writer — CLI, hench, MCP, dashboard — touches this file. There are no branch-scoped or multi-file writers.
+
+**Legacy migration.** If the directory still contains legacy branch-scoped files from a previous layout:
+
+```
+.rex/
+  prd_main_2025-11-02.json
+  prd_feature-auth_2025-11-08.json
+```
+
+the first store resolution after upgrade merges their items into `prd.json` in source order and renames the originals to `<name>.backup.<timestamp>`:
+
+```
+.rex/
+  prd.json                                        (merged)
+  prd_main_2025-11-02.json.backup.1729728000000
+  prd_feature-auth_2025-11-08.json.backup.1729728000000
+```
+
+The migration is idempotent — subsequent reads are no-ops once only `prd.json` remains. ID collisions across legacy files surface as an error for manual resolution. No user action is required; delete the `.backup.*` files once the merged `prd.json` looks correct.
+
+To settle the migration cleanly on first upgrade, run a read-only command (e.g. `rex status` or `ndx status`) once before kicking off parallel PRD writers.
 
 ### Execution log rotation
 

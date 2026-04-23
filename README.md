@@ -265,6 +265,8 @@ Codex reads `.codex/config.toml` automatically — no manual registration requir
 | `.rex/` | rex | `prd.json`, `config.json`, `execution-log.jsonl`, `workflow.md`, `acknowledged-findings.json` |
 | `.hench/` | hench | `config.json`, `runs/` |
 
+> **Legacy PRD migration.** The PRD is a single canonical file at `.rex/prd.json`. If you are upgrading from a previous layout that produced branch-scoped files (`.rex/prd_{branch}_{date}.json`), the first rex read after upgrade merges every such file into `prd.json` and renames the sources to `<name>.backup.<timestamp>`. The migration runs once, is idempotent, and requires no user action — delete the `.backup.*` files once the merged `prd.json` looks correct.
+
 ## Security
 
 n-dx runs an autonomous agent (hench) that reads, writes, and executes commands on your behalf. The security model is designed to keep all operations scoped to the project directory with no ambient access to the rest of your system.
