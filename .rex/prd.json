@@ -12,7 +12,7 @@
         {
           "id": "4c28fbf8-94bd-4950-8ad8-24578929ab44",
           "title": "Audit Recent Merges and Catalog Documentation Gaps",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Review merges from the past week to identify all user-facing behavior changes, then map each change to the documentation files that need updating. Produces a working list that drives the rest of the documentation work.",
           "source": "smart-add",
@@ -20,7 +20,7 @@
             {
               "id": "292dff9b-7b0c-406e-b1db-468128d58a11",
               "title": "Audit past-week merges and produce a documentation delta report",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Run git log for the last 7 days on main and feature branches, categorize each merged change by whether it affects the PRD structure, CLI surface, MCP tools, or architectural conventions, and produce a delta report mapping each change to the markdown files that need updating (README.md, CLAUDE.md, AGENTS.md, PACKAGE_GUIDELINES.md, TESTING.md, and per-package READMEs). The recent commits include cross-PRD duplicate detection, branch-scoped PRD file targeting, multi-file PRD migration, and MCP/CLI/dashboard multi-file validation — each of these likely has doc implications.",
               "acceptanceCriteria": [
@@ -34,9 +34,15 @@
                 "documentation",
                 "audit"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T02:44:58.277Z",
+              "completedAt": "2026-04-23T02:50:03.477Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Produced docs/doc-delta-audit.md: categorized all 7 past-week main-branch merges + 10 feature/new-PRD-design commits, mapped each to required edits in README.md / CLAUDE.md / AGENTS.md / PACKAGE_GUIDELINES.md / TESTING.md / per-package READMEs, and listed doc files requiring zero changes."
             }
-          ]
+          ],
+          "startedAt": "2026-04-23T02:50:03.489Z",
+          "completedAt": "2026-04-23T02:50:03.489Z"
         },
         {
           "id": "ef9224cb-e708-4ff4-9dcd-954a86905915",
@@ -137,6 +143,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-23T02:30:34.826Z",
+      "completedAt": "2026-04-23T02:30:34.826Z",
       "children": [
         {
           "id": "be363df5-da5d-42a8-b5fa-6bfaf294982d",
@@ -198,9 +206,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-23T02:30:34.826Z",
-      "completedAt": "2026-04-23T02:30:34.826Z"
+      ]
     }
   ]
 }
