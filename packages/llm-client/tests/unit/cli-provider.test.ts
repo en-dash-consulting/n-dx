@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createCliClient } from "../../src/cli-provider.js";
 import { ClaudeClientError } from "../../src/types.js";
 import type { LLMProvider } from "../../src/provider-interface.js";
@@ -65,6 +68,64 @@ describe("createCliClient", () => {
 
     // Should fail immediately, not wait for retries
     expect(elapsed).toBeLessThan(2000);
+  });
+});
+
+describe("createCliClient — stdout error envelope", () => {
+  function writeFakeCli(body: string): { dir: string; path: string } {
+    const dir = mkdtempSync(join(tmpdir(), "claude-fake-"));
+    const path = join(dir, "claude");
+    writeFileSync(path, body, { mode: 0o755 });
+    chmodSync(path, 0o755);
+    return { dir, path };
+  }
+
+  it("surfaces JSON stdout error envelope when stderr is empty and exit is non-zero", async () => {
+    const envelope = JSON.stringify({
+      type: "result",
+      is_error: true,
+      api_error_status: 429,
+      result: "You've hit your limit · resets Apr 23 at 12pm (America/Los_Angeles)",
+    });
+    const { dir, path } = writeFakeCli(
+      `#!/bin/sh\ncat > /dev/null\nprintf '%s' '${envelope.replace(/'/g, "'\\''")}'\nexit 1\n`,
+    );
+
+    try {
+      const client = createCliClient({
+        claudeConfig: { cli_path: path },
+        maxRetries: 0,
+      });
+      // Pre-fix: reason would be "unknown" (stderr empty → fallback to
+      // "claude exited with code 1" which matches no pattern). Post-fix the
+      // stdout envelope is parsed, "HTTP 429" is appended, and classifyStderr
+      // picks up the rate-limit. The outer retry loop then wraps it into a
+      // terminal rate-limit error when retries are exhausted.
+      await expect(
+        client.complete({ prompt: "test", model: "claude-sonnet-4-6" }),
+      ).rejects.toMatchObject({ reason: "rate-limit" });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the exit-code string when stdout has no error envelope", async () => {
+    const { dir, path } = writeFakeCli("#!/bin/sh\ncat > /dev/null\nexit 1\n");
+
+    try {
+      const client = createCliClient({
+        claudeConfig: { cli_path: path },
+        maxRetries: 0,
+      });
+      await expect(
+        client.complete({ prompt: "test", model: "claude-sonnet-4-6" }),
+      ).rejects.toMatchObject({
+        reason: "unknown",
+        message: expect.stringContaining("claude exited with code 1"),
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

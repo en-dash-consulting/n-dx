@@ -1,6 +1,6 @@
 # Local Testing Infrastructure
 
-This directory contains Docker configurations and scripts for running ndx tests in isolated Windows environments.
+This directory contains Docker configurations and scripts for running ndx tests in isolated containers. Supports Windows (Server Core) and macOS/Linux (Ubuntu) platforms with automated platform detection.
 
 ## Quick Start
 
@@ -18,11 +18,23 @@ Run the gauntlet test suite in a Docker container (builds image automatically):
 
 ## Files
 
-- **run-gauntlet.sh** - Bash script for Unix/Linux/macOS hosts
+- **run-gauntlet.sh** - Bash script for Unix/Linux/macOS hosts (supports platform auto-detection)
 - **run-gauntlet.ps1** - PowerShell script for Windows hosts  
 - **Dockerfile.windows** - Windows Server Core image with Node.js LTS, npm, git, and all ndx dependencies
-- **docker-compose.yml** - Docker Compose configuration for simplified container management
+- **Dockerfile.macos** - macOS/Linux image based on Ubuntu LTS with Node.js, bash, git, and all ndx dependencies
+- **docker-compose.yml** - Docker Compose configuration for both Windows (ndx-windows) and macOS (ndx-macos) services
+- **test-base-commands.sh** - Base command smoke test script (ndx config, init, analyze, status)
 - **.dockerignore** - Files excluded from Docker build context
+
+## Platform Comparison
+
+| Platform | Host OS | Container Base | Dockerfile | Runner Script | Docker Service | Base Commands |
+|----------|---------|-----------------|-----------|---------------|----------------|----------------|
+| **Windows** | Windows (any) | Windows Server Core (LTSC 2022) | `Dockerfile.windows` | `run-gauntlet.ps1` | `ndx-windows` | PowerShell: `pnpm test` |
+| **macOS** | macOS (Intel/Apple Silicon) | Ubuntu 20.04 LTS | `Dockerfile.macos` | `run-gauntlet.sh` | `ndx-macos` | Bash: `pnpm test` + `/ndx/test-base-commands.sh` |
+| **Linux** | Linux (any) | Ubuntu 20.04 LTS | `Dockerfile.macos` | `run-gauntlet.sh` | `ndx-macos` | Bash: `pnpm test` + `/ndx/test-base-commands.sh` |
+
+The `run-gauntlet.sh` script automatically detects the host platform (macOS, Linux, or Windows via MSYS/CYGWIN) and selects the appropriate Dockerfile. Use `--platform=<os>` to override detection.
 
 ## Run Gauntlet Script Usage
 
@@ -115,47 +127,86 @@ fi
 
 ## Container Features
 
+### Windows Container
 - ✅ Windows Server Core (LTSC 2022) base image
-- ✅ Node.js LTS installed from official Docker image
+- ✅ Node.js 20 LTS installed from official Docker image
 - ✅ npm and pnpm package managers
-- ✅ Git installed and available
+- ✅ Git installed via Chocolatey
+- ✅ PowerShell shell environment
 - ✅ All ndx dependencies installed via `pnpm install`
 - ✅ Project build completed during image creation (`npm run build`)
-- ✅ Ready to run gauntlet tests immediately
+- ✅ Ready to run `pnpm test` immediately
+
+### macOS/Linux Container
+- ✅ Ubuntu 20.04 LTS base image
+- ✅ Node.js 20 LTS installed from official Docker image
+- ✅ npm and pnpm package managers
+- ✅ Git installed via apt
+- ✅ Bash shell environment
+- ✅ All ndx dependencies installed via `pnpm install`
+- ✅ Project build completed during image creation (`npm run build`)
+- ✅ Base command smoke test script included (`test-base-commands.sh`)
+- ✅ Ready to run tests immediately
 
 ## Manual Docker Operations
 
-### Build the image:
+### Windows Container
+
+#### Build the image:
 ```bash
-docker build -f .local_testing/Dockerfile.windows -t ndx-gauntlet:latest .
+docker build -f .local_testing/Dockerfile.windows -t ndx-gauntlet:windows .
 ```
 
-### Run tests with docker-compose:
+#### Run tests with docker-compose:
 ```bash
 docker-compose -f .local_testing/docker-compose.yml run ndx-windows
 ```
 
-### Run tests with docker directly:
+#### Run tests with docker directly:
 ```bash
-docker run -it --rm -e NODE_ENV=test ndx-gauntlet:latest powershell -Command "pnpm test"
+docker run -it --rm -e NODE_ENV=test ndx-gauntlet:windows powershell -Command "pnpm test"
 ```
 
-### View running containers:
+### macOS/Linux Container
+
+#### Build the image:
+```bash
+docker build -f .local_testing/Dockerfile.macos -t ndx-gauntlet:macos .
+```
+
+#### Run tests with docker-compose:
+```bash
+docker-compose -f .local_testing/docker-compose.yml run ndx-macos
+```
+
+#### Run tests with docker directly (full test suite):
+```bash
+docker run -it --rm -e NODE_ENV=test ndx-gauntlet:macos /bin/bash -c "pnpm test"
+```
+
+#### Run base commands smoke tests:
+```bash
+docker run -it --rm -e NODE_ENV=test ndx-gauntlet:macos /bin/bash -c "/ndx/test-base-commands.sh"
+```
+
+### Common Operations
+
+#### View running containers:
 ```bash
 docker ps
 ```
 
-### View container logs:
+#### View container logs:
 ```bash
 docker logs <container_name>
 ```
 
-### Stop a running container:
+#### Stop a running container:
 ```bash
 docker stop <container_name>
 ```
 
-### Remove a stopped container:
+#### Remove a stopped container:
 ```bash
 docker rm <container_name>
 ```
@@ -174,8 +225,9 @@ docker rm <container_name>
 **Steps:**
 1. Check Docker is running: `docker ps`
 2. Verify image exists: `docker images | grep gauntlet`
-3. View build errors: `docker build -f .local_testing/Dockerfile.windows . --progress=plain`
-4. Enable verbose output: `./run-gauntlet.sh --verbose`
+3. View build errors (Windows): `docker build -f .local_testing/Dockerfile.windows . --progress=plain`
+4. View build errors (macOS/Linux): `docker build -f .local_testing/Dockerfile.macos . --progress=plain`
+5. Enable verbose output: `./run-gauntlet.sh --verbose`
 
 ### Tests fail in container but pass locally
 **Possible causes:**

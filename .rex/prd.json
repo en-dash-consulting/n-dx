@@ -27083,73 +27083,6 @@
       ]
     },
     {
-      "id": "bf7ac8f0-548f-4bfc-a6a9-63b4b5707ce3",
-      "title": "CLI & Developer Tools",
-      "status": "completed",
-      "level": "epic",
-      "source": "smart-add",
-      "startedAt": "2026-04-06T19:23:14.471Z",
-      "completedAt": "2026-04-06T19:23:14.471Z",
-      "children": [
-        {
-          "id": "b3e82a63-746a-474e-af59-947d8a0f0fb9",
-          "title": "CLI Version Command Surface",
-          "status": "completed",
-          "level": "feature",
-          "description": "Expose the installed n-dx version through standard top-level CLI flags so users can query version information without entering a subcommand.",
-          "source": "smart-add",
-          "startedAt": "2026-04-06T19:23:14.349Z",
-          "completedAt": "2026-04-06T19:23:14.349Z",
-          "children": [
-            {
-              "id": "4a9be3cc-25d6-4429-ae79-304f10d097fb",
-              "title": "Implement top-level version flag handling for ndx and n-dx",
-              "status": "completed",
-              "level": "task",
-              "description": "Add argument handling in the shared CLI entrypoint so invoking `ndx -v`, `ndx --version`, `n-dx -v`, or `n-dx --version` prints the current package version and exits successfully without triggering normal command parsing.",
-              "acceptanceCriteria": [
-                "Running `ndx -v` prints a single version string and exits with status code 0",
-                "Running `ndx --version` prints the same version output as `ndx -v`",
-                "Running `n-dx -v` and `n-dx --version` behave identically to `ndx` version flags",
-                "Version flag handling works from the top-level CLI without requiring a subcommand",
-                "Invoking the version flags does not start long-running services or execute unrelated command logic"
-              ],
-              "priority": "high",
-              "tags": [
-                "cli",
-                "ux"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-06T18:47:31.857Z",
-              "completedAt": "2026-04-06T18:50:16.350Z"
-            },
-            {
-              "id": "74047536-342a-4358-b2ec-33e783786b2a",
-              "title": "Add regression coverage and help text for version flags",
-              "status": "completed",
-              "level": "task",
-              "description": "Update automated CLI tests and user-facing help output so the new version flags remain discoverable and do not regress when command parsing changes in the future.",
-              "acceptanceCriteria": [
-                "Automated tests cover both `-v` and `--version` at the top-level CLI entrypoint",
-                "Tests verify the command exits successfully and does not route into unrelated subcommand execution",
-                "CLI help output mentions `-v, --version` as supported top-level flags",
-                "The documented behavior matches the actual output format used by the CLI"
-              ],
-              "priority": "medium",
-              "tags": [
-                "cli",
-                "testing",
-                "docs"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-06T19:19:59.169Z",
-              "completedAt": "2026-04-06T19:23:14.178Z"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "cc09612c-005f-4239-b0c9-3a7edfc6f538",
       "title": "External Integrations",
       "status": "completed",
@@ -30024,7 +29957,7 @@
           ],
           "recommendationMeta": {
             "findingHashes": [
-              "17a77de52148"
+              "878fba44f7c4"
             ],
             "category": "suggestion",
             "severityDistribution": {
@@ -31097,487 +31030,7 @@
           "source": "smart-add",
           "startedAt": "2026-02-09T21:01:23.519Z",
           "completedAt": "2026-02-09T21:01:23.519Z",
-          "children": [
-            {
-              "id": "545bde64-ebf9-47f9-936c-2e68831d7c30",
-              "title": "Sidebar Navigation and Layout Optimization",
-              "status": "completed",
-              "level": "task",
-              "description": "Improve sidebar usability and implement responsive layout that works across all device sizes while preventing horizontal scrolling\n\n---\n\nUpdate all favicon implementations across the entire n-dx toolkit to use the product-F.png branding for consistency",
-              "source": "smart-add",
-              "startedAt": "2026-02-09T19:58:32.477Z",
-              "completedAt": "2026-02-09T19:58:32.477Z",
-              "children": [
-                {
-                  "id": "4a335773-b752-453f-987e-de92af8638e5",
-                  "title": "Implement collapsible sidebar with responsive behavior",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Add expand/collapse functionality to sidebar sections and implement mobile-friendly overlay behavior with full toggle capabilities",
-                  "acceptanceCriteria": [
-                    "Section headers can be clicked to expand/collapse child views",
-                    "Only one section remains expanded at a time by default",
-                    "Collapse state persists across page refreshes",
-                    "Smooth animation transitions for expand/collapse actions",
-                    "Toggle button completely hides sidebar with keyboard shortcut support",
-                    "Main content area automatically expands to fill available space",
-                    "Sidebar becomes overlay on screens smaller than 768px",
-                    "Touch gestures and backdrop click support on mobile"
-                  ],
-                  "priority": "high",
-                  "tags": [
-                    "ui",
-                    "sidebar",
-                    "navigation",
-                    "responsive",
-                    "mobile"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-09T19:11:39.645Z",
-                  "completedAt": "2026-02-09T19:20:35.626Z"
-                },
-                {
-                  "id": "4f5a3916-91a7-445b-bff0-c8ebd8cc09c9",
-                  "title": "Implement responsive main content layout",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Ensure main content section automatically adjusts width and prevents horizontal scrolling by implementing proper CSS grid/flexbox layouts",
-                  "acceptanceCriteria": [
-                    "No horizontal scrolling occurs in main content area on any screen size",
-                    "Content scales appropriately on mobile, tablet, and desktop",
-                    "Tables and wide components wrap or scroll vertically only",
-                    "Text content reflows properly at different viewport widths"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "responsive",
-                    "layout",
-                    "css"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-09T19:49:50.791Z",
-                  "completedAt": "2026-02-09T19:58:32.434Z"
-                },
-                {
-                  "id": "96a88223-7a7c-46ce-8f56-e83d4c4256c5",
-                  "title": "Standardize favicon implementation across all packages",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Replace all SVG favicon references with product-F.png across web package, sourcevision standalone viewer, and all other HTML templates in the n-dx toolkit",
-                  "acceptanceCriteria": [
-                    "Web dashboard displays product-F.png as favicon",
-                    "Sourcevision standalone viewer displays product-F.png favicon",
-                    "All HTML templates use product-F.png favicon",
-                    "No SVG favicon references remain in any package",
-                    "Favicon loads correctly in all major browsers",
-                    "Dynamic favicon switching still works with PNG format",
-                    "No inconsistent favicon implementations exist",
-                    "Documentation reflects the standardized favicon approach"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "web",
-                    "sourcevision",
-                    "branding",
-                    "ui",
-                    "audit",
-                    "consistency"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-10T14:45:05.141Z",
-                  "completedAt": "2026-02-10T14:51:10.827Z"
-                }
-              ]
-            },
-            {
-              "id": "f5464d5e-1d5e-4e83-be3a-3e9aca398177",
-              "title": "Brand Identity and Visual Design System",
-              "status": "completed",
-              "level": "task",
-              "description": "Implement consistent branding with appropriate logos and establish clear visual hierarchy throughout the interface using a cohesive design system\n\n---\n\nEnsure the web interface meets accessibility standards and provides a consistent, professional user experience with proper semantic markup",
-              "source": "smart-add",
-              "startedAt": "2026-02-09T20:12:59.725Z",
-              "completedAt": "2026-02-09T20:12:59.725Z",
-              "children": [
-                {
-                  "id": "9f0c0eb3-72de-4d8d-8e7e-80a2f69ad289",
-                  "title": "Establish comprehensive branding and visual hierarchy",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Integrate n-dx and product-specific logos while implementing consistent typography, spacing, and visual weight to create clear information hierarchy",
-                  "acceptanceCriteria": [
-                    "N-dx logo is prominently displayed in main header/sidebar",
-                    "SourceVision, Rex, and Hench section headers include their respective logos",
-                    "Logo sizing is consistent and appropriate for different screen sizes",
-                    "Brand colors are applied consistently throughout the interface",
-                    "Logos maintain quality at different zoom levels",
-                    "Typography scale is consistent across all components",
-                    "Spacing follows a consistent 8px or 4px grid system",
-                    "Visual weight clearly distinguishes between primary and secondary content",
-                    "Color scheme supports clear content hierarchy",
-                    "Interactive elements have consistent hover and active states"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "branding",
-                    "logo",
-                    "visual-design",
-                    "design-system",
-                    "typography",
-                    "spacing",
-                    "visual-hierarchy"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-09T19:58:54.595Z",
-                  "completedAt": "2026-02-09T20:12:59.685Z"
-                },
-                {
-                  "id": "2f839e10-c3b4-4523-a485-e47f70d94ad9",
-                  "title": "Implement comprehensive accessibility features",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Add keyboard navigation, semantic HTML, and ARIA attributes to ensure full accessibility support for assistive technologies",
-                  "acceptanceCriteria": [
-                    "All interactive elements are reachable via Tab navigation",
-                    "Focus indicators are clearly visible on all focusable elements",
-                    "Escape key closes modals and collapsible sections",
-                    "Arrow keys navigate between related items where appropriate",
-                    "Screen reader announcements work for dynamic content changes",
-                    "All sections have proper landmark roles (main, navigation, etc.)",
-                    "Interactive elements have descriptive ARIA labels",
-                    "Dynamic content changes announce to screen readers",
-                    "Color contrast meets WCAG 2.1 AA standards",
-                    "Page structure is logical when CSS is disabled"
-                  ],
-                  "priority": "low",
-                  "tags": [
-                    "accessibility",
-                    "keyboard",
-                    "a11y",
-                    "semantics",
-                    "aria"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-09T20:47:47.449Z",
-                  "completedAt": "2026-02-09T21:01:23.445Z"
-                }
-              ]
-            },
-            {
-              "id": "9cf29710-2ab4-4a76-981b-c7dc729c6202",
-              "title": "Redesign header layout with integrated controls and repositioned branding",
-              "status": "completed",
-              "level": "task",
-              "description": "Consolidate all header controls into a unified navigation experience and reposition branding elements for improved visual hierarchy",
-              "source": "smart-add",
-              "startedAt": "2026-02-10T20:40:13.472Z",
-              "completedAt": "2026-02-10T20:40:13.472Z",
-              "children": [
-                {
-                  "id": "8e0b1f26-b8f1-40fc-808c-b06b2fe5aa39",
-                  "title": "Integrate header controls and reposition branding elements",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Create a unified header control bar with sidebar toggle, theme toggle, and FAQ button, while moving package logo and name to right-aligned position next to page-specific FAQ button for better visual hierarchy",
-                  "acceptanceCriteria": [
-                    "Sidebar toggle, light mode toggle, and FAQ are grouped together in header",
-                    "Controls maintain consistent visual styling and spacing",
-                    "All controls remain functional after integration",
-                    "Package logo and name appear right-aligned in content area header",
-                    "Branding is positioned adjacent to page-specific FAQ button",
-                    "Header control bar works across all viewport sizes",
-                    "Layout remains responsive across different screen sizes",
-                    "Visual hierarchy clearly separates global controls from page-specific elements"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "ui",
-                    "header",
-                    "navigation",
-                    "branding",
-                    "layout"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-10T20:34:45.791Z",
-                  "completedAt": "2026-02-11T06:28:30.598Z",
-                  "failureReason": "there's still a product title in the top-left and the global control elements overlap with the page content and there's still a sidebar toggle at the bottom. move the sidebar and themetoggle controls to the bottom of the sidebar and make it cohesive with the rest"
-                },
-                {
-                  "id": "a6dd7b7c-9e74-4626-8e27-e4aa11e771ea",
-                  "title": "Implement floating FAQ button for page-specific help",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Create a floating FAQ button that appears in the content area header, providing contextual help for the current page/section",
-                  "acceptanceCriteria": [
-                    "FAQ button floats in content area header next to repositioned branding",
-                    "Button provides page-specific help content based on current view",
-                    "FAQ content is contextually relevant to SourceVision, Rex, or Hench sections",
-                    "Button maintains consistent styling with other UI controls"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "ui",
-                    "help",
-                    "floating-button"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-10T20:11:55.019Z",
-                  "completedAt": "2026-02-10T20:34:13.649Z"
-                }
-              ]
-            },
-            {
-              "id": "c32f6e7d-847f-463f-9c20-bdab777a4308",
-              "title": "Enhanced Navigation Context and Controls",
-              "status": "completed",
-              "level": "task",
-              "description": "Improve sidebar navigation with active page indication and centralized global controls\n\n---\n\nMove the analysis progress indicator to proper SourceVision section",
-              "source": "smart-add",
-              "startedAt": "2026-02-09T20:41:37.051Z",
-              "completedAt": "2026-02-09T20:41:37.051Z",
-              "children": [
-                {
-                  "id": "71063da9-5fb4-4901-8b82-ff19a75363d6",
-                  "title": "Implement active page indication in collapsed sidebar",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Display the current active page/section title or icon when sidebar is collapsed so users maintain navigation context",
-                  "acceptanceCriteria": [
-                    "Collapsed sidebar shows current page title or representative icon",
-                    "Active indicator updates when navigating between pages",
-                    "Indicator is visually distinct and easily readable",
-                    "Logos used in sections should be the logo in the packages/foobar with foobar-F.png file naming dir and the n-dx logo should be the logo in the root of this repository",
-                    "Section with currently-active page should indicate as such even if collapse"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "ui",
-                    "navigation"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-09T20:34:16.715Z",
-                  "completedAt": "2026-02-09T20:41:37.007Z"
-                },
-                {
-                  "id": "8141f772-0b50-4ff3-8f7a-8f13246b68e3",
-                  "title": "Add global controls to sidebar",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Implement centralized global application controls including theme toggle and help/FAQ section in the sidebar",
-                  "acceptanceCriteria": [
-                    "Theme toggle is accessible from any page via sidebar",
-                    "Theme preference persists across browser sessions",
-                    "All UI components respect the selected theme",
-                    "FAQ is accessible from sidebar on any page",
-                    "FAQ contains answers to common workflow questions",
-                    "FAQ links to relevant documentation sections"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "ui",
-                    "theming",
-                    "help"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-09T20:27:34.453Z",
-                  "completedAt": "2026-02-09T20:33:33.433Z"
-                },
-                {
-                  "id": "886ca38a-73c8-4cff-a3f3-ddc44cd5c510",
-                  "title": "Relocate analysis progress indicator to SourceVision section",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Move the current analysis progress indicator from its current location to the SourceVision section of the sidebar for better organization",
-                  "acceptanceCriteria": [
-                    "Analysis progress shows under SourceVision section header",
-                    "Progress indicator updates in real-time during analysis",
-                    "Clicking indicator navigates to relevant analysis view"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "ui",
-                    "sourcevision",
-                    "progress"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-02-09T20:42:22.094Z",
-                  "completedAt": "2026-02-09T20:47:10.446Z"
-                }
-              ]
-            },
-            {
-              "id": "1b9353a7-41d8-4f55-947c-1aedaadc5932",
-              "title": "Sidebar Active State on Initial Load",
-              "status": "completed",
-              "level": "task",
-              "description": "Ensure the sidebar navigation correctly reflects the active page when the app first loads, including direct URL access and page refresh scenarios.\n\n---\n\nClarify the dual-FAB FAQ pattern by anchoring the global FAQ FAB in the bottom-left toolbar alongside the theme switcher, while leaving the page-specific FAQ FAB in its existing top-right position. This gives each button a distinct visual location that communicates its scope to the user.",
-              "source": "smart-add",
-              "startedAt": "2026-03-06T07:54:44.479Z",
-              "completedAt": "2026-03-06T07:54:44.479Z",
-              "children": [
-                {
-                  "id": "5a83f70a-b30d-4251-8168-5e8d939f9b1d",
-                  "title": "Sync sidebar active state with current route on initial page load",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "When the web UI loads or is refreshed, the sidebar should immediately highlight the nav item corresponding to the current URL hash or route, rather than defaulting to no selection or the wrong item. This involves reading the initial route from the URL at mount time and applying the active state before the first render.",
-                  "acceptanceCriteria": [
-                    "Loading the app at any valid route URL shows the correct sidebar item highlighted on first render",
-                    "Refreshing the page on any view retains the correct active sidebar item",
-                    "Direct URL navigation (e.g. pasting a deep link) highlights the matching sidebar item",
-                    "No visible flash of incorrect or missing active state on load"
-                  ],
-                  "priority": "medium",
-                  "tags": [
-                    "web",
-                    "navigation",
-                    "ux"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-03-06T07:52:49.267Z",
-                  "completedAt": "2026-03-06T07:54:44.278Z"
-                },
-                {
-                  "id": "3560e79d-0a36-4ce6-949d-5834403e5f2c",
-                  "title": "Relocate global FAQ FAB to bottom-left toolbar beside theme switcher",
-                  "status": "completed",
-                  "level": "subtask",
-                  "description": "Move the global FAQ floating action button out of its current position and into the bottom-left corner of the UI, directly adjacent to the existing theme switcher control. The page-specific FAQ FAB must remain in the top-right and must not be affected by this change. Update any positioning styles, z-index stacking, and layout containers that govern the bottom-left toolbar so the two controls sit flush without overlap.",
-                  "acceptanceCriteria": [
-                    "Global FAQ FAB renders in the bottom-left corner of the viewport at all supported viewport widths",
-                    "Global FAQ FAB is visually adjacent to the theme switcher with consistent spacing matching the design system",
-                    "Page-specific FAQ FAB remains in the top-right corner and is visually and functionally unchanged",
-                    "No overlap or collision between the global FAQ FAB and theme switcher at narrow viewport widths",
-                    "Both FABs remain accessible (keyboard-focusable, correct aria-label) after the move",
-                    "Existing FAQ FAB click handlers and modal/panel behavior are preserved"
-                  ],
-                  "priority": "low",
-                  "tags": [
-                    "ui",
-                    "layout",
-                    "faq",
-                    "accessibility"
-                  ],
-                  "source": "smart-add",
-                  "startedAt": "2026-03-06T07:55:16.344Z",
-                  "completedAt": "2026-03-06T07:57:24.894Z"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "5d5d463c-30c6-4216-a5bc-523a5fb8666d",
-      "title": "Self-Heal Pipeline Enhancements",
-      "status": "completed",
-      "level": "epic",
-      "source": "smart-add",
-      "startedAt": "2026-04-14T21:36:07.688Z",
-      "completedAt": "2026-04-14T21:36:07.688Z",
-      "children": [
-        {
-          "id": "e0d22237-06af-4147-a3d7-c3a95c202d59",
-          "title": "Vendor-Agnostic Batch Execution in Self-Heal Loop",
-          "status": "completed",
-          "level": "feature",
-          "description": "The self-heal loop batch processing fails when the active vendor is Codex. Batches must execute reliably regardless of whether Claude or Codex is configured, covering prompt format differences, response parsing, token budgeting, and error recovery paths.",
-          "source": "smart-add",
-          "startedAt": "2026-04-14T21:36:07.553Z",
-          "completedAt": "2026-04-14T21:36:07.553Z",
-          "children": [
-            {
-              "id": "1f2e1438-4f55-4ac3-9061-23b01e5d92aa",
-              "title": "Audit self-heal batch pipeline for Codex incompatibilities",
-              "status": "completed",
-              "level": "task",
-              "description": "Trace the full self-heal batch execution path — from batch construction through LLM invocation to result parsing — and document every assumption that holds only for Claude (API response shape, tool-use availability, streaming format, token field names). Reproduce the Codex failure mode with a minimal fixture and attach the error context to inform the fix.",
-              "acceptanceCriteria": [
-                "A written finding lists every code path in the self-heal batch loop that branches or fails on Codex input/output",
-                "The root-cause failure mode is reproducible in a unit or integration test against a Codex fixture",
-                "Each incompatibility is tagged with the file and line number where the Claude-specific assumption lives"
-              ],
-              "priority": "critical",
-              "tags": [
-                "self-heal",
-                "codex",
-                "hench"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-14T20:56:54.685Z",
-              "completedAt": "2026-04-14T21:05:55.177Z"
-            },
-            {
-              "id": "97ec62e7-6687-4152-b6f2-cf6a6afaf858",
-              "title": "Implement vendor-aware batch construction and response handling in self-heal",
-              "status": "completed",
-              "level": "task",
-              "description": "Fix the self-heal batch pipeline so it adapts batch size, prompt format, and response parsing to the active vendor. For Codex, this means using text-based invocation (no tool-use schema), parsing the CLI stdout response format, and respecting Codex context window limits when sizing batches. For Claude, retain current behavior. Use the vendor/model resolver already present in llm-gateway to gate the two paths.",
-              "acceptanceCriteria": [
-                "Self-heal batches complete without error when the configured vendor is Codex",
-                "Self-heal batches continue to complete without regression when the configured vendor is Claude",
-                "Batch size is bounded by the active vendor's effective context limit, not a Claude-specific constant",
-                "No new Claude-specific assumptions are introduced in the shared batch pipeline code"
-              ],
-              "priority": "critical",
-              "tags": [
-                "self-heal",
-                "codex",
-                "hench",
-                "llm-client"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-14T21:05:57.971Z",
-              "completedAt": "2026-04-14T21:20:02.251Z"
-            },
-            {
-              "id": "1074c4ff-b1d7-437a-9d3a-570394428e33",
-              "title": "Add vendor-resilient error handling and retry logic for self-heal batch failures",
-              "status": "completed",
-              "level": "task",
-              "description": "Ensure that any vendor-specific transient error (rate limit, quota exhaustion, parse failure on partial output) in a self-heal batch is caught and retried with exponential backoff rather than crashing the loop. The retry strategy should be aware of the vendor in use — Codex CLI errors surface differently from Claude API errors — and should log the vendor, batch index, and failure reason before each retry.",
-              "acceptanceCriteria": [
-                "A Codex-style batch failure (non-zero exit code, malformed stdout) triggers a retry rather than an unhandled exception",
-                "A Claude-style batch failure (HTTP 429, truncated JSON) also triggers the same retry path",
-                "Retry attempts are logged with vendor name, batch index, attempt number, and error summary",
-                "After max retries, the self-heal loop skips the failing batch and continues rather than halting entirely"
-              ],
-              "priority": "high",
-              "tags": [
-                "self-heal",
-                "codex",
-                "hench",
-                "resilience"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-14T21:28:44.422Z",
-              "completedAt": "2026-04-14T21:36:07.371Z"
-            },
-            {
-              "id": "e72caddd-238f-426f-b191-4adec1de560d",
-              "title": "Add regression tests for Codex batch execution in the self-heal pipeline",
-              "status": "completed",
-              "level": "task",
-              "description": "Add integration tests that run the self-heal batch loop against a Codex fixture (recorded or mock CLI output) and assert that batches complete, results are parsed correctly, and the pipeline proceeds to the next step. Include a test for the partial-output and rate-limit error paths to confirm retry behavior. Mirror the existing Claude self-heal tests so both vendor paths are covered symmetrically.",
-              "acceptanceCriteria": [
-                "At least one integration test executes a self-heal batch with a Codex mock and asserts a successful result",
-                "At least one test asserts that a Codex parse error triggers retry and eventually continues the loop",
-                "Existing Claude self-heal batch tests continue to pass without modification",
-                "Tests are placed in the hench integration test directory and run as part of `pnpm test`"
-              ],
-              "priority": "high",
-              "tags": [
-                "self-heal",
-                "codex",
-                "hench",
-                "testing"
-              ],
-              "source": "smart-add",
-              "startedAt": "2026-04-14T21:20:05.017Z",
-              "completedAt": "2026-04-14T21:28:41.651Z"
-            }
-          ]
+          "children": []
         }
       ]
     },
@@ -31591,8 +31044,8 @@
       "completedAt": "2026-04-16T15:06:34.573Z",
       "children": [
         {
-          "id": "fb76efeb-edec-49fd-8bb7-e90d64065796",
-          "title": "Deferred Codex Token Validation at End of Work Run",
+          "id": "0b4df255-0bdd-476c-bde3-7c666ae249a7",
+          "title": "Fix move-file in web-server (1 finding)",
           "status": "completed",
           "level": "feature",
           "description": "Currently Codex token counts are validated (e.g. against budget thresholds or parsed and surfaced) incrementally during a hench work run, which can produce premature interruptions or misleading mid-run diagnostics. The desired behavior is to accumulate raw Codex token data throughout the run and defer all validation and reporting to the run-completion phase.",
@@ -31613,37 +31066,56 @@
               ],
               "priority": "high",
               "tags": [
-                "codex",
-                "tokens",
-                "hench"
+                "infrastructure",
+                "testing",
+                "docker"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-16T14:47:56.641Z",
-              "completedAt": "2026-04-16T14:53:05.737Z"
+              "startedAt": "2026-04-15T14:55:59.805Z",
+              "completedAt": "2026-04-15T14:57:37.511Z"
             },
             {
-              "id": "70b824a2-9dfd-440f-8e89-576a8e0fc586",
-              "title": "Refactor Codex token accumulation to defer validation and reporting until run completion",
+              "id": "718406b9-2826-4a8b-a6d7-94f76b846b00",
+              "title": "Implement local gauntlet test runner script",
               "status": "completed",
               "level": "task",
-              "description": "Move Codex token validation (budget checks, count assertions, and quota logging) out of the per-turn loop and into the post-run summary phase. The per-turn path should only accumulate raw token counts; validation and user-facing diagnostics fire once at the end of the full work run. Ensure the existing mid-run quota log formatter still receives final totals at run end.",
+              "description": "Add run-gauntlet-macos.sh (or extend run-gauntlet.sh with a --platform flag) to build and run the macOS container, streaming test output and returning meaningful exit codes. Validate the full flow: build → run → stream output → clean up. Runner should accept --no-build, --keep-container, and --verbose flags matching the existing Windows runner interface.",
               "acceptanceCriteria": [
-                "No Codex token validation or budget-threshold checks fire before the run-completion handler",
-                "Raw Codex token counts are correctly accumulated across all turns within a single work run",
-                "End-of-run validation receives the correct cumulative totals, not per-turn values",
-                "Existing quota status log output still appears once at run end, not per turn",
-                "No regressions in token attribution or run summary fields"
+                "Shell script (e.g., run-gauntlet.sh) in .local_testing/ starts container and runs tests",
+                "Test output is readable and includes progress indicators",
+                "Exit codes reflect gauntlet pass/fail status",
+                "Documentation includes command examples and troubleshooting",
+                "Script handles container cleanup on completion",
+                "Script builds the macOS Docker image and runs the gauntlet test suite inside it",
+                "Script returns exit code 0 on test pass, non-zero on failure or Docker error",
+                "--no-build, --keep-container, and --verbose flags work as documented",
+                "Script can be run from the repo root on a macOS or Linux host",
+                "Container is automatically removed after tests unless --keep-container is set"
               ],
               "priority": "high",
               "tags": [
-                "codex",
-                "tokens",
-                "hench",
-                "refactor"
+                "testing",
+                "docker",
+                "automation",
+                "macos",
+                "shell"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-16T14:53:45.837Z",
-              "completedAt": "2026-04-16T15:06:34.014Z"
+              "startedAt": "2026-04-15T14:57:43.008Z",
+              "completedAt": "2026-04-20T19:13:21.724Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Fixed platform-specific shell command selection in run-gauntlet.sh. The script now correctly uses /bin/bash -c for macOS/Linux containers and powershell -Command for Windows containers, matching each platform's Dockerfile entrypoint configuration.",
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:0:1",
+                  "proposalTitle": "Create macOS gauntlet runner script and validate end-to-end locally",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.7030592105263158,
+                  "mergedAt": "2026-04-20T19:07:43.734Z",
+                  "source": "smart-add"
+                }
+              ]
             }
           ]
         }
@@ -31655,8 +31127,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
-      "startedAt": "2026-04-16T16:19:57.286Z",
-      "completedAt": "2026-04-16T16:19:57.286Z",
+      "startedAt": "2026-04-15T17:52:01.299Z",
+      "completedAt": "2026-04-15T17:52:01.299Z",
       "children": [
         {
           "id": "9611c581-175a-4c59-8d3a-e265e8383745",
@@ -32327,6 +31799,273 @@
                   "completedAt": "2026-03-09T01:16:11.451Z"
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4d4982c7-dc4c-44c1-82e5-7293e4670510",
+      "title": "Hench Execution Context Visibility",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-20T18:43:09.875Z",
+      "completedAt": "2026-04-20T18:43:09.875Z",
+      "children": [
+        {
+          "id": "28bd8b48-2012-42dd-9148-d844a082cb8b",
+          "title": "API vs CLI Invocation Context Detection and Display",
+          "status": "completed",
+          "level": "feature",
+          "description": "Detect whether hench is being invoked through the CLI (ndx work command) or via HTTP API/MCP and surface this context to the user through output messages, flags, and run metadata.",
+          "source": "smart-add",
+          "startedAt": "2026-04-20T18:43:09.805Z",
+          "completedAt": "2026-04-20T18:43:09.805Z",
+          "children": [
+            {
+              "id": "8f811dac-e4f2-4e47-84ea-8c425a1d6328",
+              "title": "Detect and expose invocation context in hench runner",
+              "status": "completed",
+              "level": "task",
+              "description": "Modify hench entry points to detect the invocation method (CLI vs API) at run initialization. Add context information to the execution output stream and run metadata so users can clearly see which interface triggered the agent execution.",
+              "acceptanceCriteria": [
+                "Hench detects CLI vs HTTP/API invocation context at run start",
+                "Context flag is stored in run metadata and persisted in .hench/runs/",
+                "Context is emitted in the output stream so both CLI and dashboard receive it",
+                "Detection works correctly for all hench invocation paths (ndx work CLI, web HTTP, MCP)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "visibility",
+                "logging"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-20T18:27:53.277Z",
+              "completedAt": "2026-04-20T18:37:20.851Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added invocationContext field to RunRecord to detect and expose whether hench is invoked via CLI (ndx work) or API (HTTP/MCP). The context is emitted via output stream and persisted in run metadata for both CLI and dashboard visibility."
+            },
+            {
+              "id": "eab9294a-7201-4d16-9031-fda6a89618aa",
+              "title": "Display execution context indicator to users in CLI and dashboard",
+              "status": "completed",
+              "level": "task",
+              "description": "Surface the invocation context visibly in CLI output when running ndx work, and in the web dashboard when viewing runs. Include the context indicator in run history, active run displays, and real-time output streams.",
+              "acceptanceCriteria": [
+                "CLI output shows execution context indicator (e.g., badge or message at run start)",
+                "Dashboard run viewer displays context in the run header or metadata panel",
+                "Context is preserved in run transcripts for audit and historical review",
+                "Both CLI and dashboard clearly communicate whether the run was triggered via CLI or API"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "cli",
+                "dashboard",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-20T18:37:35.481Z",
+              "completedAt": "2026-04-20T18:43:09.749Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Implemented invocation context display in CLI output and dashboard. Added context indicator to run completion output, API responses, and dashboard UI with appropriate styling."
+            }
+          ]
+        }
+      ],
+      "overrideMarker": {
+        "type": "duplicate_guard_override",
+        "reason": "semantic_title",
+        "reasonRef": "semantic_title:11312d55-399a-4130-b04c-e356d0fb007b",
+        "matchedItemId": "11312d55-399a-4130-b04c-e356d0fb007b",
+        "matchedItemTitle": "Hench",
+        "matchedItemLevel": "epic",
+        "matchedItemStatus": "completed",
+        "createdAt": "2026-04-20T18:27:39.672Z"
+      }
+    },
+    {
+      "id": "b7aeaf13-916f-44d7-8b4f-2226d77a5d4e",
+      "title": "Local Testing Infrastructure and Gauntlet Config Validation",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-20T19:44:11.415Z",
+      "completedAt": "2026-04-20T19:44:11.415Z",
+      "children": [
+        {
+          "id": "9dbecc75-f550-4b7b-b3b7-fc2bb3ffef53",
+          "title": "macOS Local Docker Test Suite",
+          "status": "completed",
+          "level": "feature",
+          "description": "Extend the existing Windows Docker gauntlet to include a macOS-representative Linux container that validates base ndx commands on a Unix environment. The Windows Dockerfile targets Windows Server Core; this parallel track creates a Linux-based image (matching macOS runtime behavior) with the same base-command smoke tests, a docker-compose service, and a runner script.",
+          "source": "smart-add",
+          "startedAt": "2026-04-20T19:16:21.371Z",
+          "completedAt": "2026-04-20T19:16:21.371Z",
+          "children": [
+            {
+              "id": "c17d8735-2570-4af2-9b47-83a6b751e310",
+              "title": "Build Linux/macOS-representative Docker container with ndx base command tests",
+              "status": "completed",
+              "level": "task",
+              "description": "Create Dockerfile.macos (Ubuntu/Node LTS base) mirroring the structure of Dockerfile.windows — installs Node.js, pnpm, git, builds the monorepo, and runs the base-command smoke test suite (ndx init, ndx analyze, ndx status, ndx config). Add a corresponding `ndx-macos` service to docker-compose.yml alongside the existing `ndx-windows` service.",
+              "acceptanceCriteria": [
+                "Dockerfile.macos builds successfully and produces a working image",
+                "Image runs ndx init, ndx analyze, ndx status, and ndx config without errors inside the container",
+                "docker-compose.yml includes an ndx-macos service that builds from Dockerfile.macos",
+                "Container exits with code 0 on success and non-zero on any command failure"
+              ],
+              "priority": "high",
+              "tags": [
+                "testing",
+                "docker",
+                "macos",
+                "infrastructure"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:13:53.689Z",
+              "completedAt": "2026-04-20T19:16:21.307Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Implemented Dockerfile.macos with Ubuntu LTS base, test-base-commands.sh smoke test script, and ndx-macos docker-compose service. All acceptance criteria met: image builds successfully, runs ndx init/analyze/status/config without errors, docker-compose.yml includes ndx-macos service, proper exit codes on success/failure."
+            }
+          ]
+        },
+        {
+          "id": "5a24a938-4bbe-4f27-a036-bfdf08400af8",
+          "title": "Local Test Suite Documentation in Main README",
+          "status": "completed",
+          "level": "feature",
+          "description": "The main README references .local_testing/ in passing but has no dedicated section explaining how to run the Docker-based local test suite, what prerequisites are needed, or what commands to use. Users need a self-contained guide in README.md so they can find and run local platform tests without digging into .local_testing/README.md.",
+          "source": "smart-add",
+          "startedAt": "2026-04-20T19:44:11.364Z",
+          "completedAt": "2026-04-20T19:44:11.364Z",
+          "children": [
+            {
+              "id": "11343373-2400-483d-9736-04f42cbce488",
+              "title": "Add Local Platform Testing section to main README with prerequisites and run commands",
+              "status": "completed",
+              "level": "task",
+              "description": "Insert a 'Local Platform Testing' section in README.md (near the Platform Support table) that documents: (1) prerequisites — Docker Desktop ≥ 20, disk space for images; (2) commands to run the Windows and macOS gauntlet suites; (3) expected output and exit codes; (4) a pointer to .local_testing/README.md for advanced options. Content must be accurate and runnable from the repo root.",
+              "acceptanceCriteria": [
+                "README.md contains a 'Local Platform Testing' section with Windows and macOS run commands",
+                "Prerequisites (Docker Desktop version, disk space) are explicitly listed",
+                "Commands are copy-pasteable from the repo root without modification",
+                "Section links to .local_testing/README.md for advanced options",
+                "Section accurately reflects the actual scripts and Dockerfiles present in .local_testing/"
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
+                "readme",
+                "testing",
+                "docker"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:33:37.471Z",
+              "completedAt": "2026-04-20T19:34:22.499Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added \"Local Platform Testing\" section to README.md with prerequisites, copy-pasteable commands for Windows/macOS gauntlets, exit codes, and link to .local_testing/README.md for advanced options."
+            },
+            {
+              "id": "5f514493-0b61-4348-b826-fb4d1e3a32cf",
+              "title": "Update .local_testing/README.md to cover macOS suite and unify platform guidance",
+              "status": "completed",
+              "level": "task",
+              "description": "Once the macOS container exists, update .local_testing/README.md to document the new Dockerfile.macos, docker-compose ndx-macos service, and the macOS runner script. Add a 'Platform comparison' table showing which Dockerfile targets which host OS, and what the base commands under test are for each platform.",
+              "acceptanceCriteria": [
+                ".local_testing/README.md documents Dockerfile.macos, its purpose, and the run command",
+                "A platform comparison table lists Windows vs macOS containers with Dockerfile names and runner scripts",
+                "The 'Container Features' section is updated to include macOS container capabilities",
+                "Manual Docker operations section includes macOS image build and run commands"
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
+                "testing",
+                "docker",
+                "macos"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:40:19.135Z",
+              "completedAt": "2026-04-20T19:44:11.316Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Updated .local_testing/README.md with comprehensive macOS documentation including platform comparison table, updated Container Features section, and Manual Docker Operations with macOS-specific commands. Added .gitignore exceptions to track Docker configs and documentation files."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eb706a5e-011c-485d-ba5e-a8ffc6f17879",
+      "title": "Hench",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "startedAt": "2026-04-20T19:32:34.107Z",
+      "completedAt": "2026-04-20T19:32:34.107Z",
+      "children": [
+        {
+          "id": "626d40cf-4513-4cb1-a767-0aabd05a5f7c",
+          "title": "Graceful Cancellation with Rollback Prompt on Ctrl+C",
+          "status": "completed",
+          "level": "feature",
+          "description": "Extend the existing run-failure rollback flow to also trigger when the user cancels a hench run via Ctrl+C (SIGINT). Currently Ctrl+C exits abruptly, leaving the PRD task in an in-progress state and any partial file changes uncommitted. This feature brings parity between the failure-path rollback UX and the user-initiated cancellation path.",
+          "source": "smart-add",
+          "startedAt": "2026-04-20T19:32:34.057Z",
+          "completedAt": "2026-04-20T19:32:34.057Z",
+          "children": [
+            {
+              "id": "f00023d2-c399-4bd2-beb8-481549a6ad37",
+              "title": "Intercept SIGINT during hench run loop and transition to graceful cancellation state",
+              "status": "completed",
+              "level": "task",
+              "description": "Register a SIGINT handler at the start of a hench run that prevents abrupt process exit. When Ctrl+C is received, signal the agent loop to stop at the next safe checkpoint (end of the current tool call or LLM turn) rather than mid-operation. Restore the default SIGINT handler after the run completes normally so Ctrl+C during post-run prompts works as expected.",
+              "acceptanceCriteria": [
+                "Pressing Ctrl+C during an active agent loop does not exit the process immediately — it sets a cancellation flag",
+                "The agent loop detects the cancellation flag at the next loop iteration boundary and exits cleanly",
+                "Any in-flight tool call or LLM request is allowed to complete before the loop exits (no torn state)",
+                "The default SIGINT handler is restored after the run concludes, whether cancelled or not",
+                "A cancellation message is printed to the terminal indicating the run was interrupted"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "signal-handling",
+                "ux"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:16:56.406Z",
+              "completedAt": "2026-04-20T19:23:48.298Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Implemented SIGINT handler in agent loop with cancellation flag, graceful exit at loop boundary, and proper handler cleanup. Added \"cancelled\" status to schema. All tests pass."
+            },
+            {
+              "id": "6dc86135-1fe7-4570-8988-cf66af659f85",
+              "title": "Show rollback prompt on Ctrl+C cancellation and reset PRD task status",
+              "status": "completed",
+              "level": "task",
+              "description": "After the agent loop exits due to a Ctrl+C cancellation, invoke the same rollback prompt flow that already exists for failed runs. If the user confirms, revert all git-tracked file changes made during the run and reset the PRD task status back to its pre-run value (e.g. 'pending'). If the user declines, leave changes in place and mark the task status appropriately (e.g. 'in_progress' or 'pending'). This reuses the existing rollback infrastructure — the goal is to route the cancellation path through it.",
+              "acceptanceCriteria": [
+                "After Ctrl+C cancellation, the terminal displays the rollback confirmation prompt (same prompt shown on run failure)",
+                "If the user confirms rollback: all file changes introduced during the run are reverted via git, and the PRD task status is reset to its pre-run state",
+                "If the user declines rollback: file changes are preserved and the task is left in a non-completed state with a terminal message explaining how to resume",
+                "PRD task status is never left as 'in_progress' after a cancelled run regardless of rollback choice",
+                "Rollback on cancellation is covered by at least one regression test that simulates SIGINT mid-run"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "rollback",
+                "ux",
+                "prd"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-20T19:26:18.902Z",
+              "completedAt": "2026-04-20T19:32:34.014Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added \"cancelled\" status to FAILURE_STATUSES set in shared.ts. This activates existing rollback and task-reset machinery for cancelled runs. Added unit and integration tests for the feature. All acceptance criteria met."
             }
           ]
         }

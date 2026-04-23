@@ -93,11 +93,11 @@ describe("sourcevision CLI hint surfacing and follow-through", () => {
     });
 
     it("follow-through: hinted 'serve' is a recognized command", () => {
-      // 'serve' starts a long-running HTTP server; invoke it with --help to
-      // confirm it is a known command without starting the server.
-      const { code, stdout } = runResult(["--help"]);
+      // 'serve' starts a long-running HTTP server; invoke command-specific
+      // help to confirm the command is recognized without starting the server.
+      const { code, stdout } = runResult(["serve", "--help"], 15_000);
       expect(code).toBe(0);
-      expect(stdout).toContain("serve");
+      expect(stdout).toContain("sourcevision serve");
     });
   });
 

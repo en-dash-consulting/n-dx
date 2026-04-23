@@ -38,6 +38,22 @@ import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/inde
 import { loadLLMConfig } from "../../store/project-config.js";
 
 // ---------------------------------------------------------------------------
+// Display helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Shorten a model ID for stream-log labels by dropping numeric version
+ * identifiers. Examples: "claude-sonnet-4-6" → "claude-sonnet",
+ * "claude-haiku-4-20250414" → "claude-haiku", "gpt-5.1-codex-max" →
+ * "gpt-codex-max". Falls back to the fallback label when model is empty.
+ */
+export function formatModelLabel(model?: string, fallback = "Agent"): string {
+  if (!model) return fallback;
+  const parts = model.split("-").filter((p) => !/^\d/.test(p));
+  return parts.length > 0 ? parts.join("-") : model;
+}
+
+// ---------------------------------------------------------------------------
 // Shared option types
 // ---------------------------------------------------------------------------
 
@@ -198,6 +214,8 @@ export interface DryRunOptions {
   model: string;
   /** Extra lines to show after the system prompt + brief. */
   extraInfo?: Array<{ heading: string; content: string }>;
+  /** Invocation context: "cli" for CLI invocation, "api" for HTTP/MCP. */
+  invocationContext?: "cli" | "api";
 }
 
 /**
@@ -219,6 +237,14 @@ export function executeDryRun(opts: DryRunOptions): RunRecord {
     }
   }
 
+  // Emit invocation context for dry runs as well
+  if (opts.invocationContext) {
+    const contextDisplay = opts.invocationContext === "cli"
+      ? "CLI (ndx work command)"
+      : "API (HTTP/MCP)";
+    stream("Context", `Invoked via ${contextDisplay}`);
+  }
+
   return {
     id: randomUUID(),
     taskId: opts.taskId,
@@ -231,6 +257,7 @@ export function executeDryRun(opts: DryRunOptions): RunRecord {
     tokenUsage: { input: 0, output: 0 },
     toolCalls: [],
     model: opts.model,
+    invocationContext: opts.invocationContext,
   };
 }
 
@@ -269,6 +296,8 @@ export interface InitRunOptions {
   approvals?: string;
   /** Output parse mode (e.g. "stream-json", "api-sdk"). Captured in diagnostics. */
   parseMode?: string;
+  /** Invocation context: "cli" for CLI invocation, "api" for HTTP/MCP. */
+  invocationContext?: "cli" | "api";
 }
 
 /**
@@ -297,7 +326,16 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     turnTokenUsage: [],
     toolCalls: [],
     model: opts.model,
+    invocationContext: opts.invocationContext,
   };
+
+  // Emit invocation context to the output stream for CLI and dashboard visibility
+  if (opts.invocationContext) {
+    const contextDisplay = opts.invocationContext === "cli"
+      ? "CLI (ndx work command)"
+      : "API (HTTP/MCP)";
+    stream("Context", `Invoked via ${contextDisplay}`);
+  }
 
   // Capture initial runtime diagnostics snapshot when identity fields are provided.
   // tokenDiagnosticStatus starts as "unavailable" and is updated at run end.
@@ -546,6 +584,12 @@ export interface FinalizeRunOptions {
    * independently of rollbackOnFailure.
    */
   store?: PRDStore;
+  /**
+   * When true, the agent committed its own changes (legacy behavior) and
+   * n-dx should not prompt. When false (default), n-dx checks for a pending
+   * commit message written by the agent and prompts the user to commit.
+   */
+  autoCommit?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -553,7 +597,7 @@ export interface FinalizeRunOptions {
 // ---------------------------------------------------------------------------
 
 /** Run statuses that indicate the run ended in failure. */
-const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient"]);
+const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 /**
  * Return the list of entries reported by `git status --porcelain`.
@@ -617,6 +661,107 @@ async function performRollbackIfNeeded(projectDir: string, yes?: boolean): Promi
   info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
   await revertChanges(projectDir);
   info(`Rollback complete — ${dirtyPaths.length} file(s) reverted.`);
+}
+
+// ---------------------------------------------------------------------------
+// Pending-commit prompt helpers
+// ---------------------------------------------------------------------------
+
+/** Project-root sentinel where the agent writes its proposed commit message. */
+const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
+
+async function promptCommitConfirm(fileCount: number): Promise<boolean> {
+  const { createInterface } = await import("node:readline");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise<boolean>((resolve) => {
+    rl.question(`\nCommit ${fileCount} staged file(s) with the above message? [Y/n] `, (answer) => {
+      rl.close();
+      const trimmed = answer.trim().toLowerCase();
+      resolve(trimmed === "" || trimmed === "y" || trimmed === "yes");
+    });
+  });
+}
+
+async function countStagedFiles(projectDir: string): Promise<number> {
+  try {
+    const output = await execStdout("git", ["diff", "--cached", "--name-only"], {
+      cwd: projectDir,
+      timeout: 15_000,
+    });
+    return output.trim().split("\n").filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * When the agent wrote a pending commit message, show it to the user and
+ * prompt them to approve the commit. Runs `git commit -F <file>` on accept,
+ * deletes the sentinel on both accept and decline.
+ *
+ * Skipped when:
+ * - autoCommit is enabled (agent commits itself; no sentinel to process)
+ * - the run did not complete successfully
+ * - no sentinel file is present (agent skipped writing it)
+ */
+async function performCommitPromptIfNeeded(
+  run: RunRecord,
+  projectDir: string,
+  autoCommit: boolean,
+  yes?: boolean,
+): Promise<void> {
+  if (autoCommit || run.status !== "completed") return;
+
+  const { join } = await import("node:path");
+  const { readFileSync, existsSync, unlinkSync } = await import("node:fs");
+  const msgPath = join(projectDir, PENDING_COMMIT_FILE);
+
+  if (!existsSync(msgPath)) return;
+
+  let message = "";
+  try {
+    message = readFileSync(msgPath, "utf-8").trim();
+  } catch {
+    return;
+  }
+  if (!message) {
+    try { unlinkSync(msgPath); } catch { /* ignore */ }
+    return;
+  }
+
+  const stagedCount = await countStagedFiles(projectDir);
+  if (stagedCount === 0) {
+    info("\nPending commit message found but no staged changes — skipping commit.");
+    try { unlinkSync(msgPath); } catch { /* ignore */ }
+    return;
+  }
+
+  subsection("Proposed Commit");
+  info(message);
+
+  const isInteractive = Boolean(process.stdin.isTTY) && !yes;
+  let confirmed = true;
+  if (isInteractive) {
+    confirmed = await promptCommitConfirm(stagedCount);
+  }
+
+  if (!confirmed) {
+    info(`Commit declined — ${stagedCount} file(s) left staged.`);
+    try { unlinkSync(msgPath); } catch { /* ignore */ }
+    return;
+  }
+
+  try {
+    await execStdout("git", ["commit", "-F", PENDING_COMMIT_FILE], {
+      cwd: projectDir,
+      timeout: 30_000,
+    });
+    info(`Commit created — ${stagedCount} file(s).`);
+  } catch (err) {
+    info(`Commit failed: ${(err as Error).message}`);
+  } finally {
+    try { unlinkSync(msgPath); } catch { /* ignore */ }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -809,6 +954,10 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Validate token reporting for Codex runs.
   // This is a non-blocking post-run check that logs warnings but never fails the run.
   validateRunTokensPostRun(run, true);
+
+  // Prompt the user to commit staged changes using the agent's proposed message.
+  // No-op when autoCommit is true (agent committed itself) or on failure paths.
+  await performCommitPromptIfNeeded(run, projectDir, opts.autoCommit === true, opts.yes);
 
   // Rollback uncommitted changes when the run failed (unless suppressed).
   // Runs after test gates so the working tree reflects the agent's final state.

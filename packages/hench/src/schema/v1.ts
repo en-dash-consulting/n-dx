@@ -116,6 +116,14 @@ export interface HenchConfig {
    * The --no-rollback CLI flag always overrides this setting for a single run.
    */
   rollbackOnFailure?: boolean;
+  /**
+   * When true, the agent performs `git commit` itself at the end of the run
+   * (legacy behavior — Claude CLI does this by default when the prompt tells
+   * it to commit). When false (default), the agent stages changes and writes
+   * its proposed commit message to `.hench-commit-msg.txt`; n-dx then prompts
+   * the user to approve the commit before running `git commit -F <file>`.
+   */
+  autoCommit?: boolean;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────
@@ -184,7 +192,7 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
   };
 }
 
-export type RunStatus = "running" | "completed" | "failed" | "timeout" | "budget_exceeded" | "error_transient";
+export type RunStatus = "running" | "completed" | "failed" | "timeout" | "budget_exceeded" | "error_transient" | "cancelled";
 
 export interface ToolCallRecord {
   turn: number;
@@ -576,6 +584,13 @@ export interface RunRecord {
    * this field load normally.
    */
   events?: PersistedRuntimeEvent[];
+  /**
+   * Context in which hench was invoked ("cli" for CLI invocation, "api" for HTTP/MCP).
+   *
+   * v1 additive field — no migration needed. Existing records without
+   * this field load normally.
+   */
+  invocationContext?: "cli" | "api";
 }
 
 export interface TaskBriefTask {

@@ -60,6 +60,8 @@ interface RunSummary {
   vendor?: string;
   /** Token diagnostic status: complete, partial, or unavailable. */
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
+  /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
+  invocationContext?: "cli" | "api";
 }
 
 interface RunDiagnosticsData {
@@ -82,6 +84,8 @@ interface RunDetail extends RunSummary {
     cacheReadInput?: number;
   }>;
   diagnostics?: RunDiagnosticsData;
+  /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
+  invocationContext?: "cli" | "api";
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -363,6 +367,14 @@ function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: ()
         h("span", { class: "hench-info-label" }, "Model"),
         h("span", { class: "hench-info-value" }, run.model),
       ),
+      run.invocationContext
+        ? h("div", { class: "hench-info-row" },
+            h("span", { class: "hench-info-label" }, "Invocation"),
+            h("span", {
+              class: `hench-info-value hench-info-invocation hench-info-invocation-${run.invocationContext}`,
+            }, run.invocationContext === "cli" ? "CLI" : "API"),
+          )
+        : null,
       h("div", { class: "hench-info-row" },
         h("span", { class: "hench-info-label" }, "Turns"),
         h("span", { class: "hench-info-value" }, String(run.turns)),

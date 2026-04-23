@@ -150,8 +150,8 @@ describe("cross-vendor init-to-run smoke", () => {
       expect(apiPrompt).toContain("Follow existing code patterns");
       expect(cliPrompt).toContain("Run tests after making changes");
       expect(apiPrompt).toContain("Run tests after making changes");
-      expect(cliPrompt).toContain("Commit your work");
-      expect(apiPrompt).toContain("Commit your work");
+      expect(cliPrompt).toContain("commit message");
+      expect(apiPrompt).toContain("commit message");
     });
 
     it("both providers include project commands", () => {

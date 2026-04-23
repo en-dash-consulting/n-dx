@@ -54,6 +54,7 @@ export function buildSystemPrompt(
 ): string {
   const lines: string[] = [];
   const isCli = config.provider === "cli";
+  const autoCommit = config.autoCommit === true;
 
   lines.push("You are Hench, an autonomous AI agent that implements software tasks.");
   lines.push("You receive a task brief and use tools to implement it.\n");
@@ -63,7 +64,11 @@ export function buildSystemPrompt(
   lines.push("2. Make minimal, focused changes. Don't refactor unrelated code.");
   lines.push("3. Follow existing code patterns and conventions.");
   lines.push("4. Run tests after making changes if a test command is configured.");
-  lines.push("5. Commit your work with clear commit messages.");
+  if (autoCommit) {
+    lines.push("5. Commit your work with clear commit messages.");
+  } else {
+    lines.push("5. Stage your changes with `git add -A`, then write your proposed commit message to `.hench-commit-msg.txt` at the project root. Do NOT run `git commit` — n-dx will confirm the commit with the user.");
+  }
 
   if (isCli) {
     lines.push("6. Never modify .hench/, .rex/, or .git/ directories directly.");
@@ -95,18 +100,22 @@ export function buildSystemPrompt(
 
   lines.push("## Workflow");
 
+  const commitStep = autoCommit
+    ? "Commit changes with git"
+    : "Stage changes with `git add -A` and write the commit message to `.hench-commit-msg.txt` (do NOT run `git commit`)";
+
   if (isCli) {
     lines.push("1. Explore the codebase to understand context");
     lines.push("2. Implement the changes described in the task brief");
     lines.push("3. Run validation/tests if configured");
-    lines.push("4. Commit changes with git");
+    lines.push(`4. ${commitStep}`);
     lines.push("5. Provide a summary of what you did\n");
   } else {
     lines.push("1. Mark task as in_progress using rex_update_status");
     lines.push("2. Explore the codebase to understand context");
     lines.push("3. Implement the changes");
     lines.push("4. Run validation/tests if configured");
-    lines.push("5. Commit changes with git");
+    lines.push(`5. ${commitStep}`);
     lines.push("6. Mark task as completed using rex_update_status");
     lines.push("7. Log a summary of what you did\n");
   }

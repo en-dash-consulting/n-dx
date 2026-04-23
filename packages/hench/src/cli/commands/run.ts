@@ -674,6 +674,12 @@ async function runOne(
   output(`Task: ${cyan(run.taskTitle)}`);
   output(`Status: ${colorStatus(run.status)}`);
 
+  // Invocation context
+  if (run.invocationContext) {
+    const label = run.invocationContext === "cli" ? "CLI" : "API";
+    output(colorWarn(`Invocation: ${label}`));
+  }
+
   // Duration
   if (run.startedAt && run.finishedAt) {
     const durationMs = new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
