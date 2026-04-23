@@ -11,7 +11,24 @@
       "Bash(pnpm --filter * typecheck *)",
       "Bash(pnpm preflight)",
       "Bash(pnpm validate)", "Bash(pnpm validate *)",
-      "Bash(mkdir -p *)"
+      "Bash(mkdir -p *)",
+      "mcp__rex__get_next_task",
+      "mcp__sourcevision__get_overview",
+      "mcp__sourcevision__get_zone",
+      "mcp__sourcevision__get_findings",
+      "mcp__sourcevision__search_files",
+      "mcp__sourcevision__get_file_info",
+      "mcp__sourcevision__get_imports", 
+      "mcp__sourcevision__get_next_steps",
+      "mcp__sourcevision__get_classifications",
+      "mcp__rex__get_prd_status",
+      "mcp__rex__get_item",
+      "mcp__rex__health",
+      "mcp__rex__get_recommendations",
+      "mcp__rex__verify_criteria",
+      "mcp__rex__get_capabilities", 
+      "mcp__rex__facets",
+      "mcp__sourcevision__get_route_tree"
     ]
   }
 }

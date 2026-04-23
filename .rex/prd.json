@@ -592,7 +592,9 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-23T19:26:31.234Z",
-              "completedAt": "2026-04-23T19:34:59.048Z"
+              "completedAt": "2026-04-23T19:46:56.962Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Created packages/rex/docs/prd-markdown-schema.md — authoritative spec for the PRD markdown format covering all fields, hierarchy encoding, edge cases, and parser/serializer contracts."
             },
             {
               "id": "35ccf9ee-0cb4-48b8-8aa3-185d76939c20",
