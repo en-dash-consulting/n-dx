@@ -1,5 +1,15 @@
 # @n-dx/llm-client
 
+## 0.4.0
+
+### Minor Changes
+
+- [#170](https://github.com/en-dash-consulting/n-dx/pull/170) [`0269cf7`](https://github.com/en-dash-consulting/n-dx/commit/0269cf75bddcbd50c352b9cf11365103a3a40c71) Thanks [@endash-shal](https://github.com/endash-shal)! - This adds a new commands, bug fixes, and a suprise for devs
+
+### Patch Changes
+
+- [#175](https://github.com/en-dash-consulting/n-dx/pull/175) [`76bfdd7`](https://github.com/en-dash-consulting/n-dx/commit/76bfdd76b90c37bd79b08833072322704f24eb3c) Thanks [@endash-shal](https://github.com/endash-shal)! - cli vs api distincition, bug fixes and check with user before commits being added to branch
+
 ## 0.3.1
 
 ## 0.3.0

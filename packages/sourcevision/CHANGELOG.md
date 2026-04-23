@@ -1,5 +1,16 @@
 # @n-dx/sourcevision
 
+## 0.4.0
+
+### Minor Changes
+
+- [#170](https://github.com/en-dash-consulting/n-dx/pull/170) [`0269cf7`](https://github.com/en-dash-consulting/n-dx/commit/0269cf75bddcbd50c352b9cf11365103a3a40c71) Thanks [@endash-shal](https://github.com/endash-shal)! - This adds a new commands, bug fixes, and a suprise for devs
+
+### Patch Changes
+
+- Updated dependencies [[`76bfdd7`](https://github.com/en-dash-consulting/n-dx/commit/76bfdd76b90c37bd79b08833072322704f24eb3c), [`0269cf7`](https://github.com/en-dash-consulting/n-dx/commit/0269cf75bddcbd50c352b9cf11365103a3a40c71)]:
+  - @n-dx/llm-client@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes
