@@ -198,7 +198,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
 
   server.tool(
     "get_token_usage",
-    "Roll up hench run token usage across every PRD item. Returns self + descendant + total token counts per item, plus any runs whose itemId is no longer in the PRD as orphans. Pass `id` to narrow to a single item.",
+    "Roll up hench run token usage and work duration across every PRD item. Returns `{ tokens, duration }` per item, where tokens is self+descendants+total counts and duration is { totalMs, runningMs, isRunning }. Completed subtrees report stable totalMs; running subtrees update on each call. Orphan runs (whose itemId is no longer in the PRD) are reported separately. Pass `id` to narrow to a single item.",
     {
       id: z.string().optional().describe("Optional: only return rollup for this item"),
     },

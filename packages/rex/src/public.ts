@@ -323,6 +323,14 @@ export type {
   ItemTokenAggregation,
 } from "./core/item-token-rollup.js";
 
+// ---- Core: per-item duration rollup -----------------------------------------
+
+export { aggregateItemDurations } from "./core/item-duration-rollup.js";
+export type {
+  ItemDurationTotals,
+  ItemDurationAggregation,
+} from "./core/item-duration-rollup.js";
+
 // ---- Analyze: finding acknowledgment ----------------------------------------
 
 export {

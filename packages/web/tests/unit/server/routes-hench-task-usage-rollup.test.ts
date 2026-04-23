@@ -133,16 +133,19 @@ describe("GET /api/hench/task-usage — rollup", () => {
     const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
     const data = await res.json();
 
-    // Leaves carry only self attribution.
+    // Leaves carry only self attribution. Duration is zero because none of
+    // these items have startedAt / activeIntervals recorded on the PRD.
     expect(data.rollup["task-a"]).toEqual({
       self: { totalTokens: 225, runCount: 2 },
       descendants: { totalTokens: 0, runCount: 0 },
       total: { totalTokens: 225, runCount: 2 },
+      duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
     expect(data.rollup["task-b"]).toEqual({
       self: { totalTokens: 400, runCount: 1 },
       descendants: { totalTokens: 0, runCount: 0 },
       total: { totalTokens: 400, runCount: 1 },
+      duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
 
     // Feature rolls up both tasks.
@@ -150,6 +153,7 @@ describe("GET /api/hench/task-usage — rollup", () => {
       self: { totalTokens: 0, runCount: 0 },
       descendants: { totalTokens: 625, runCount: 3 },
       total: { totalTokens: 625, runCount: 3 },
+      duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
 
     // Epic rolls up the feature.
@@ -157,6 +161,7 @@ describe("GET /api/hench/task-usage — rollup", () => {
       self: { totalTokens: 0, runCount: 0 },
       descendants: { totalTokens: 625, runCount: 3 },
       total: { totalTokens: 625, runCount: 3 },
+      duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
 
     // Flat taskUsage is still present for backward compatibility.
@@ -185,6 +190,7 @@ describe("GET /api/hench/task-usage — rollup", () => {
       self: { totalTokens: 20, runCount: 1 },
       descendants: { totalTokens: 50, runCount: 1 },
       total: { totalTokens: 70, runCount: 2 },
+      duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
   });
 
@@ -198,6 +204,88 @@ describe("GET /api/hench/task-usage — rollup", () => {
       self: { totalTokens: 0, runCount: 0 },
       descendants: { totalTokens: 0, runCount: 0 },
       total: { totalTokens: 0, runCount: 0 },
+      duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
+  });
+
+  it("rolls up task durations from activeIntervals into ancestors", async () => {
+    // Two completed tasks under a feature under an epic.
+    // Task-a: 60s of work. Task-b: 30s of work.
+    const start = new Date("2026-01-01T00:00:00.000Z").toISOString();
+    const endA = new Date("2026-01-01T00:01:00.000Z").toISOString();
+    const endB = new Date("2026-01-01T00:00:30.000Z").toISOString();
+    await writePRD(ctx.rexDir, [
+      {
+        id: "epic", title: "E", level: "epic", status: "pending",
+        children: [
+          {
+            id: "feature", title: "F", level: "feature", status: "pending",
+            children: [
+              {
+                id: "task-a", title: "A", level: "task", status: "completed",
+                startedAt: start, endedAt: endA, completedAt: endA,
+                activeIntervals: [{ start, end: endA }],
+              },
+              {
+                id: "task-b", title: "B", level: "task", status: "completed",
+                startedAt: start, endedAt: endB, completedAt: endB,
+                activeIntervals: [{ start, end: endB }],
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
+    const data = await res.json();
+
+    expect(data.rollup["task-a"].duration).toEqual({
+      totalMs: 60_000,
+      runningMs: 0,
+      isRunning: false,
+    });
+    expect(data.rollup["task-b"].duration).toEqual({
+      totalMs: 30_000,
+      runningMs: 0,
+      isRunning: false,
+    });
+    expect(data.rollup["feature"].duration).toEqual({
+      totalMs: 90_000,
+      runningMs: 0,
+      isRunning: false,
+    });
+    expect(data.rollup["epic"].duration).toEqual({
+      totalMs: 90_000,
+      runningMs: 0,
+      isRunning: false,
+    });
+  });
+
+  it("flags in-progress subtrees as running and reports a non-zero runningMs", async () => {
+    // Task-b is still in progress (no end on its active interval).
+    const start = new Date(Date.now() - 90_000).toISOString();
+    await writePRD(ctx.rexDir, [
+      {
+        id: "epic", title: "E", level: "epic", status: "pending",
+        children: [
+          {
+            id: "task-b", title: "B", level: "task", status: "in_progress",
+            startedAt: start,
+            activeIntervals: [{ start }],
+          },
+        ],
+      },
+    ]);
+
+    const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
+    const data = await res.json();
+
+    expect(data.rollup["task-b"].duration.isRunning).toBe(true);
+    expect(data.rollup["task-b"].duration.runningMs).toBeGreaterThanOrEqual(90_000);
+    expect(data.rollup["task-b"].duration.totalMs).toBeGreaterThanOrEqual(90_000);
+    // Running state fans up to ancestors.
+    expect(data.rollup["epic"].duration.isRunning).toBe(true);
+    expect(data.rollup["epic"].duration.runningMs).toBeGreaterThanOrEqual(90_000);
   });
 });

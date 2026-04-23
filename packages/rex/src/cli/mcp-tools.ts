@@ -29,6 +29,10 @@ import {
   readRunTokensFromHench,
   type ItemTokenTotals,
 } from "../core/item-token-rollup.js";
+import {
+  aggregateItemDurations,
+  type ItemDurationTotals,
+} from "../core/item-duration-rollup.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
@@ -698,14 +702,18 @@ export async function handleEditItem(
 }
 
 /**
- * Roll up hench run token totals across every PRD item.
+ * Roll up hench run token totals and work durations across every PRD item.
  *
- * Returns `self`, `descendants`, and `total` token counts for every item in
- * the tree, plus any runs whose `itemId` is no longer in the PRD (archived,
- * pruned, deleted) as `orphans`.
+ * Returns a combined `{ tokens, duration }` record for every item in the
+ * tree, where `tokens` is the token-rollup triple (self/descendants/total
+ * plus runCount) and `duration` is `{ totalMs, runningMs, isRunning }`.
+ * Runs whose `itemId` is no longer in the PRD (archived, pruned, deleted)
+ * are reported as `orphans`.
  *
- * If `id` is provided, the response is narrowed to that single item (still
- * with full rollup — just filtered in the output).
+ * Duration fields update on each call based on the wall clock; completed
+ * subtrees return stable `totalMs` values.
+ *
+ * If `id` is provided, the response is narrowed to that single item.
  */
 export async function handleGetTokenUsage(
   store: PRDStore,
@@ -716,6 +724,13 @@ export async function handleGetTokenUsage(
     const doc = await store.loadDocument();
     const runs = await readRunTokensFromHench(projectDir);
     const { totals, orphans } = aggregateItemTokenUsage(doc.items, runs);
+    const { durations } = aggregateItemDurations(doc.items);
+
+    const emptyDuration: ItemDurationTotals = {
+      totalMs: 0,
+      runningMs: 0,
+      isRunning: false,
+    };
 
     if (args.id) {
       const t = totals.get(args.id);
@@ -725,13 +740,24 @@ export async function handleGetTokenUsage(
           true,
         );
       }
+      const d = durations.get(args.id) ?? emptyDuration;
       return textResult(
-        JSON.stringify({ id: args.id, ...t }, null, 2),
+        JSON.stringify(
+          { id: args.id, tokens: t, duration: d },
+          null,
+          2,
+        ),
       );
     }
 
-    const items: Array<{ id: string } & ItemTokenTotals> = [];
-    for (const [id, t] of totals) items.push({ id, ...t });
+    const items: Array<{
+      id: string;
+      tokens: ItemTokenTotals;
+      duration: ItemDurationTotals;
+    }> = [];
+    for (const [id, t] of totals) {
+      items.push({ id, tokens: t, duration: durations.get(id) ?? emptyDuration });
+    }
 
     const orphanTotal = orphans.reduce(
       (acc, o) => ({

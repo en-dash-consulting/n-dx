@@ -69,6 +69,10 @@ export { computeTimestampUpdates } from "@n-dx/rex";
 export { aggregateItemTokenUsage } from "@n-dx/rex";
 export type { ItemTokenTotals } from "@n-dx/rex";
 
+// ---- Rex per-item duration rollup -------------------------------------------
+export { aggregateItemDurations } from "@n-dx/rex";
+export type { ItemDurationTotals } from "@n-dx/rex";
+
 // ---- Rex merge/consolidation ------------------------------------------------
 export { validateMerge, previewMerge, mergeItems } from "@n-dx/rex";
 

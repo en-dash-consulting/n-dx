@@ -277,7 +277,7 @@
     {
       "id": "bf433438-aa34-4026-a98b-6eb65866c30f",
       "title": "Token Usage and Duration Tracking for PRD Items",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -344,10 +344,12 @@
         {
           "id": "db3f2b10-1f3d-46be-a276-9274fceff25d",
           "title": "Task Duration Tracking",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Record start and end timestamps for work on a task so the system can report either elapsed duration (completed) or running duration (in progress), and roll those durations up to features and epics alongside token usage.",
           "source": "smart-add",
+          "startedAt": "2026-04-23T17:11:13.162Z",
+          "completedAt": "2026-04-23T17:11:13.162Z",
           "children": [
             {
               "id": "89bd6c5d-093b-480d-91ba-965289768925",
@@ -376,7 +378,7 @@
             {
               "id": "8f8ab3e2-bd78-4dff-8f01-5545ad395728",
               "title": "Aggregate durations up the PRD tree and expose alongside token usage",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Extend the rollup layer so features and epics report total time spent (sum of descendant task durations) and, for in-progress subtrees, a live running duration. Expose these values through the same rex accessor/MCP tool that serves token rollups so the dashboard can fetch both in one call.",
               "acceptanceCriteria": [
@@ -391,22 +393,28 @@
                 "aggregation",
                 "mcp"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T16:54:46.650Z",
+              "completedAt": "2026-04-23T17:11:13.151Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added pure aggregateItemDurations to rex core (packages/rex/src/core/item-duration-rollup.ts), extended the get_token_usage MCP handler to return { tokens, duration } per item, wired duration through the web rex-gateway and /api/hench/task-usage endpoint, and updated the dashboard viewer to consume rolled-up duration for parent rows. 12 new rex tests + 2 new web wire tests. Completed subtrees report stable totalMs; running subtrees report live runningMs via injected `now`. No mutation of stored interval state."
             }
           ]
         },
         {
           "id": "ab5ab1c8-0e01-4db6-ada2-025504b83c89",
           "title": "Dashboard UI for Usage and Duration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Surface per-item token usage and duration in the web dashboard so users can see, at a glance, how much LLM spend and wall-clock time each task, feature, and epic has consumed.",
           "source": "smart-add",
+          "startedAt": "2026-04-23T16:54:04.708Z",
+          "completedAt": "2026-04-23T16:54:04.708Z",
           "children": [
             {
               "id": "4fdeed51-b742-4d6e-a321-42d2be246084",
               "title": "Render token usage and duration columns on the PRD tree view",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add columns (or inline badges) to the existing PRD tree view in the web dashboard showing total tokens and duration for every task, feature, and epic. Running tasks should show a live-updating elapsed time; completed tasks show their final duration. Values come from the new rex accessor so no client-side aggregation is needed.",
               "acceptanceCriteria": [
@@ -422,11 +430,17 @@
                 "ui",
                 "dashboard"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T16:17:13.092Z",
+              "completedAt": "2026-04-23T16:54:04.691Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added token-rollup and live-duration columns to the PRD tree view."
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-23T17:11:13.169Z",
+      "completedAt": "2026-04-23T17:11:13.169Z"
     }
   ]
 }

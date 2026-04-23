@@ -264,13 +264,34 @@ function renderUsageCell(args: UsageCellArgs) {
 
 interface DurationCellArgs {
   item: PRDItemData;
+  usageRollup?: ItemUsageRollup;
+  hasChildren: boolean;
   tickMs: number | null;
 }
 
 function renderDurationCell(args: DurationCellArgs) {
-  const { item, tickMs } = args;
+  const { item, usageRollup, hasChildren, tickMs } = args;
   const nowMs = tickMs ?? Date.now();
-  const { elapsedMs, isRunning, hasRecord } = getTaskDuration(item, nowMs);
+
+  // Leaf items compute duration locally so in-progress rows tick every
+  // frame (the client has the full interval log). Parent rows (epics /
+  // features) don't have descendant intervals on the client — they fall
+  // back to the server rollup's `totalMs`, refreshed on each poll.
+  // `duration` may be absent on older server payloads; fall through to
+  // local computation in that case.
+  let elapsedMs: number;
+  let isRunning: boolean;
+  let hasRecord: boolean;
+  if (hasChildren && usageRollup && usageRollup.duration) {
+    elapsedMs = usageRollup.duration.totalMs;
+    isRunning = usageRollup.duration.isRunning;
+    hasRecord = elapsedMs > 0 || isRunning;
+  } else {
+    const self = getTaskDuration(item, nowMs);
+    elapsedMs = self.elapsedMs;
+    isRunning = self.isRunning;
+    hasRecord = self.hasRecord;
+  }
 
   if (!hasRecord) {
     return h(
@@ -478,7 +499,7 @@ class NodeRow extends Component<NodeRowProps> {
       renderUsageCell({ item, usageRollup, usage, showTokenBudget, utilization }),
       // Duration column — live-updating for in-progress rows, static
       // for terminal rows, `—` when no work has been recorded yet.
-      renderDurationCell({ item, tickMs }),
+      renderDurationCell({ item, usageRollup, hasChildren, tickMs }),
       // Timestamp
       h(TimestampSuffix, { item }),
       // ── Inline action group (hover-reveal) ──────────────────────────
