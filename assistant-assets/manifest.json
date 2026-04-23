@@ -44,6 +44,7 @@
           "get_item",
           "get_capabilities",
           "get_recommendations",
+          "get_token_usage",
           "health",
           "facets"
         ],

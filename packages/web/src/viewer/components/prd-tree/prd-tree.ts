@@ -69,6 +69,10 @@ const LEVEL_LABELS: Record<ItemLevel, string> = {
   subtask: "Subtask",
 };
 
+function statusSetKey(statuses: Set<ItemStatus>): string {
+  return Array.from(statuses).sort().join("|");
+}
+
 // ── Helper: collect all node IDs up to a depth ──────────────────────
 
 function collectIdsToDepth(
@@ -748,6 +752,10 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
   // Status filter: controlled (from parent) or internal fallback
   const [internalStatuses] = useState<Set<ItemStatus>>(() => defaultStatusFilter());
   const activeStatuses = externalStatuses ?? internalStatuses;
+  const activeStatusesKey = useMemo(
+    () => statusSetKey(activeStatuses),
+    [activeStatuses],
+  );
 
   // ── Virtual scroll ────────────────────────────────────────────────
   // Flatten the tree into a linear array respecting expansion and filter
@@ -767,7 +775,7 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
 
   const flatNodes = useMemo(
     () => flattenVisibleTree(doc.items, expanded, activeStatuses, 0, searchVisibleIds),
-    [doc.items, expanded, activeStatuses, searchVisibleIds],
+    [doc.items, expanded, activeStatusesKey, searchVisibleIds],
   );
 
   // Live tick for in-progress duration badges. The tick is only

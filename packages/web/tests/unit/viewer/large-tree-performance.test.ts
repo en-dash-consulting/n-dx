@@ -482,9 +482,12 @@ describe("sliceVisibleTree performance", () => {
     // (would indicate O(n²) or worse degradation)
     const firstChunk = chunkTimes[0];
     const lastChunk = chunkTimes[chunkTimes.length - 1];
+    const normalizedFirstChunk = Math.max(firstChunk, 10);
     // Allow 10× variance between first and last chunk
-    // (some increase is expected as more nodes are counted)
-    expect(lastChunk).toBeLessThan(firstChunk * 10 + 10);
+    // (some increase is expected as more nodes are counted). Clamp the
+    // first sample so a near-zero warm cache / timer-resolution artifact
+    // does not create an unrealistically tiny ceiling in jsdom.
+    expect(lastChunk).toBeLessThan(normalizedFirstChunk * 10 + 10);
   });
 });
 
