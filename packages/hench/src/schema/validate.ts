@@ -74,7 +74,15 @@ export const HenchConfigSchema = z.object({
   autoCommit: z.boolean().optional(),
 });
 
-const RunStatusSchema = z.enum(["running", "completed", "failed", "timeout", "budget_exceeded", "error_transient"]);
+const RunStatusSchema = z.enum([
+  "running",
+  "completed",
+  "failed",
+  "timeout",
+  "budget_exceeded",
+  "error_transient",
+  "cancelled",
+]);
 
 const ToolCallRecordSchema = z.object({
   turn: z.number(),
@@ -89,6 +97,13 @@ const TokenUsageSchema = z.object({
   output: z.number(),
   cacheCreationInput: z.number().optional(),
   cacheReadInput: z.number().optional(),
+});
+
+const RunTokensSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cached: z.number(),
+  total: z.number(),
 });
 
 const TokenDiagnosticStatusSchema = z.enum(["complete", "partial", "unavailable"]);
@@ -201,6 +216,7 @@ export const RunRecordSchema = z.object({
   summary: z.string().optional(),
   error: z.string().optional(),
   tokenUsage: TokenUsageSchema,
+  tokens: RunTokensSchema.optional(),
   turnTokenUsage: z.array(TurnTokenUsageSchema).optional(),
   toolCalls: z.array(ToolCallRecordSchema),
   model: z.string(),

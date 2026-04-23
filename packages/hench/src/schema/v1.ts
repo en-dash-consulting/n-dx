@@ -210,6 +210,40 @@ export interface TokenUsage {
   cacheReadInput?: number;
 }
 
+/**
+ * Normalized per-run token totals suitable for PRD rollup.
+ *
+ * Derived from {@link TokenUsage} via {@link normalizeRunTokens}. Stored on
+ * every {@link RunRecord} so that downstream consumers (dashboards, rollup
+ * queries) can join runs to PRD items by `taskId` without re-parsing
+ * transcripts or re-deriving cache accounting on every read.
+ *
+ * - `input`  — uncached input tokens
+ * - `output` — completion tokens
+ * - `cached` — cache-write + cache-read tokens (combined)
+ * - `total`  — sum of the three fields above
+ */
+export interface RunTokens {
+  input: number;
+  output: number;
+  cached: number;
+  total: number;
+}
+
+/**
+ * Normalize a {@link TokenUsage} into the PRD-rollup shape.
+ *
+ * Accepts `undefined` (and missing cache fields) so it can be called
+ * unconditionally at save time — aborted, failed, and zero-usage runs
+ * all produce a valid tuple with the correct zeros.
+ */
+export function normalizeRunTokens(usage: TokenUsage | undefined): RunTokens {
+  const input = usage?.input ?? 0;
+  const output = usage?.output ?? 0;
+  const cached = (usage?.cacheCreationInput ?? 0) + (usage?.cacheReadInput ?? 0);
+  return { input, output, cached, total: input + output + cached };
+}
+
 /** Token usage for a single API turn. */
 export interface TurnTokenUsage {
   turn: number;
@@ -557,6 +591,17 @@ export interface RunRecord {
   summary?: string;
   error?: string;
   tokenUsage: TokenUsage;
+  /**
+   * Normalized per-run token totals used for PRD rollup.
+   *
+   * Populated automatically by `saveRun()` from {@link tokenUsage} on every
+   * write, including aborted/failed runs — so downstream rollups can
+   * `{ itemId: taskId, tokens }`-join to the PRD without undercounting.
+   *
+   * Optional on read for backward compatibility with legacy run files; new
+   * writes always include it.
+   */
+  tokens?: RunTokens;
   /** Per-turn token breakdown. One entry per API call. */
   turnTokenUsage?: TurnTokenUsage[];
   toolCalls: ToolCallRecord[];

@@ -27,7 +27,7 @@
 
 // ---- Schema constants & config factory ------------------------------------
 
-export { HENCH_SCHEMA_VERSION, DEFAULT_HENCH_CONFIG, guardDefaultsForLanguage } from "./schema/v1.js";
+export { HENCH_SCHEMA_VERSION, DEFAULT_HENCH_CONFIG, guardDefaultsForLanguage, normalizeRunTokens } from "./schema/v1.js";
 
 // ---- Schema types (config, run records) ------------------------------------
 
@@ -45,6 +45,7 @@ export type {
   RunStatus,
   ToolCallRecord,
   TokenUsage,
+  RunTokens,
   TurnTokenUsage,
   CommandRecord,
   TestRecord,
@@ -199,6 +200,15 @@ export type {
   UtilizationPatterns,
   ExecutionMetricsSummary,
 } from "./process/concurrent-execution-metrics.js";
+
+// ---- Run → PRD-item token index ---------------------------------------------
+
+export {
+  listCompletedRunTokens,
+  runTokenTupleFromRecord,
+} from "./store/run-token-index.js";
+
+export type { RunTokenTuple } from "./store/run-token-index.js";
 
 // ---- Run file change detection ----------------------------------------------
 

@@ -273,6 +273,150 @@
           ]
         }
       ]
+    },
+    {
+      "id": "bf433438-aa34-4026-a98b-6eb65866c30f",
+      "title": "Token Usage and Duration Tracking for PRD Items",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "aa92ccd9-989b-4296-8935-c83c771f34d0",
+          "title": "Token Usage Attribution per PRD Item",
+          "status": "pending",
+          "level": "feature",
+          "description": "Capture and aggregate LLM token usage (input, output, cached, total) against the PRD item each hench run is working on, then roll those totals up the tree so tasks, features, and epics each expose their own usage.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "34344b18-f2a4-43d0-822c-27c7d2e97837",
+              "title": "Attribute hench run token usage to the active PRD task",
+              "status": "completed",
+              "level": "task",
+              "description": "Extend the hench run recorder to stamp each run with the rex task/subtask ID it executed against and persist per-run token totals (input, output, cached, total) in a form that can be joined back to the PRD. Today `.hench/runs/` captures usage per run but there is no durable link from a run to the specific PRD item, which blocks any per-task or per-feature rollup.",
+              "acceptanceCriteria": [
+                "Each entry written under `.hench/runs/` includes the rex item ID the run targeted and an aggregated token-usage object (input, output, cached, total)",
+                "A rex/hench gateway helper returns `{ itemId, tokens }` tuples for all completed runs without re-parsing transcripts on every call",
+                "Runs that fail or are aborted still record whatever usage was consumed so rollups are not silently undercounted",
+                "Unit tests cover: run with a task ID, run with a subtask ID, run aborted mid-loop, and run with zero usage"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "rex",
+                "telemetry"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-23T15:38:24.782Z",
+              "completedAt": "2026-04-23T15:50:43.494Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added RunTokens `{input, output, cached, total}` schema + normalizeRunTokens() helper. saveRun() auto-stamps the tuple on every write so failed/aborted/zero-usage runs all persist joinable totals. Added store/run-token-index.ts with listCompletedRunTokens() returning {runId, itemId, tokens, status, finishedAt} tuples for every terminal-state run — reads structured run JSON only, no transcript parsing. Exposed via public.ts. Extended Zod validator to accept the tokens field and the previously-missing 'cancelled' run status. Added 11 unit tests covering task ID, subtask ID, aborted mid-loop (cancelled + failed), zero usage, legacy-record fallback, and multi-status filtering."
+            },
+            {
+              "id": "61022482-f8de-4c2b-8cc0-78946df52c94",
+              "title": "Roll up token usage from subtasks to tasks, features, and epics",
+              "status": "pending",
+              "level": "task",
+              "description": "Add a rex-side aggregator that walks the PRD tree and sums per-item token usage from hench run data, exposing totals on every node so the dashboard and MCP consumers can read usage at any level without recomputing. Rollups must stay consistent with the single-file PRD invariant and be cheap enough to compute on every dashboard poll.",
+              "acceptanceCriteria": [
+                "A pure function `aggregateTokenUsage(prd, runs)` returns a map of `itemId -> { self, descendants, total }` token counts",
+                "Totals on a parent equal the sum of its own usage plus all descendant usage, verified by a property-style test on a synthetic tree",
+                "Aggregation handles items with no runs, items archived/pruned, and orphan run entries whose item IDs are no longer in the PRD (orphans reported separately, not silently dropped)",
+                "The aggregator is exposed through the existing rex MCP surface (new tool or extension of `get_prd_status`) and returns in under 50ms on a PRD with 500 items and 5k runs in a benchmark test"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "aggregation",
+                "mcp"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "db3f2b10-1f3d-46be-a276-9274fceff25d",
+          "title": "Task Duration Tracking",
+          "status": "pending",
+          "level": "feature",
+          "description": "Record start and end timestamps for work on a task so the system can report either elapsed duration (completed) or running duration (in progress), and roll those durations up to features and epics alongside token usage.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "89bd6c5d-093b-480d-91ba-965289768925",
+              "title": "Record task start and end timestamps from hench runs and status transitions",
+              "status": "pending",
+              "level": "task",
+              "description": "Whenever a task transitions to in-progress (via `update_task_status`, `ndx work`, or MCP) capture a `startedAt`; when it transitions to completed capture an `endedAt`. Persist both on the PRD item in `.rex/prd.json` so duration is derivable without replaying the execution log. Handle the case where a task is picked up multiple times by accumulating active intervals rather than overwriting.",
+              "acceptanceCriteria": [
+                "`.rex/prd.json` items gain `startedAt`, `endedAt`, and `activeIntervals: [{start, end}]` fields, backfilled as optional so existing PRDs load unchanged",
+                "Starting a task that is already in-progress does not overwrite the original `startedAt`; re-opening a completed task appends a new interval",
+                "A helper `getTaskDuration(item, now)` returns `{ elapsedMs, isRunning }` and is unit-tested for: never-started, running, completed, and re-opened tasks",
+                "Writes go through the existing PRD store so the single-file invariant and on-load migration behavior are preserved"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "prd",
+                "timing"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "8f8ab3e2-bd78-4dff-8f01-5545ad395728",
+              "title": "Aggregate durations up the PRD tree and expose alongside token usage",
+              "status": "pending",
+              "level": "task",
+              "description": "Extend the rollup layer so features and epics report total time spent (sum of descendant task durations) and, for in-progress subtrees, a live running duration. Expose these values through the same rex accessor/MCP tool that serves token rollups so the dashboard can fetch both in one call.",
+              "acceptanceCriteria": [
+                "The PRD status accessor returns `{ tokens, duration }` for every item, where `duration` is `{ totalMs, runningMs, isRunning }`",
+                "Running duration updates on each call based on `now` without mutating stored state",
+                "Completed subtrees report a stable `totalMs` that does not change between calls",
+                "Tests cover: epic with all completed tasks, epic with one running task, and epic with a re-opened task whose intervals overlap chronologically"
+              ],
+              "priority": "medium",
+              "tags": [
+                "rex",
+                "aggregation",
+                "mcp"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "ab5ab1c8-0e01-4db6-ada2-025504b83c89",
+          "title": "Dashboard UI for Usage and Duration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Surface per-item token usage and duration in the web dashboard so users can see, at a glance, how much LLM spend and wall-clock time each task, feature, and epic has consumed.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "4fdeed51-b742-4d6e-a321-42d2be246084",
+              "title": "Render token usage and duration columns on the PRD tree view",
+              "status": "pending",
+              "level": "task",
+              "description": "Add columns (or inline badges) to the existing PRD tree view in the web dashboard showing total tokens and duration for every task, feature, and epic. Running tasks should show a live-updating elapsed time; completed tasks show their final duration. Values come from the new rex accessor so no client-side aggregation is needed.",
+              "acceptanceCriteria": [
+                "PRD tree rows display `tokens` (formatted with thousands separators) and `duration` (human-readable: `1.2s`, `4m 10s`, `2h 15m`) for tasks, features, and epics",
+                "Rows for in-progress tasks update their duration at least once per second without refetching the whole tree",
+                "Rollup values on a parent row visually distinguish self vs. descendant contribution (e.g. tooltip or secondary text) so users can tell whether an epic's cost is concentrated in one task",
+                "UI remains usable on a PRD with 500 items — rendering and live updates stay under a 16ms-per-frame budget in a profiled test",
+                "Empty states (no runs yet, task never started) render as `—` rather than `0` to avoid implying work was done"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "ui",
+                "dashboard"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

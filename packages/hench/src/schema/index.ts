@@ -2,6 +2,7 @@ export {
   HENCH_SCHEMA_VERSION,
   DEFAULT_HENCH_CONFIG,
   guardDefaultsForLanguage,
+  normalizeRunTokens,
 } from "./v1.js";
 
 export type {
@@ -14,6 +15,7 @@ export type {
   RunStatus,
   ToolCallRecord,
   TokenUsage,
+  RunTokens,
   TurnTokenUsage,
   CommandRecord,
   TestRecord,
