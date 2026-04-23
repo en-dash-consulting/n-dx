@@ -60,6 +60,17 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       requirements: z.array(RequirementSchema).optional(),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
+      endedAt: z.string().optional(),
+      activeIntervals: z
+        .array(
+          z
+            .object({
+              start: z.string(),
+              end: z.string().optional(),
+            })
+            .strict(),
+        )
+        .optional(),
       failureReason: z.string().optional(),
       resolutionType: z.enum(["code-change", "config-override", "acknowledgment", "deferred", "unclassified"]).optional(),
       resolutionDetail: z.string().optional(),

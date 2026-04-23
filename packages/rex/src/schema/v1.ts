@@ -224,6 +224,18 @@ export function isValidationType(value: string | undefined): value is Requiremen
   return value !== undefined && VALID_VALIDATION_TYPES.has(value as RequirementValidationType);
 }
 
+/**
+ * A single active work interval. An interval with no `end` is open — the item
+ * is currently in `in_progress` status. Intervals accumulate: re-opening a
+ * completed task appends a new interval rather than overwriting the prior one.
+ */
+export interface ActiveInterval {
+  /** ISO timestamp when work started (entered `in_progress`). */
+  start: string;
+  /** ISO timestamp when work paused/completed. Absent if still running. */
+  end?: string;
+}
+
 export interface PRDItem {
   id: string;
   title: string;
@@ -237,8 +249,19 @@ export interface PRDItem {
   blockedBy?: string[];
   /** Structured requirements associated with this item. */
   requirements?: Requirement[];
+  /** ISO timestamp of the first transition into `in_progress`. Preserved across re-opens. */
   startedAt?: string;
+  /** ISO timestamp of the latest transition into `completed`. Cleared if the item is re-opened. */
   completedAt?: string;
+  /** ISO timestamp of the most recent transition out of `in_progress` into a terminal state. Cleared when work resumes. */
+  endedAt?: string;
+  /**
+   * Append-only log of work intervals. Each `in_progress` entry pushes a new
+   * open interval; leaving `in_progress` closes the last one. Re-opening a
+   * completed task appends a new interval without mutating earlier ones, so
+   * cumulative duration can be derived by summing `end - start` across the list.
+   */
+  activeIntervals?: ActiveInterval[];
   failureReason?: string;
   /** How this item was resolved (code change, config override, etc.). */
   resolutionType?: ResolutionType;

@@ -288,6 +288,8 @@
           "level": "feature",
           "description": "Capture and aggregate LLM token usage (input, output, cached, total) against the PRD item each hench run is working on, then roll those totals up the tree so tasks, features, and epics each expose their own usage.",
           "source": "smart-add",
+          "startedAt": "2026-04-23T16:02:11.657Z",
+          "completedAt": "2026-04-23T16:02:11.657Z",
           "children": [
             {
               "id": "34344b18-f2a4-43d0-822c-27c7d2e97837",
@@ -337,9 +339,7 @@
               "resolutionType": "code-change",
               "resolutionDetail": "Added pure per-PRD-item token rollup (aggregateItemTokenUsage) in packages/rex/src/core/item-token-rollup.ts + get_token_usage MCP tool. Tests cover self/descendants/total rollup, property-style invariant on random trees, orphan handling, and sub-50ms perf on 500 items × 5k runs."
             }
-          ],
-          "startedAt": "2026-04-23T16:02:11.657Z",
-          "completedAt": "2026-04-23T16:02:11.657Z"
+          ]
         },
         {
           "id": "db3f2b10-1f3d-46be-a276-9274fceff25d",
@@ -352,7 +352,7 @@
             {
               "id": "89bd6c5d-093b-480d-91ba-965289768925",
               "title": "Record task start and end timestamps from hench runs and status transitions",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Whenever a task transitions to in-progress (via `update_task_status`, `ndx work`, or MCP) capture a `startedAt`; when it transitions to completed capture an `endedAt`. Persist both on the PRD item in `.rex/prd.json` so duration is derivable without replaying the execution log. Handle the case where a task is picked up multiple times by accumulating active intervals rather than overwriting.",
               "acceptanceCriteria": [
@@ -367,7 +367,11 @@
                 "prd",
                 "timing"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T16:03:02.619Z",
+              "completedAt": "2026-04-23T16:16:21.009Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added startedAt/endedAt/activeIntervals timing fields to PRDItem; extended computeTimestampUpdates to stamp them on every status transition; shipped getTaskDuration helper with 14 unit tests."
             },
             {
               "id": "8f8ab3e2-bd78-4dff-8f01-5545ad395728",

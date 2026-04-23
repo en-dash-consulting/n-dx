@@ -51,6 +51,7 @@ export type {
   MergedProposalRecord,
   PRDItem,
   PRDDocument,
+  ActiveInterval,
   RexConfig,
   StructureHealthThresholds,
   FacetDefinition,

@@ -95,7 +95,7 @@ export { jiraIntegrationSchema } from "./store/integration-schemas/jira.js";
 export type {
   PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, ResolutionType, RexConfig,
   RequirementCategory, RequirementValidationType, Requirement,
-  FacetDefinition, LoEConfig,
+  FacetDefinition, LoEConfig, ActiveInterval,
 } from "./schema/v1.js";
 export {
   SCHEMA_VERSION,
@@ -214,6 +214,12 @@ export type {
 // ---- Core: timestamps -------------------------------------------------------
 
 export { computeTimestampUpdates } from "./core/timestamps.js";
+export type { TimestampUpdates } from "./core/timestamps.js";
+
+// ---- Core: durations --------------------------------------------------------
+
+export { getTaskDuration } from "./core/durations.js";
+export type { TaskDuration } from "./core/durations.js";
 
 // ---- Core: parent auto-completion -------------------------------------------
 
