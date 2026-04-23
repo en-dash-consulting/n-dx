@@ -290,6 +290,8 @@ Satellite zones that survive the merge (because they have strong internal cohesi
 
 The `.rex/` directory is a **shared mutable data zone** — readable by rex, hench, and web without creating import-graph coupling. This is an intentional design: packages share state via filesystem rather than runtime imports. However, concurrent write safety depends on the following protocol.
 
+**Single-file PRD invariant.** `.rex/prd.json` is the one canonical PRD file. There are no branch-scoped or multi-file writers — every reader and writer (rex CLI, hench, MCP, web dashboard) touches the same file. A one-time on-load migration consolidates any legacy `prd_{branch}_{date}.json` files into `prd.json` and renames the sources to `<name>.backup.<timestamp>`; no user action is required. `rex add` / `ndx add` therefore target `prd.json` unconditionally — any documentation or tooling that still references branch-scoped PRD targeting is stale and should be updated.
+
 ### Write ownership
 
 | File | Owner (writer) | Readers | Write pattern |
