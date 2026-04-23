@@ -488,6 +488,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
     yes: opts.yes,
+    autonomous: opts.autonomous,
     store,
     autoCommit: config.autoCommit === true,
   });

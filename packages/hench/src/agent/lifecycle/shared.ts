@@ -87,6 +87,12 @@ export interface SharedLoopOptions {
    */
   yes?: boolean;
   /**
+   * True when the run is in a non-interactive autonomous mode (--auto or
+   * --loop). Bypasses interactive prompts — including the commit-message
+   * approval gate — so unattended runs do not stall waiting for input.
+   */
+  autonomous?: boolean;
+  /**
    * Additional project context to append to the prompt (e.g. CONTEXT.md +
    * PRD status excerpt injected by the pair-programming command).
    */
@@ -578,6 +584,12 @@ export interface FinalizeRunOptions {
    */
   yes?: boolean;
   /**
+   * True when the run is in a non-interactive autonomous mode (--auto or
+   * --loop). Bypasses the interactive commit-message approval prompt so
+   * unattended runs do not stall waiting for input.
+   */
+  autonomous?: boolean;
+  /**
    * PRD store used to reset task status to pending on failure.
    * When provided, if the run fails and the task is still in_progress,
    * it is reset to pending so it reappears as actionable. This occurs
@@ -703,12 +715,20 @@ async function countStagedFiles(projectDir: string): Promise<number> {
  * - autoCommit is enabled (agent commits itself; no sentinel to process)
  * - the run did not complete successfully
  * - no sentinel file is present (agent skipped writing it)
+ *
+ * The approval prompt is bypassed (commit proceeds using the proposed
+ * message) when `yes` is true (--yes) or `autonomous` is true (--auto or
+ * --loop) so unattended runs do not stall waiting for input.
+ *
+ * Exported for direct unit-testing of the approval gate; callers in the
+ * lifecycle pipeline reach it via `finalizeRun`.
  */
-async function performCommitPromptIfNeeded(
+export async function performCommitPromptIfNeeded(
   run: RunRecord,
   projectDir: string,
   autoCommit: boolean,
   yes?: boolean,
+  autonomous?: boolean,
 ): Promise<void> {
   if (autoCommit || run.status !== "completed") return;
 
@@ -739,7 +759,11 @@ async function performCommitPromptIfNeeded(
   subsection("Proposed Commit");
   info(message);
 
-  const isInteractive = Boolean(process.stdin.isTTY) && !yes;
+  // Skip the approval prompt whenever the caller signalled non-interactive
+  // operation — --yes or any autonomous mode (--auto, --loop). The same flag
+  // state governs other autonomous behaviors (task autoselect, rollback), so
+  // the commit gate stays consistent with the rest of the unattended run.
+  const isInteractive = Boolean(process.stdin.isTTY) && !yes && !autonomous;
   let confirmed = true;
   if (isInteractive) {
     info("Tip: pass --yes to auto-confirm, or run 'ndx config hench.autoCommit true' to let the agent commit itself.");
@@ -958,7 +982,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
   // Prompt the user to commit staged changes using the agent's proposed message.
   // No-op when autoCommit is true (agent committed itself) or on failure paths.
-  await performCommitPromptIfNeeded(run, projectDir, opts.autoCommit === true, opts.yes);
+  // The approval prompt is bypassed in autonomous mode (--auto, --loop) so
+  // unattended runs do not stall waiting for user input.
+  await performCommitPromptIfNeeded(
+    run,
+    projectDir,
+    opts.autoCommit === true,
+    opts.yes,
+    opts.autonomous,
+  );
 
   // Rollback uncommitted changes when the run failed (unless suppressed).
   // Runs after test gates so the working tree reflects the agent's final state.

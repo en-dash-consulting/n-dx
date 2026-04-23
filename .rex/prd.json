@@ -5,9 +5,11 @@
     {
       "id": "5687b9ba-5dae-4a5f-b1d4-d43176351357",
       "title": "Documentation Refresh for Recent PRD Changes",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-23T03:15:07.843Z",
+      "completedAt": "2026-04-23T03:15:07.843Z",
       "children": [
         {
           "id": "4c28fbf8-94bd-4950-8ad8-24578929ab44",
@@ -47,10 +49,12 @@
         {
           "id": "ef9224cb-e708-4ff4-9dcd-954a86905915",
           "title": "Update Documentation for New PRD Structure",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Apply the documentation changes identified in the audit across all markdown files, ensuring the new multi-file branch-scoped PRD structure is accurately described everywhere it is referenced. Includes a reserved slot for a structural diagram.",
           "source": "smart-add",
+          "startedAt": "2026-04-23T03:15:07.837Z",
+          "completedAt": "2026-04-23T03:15:07.837Z",
           "children": [
             {
               "id": "1132550d-e4dc-4103-b86a-c849b46d60f5",
@@ -102,7 +106,7 @@
             {
               "id": "2e6f0a74-f49b-4bd6-92ab-088db5568c58",
               "title": "Add PRD structure diagram placeholder with 'img_here' label",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Insert a reserved placeholder for a diagram of the new PRD structure in the primary documentation location (README.md and/or CLAUDE.md where the PRD format is first introduced) using the literal label 'img_here' so the user can replace it with the actual image later. Include a short caption describing what the diagram should depict (branch-scoped multi-file layout and their relationships) so the replacement image has clear intent.",
               "acceptanceCriteria": [
@@ -116,12 +120,16 @@
                 "documentation",
                 "diagram"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T03:09:12.193Z",
+              "completedAt": "2026-04-23T03:10:36.889Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added markdown image-syntax placeholders with the literal label 'img_here' plus descriptive captions in two primary doc locations: root README.md (after the §Output Files legacy PRD migration note) and packages/rex/README.md (in the §PRD file layout subsection). Captions describe the intended diagram — the legacy branch-scoped multi-file layout (prd_{branch}_{date}.json) and its consolidation into the single canonical .rex/prd.json with sources renamed to .backup.<timestamp> on first load. The image syntax `![img_here](img_here)` is trivially find-and-replaceable when the real image is produced."
             },
             {
               "id": "9a7cb6af-cd94-4904-9e5a-1274e996fc09",
               "title": "Update supporting docs (PACKAGE_GUIDELINES, TESTING, workflow docs) for recent merges",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Update PACKAGE_GUIDELINES.md, TESTING.md, and any workflow or architecture documents that reference PRD file layout, add/recommend pipelines, or duplicate detection behavior. Ensure test documentation reflects any new required tests or validation from the multi-file backend validation merge, and that architectural guidance mentions the new file-targeting behavior where relevant.",
               "acceptanceCriteria": [
@@ -137,7 +145,11 @@
                 "testing",
                 "architecture"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T03:10:48.937Z",
+              "completedAt": "2026-04-23T03:15:07.826Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Updated TESTING.md Required Coverage table + scenario-to-file pointer table for legacy multi-file PRD migration, cross-vendor authoring regression, self-heal test gate, Codex-batch fallback, and pair-programming cross-vendor review. Added single-file PRD invariant paragraph to PACKAGE_GUIDELINES.md §.rex/ Write-Access Protocol. Verified no workflow guide docs reference branch-scoped or multi-file layouts (grep-clean across docs/guide/*). Cross-checked with docs/doc-delta-audit.md §3.4/§3.5/§6. Docs-only — no code or link breakage."
             }
           ]
         }
@@ -213,6 +225,54 @@
           ]
         }
       ]
+    },
+    {
+      "id": "365af34f-65ef-4fa0-adc5-bf07665d9efa",
+      "title": "Hench Autonomous Execution Improvements",
+      "status": "completed",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "3ca4d0d8-070b-476f-8c90-79bf6b349021",
+          "title": "Commit Approval Bypass for Autonomous Runs",
+          "status": "completed",
+          "level": "feature",
+          "description": "Allow ndx work invocations running in non-interactive autonomous modes (--auto, --loop) to skip the interactive commit message approval gate, so unattended runs don't stall waiting for user input.",
+          "source": "smart-add",
+          "startedAt": "2026-04-23T03:25:03.715Z",
+          "completedAt": "2026-04-23T03:25:03.715Z",
+          "children": [
+            {
+              "id": "eee22417-50e4-41a3-8749-cd55f3190d8a",
+              "title": "Bypass commit message approval when ndx work runs with --auto or --loop",
+              "status": "completed",
+              "level": "task",
+              "description": "The hench agent's commit workflow currently prompts the user to approve generated commit messages before finalizing a commit. In autonomous modes (--auto, --loop), there is no interactive user to respond, causing runs to hang or time out. Detect these flags at the point the commit-approval check is invoked and skip the prompt, falling back to the generated commit message without confirmation. Preserve the existing interactive behavior for normal (non-autonomous) runs.",
+              "acceptanceCriteria": [
+                "ndx work --auto completes commits without prompting for commit message approval",
+                "ndx work --loop completes commits without prompting for commit message approval",
+                "ndx work (no auto/loop flags) still prompts for commit message approval as before",
+                "The bypass is driven by the same flag state that governs other autonomous behaviors, not a separate toggle",
+                "Unit or integration test covers both the bypass and the interactive path"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "agent",
+                "cli"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-23T03:15:37.947Z",
+              "completedAt": "2026-04-23T03:25:03.702Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added `autonomous` flag to SharedLoopOptions/FinalizeRunOptions, computed as `auto || loop || epicByEpic` in run.ts, and propagated it through runOne → cliLoop/agentLoop → finalizeRun → performCommitPromptIfNeeded. The approval prompt is now bypassed when either `yes` or `autonomous` is set (same mechanism that already gates task autoselect). Exported performCommitPromptIfNeeded for direct unit testing; new integration test packages/hench/tests/integration/commit-prompt.test.ts covers three cases: autonomous bypass (commits using the proposed message, no prompt), interactive path (readline is invoked and user decision respected), and --yes bypass. All 2483 hench tests pass; typecheck clean across the monorepo. Two pre-existing zone-cohesion e2e failures (tick zone cohesion 0.44 < 0.5; stale `sync` entry in COHESION_EXCEPTIONS) are unrelated to this change — verified against git stash. No commit-config toggle was introduced; reused existing auto/loop flag state per AC #4."
+            }
+          ]
+        }
+      ],
+      "startedAt": "2026-04-23T03:25:03.721Z",
+      "completedAt": "2026-04-23T03:25:03.721Z"
     }
   ]
 }

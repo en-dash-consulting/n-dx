@@ -617,6 +617,7 @@ async function runOne(
   rollbackOnFailure?: boolean,
   yes?: boolean,
   extraContext?: string,
+  autonomous?: boolean,
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
@@ -646,6 +647,7 @@ async function runOne(
         runHistory: runs,
         rollbackOnFailure,
         yes,
+        autonomous,
         extraContext,
       })
     : await agentLoop({
@@ -664,6 +666,7 @@ async function runOne(
         runHistory: runs,
         rollbackOnFailure,
         yes,
+        autonomous,
         extraContext,
       });
 
@@ -985,8 +988,13 @@ export async function cmdRun(
       }
     }
 
+    // Autonomous runs (--auto, --loop, --epic-by-epic) bypass interactive
+    // prompts such as the commit-message approval gate. The same flag state
+    // governs task autoselect above — both are facets of "running unattended".
+    const autonomous = auto || loop || epicByEpic;
+
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride, rollbackOnFailure, yes, extraContext);
+      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous);
       return;
     }
 
@@ -1000,9 +1008,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride, rollbackOnFailure, yes, extraContext);
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, rollbackOnFailure, yes, extraContext);
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, rollbackOnFailure, yes, extraContext, autonomous);
     }
   } finally {
     await limiter.release();
@@ -1031,6 +1039,7 @@ async function runIterations(
   rollbackOnFailure?: boolean,
   yes?: boolean,
   extraContext?: string,
+  autonomous?: boolean,
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
     if (iterations > 1) {
@@ -1056,6 +1065,7 @@ async function runIterations(
       rollbackOnFailure,
       yes,
       extraContext,
+      autonomous,
     );
 
     // Emit quota log line(s) at the inter-run boundary.
@@ -1099,6 +1109,7 @@ async function runLoop(
   rollbackOnFailure?: boolean,
   yes?: boolean,
   extraContext?: string,
+  autonomous?: boolean,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -1170,6 +1181,7 @@ async function runLoop(
             rollbackOnFailure,
             yes,
             extraContext,
+            autonomous,
           );
           status = result.status;
         } finally {
@@ -1280,6 +1292,7 @@ async function runEpicByEpic(
   rollbackOnFailure?: boolean,
   yes?: boolean,
   extraContext?: string,
+  autonomous?: boolean,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -1409,6 +1422,7 @@ async function runEpicByEpic(
               rollbackOnFailure,
               yes,
               extraContext,
+              autonomous,
             );
             status = result.status;
           } finally {
