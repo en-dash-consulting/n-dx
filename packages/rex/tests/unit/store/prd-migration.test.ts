@@ -1,13 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, readFile, readdir, access, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile, readdir, access, mkdir, copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { migrateLegacyPRD } from "../../../src/store/prd-migration.js";
-import { resolveStore, PRD_FILENAME } from "../../../src/store/index.js";
+import { FileStore, resolveStore, PRD_FILENAME } from "../../../src/store/index.js";
 import { cmdInit } from "../../../src/cli/commands/init.js";
 import { SCHEMA_VERSION } from "../../../src/schema/v1.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
-import type { PRDDocument } from "../../../src/schema/v1.js";
+import type { PRDDocument, LogEntry } from "../../../src/schema/v1.js";
+
+const FIXTURES_DIR = join(
+  fileURLToPath(new URL(".", import.meta.url)),
+  "../../fixtures/legacy-multifile-prd",
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -385,5 +391,145 @@ describe("cmdInit", () => {
 
     const doc = await readPRD(rexDir, PRD_FILENAME);
     expect(doc.title).toBe("Existing");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Legacy multi-file fixture — end-to-end migration with items + log content
+// ---------------------------------------------------------------------------
+
+describe("migrateLegacyPRD — legacy multi-file fixture", () => {
+  let tmpDir: string;
+  let rexDir: string;
+
+  /**
+   * Copy every file in the legacy multi-file fixture into a fresh `.rex/` so
+   * the test exercises the real on-disk layout a pre-consolidation project
+   * would have had (multiple `prd_{branch}_{date}.json` files plus a shared
+   * execution-log.jsonl).
+   */
+  async function seedFixture(target: string): Promise<void> {
+    const entries = await readdir(FIXTURES_DIR);
+    for (const name of entries) {
+      await copyFile(join(FIXTURES_DIR, name), join(target, name));
+    }
+  }
+
+  async function readLog(path: string): Promise<LogEntry[]> {
+    const raw = await readFile(path, "utf-8");
+    return raw
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as LogEntry);
+  }
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-legacy-fixture-"));
+    rexDir = join(tmpDir, ".rex");
+    await mkdir(rexDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("collapses the fixture into prd.json with identical item content and preserves execution-log.jsonl", async () => {
+    await seedFixture(rexDir);
+
+    // Snapshot the fixture bytes before migration so we can assert the log is
+    // preserved verbatim and items survive the round-trip without mutation.
+    const legacyMainBefore = JSON.parse(
+      await readFile(join(rexDir, "prd_main_2025-03-01.json"), "utf-8"),
+    ) as PRDDocument;
+    const legacyFeatureXBefore = JSON.parse(
+      await readFile(join(rexDir, "prd_feature-x_2025-04-01.json"), "utf-8"),
+    ) as PRDDocument;
+    const legacyFeatureYBefore = JSON.parse(
+      await readFile(join(rexDir, "prd_feature-y_2025-04-10.json"), "utf-8"),
+    ) as PRDDocument;
+    const logBytesBefore = await readFile(join(rexDir, "execution-log.jsonl"), "utf-8");
+
+    const result = await migrateLegacyPRD(rexDir);
+
+    expect(result.migrated).toBe(true);
+    expect(result.mergedFiles?.sort()).toEqual([
+      "prd_feature-x_2025-04-01.json",
+      "prd_feature-y_2025-04-10.json",
+      "prd_main_2025-03-01.json",
+    ]);
+
+    // The unified prd.json exists and loads through the production FileStore —
+    // identical item content, including nested children and metadata.
+    const store = new FileStore(rexDir);
+    const merged = await store.loadDocument();
+
+    expect(merged.schema).toBe(SCHEMA_VERSION);
+    // All legacy items survived the merge (order follows discovery — sorted
+    // lexicographically when no canonical prd.json seeds the order).
+    expect(merged.items.map((i) => i.id).sort()).toEqual([
+      "epic-feature-x",
+      "epic-feature-y",
+      "epic-main",
+    ]);
+    const byId = new Map(merged.items.map((i) => [i.id, i]));
+    expect(byId.get("epic-main")).toEqual(legacyMainBefore.items[0]);
+    expect(byId.get("epic-feature-x")).toEqual(legacyFeatureXBefore.items[0]);
+    expect(byId.get("epic-feature-y")).toEqual(legacyFeatureYBefore.items[0]);
+
+    // Legacy sources no longer exist under their original names; backups do.
+    for (const original of [
+      "prd_main_2025-03-01.json",
+      "prd_feature-x_2025-04-01.json",
+      "prd_feature-y_2025-04-10.json",
+    ]) {
+      await expect(access(join(rexDir, original))).rejects.toThrow();
+    }
+    const backups = (await readdir(rexDir)).filter((f) => f.includes(".backup."));
+    expect(backups).toHaveLength(3);
+
+    // Execution log is shared across branches and must be preserved byte-for-byte
+    // with every entry intact.
+    const logBytesAfter = await readFile(join(rexDir, "execution-log.jsonl"), "utf-8");
+    expect(logBytesAfter).toBe(logBytesBefore);
+
+    const logEntries = await readLog(join(rexDir, "execution-log.jsonl"));
+    expect(logEntries).toHaveLength(4);
+    expect(logEntries.map((e) => e.itemId)).toEqual([
+      "epic-main",
+      "task-main-1",
+      "epic-feature-x",
+      "epic-feature-y",
+    ]);
+
+    // Every logged itemId should resolve to an item in the unified PRD so the
+    // log is semantically consistent with the migrated tree.
+    const allIds = new Set<string>();
+    const walk = (nodes: typeof merged.items): void => {
+      for (const n of nodes) {
+        allIds.add(n.id);
+        if (n.children) walk(n.children);
+      }
+    };
+    walk(merged.items);
+    for (const entry of logEntries) {
+      if (entry.itemId) expect(allIds.has(entry.itemId)).toBe(true);
+    }
+  });
+
+  it("resolveStore loads the fixture through the production code path", async () => {
+    await seedFixture(rexDir);
+
+    const store = await resolveStore(rexDir);
+    const doc = await store.loadDocument();
+
+    expect(doc.items.map((i) => i.id).sort()).toEqual([
+      "epic-feature-x",
+      "epic-feature-y",
+      "epic-main",
+    ]);
+    // Log is untouched and readable via the store's own API.
+    const entries = await store.readLog();
+    expect(entries).toHaveLength(4);
   });
 });

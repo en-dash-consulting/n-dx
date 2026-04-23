@@ -1,0 +1,4 @@
+{"timestamp":"2025-03-01T10:00:00.000Z","event":"item_added","itemId":"epic-main","detail":"Created main epic"}
+{"timestamp":"2025-03-05T11:30:00.000Z","event":"status_updated","itemId":"task-main-1","detail":"Status changed to completed"}
+{"timestamp":"2025-04-01T08:15:00.000Z","event":"item_added","itemId":"epic-feature-x","detail":"Branch-scoped epic created on feature-x"}
+{"timestamp":"2025-04-10T14:00:00.000Z","event":"item_added","itemId":"epic-feature-y","detail":"Branch-scoped epic created on feature-y"}

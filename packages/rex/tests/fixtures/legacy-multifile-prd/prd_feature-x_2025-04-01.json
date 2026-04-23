@@ -1,0 +1,35 @@
+{
+  "schema": "rex/v1",
+  "title": "Feature X Branch",
+  "items": [
+    {
+      "id": "epic-feature-x",
+      "level": "epic",
+      "title": "Feature X Epic",
+      "status": "in_progress",
+      "priority": "medium",
+      "description": "Work on a feature branch.",
+      "children": [
+        {
+          "id": "feature-x-feature",
+          "level": "feature",
+          "title": "Feature X — Primary Feature",
+          "status": "pending",
+          "description": "feature-scoped work",
+          "children": [
+            {
+              "id": "feature-x-task",
+              "level": "task",
+              "title": "Feature X Task",
+              "status": "pending",
+              "priority": "medium",
+              "acceptanceCriteria": ["feature-x criterion A", "feature-x criterion B"],
+              "blockedBy": ["task-main-1"],
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -134,22 +134,24 @@
     {
       "id": "1c4e4162-d5e6-4e2b-ad45-ead62b9a5508",
       "title": "PRD Storage Consolidation",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "be363df5-da5d-42a8-b5fa-6bfaf294982d",
           "title": "Consolidate PRD Files into Single 'prd' File",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Unify the branch-scoped multi-file PRD storage back into a single canonical file named 'prd' for both newly generated and existing PRDs, including migration of any existing split files.",
           "source": "smart-add",
+          "startedAt": "2026-04-23T02:30:34.820Z",
+          "completedAt": "2026-04-23T02:30:34.820Z",
           "children": [
             {
               "id": "37c43e3c-bcce-432c-a953-9685f1618999",
               "title": "Merge branch-scoped PRD files into single canonical 'prd' file",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Replace the current multi-file branch-scoped PRD storage with a single consolidated file named 'prd' at the new canonical location. Combine content from any existing split files during load, write to the unified location on save, and add a one-time migration path that folds legacy multi-file layouts into the new single-file format without data loss.",
               "acceptanceCriteria": [
@@ -166,12 +168,13 @@
                 "migration"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-23T01:33:12.091Z"
+              "startedAt": "2026-04-23T01:33:12.091Z",
+              "completedAt": "2026-04-23T01:54:23.844Z"
             },
             {
               "id": "54be143d-cb14-4fe1-89e1-376b8a224755",
               "title": "Update PRD storage tests for single-file 'prd' location",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Revise unit, integration, and e2e tests that assume the branch-scoped multi-file PRD layout so they target the new single 'prd' file location. Add migration coverage that exercises loading a legacy multi-file fixture and verifying it collapses correctly into the unified file.",
               "acceptanceCriteria": [
@@ -187,11 +190,17 @@
                 "tests",
                 "migration"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T02:22:15.872Z",
+              "completedAt": "2026-04-23T02:30:34.809Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added legacy multi-file fixture under packages/rex/tests/fixtures/legacy-multifile-prd/ and a new prd-migration.test.ts describe block that copies the fixture into a fresh .rex/, runs migrateLegacyPRD (and resolveStore), and asserts the merged prd.json has identical item content and that execution-log.jsonl is preserved byte-for-byte. Prior multi-file test suites had already been removed/converted; every remaining rex and web test references the single prd.json. Full rex (3457) and web (2618) test suites pass."
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-23T02:30:34.826Z",
+      "completedAt": "2026-04-23T02:30:34.826Z"
     }
   ]
 }

@@ -1,0 +1,33 @@
+{
+  "schema": "rex/v1",
+  "title": "Feature Y Branch",
+  "items": [
+    {
+      "id": "epic-feature-y",
+      "level": "epic",
+      "title": "Feature Y Epic",
+      "status": "pending",
+      "priority": "low",
+      "children": [
+        {
+          "id": "feature-y-task",
+          "level": "task",
+          "title": "Feature Y Task",
+          "status": "pending",
+          "priority": "low",
+          "acceptanceCriteria": ["feature-y done criteria"],
+          "blockedBy": [],
+          "children": [
+            {
+              "id": "feature-y-subtask",
+              "level": "subtask",
+              "title": "Feature Y Subtask",
+              "status": "pending",
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

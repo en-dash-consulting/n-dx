@@ -1,0 +1,27 @@
+{
+  "schema": "rex/v1",
+  "title": "Legacy Project",
+  "items": [
+    {
+      "id": "epic-main",
+      "level": "epic",
+      "title": "Main Branch Epic",
+      "status": "completed",
+      "priority": "high",
+      "description": "Epic that lived on main before consolidation.",
+      "tags": ["v1", "core"],
+      "children": [
+        {
+          "id": "task-main-1",
+          "level": "task",
+          "title": "Main Branch Task",
+          "status": "completed",
+          "priority": "medium",
+          "acceptanceCriteria": ["original main criteria"],
+          "blockedBy": [],
+          "children": []
+        }
+      ]
+    }
+  ]
+}
