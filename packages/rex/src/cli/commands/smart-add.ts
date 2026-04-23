@@ -3,14 +3,7 @@ import { access, readFile, unlink } from "node:fs/promises";
 import { atomicWriteJSON } from "../../store/atomic-write.js";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
-import {
-  resolveStore,
-  FileStore,
-  resolvePRDFile,
-  resolveGitBranch,
-  findPRDFileForBranch,
-  resolvePRDFilename,
-} from "../../store/index.js";
+import { resolveStore } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { REX_DIR } from "./constants.js";
@@ -38,7 +31,7 @@ import {
   attachDuplicateReasonsToProposals,
   buildDuplicateOverrideMarkerIndex,
 } from "./smart-add-duplicates.js";
-import type { ProposalDuplicateMatch, ItemFileMap } from "./smart-add-duplicates.js";
+import type { ProposalDuplicateMatch } from "./smart-add-duplicates.js";
 import type { LLMVendor, LLMConfig } from "@n-dx/llm-client";
 import { printVendorModelHeader, resolveVendorModel } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
@@ -749,15 +742,6 @@ async function acceptProposals(
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
 
-  // Ensure the current branch's PRD file exists and is the write target.
-  if (store instanceof FileStore) {
-    const branch = resolveGitBranch(dir);
-    if (branch !== "unknown") {
-      const resolution = await resolvePRDFile(rexDir, dir);
-      store.setCurrentBranchFile(resolution.filename);
-    }
-  }
-
   const parentLevel = await resolveParentLevel(dir, parentId);
 
   let addedCount = 0;
@@ -1059,8 +1043,6 @@ type SmartAddInput = {
 type SmartAddContext = {
   existing: PRDItem[];
   parentLevel?: ItemLevel;
-  /** Item-to-file ownership map for cross-PRD duplicate detection. */
-  itemFileMap?: ItemFileMap;
 };
 
 function parseSmartAddInput(
@@ -1196,12 +1178,7 @@ async function loadSmartAddContext(
   const doc = await store.loadDocument();
   const existing = doc.items;
 
-  // Extract item-to-file map for cross-PRD duplicate detection.
-  // FileStore populates this map as a side effect of loadDocument().
-  const itemFileMap: ItemFileMap | undefined =
-    store instanceof FileStore ? store.getItemFileMap() : undefined;
-
-  if (!parentId) return { existing, itemFileMap };
+  if (!parentId) return { existing };
 
   const parentEntry = findItem(existing, parentId);
   if (!parentEntry) {
@@ -1219,7 +1196,7 @@ async function loadSmartAddContext(
     );
   }
 
-  return { existing, parentLevel, itemFileMap };
+  return { existing, parentLevel };
 }
 
 async function generateSmartAddProposals(params: {
@@ -1300,9 +1277,8 @@ function renderSmartAddProposals(params: {
   qualityIssues: QualityIssue[];
   isJson: boolean;
   thresholdWeeks?: number;
-  targetFile?: string;
 }): void {
-  const { proposals, parentId, parentLevel, qualityIssues, isJson, thresholdWeeks, targetFile } = params;
+  const { proposals, parentId, parentLevel, qualityIssues, isJson, thresholdWeeks } = params;
   if (isJson) return;
 
   const summary = formatProposalSummary(proposals, parentLevel);
@@ -1312,10 +1288,6 @@ function renderSmartAddProposals(params: {
     info(`\nProposed structure (${summary}):`);
   }
   info(formatProposalTree(proposals, parentLevel, thresholdWeeks));
-
-  if (targetFile && targetFile !== "prd.json") {
-    info(`  Target file: ${targetFile}`);
-  }
 
   if (qualityIssues.length > 0) {
     warn("");
@@ -1345,9 +1317,8 @@ async function runInteractiveSmartAddApproval(params: {
   parentLevel?: ItemLevel;
   model?: string;
   thresholdWeeks?: number;
-  itemFileMap?: ItemFileMap;
 }): Promise<void> {
-  const { dir, existing, parentId, parentLevel, model, thresholdWeeks, itemFileMap } = params;
+  const { dir, existing, parentId, parentLevel, model, thresholdWeeks } = params;
   const { adjustGranularity } = await import("../../analyze/index.js");
   const resolvedModel = model;
   let currentProposals = params.proposals;
@@ -1400,7 +1371,7 @@ async function runInteractiveSmartAddApproval(params: {
           info("");
 
           currentDuplicateMatches = filterPlacedDuplicateMatches(
-            matchProposalNodesToPRD(currentProposals, existing, itemFileMap),
+            matchProposalNodesToPRD(currentProposals, existing),
             currentProposals,
           );
           await maybeCacheSmartAddProposals(dir, currentProposals, parentId, hashPRD(existing));
@@ -1550,7 +1521,6 @@ async function finalizeSmartAdd(params: {
   parentLevel?: ItemLevel;
   model?: string;
   thresholdWeeks?: number;
-  itemFileMap?: ItemFileMap;
 }): Promise<void> {
   const {
     dir,
@@ -1564,7 +1534,6 @@ async function finalizeSmartAdd(params: {
     parentLevel,
     model,
     thresholdWeeks,
-    itemFileMap,
   } = params;
 
   await maybeCacheSmartAddProposals(dir, proposals, parentId, hashPRD(existing));
@@ -1608,7 +1577,6 @@ async function finalizeSmartAdd(params: {
       parentLevel,
       model,
       thresholdWeeks,
-      itemFileMap,
     });
     return;
   }
@@ -1637,7 +1605,7 @@ export async function cmdSmartAdd(
   }
 
   const model = await resolveSmartAddModel(dir, flags.model);
-  const { existing, parentLevel, itemFileMap } = await loadSmartAddContext(dir, input.parentId);
+  const { existing, parentLevel } = await loadSmartAddContext(dir, input.parentId);
   const proposals = await generateSmartAddProposals({
     dir,
     existing,
@@ -1689,7 +1657,7 @@ export async function cmdSmartAdd(
   }
 
   const duplicateMatches = filterPlacedDuplicateMatches(
-    matchProposalNodesToPRD(consolidatedProposals, existing, itemFileMap),
+    matchProposalNodesToPRD(consolidatedProposals, existing),
     consolidatedProposals,
   );
   const proposalsWithReasons = attachDuplicateReasonsToProposals(consolidatedProposals, duplicateMatches);
@@ -1699,17 +1667,6 @@ export async function cmdSmartAdd(
     return;
   }
 
-  // Resolve target filename for approval display (read-only, no file creation)
-  let targetFile: string | undefined;
-  {
-    const rexDir = join(dir, REX_DIR);
-    const branch = resolveGitBranch(dir);
-    if (branch !== "unknown") {
-      const existing = await findPRDFileForBranch(rexDir, branch);
-      targetFile = existing ?? resolvePRDFilename(dir);
-    }
-  }
-
   renderSmartAddProposals({
     proposals: proposalsWithReasons,
     parentId: input.parentId,
@@ -1717,7 +1674,6 @@ export async function cmdSmartAdd(
     qualityIssues,
     isJson: input.isJson,
     thresholdWeeks,
-    targetFile,
   });
 
   await finalizeSmartAdd({
@@ -1732,6 +1688,5 @@ export async function cmdSmartAdd(
     parentLevel,
     model,
     thresholdWeeks,
-    itemFileMap,
   });
 }

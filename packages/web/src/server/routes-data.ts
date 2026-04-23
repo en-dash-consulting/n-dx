@@ -43,7 +43,7 @@ export function createDataWatcher(ctx: ServerContext, viewerPath?: string): Data
           // File may be mid-write
         }
       }
-      // Track max mtime across all PRD files (legacy prd.json + branch-scoped)
+      // Track the prd.json mtime for live-reload polling
       try {
         const mtime = prdMaxMtimeMs(ctx.rexDir);
         if (mtime > 0) {

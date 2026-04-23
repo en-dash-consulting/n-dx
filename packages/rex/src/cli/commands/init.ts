@@ -2,7 +2,7 @@ import { join, basename } from "node:path";
 import { readFile, writeFile, access } from "node:fs/promises";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
-import { ensureRexDir, discoverPRDFiles, resolveGitBranch, resolvePRDFilename } from "../../store/index.js";
+import { ensureRexDir, PRD_FILENAME } from "../../store/index.js";
 import { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "../../workflow/default.js";
 import { REX_DIR } from "./constants.js";
 import { info } from "../output.js";
@@ -29,30 +29,19 @@ export async function cmdInit(
     info("Created config.json");
   }
 
-  // PRD file — branch-scoped (in git repos) or legacy prd.json
-  const existingBranchFiles = await discoverPRDFiles(rexDir);
-  let hasPRD = existingBranchFiles.length > 0;
-  if (!hasPRD) {
-    try {
-      await access(join(rexDir, "prd.json"));
-      hasPRD = true;
-    } catch {
-      // No PRD files at all
-    }
-  }
-  if (hasPRD) {
-    info("PRD file already exists, skipping");
-  } else {
-    // Use branch-scoped naming when inside a git repo, fall back to prd.json otherwise
-    const branch = resolveGitBranch(dir);
-    const prdFilename = branch !== "unknown" ? resolvePRDFilename(dir) : "prd.json";
+  // prd.json — always the single canonical PRD file.
+  const prdPath = join(rexDir, PRD_FILENAME);
+  try {
+    await access(prdPath);
+    info(`${PRD_FILENAME} already exists, skipping`);
+  } catch {
     const doc: PRDDocument = {
       schema: SCHEMA_VERSION,
       title: project,
       items: [],
     };
-    await writeFile(join(rexDir, prdFilename), toCanonicalJSON(doc), "utf-8");
-    info(`Created ${prdFilename}`);
+    await writeFile(prdPath, toCanonicalJSON(doc), "utf-8");
+    info(`Created ${PRD_FILENAME}`);
   }
 
   // execution-log.jsonl

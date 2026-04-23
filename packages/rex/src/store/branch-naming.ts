@@ -1,9 +1,10 @@
 /**
- * Branch-aware PRD file naming utilities.
+ * Git branch detection utilities.
  *
- * Generates deterministic filenames in the format `prd_{branch}_{date}.json`
- * by detecting the current git branch, sanitizing it for filesystem use,
- * and extracting the date of the first branch-specific commit.
+ * Small set of helpers for resolving the current git branch and the date of
+ * its first unique commit. Historically this module also owned the branch-
+ * scoped PRD filename scheme; after the PRD storage consolidation, only the
+ * branch-detection primitives remain.
  */
 
 import { execFileSync } from "node:child_process";
@@ -121,27 +122,4 @@ export function getFirstCommitDate(cwd: string): string {
 
   // 3. Final fallback
   return new Date().toISOString().slice(0, 10);
-}
-
-/**
- * Generate a PRD filename in the `prd_{sanitized-branch}_{YYYY-MM-DD}.json` format.
- *
- * The branch name is sanitized automatically. Pass a raw (unsanitized)
- * branch name — the function handles the conversion.
- */
-export function generatePRDFilename(branch: string, date: string): string {
-  const sanitized = sanitizeBranchName(branch);
-  return `prd_${sanitized}_${date}.json`;
-}
-
-/**
- * Resolve the PRD filename for the current git context.
- *
- * Convenience composition of {@link resolveGitBranch}, {@link getFirstCommitDate},
- * and {@link generatePRDFilename}. Deterministic for a given branch+history.
- */
-export function resolvePRDFilename(cwd: string): string {
-  const branch = resolveGitBranch(cwd);
-  const date = getFirstCommitDate(cwd);
-  return generatePRDFilename(branch, date);
 }
