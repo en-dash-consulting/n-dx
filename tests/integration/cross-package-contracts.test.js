@@ -358,6 +358,7 @@ describe("web → rex gateway contract", () => {
     "isRootLevel",
     "isWorkItem",
     "handleEditItem",
+    "aggregateItemTokenUsage",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -632,7 +633,7 @@ describe("gateway export auto-detection", () => {
         "detectReorganizations", "applyProposals", "applyReshape",
         "reasonForReshape", "isPriority", "isItemLevel",
         "isRequirementCategory", "isValidationType", "isRootLevel", "isWorkItem",
-        "handleEditItem",
+        "handleEditItem", "aggregateItemTokenUsage",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "CHILD_LEVEL"],
       ...["SCHEMA_VERSION"],

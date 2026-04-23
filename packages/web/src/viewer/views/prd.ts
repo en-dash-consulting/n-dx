@@ -62,7 +62,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   // ── Data fetching & polling ────────────────────────────────────
   const {
     data, setData, loading, error, setError,
-    taskUsageById, weeklyBudget,
+    taskUsageById, rollupById, weeklyBudget,
     fetchPRDData, fetchTaskUsage,
   } = usePRDData(prdData);
 
@@ -315,6 +315,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       key: `prd-${hasActiveWork ? "active" : "done"}`,
       document: data,
       taskUsageById,
+      rollupById,
       weeklyBudget,
       showTokenBudget,
       defaultExpandDepth: hasActiveWork ? 2 : 0,

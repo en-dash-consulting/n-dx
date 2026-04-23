@@ -57,6 +57,14 @@ export interface RequirementData {
   priority?: Priority;
 }
 
+/**
+ * @see packages/rex/src/schema/v1.ts — ActiveInterval
+ */
+export interface ActiveIntervalData {
+  start: string;
+  end?: string;
+}
+
 export interface PRDItemData {
   id: string;
   title: string;
@@ -70,7 +78,9 @@ export interface PRDItemData {
   /** @see packages/rex/src/schema/v1.ts — PRDItem.requirements */
   requirements?: RequirementData[];
   startedAt?: string;
+  endedAt?: string;
   completedAt?: string;
+  activeIntervals?: ActiveIntervalData[];
   failureReason?: string;
   children?: PRDItemData[];
 }
@@ -104,6 +114,30 @@ export interface TaskUsageSummary {
   totalTokens: number;
   runCount: number;
   utilization?: TaskUtilizationSummary;
+}
+
+/** Bucketed token totals. */
+export interface ItemUsageBucket {
+  totalTokens: number;
+  runCount: number;
+}
+
+/**
+ * Rolled-up per-item token usage.
+ *
+ * `self` captures runs that directly targeted this item; `descendants`
+ * sums every descendant's `total`; `total = self + descendants`.
+ *
+ * Mirrors the `ItemTokenTotals` wire shape emitted by the `/api/hench/task-usage`
+ * endpoint; the server computes this via rex's `aggregateItemTokenUsage` so the
+ * viewer never aggregates tree usage itself.
+ *
+ * @see packages/rex/src/core/item-token-rollup.ts — canonical aggregator
+ */
+export interface ItemUsageRollup {
+  self: ItemUsageBucket;
+  descendants: ItemUsageBucket;
+  total: ItemUsageBucket;
 }
 
 /** Computed stats for a branch of the tree. */

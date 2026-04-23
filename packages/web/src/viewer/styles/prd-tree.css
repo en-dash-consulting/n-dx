@@ -702,6 +702,48 @@
   border-color: color-mix(in srgb, var(--brand-teal) 35%, transparent);
 }
 
+/* Token usage cell — container tag used for both the active badge and
+   the empty-dash placeholder, so the column layout stays consistent
+   whether or not runs exist. */
+.prd-usage-cell {
+  font-size: var(--font-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.prd-usage-cell-empty {
+  color: color-mix(in srgb, var(--text-dim) 60%, transparent);
+  padding: 0 var(--space-1);
+}
+
+/* Secondary "(X self)" annotation inside a rollup row — tells the
+   reader how concentrated vs. distributed the cost is at a glance. */
+.prd-usage-breakdown {
+  color: color-mix(in srgb, var(--text-dim) 75%, transparent);
+  margin-left: var(--space-1);
+}
+
+/* Duration column — static for terminal rows, animates subtly while
+   the row is in-progress so the reader knows the number is ticking. */
+.prd-duration-cell {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  padding: 0 var(--space-1);
+}
+
+.prd-duration-cell-empty {
+  color: color-mix(in srgb, var(--text-dim) 60%, transparent);
+}
+
+.prd-duration-cell-running {
+  color: var(--brand-teal);
+  font-weight: 500;
+}
+
 /* Timestamp */
 .prd-timestamp {
   font-size: var(--font-sm);

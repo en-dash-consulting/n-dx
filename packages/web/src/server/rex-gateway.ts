@@ -61,6 +61,14 @@ export { findNextTask, collectCompletedIds } from "@n-dx/rex";
 // ---- Rex timestamps ---------------------------------------------------------
 export { computeTimestampUpdates } from "@n-dx/rex";
 
+// ---- Rex per-item token rollup ----------------------------------------------
+// Only the symbols actively consumed by the web server route handler
+// are re-exported through the gateway. ItemTokenTuple, ItemRunTokens, and
+// ItemTokenAggregation live in rex's public API but are not (yet)
+// consumed by web — if a future route needs them, add the re-export here.
+export { aggregateItemTokenUsage } from "@n-dx/rex";
+export type { ItemTokenTotals } from "@n-dx/rex";
+
 // ---- Rex merge/consolidation ------------------------------------------------
 export { validateMerge, previewMerge, mergeItems } from "@n-dx/rex";
 

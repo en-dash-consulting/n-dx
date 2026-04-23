@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import type { PRDDocumentData } from "../components/prd-tree/types.js";
-import type { TaskUsageSummary, WeeklyBudgetResolution } from "../components/prd-tree/types.js";
+import type { TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "../components/prd-tree/types.js";
 import { resolveTaskUtilization } from "../components/prd-tree/task-utilization.js";
 import { diffDocument } from "../components/prd-tree/tree-differ.js";
 import { usePolling } from "../views/use-polling.js";
@@ -85,6 +85,14 @@ export interface PRDDataState {
   setError: (error: string | null) => void;
   /** Per-task usage summaries keyed by task ID. */
   taskUsageById: Record<string, TaskUsageSummary>;
+  /**
+   * Per-item rolled-up token usage keyed by item ID.
+   *
+   * Emitted by `/api/hench/task-usage` alongside the flat `taskUsage`
+   * map; the server computes the rollup with rex's
+   * `aggregateItemTokenUsage` so the tree never aggregates itself.
+   */
+  rollupById: Record<string, ItemUsageRollup>;
   /** Resolved weekly budget (for utilization calculations). */
   weeklyBudget: WeeklyBudgetResolution | null;
   /** Fetch/reconcile PRD data from server. Rate-limited and deduped. */
@@ -103,6 +111,7 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
   const [loading, setLoading] = useState(!prdData);
   const [error, setError] = useState<string | null>(null);
   const [taskUsageById, setTaskUsageById] = useState<Record<string, TaskUsageSummary>>({});
+  const [rollupById, setRollupById] = useState<Record<string, ItemUsageRollup>>({});
   const [weeklyBudget, setWeeklyBudget] = useState<WeeklyBudgetResolution | null>(null);
 
   /** Mutable ref so the dedup-wrapped fetchTaskUsage always reads the latest budget. */
@@ -159,8 +168,12 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
 
       if (taskUsageResult.status === "fulfilled" && taskUsageResult.value.ok) {
         try {
-          const json = await taskUsageResult.value.json() as { taskUsage?: Record<string, ServerTaskUsage> };
+          const json = await taskUsageResult.value.json() as {
+            taskUsage?: Record<string, ServerTaskUsage>;
+            rollup?: Record<string, ItemUsageRollup>;
+          };
           setTaskUsageById(applyUtilizationToTaskUsage(json.taskUsage ?? {}, resolvedWeeklyBudget));
+          setRollupById(json.rollup ?? {});
         } catch {
           // Keep existing values on parse errors.
         }
@@ -208,6 +221,7 @@ export function usePRDData(prdData?: PRDDocumentData | null): PRDDataState {
     error,
     setError,
     taskUsageById,
+    rollupById,
     weeklyBudget,
     fetchPRDData,
     fetchTaskUsage,

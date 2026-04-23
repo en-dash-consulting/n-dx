@@ -91,6 +91,30 @@ export class IncrementalTaskUsageAggregator {
   }
 
   /**
+   * Return one entry per cached run-file contribution, shaped for
+   * `aggregateItemTokenUsage` (rex's pure rollup function).
+   *
+   * Only `tokens.total` is populated from cache (input/output/cached
+   * breakdowns aren't retained by the incremental aggregator — they
+   * aren't needed for the per-item rollup totals the dashboard consumes).
+   * Run count is reflected by the number of returned entries since each
+   * contribution corresponds to one run file.
+   *
+   * The caller MUST `await getTaskUsage()` first (or call `refresh()`
+   * indirectly) to ensure the cache reflects the current filesystem.
+   */
+  getFileContributions(): Array<{ itemId: string; tokens: { input: number; output: number; cached: number; total: number } }> {
+    const out: Array<{ itemId: string; tokens: { input: number; output: number; cached: number; total: number } }> = [];
+    for (const c of this.fileContributions.values()) {
+      out.push({
+        itemId: c.taskId,
+        tokens: { input: 0, output: 0, cached: 0, total: c.totalTokens },
+      });
+    }
+    return out;
+  }
+
+  /**
    * Force a full rebuild on the next `getTaskUsage()` call.
    * Useful for testing or when external state is known to have changed.
    */
