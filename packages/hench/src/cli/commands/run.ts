@@ -76,17 +76,17 @@ export function formatRunSuccessMessage(text: string): string {
 /**
  * Format a loop-iteration boundary separator line.
  *
- * Rendered in pink/magenta (colorPink) to visually distinguish loop-iteration
+ * Rendered in yellow (colorWarn) to visually distinguish loop-iteration
  * boundaries from the cyan ═══ agent-turn section separators.  Width matches
  * SECTION_WIDTH (60 chars) for visual consistency with the rest of the
  * transcript.
  *
  * Fully suppressed (returns plain text that callers skip via NO_COLOR / !isTTY
- * checks in colorPink) when color is disabled.
- * Exported for testing — verifies colorPink is applied and suppression works.
+ * checks in colorWarn) when color is disabled.
+ * Exported for testing — verifies colorWarn is applied and suppression works.
  */
 export function formatLoopIterationSeparator(): string {
-  return colorPink("─".repeat(60));
+  return colorWarn("─".repeat(60));
 }
 
 /**

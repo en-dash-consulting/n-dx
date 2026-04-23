@@ -13,7 +13,6 @@ import { describe, it, expect, afterEach } from "vitest";
 // ANSI escape codes we assert on
 const YELLOW   = "\x1b[33m";
 const GREEN    = "\x1b[32m";
-const MAGENTA  = "\x1b[35m";
 const ANSI_PREFIX = "\x1b[";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -210,12 +209,12 @@ describe("formatLoopIterationSeparator", () => {
     await resetColor();
   });
 
-  it("contains magenta ANSI code when color is forced (TTY mode)", async () => {
+  it("contains yellow ANSI code when color is forced (TTY mode)", async () => {
     setColorMode("force");
     await resetColor();
     const { formatLoopIterationSeparator } = await import("../../../../src/cli/commands/run.js");
     const sep = formatLoopIterationSeparator();
-    expect(sep).toContain(MAGENTA);
+    expect(sep).toContain(YELLOW);
   });
 
   it("is 60 separator characters wide (excluding ANSI codes)", async () => {
