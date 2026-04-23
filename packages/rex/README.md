@@ -259,6 +259,10 @@ The PRD document (`prd.json`) wraps items in:
 
 `.rex/prd.json` is the **single canonical PRD file**. Every reader and writer — CLI, hench, MCP, dashboard — touches this file. There are no branch-scoped or multi-file writers.
 
+![img_here](img_here)
+
+*Figure placeholder — replace `img_here` with the final image path. The diagram should depict the legacy branch-scoped multi-file PRD layout (one `prd_{branch}_{date}.json` per branch/date) and its relationship to the current single-file layout: each legacy file feeds into the canonical `.rex/prd.json` during on-load consolidation, and the originals are renamed to `<name>.backup.<timestamp>`.*
+
 **Legacy migration.** If the directory still contains legacy branch-scoped files from a previous layout:
 
 ```

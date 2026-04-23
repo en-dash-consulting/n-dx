@@ -267,6 +267,10 @@ Codex reads `.codex/config.toml` automatically — no manual registration requir
 
 > **Legacy PRD migration.** The PRD is a single canonical file at `.rex/prd.json`. If you are upgrading from a previous layout that produced branch-scoped files (`.rex/prd_{branch}_{date}.json`), the first rex read after upgrade merges every such file into `prd.json` and renames the sources to `<name>.backup.<timestamp>`. The migration runs once, is idempotent, and requires no user action — delete the `.backup.*` files once the merged `prd.json` looks correct.
 
+![img_here](img_here)
+
+*Figure placeholder — replace `img_here` with the final image path. The diagram should depict the legacy branch-scoped multi-file PRD layout (`.rex/prd_{branch}_{date}.json` per branch/date) on the left, the single canonical `.rex/prd.json` on the right, and arrows showing each legacy file being merged into `prd.json` and renamed to `<name>.backup.<timestamp>` on first store resolution.*
+
 ## Security
 
 n-dx runs an autonomous agent (hench) that reads, writes, and executes commands on your behalf. The security model is designed to keep all operations scoped to the project directory with no ambient access to the rest of your system.
