@@ -51,13 +51,26 @@
 export { resolveStore, PRD_FILENAME } from "./store/index.js";
 export type { PRDStore } from "./store/contracts.js";
 
-// ---- Store: git branch helpers ---------------------------------------------
+// ---- Store: git branch helpers and PRD filename composers ------------------
 
 export {
   sanitizeBranchName,
   resolveGitBranch,
   getFirstCommitDate,
+  generatePRDFilename,
+  resolvePRDFilename,
 } from "./store/branch-naming.js";
+
+// ---- Store: branch-scoped PRD discovery and resolution ---------------------
+
+export {
+  discoverPRDFiles,
+  parsePRDBranchSegment,
+  parsePRDFileDate,
+  findPRDFileForBranch,
+  resolvePRDFile,
+} from "./store/prd-discovery.js";
+export type { PRDFileResolution } from "./store/prd-discovery.js";
 
 // ---- Store: legacy PRD migration -------------------------------------------
 

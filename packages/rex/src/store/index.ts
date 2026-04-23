@@ -4,7 +4,17 @@ export {
   sanitizeBranchName,
   resolveGitBranch,
   getFirstCommitDate,
+  generatePRDFilename,
+  resolvePRDFilename,
 } from "./branch-naming.js";
+export {
+  discoverPRDFiles,
+  parsePRDBranchSegment,
+  parsePRDFileDate,
+  findPRDFileForBranch,
+  resolvePRDFile,
+} from "./prd-discovery.js";
+export type { PRDFileResolution } from "./prd-discovery.js";
 export { migrateLegacyPRD } from "./prd-migration.js";
 export type { MigrationResult } from "./prd-migration.js";
 export { withLock, acquireLock } from "./file-lock.js";
@@ -53,11 +63,13 @@ export {
 export { notionIntegrationSchema } from "./integration-schemas/notion.js";
 export { jiraIntegrationSchema } from "./integration-schemas/jira.js";
 
-import { FileStore } from "./file-adapter.js";
+import { FileStore, PRD_FILENAME } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
 import { getDefaultRegistry } from "./adapter-registry.js";
-import { migrateLegacyPRD } from "./prd-migration.js";
+import { dirname } from "node:path";
+import { resolveGitBranch } from "./branch-naming.js";
+import { findPRDFileForBranch } from "./prd-discovery.js";
 import type { PRDStore } from "./contracts.js";
 import type { NotionAdapterConfig } from "./notion-client.js";
 
@@ -102,15 +114,16 @@ export function createNotionStore(
 /**
  * Resolve the local PRDStore for a `.rex/` directory.
  *
- * Always returns a FileStore backed by the canonical single `prd.json`.
+ * Always returns a FileStore. Reads aggregate all branch-scoped PRD files
+ * (`prd_{branch}_{date}.json`) plus `prd.json` into one in-memory document.
+ * When a branch-scoped file already exists for the current git branch, new
+ * root-level items are routed there; otherwise they go to `prd.json`.
+ *
+ * CLI commands that write new root items should call {@link resolvePRDFile}
+ * before writing to ensure the branch file exists and the store targets it.
+ *
  * Remote adapters (e.g. Notion) are accessed only during explicit sync
  * operations via {@link resolveRemoteStore}.
- *
- * On first call, automatically consolidates any legacy branch-scoped
- * `prd_{branch}_{date}.json` files into the canonical `prd.json`,
- * renaming each consumed source to a timestamped backup.
- *
- * This is the preferred way to obtain a store in CLI commands and tools.
  *
  * @param rexDir  Path to the `.rex/` directory.
  * @returns A FileStore instance.
@@ -122,8 +135,12 @@ export function createNotionStore(
  * ```
  */
 export async function resolveStore(rexDir: string): Promise<PRDStore> {
-  await migrateLegacyPRD(rexDir);
-  return new FileStore(rexDir);
+  const projectDir = dirname(rexDir);
+  const branch = resolveGitBranch(projectDir);
+  const currentBranchFile = await findPRDFileForBranch(rexDir, branch);
+  return new FileStore(rexDir, {
+    currentBranchFile: currentBranchFile ?? PRD_FILENAME,
+  });
 }
 
 /**

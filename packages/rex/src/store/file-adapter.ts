@@ -3,10 +3,11 @@ import { join } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
-import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
+import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWriteJSON } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
+import { discoverPRDFiles } from "./prd-discovery.js";
 import type { PRDStore, StoreCapabilities } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -16,9 +17,17 @@ export class FileStore implements PRDStore {
   private rexDir: string;
   /** True while inside withTransaction — prevents double-locking in saveDocument. */
   private inTransaction = false;
+  private itemToFile: Map<string, string> = new Map();
+  private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
+  private ownershipLoaded = false;
+  private primaryFile: string | null = null;
+  private currentBranchFile: string = PRD_FILENAME;
 
-  constructor(rexDir: string) {
+  constructor(rexDir: string, options?: { currentBranchFile?: string }) {
     this.rexDir = rexDir;
+    if (options?.currentBranchFile) {
+      this.currentBranchFile = options.currentBranchFile;
+    }
   }
 
   private path(file: string): string {
@@ -33,19 +42,163 @@ export class FileStore implements PRDStore {
     return this.path(`${PRD_FILENAME}.lock`);
   }
 
+  setCurrentBranchFile(filename: string): void {
+    this.currentBranchFile = filename;
+  }
+
+  getCurrentBranchFile(): string {
+    return this.currentBranchFile;
+  }
+
+  /** Expose the item-to-file ownership map for cross-file duplicate detection. */
+  getItemFileMap(): ReadonlyMap<string, string> {
+    return this.itemToFile;
+  }
+
+  private lockPathForFile(filename: string): string {
+    return this.path(`${filename}.lock`);
+  }
+
+  private async loadSingleFile(filename: string): Promise<PRDDocument> {
+    const raw = await readFile(this.path(filename), "utf-8");
+    const parsed = JSON.parse(raw);
+    const result = validateDocument(parsed);
+    if (!result.ok) {
+      throw new Error(`Invalid ${filename}: ${result.errors.message}`);
+    }
+    return result.data as PRDDocument;
+  }
+
+  private mergeDocuments(
+    sources: Array<{ filename: string; doc: PRDDocument }>,
+  ): PRDDocument {
+    const allItems: PRDItem[] = [];
+    const collisions: string[] = [];
+
+    this.itemToFile.clear();
+    this.fileMetadata.clear();
+
+    for (const { filename, doc } of sources) {
+      this.fileMetadata.set(filename, { schema: doc.schema, title: doc.title });
+      for (const entry of walkTree(doc.items)) {
+        const existing = this.itemToFile.get(entry.item.id);
+        if (existing) {
+          collisions.push(`  ${entry.item.id} in ${existing} and ${filename}`);
+        } else {
+          this.itemToFile.set(entry.item.id, filename);
+        }
+      }
+      allItems.push(...doc.items);
+    }
+
+    if (collisions.length > 0) {
+      throw new Error(`ID collision across PRD files:\n${collisions.join("\n")}`);
+    }
+
+    this.primaryFile = sources[0].filename;
+    this.ownershipLoaded = true;
+
+    return {
+      ...sources[0].doc,
+      items: allItems,
+    };
+  }
+
+  private async ensureOwnershipMap(): Promise<void> {
+    if (this.ownershipLoaded) return;
+    await this.loadDocument();
+  }
+
+  private async resolveOwnerFile(itemId: string): Promise<string> {
+    await this.ensureOwnershipMap();
+    const file = this.itemToFile.get(itemId);
+    if (!file) {
+      throw new Error(`Item "${itemId}" not found in any PRD file`);
+    }
+    return file;
+  }
+
+  private async withFileTransaction<T>(
+    filename: string,
+    fn: (doc: PRDDocument) => Promise<T>,
+  ): Promise<T> {
+    return withLock(this.lockPathForFile(filename), async () => {
+      const doc = await this.loadSingleFile(filename);
+      const result = await fn(doc);
+      const valid = validateDocument(doc);
+      if (!valid.ok) {
+        throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
+      }
+      await atomicWriteJSON(this.path(filename), doc, toCanonicalJSON);
+      return result;
+    });
+  }
+
+  private async withNestedLocks<T>(
+    filenames: string[],
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    if (filenames.length === 0) return fn();
+    const [next, ...rest] = filenames;
+    return withLock(this.lockPathForFile(next), () => this.withNestedLocks(rest, fn));
+  }
+
   /**
    * Load and validate the consolidated PRD document.
    *
    * @throws If `prd.json` is missing, invalid JSON, or fails schema validation.
    */
   async loadDocument(): Promise<PRDDocument> {
-    const raw = await readFile(this.prdPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const result = validateDocument(parsed);
-    if (!result.ok) {
-      throw new Error(`Invalid ${PRD_FILENAME}: ${result.errors.message}`);
+    const branchFiles = await discoverPRDFiles(this.rexDir);
+
+    if (branchFiles.length === 0) {
+      const doc = await this.loadSingleFile(PRD_FILENAME);
+      this.itemToFile.clear();
+      this.fileMetadata.clear();
+      this.fileMetadata.set(PRD_FILENAME, { schema: doc.schema, title: doc.title });
+      for (const entry of walkTree(doc.items)) {
+        this.itemToFile.set(entry.item.id, PRD_FILENAME);
+      }
+      this.primaryFile = PRD_FILENAME;
+      this.ownershipLoaded = true;
+      return doc;
     }
-    return result.data as PRDDocument;
+
+    const sources: Array<{ filename: string; doc: PRDDocument }> = [];
+
+    try {
+      const doc = await this.loadSingleFile(PRD_FILENAME);
+      sources.push({ filename: PRD_FILENAME, doc });
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException | undefined)?.code;
+      if (code !== "ENOENT") {
+        throw err;
+      }
+    }
+
+    for (const filename of branchFiles) {
+      const doc = await this.loadSingleFile(filename);
+      sources.push({ filename, doc });
+    }
+
+    if (sources.length === 0) {
+      throw new Error(`Invalid ${PRD_FILENAME}: file not found`);
+    }
+
+    if (sources.length === 1) {
+      const { filename, doc } = sources[0];
+      this.itemToFile.clear();
+      this.fileMetadata.clear();
+      this.fileMetadata.set(filename, { schema: doc.schema, title: doc.title });
+      for (const entry of walkTree(doc.items)) {
+        this.itemToFile.set(entry.item.id, filename);
+      }
+      this.primaryFile = filename;
+      this.ownershipLoaded = true;
+      return doc;
+    }
+
+    return this.mergeDocuments(sources);
   }
 
   /**
@@ -60,18 +213,59 @@ export class FileStore implements PRDStore {
       throw new Error(`Invalid document: ${result.errors.message}`);
     }
 
-    if (this.inTransaction) {
-      await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
+    if (!this.ownershipLoaded) {
+      if (this.inTransaction) {
+        await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
+        return;
+      }
+
+      await withLock(this.prdLockPath, async () => {
+        await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
+      });
       return;
     }
 
-    await withLock(this.prdLockPath, async () => {
-      await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
-    });
+    const fileItems = new Map<string, PRDItem[]>();
+    for (const filename of this.fileMetadata.keys()) {
+      fileItems.set(filename, []);
+    }
+
+    for (const item of doc.items) {
+      const file = this.itemToFile.get(item.id) ?? this.currentBranchFile;
+      if (!fileItems.has(file)) fileItems.set(file, []);
+      fileItems.get(file)!.push(item);
+    }
+
+    const filenames = [...fileItems.keys()].sort();
+    const writeAll = async () => {
+      for (const filename of filenames) {
+        const items = fileItems.get(filename)!;
+        const meta =
+          filename === this.primaryFile
+            ? { schema: doc.schema, title: doc.title }
+            : this.fileMetadata.get(filename) ?? { schema: doc.schema, title: doc.title };
+        await atomicWriteJSON(
+          this.path(filename),
+          { schema: meta.schema, title: meta.title, items },
+          toCanonicalJSON,
+        );
+      }
+    };
+
+    if (this.inTransaction) {
+      await writeAll();
+      return;
+    }
+
+    await this.withNestedLocks(filenames, writeAll);
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-    return withLock(this.prdLockPath, async () => {
+    await this.ensureOwnershipMap();
+    const filenames =
+      this.fileMetadata.size > 0 ? [...this.fileMetadata.keys()].sort() : [PRD_FILENAME];
+
+    return this.withNestedLocks(filenames, async () => {
       this.inTransaction = true;
       try {
         const doc = await this.loadDocument();
@@ -80,7 +274,7 @@ export class FileStore implements PRDStore {
         if (!valid.ok) {
           throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
         }
-        await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
+        await this.saveDocument(doc);
         return result;
       } finally {
         this.inTransaction = false;
@@ -95,19 +289,33 @@ export class FileStore implements PRDStore {
   }
 
   async addItem(item: PRDItem, parentId?: string): Promise<void> {
-    await this.withTransaction(async (doc) => {
-      if (parentId) {
+    if (parentId) {
+      let owner: string;
+      try {
+        owner = await this.resolveOwnerFile(parentId);
+      } catch {
+        throw new Error(`Parent "${parentId}" not found`);
+      }
+      await this.withFileTransaction(owner, async (doc) => {
         if (!insertChild(doc.items, parentId, item)) {
           throw new Error(`Parent "${parentId}" not found`);
         }
-      } else {
-        doc.items.push(item);
-      }
+      });
+      this.itemToFile.set(item.id, owner);
+      this.ownershipLoaded = true;
+      return;
+    }
+
+    await this.withFileTransaction(this.currentBranchFile, async (doc) => {
+      doc.items.push(item);
     });
+    this.itemToFile.set(item.id, this.currentBranchFile);
+    this.ownershipLoaded = true;
   }
 
   async updateItem(id: string, updates: Partial<PRDItem>): Promise<void> {
-    await this.withTransaction(async (doc) => {
+    const owner = await this.resolveOwnerFile(id);
+    await this.withFileTransaction(owner, async (doc) => {
       if (!updateInTree(doc.items, id, updates)) {
         throw new Error(`Item "${id}" not found`);
       }
@@ -115,12 +323,14 @@ export class FileStore implements PRDStore {
   }
 
   async removeItem(id: string): Promise<void> {
-    await this.withTransaction(async (doc) => {
+    const owner = await this.resolveOwnerFile(id);
+    await this.withFileTransaction(owner, async (doc) => {
       const removed = removeFromTree(doc.items, id);
       if (!removed) {
         throw new Error(`Item "${id}" not found`);
       }
     });
+    this.itemToFile.delete(id);
   }
 
   async loadConfig(): Promise<RexConfig> {

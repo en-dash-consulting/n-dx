@@ -1,6 +1,11 @@
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { resolveStore } from "../../store/index.js";
+import {
+  resolveStore,
+  FileStore,
+  resolvePRDFile,
+  resolveGitBranch,
+} from "../../store/index.js";
 import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js";
 import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";
@@ -25,6 +30,17 @@ export async function cmdAdd(
 
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Ensure the current branch's PRD file exists and is the write target.
+  // resolveStore does a read-only lookup; resolvePRDFile creates the file if needed.
+  if (store instanceof FileStore) {
+    const branch = resolveGitBranch(dir);
+    if (branch !== "unknown") {
+      const resolution = await resolvePRDFile(rexDir, dir);
+      store.setCurrentBranchFile(resolution.filename);
+    }
+  }
+
   const doc = await store.loadDocument();
 
   const parentId = flags.parent;

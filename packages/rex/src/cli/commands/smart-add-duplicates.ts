@@ -1,5 +1,6 @@
 import { similarity } from "../../analyze/dedupe.js";
 import { walkTree } from "../../core/tree.js";
+import { parsePRDFileDate } from "../../store/index.js";
 import type {
   PRDItem,
   ItemLevel,
@@ -7,6 +8,14 @@ import type {
   DuplicateOverrideMarker,
 } from "../../schema/index.js";
 import type { Proposal, DuplicateReasonMetadata, DuplicateReasonType } from "../../analyze/index.js";
+
+/**
+ * Item-to-file ownership map.
+ *
+ * Maps item IDs to the PRD filename that owns them (e.g. `"prd_main_2024-01-15.json"`).
+ * Used by cross-file duplicate detection to prefer matches from older files.
+ */
+export type ItemFileMap = ReadonlyMap<string, string>;
 
 const DUPLICATE_THRESHOLD = 0.7;
 
@@ -26,6 +35,8 @@ export interface MatchedPRDItemRef {
   title: string;
   level: ItemLevel;
   status: ItemStatus;
+  /** PRD filename that owns this item. Present when cross-file matching is active. */
+  sourceFile?: string;
 }
 
 export interface ProposalDuplicateMatch {
@@ -288,9 +299,57 @@ export function flattenProposalNodes(proposals: Proposal[]): ProposalNode[] {
   return nodes;
 }
 
+/**
+ * Compare two PRD filenames by creation date, returning negative when `a` is older.
+ *
+ * Legacy `prd.json` (no date in filename) is treated as the oldest possible file.
+ * Files with identical or unparseable dates compare equal.
+ */
+export function comparePRDFileAge(a: string, b: string): number {
+  const dateA = parsePRDFileDate(a);
+  const dateB = parsePRDFileDate(b);
+
+  // Legacy prd.json (null date) is oldest
+  if (dateA === null && dateB === null) return 0;
+  if (dateA === null) return -1;
+  if (dateB === null) return 1;
+
+  if (dateA < dateB) return -1;
+  if (dateA > dateB) return 1;
+  return 0;
+}
+
+/**
+ * Pick the best candidate from a list of duplicates, preferring older files.
+ *
+ * When an {@link ItemFileMap} is provided and multiple candidates exist,
+ * the candidate from the oldest PRD file wins. Within the same file,
+ * the highest score wins.
+ */
+function pickBestCandidate(
+  candidates: CandidateScore[],
+  itemFileMap?: ItemFileMap,
+): CandidateScore {
+  if (candidates.length === 1 || !itemFileMap) {
+    return candidates.reduce((a, b) => (b.score > a.score ? b : a));
+  }
+
+  // Sort by file age (oldest first), then by score (highest first)
+  const sorted = [...candidates].sort((a, b) => {
+    const fileA = itemFileMap.get(a.item.id) ?? "prd.json";
+    const fileB = itemFileMap.get(b.item.id) ?? "prd.json";
+    const ageCmp = comparePRDFileAge(fileA, fileB);
+    if (ageCmp !== 0) return ageCmp;
+    return b.score - a.score;
+  });
+
+  return sorted[0];
+}
+
 export function matchProposalNodeToPRD(
   node: ProposalNode,
   existingItems: PRDItem[],
+  itemFileMap?: ItemFileMap,
 ): ProposalDuplicateMatch {
   const candidates: CandidateScore[] = [];
 
@@ -308,7 +367,8 @@ export function matchProposalNodeToPRD(
     };
   }
 
-  const best = candidates.reduce((a, b) => (b.score > a.score ? b : a));
+  const best = pickBestCandidate(candidates, itemFileMap);
+  const sourceFile = itemFileMap?.get(best.item.id);
 
   return {
     node,
@@ -320,6 +380,7 @@ export function matchProposalNodeToPRD(
       title: best.item.title,
       level: best.item.level,
       status: best.item.status,
+      ...(sourceFile ? { sourceFile } : {}),
     },
   };
 }
@@ -327,8 +388,9 @@ export function matchProposalNodeToPRD(
 export function matchProposalNodesToPRD(
   proposals: Proposal[],
   existingItems: PRDItem[],
+  itemFileMap?: ItemFileMap,
 ): ProposalDuplicateMatch[] {
   return flattenProposalNodes(proposals).map((node) =>
-    matchProposalNodeToPRD(node, existingItems),
+    matchProposalNodeToPRD(node, existingItems, itemFileMap),
   );
 }

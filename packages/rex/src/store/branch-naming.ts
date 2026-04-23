@@ -1,13 +1,13 @@
 /**
- * Git branch detection utilities.
+ * Git branch detection utilities and branch-scoped PRD filename composers.
  *
- * Small set of helpers for resolving the current git branch and the date of
- * its first unique commit. Historically this module also owned the branch-
- * scoped PRD filename scheme; after the PRD storage consolidation, only the
- * branch-detection primitives remain.
+ * Provides helpers for resolving the current git branch, the date of its first
+ * unique commit, and composing branch-scoped `prd_{branch}_{date}.json` filenames.
  */
 
 import { execFileSync } from "node:child_process";
+
+const QUIET_GIT = { stdio: ["ignore", "pipe", "ignore"] as ["ignore", "pipe", "ignore"] };
 
 /**
  * Characters unsafe for filenames or confusing in branch-to-path mapping.
@@ -46,7 +46,7 @@ export function resolveGitBranch(cwd: string): string {
     const branch = execFileSync(
       "git",
       ["rev-parse", "--abbrev-ref", "HEAD"],
-      { cwd, encoding: "utf-8" },
+      { cwd, encoding: "utf-8", ...QUIET_GIT },
     ).trim();
 
     if (branch && branch !== "HEAD") {
@@ -57,7 +57,7 @@ export function resolveGitBranch(cwd: string): string {
     const hash = execFileSync(
       "git",
       ["rev-parse", "--short", "HEAD"],
-      { cwd, encoding: "utf-8" },
+      { cwd, encoding: "utf-8", ...QUIET_GIT },
     ).trim();
 
     return hash || "unknown";
@@ -85,7 +85,7 @@ export function getFirstCommitDate(cwd: string): string {
       const output = execFileSync(
         "git",
         ["log", `${base}..HEAD`, "--reverse", "--format=%aI"],
-        { cwd, encoding: "utf-8" },
+        { cwd, encoding: "utf-8", ...QUIET_GIT },
       ).trim();
 
       if (output) {
@@ -101,7 +101,7 @@ export function getFirstCommitDate(cwd: string): string {
     const roots = execFileSync(
       "git",
       ["rev-list", "--max-parents=0", "HEAD"],
-      { cwd, encoding: "utf-8" },
+      { cwd, encoding: "utf-8", ...QUIET_GIT },
     ).trim();
 
     if (roots) {
@@ -109,7 +109,7 @@ export function getFirstCommitDate(cwd: string): string {
       const date = execFileSync(
         "git",
         ["log", "-1", "--format=%aI", rootHash],
-        { cwd, encoding: "utf-8" },
+        { cwd, encoding: "utf-8", ...QUIET_GIT },
       ).trim();
 
       if (date) {
@@ -122,4 +122,28 @@ export function getFirstCommitDate(cwd: string): string {
 
   // 3. Final fallback
   return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Build the canonical branch-scoped PRD filename.
+ *
+ * Format: `prd_{sanitized-branch}_{YYYY-MM-DD}.json`
+ * Example: `prd_feature-my-thing_2025-04-01.json`
+ */
+export function generatePRDFilename(branch: string, date: string): string {
+  return `prd_${sanitizeBranchName(branch)}_${date}.json`;
+}
+
+/**
+ * Compose a branch-scoped PRD filename for the current working directory.
+ *
+ * Combines `resolveGitBranch` + `getFirstCommitDate` + `generatePRDFilename`.
+ * Returns `null` when the branch cannot be resolved (not a git repo, detached HEAD
+ * with no hash, etc.).
+ */
+export function resolvePRDFilename(cwd: string): string | null {
+  const branch = resolveGitBranch(cwd);
+  if (!branch || branch === "unknown") return null;
+  const date = getFirstCommitDate(cwd);
+  return generatePRDFilename(branch, date);
 }

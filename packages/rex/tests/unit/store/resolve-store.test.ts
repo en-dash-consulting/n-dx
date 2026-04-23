@@ -7,9 +7,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import { resolveStore, resolveRemoteStore, createStore } from "../../../src/store/index.js";
@@ -235,5 +236,42 @@ describe("resolveStore", () => {
     const doc1 = await resolved.loadDocument();
     const doc2 = await direct.loadDocument();
     expect(doc1).toEqual(doc2);
+  });
+
+  it("routes new root items to the current branch's matching PRD file when one exists", async () => {
+    await mkdir(tmpDir, { recursive: true });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, encoding: "utf-8" });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, encoding: "utf-8" });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir, encoding: "utf-8" });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
+      cwd: tmpDir,
+      encoding: "utf-8",
+    });
+    execFileSync("git", ["checkout", "-b", "feature/test"], { cwd: tmpDir, encoding: "utf-8" });
+
+    await seedRexDir(rexDir, "file");
+    await writeFile(
+      join(rexDir, "prd_feature-test_2025-04-01.json"),
+      toCanonicalJSON({ schema: SCHEMA_VERSION, title: "feature/test", items: [] }),
+      "utf-8",
+    );
+
+    const store = await resolveStore(rexDir);
+    await store.addItem({
+      id: "branch-epic",
+      title: "Branch Epic",
+      status: "pending",
+      level: "epic",
+    });
+
+    const branchDoc = JSON.parse(
+      await readFile(join(rexDir, "prd_feature-test_2025-04-01.json"), "utf-8"),
+    ) as { items: Array<{ id: string }> };
+    expect(branchDoc.items.map((item) => item.id)).toEqual(["branch-epic"]);
+
+    const primaryDoc = JSON.parse(
+      await readFile(join(rexDir, "prd.json"), "utf-8"),
+    ) as { items: Array<{ id: string }> };
+    expect(primaryDoc.items).toEqual([]);
   });
 });

@@ -7,6 +7,8 @@ import {
   sanitizeBranchName,
   resolveGitBranch,
   getFirstCommitDate,
+  generatePRDFilename,
+  resolvePRDFilename,
 } from "../../../src/store/branch-naming.js";
 
 // ---------------------------------------------------------------------------
@@ -213,6 +215,125 @@ describe("getFirstCommitDate", () => {
     try {
       const today = new Date().toISOString().slice(0, 10);
       expect(getFirstCommitDate(nonGit)).toBe(today);
+    } finally {
+      await rm(nonGit, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generatePRDFilename — pure-function tests
+// ---------------------------------------------------------------------------
+
+describe("generatePRDFilename", () => {
+  it("produces prd_{branch}_{date}.json format", () => {
+    expect(generatePRDFilename("my-feature", "2025-01-15")).toBe(
+      "prd_my-feature_2025-01-15.json",
+    );
+  });
+
+  it("sanitizes the branch name (slashes → hyphens)", () => {
+    expect(generatePRDFilename("feature/thing", "2025-03-20")).toBe(
+      "prd_feature-thing_2025-03-20.json",
+    );
+  });
+
+  it("handles detached HEAD short hash", () => {
+    expect(generatePRDFilename("a1b2c3d", "2025-06-01")).toBe(
+      "prd_a1b2c3d_2025-06-01.json",
+    );
+  });
+
+  it("lowercases branch names", () => {
+    expect(generatePRDFilename("Feature-UPPERCASE", "2025-01-01")).toBe(
+      "prd_feature-uppercase_2025-01-01.json",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolvePRDFilename — git-dependent tests
+// ---------------------------------------------------------------------------
+
+describe("resolvePRDFilename", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-resolve-test-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns prd_{branch}_{date}.json for a real repo", () => {
+    initRepo(tmpDir);
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
+      cwd: tmpDir,
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: "2025-02-20T12:00:00Z",
+        GIT_COMMITTER_DATE: "2025-02-20T12:00:00Z",
+      },
+    });
+
+    git(tmpDir, "checkout", "-b", "feature/cool-thing");
+    execFileSync("git", ["commit", "--allow-empty", "-m", "branch work"], {
+      cwd: tmpDir,
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: "2025-04-01T12:00:00Z",
+        GIT_COMMITTER_DATE: "2025-04-01T12:00:00Z",
+      },
+    });
+
+    expect(resolvePRDFilename(tmpDir)).toBe("prd_feature-cool-thing_2025-04-01.json");
+  });
+
+  it("returns consistent filename on repeated calls", () => {
+    initRepo(tmpDir);
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
+      cwd: tmpDir,
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: "2025-01-01T12:00:00Z",
+        GIT_COMMITTER_DATE: "2025-01-01T12:00:00Z",
+      },
+    });
+
+    const first = resolvePRDFilename(tmpDir);
+    const second = resolvePRDFilename(tmpDir);
+    const third = resolvePRDFilename(tmpDir);
+    expect(first).toBe(second);
+    expect(second).toBe(third);
+  });
+
+  it("uses short hash for detached HEAD", () => {
+    initRepo(tmpDir);
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
+      cwd: tmpDir,
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: "2025-05-10T12:00:00Z",
+        GIT_COMMITTER_DATE: "2025-05-10T12:00:00Z",
+      },
+    });
+
+    const hash = git(tmpDir, "rev-parse", "--short", "HEAD");
+    git(tmpDir, "checkout", "--detach");
+
+    const filename = resolvePRDFilename(tmpDir);
+    expect(filename).toBe(`prd_${hash}_2025-05-10.json`);
+  });
+
+  it("returns null for a non-git directory", async () => {
+    const nonGit = await mkdtemp(join(tmpdir(), "rex-no-git-"));
+    try {
+      expect(resolvePRDFilename(nonGit)).toBeNull();
     } finally {
       await rm(nonGit, { recursive: true, force: true });
     }

@@ -599,7 +599,7 @@
             {
               "id": "35ccf9ee-0cb4-48b8-8aa3-185d76939c20",
               "title": "Implement bidirectional markdown serializer and parser with round-trip fidelity tests",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Build a markdown serializer (PRD tree → .md string) and a markdown parser (.md string → PRD tree) inside the rex package, conforming to the schema spec. All fields must survive a round-trip without loss or mutation. Include comprehensive tests covering the full field set, multi-level nesting, and edge cases such as empty descriptions, missing optional fields, and special characters.",
               "acceptanceCriteria": [
@@ -617,7 +617,8 @@
                 "markdown",
                 "testing"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T19:49:17.111Z"
             }
           ]
         },
