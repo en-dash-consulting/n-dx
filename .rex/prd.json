@@ -1,0 +1,197 @@
+{
+  "schema": "rex/v1",
+  "title": "n-dx-internal",
+  "items": [
+    {
+      "id": "5687b9ba-5dae-4a5f-b1d4-d43176351357",
+      "title": "Documentation Refresh for Recent PRD Changes",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "4c28fbf8-94bd-4950-8ad8-24578929ab44",
+          "title": "Audit Recent Merges and Catalog Documentation Gaps",
+          "status": "pending",
+          "level": "feature",
+          "description": "Review merges from the past week to identify all user-facing behavior changes, then map each change to the documentation files that need updating. Produces a working list that drives the rest of the documentation work.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "292dff9b-7b0c-406e-b1db-468128d58a11",
+              "title": "Audit past-week merges and produce a documentation delta report",
+              "status": "pending",
+              "level": "task",
+              "description": "Run git log for the last 7 days on main and feature branches, categorize each merged change by whether it affects the PRD structure, CLI surface, MCP tools, or architectural conventions, and produce a delta report mapping each change to the markdown files that need updating (README.md, CLAUDE.md, AGENTS.md, PACKAGE_GUIDELINES.md, TESTING.md, and per-package READMEs). The recent commits include cross-PRD duplicate detection, branch-scoped PRD file targeting, multi-file PRD migration, and MCP/CLI/dashboard multi-file validation — each of these likely has doc implications.",
+              "acceptanceCriteria": [
+                "git log --since='7 days ago' output captured and each merge categorized",
+                "Delta report lists every merge with affected doc files and a one-line description of what needs to change",
+                "Report covers at minimum: branch-scoped PRD targeting, cross-PRD duplicate detection, multi-file PRD migration, and multi-file backend validation",
+                "Report identifies documentation files with zero required changes so they can be skipped explicitly"
+              ],
+              "priority": "high",
+              "tags": [
+                "documentation",
+                "audit"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "ef9224cb-e708-4ff4-9dcd-954a86905915",
+          "title": "Update Documentation for New PRD Structure",
+          "status": "pending",
+          "level": "feature",
+          "description": "Apply the documentation changes identified in the audit across all markdown files, ensuring the new multi-file branch-scoped PRD structure is accurately described everywhere it is referenced. Includes a reserved slot for a structural diagram.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "1132550d-e4dc-4103-b86a-c849b46d60f5",
+              "title": "Update root and package READMEs for new PRD structure and recent merges",
+              "status": "pending",
+              "level": "task",
+              "description": "Revise README.md, packages/rex/README.md, packages/core/README.md, and any other package READMEs that reference .rex/prd.json or PRD workflow to reflect the branch-scoped multi-file PRD format, the migration path from single-file prd.json, cross-PRD duplicate detection behavior, and any CLI/MCP surface changes from recent merges. Replace outdated examples and command output snippets where the behavior has changed.",
+              "acceptanceCriteria": [
+                "All README files referencing .rex/prd.json describe the multi-file format accurately",
+                "Migration behavior from single prd.json to branch-scoped format is documented with before/after file layout",
+                "Cross-PRD duplicate detection is described where add/recommend workflows are documented",
+                "CLI examples and command output in READMEs match current behavior for ndx add, rex add, and related commands",
+                "No broken cross-references between READMEs remain after edits"
+              ],
+              "priority": "high",
+              "tags": [
+                "documentation",
+                "readme"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae",
+              "title": "Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend",
+              "status": "pending",
+              "level": "task",
+              "description": "Update CLAUDE.md and AGENTS.md (plus their shared source assistant-assets/project-guidance.md and claude-addendum.md) so assistant instructions reflect the multi-file branch-scoped PRD layout, the .rex/ directory structure under the new format, and the MCP concurrency rules as they apply to multi-file writes. Ensure the 'Key Files' table and any PRD-related examples are current. Regenerate AGENTS.md and CLAUDE.md via ndx init after editing the assistant-assets source so both stay in sync.",
+              "acceptanceCriteria": [
+                "assistant-assets/project-guidance.md updated with multi-file PRD layout and branch-scoping behavior",
+                "claude-addendum.md updated if any Claude-specific deep sections reference PRD file layout",
+                "CLAUDE.md Key Files table reflects actual .rex/ directory contents under multi-file format",
+                "AGENTS.md regenerated from updated source and contains the same PRD-structure updates",
+                "MCP concurrency contract section mentions multi-file write implications if applicable",
+                "ndx init regeneration verified to produce no unexpected diffs beyond the intended updates"
+              ],
+              "priority": "high",
+              "tags": [
+                "documentation",
+                "assistant-instructions"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "2e6f0a74-f49b-4bd6-92ab-088db5568c58",
+              "title": "Add PRD structure diagram placeholder with 'img_here' label",
+              "status": "pending",
+              "level": "task",
+              "description": "Insert a reserved placeholder for a diagram of the new PRD structure in the primary documentation location (README.md and/or CLAUDE.md where the PRD format is first introduced) using the literal label 'img_here' so the user can replace it with the actual image later. Include a short caption describing what the diagram should depict (branch-scoped multi-file layout and their relationships) so the replacement image has clear intent.",
+              "acceptanceCriteria": [
+                "A placeholder block with the literal text 'img_here' is present in the PRD-structure documentation section",
+                "The placeholder is accompanied by a caption or surrounding text describing the intended diagram content",
+                "The placeholder appears in at minimum one primary doc location where readers first encounter the PRD structure",
+                "The placeholder uses a markdown-friendly format (e.g. image syntax or clearly marked block) that renders cleanly and is easy to find-and-replace"
+              ],
+              "priority": "medium",
+              "tags": [
+                "documentation",
+                "diagram"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "9a7cb6af-cd94-4904-9e5a-1274e996fc09",
+              "title": "Update supporting docs (PACKAGE_GUIDELINES, TESTING, workflow docs) for recent merges",
+              "status": "pending",
+              "level": "task",
+              "description": "Update PACKAGE_GUIDELINES.md, TESTING.md, and any workflow or architecture documents that reference PRD file layout, add/recommend pipelines, or duplicate detection behavior. Ensure test documentation reflects any new required tests or validation from the multi-file backend validation merge, and that architectural guidance mentions the new file-targeting behavior where relevant.",
+              "acceptanceCriteria": [
+                "PACKAGE_GUIDELINES.md references to PRD layout or rex add pipelines are current",
+                "TESTING.md reflects any new or updated required tests from recent merges (e.g. multi-file validation)",
+                "Any workflow documentation describing the add/recommend pipeline matches current branch-scoped targeting behavior",
+                "All updated docs are cross-checked against the audit delta report — no listed change is missing a corresponding doc update",
+                "Running a spell/link check or equivalent confirms no broken internal links introduced by edits"
+              ],
+              "priority": "medium",
+              "tags": [
+                "documentation",
+                "testing",
+                "architecture"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1c4e4162-d5e6-4e2b-ad45-ead62b9a5508",
+      "title": "PRD Storage Consolidation",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "be363df5-da5d-42a8-b5fa-6bfaf294982d",
+          "title": "Consolidate PRD Files into Single 'prd' File",
+          "status": "pending",
+          "level": "feature",
+          "description": "Unify the branch-scoped multi-file PRD storage back into a single canonical file named 'prd' for both newly generated and existing PRDs, including migration of any existing split files.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "37c43e3c-bcce-432c-a953-9685f1618999",
+              "title": "Merge branch-scoped PRD files into single canonical 'prd' file",
+              "status": "in_progress",
+              "level": "task",
+              "description": "Replace the current multi-file branch-scoped PRD storage with a single consolidated file named 'prd' at the new canonical location. Combine content from any existing split files during load, write to the unified location on save, and add a one-time migration path that folds legacy multi-file layouts into the new single-file format without data loss.",
+              "acceptanceCriteria": [
+                "Rex store reads and writes a single file named 'prd' at the new canonical location",
+                "Existing multi-file / branch-scoped PRD layouts are auto-migrated into the unified 'prd' file on first load",
+                "No PRD items, logs, or metadata are lost during migration (verified by round-trip test)",
+                "CLI commands (rex add, ndx add, plan, status) operate against the unified file",
+                "MCP write tools (add_item, edit_item, update_task_status, merge_items, move_item) target the unified file"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "storage",
+                "migration"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-23T01:33:12.091Z"
+            },
+            {
+              "id": "54be143d-cb14-4fe1-89e1-376b8a224755",
+              "title": "Update PRD storage tests for single-file 'prd' location",
+              "status": "pending",
+              "level": "task",
+              "description": "Revise unit, integration, and e2e tests that assume the branch-scoped multi-file PRD layout so they target the new single 'prd' file location. Add migration coverage that exercises loading a legacy multi-file fixture and verifying it collapses correctly into the unified file.",
+              "acceptanceCriteria": [
+                "All rex store tests reference the new single 'prd' file path",
+                "Tests covering branch-scoped multi-file behavior are either removed or converted into migration tests",
+                "New test verifies legacy multi-file fixture migrates into the unified file with identical item/log content",
+                "Integration tests for ndx add, rex add, plan, and status pass against the new location",
+                "pnpm test passes across rex and web packages with the updated layout"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "tests",
+                "migration"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
