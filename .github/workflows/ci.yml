@@ -70,7 +70,9 @@ jobs:
         run: pnpm -r run test
 
       - name: Require changeset
-        if: github.event_name == 'pull_request'
+        # Skip on the Changesets release PR: that PR's whole purpose is
+        # to consume the changesets, so the directory is empty by design.
+        if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
         run: |
           # Check for .changeset/*.md files (not config.json, not README)
           CHANGESETS=$(ls .changeset/*.md 2>/dev/null | grep -v README || true)
