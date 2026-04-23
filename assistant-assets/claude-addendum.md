@@ -139,6 +139,8 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) also write to `.rex/prd.json`. Never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
 
+**Single-file PRD invariant.** The PRD is one canonical file: `.rex/prd.json`. There are no branch-scoped or multi-file writers — every reader and writer (CLI, hench, MCP, dashboard) touches the same file. The one exception is a one-time on-load migration that consolidates any legacy `prd_{branch}_{date}.json` files into `prd.json` and renames the sources to `<name>.backup.<timestamp>`. The migration runs inside the same store resolution as a regular read, is idempotent, and never touches `.backup.*` files — so it races only with concurrent writers to `.rex/prd.json`. To avoid the race on first upgrade, run a read-only command (e.g. `ndx status`) once to settle the migration before kicking off parallel writers.
+
 #### HTTP-request concurrency (web server)
 
 When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:

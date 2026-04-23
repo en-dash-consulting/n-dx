@@ -16,6 +16,8 @@
           "level": "feature",
           "description": "Review merges from the past week to identify all user-facing behavior changes, then map each change to the documentation files that need updating. Produces a working list that drives the rest of the documentation work.",
           "source": "smart-add",
+          "startedAt": "2026-04-23T02:50:03.489Z",
+          "completedAt": "2026-04-23T02:50:03.489Z",
           "children": [
             {
               "id": "292dff9b-7b0c-406e-b1db-468128d58a11",
@@ -40,9 +42,7 @@
               "resolutionType": "code-change",
               "resolutionDetail": "Produced docs/doc-delta-audit.md: categorized all 7 past-week main-branch merges + 10 feature/new-PRD-design commits, mapped each to required edits in README.md / CLAUDE.md / AGENTS.md / PACKAGE_GUIDELINES.md / TESTING.md / per-package READMEs, and listed doc files requiring zero changes."
             }
-          ],
-          "startedAt": "2026-04-23T02:50:03.489Z",
-          "completedAt": "2026-04-23T02:50:03.489Z"
+          ]
         },
         {
           "id": "ef9224cb-e708-4ff4-9dcd-954a86905915",
@@ -75,7 +75,7 @@
             {
               "id": "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae",
               "title": "Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "description": "Update CLAUDE.md and AGENTS.md (plus their shared source assistant-assets/project-guidance.md and claude-addendum.md) so assistant instructions reflect the multi-file branch-scoped PRD layout, the .rex/ directory structure under the new format, and the MCP concurrency rules as they apply to multi-file writes. Ensure the 'Key Files' table and any PRD-related examples are current. Regenerate AGENTS.md and CLAUDE.md via ndx init after editing the assistant-assets source so both stay in sync.",
               "acceptanceCriteria": [
@@ -91,7 +91,8 @@
                 "documentation",
                 "assistant-instructions"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T02:51:02.824Z"
             },
             {
               "id": "2e6f0a74-f49b-4bd6-92ab-088db5568c58",
