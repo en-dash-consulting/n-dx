@@ -351,7 +351,11 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     { role: "user", content: briefText },
   ];
 
-  section(`Agent Run (${model})`);
+  section(
+    opts.runNumber !== undefined
+      ? `Agent Run #${opts.runNumber} (${model}) start`
+      : `Agent Run (${model})`,
+  );
 
   // Start heartbeat — writes lastActivityAt to disk periodically so long-running
   // tool calls don't make the run appear stale to the web dashboard.

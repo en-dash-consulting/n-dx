@@ -188,6 +188,7 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
     },
     loopPauseMs: 2000,
     maxFailedAttempts: 3,
+    autoCommit: false,
     ...(language ? { language } : {}),
   };
 }

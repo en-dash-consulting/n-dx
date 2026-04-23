@@ -97,6 +97,13 @@ export interface SharedLoopOptions {
    * PRD status excerpt injected by the pair-programming command).
    */
   extraContext?: string;
+  /**
+   * 1-based ordinal of this run within the current `ndx work --loop`
+   * invocation. When set, the Agent Run banner uses the
+   * `#N … start` / `#N … end` format; when undefined (non-loop callers),
+   * the original banner is preserved.
+   */
+  runNumber?: number;
 }
 
 // ---------------------------------------------------------------------------

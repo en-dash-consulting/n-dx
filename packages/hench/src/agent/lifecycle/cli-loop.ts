@@ -31,7 +31,7 @@ import { checkTokenBudget } from "./token-budget.js";
 import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
-import { section, stream, info } from "../../types/output.js";
+import { section, subsection, stream, info } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import {
   loadLLMConfig,
@@ -1163,6 +1163,15 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Prompt section diagnostics — captured on first attempt, stored on run record.
   let promptSectionDiagnostics: PromptSectionDiagnostic[] | undefined;
 
+  // Emit the Agent Run banner exactly once per run, before the retry loop.
+  // Retries are surfaced as lighter subsection lines inside the loop so a
+  // single run renders as one start banner, N attempt markers, one end.
+  section(
+    opts.runNumber !== undefined
+      ? `Agent Run #${opts.runNumber}${opts.spawnModel ? ` (${opts.spawnModel})` : ""} start`
+      : `Agent Run${opts.spawnModel ? ` (${opts.spawnModel})` : ""}`,
+  );
+
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
       const promptText = attempt === 0
@@ -1189,7 +1198,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         promptSectionDiagnostics = sectionDiags;
       }
 
-      section(`Agent Run${opts.spawnModel ? ` (${opts.spawnModel})` : ""}${attempt > 0 ? ` (retry ${attempt}/${retryConfig.maxRetries})` : ""}`);
+      if (attempt > 0) {
+        subsection(`Retry ${attempt}/${retryConfig.maxRetries}`);
+      }
       stream("CLI", `Spawning ${vendor}${opts.spawnModel ? ` (model: ${opts.spawnModel})` : ""}...`);
       logPromptSections(sectionDiags);
 

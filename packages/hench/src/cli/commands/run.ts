@@ -13,6 +13,7 @@ import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
+import { section } from "../../types/output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
@@ -618,6 +619,7 @@ async function runOne(
   yes?: boolean,
   extraContext?: string,
   autonomous?: boolean,
+  runNumber?: number,
 ): Promise<{ status: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
@@ -649,6 +651,7 @@ async function runOne(
         yes,
         autonomous,
         extraContext,
+        runNumber,
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -668,6 +671,7 @@ async function runOne(
         yes,
         autonomous,
         extraContext,
+        runNumber,
       });
 
   const { run } = result;
@@ -1182,8 +1186,13 @@ async function runLoop(
             yes,
             extraContext,
             autonomous,
+            completed,
           );
           status = result.status;
+          // Close the banner opened by the lifecycle loop. Mirrors the
+          // start banner's format so each run is visually bracketed in
+          // long --loop transcripts.
+          section(`Agent Run #${completed}${model ? ` (${model})` : ""} end`);
         } finally {
           // Release the queue slot after the task completes
           if (queue) queue.release();
