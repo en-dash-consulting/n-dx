@@ -742,6 +742,7 @@ async function performCommitPromptIfNeeded(
   const isInteractive = Boolean(process.stdin.isTTY) && !yes;
   let confirmed = true;
   if (isInteractive) {
+    info("Tip: pass --yes to auto-confirm, or run 'ndx config hench.autoCommit true' to let the agent commit itself.");
     confirmed = await promptCommitConfirm(stagedCount);
   }
 

@@ -852,11 +852,13 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--max-turns=<n>", description: "Override max agent turns per task" },
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
       { flag: "--model=<model>", description: "Override the Claude model" },
+      { flag: "--yes", description: "Auto-confirm the proposed commit and skip rollback prompts" },
     ],
     examples: [
       { command: "ndx work", description: "Run next task interactively" },
       { command: "ndx work --task=abc123 .", description: "Run a specific task" },
       { command: "ndx work --auto --loop .", description: "Continuously auto-run tasks" },
+      { command: "ndx work --auto --yes .", description: "Run unattended, auto-commit each task" },
       { command: "ndx work --dry-run .", description: "Preview the brief without execution" },
     ],
     related: ["plan", "status"],
@@ -1222,11 +1224,16 @@ const ORCHESTRATOR_HELP_DEFS = {
       "changes (not documentation) and rejects doc-only completions.\n" +
       "Completed findings are acknowledged to prevent regeneration.\n" +
       "The loop terminates early if no progress is made between iterations.",
-    usage: "ndx self-heal [N] [dir]",
+    usage: "ndx self-heal [N] [options] [dir]",
+    options: [
+      { flag: "--include-structural", description: "Include structural findings (excluded by default)" },
+      { flag: "--yes", description: "Auto-confirm commits inside the hench loop (forwarded to 'hench run')" },
+    ],
     examples: [
       { command: "ndx self-heal 3 .", description: "Run 3 improvement iterations" },
       { command: "ndx self-heal .", description: "Run 1 iteration (default)" },
       { command: "ndx self-heal 5", description: "Run 5 iterations in current directory" },
+      { command: "ndx self-heal 3 --yes .", description: "Unattended: auto-commit each task in the loop" },
     ],
     related: ["plan", "work", "refresh"],
   },

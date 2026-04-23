@@ -1718,6 +1718,10 @@ async function handleSelfHeal(rest) {
   const includeStructural = rest.includes("--include-structural");
   const structuralFlag = includeStructural ? [] : ["--exclude-structural"];
 
+  // --yes suppresses interactive prompts (commit confirmation, rollback) inside the hench loop
+  const yes = rest.includes("--yes");
+  const yesFlag = yes ? ["--yes"] : [];
+
   const shTag = cyan("[self-heal]");
   console.log(`${shTag} starting ${bold(String(iterCount))} iteration${iterCount === 1 ? "" : "s"}${includeStructural ? "" : dim(" (excluding structural findings)")}`);
 
@@ -1770,8 +1774,8 @@ async function handleSelfHeal(rest) {
     console.log(`\n${shTag} step 3/5: rex recommend --actionable-only --accept`);
     await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", ...structuralFlag, dir]);
 
-    console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal`);
-    await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", dir]);
+    console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal${yes ? " --yes" : ""}`);
+    await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", ...yesFlag, dir]);
 
     console.log(`\n${shTag} step 5/5: acknowledge completed findings`);
     await runOrDie(tools.rex, ["recommend", "--acknowledge-completed", dir]);

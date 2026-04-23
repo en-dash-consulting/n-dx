@@ -137,14 +137,16 @@ ndx work --auto .                          # next highest-priority task
 ndx work --auto --iterations=4 .           # run 4 tasks sequentially
 ndx work --epic="Auth System" --auto .     # scope to an epic
 ndx work --task=abc123 .                   # specific task
+ndx work --auto --yes .                    # unattended: auto-confirm commit + rollback prompts
 ```
 
-Hench picks a task, builds a brief with codebase context, runs an LLM tool-use loop to implement it, then records the run.
+Hench picks a task, builds a brief with codebase context, runs an LLM tool-use loop to implement it, then records the run. Pass `--yes` to skip the interactive commit-confirmation prompt (the agent's proposed message is committed automatically).
 
 ### 6. Self-Heal
 
 ```sh
 ndx self-heal 3 .           # 3 iterations of analyze → recommend → execute
+ndx self-heal 3 --yes .     # unattended: forward --yes to the inner hench loop
 ```
 
 Iterative improvement loop: re-analyze the codebase, accept new recommendations (filtered to actionable findings), execute tasks, acknowledge completed findings, and repeat. Fuzzy acknowledgment matching prevents fixed findings from regenerating as "new" after code changes alter zone names.
@@ -185,7 +187,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx analyze [dir]` | Run SourceVision codebase analysis (`--deep`, `--full`, `--lite`) |
 | `ndx recommend [dir]` | Show/accept SourceVision recommendations (`--accept`, `--actionable-only`) |
 | `ndx add "<desc>" [dir]` | Add PRD items from descriptions, files, or stdin |
-| `ndx work [dir]` | Run next task (`--task=ID`, `--epic=ID`, `--auto`, `--loop`) |
+| `ndx work [dir]` | Run next task (`--task=ID`, `--epic=ID`, `--auto`, `--loop`, `--yes`) |
 | `ndx self-heal [N] [dir]` | Iterative improvement loop (analyze + recommend + execute) |
 | `ndx start [dir]` | Start server: dashboard + MCP (`--port=N`, `--background`, `stop`, `status`) |
 
