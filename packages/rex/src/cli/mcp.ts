@@ -22,6 +22,7 @@ import {
   handleHealth,
   handleFacets,
   handleEditItem,
+  handleGetTokenUsage,
 } from "./mcp-tools.js";
 
 /**
@@ -193,6 +194,15 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       itemId: z.string().optional().describe("Item ID to get facet suggestions for (omit for overview)"),
     },
     async (args) => handleFacets(store, args),
+  );
+
+  server.tool(
+    "get_token_usage",
+    "Roll up hench run token usage across every PRD item. Returns self + descendant + total token counts per item, plus any runs whose itemId is no longer in the PRD as orphans. Pass `id` to narrow to a single item.",
+    {
+      id: z.string().optional().describe("Optional: only return rollup for this item"),
+    },
+    async (args) => handleGetTokenUsage(store, dir, args),
   );
 
   server.tool("get_capabilities", "Get Rex server capabilities and configuration", {},

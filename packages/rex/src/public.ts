@@ -304,6 +304,19 @@ export type {
   EpicStats, PriorityDistribution, RequirementsSummary,
 } from "./core/analytics.js";
 
+// ---- Core: per-item token rollup --------------------------------------------
+
+export {
+  aggregateItemTokenUsage,
+  readRunTokensFromHench,
+} from "./core/item-token-rollup.js";
+export type {
+  ItemTokenTuple,
+  ItemRunTokens,
+  ItemTokenTotals,
+  ItemTokenAggregation,
+} from "./core/item-token-rollup.js";
+
 // ---- Analyze: finding acknowledgment ----------------------------------------
 
 export {

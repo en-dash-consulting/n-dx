@@ -284,7 +284,7 @@
         {
           "id": "aa92ccd9-989b-4296-8935-c83c771f34d0",
           "title": "Token Usage Attribution per PRD Item",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Capture and aggregate LLM token usage (input, output, cached, total) against the PRD item each hench run is working on, then roll those totals up the tree so tasks, features, and epics each expose their own usage.",
           "source": "smart-add",
@@ -316,7 +316,7 @@
             {
               "id": "61022482-f8de-4c2b-8cc0-78946df52c94",
               "title": "Roll up token usage from subtasks to tasks, features, and epics",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add a rex-side aggregator that walks the PRD tree and sums per-item token usage from hench run data, exposing totals on every node so the dashboard and MCP consumers can read usage at any level without recomputing. Rollups must stay consistent with the single-file PRD invariant and be cheap enough to compute on every dashboard poll.",
               "acceptanceCriteria": [
@@ -331,9 +331,15 @@
                 "aggregation",
                 "mcp"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-23T15:52:30.570Z",
+              "completedAt": "2026-04-23T16:02:11.645Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added pure per-PRD-item token rollup (aggregateItemTokenUsage) in packages/rex/src/core/item-token-rollup.ts + get_token_usage MCP tool. Tests cover self/descendants/total rollup, property-style invariant on random trees, orphan handling, and sub-50ms perf on 500 items × 5k runs."
             }
-          ]
+          ],
+          "startedAt": "2026-04-23T16:02:11.657Z",
+          "completedAt": "2026-04-23T16:02:11.657Z"
         },
         {
           "id": "db3f2b10-1f3d-46be-a276-9274fceff25d",

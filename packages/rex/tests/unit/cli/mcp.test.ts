@@ -26,6 +26,7 @@ const EXPECTED_TOOLS = [
   "reorganize",
   "health",
   "facets",
+  "get_token_usage",
   "get_capabilities",
 ];
 

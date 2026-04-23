@@ -24,6 +24,11 @@ import { detectReorganizations } from "../core/reorganize.js";
 import { applyProposals } from "../core/reorganize-executor.js";
 import { computeHealthScore } from "../core/health.js";
 import { computeFacetDistribution, suggestFacets, getItemFacets } from "../core/facets.js";
+import {
+  aggregateItemTokenUsage,
+  readRunTokensFromHench,
+  type ItemTokenTotals,
+} from "../core/item-token-rollup.js";
 import { TOOL_VERSION } from "./commands/constants.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
@@ -686,6 +691,71 @@ export async function handleEditItem(
         updatedFields: changedFields,
         item: updated,
       }, null, 2),
+    );
+  } catch (err) {
+    return textResult(`Error: ${(err as Error).message}`, true);
+  }
+}
+
+/**
+ * Roll up hench run token totals across every PRD item.
+ *
+ * Returns `self`, `descendants`, and `total` token counts for every item in
+ * the tree, plus any runs whose `itemId` is no longer in the PRD (archived,
+ * pruned, deleted) as `orphans`.
+ *
+ * If `id` is provided, the response is narrowed to that single item (still
+ * with full rollup — just filtered in the output).
+ */
+export async function handleGetTokenUsage(
+  store: PRDStore,
+  projectDir: string,
+  args: { id?: string } = {},
+): Promise<McpResult> {
+  try {
+    const doc = await store.loadDocument();
+    const runs = await readRunTokensFromHench(projectDir);
+    const { totals, orphans } = aggregateItemTokenUsage(doc.items, runs);
+
+    if (args.id) {
+      const t = totals.get(args.id);
+      if (!t) {
+        return textResult(
+          `Item "${args.id}" not found. Use get_prd_status to see available items.`,
+          true,
+        );
+      }
+      return textResult(
+        JSON.stringify({ id: args.id, ...t }, null, 2),
+      );
+    }
+
+    const items: Array<{ id: string } & ItemTokenTotals> = [];
+    for (const [id, t] of totals) items.push({ id, ...t });
+
+    const orphanTotal = orphans.reduce(
+      (acc, o) => ({
+        input: acc.input + o.tokens.input,
+        output: acc.output + o.tokens.output,
+        cached: acc.cached + o.tokens.cached,
+        total: acc.total + o.tokens.total,
+      }),
+      { input: 0, output: 0, cached: 0, total: 0 },
+    );
+
+    return textResult(
+      JSON.stringify(
+        {
+          items,
+          orphans: {
+            count: orphans.length,
+            totals: orphanTotal,
+            runs: orphans,
+          },
+        },
+        null,
+        2,
+      ),
     );
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);

@@ -210,6 +210,7 @@ Two MCP servers provide structured access to project data. They are configured i
 - `get_item`
 - `get_capabilities`
 - `get_recommendations`
+- `get_token_usage`
 - `health`
 - `facets`
 

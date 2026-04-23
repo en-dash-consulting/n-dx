@@ -203,6 +203,7 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 - `facets` — list configured facets with distribution
 - `append_log` — write structured log entry
 - `sync_with_remote` — sync with remote adapter (e.g. Notion)
+- `get_token_usage` — roll up hench run token totals per PRD item (self/descendants/total) with orphans surfaced separately
 - `get_capabilities` — server capabilities and configuration
 
 ### Sourcevision MCP tools
