@@ -6,7 +6,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 ## Packages
 
 - **sourcevision** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption.
-- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores state in a single `.rex/prd.json`; any legacy branch-scoped `prd_{branch}_{date}.json` files are auto-merged into it on first load and renamed to `<name>.backup.<timestamp>`.
+- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores state in `.rex/prd.json`.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 
 ## Monorepo Structure
@@ -195,8 +195,6 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) also write to `.rex/prd.json`. Never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
 
-**Single-file PRD invariant.** The PRD is one canonical file: `.rex/prd.json`. There are no branch-scoped or multi-file writers — every reader and writer (CLI, hench, MCP, dashboard) touches the same file. The one exception is a one-time on-load migration that consolidates any legacy `prd_{branch}_{date}.json` files into `prd.json` and renames the sources to `<name>.backup.<timestamp>`. The migration runs inside the same store resolution as a regular read, is idempotent, and never touches `.backup.*` files — so it races only with concurrent writers to `.rex/prd.json`. To avoid the race on first upgrade, run a read-only command (e.g. `ndx status`) once to settle the migration before kicking off parallel writers.
-
 #### HTTP-request concurrency (web server)
 
 When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:
@@ -259,7 +257,6 @@ ndx add --file=spec.md    # import ideas from a text file
 ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
 ndx plan --accept [dir]   # ...then accept proposals into PRD
 ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, --yes, etc.)
-ndx pair-programming "<desc>" # agent + cross-vendor review (bicker alias)
 ndx self-heal [N] [dir]   # iterative improvement loop (analyze → recommend → execute; --yes for unattended)
 ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
 ndx status [dir]          # rex status (pass --format=json)
@@ -359,7 +356,6 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 - `facets` — list configured facets with distribution
 - `append_log` — write structured log entry
 - `sync_with_remote` — sync with remote adapter (e.g. Notion)
-- `get_token_usage` — roll up hench run token totals per PRD item (self/descendants/total) with orphans surfaced separately
 - `get_capabilities` — server capabilities and configuration
 
 ### Sourcevision MCP tools
@@ -392,14 +388,12 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 |------|---------|
 | `.sourcevision/CONTEXT.md` | AI-readable codebase summary |
 | `.sourcevision/manifest.json` | Analysis metadata and version |
-| `.rex/prd.json` | PRD tree (epics → features → tasks → subtasks) — single canonical file |
-| `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
+| `.rex/prd.json` | PRD tree (epics → features → tasks → subtasks) |
 | `.rex/workflow.md` | Human-readable workflow state |
 | `.rex/config.json` | Rex project configuration |
-| `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
-| `.rex/prd_{branch}_{date}.json.backup.<timestamp>` | Legacy multi-file PRD backups, produced once on first load after the on-load consolidation migration — safe to delete once `prd.json` contents are confirmed correct |
 | `.hench/config.json` | Hench agent configuration (model, max turns) |
 | `.hench/runs/` | Run history and transcripts |
+| `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
 | `.n-dx-web.pid` | Background web server PID file (auto-managed) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
@@ -408,5 +402,3 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
-
-> **PRD file layout.** `.rex/prd.json` is the single canonical PRD file. On first store resolution after upgrading from a branch-scoped layout, any `prd_{branch}_{date}.json` files found in `.rex/` are merged into `prd.json` (items concatenated in source order; ID collisions surface as an error for manual resolution) and renamed to `<name>.backup.<timestamp>`. The migration is idempotent — subsequent reads are no-ops once only `prd.json` remains. No user action is required; delete the `.backup.*` files once the merged `prd.json` looks correct.

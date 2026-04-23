@@ -49,12 +49,22 @@
         {
           "id": "ef9224cb-e708-4ff4-9dcd-954a86905915",
           "title": "Update Documentation for New PRD Structure",
-          "status": "completed",
+          "status": "pending",
           "level": "feature",
           "description": "Apply the documentation changes identified in the audit across all markdown files, ensuring the new multi-file branch-scoped PRD structure is accurately described everywhere it is referenced. Includes a reserved slot for a structural diagram.",
           "source": "smart-add",
           "startedAt": "2026-04-23T03:15:07.837Z",
-          "completedAt": "2026-04-23T03:15:07.837Z",
+          "mergedProposals": [
+            {
+              "proposalNodeKey": "p0:feature:2",
+              "proposalTitle": "Documentation Updates for Markdown-First PRD Storage",
+              "proposalKind": "feature",
+              "reason": "semantic_title",
+              "score": 0.6206896551724138,
+              "mergedAt": "2026-04-23T19:21:18.765Z",
+              "source": "smart-add"
+            }
+          ],
           "children": [
             {
               "id": "1132550d-e4dc-4103-b86a-c849b46d60f5",
@@ -83,7 +93,7 @@
             {
               "id": "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae",
               "title": "Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend",
-              "status": "completed",
+              "status": "pending",
               "level": "task",
               "description": "Update CLAUDE.md and AGENTS.md (plus their shared source assistant-assets/project-guidance.md and claude-addendum.md) so assistant instructions reflect the multi-file branch-scoped PRD layout, the .rex/ directory structure under the new format, and the MCP concurrency rules as they apply to multi-file writes. Ensure the 'Key Files' table and any PRD-related examples are current. Regenerate AGENTS.md and CLAUDE.md via ndx init after editing the assistant-assets source so both stay in sync.",
               "acceptanceCriteria": [
@@ -92,16 +102,34 @@
                 "CLAUDE.md Key Files table reflects actual .rex/ directory contents under multi-file format",
                 "AGENTS.md regenerated from updated source and contains the same PRD-structure updates",
                 "MCP concurrency contract section mentions multi-file write implications if applicable",
-                "ndx init regeneration verified to produce no unexpected diffs beyond the intended updates"
+                "ndx init regeneration verified to produce no unexpected diffs beyond the intended updates",
+                "CLAUDE.md Key Files table lists .rex/prd.md as primary PRD storage; .rex/prd.json entry notes it is a sync artifact",
+                "AGENTS.md Key Files table updated consistently with CLAUDE.md",
+                "Concurrency contract table rows that reference .rex/prd.json are updated to .rex/prd.md",
+                "MCP write tools documentation notes that mutations write to prd.md (with prd.json as secondary sync)",
+                "assistant-assets/project-guidance.md updated so ndx init regenerates correct instruction files",
+                "No remaining documentation references prd.json as the sole or primary PRD storage location"
               ],
               "priority": "high",
               "tags": [
                 "documentation",
-                "assistant-instructions"
+                "assistant-instructions",
+                "docs",
+                "rex"
               ],
               "source": "smart-add",
               "startedAt": "2026-04-23T02:51:02.824Z",
-              "completedAt": "2026-04-23T02:55:24.506Z"
+              "mergedProposals": [
+                {
+                  "proposalNodeKey": "p0:task:2:0",
+                  "proposalTitle": "Update CLAUDE.md, AGENTS.md, and assistant-assets to reference prd.md as primary storage",
+                  "proposalKind": "task",
+                  "reason": "content_overlap",
+                  "score": 0.7461046133853151,
+                  "mergedAt": "2026-04-23T19:21:18.765Z",
+                  "source": "smart-add"
+                }
+              ]
             },
             {
               "id": "2e6f0a74-f49b-4bd6-92ab-088db5568c58",
@@ -150,6 +178,26 @@
               "completedAt": "2026-04-23T03:15:07.826Z",
               "resolutionType": "code-change",
               "resolutionDetail": "Updated TESTING.md Required Coverage table + scenario-to-file pointer table for legacy multi-file PRD migration, cross-vendor authoring regression, self-heal test gate, Codex-batch fallback, and pair-programming cross-vendor review. Added single-file PRD invariant paragraph to PACKAGE_GUIDELINES.md §.rex/ Write-Access Protocol. Verified no workflow guide docs reference branch-scoped or multi-file layouts (grep-clean across docs/guide/*). Cross-checked with docs/doc-delta-audit.md §3.4/§3.5/§6. Docs-only — no code or link breakage."
+            },
+            {
+              "id": "8894ca28-c09b-4fb7-a704-cde878a0990f",
+              "title": "Update rex package README and PACKAGE_GUIDELINES for markdown-first storage",
+              "status": "pending",
+              "level": "task",
+              "description": "Update packages/rex/README.md to document the new markdown storage format with a Storage section covering the schema overview, dual-write behavior, and migration path. Update PACKAGE_GUIDELINES.md and TESTING.md wherever prd.json file format or storage conventions are referenced to reflect the markdown-primary model.",
+              "acceptanceCriteria": [
+                "packages/rex/README.md contains a Storage section documenting prd.md as primary, dual-write to prd.json, and the automatic migration path",
+                "PACKAGE_GUIDELINES.md updated to reference prd.md wherever prd.json storage format is discussed",
+                "TESTING.md updated if any test guidance references prd.json as the file to inspect or seed",
+                "Migration path is clearly described: automatic on first load, or manual via `rex migrate-to-md`",
+                "README documents how to read and manually edit prd.md, including which fields are required vs optional"
+              ],
+              "priority": "medium",
+              "tags": [
+                "docs",
+                "rex"
+              ],
+              "source": "smart-add"
             }
           ]
         }
@@ -437,6 +485,331 @@
               "completedAt": "2026-04-23T16:54:04.691Z",
               "resolutionType": "code-change",
               "resolutionDetail": "Added token-rollup and live-duration columns to the PRD tree view."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e4f88e2c-6c5a-4e6e-89cf-3376e5ecadf2",
+      "title": "PRD Context Graph Visualization",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "a32f8a34-2c34-4ea1-9652-d85d0ba4e8d2",
+          "title": "PRD Merge Context Graph View",
+          "status": "pending",
+          "level": "feature",
+          "description": "Interactive visual graph in the dashboard that shows the PRD tree as a context graph overlaid with git merge history, so users can see which PRD items correspond to which merges and what code changes were introduced in each merge.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "3b7bdd81-eb20-42c7-89b1-145131665551",
+              "title": "Build merge history data pipeline linking git merges to PRD items",
+              "status": "pending",
+              "level": "task",
+              "description": "Create a backend data pipeline that walks the git log for merge commits, extracts the files and PRD item IDs affected in each merge (via commit message parsing and hench run attribution), and serves the merged graph data through a new dashboard API endpoint. This is the data foundation for the visualization — without accurate merge-to-PRD linkage, the visual graph is just a tree.",
+              "acceptanceCriteria": [
+                "New dashboard API endpoint returns a graph payload containing PRD nodes, merge nodes, and edges between them",
+                "Merge commits are correlated to PRD items using commit message references, hench run metadata, and branch names",
+                "Endpoint returns file change summaries (added/modified/deleted paths) per merge",
+                "Payload is incrementally cacheable and invalidates when new merges land or PRD is updated",
+                "Unit and integration tests cover merge-to-PRD correlation, including merges with no PRD linkage"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "backend",
+                "prd",
+                "git"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-23T19:16:08.551Z",
+              "completedAt": "2026-04-23T19:26:28.368Z"
+            },
+            {
+              "id": "72855b7e-99c5-47cb-a742-45a160e0cf58",
+              "title": "Render interactive PRD-and-merge context graph in the dashboard",
+              "status": "pending",
+              "level": "task",
+              "description": "Build a new dashboard view that renders the PRD tree as a force-directed or hierarchical context graph with merge commit nodes attached to the PRD items they implemented. Users should be able to pan, zoom, select a merge node to see the files it added/changed, and filter by epic, feature, or time range. This gives users a single visual surface to understand how code shipped into the repo maps back to planned work.",
+              "acceptanceCriteria": [
+                "New route in the dashboard renders PRD items and merge commits as a connected graph",
+                "Clicking a merge node shows the list of files added, modified, and deleted in that merge",
+                "Clicking a PRD node highlights all merges that contributed to it",
+                "View supports filtering by epic, feature, date range, and completion status",
+                "Graph degrades gracefully for repos with no merge history and for PRD items with no associated merges",
+                "View is reachable from the existing PRD tree view with a clear toggle or link"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "frontend",
+                "viewer",
+                "ui"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fe673c36-ffc7-45c4-b6d2-09f7112eb214",
+      "title": "PRD Markdown Storage Format",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "6687abd2-80f8-43e0-973e-f5242b635378",
+          "title": "Markdown Schema Design and Bidirectional Serialization",
+          "status": "pending",
+          "level": "feature",
+          "description": "Define a human-readable markdown format that encodes all PRD fields with full fidelity, and implement serializers/parsers for converting between the in-memory PRD tree and markdown representations.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "52811e0d-fa0f-4cf8-9879-020d35f90473",
+              "title": "Design and document the markdown schema for full-fidelity PRD tree representation",
+              "status": "completed",
+              "level": "task",
+              "description": "Define a markdown structure that captures every PRD field (id, status, priority, tags, description, acceptanceCriteria, loe, loeRationale, loeConfidence, startedAt, completedAt, tokenUsage, duration) without loss. The schema must be both human-readable and machine-parseable. Hierarchy (epic → feature → task → subtask) is encoded via heading levels; metadata fields use a consistent encoding such as YAML front-matter blocks or structured HTML comment annotations. Produce a spec document under the rex package to serve as the authoritative reference for parser and serializer implementations.",
+              "acceptanceCriteria": [
+                "Schema spec document exists at packages/rex/docs/prd-markdown-schema.md",
+                "All current PRD field types are covered: strings, arrays (tags, acceptanceCriteria), numbers (loe), enums (status, priority, loeConfidence), ISO timestamps (startedAt, completedAt), and nested token/duration objects",
+                "Hierarchy levels epic/feature/task/subtask are distinguishable from markdown heading level alone",
+                "Metadata encoding is consistent and unambiguous — a field present in JSON must have exactly one encoding in markdown with no information collision",
+                "Edge cases documented: null/undefined fields, empty arrays, special characters in titles, multi-line descriptions"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "storage",
+                "markdown"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-23T19:26:31.234Z",
+              "completedAt": "2026-04-23T19:34:59.048Z"
+            },
+            {
+              "id": "35ccf9ee-0cb4-48b8-8aa3-185d76939c20",
+              "title": "Implement bidirectional markdown serializer and parser with round-trip fidelity tests",
+              "status": "pending",
+              "level": "task",
+              "description": "Build a markdown serializer (PRD tree → .md string) and a markdown parser (.md string → PRD tree) inside the rex package, conforming to the schema spec. All fields must survive a round-trip without loss or mutation. Include comprehensive tests covering the full field set, multi-level nesting, and edge cases such as empty descriptions, missing optional fields, and special characters.",
+              "acceptanceCriteria": [
+                "Serializer converts a complete in-memory PRD tree to a markdown string that matches the schema spec",
+                "Parser reconstructs the exact PRD tree from a valid serialized markdown string",
+                "Round-trip invariant holds: serialize(parse(serialize(tree))) deep-equals serialize(tree) for any valid PRD tree",
+                "All field types survive round-trip without type coercion (numbers stay numbers, arrays stay arrays)",
+                "Parser returns a typed error (not an uncaught exception) for malformed input",
+                "Unit tests achieve ≥90% line coverage for both serializer and parser modules"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "storage",
+                "markdown",
+                "testing"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "1306e659-dcaf-4303-b890-a8fdd5b706c8",
+          "title": "PRD Store Integration with Dual-Write and First-Run Migration",
+          "status": "pending",
+          "level": "feature",
+          "description": "Integrate the markdown format as the primary read/write target in the PRD store while keeping prd.json synchronized for backward compatibility, and automate migration from existing JSON files on first use.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "97b24996-6ca7-46de-a2bf-1355ebc12e9f",
+              "title": "Integrate markdown as primary read/write format in PRDStore with JSON dual-write",
+              "status": "pending",
+              "level": "task",
+              "description": "Update the PRD store (packages/rex/src/core/) to read from and write to .rex/prd.md as the primary storage file. On every save, also write the equivalent JSON to .rex/prd.json to keep it current for backward-compatible tooling. All existing store operations (load, save, add, edit, update, merge, move) must work transparently. The store falls back to reading .rex/prd.json if .rex/prd.md does not exist, enabling the migration path. Dual-write failure must not leave prd.md in an inconsistent state.",
+              "acceptanceCriteria": [
+                "PRDStore.load() reads from .rex/prd.md when the file exists; falls back to .rex/prd.json when prd.md is absent",
+                "PRDStore.save() writes .rex/prd.md first, then syncs .rex/prd.json; a write error on the json sync is logged but does not throw",
+                "All rex commands (status, next, add, edit, update, move, merge) operate correctly with markdown as primary storage",
+                "MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) persist to prd.md and the json sync follows",
+                "prd.json content equals JSON.stringify(parse(prd.md)) after every mutation",
+                "All existing PRDStore unit and integration tests pass without modification"
+              ],
+              "priority": "critical",
+              "tags": [
+                "rex",
+                "storage",
+                "refactor"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "7143e2a0-7c77-45ed-b3e5-d588a11b3b27",
+              "title": "Build automatic first-run migration and explicit rex migrate-to-md CLI command",
+              "status": "pending",
+              "level": "task",
+              "description": "Implement a migration that runs automatically in PRDStore.load() the first time a project is opened after the update (prd.md absent, prd.json present) and converts the existing JSON PRD to markdown. Expose the same logic as an explicit `rex migrate-to-md` CLI command for manual invocation. The original prd.json must not be modified. No data loss is acceptable.",
+              "acceptanceCriteria": [
+                "Automatic migration fires in PRDStore.load() when .rex/prd.md is absent and .rex/prd.json is present, producing .rex/prd.md",
+                "`rex migrate-to-md` command exists, is documented in `rex --help`, and produces .rex/prd.md from .rex/prd.json",
+                "Migration output passes the round-trip fidelity test: parse(migrate(prd.json)) deep-equals the original in-memory tree",
+                "All fields are preserved including timestamps, token usage, duration, and completed/in_progress status",
+                "Original .rex/prd.json is NOT deleted or modified by either migration path",
+                "Migration emits a clear success message including the output path; errors surface as typed failures with actionable messages"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "migration",
+                "storage"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "3b442642-e7e9-49a4-96fc-debd8da30fc1",
+              "title": "Write end-to-end and concurrency tests for markdown-primary PRD storage",
+              "status": "pending",
+              "level": "task",
+              "description": "Add integration and e2e tests that exercise the full lifecycle of prd.md as primary storage: initialization, mutation via CLI and MCP tools, dual-write consistency, fallback path, and concurrent write safety. Ensure the existing domain-isolation and PRD storage tests are updated to cover the markdown layer.",
+              "acceptanceCriteria": [
+                "Integration test covers: init → add → edit → update_status → move using prd.md as primary, verifying prd.json stays in sync after each step",
+                "Fallback path test: PRDStore.load() with only prd.json present triggers migration and subsequent reads come from prd.md",
+                "Concurrent write test: two rapid mutations do not corrupt prd.md or produce a prd.json that diverges from it",
+                "Existing PRD storage tests in tests/integration/ updated to validate both prd.md and prd.json after mutations",
+                "Test suite passes on both macOS and Linux CI environments"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "testing",
+                "storage"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b81be3e0-2651-4773-9127-420132e31604",
+      "title": "PRD Item Branch and File Attribution",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "578686b2-4fab-45a3-a452-28a8dc45231f",
+          "title": "Branch Attribution Metadata on PRD Items",
+          "status": "pending",
+          "level": "feature",
+          "description": "Extend the PRD item schema and write paths so each item records the git branch and source file it was created or last modified on, enabling provenance tracking across the tool chain.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "95037bd6-871c-4a16-bf90-90a081dbfe9e",
+              "title": "Add branch and source-file fields to PRD item schema and storage",
+              "status": "pending",
+              "level": "task",
+              "description": "PRD items currently carry no record of which git branch or PRD file they originate from. Adding optional `branch` and `sourceFile` fields to the item schema is the prerequisite for all downstream attribution display. The fields must survive JSON round-trips and remain backward-compatible so existing PRD files need no migration.",
+              "acceptanceCriteria": [
+                "PRD item schema accepts optional `branch: string` and `sourceFile: string` fields at all levels (epic, feature, task, subtask)",
+                "Fields are preserved through JSON serialization and deserialization without data loss",
+                "Existing items that lack these fields remain valid and load without error",
+                "`rex status --format=json` output includes `branch` and `sourceFile` when present on an item"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "schema",
+                "backend"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "07714a07-008e-4254-a0cd-56b15766afa4",
+              "title": "Populate branch attribution on item create and edit across all write paths",
+              "status": "pending",
+              "level": "task",
+              "description": "When a PRD item is created or updated through any write path — `rex add`, `ndx add`, MCP `add_item`/`edit_item`/`update_task_status`, or a hench run — automatically capture the current git branch and PRD file path as attribution metadata. This makes attribution automatic rather than opt-in, ensuring the UI has data to display without requiring user action.",
+              "acceptanceCriteria": [
+                "`rex add` and `ndx add` set `branch` to the current git branch on newly created items",
+                "MCP `add_item` and `edit_item` set `branch` to the current git branch at call time",
+                "Hench runs set `branch` on the task they act on at run start",
+                "`update_task_status` updates `branch` to reflect the branch active at the time of the status change",
+                "Branch detection fails gracefully when git is unavailable — field is omitted rather than crashing",
+                "`sourceFile` is set to the resolved path of the active `.rex/prd.json` (or markdown equivalent) at write time"
+              ],
+              "priority": "high",
+              "tags": [
+                "rex",
+                "hench",
+                "mcp",
+                "backend"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "9f96a45d-092e-4ea2-a76d-b21551cedbba",
+          "title": "Branch Attribution Display in PRD Dashboard",
+          "status": "pending",
+          "level": "feature",
+          "description": "Surface branch and file attribution visually in the dashboard PRD tree view so users can immediately see which items are actively being worked on and on which branch, without leaving the dashboard.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "d355da37-c17c-4a29-a18b-96ad2e854555",
+              "title": "Include branch and file attribution in rex API and MCP status responses",
+              "status": "pending",
+              "level": "task",
+              "description": "The web server `/api/status` route and the `get_prd_status` MCP tool must propagate `branch` and `sourceFile` fields from PRD items into their response payloads so the dashboard viewer has the data it needs to render attribution badges. This is the data plumbing prerequisite for the UI rendering task.",
+              "acceptanceCriteria": [
+                "`GET /api/status` response includes `branch` and `sourceFile` on each item node when present",
+                "`get_prd_status` MCP tool response includes the same fields",
+                "The `LoadedData` TypeScript schema in `external.ts` is updated to carry the new fields",
+                "Items without attribution serialize as `null` (not empty string or omitted key) for consistent client-side checks",
+                "No regression in existing status response fields or structure"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "api",
+                "rex",
+                "mcp"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "982777ca-fa74-4b7a-ae46-5c4329cf8ace",
+              "title": "Render branch badges on PRD tree rows and add branch filter to toolbar",
+              "status": "pending",
+              "level": "task",
+              "description": "Display a compact branch badge on each PRD tree row (epic, feature, task, subtask) when `branch` is set, and add a branch filter control to the tree toolbar so users can focus the view on items belonging to a specific branch. Items without attribution display no badge. The filter should be unobtrusive when only one branch is present.",
+              "acceptanceCriteria": [
+                "Each tree row renders a visually distinct badge showing the branch name when the item has `branch` set",
+                "Items without `branch` attribution show no badge and no empty placeholder",
+                "Hovering or clicking the branch badge shows a tooltip with the full `sourceFile` path",
+                "Branch badges are visually distinct from existing status badges (color, shape, or prefix)",
+                "A branch filter dropdown appears in the PRD tree toolbar only when items from more than one branch are present in the loaded data",
+                "Selecting a branch in the filter hides items whose `branch` does not match; selecting 'All' restores the full tree",
+                "Filter state is preserved through same-session navigation (e.g., switching tabs and returning)",
+                "No visual regression on tree rows that have no attribution data"
+              ],
+              "priority": "high",
+              "tags": [
+                "web",
+                "ui",
+                "dashboard",
+                "preact"
+              ],
+              "source": "smart-add"
             }
           ]
         }

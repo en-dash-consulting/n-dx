@@ -5,7 +5,13 @@
       "Bash(pnpm test *)",
       "Bash(pnpm --filter * test)",
       "Bash(pnpm --filter * test *)",
-      "Bash(pnpm --filter * typecheck)"
+      "Bash(pnpm --filter * typecheck)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm --filter * typecheck *)",
+      "Bash(pnpm preflight)",
+      "Bash(pnpm validate)", "Bash(pnpm validate *)",
+      "Bash(mkdir -p *)"
     ]
   }
 }
