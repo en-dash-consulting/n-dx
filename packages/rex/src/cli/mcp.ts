@@ -56,8 +56,14 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
   server.tool("get_prd_status", "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress.", {},
     async () => handleGetPrdStatus(store));
 
-  server.tool("get_next_task", "Get the next actionable task based on priority and dependencies, with explanation of why it was selected. Use when the user asks what to work on next.", {},
-    async () => handleGetNextTask(store));
+  server.tool(
+    "get_next_task",
+    "Get the next actionable task based on priority and dependencies, with explanation of why it was selected. Use when the user asks what to work on next.",
+    {
+      tags: z.array(z.string()).optional().describe("Only return tasks that have at least one of these tags. Omit to return any task regardless of tags."),
+    },
+    async (args) => handleGetNextTask(store, args),
+  );
 
   server.tool(
     "update_task_status",

@@ -15,7 +15,7 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { section } from "../../types/output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, cyan, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor } from "../../prd/llm-gateway.js";
 import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
 import type { TaskPriority } from "../../queue/index.js";
 import { ProcessLimiter } from "../../process/limiter.js";
@@ -367,6 +367,7 @@ export async function peekNextTaskPriority(
   cliOverride?: string,
   excludeTaskIds?: Set<string>,
   epicId?: string,
+  tags?: string[],
 ): Promise<TaskPriority> {
   const doc = await store.loadDocument();
 
@@ -390,10 +391,12 @@ export async function peekNextTaskPriority(
     ? new Set([...completedIds, ...excludeTaskIds])
     : completedIds;
 
+  const tagOptions = tags?.length ? { tags } : undefined;
+
   if (epicId) {
     // Use the same logic as assembleTaskBrief for epic-scoped selection
     const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
-    const allActionable = findActionable(doc.items, skipIds, Infinity);
+    const allActionable = findActionable(doc.items, skipIds, Infinity, tagOptions);
     const epicActionable = allActionable.filter(
       (e) => epicTaskIds.has(e.item.id) && !excludeTaskIds?.has(e.item.id),
     );
@@ -406,7 +409,7 @@ export async function peekNextTaskPriority(
       });
     }
   } else {
-    const next = findNextTask(doc.items, skipIds);
+    const next = findNextTask(doc.items, skipIds, tagOptions);
     if (next) {
       return resolveSchedulingPriority({
         taskPriority: next.item.priority,
@@ -614,6 +617,7 @@ async function runOne(
   review: boolean,
   excludeTaskIds?: Set<string>,
   epicId?: string,
+  tags?: string[],
   runHistory?: RunRecord[],
   rollbackOnFailure?: boolean,
   yes?: boolean,
@@ -646,6 +650,7 @@ async function runOne(
         review,
         excludeTaskIds,
         epicId,
+        tags,
         runHistory: runs,
         rollbackOnFailure,
         yes,
@@ -666,6 +671,7 @@ async function runOne(
         review,
         excludeTaskIds,
         epicId,
+        tags,
         runHistory: runs,
         rollbackOnFailure,
         yes,
@@ -678,7 +684,7 @@ async function runOne(
 
   info(`\n${bold("=== Run Complete ===")}`);
   output(`Run ID: ${run.id}`);
-  output(`Task: ${cyan(run.taskTitle)}`);
+  output(`Task: ${colorPink(run.taskTitle)}`);
   output(`Status: ${colorStatus(run.status)}`);
 
   // Invocation context
@@ -821,6 +827,9 @@ export async function cmdRun(
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";
   const skipDeps = flags["skip-deps"] === "true";
+  const tagsFilter = flags["tags"]
+    ? (flags["tags"] as string).split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
 
   // Apply self-heal mode to config so it flows through to prompt building
   if (selfHeal) {
@@ -1012,9 +1021,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous);
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, rollbackOnFailure, yes, extraContext, autonomous);
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous);
     }
   } finally {
     await limiter.release();
@@ -1040,6 +1049,7 @@ async function runIterations(
   maxFailedAttempts: number,
   review: boolean,
   epicId?: string,
+  tags?: string[],
   rollbackOnFailure?: boolean,
   yes?: boolean,
   extraContext?: string,
@@ -1065,6 +1075,7 @@ async function runIterations(
       review,
       stuckIds,
       epicId,
+      tags,
       undefined,
       rollbackOnFailure,
       yes,
@@ -1108,6 +1119,7 @@ async function runLoop(
   maxFailedAttempts: number,
   review: boolean,
   epicId?: string,
+  tags?: string[],
   queue?: ExecutionQueue,
   priorityOverride?: string,
   rollbackOnFailure?: boolean,
@@ -1136,7 +1148,8 @@ async function runLoop(
 
   try {
     const scope = epicId ? "epic tasks" : "all tasks";
-    info(`Loop mode: running continuously until ${scope} complete or interrupted (Ctrl+C to stop)`);
+    const tagNote = tags?.length ? ` [tag filter: ${tags.join(", ")}]` : "";
+    info(`Loop mode: running continuously until ${scope} complete or interrupted (Ctrl+C to stop)${tagNote}`);
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
@@ -1167,7 +1180,7 @@ async function runLoop(
         if (queue) {
           const store = await resolveStore(rexDir);
           schedulingPriority = await peekNextTaskPriority(
-            store, effectiveTaskId, priorityOverride, stuckIds, epicId,
+            store, effectiveTaskId, priorityOverride, stuckIds, epicId, tags,
           );
           await queue.acquire(effectiveTaskId ?? "auto", schedulingPriority);
         }
@@ -1181,6 +1194,7 @@ async function runLoop(
             review,
             stuckIds,
             epicId,
+            tags,
             undefined,
             rollbackOnFailure,
             yes,
@@ -1361,9 +1375,9 @@ async function runEpicByEpic(
 
       const epic = actionableEpics[epicIdx];
 
-      info(`\n${cyan("═".repeat(60))}`);
+      info(`\n${colorPink("═".repeat(60))}`);
       info(bold(`Epic ${epicIdx + 1}/${actionableEpics.length}: ${epic.title}`));
-      info(cyan("═".repeat(60)));
+      info(colorPink("═".repeat(60)));
 
       // Re-check epic scope (tasks may have changed from prior epic's work)
       const freshScope = await getEpicScopeInfo(store, epic.id);
@@ -1427,6 +1441,7 @@ async function runEpicByEpic(
               review,
               stuckIds,
               epic.id,
+              undefined, // tags (epic-by-epic doesn't apply a tag filter)
               undefined,
               rollbackOnFailure,
               yes,
@@ -1512,9 +1527,9 @@ async function runEpicByEpic(
  * Print a summary table of epic-by-epic execution results.
  */
 export function printEpicByEpicSummary(summaries: EpicRunSummary[]): void {
-  info(`\n${cyan("═".repeat(60))}`);
+  info(`\n${colorPink("═".repeat(60))}`);
   info(bold("Epic-by-Epic Execution Summary"));
-  info(cyan("═".repeat(60)));
+  info(colorPink("═".repeat(60)));
 
   let totalCompleted = 0;
   let totalFailed = 0;

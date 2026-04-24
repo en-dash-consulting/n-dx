@@ -1774,8 +1774,8 @@ async function handleSelfHeal(rest) {
     console.log(`\n${shTag} step 3/5: rex recommend --actionable-only --accept`);
     await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", ...structuralFlag, dir]);
 
-    console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal${yes ? " --yes" : ""}`);
-    await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", ...yesFlag, dir]);
+    console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal --tags=self-heal${yes ? " --yes" : ""}`);
+    await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", "--tags=self-heal", ...yesFlag, dir]);
 
     console.log(`\n${shTag} step 5/5: acknowledge completed findings`);
     await runOrDie(tools.rex, ["recommend", "--acknowledge-completed", dir]);

@@ -699,4 +699,12 @@ export interface TaskBrief {
   project: TaskBriefProject;
   workflow: string;
   recentLog: TaskBriefLogEntry[];
+  /**
+   * Active session-level filters applied during task selection.
+   * Present when the caller restricted selection (e.g. self-heal tag filter).
+   */
+  sessionFilters?: {
+    /** Only tasks with at least one of these tags were eligible for selection. */
+    tags?: string[];
+  };
 }

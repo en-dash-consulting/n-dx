@@ -25,6 +25,8 @@ export interface AssembleBriefOptions {
   excludeTaskIds?: Set<string>;
   /** Restrict task selection to this epic (ID). */
   epicId?: string;
+  /** Only select tasks with at least one of these tags. */
+  tags?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +151,7 @@ export async function assembleTaskBrief(
   const doc = await store.loadDocument();
   const config = await store.loadConfig();
   const excludeIds = options?.excludeTaskIds;
+  const tags = options?.tags?.length ? options.tags : undefined;
 
   let entry: TreeEntry | null;
 
@@ -177,7 +180,7 @@ export async function assembleTaskBrief(
     if (epicId) {
       // Epic filter active: get all actionable tasks and filter to epic
       const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
-      const allActionable = findActionableTasks(doc.items, skipIds, Infinity);
+      const allActionable = findActionableTasks(doc.items, skipIds, Infinity, tags ? { tags } : undefined);
 
       // Filter to tasks within the epic and not in excludeIds
       const epicActionable = allActionable.filter(
@@ -192,7 +195,7 @@ export async function assembleTaskBrief(
       entry = epicActionable[0];
     } else {
       // No epic filter: use standard findNextTask
-      entry = findNextTask(doc.items, skipIds);
+      entry = findNextTask(doc.items, skipIds, tags ? { tags } : undefined);
       if (!entry) {
         throw new Error("No actionable tasks found in PRD");
       }
@@ -237,6 +240,7 @@ export async function assembleTaskBrief(
       event: e.event,
       detail: e.detail,
     })),
+    ...(tags ? { sessionFilters: { tags } } : {}),
   };
 
   return { brief, taskId: entry.item.id };
@@ -346,6 +350,12 @@ export function formatTaskBrief(brief: TaskBrief): string {
       const marker = s.status === "completed" ? "[x]" : "[ ]";
       sections.push(`- ${marker} ${s.title} (${s.status})`);
     }
+  }
+
+  // Session filters (e.g. self-heal tag constraint)
+  if (brief.sessionFilters?.tags?.length) {
+    sections.push(`\n## Session Filters`);
+    sections.push(`Active tag filter: ${brief.sessionFilters.tags.join(", ")} — only tasks with these tags are eligible for selection.`);
   }
 
   // Project

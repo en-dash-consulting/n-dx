@@ -72,6 +72,8 @@ export interface SharedLoopOptions {
   excludeTaskIds?: Set<string>;
   /** Restrict task selection to this epic (ID). */
   epicId?: string;
+  /** Only select tasks with at least one of these tags (e.g. ["self-heal"]). */
+  tags?: string[];
   /** Prior attempt history for the selected task (shown in task card). */
   priorAttempts?: PriorAttemptInfo;
   /** Run records for computing prior attempts when task is auto-selected. */

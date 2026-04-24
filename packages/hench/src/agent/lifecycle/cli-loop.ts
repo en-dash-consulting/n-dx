@@ -1083,7 +1083,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Shared: assemble brief, format, build system prompt + envelope, display task info
   const { brief, taskId, briefText, systemPrompt, envelope: baseEnvelope } = await prepareBrief(
     store, config, opts.taskId,
-    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId },
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );

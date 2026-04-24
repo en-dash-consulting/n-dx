@@ -68,11 +68,15 @@ export async function handleGetPrdStatus(store: PRDStore): Promise<McpResult> {
   }
 }
 
-export async function handleGetNextTask(store: PRDStore): Promise<McpResult> {
+export async function handleGetNextTask(
+  store: PRDStore,
+  args?: { tags?: string[] },
+): Promise<McpResult> {
   try {
     const doc = await store.loadDocument();
     const completedIds = collectCompletedIds(doc.items);
-    const result = findNextTask(doc.items, completedIds);
+    const options = args?.tags?.length ? { tags: args.tags } : undefined;
+    const result = findNextTask(doc.items, completedIds, options);
     if (!result) {
       return textResult(JSON.stringify({ next: null, message: "No actionable tasks remaining" }));
     }

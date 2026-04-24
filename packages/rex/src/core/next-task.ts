@@ -144,6 +144,11 @@ export interface PrioritizationOptions {
    * When set, only tasks/subtasks under this feature ID are considered.
    */
   featureId?: string;
+  /**
+   * Only return tasks that have at least one tag in this list.
+   * When empty or undefined, no tag filtering is applied.
+   */
+  tags?: string[];
 }
 
 /**
@@ -329,6 +334,14 @@ function resolveFeatureSubtree(
   return entry.item.children ?? [];
 }
 
+/** Filter entries to those with at least one tag in the allowed list. */
+function filterByTags(entries: TreeEntry[], tags: string[]): TreeEntry[] {
+  if (tags.length === 0) return entries;
+  return entries.filter(
+    (e) => e.item.tags && e.item.tags.some((t) => tags.includes(t)),
+  );
+}
+
 export function findActionableTasks(
   items: PRDItem[],
   completedIds: Set<string>,
@@ -341,7 +354,10 @@ export function findActionableTasks(
     if (!subtree || subtree.length === 0) return [];
     scope = subtree;
   }
-  const results = collectActionable(scope, completedIds);
+  let results = collectActionable(scope, completedIds);
+  if (options?.tags?.length) {
+    results = filterByTags(results, options.tags);
+  }
   results.sort(makeComparator(items, options));
   return results.slice(0, limit);
 }
@@ -357,7 +373,10 @@ export function findNextTask(
     if (!subtree || subtree.length === 0) return null;
     scope = subtree;
   }
-  const results = collectActionable(scope, completedIds);
+  let results = collectActionable(scope, completedIds);
+  if (options?.tags?.length) {
+    results = filterByTags(results, options.tags);
+  }
   if (results.length === 0) return null;
   results.sort(makeComparator(items, options));
   return results[0];
