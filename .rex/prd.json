@@ -566,7 +566,7 @@
         {
           "id": "6687abd2-80f8-43e0-973e-f5242b635378",
           "title": "Markdown Schema Design and Bidirectional Serialization",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Define a human-readable markdown format that encodes all PRD fields with full fidelity, and implement serializers/parsers for converting between the in-memory PRD tree and markdown representations.",
           "source": "smart-add",
@@ -599,7 +599,7 @@
             {
               "id": "35ccf9ee-0cb4-48b8-8aa3-185d76939c20",
               "title": "Implement bidirectional markdown serializer and parser with round-trip fidelity tests",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "description": "Build a markdown serializer (PRD tree → .md string) and a markdown parser (.md string → PRD tree) inside the rex package, conforming to the schema spec. All fields must survive a round-trip without loss or mutation. Include comprehensive tests covering the full field set, multi-level nesting, and edge cases such as empty descriptions, missing optional fields, and special characters.",
               "acceptanceCriteria": [
@@ -618,9 +618,14 @@
                 "testing"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-23T19:49:17.111Z"
+              "startedAt": "2026-04-23T19:49:17.111Z",
+              "completedAt": "2026-04-24T14:24:27.185Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Implemented markdown-serializer.ts and markdown-parser.ts with self-contained YAML codec. Exported from public.ts. 128 new tests covering full field set, round-trip invariant, and all edge cases. All 3711 existing tests pass."
             }
-          ]
+          ],
+          "startedAt": "2026-04-24T14:24:27.208Z",
+          "completedAt": "2026-04-24T14:24:27.208Z"
         },
         {
           "id": "1306e659-dcaf-4303-b890-a8fdd5b706c8",
@@ -811,6 +816,94 @@
                 "ui",
                 "dashboard",
                 "preact"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0feb4eb5-79e3-435d-83ab-5cbf4eb7f235",
+      "title": "Self-Heal Loop Scoped Execution",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "2e184cee-25e9-4811-af0a-da72bb9c366f",
+          "title": "Self-Heal Tag Attribution on Created PRD Items",
+          "status": "pending",
+          "level": "feature",
+          "description": "Ensure that every PRD item created or added during a self-heal run is automatically tagged with 'self-heal', making it easy to distinguish autonomously-created remediation work from manually-authored PRD items.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "a699a497-d58e-4c3d-afc7-b029b2b3c2ee",
+              "title": "Auto-tag PRD items created during self-heal runs with 'self-heal' marker",
+              "status": "pending",
+              "level": "task",
+              "description": "When ndx self-heal creates new PRD items (via rex add, recommend --accept, or direct MCP writes), automatically apply the 'self-heal' tag to each item at creation time. This covers items created during the analyze → recommend → execute cycle within a self-heal run.",
+              "acceptanceCriteria": [
+                "All PRD items created via ndx self-heal carry the 'self-heal' tag",
+                "Items created outside of self-heal (manual adds, ndx plan) do NOT receive the tag",
+                "Tag is written to prd storage at item creation time, not applied post-hoc",
+                "Existing PRD items without the tag are not modified by a self-heal run"
+              ],
+              "priority": "high",
+              "tags": [
+                "self-heal",
+                "rex",
+                "hench"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "ae28134a-cb7d-4427-87f0-55094e3500d0",
+          "title": "Self-Heal Scoped Task Selection and Auto-Termination",
+          "status": "pending",
+          "level": "feature",
+          "description": "Restrict hench task selection during self-heal runs to only pick up items tagged 'self-heal', and automatically stop the loop once all such items are resolved — without spilling into unrelated PRD work.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "4fc2aacd-651b-4499-8555-2a6f2c8007ba",
+              "title": "Filter hench task selection to self-heal tagged items when running in self-heal mode",
+              "status": "pending",
+              "level": "task",
+              "description": "Pass a tag filter from ndx self-heal into the hench run invocation so that rex get_next_task only surfaces self-heal tagged items. Prevents the agent from accidentally picking up and completing unrelated PRD tasks during a self-heal session.",
+              "acceptanceCriteria": [
+                "ndx self-heal passes a 'self-heal' tag constraint to hench/rex task selection",
+                "rex get_next_task returns only tasks tagged 'self-heal' when the filter is active",
+                "Non-self-heal tasks are never started or modified during a self-heal run",
+                "Tag filter is reflected in the hench run brief and run logs"
+              ],
+              "priority": "critical",
+              "tags": [
+                "self-heal",
+                "hench",
+                "rex"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "ed9b7154-5527-4646-b421-dc25b5095a84",
+              "title": "Implement self-heal loop auto-termination when all self-heal items are completed",
+              "status": "pending",
+              "level": "task",
+              "description": "After each hench iteration within a self-heal run, check whether any pending self-heal tagged items remain. If none remain, exit the loop cleanly and report completion — rather than continuing to the next generic PRD task or looping indefinitely.",
+              "acceptanceCriteria": [
+                "Loop exits with a success message when zero pending 'self-heal' items remain",
+                "Loop does NOT continue to non-self-heal tasks after completing all self-heal items",
+                "Termination condition is evaluated after each completed task, not only at loop start",
+                "Final status output lists the self-heal items resolved in the run and their outcome"
+              ],
+              "priority": "critical",
+              "tags": [
+                "self-heal",
+                "hench"
               ],
               "source": "smart-add"
             }

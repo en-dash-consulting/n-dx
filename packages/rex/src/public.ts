@@ -51,6 +51,12 @@
 export { resolveStore, PRD_FILENAME } from "./store/index.js";
 export type { PRDStore } from "./store/contracts.js";
 
+// ---- Markdown serializer / parser ------------------------------------------
+
+export { serializeDocument } from "./store/markdown-serializer.js";
+export { parseDocument, MarkdownParseError } from "./store/markdown-parser.js";
+export type { ParseResult } from "./store/markdown-parser.js";
+
 // ---- Store: git branch helpers and PRD filename composers ------------------
 
 export {
