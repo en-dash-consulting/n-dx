@@ -14,6 +14,7 @@ import {
 import { parseDocument } from "./markdown-parser.js";
 import { serializeDocument } from "./markdown-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
+import { withSelfHealTag } from "./self-heal-tag.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -364,6 +365,10 @@ export class FileStore implements PRDStore {
   }
 
   async addItem(item: PRDItem, parentId?: string, options?: WriteOptions): Promise<void> {
+    // Self-heal tagging runs on creation only so that self-heal runs never
+    // rewrite tags on previously-authored items (see updateItem).
+    const tagged = withSelfHealTag(item);
+
     if (parentId) {
       let owner: string;
       try {
@@ -371,7 +376,7 @@ export class FileStore implements PRDStore {
       } catch {
         throw new Error(`Parent "${parentId}" not found`);
       }
-      const attributedItem = this.applyWriteAttribution(item, owner, options);
+      const attributedItem = this.applyWriteAttribution(tagged, owner, options);
       await this.withFileTransaction(owner, async (doc) => {
         if (!insertChild(doc.items, parentId, attributedItem)) {
           throw new Error(`Parent "${parentId}" not found`);
@@ -382,7 +387,7 @@ export class FileStore implements PRDStore {
       return;
     }
 
-    const attributedItem = this.applyWriteAttribution(item, this.currentBranchFile, options);
+    const attributedItem = this.applyWriteAttribution(tagged, this.currentBranchFile, options);
     await this.withFileTransaction(this.currentBranchFile, async (doc) => {
       doc.items.push(attributedItem);
     });

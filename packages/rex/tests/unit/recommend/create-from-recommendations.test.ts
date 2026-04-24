@@ -2021,4 +2021,79 @@ describe("createItemsFromRecommendations", () => {
       expect(doc.items[0].children![0].title).toBe("Feature A");
     });
   });
+
+  // ── Self-heal attribution ──────────────────────────────────────────
+
+  describe("self-heal attribution", () => {
+    afterEach(() => {
+      delete process.env.NDX_SELF_HEAL;
+    });
+
+    it("tags every created item with 'self-heal' when NDX_SELF_HEAL=1", async () => {
+      await writeFixtureProject(tmpDir);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      process.env.NDX_SELF_HEAL = "1";
+      await createItemsFromRecommendations(store, [
+        {
+          title: "Fix auth",
+          level: "epic",
+          description: "auth",
+          priority: "high",
+          source: "sourcevision",
+        },
+        {
+          title: "Fix perf",
+          level: "epic",
+          description: "perf",
+          priority: "medium",
+          source: "sourcevision",
+          tags: ["perf"],
+        },
+      ]);
+
+      const doc = await readPrd(tmpDir);
+      expect(doc.items[0].tags).toEqual(["self-heal"]);
+      expect(doc.items[1].tags).toEqual(["perf", "self-heal"]);
+    });
+
+    it("does not tag items when NDX_SELF_HEAL is unset", async () => {
+      await writeFixtureProject(tmpDir);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      delete process.env.NDX_SELF_HEAL;
+      await createItemsFromRecommendations(store, [
+        {
+          title: "Plan epic",
+          level: "epic",
+          description: "regular plan flow",
+          priority: "high",
+          source: "sourcevision",
+        },
+      ]);
+
+      const doc = await readPrd(tmpDir);
+      expect(doc.items[0].tags).toBeUndefined();
+    });
+
+    it("does not duplicate the tag when a recommendation already carries it", async () => {
+      await writeFixtureProject(tmpDir);
+      const store = await resolveStore(join(tmpDir, ".rex"));
+
+      process.env.NDX_SELF_HEAL = "1";
+      await createItemsFromRecommendations(store, [
+        {
+          title: "Pre-tagged",
+          level: "epic",
+          description: "already has the tag",
+          priority: "low",
+          source: "sourcevision",
+          tags: ["self-heal", "other"],
+        },
+      ]);
+
+      const doc = await readPrd(tmpDir);
+      expect(doc.items[0].tags).toEqual(["self-heal", "other"]);
+    });
+  });
 });

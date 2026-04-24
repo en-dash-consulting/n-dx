@@ -15,6 +15,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { PRDStore } from "../store/contracts.js";
+import { withSelfHealTag } from "../store/self-heal-tag.js";
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { LEVEL_HIERARCHY, CHILD_LEVEL, isLeafLevel, getLevelLabel } from "../schema/index.js";
 import { findItem, insertChild } from "../core/tree.js";
@@ -364,7 +365,9 @@ export async function createItemsFromRecommendations(
       item.recommendationMeta = rec.meta;
     }
 
-    pending.push({ item, parentId: rec.parentId });
+    // When invoked inside `ndx self-heal`, stamp every newly-created item
+    // with the `self-heal` tag at creation time. No-op outside self-heal.
+    pending.push({ item: withSelfHealTag(item), parentId: rec.parentId });
   }
 
   // 4. Validate placement (level hierarchy) for each item

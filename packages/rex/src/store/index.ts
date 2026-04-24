@@ -24,6 +24,12 @@ export {
 } from "./prd-md-migration.js";
 export type { MarkdownMigrationResult } from "./prd-md-migration.js";
 export { serializeDocument } from "./markdown-serializer.js";
+export {
+  SELF_HEAL_TAG,
+  SELF_HEAL_ENV_VAR,
+  isSelfHealRun,
+  withSelfHealTag,
+} from "./self-heal-tag.js";
 export { withLock, acquireLock } from "./file-lock.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";

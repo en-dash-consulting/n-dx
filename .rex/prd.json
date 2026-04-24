@@ -728,6 +728,8 @@
           "level": "feature",
           "description": "Extend the PRD item schema and write paths so each item records the git branch and source file it was created or last modified on, enabling provenance tracking across the tool chain.",
           "source": "smart-add",
+          "startedAt": "2026-04-24T16:57:13.842Z",
+          "completedAt": "2026-04-24T16:57:13.842Z",
           "children": [
             {
               "id": "95037bd6-871c-4a16-bf90-90a081dbfe9e",
@@ -779,9 +781,7 @@
               "startedAt": "2026-04-24T16:45:55.383Z",
               "completedAt": "2026-04-24T16:57:13.824Z"
             }
-          ],
-          "startedAt": "2026-04-24T16:57:13.842Z",
-          "completedAt": "2026-04-24T16:57:13.842Z"
+          ]
         },
         {
           "id": "9f96a45d-092e-4ea2-a76d-b21551cedbba",
@@ -845,22 +845,24 @@
     {
       "id": "0feb4eb5-79e3-435d-83ab-5cbf4eb7f235",
       "title": "Self-Heal Loop Scoped Execution",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "2e184cee-25e9-4811-af0a-da72bb9c366f",
           "title": "Self-Heal Tag Attribution on Created PRD Items",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Ensure that every PRD item created or added during a self-heal run is automatically tagged with 'self-heal', making it easy to distinguish autonomously-created remediation work from manually-authored PRD items.",
           "source": "smart-add",
+          "startedAt": "2026-04-24T18:55:40.239Z",
+          "completedAt": "2026-04-24T18:55:40.239Z",
           "children": [
             {
               "id": "a699a497-d58e-4c3d-afc7-b029b2b3c2ee",
               "title": "Auto-tag PRD items created during self-heal runs with 'self-heal' marker",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "When ndx self-heal creates new PRD items (via rex add, recommend --accept, or direct MCP writes), automatically apply the 'self-heal' tag to each item at creation time. This covers items created during the analyze → recommend → execute cycle within a self-heal run.",
               "acceptanceCriteria": [
@@ -875,7 +877,11 @@
                 "rex",
                 "hench"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T18:45:57.994Z",
+              "completedAt": "2026-04-24T18:55:40.211Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added NDX_SELF_HEAL env var propagation in core self-heal, plus withSelfHealTag helper that rex's FileStore.addItem and createItemsFromRecommendations use to stamp the 'self-heal' tag at creation time. Tests cover both self-heal and non-self-heal paths, and the updateItem path is confirmed not to retag existing items."
             }
           ]
         },
@@ -938,7 +944,9 @@
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-24T18:55:40.254Z",
+      "completedAt": "2026-04-24T18:55:40.254Z"
     },
     {
       "id": "cbe4e682-3315-4e77-a4a9-aea17c51a8e2",

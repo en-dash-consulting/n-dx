@@ -1725,6 +1725,13 @@ async function handleSelfHeal(rest) {
   const shTag = cyan("[self-heal]");
   console.log(`${shTag} starting ${bold(String(iterCount))} iteration${iterCount === 1 ? "" : "s"}${includeStructural ? "" : dim(" (excluding structural findings)")}`);
 
+  // Mark every child process spawned by this command so that newly-created
+  // PRD items (via rex recommend --accept, hench MCP add_item, etc.) receive
+  // the "self-heal" tag at creation time. Rex reads this env var in
+  // packages/rex/src/store/self-heal-tag.ts.
+  const prevSelfHealEnv = process.env.NDX_SELF_HEAL;
+  process.env.NDX_SELF_HEAL = "1";
+
   let prevFindingCount = Infinity;
   let baselineHealth = readCodeHealthMetrics(dir);
 
@@ -1801,6 +1808,12 @@ async function handleSelfHeal(rest) {
         // JSON parse failed — continue without progress tracking
       }
     }
+  }
+
+  if (prevSelfHealEnv === undefined) {
+    delete process.env.NDX_SELF_HEAL;
+  } else {
+    process.env.NDX_SELF_HEAL = prevSelfHealEnv;
   }
 
   console.log(`\n${shTag} ${green("completed")}`);
