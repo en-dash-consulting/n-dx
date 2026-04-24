@@ -15,6 +15,7 @@
 import type { LLMVendor, LLMConfig, TaskWeight } from "./llm-types.js";
 import { resolveVendorModel, resolveModel } from "./config.js";
 import { info, warn } from "./output.js";
+import { yellow } from "./help-format.js";
 
 export interface VendorModelHeaderOptions {
   /**
@@ -97,7 +98,7 @@ export function printVendorModelHeader(
     label = source;
   }
 
-  info(`Vendor: ${vendor}  Model: ${resolved} (${label})`);
+  info(`${yellow(`Vendor: ${vendor}`)}  ${yellow(`Model: ${resolved}`)} (${label})`);
 
   if (options?.lastModel) {
     const resolvedLast = resolveModel(options.lastModel);

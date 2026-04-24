@@ -27,6 +27,5 @@
       "enabled": false
     }
   },
-  "claudePath": "claude",
-  "autoCommit": true
+  "claudePath": "claude"
 }

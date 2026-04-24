@@ -33,7 +33,7 @@
 // Re-export shared foundation primitives.
 export { setQuiet, isQuiet, info, result } from "../prd/llm-gateway.js";
 
-import { isQuiet, bold, cyan, dim, colorDim, colorWarn, colorInfo, isColorEnabled } from "../prd/llm-gateway.js";
+import { isQuiet, bold, dim, yellow, colorDim, colorWarn, colorPink, isColorEnabled } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Rolling window state
@@ -202,7 +202,7 @@ export function section(title: string): void {
   // Start each section with an empty rolling window so the new task's output
   // doesn't bleed into the previous task's last-10-line display.
   resetRollingWindow();
-  console.log(`\n${cyan(rule)}\n${bold(`❯ ${title}`)}\n${cyan(rule)}`);
+  console.log(`\n${colorPink(rule)}\n${bold(`❯ ${title}`)}\n${colorPink(rule)}`);
 }
 
 /**
@@ -214,7 +214,7 @@ export function subsection(title: string): void {
   if (isQuiet()) return;
   const prefix = `── ${title} `;
   const pad = Math.max(0, SECTION_WIDTH - prefix.length);
-  console.log(`\n${cyan(bold(prefix))}${cyan(dim("─".repeat(pad)))}`);
+  console.log(`\n${colorPink(bold(prefix))}${colorPink(dim("─".repeat(pad)))}`);
 }
 
 /**
@@ -222,7 +222,7 @@ export function subsection(title: string): void {
  *
  * - Tool:   dim/grey  — secondary, operational tag
  * - Agent:  yellow    — primary agent voice
- * - Vendor/model names (Codex, claude, …): cyan/blue — origin identifier
+ * - Vendor/model names (Codex, claude, …): yellow — origin identifier
  *
  * Labels not listed here render without color.
  * Color helpers are evaluated at call time, so TTY and NO_COLOR detection
@@ -231,20 +231,20 @@ export function subsection(title: string): void {
 const STREAM_LABEL_COLORS: Readonly<Record<string, (text: string) => string>> = {
   Tool:   colorDim,
   Agent:  colorWarn,
-  Codex:  colorInfo,
-  claude: colorInfo,
+  Codex:  yellow,
+  claude: yellow,
 };
 
 /**
  * Color mapping for the message body (text portion) in stream output.
  *
- * - Agent: cyan — agent narrative text distinguishes itself from tool noise
+ * - Agent: magenta — agent narrative text distinguishes itself from tool noise
  *
  * Labels not listed here receive no body color.
  * Raw text is always captured in _capturedLines without ANSI codes.
  */
 const STREAM_TEXT_COLORS: Readonly<Record<string, (text: string) => string>> = {
-  Agent: colorInfo,
+  Agent: colorPink,
 };
 
 /**

@@ -19,6 +19,7 @@ import { _overrideTTY } from "../../../src/types/output.js";
 const DIM    = "\x1b[2m";
 const YELLOW = "\x1b[33m";
 const CYAN   = "\x1b[36m";
+const MAGENTA = "\x1b[35m";
 const ANSI_PREFIX = "\x1b[";
 
 describe("CLI output", () => {
@@ -221,14 +222,14 @@ describe("stream() label color mapping", () => {
     expect(output).toContain("[Agent]");
   });
 
-  // ── [Agent] text body → colorInfo (cyan) ─────────────────────────────────
+  // ── [Agent] text body → colorPink (magenta) ──────────────────────────────
 
-  it("[Agent] text body contains cyan ANSI code when color is forced", async () => {
+  it("[Agent] text body contains magenta ANSI code when color is forced", async () => {
     setColorMode("force");
     await resetColor();
     stream("Agent", "Some agent narrative");
     const output = spy.mock.calls[0][0] as string;
-    expect(output).toContain(CYAN);
+    expect(output).toContain(MAGENTA);
     expect(output).toContain("Some agent narrative");
   });
 
@@ -241,34 +242,34 @@ describe("stream() label color mapping", () => {
     expect(output).toContain("Some agent narrative");
   });
 
-  it("[Tool] text body has no cyan code even when color is forced (only label colored)", async () => {
+  it("[Tool] text body has no magenta code even when color is forced (only label colored)", async () => {
     setColorMode("force");
     await resetColor();
     stream("Tool", "read_file(path)");
     const output = spy.mock.calls[0][0] as string;
     expect(output).toContain(DIM); // label color
-    // text body after the bracket should not contain cyan
+    // text body after the bracket should not contain magenta
     const afterBracket = output.split("[Tool]")[1] ?? "";
-    expect(afterBracket).not.toContain(CYAN);
+    expect(afterBracket).not.toContain(MAGENTA);
   });
 
-  // ── vendor labels → colorInfo (cyan/blue) ────────────────────────────────
+  // ── vendor labels → yellow ────────────────────────────────────────────────
 
-  it("[Codex] vendor label contains cyan ANSI code when color is forced", async () => {
+  it("[Codex] vendor label contains yellow ANSI code when color is forced", async () => {
     setColorMode("force");
     await resetColor();
     stream("Codex", "vendor output line");
     const output = spy.mock.calls[0][0] as string;
-    expect(output).toContain(CYAN);
+    expect(output).toContain(YELLOW);
     expect(output).toContain("[Codex]");
   });
 
-  it("[claude] vendor label contains cyan ANSI code when color is forced", async () => {
+  it("[claude] vendor label contains yellow ANSI code when color is forced", async () => {
     setColorMode("force");
     await resetColor();
     stream("claude", "vendor output line");
     const output = spy.mock.calls[0][0] as string;
-    expect(output).toContain(CYAN);
+    expect(output).toContain(YELLOW);
     expect(output).toContain("[claude]");
   });
 
@@ -316,7 +317,7 @@ describe("stream() label color mapping", () => {
 });
 
 // ---------------------------------------------------------------------------
-// subsection() color — cyan on TTY, plain on NO_COLOR
+// subsection() color — magenta on TTY, plain on NO_COLOR
 // ---------------------------------------------------------------------------
 
 describe("subsection() color", () => {
@@ -334,12 +335,12 @@ describe("subsection() color", () => {
     setQuiet(false);
   });
 
-  it("contains cyan ANSI code when color is forced", async () => {
+  it("contains magenta ANSI code when color is forced", async () => {
     setColorMode("force");
     await resetColor();
     subsection("Task");
     const output = subSpy.mock.calls[0][0] as string;
-    expect(output).toContain(CYAN);
+    expect(output).toContain(MAGENTA);
     expect(output).toContain("Task");
   });
 

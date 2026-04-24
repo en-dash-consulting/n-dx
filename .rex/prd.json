@@ -570,6 +570,8 @@
           "level": "feature",
           "description": "Define a human-readable markdown format that encodes all PRD fields with full fidelity, and implement serializers/parsers for converting between the in-memory PRD tree and markdown representations.",
           "source": "smart-add",
+          "startedAt": "2026-04-24T14:24:27.208Z",
+          "completedAt": "2026-04-24T14:24:27.208Z",
           "children": [
             {
               "id": "52811e0d-fa0f-4cf8-9879-020d35f90473",
@@ -623,9 +625,7 @@
               "resolutionType": "code-change",
               "resolutionDetail": "Implemented markdown-serializer.ts and markdown-parser.ts with self-contained YAML codec. Exported from public.ts. 128 new tests covering full field set, round-trip invariant, and all edge cases. All 3711 existing tests pass."
             }
-          ],
-          "startedAt": "2026-04-24T14:24:27.208Z",
-          "completedAt": "2026-04-24T14:24:27.208Z"
+          ]
         },
         {
           "id": "1306e659-dcaf-4303-b890-a8fdd5b706c8",
@@ -871,7 +871,7 @@
             {
               "id": "4fc2aacd-651b-4499-8555-2a6f2c8007ba",
               "title": "Filter hench task selection to self-heal tagged items when running in self-heal mode",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Pass a tag filter from ndx self-heal into the hench run invocation so that rex get_next_task only surfaces self-heal tagged items. Prevents the agent from accidentally picking up and completing unrelated PRD tasks during a self-heal session.",
               "acceptanceCriteria": [
@@ -886,7 +886,11 @@
                 "hench",
                 "rex"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T14:36:54.749Z",
+              "completedAt": "2026-04-24T15:03:15.777Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added tags filter to PrioritizationOptions, findNextTask, findActionableTasks; threaded through hench run via --tags flag; ndx self-heal now passes --tags=self-heal"
             },
             {
               "id": "ed9b7154-5527-4646-b421-dc25b5095a84",
