@@ -1,12 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createStore, ensureRexDir } from "../../src/store/index.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import { toCanonicalJSON } from "../../src/core/canonical.js";
+import { parseDocument } from "../../src/store/markdown-parser.js";
+import { PRD_MARKDOWN_FILENAME } from "../../src/store/prd-md-migration.js";
 import type { PRDStore } from "../../src/store/index.js";
 import type { PRDItem, PRDDocument } from "../../src/schema/index.js";
+
+async function readJsonDoc(rexDir: string): Promise<PRDDocument> {
+  return JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8")) as PRDDocument;
+}
+
+async function readMarkdownDoc(rexDir: string): Promise<PRDDocument> {
+  const parsed = parseDocument(await readFile(join(rexDir, PRD_MARKDOWN_FILENAME), "utf-8"));
+  if (!parsed.ok) throw parsed.error;
+  return parsed.data;
+}
+
+async function expectCanonicalFilesInSync(rexDir: string): Promise<PRDDocument> {
+  const [jsonDoc, markdownDoc] = await Promise.all([
+    readJsonDoc(rexDir),
+    readMarkdownDoc(rexDir),
+  ]);
+  expect(markdownDoc).toEqual(jsonDoc);
+  return markdownDoc;
+}
 
 describe("Store roundtrip integration", () => {
   let tmpDir: string;
@@ -25,6 +46,7 @@ describe("Store roundtrip integration", () => {
       items: [],
     };
     await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
+    await writeFile(join(rexDir, "prd.md"), `---\nschema: ${SCHEMA_VERSION}\n---\n\n# Integration Test\n`, "utf-8");
     await writeFile(
       join(rexDir, "config.json"),
       toCanonicalJSON({ schema: SCHEMA_VERSION, project: "test", adapter: "file" }),
@@ -38,7 +60,7 @@ describe("Store roundtrip integration", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("full lifecycle: add items, read back, update, verify", async () => {
+  it("full lifecycle keeps prd.md primary and prd.json synchronized", async () => {
     // Add an epic
     const epic: PRDItem = {
       id: "epic-1",
@@ -48,6 +70,7 @@ describe("Store roundtrip integration", () => {
       priority: "high",
     };
     await store.addItem(epic);
+    await expectCanonicalFilesInSync(rexDir);
 
     // Add a feature under the epic
     const feature: PRDItem = {
@@ -57,6 +80,7 @@ describe("Store roundtrip integration", () => {
       level: "feature",
     };
     await store.addItem(feature, "epic-1");
+    await expectCanonicalFilesInSync(rexDir);
 
     // Add tasks under the feature
     const task1: PRDItem = {
@@ -76,9 +100,11 @@ describe("Store roundtrip integration", () => {
     };
     await store.addItem(task1, "feat-1");
     await store.addItem(task2, "feat-1");
+    const afterAdd = await expectCanonicalFilesInSync(rexDir);
 
     // Read back the full document
     const doc = await store.loadDocument();
+    expect(doc).toEqual(afterAdd);
     expect(doc.items.length).toBe(1);
     expect(doc.items[0].children!.length).toBe(1);
     expect(doc.items[0].children![0].children!.length).toBe(2);
@@ -93,11 +119,13 @@ describe("Store roundtrip integration", () => {
 
     // Update status
     await store.updateItem("task-1", { status: "completed" });
+    await expectCanonicalFilesInSync(rexDir);
     const updated = await store.getItem("task-1");
     expect(updated!.status).toBe("completed");
 
     // Remove an item
     await store.removeItem("task-2");
+    await expectCanonicalFilesInSync(rexDir);
     const afterRemove = await store.loadDocument();
     expect(afterRemove.items[0].children![0].children!.length).toBe(1);
   });
@@ -119,6 +147,7 @@ describe("Store roundtrip integration", () => {
       projectMeta: "preserved",
     } as PRDDocument;
     await store.saveDocument(docWithExtras);
+    await expectCanonicalFilesInSync(rexDir);
 
     const reloaded = await store.loadDocument();
     expect((reloaded as Record<string, unknown>).projectMeta).toBe("preserved");
@@ -134,6 +163,7 @@ describe("Store roundtrip integration", () => {
       status: "pending",
       level: "epic",
     });
+    await expectCanonicalFilesInSync(rexDir);
 
     await store.addItem({
       id: "epic-force",
@@ -230,6 +260,54 @@ describe("Store roundtrip integration", () => {
       ],
     } as unknown as PRDDocument;
     await expect(store.saveDocument(badDoc)).rejects.toThrow("Invalid document");
+  });
+
+  it("migrates from prd.json and continues reading from prd.md", async () => {
+    await unlink(join(rexDir, "prd.md"));
+
+    const doc = await store.loadDocument();
+    expect(doc.title).toBe("Integration Test");
+
+    const migrated = await readMarkdownDoc(rexDir);
+    expect(migrated).toEqual(await readJsonDoc(rexDir));
+
+    await writeFile(
+      join(rexDir, "prd.json"),
+      toCanonicalJSON({
+        schema: SCHEMA_VERSION,
+        title: "Corrupted JSON Should Be Ignored",
+        items: [{ id: "json-only", title: "JSON only", status: "pending", level: "epic" }],
+      }),
+      "utf-8",
+    );
+
+    const secondRead = await store.loadDocument();
+    expect(secondRead).toEqual(migrated);
+    expect(secondRead.title).toBe("Integration Test");
+  });
+
+  it("serializes rapid single-file mutations without corrupting markdown", async () => {
+    await store.addItem({
+      id: "epic-1",
+      title: "Concurrent Epic",
+      status: "pending",
+      level: "epic",
+    });
+
+    await Promise.all([
+      store.updateItem("epic-1", { title: "Concurrent Epic Updated" }),
+      store.addItem({
+        id: "epic-2",
+        title: "Second Epic",
+        status: "pending",
+        level: "epic",
+      }),
+    ]);
+
+    const synced = await expectCanonicalFilesInSync(rexDir);
+    expect(synced.items).toHaveLength(2);
+    expect(synced.items.map((item) => item.id).sort()).toEqual(["epic-1", "epic-2"]);
+    expect(synced.items.find((item) => item.id === "epic-1")?.title).toBe("Concurrent Epic Updated");
   });
 
   it("loads and round-trips workflow content", async () => {

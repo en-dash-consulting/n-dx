@@ -23,6 +23,7 @@ export {
   PRDMarkdownMigrationError,
 } from "./prd-md-migration.js";
 export type { MarkdownMigrationResult } from "./prd-md-migration.js";
+export { serializeDocument } from "./markdown-serializer.js";
 export { withLock, acquireLock } from "./file-lock.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";

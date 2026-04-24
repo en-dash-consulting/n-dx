@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { serializeDocument } from "../../src/store/markdown-serializer.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -40,11 +41,12 @@ function run(args: string[], expectFail = false): string {
 
 /** Write a PRD with specific items for testing fix scenarios. */
 async function writePrd(dir: string, items: unknown[]): Promise<void> {
+  const doc = { schema: "rex/v1", title: "Fix Test", items };
   await writeFile(
     join(dir, ".rex", "prd.json"),
-    JSON.stringify({ schema: "rex/v1", title: "Fix Test", items }, null, 2) +
-      "\n",
+    JSON.stringify(doc, null, 2) + "\n",
   );
+  await writeFile(join(dir, ".rex", "prd.md"), serializeDocument(doc));
 }
 
 describe("rex fix", () => {

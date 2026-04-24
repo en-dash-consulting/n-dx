@@ -9,6 +9,7 @@ import {
   PRDDocumentSchema,
 } from "../../src/schema/validate.js";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../src/schema/v1.js";
+import { parseDocument } from "../../src/store/markdown-parser.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -45,6 +46,7 @@ describe("rex init", () => {
     const rexDir = join(tmpDir, ".rex");
     await access(join(rexDir, "config.json"));
     await access(join(rexDir, "prd.json"));
+    await access(join(rexDir, "prd.md"));
     await access(join(rexDir, "execution-log.jsonl"));
     await access(join(rexDir, "workflow.md"));
   });
@@ -121,6 +123,20 @@ describe("rex init", () => {
     );
     expect(doc.schema).toBe("rex/v1");
     expect(doc.items).toEqual([]);
+  });
+
+  it("creates prd.md in sync with prd.json", async () => {
+    run(["init", tmpDir]);
+    const jsonDoc = JSON.parse(
+      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
+    );
+    const markdown = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
+    const parsed = parseDocument(markdown);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) {
+      throw parsed.error;
+    }
+    expect(parsed.data).toEqual(jsonDoc);
   });
 
   it("creates prd.json that passes schema validation", async () => {

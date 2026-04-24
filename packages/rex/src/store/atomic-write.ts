@@ -8,6 +8,7 @@
  * @module rex/store/atomic-write
  */
 
+import { randomUUID } from "node:crypto";
 import { writeFile, rename } from "node:fs/promises";
 
 /**
@@ -18,7 +19,7 @@ export async function atomicWrite(
   filePath: string,
   content: string,
 ): Promise<void> {
-  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  const tmpPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(tmpPath, content, "utf-8");
   await rename(tmpPath, filePath);
 }

@@ -5,13 +5,14 @@ import { validateDocument, validateConfig, validateLogEntry } from "../schema/va
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
-import { atomicWriteJSON } from "./atomic-write.js";
+import { atomicWrite, atomicWriteJSON } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import {
-  migrateJsonPrdToMarkdown,
-  PRDMarkdownMigrationError,
+  PRD_MARKDOWN_FILENAME,
 } from "./prd-md-migration.js";
+import { parseDocument } from "./markdown-parser.js";
+import { serializeDocument } from "./markdown-serializer.js";
 import type { PRDStore, StoreCapabilities } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -40,6 +41,10 @@ export class FileStore implements PRDStore {
 
   private get prdPath(): string {
     return this.path(PRD_FILENAME);
+  }
+
+  private get markdownPath(): string {
+    return this.path(PRD_MARKDOWN_FILENAME);
   }
 
   private get prdLockPath(): string {
@@ -110,7 +115,7 @@ export class FileStore implements PRDStore {
 
   private async ensureOwnershipMap(): Promise<void> {
     if (this.ownershipLoaded) return;
-    await this.loadDocument();
+    await this.loadDocumentFromJsonSources();
   }
 
   private async resolveOwnerFile(itemId: string): Promise<string> {
@@ -134,6 +139,8 @@ export class FileStore implements PRDStore {
         throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
       }
       await atomicWriteJSON(this.path(filename), doc, toCanonicalJSON);
+      const snapshot = await this.loadDocumentFromJsonSources();
+      await this.saveMarkdownDocument(snapshot);
       return result;
     });
   }
@@ -147,24 +154,7 @@ export class FileStore implements PRDStore {
     return withLock(this.lockPathForFile(next), () => this.withNestedLocks(rest, fn));
   }
 
-  /**
-   * Load and validate the consolidated PRD document.
-   *
-   * @throws If `prd.json` is missing, invalid JSON, or fails schema validation.
-   */
-  async loadDocument(): Promise<PRDDocument> {
-    try {
-      await migrateJsonPrdToMarkdown(this.rexDir);
-    } catch (error) {
-      if (
-        error instanceof PRDMarkdownMigrationError
-        && (error.code === "json-parse-failed" || error.code === "invalid-document")
-      ) {
-        // Let the normal JSON load path surface the canonical validation error.
-      } else {
-        throw error;
-      }
-    }
+  private async loadDocumentFromJsonSources(): Promise<PRDDocument> {
     const branchFiles = await discoverPRDFiles(this.rexDir);
 
     if (branchFiles.length === 0) {
@@ -218,6 +208,39 @@ export class FileStore implements PRDStore {
   }
 
   /**
+   * Load and validate the consolidated PRD document.
+   *
+   * `prd.md` is the primary read surface when present. If only `prd.json`
+   * exists, the first read migrates it to markdown and subsequent reads use
+   * the markdown file.
+   *
+   * @throws If the backing files are missing, invalid, or fail validation.
+   */
+  async loadDocument(): Promise<PRDDocument> {
+    try {
+      const markdown = await readFile(this.markdownPath, "utf-8");
+      const parsed = parseDocument(markdown);
+      if (!parsed.ok) {
+        throw new Error(`Invalid ${PRD_MARKDOWN_FILENAME}: ${parsed.error.message}`);
+      }
+      return parsed.data;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (code !== "ENOENT") {
+        throw error;
+      }
+    }
+
+    const doc = await this.loadDocumentFromJsonSources();
+    await this.saveMarkdownDocument(doc);
+    return doc;
+  }
+
+  private async saveMarkdownDocument(doc: PRDDocument): Promise<void> {
+    await atomicWrite(this.markdownPath, serializeDocument(doc));
+  }
+
+  /**
    * Persist a PRD document to the canonical `prd.json` file.
    *
    * When not inside a {@link withTransaction}, acquires a per-file lock
@@ -232,11 +255,13 @@ export class FileStore implements PRDStore {
     if (!this.ownershipLoaded) {
       if (this.inTransaction) {
         await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
+        await this.saveMarkdownDocument(doc);
         return;
       }
 
       await withLock(this.prdLockPath, async () => {
         await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
+        await this.saveMarkdownDocument(doc);
       });
       return;
     }
@@ -270,10 +295,14 @@ export class FileStore implements PRDStore {
 
     if (this.inTransaction) {
       await writeAll();
+      await this.saveMarkdownDocument(doc);
       return;
     }
 
-    await this.withNestedLocks(filenames, writeAll);
+    await this.withNestedLocks(filenames, async () => {
+      await writeAll();
+      await this.saveMarkdownDocument(doc);
+    });
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {

@@ -55,4 +55,37 @@ describe("FileStore markdown auto-migration", () => {
     const jsonAfter = await readFile(jsonPath, "utf-8");
     expect(jsonAfter).toBe(jsonBefore);
   });
+
+  it("prefers prd.md on subsequent loads after migration", async () => {
+    const doc: PRDDocument = {
+      schema: SCHEMA_VERSION,
+      title: "Markdown Primary",
+      items: [
+        {
+          id: "task-1",
+          title: "Task",
+          level: "task",
+          status: "pending",
+        },
+      ],
+    };
+    await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
+
+    const store = new FileStore(rexDir);
+    const firstLoad = await store.loadDocument();
+    expect(firstLoad).toEqual(doc);
+
+    await writeFile(
+      join(rexDir, "prd.json"),
+      toCanonicalJSON({
+        schema: SCHEMA_VERSION,
+        title: "JSON Drift",
+        items: [],
+      }),
+      "utf-8",
+    );
+
+    const secondLoad = await store.loadDocument();
+    expect(secondLoad).toEqual(doc);
+  });
 });

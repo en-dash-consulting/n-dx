@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -8,6 +8,7 @@ import { createRexMcpServer, startMcpServer } from "../../../src/cli/mcp.js";
 import { ensureRexDir } from "../../../src/store/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import { SCHEMA_VERSION } from "../../../src/schema/v1.js";
+import { parseDocument } from "../../../src/store/markdown-parser.js";
 import type { PRDDocument } from "../../../src/schema/v1.js";
 
 const EXPECTED_TOOLS = [
@@ -32,6 +33,33 @@ const EXPECTED_TOOLS = [
 
 const EXPECTED_RESOURCES = ["prd", "workflow", "log"];
 
+async function expectCanonicalFilesInSync(rexDir: string): Promise<PRDDocument> {
+  const jsonDoc = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8")) as PRDDocument;
+  const parsed = parseDocument(await readFile(join(rexDir, "prd.md"), "utf-8"));
+  expect(parsed.ok).toBe(true);
+  if (!parsed.ok) {
+    throw parsed.error;
+  }
+  expect(normalizeForMarkdown(parsed.data)).toEqual(normalizeForMarkdown(jsonDoc));
+  return jsonDoc;
+}
+
+function normalizeForMarkdown<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeForMarkdown(entry)) as T;
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  const normalized: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry === undefined) continue;
+    if (Array.isArray(entry) && entry.length === 0 && key !== "items") continue;
+    normalized[key] = normalizeForMarkdown(entry);
+  }
+  return normalized as T;
+}
+
 describe("Rex MCP server factory", () => {
   let tmpDir: string;
   let rexDir: string;
@@ -47,6 +75,7 @@ describe("Rex MCP server factory", () => {
       items: [],
     };
     await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
+    await writeFile(join(rexDir, "prd.md"), `---\nschema: ${SCHEMA_VERSION}\n---\n\n# MCP Test\n`, "utf-8");
     await writeFile(
       join(rexDir, "config.json"),
       toCanonicalJSON({ schema: SCHEMA_VERSION, project: "test", adapter: "file" }),
@@ -120,6 +149,69 @@ describe("Rex MCP server factory", () => {
     const parsed = JSON.parse(content[0].text);
     expect(parsed.title).toBe("MCP Test");
     expect(parsed.overall).toBeDefined();
+
+    await client.close();
+    await server.close();
+  });
+
+  it("keeps prd.md and prd.json synchronized across MCP mutations", async () => {
+    const server = await createRexMcpServer(tmpDir);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const epicResult = await client.callTool({
+      name: "add_item",
+      arguments: { title: "Platform", level: "epic" },
+    });
+    const epic = JSON.parse((epicResult.content as Array<{ text: string }>)[0].text);
+    await expectCanonicalFilesInSync(rexDir);
+
+    const featureResult = await client.callTool({
+      name: "add_item",
+      arguments: { title: "Markdown Storage", level: "feature", parentId: epic.id },
+    });
+    const feature = JSON.parse((featureResult.content as Array<{ text: string }>)[0].text);
+    await expectCanonicalFilesInSync(rexDir);
+
+    await client.callTool({
+      name: "edit_item",
+      arguments: {
+        id: feature.id,
+        title: "Markdown-Primary Storage",
+        description: "Keep markdown and json synchronized",
+      },
+    });
+    await expectCanonicalFilesInSync(rexDir);
+
+    await client.callTool({
+      name: "update_task_status",
+      arguments: {
+        id: feature.id,
+        status: "in_progress",
+      },
+    });
+    await expectCanonicalFilesInSync(rexDir);
+
+    const targetEpicResult = await client.callTool({
+      name: "add_item",
+      arguments: { title: "Execution", level: "epic" },
+    });
+    const targetEpic = JSON.parse((targetEpicResult.content as Array<{ text: string }>)[0].text);
+    await expectCanonicalFilesInSync(rexDir);
+
+    await client.callTool({
+      name: "move_item",
+      arguments: {
+        id: feature.id,
+        parentId: targetEpic.id,
+      },
+    });
+    const synced = await expectCanonicalFilesInSync(rexDir);
+    const executionEpic = synced.items.find((item) => item.id === targetEpic.id);
+    expect(executionEpic?.children?.some((item) => item.id === feature.id)).toBe(true);
 
     await client.close();
     await server.close();

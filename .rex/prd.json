@@ -560,7 +560,7 @@
     {
       "id": "fe673c36-ffc7-45c4-b6d2-09f7112eb214",
       "title": "PRD Markdown Storage Format",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
@@ -631,10 +631,12 @@
         {
           "id": "1306e659-dcaf-4303-b890-a8fdd5b706c8",
           "title": "PRD Store Integration with Dual-Write and First-Run Migration",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Integrate the markdown format as the primary read/write target in the PRD store while keeping prd.json synchronized for backward compatibility, and automate migration from existing JSON files on first use.",
           "source": "smart-add",
+          "startedAt": "2026-04-24T16:20:10.156Z",
+          "completedAt": "2026-04-24T16:20:10.156Z",
           "children": [
             {
               "id": "97b24996-6ca7-46de-a2bf-1355ebc12e9f",
@@ -686,7 +688,7 @@
             {
               "id": "3b442642-e7e9-49a4-96fc-debd8da30fc1",
               "title": "Write end-to-end and concurrency tests for markdown-primary PRD storage",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Add integration and e2e tests that exercise the full lifecycle of prd.md as primary storage: initialization, mutation via CLI and MCP tools, dual-write consistency, fallback path, and concurrent write safety. Ensure the existing domain-isolation and PRD storage tests are updated to cover the markdown layer.",
               "acceptanceCriteria": [
@@ -702,11 +704,15 @@
                 "testing",
                 "storage"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T16:08:51.271Z",
+              "completedAt": "2026-04-24T16:20:10.138Z"
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-24T16:20:10.167Z",
+      "completedAt": "2026-04-24T16:20:10.167Z"
     },
     {
       "id": "b81be3e0-2651-4773-9127-420132e31604",
