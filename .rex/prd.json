@@ -509,7 +509,7 @@
             {
               "id": "3b7bdd81-eb20-42c7-89b1-145131665551",
               "title": "Build merge history data pipeline linking git merges to PRD items",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Create a backend data pipeline that walks the git log for merge commits, extracts the files and PRD item IDs affected in each merge (via commit message parsing and hench run attribution), and serves the merged graph data through a new dashboard API endpoint. This is the data foundation for the visualization — without accurate merge-to-PRD linkage, the visual graph is just a tree.",
               "acceptanceCriteria": [
@@ -528,7 +528,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-23T19:16:08.551Z",
-              "completedAt": "2026-04-23T19:26:28.368Z"
+              "completedAt": "2026-04-24T19:31:22.575Z"
             },
             {
               "id": "72855b7e-99c5-47cb-a742-45a160e0cf58",
@@ -848,6 +848,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-24T18:55:40.254Z",
+      "completedAt": "2026-04-24T18:55:40.254Z",
       "children": [
         {
           "id": "2e184cee-25e9-4811-af0a-da72bb9c366f",
@@ -944,9 +946,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-24T18:55:40.254Z",
-      "completedAt": "2026-04-24T18:55:40.254Z"
+      ]
     },
     {
       "id": "cbe4e682-3315-4e77-a4a9-aea17c51a8e2",

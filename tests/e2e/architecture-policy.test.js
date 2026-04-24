@@ -63,6 +63,9 @@ const ALLOWED = new Set([
   // Web server routes — spawn CLI subprocesses for domain tool execution
   "packages/web/src/server/routes-hench.ts",
   "packages/web/src/server/routes-sourcevision.ts",
+  // Merge-history pipeline — walks `git log --merges` via execFileSync for the
+  // PRD ↔ merge context graph endpoint (same pattern as branch-work-collector).
+  "packages/web/src/server/merge-history.ts",
   // Claude Code integration — runs `claude mcp add` via execSync
   "packages/core/claude-integration.js",
   // Codex integration — writes .codex/config.toml, .agents/skills, AGENTS.md
@@ -823,7 +826,6 @@ const COHESION_THRESHOLD = 0.5;
  */
 const COHESION_EXCEPTIONS = new Map([
   ["web-server-unit", "Mixed zone intentionally co-locating aggregation-cache.ts and routes-token-usage.ts with their unit tests (5 files total). The production-plus-tests composition keeps cohesion at 0.4, just below threshold, but the zone description documents this as a boundary case — splitting tests out would reduce the zone below sourcevision's minimum zone size."],
-  ["tick", "7-file web polling cluster for elapsed-time updates (tick-timer.ts, tick-visibility-gate.ts, batched-tick-dispatcher.ts + focused unit tests). These modules intentionally compose through a small event pipeline rather than dense mutual imports, so SourceVision reports cohesion 0.44 despite the zone being a deliberate slice of the viewer polling system. Remove this exemption if the tick pipeline is merged into a larger polling zone or gains stronger internal coupling through shared orchestration code."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {
