@@ -38,7 +38,7 @@ import {
   useFeatureToggle,
   useFacetState,
 } from "../hooks/index.js";
-import { searchTree, collectAllTags } from "../components/prd-tree/tree-search.js";
+import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
 
 export interface PRDViewProps {
@@ -103,9 +103,10 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Facet filters (tags + status, URL-persisted) ──────────────
+  // ── Facet filters (tags + status + branch, URL-persisted) ────
   const {
     activeTags, activeSearchStatuses, searchFacets,
+    activeBranch, setActiveBranch,
     setActiveTags, setActiveSearchStatuses,
     clearFacets, hasFacets,
   } = useFacetState();
@@ -113,6 +114,12 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   // Collect all unique tags from the PRD for facet chip rendering
   const availableTags = useMemo(
     () => data ? collectAllTags(data.items) : [],
+    [data],
+  );
+
+  // Collect all unique branch names for the toolbar branch filter
+  const availableBranches = useMemo(
+    () => data ? collectAllBranches(data.items) : [],
     [data],
   );
 
@@ -341,6 +348,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       searchQuery: searchQuery || undefined,
       searchVisibleIds: searchResult?.visibleIds,
       searchMatchIds: searchResult?.matchIds,
+      availableBranches,
+      activeBranch,
+      onBranchChange: setActiveBranch,
     }),
 
     // Bulk actions bar (floating at bottom)

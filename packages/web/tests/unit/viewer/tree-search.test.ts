@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchTree, itemMatchesSearch, highlightSearchText, collectAllTags } from "../../../src/viewer/components/prd-tree/tree-search.js";
+import { searchTree, itemMatchesSearch, highlightSearchText, collectAllTags, collectAllBranches, buildBranchVisibleSet } from "../../../src/viewer/components/prd-tree/tree-search.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 import type { SearchFacets } from "../../../src/viewer/components/prd-tree/index.js";
 
@@ -363,6 +363,105 @@ describe("searchTree with facets", () => {
     const facets: SearchFacets = { tags: new Set(["nonexistent"]) };
     const result = searchTree(tree, "", facets);
     expect(result.matchCount).toBe(0);
+  });
+});
+
+// ── collectAllBranches ──────────────────────────────────────────────────────
+
+describe("collectAllBranches", () => {
+  const branchTree: PRDItemData[] = [
+    makeItem({
+      id: "e1", level: "epic", status: "pending", title: "Epic A", branch: "main",
+      children: [
+        makeItem({ id: "t1", level: "task", status: "pending", title: "Task 1", branch: "feature/login" }),
+        makeItem({ id: "t2", level: "task", status: "pending", title: "Task 2" }),
+        makeItem({ id: "t3", level: "task", status: "completed", title: "Task 3", branch: "main" }),
+      ],
+    }),
+    makeItem({ id: "e2", level: "epic", status: "pending", title: "Epic B", branch: "feature/login" }),
+    makeItem({ id: "e3", level: "epic", status: "pending", title: "Epic C" }),
+  ];
+
+  it("collects unique branches sorted alphabetically", () => {
+    const branches = collectAllBranches(branchTree);
+    expect(branches).toEqual(["feature/login", "main"]);
+  });
+
+  it("returns empty array when no items have branches", () => {
+    const noBranch: PRDItemData[] = [
+      makeItem({ id: "t1", level: "task", status: "pending", title: "Task" }),
+    ];
+    expect(collectAllBranches(noBranch)).toEqual([]);
+  });
+
+  it("deduplicates branches appearing in multiple items", () => {
+    const branches = collectAllBranches(branchTree);
+    // "main" appears in e1 and t3 — should appear once
+    expect(branches.filter((b) => b === "main")).toHaveLength(1);
+  });
+
+  it("handles null branch values without including them", () => {
+    const withNull: PRDItemData[] = [
+      makeItem({ id: "t1", level: "task", status: "pending", title: "T1", branch: null }),
+      makeItem({ id: "t2", level: "task", status: "pending", title: "T2", branch: "dev" }),
+    ];
+    expect(collectAllBranches(withNull)).toEqual(["dev"]);
+  });
+});
+
+// ── buildBranchVisibleSet ───────────────────────────────────────────────────
+
+describe("buildBranchVisibleSet", () => {
+  const branchTree: PRDItemData[] = [
+    makeItem({
+      id: "e1", level: "epic", status: "pending", title: "Epic A",
+      children: [
+        makeItem({ id: "f1", level: "feature", status: "pending", title: "Feature X",
+          children: [
+            makeItem({ id: "t1", level: "task", status: "pending", title: "Task 1", branch: "feature/x" }),
+            makeItem({ id: "t2", level: "task", status: "pending", title: "Task 2", branch: "main" }),
+            makeItem({ id: "t3", level: "task", status: "pending", title: "Task 3" }),
+          ],
+        }),
+        makeItem({ id: "f2", level: "feature", status: "pending", title: "Feature Y",
+          children: [
+            makeItem({ id: "t4", level: "task", status: "pending", title: "Task 4", branch: "main" }),
+          ],
+        }),
+      ],
+    }),
+    makeItem({ id: "e2", level: "epic", status: "pending", title: "Epic B" }),
+  ];
+
+  it("returns IDs of matching items and their ancestors", () => {
+    const visible = buildBranchVisibleSet(branchTree, "feature/x");
+    expect(visible.has("t1")).toBe(true);   // direct match
+    expect(visible.has("f1")).toBe(true);   // ancestor of t1
+    expect(visible.has("e1")).toBe(true);   // ancestor of t1
+  });
+
+  it("excludes items not on the branch and their non-ancestor relatives", () => {
+    const visible = buildBranchVisibleSet(branchTree, "feature/x");
+    expect(visible.has("t2")).toBe(false);  // different branch
+    expect(visible.has("t3")).toBe(false);  // no branch
+    expect(visible.has("f2")).toBe(false);  // no children on feature/x
+    expect(visible.has("t4")).toBe(false);  // different branch
+    expect(visible.has("e2")).toBe(false);  // no descendants on feature/x
+  });
+
+  it("includes multiple matching items across different subtrees", () => {
+    const visible = buildBranchVisibleSet(branchTree, "main");
+    expect(visible.has("t2")).toBe(true);
+    expect(visible.has("t4")).toBe(true);
+    // Both parents should be visible
+    expect(visible.has("f1")).toBe(true);
+    expect(visible.has("f2")).toBe(true);
+    expect(visible.has("e1")).toBe(true);
+  });
+
+  it("returns empty set when no items match the branch", () => {
+    const visible = buildBranchVisibleSet(branchTree, "nonexistent");
+    expect(visible.size).toBe(0);
   });
 });
 

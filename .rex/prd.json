@@ -725,9 +725,11 @@
     {
       "id": "b81be3e0-2651-4773-9127-420132e31604",
       "title": "PRD Item Branch and File Attribution",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-24T20:41:18.643Z",
+      "completedAt": "2026-04-24T20:41:18.643Z",
       "children": [
         {
           "id": "578686b2-4fab-45a3-a452-28a8dc45231f",
@@ -794,10 +796,12 @@
         {
           "id": "9f96a45d-092e-4ea2-a76d-b21551cedbba",
           "title": "Branch Attribution Display in PRD Dashboard",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Surface branch and file attribution visually in the dashboard PRD tree view so users can immediately see which items are actively being worked on and on which branch, without leaving the dashboard.",
           "source": "smart-add",
+          "startedAt": "2026-04-24T20:41:18.632Z",
+          "completedAt": "2026-04-24T20:41:18.632Z",
           "children": [
             {
               "id": "d355da37-c17c-4a29-a18b-96ad2e854555",
@@ -828,7 +832,7 @@
             {
               "id": "982777ca-fa74-4b7a-ae46-5c4329cf8ace",
               "title": "Render branch badges on PRD tree rows and add branch filter to toolbar",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Display a compact branch badge on each PRD tree row (epic, feature, task, subtask) when `branch` is set, and add a branch filter control to the tree toolbar so users can focus the view on items belonging to a specific branch. Items without attribution display no badge. The filter should be unobtrusive when only one branch is present.",
               "acceptanceCriteria": [
@@ -848,7 +852,11 @@
                 "dashboard",
                 "preact"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T20:33:05.022Z",
+              "completedAt": "2026-04-24T20:41:18.610Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added branch badge to tree rows and branch filter dropdown to toolbar, with URL-persisted filter state."
             }
           ]
         }

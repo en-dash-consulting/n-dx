@@ -32,7 +32,7 @@ import { resolveTaskUtilization } from "./task-utilization.js";
 import { useTreeEventDelegation } from "./tree-event-delegate.js";
 import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex, DEFAULT_ITEM_HEIGHT } from "./virtual-scroll.js";
 import type { FlatNode } from "./virtual-scroll.js";
-import { highlightSearchText } from "./tree-search.js";
+import { highlightSearchText, buildBranchVisibleSet } from "./tree-search.js";
 import { getTaskDuration } from "./durations.js";
 import { formatTokensExact, formatDuration, EMPTY_DASH } from "./format-usage.js";
 import { useLiveTick } from "./use-live-tick.js";
@@ -114,6 +114,19 @@ function PriorityBadge({ priority }: { priority: Priority }) {
     "span",
     { class: `prd-priority-badge ${config.cssClass}` },
     priority,
+  );
+}
+
+function BranchBadge({ branch, sourceFile }: { branch: string; sourceFile?: string | null }) {
+  const tooltip = sourceFile ? `${branch}\n${sourceFile}` : branch;
+  return h(
+    "span",
+    {
+      class: "prd-branch-badge",
+      title: tooltip,
+      "aria-label": `Branch: ${branch}`,
+    },
+    `⎇ ${branch}`,
   );
 }
 
@@ -474,6 +487,10 @@ class NodeRow extends Component<NodeRowProps> {
       h(StatusIndicator, { status: item.status }),
       // Level badge
       h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level]),
+      // Branch badge (only when attribution is present)
+      item.branch
+        ? h(BranchBadge, { branch: item.branch, sourceFile: item.sourceFile })
+        : null,
       // Title (with search highlighting when query is active)
       h("span", { class: "prd-node-title", title: item.title },
         ...(searchQuery ? highlightSearchText(item.title, searchQuery) : [item.title]),
@@ -601,12 +618,37 @@ function SummaryBar({ items }: { items: PRDItemData[] }) {
 interface ToolbarProps {
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  /** All branch names present in the loaded data. Dropdown shown only when > 1. */
+  availableBranches?: string[];
+  /** Currently active branch filter; null means "All branches". */
+  activeBranch?: string | null;
+  /** Called when the user selects a branch or "All". */
+  onBranchChange?: (branch: string | null) => void;
 }
 
-function Toolbar({ onExpandAll, onCollapseAll }: ToolbarProps) {
+function Toolbar({ onExpandAll, onCollapseAll, availableBranches, activeBranch, onBranchChange }: ToolbarProps) {
+  const showBranchFilter = availableBranches && availableBranches.length > 1;
   return h(
     "div",
     { class: "prd-toolbar" },
+    // Branch filter — only rendered when items from multiple branches are present
+    showBranchFilter
+      ? h(
+          "select",
+          {
+            class: "prd-toolbar-select",
+            value: activeBranch ?? "",
+            onChange: (e: Event) => {
+              const val = (e.target as HTMLSelectElement).value;
+              onBranchChange?.(val || null);
+            },
+            "aria-label": "Filter by branch",
+            title: "Filter by branch",
+          },
+          h("option", { value: "" }, "All branches"),
+          availableBranches!.map((b) => h("option", { key: b, value: b }, b)),
+        )
+      : null,
     h(
       "button",
       {
@@ -698,6 +740,18 @@ export interface PRDTreeProps {
    * This prop is accepted for backward compatibility but has no effect.
    */
   chunkSize?: number;
+  /**
+   * All branch names present in the loaded data.
+   * When more than one branch is present, the toolbar renders a filter dropdown.
+   */
+  availableBranches?: string[];
+  /**
+   * Currently active branch filter. When set, only items from this branch
+   * (and their ancestors for tree context) are visible. null = All branches.
+   */
+  activeBranch?: string | null;
+  /** Called when the user selects a different branch in the toolbar dropdown. */
+  onBranchChange?: (branch: string | null) => void;
 }
 
 // ── Item lookup helper ──────────────────────────────────────────────
@@ -715,7 +769,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize }: PRDTreeProps) {
+export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
@@ -773,9 +827,41 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
     });
   }, [searchVisibleIds]);
 
+  // Branch filter: compute visible set for the active branch
+  const branchVisibleIds = useMemo(
+    () => activeBranch ? buildBranchVisibleSet(doc.items, activeBranch) : undefined,
+    [doc.items, activeBranch],
+  );
+
+  // Branch filter: auto-expand ancestors of branch-matched items
+  useEffect(() => {
+    if (!branchVisibleIds || branchVisibleIds.size === 0) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      for (const id of branchVisibleIds) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, [branchVisibleIds]);
+
+  // Combined visibility: intersection of search and branch when both active,
+  // or whichever single filter is active.
+  const combinedVisibleIds = useMemo(() => {
+    if (!searchVisibleIds && !branchVisibleIds) return undefined;
+    if (!branchVisibleIds) return searchVisibleIds;
+    if (!searchVisibleIds || searchVisibleIds.size === 0) return branchVisibleIds;
+    // Intersect: item must satisfy both search and branch filters
+    const intersection = new Set<string>();
+    for (const id of searchVisibleIds) {
+      if (branchVisibleIds.has(id)) intersection.add(id);
+    }
+    return intersection;
+  }, [searchVisibleIds, branchVisibleIds]);
+
   const flatNodes = useMemo(
-    () => flattenVisibleTree(doc.items, expanded, activeStatuses, 0, searchVisibleIds),
-    [doc.items, expanded, activeStatusesKey, searchVisibleIds],
+    () => flattenVisibleTree(doc.items, expanded, activeStatuses, 0, combinedVisibleIds),
+    [doc.items, expanded, activeStatusesKey, combinedVisibleIds],
   );
 
   // Live tick for in-progress duration badges. The tick is only
@@ -940,7 +1026,7 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
       "div",
       { class: "prd-header" },
       h("h2", { class: "prd-title" }, doc.title),
-      h(Toolbar, { onExpandAll: expandAll, onCollapseAll: collapseAll }),
+      h(Toolbar, { onExpandAll: expandAll, onCollapseAll: collapseAll, availableBranches, activeBranch, onBranchChange }),
     ),
     // Summary
     h(SummaryBar, { items: doc.items }),

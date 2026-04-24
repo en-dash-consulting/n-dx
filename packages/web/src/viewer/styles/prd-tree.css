@@ -590,6 +590,48 @@
   font-weight: var(--weight-semibold);
 }
 
+/* Branch badge — pill shape + monospace to distinguish from rectangular status/priority badges */
+.prd-branch-badge {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+  padding: 1px var(--space-2);
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  letter-spacing: -0.2px;
+}
+
+/* Toolbar branch filter select */
+.prd-toolbar-select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  padding: var(--space-1) var(--space-2-5);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.prd-toolbar-select:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.prd-toolbar-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 /* Priority badges */
 .prd-priority-badge {
   font-size: var(--font-sm);

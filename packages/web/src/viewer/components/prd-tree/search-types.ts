@@ -20,6 +20,8 @@ export interface SearchablePRDItem {
   status: SearchItemStatus;
   description?: string;
   tags?: string[];
+  /** @see packages/rex/src/schema/v1.ts — PRDItem.branch */
+  branch?: string | null;
   children?: SearchablePRDItem[];
 }
 

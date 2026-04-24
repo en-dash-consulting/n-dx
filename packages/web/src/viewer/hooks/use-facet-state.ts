@@ -1,11 +1,11 @@
 /**
  * Facet filter state management with URL hash persistence.
  *
- * Manages active tag and status facets, syncing state to the URL hash
- * so filtered views are shareable. Reads initial state from the URL
+ * Manages active tag, status, and branch facets, syncing state to the URL
+ * hash so filtered views are shareable. Reads initial state from the URL
  * on mount and writes back on every change.
  *
- * URL format: #facets=tag:foo,tag:bar,status:pending,status:blocked
+ * URL format: #facets=tag:foo,tag:bar,status:pending,branch:main
  * Combined with existing hash params using & separator.
  *
  * @see ../components/prd-tree/facet-filter.ts — FacetFilter component
@@ -23,17 +23,18 @@ import type {
 const FACET_PARAM = "facets";
 
 /** Parse facet state from the URL hash. */
-function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<SearchItemStatus> } {
+function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<SearchItemStatus>; branch: string | null } {
   const tags = new Set<string>();
   const statuses = new Set<SearchItemStatus>();
+  let branch: string | null = null;
 
   try {
     const hash = window.location.hash.slice(1); // remove leading #
-    if (!hash) return { tags, statuses };
+    if (!hash) return { tags, statuses, branch };
 
     const params = new URLSearchParams(hash);
     const facetStr = params.get(FACET_PARAM);
-    if (!facetStr) return { tags, statuses };
+    if (!facetStr) return { tags, statuses, branch };
 
     for (const part of facetStr.split(",")) {
       const colonIdx = part.indexOf(":");
@@ -44,17 +45,19 @@ function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<SearchItemSta
         tags.add(value);
       } else if (type === "status" && value) {
         statuses.add(value as SearchItemStatus);
+      } else if (type === "branch" && value) {
+        branch = value;
       }
     }
   } catch {
     // Ignore malformed hashes
   }
 
-  return { tags, statuses };
+  return { tags, statuses, branch };
 }
 
 /** Write facet state to the URL hash, preserving other hash params. */
-function writeFacetsToHash(tags: Set<string>, statuses: Set<SearchItemStatus>): void {
+function writeFacetsToHash(tags: Set<string>, statuses: Set<SearchItemStatus>, branch: string | null): void {
   try {
     const hash = window.location.hash.slice(1);
     const params = new URLSearchParams(hash);
@@ -65,6 +68,9 @@ function writeFacetsToHash(tags: Set<string>, statuses: Set<SearchItemStatus>): 
     }
     for (const status of [...statuses].sort()) {
       parts.push(`status:${encodeURIComponent(status)}`);
+    }
+    if (branch) {
+      parts.push(`branch:${encodeURIComponent(branch)}`);
     }
 
     if (parts.length > 0) {
@@ -91,10 +97,14 @@ export interface FacetState {
   activeSearchStatuses: Set<SearchItemStatus>;
   /** Combined facets object for searchTree(). null when no facets are active. */
   searchFacets: SearchFacets | undefined;
+  /** Currently active branch filter. null means "All branches". */
+  activeBranch: string | null;
   /** Update active tags. */
   setActiveTags: (tags: Set<string>) => void;
   /** Update active search statuses. */
   setActiveSearchStatuses: (statuses: Set<SearchItemStatus>) => void;
+  /** Update the active branch filter. */
+  setActiveBranch: (branch: string | null) => void;
   /** Clear all facets. */
   clearFacets: () => void;
   /** Whether any facet is currently active. */
@@ -102,16 +112,11 @@ export interface FacetState {
 }
 
 export function useFacetState(): FacetState {
-  // Initialize from URL hash
-  const [activeTags, setActiveTagsRaw] = useState<Set<string>>(() => {
-    const parsed = parseFacetsFromHash();
-    return parsed.tags;
-  });
-
-  const [activeSearchStatuses, setActiveSearchStatusesRaw] = useState<Set<SearchItemStatus>>(() => {
-    const parsed = parseFacetsFromHash();
-    return parsed.statuses;
-  });
+  // Initialize from URL hash — parse once and share across all three fields
+  const initialParsed = parseFacetsFromHash();
+  const [activeTags, setActiveTagsRaw] = useState<Set<string>>(() => initialParsed.tags);
+  const [activeSearchStatuses, setActiveSearchStatusesRaw] = useState<Set<SearchItemStatus>>(() => initialParsed.statuses);
+  const [activeBranch, setActiveBranchRaw] = useState<string | null>(() => initialParsed.branch);
 
   // Track whether we've initialized (skip first URL write)
   const initialized = useRef(false);
@@ -122,8 +127,8 @@ export function useFacetState(): FacetState {
       initialized.current = true;
       return;
     }
-    writeFacetsToHash(activeTags, activeSearchStatuses);
-  }, [activeTags, activeSearchStatuses]);
+    writeFacetsToHash(activeTags, activeSearchStatuses, activeBranch);
+  }, [activeTags, activeSearchStatuses, activeBranch]);
 
   const setActiveTags = useCallback((tags: Set<string>) => {
     setActiveTagsRaw(tags);
@@ -133,9 +138,14 @@ export function useFacetState(): FacetState {
     setActiveSearchStatusesRaw(statuses);
   }, []);
 
+  const setActiveBranch = useCallback((branch: string | null) => {
+    setActiveBranchRaw(branch);
+  }, []);
+
   const clearFacets = useCallback(() => {
     setActiveTagsRaw(new Set());
     setActiveSearchStatusesRaw(new Set());
+    setActiveBranchRaw(null);
   }, []);
 
   const hasFacets = activeTags.size > 0 || activeSearchStatuses.size > 0;
@@ -148,8 +158,10 @@ export function useFacetState(): FacetState {
     activeTags,
     activeSearchStatuses,
     searchFacets,
+    activeBranch,
     setActiveTags,
     setActiveSearchStatuses,
+    setActiveBranch,
     clearFacets,
     hasFacets,
   };

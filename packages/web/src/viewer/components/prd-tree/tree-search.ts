@@ -175,6 +175,60 @@ export function collectAllTags(items: SearchablePRDItem[]): string[] {
   return [...tags].sort();
 }
 
+// ── Branch collection & filtering ──────────────────────────────────────────
+
+/**
+ * Collect all unique branch names from the PRD tree, sorted alphabetically.
+ * Used to populate the branch filter dropdown.
+ */
+export function collectAllBranches(items: SearchablePRDItem[]): string[] {
+  const branches = new Set<string>();
+  function walk(nodes: SearchablePRDItem[]) {
+    for (const item of nodes) {
+      if (item.branch) branches.add(item.branch);
+      if (item.children) walk(item.children);
+    }
+  }
+  walk(items);
+  return [...branches].sort();
+}
+
+/**
+ * Build the set of item IDs that should remain visible when filtering by branch.
+ *
+ * Returns the IDs of items whose `branch` matches the given value, plus the
+ * IDs of all their ancestor nodes (so tree structure context is preserved).
+ * Ancestors are detected the same way `searchTree` detects them — by walking
+ * the tree and propagating upward when any descendant matches.
+ *
+ * Complexity: O(N) where N = total tree nodes.
+ */
+export function buildBranchVisibleSet(
+  items: SearchablePRDItem[],
+  branch: string,
+): Set<string> {
+  const visibleIds = new Set<string>();
+
+  function walk(nodes: SearchablePRDItem[], ancestors: string[]): boolean {
+    let anyMatch = false;
+    for (const node of nodes) {
+      const childAncestors = [...ancestors, node.id];
+      const childMatch = node.children ? walk(node.children, childAncestors) : false;
+      const selfMatch = node.branch === branch;
+
+      if (selfMatch || childMatch) {
+        visibleIds.add(node.id);
+        for (const aid of ancestors) visibleIds.add(aid);
+        anyMatch = true;
+      }
+    }
+    return anyMatch;
+  }
+
+  walk(items, []);
+  return visibleIds;
+}
+
 /**
  * Check if an item (or any descendant) is in the visible set.
  * Used by flattenVisibleTree when a search is active.
