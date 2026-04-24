@@ -158,6 +158,8 @@ describe("validateDocument", () => {
           title: "Task",
           status: "pending",
           level: "task",
+          branch: "feature/prd-attribution",
+          sourceFile: ".rex/prd_feature-prd-attribution_2026-04-24.md",
           description: "A task",
           acceptanceCriteria: ["criterion 1"],
           priority: "high",
@@ -168,6 +170,40 @@ describe("validateDocument", () => {
       ],
     });
     expect(result.ok).toBe(true);
+  });
+
+  it("preserves branch and sourceFile when present", () => {
+    const result = validateDocument({
+      schema: "rex/v1",
+      title: "Test",
+      items: [
+        {
+          id: "e1",
+          title: "Epic 1",
+          status: "pending",
+          level: "epic",
+          branch: "feature/prd-attribution",
+          sourceFile: ".rex/prd_feature-prd-attribution_2026-04-24.md",
+          children: [
+            {
+              id: "f1",
+              title: "Feature 1",
+              status: "pending",
+              level: "feature",
+              branch: "feature/prd-attribution",
+              sourceFile: ".rex/prd_feature-prd-attribution_2026-04-24.md",
+            },
+          ],
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.items[0].branch).toBe("feature/prd-attribution");
+      expect(result.data.items[0].sourceFile).toBe(".rex/prd_feature-prd-attribution_2026-04-24.md");
+      expect(result.data.items[0].children?.[0].branch).toBe("feature/prd-attribution");
+      expect(result.data.items[0].children?.[0].sourceFile).toBe(".rex/prd_feature-prd-attribution_2026-04-24.md");
+    }
   });
 
   it("accepts items without optional fields (legacy format)", () => {

@@ -241,6 +241,10 @@ export interface PRDItem {
   title: string;
   status: ItemStatus;
   level: ItemLevel;
+  /** Git branch the item originated from or was last attributed to. */
+  branch?: string;
+  /** PRD source file the item originated from or was last written to. */
+  sourceFile?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: Priority;

@@ -51,6 +51,8 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       title: z.string(),
       status: ItemStatusSchema,
       level: ItemLevelSchema,
+      branch: z.string().optional(),
+      sourceFile: z.string().optional(),
       description: z.string().optional(),
       acceptanceCriteria: z.array(z.string()).optional(),
       priority: PrioritySchema.optional(),

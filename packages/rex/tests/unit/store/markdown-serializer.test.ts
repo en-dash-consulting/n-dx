@@ -131,6 +131,15 @@ describe("serializeDocument: rex-meta block", () => {
     expect(out).toContain("priority: high");
   });
 
+  it("writes branch and sourceFile when present", () => {
+    const out = serializeDocument(minimalDoc([minimalEpic({
+      branch: "feature/prd-attribution",
+      sourceFile: ".rex/prd_feature-prd-attribution_2026-04-24.md",
+    })]));
+    expect(out).toContain("branch: feature/prd-attribution");
+    expect(out).toContain("sourceFile: .rex/prd_feature-prd-attribution_2026-04-24.md");
+  });
+
   it("omits priority when absent", () => {
     const out = serializeDocument(minimalDoc([minimalEpic()]));
     expect(out).not.toContain("priority:");

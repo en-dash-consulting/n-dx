@@ -563,6 +563,8 @@
       "status": "completed",
       "level": "epic",
       "source": "smart-add",
+      "startedAt": "2026-04-24T16:20:10.167Z",
+      "completedAt": "2026-04-24T16:20:10.167Z",
       "children": [
         {
           "id": "6687abd2-80f8-43e0-973e-f5242b635378",
@@ -710,9 +712,7 @@
             }
           ]
         }
-      ],
-      "startedAt": "2026-04-24T16:20:10.167Z",
-      "completedAt": "2026-04-24T16:20:10.167Z"
+      ]
     },
     {
       "id": "b81be3e0-2651-4773-9127-420132e31604",
@@ -732,7 +732,7 @@
             {
               "id": "95037bd6-871c-4a16-bf90-90a081dbfe9e",
               "title": "Add branch and source-file fields to PRD item schema and storage",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "PRD items currently carry no record of which git branch or PRD file they originate from. Adding optional `branch` and `sourceFile` fields to the item schema is the prerequisite for all downstream attribution display. The fields must survive JSON round-trips and remain backward-compatible so existing PRD files need no migration.",
               "acceptanceCriteria": [
@@ -747,7 +747,12 @@
                 "schema",
                 "backend"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T16:39:25.070Z",
+              "completedAt": "2026-04-24T16:44:27.245Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added optional branch/sourceFile fields to PRD item typing and validation, preserved them in markdown serialization, and added validation, store round-trip, and status JSON coverage.",
+              "endedAt": "2026-04-24T16:44:27.245Z"
             },
             {
               "id": "07714a07-008e-4254-a0cd-56b15766afa4",

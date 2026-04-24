@@ -36,7 +36,7 @@ const ORDERED_FIRST: ReadonlyArray<string> = ["id", "level", "status", "priority
  * YAML block (not as passthrough). Must stay in sync with the schema spec.
  */
 const YAML_KNOWN_FIELDS = new Set([
-  "id", "level", "status", "priority", "tags", "source", "blockedBy",
+  "id", "level", "status", "priority", "branch", "sourceFile", "tags", "source", "blockedBy",
   "startedAt", "completedAt", "endedAt", "activeIntervals",
   "acceptanceCriteria",
   "loe", "loeRationale", "loeConfidence",

@@ -401,6 +401,42 @@ describe("cmdStatus", () => {
       expect(parsed.items[1].title).toBe("Deleted Epic");
     });
 
+    it("preserves branch and sourceFile in JSON output when present", async () => {
+      const prdWithAttribution: PRDDocument = {
+        schema: "rex/v1",
+        title: "Test Project",
+        items: [
+          {
+            id: "e1",
+            title: "Attributed Epic",
+            level: "epic",
+            status: "pending",
+            branch: "feature/prd-attribution",
+            sourceFile: ".rex/prd_feature-prd-attribution_2026-04-24.md",
+            children: [
+              {
+                id: "t1",
+                title: "Attributed Task",
+                level: "task",
+                status: "pending",
+                branch: "feature/prd-attribution",
+                sourceFile: ".rex/prd_feature-prd-attribution_2026-04-24.md",
+              },
+            ],
+          },
+        ],
+      };
+
+      writePRD(tmp, prdWithAttribution);
+      await cmdStatus(tmp, { format: "json", tokens: "false" });
+      const parsed = JSON.parse(output());
+
+      expect(parsed.items[0].branch).toBe("feature/prd-attribution");
+      expect(parsed.items[0].sourceFile).toBe(".rex/prd_feature-prd-attribution_2026-04-24.md");
+      expect(parsed.items[0].children[0].branch).toBe("feature/prd-attribution");
+      expect(parsed.items[0].children[0].sourceFile).toBe(".rex/prd_feature-prd-attribution_2026-04-24.md");
+    });
+
     it("shows hint about hidden items when deleted items exist", async () => {
       writePRD(tmp, PRD_WITH_DELETED);
       await cmdStatus(tmp, { format: "tree" });

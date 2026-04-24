@@ -130,6 +130,23 @@ describe("Store roundtrip integration", () => {
     expect(afterRemove.items[0].children![0].children!.length).toBe(1);
   });
 
+  it("round-trips branch and sourceFile across json and markdown storage", async () => {
+    await store.addItem({
+      id: "epic-attrib",
+      title: "Attributed Epic",
+      status: "pending",
+      level: "epic",
+      branch: "feature/prd-attribution",
+      sourceFile: ".rex/prd_feature-prd-attribution_2026-04-24.md",
+    });
+
+    await expectCanonicalFilesInSync(rexDir);
+
+    const reloaded = await store.loadDocument();
+    expect(reloaded.items[0].branch).toBe("feature/prd-attribution");
+    expect(reloaded.items[0].sourceFile).toBe(".rex/prd_feature-prd-attribution_2026-04-24.md");
+  });
+
   it("passthrough preserves unknown fields", async () => {
     // Write doc with unknown fields directly
     const docWithExtras: PRDDocument = {
