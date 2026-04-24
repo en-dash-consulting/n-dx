@@ -260,6 +260,81 @@ describe("prompt SIGINT suspension", () => {
     }
   });
 
+  it("does not call process.exit(1) when a second SIGINT arrives during the rollback prompt", async () => {
+    // Reproduces the original bug scenario as closely as possible: the
+    // run-loop in `run.ts` registers a handler that calls
+    // `process.exit(1)` on a second Ctrl-C. The first Ctrl-C is assumed
+    // to have already ended the run (the run arrives here in a failed
+    // state and enters the rollback path). The outer handler stays
+    // registered unless something detaches it — without the suspension
+    // shim, the second Ctrl-C delivered while the rollback prompt is
+    // open would immediately kill the process before the user can
+    // answer.
+    const { fakes } = installFakeReadline();
+    vi.resetModules();
+
+    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
+    await writeFile(join(projectDir, "src.ts"), "export const x = 999;\n", "utf-8");
+
+    // Spy on process.exit so the assertion can state the behavior in
+    // the exact language of the acceptance criterion.
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(((_code?: number) => undefined) as never);
+
+    const priorListeners = detachExistingSigintListeners();
+    // Install a handler with the force-exit shape used by run.ts's
+    // second-Ctrl-C branch. The test asserts this never fires while the
+    // prompt is open — the suspension shim must detach it first.
+    const outerForceExit = vi.fn(() => {
+      process.exit(1);
+    });
+    process.on("SIGINT", outerForceExit);
+
+    try {
+      const { finalizeRun } = await import(
+        "../../src/agent/lifecycle/shared.js"
+      );
+
+      const run = buildFailedRun();
+      const finalizePromise = finalizeRun({
+        run,
+        henchDir,
+        projectDir,
+        rollbackOnFailure: true,
+      });
+
+      // Let the prompt open.
+      await new Promise<void>((r) => setTimeout(r, 30));
+      expect(fakes).toHaveLength(1);
+      // Precondition: the outer force-exit handler is detached while
+      // the prompt is open.
+      expect(process.listeners("SIGINT")).not.toContain(outerForceExit);
+
+      // Deliver the "second" Ctrl-C. The first one is the signal that
+      // ended the run and opened the prompt in the first place.
+      process.emit("SIGINT");
+      await finalizePromise;
+
+      // Core criterion: process.exit(1) must not have been invoked.
+      expect(exitSpy).not.toHaveBeenCalled();
+      expect(outerForceExit).not.toHaveBeenCalled();
+      // The readline interface completed cleanly — it was closed by the
+      // shim's onInterrupt handler, and the finalizeRun promise resolved
+      // without rejection (implicit in the awaited promise above).
+      expect(fakes[0].closed).toBe(true);
+      // And the outer handler is reinstalled exactly once so subsequent
+      // Ctrl-C handling is uninterrupted.
+      const restored = (process.listeners("SIGINT") as Array<(...a: unknown[]) => void>).filter(
+        (l) => l === outerForceExit,
+      );
+      expect(restored).toHaveLength(1);
+    } finally {
+      restoreSigintListeners(priorListeners);
+      exitSpy.mockRestore();
+    }
+  });
+
   it("also cancels cleanly when SIGINT is delivered via readline's own event", async () => {
     // Some terminals deliver Ctrl-C through the readline surface instead
     // of (or in addition to) the process-level signal. The prompt

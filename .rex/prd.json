@@ -54,6 +54,7 @@
           "description": "Apply the documentation changes identified in the audit across all markdown files, ensuring the new multi-file branch-scoped PRD structure is accurately described everywhere it is referenced. Includes a reserved slot for a structural diagram.",
           "source": "smart-add",
           "startedAt": "2026-04-23T03:15:07.837Z",
+          "completedAt": "2026-04-24T20:55:20.195Z",
           "mergedProposals": [
             {
               "proposalNodeKey": "p0:feature:2",
@@ -204,8 +205,7 @@
               "resolutionType": "code-change",
               "resolutionDetail": "Added Storage section to packages/rex/README.md documenting prd.md as primary, dual-write to prd.json, automatic on-load migration, manual migration via rex migrate-to-md, required vs optional fields, and how to edit prd.md by hand. Updated PACKAGE_GUIDELINES.md (.rex/ write-access protocol) to describe markdown-primary with prd.json as derived sync artifact, dual-write invariant, and updated write-ownership table. Updated TESTING.md rex integration scenario list to call out JSON→markdown migration and dual-write, and added test-file pointers for prd-md-migration, file-adapter-markdown-migration, markdown-roundtrip, and prd-write-routing."
             }
-          ],
-          "completedAt": "2026-04-24T20:55:20.195Z"
+          ]
         }
       ]
     },
@@ -976,17 +976,19 @@
     {
       "id": "cbe4e682-3315-4e77-a4a9-aea17c51a8e2",
       "title": "Hench Autonomous Execution Improvements",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "source": "smart-add",
       "children": [
         {
           "id": "469c7900-cd34-4919-bc40-5f474a96654a",
           "title": "Ctrl-C Interrupt Rollback Prompt Coordination",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "When the user interrupts the work loop with Ctrl-C, the existing SIGINT handler (which calls process.exit(1) on a second Ctrl-C) remains active while the rollback confirmation prompt is waiting for readline input. Any Ctrl-C during the prompt immediately kills the process before the user can answer. The handler must be suspended for the duration of the rollback prompt and restored (or replaced with the default) afterward.",
           "source": "smart-add",
+          "startedAt": "2026-04-24T21:00:00.715Z",
+          "completedAt": "2026-04-24T21:00:00.715Z",
           "children": [
             {
               "id": "5cfeee22-c15d-40ec-aa66-0983959703f5",
@@ -1017,7 +1019,7 @@
             {
               "id": "20bbb688-65c2-4331-a508-5b5700272200",
               "title": "Add integration tests for Ctrl-C interrupt and rollback prompt interaction",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The interrupt-to-rollback path currently has no automated coverage. Add integration tests that simulate a SIGINT mid-run, verify the rollback prompt is displayed, and assert correct behavior for both 'confirm' and 'skip' responses. Cover the edge case where a second SIGINT arrives while the prompt is open.",
               "acceptanceCriteria": [
@@ -1033,11 +1035,17 @@
                 "testing",
                 "signal-handling"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T20:56:08.084Z",
+              "completedAt": "2026-04-24T21:00:00.697Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added a 6th integration test in packages/hench/tests/integration/sigint-prompt.test.ts that explicitly asserts criterion 4 of the acceptance list (\"a second SIGINT during the prompt does not call process.exit(1) and allows the readline to complete\") using vi.spyOn(process, \"exit\") and an outer handler shaped like run.ts's force-exit branch (unconditional process.exit(1)). Confirms: exitSpy never called; outerForceExit never called; readline closed cleanly; outer handler restored exactly once. The previous 5 tests from the sibling commit already covered the other acceptance criteria (prompt presented when dirty files exist, 'y' reverts files, 'n' leaves them, TTY mocking in lieu of real TTY); the new test closes the remaining gap by pinning the no-exit guarantee with a direct process.exit spy."
             }
           ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-24T21:00:00.725Z",
+      "completedAt": "2026-04-24T21:00:00.725Z"
     }
   ]
 }
