@@ -32,6 +32,7 @@ describe("rex CLI help", () => {
     "analyze",
     "import",
     "adapter",
+    "migrate-to-md",
     "mcp",
   ];
 
@@ -124,6 +125,14 @@ describe("rex CLI help", () => {
       const output = logSpy.mock.calls[0][0] as string;
       expect(output).toContain("--push");
       expect(output).toContain("--pull");
+    });
+
+    it("migrate-to-md help explains JSON to markdown migration", () => {
+      showCommandHelp("migrate-to-md");
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).toContain(".rex/prd.json");
+      expect(output).toContain(".rex/prd.md");
+      expect(output).toContain("same in-memory PRD tree");
     });
 
     it("remove help explains epic vs task differences and data loss warning", () => {

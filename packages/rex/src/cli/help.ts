@@ -538,6 +538,21 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["reorganize", "report", "validate"],
   },
+  "migrate-to-md": {
+    tool: "rex",
+    command: "migrate-to-md",
+    summary: "create prd.md from an existing prd.json",
+    usage: "rex migrate-to-md [dir]",
+    description:
+      "Converts the local .rex/prd.json document into .rex/prd.md using the\n" +
+      "markdown serializer, verifies that parsing the generated markdown yields\n" +
+      "the same in-memory PRD tree, and leaves prd.json untouched.",
+    examples: [
+      { command: "rex migrate-to-md", description: "Generate .rex/prd.md in the current project" },
+      { command: "rex migrate-to-md ./my-project", description: "Generate .rex/prd.md in a specific project" },
+    ],
+    related: ["init", "validate", "status"],
+  },
   mcp: {
     tool: "rex",
     command: "mcp",
@@ -581,6 +596,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   adapter: ["sync"],
   reorganize: ["health", "prune", "reshape"],
   health: ["reorganize", "report", "validate"],
+  "migrate-to-md": ["init", "validate", "status"],
   mcp: [],
 };
 

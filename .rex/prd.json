@@ -93,7 +93,7 @@
             {
               "id": "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae",
               "title": "Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Update CLAUDE.md and AGENTS.md (plus their shared source assistant-assets/project-guidance.md and claude-addendum.md) so assistant instructions reflect the multi-file branch-scoped PRD layout, the .rex/ directory structure under the new format, and the MCP concurrency rules as they apply to multi-file writes. Ensure the 'Key Files' table and any PRD-related examples are current. Regenerate AGENTS.md and CLAUDE.md via ndx init after editing the assistant-assets source so both stay in sync.",
               "acceptanceCriteria": [
@@ -119,6 +119,7 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-23T02:51:02.824Z",
+              "completedAt": "2026-04-24T15:41:44.804Z",
               "mergedProposals": [
                 {
                   "proposalNodeKey": "p0:task:2:0",
@@ -638,7 +639,7 @@
             {
               "id": "97b24996-6ca7-46de-a2bf-1355ebc12e9f",
               "title": "Integrate markdown as primary read/write format in PRDStore with JSON dual-write",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "description": "Update the PRD store (packages/rex/src/core/) to read from and write to .rex/prd.md as the primary storage file. On every save, also write the equivalent JSON to .rex/prd.json to keep it current for backward-compatible tooling. All existing store operations (load, save, add, edit, update, merge, move) must work transparently. The store falls back to reading .rex/prd.json if .rex/prd.md does not exist, enabling the migration path. Dual-write failure must not leave prd.md in an inconsistent state.",
               "acceptanceCriteria": [
@@ -655,12 +656,13 @@
                 "storage",
                 "refactor"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T15:54:10.082Z"
             },
             {
               "id": "7143e2a0-7c77-45ed-b3e5-d588a11b3b27",
               "title": "Build automatic first-run migration and explicit rex migrate-to-md CLI command",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "Implement a migration that runs automatically in PRDStore.load() the first time a project is opened after the update (prd.md absent, prd.json present) and converts the existing JSON PRD to markdown. Expose the same logic as an explicit `rex migrate-to-md` CLI command for manual invocation. The original prd.json must not be modified. No data loss is acceptable.",
               "acceptanceCriteria": [
@@ -677,7 +679,9 @@
                 "migration",
                 "storage"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T15:55:40.852Z",
+              "completedAt": "2026-04-24T16:05:53.263Z"
             },
             {
               "id": "3b442642-e7e9-49a4-96fc-debd8da30fc1",
@@ -867,6 +871,8 @@
           "level": "feature",
           "description": "Restrict hench task selection during self-heal runs to only pick up items tagged 'self-heal', and automatically stop the loop once all such items are resolved — without spilling into unrelated PRD work.",
           "source": "smart-add",
+          "startedAt": "2026-04-24T15:25:12.963Z",
+          "completedAt": "2026-04-24T15:25:12.963Z",
           "children": [
             {
               "id": "4fc2aacd-651b-4499-8555-2a6f2c8007ba",
@@ -915,9 +921,7 @@
               "resolutionType": "code-change",
               "resolutionDetail": "Added post-task tag-filter check in runLoop: after each runOne call when tags are set, hasPendingTaggedTasks queries the PRD and breaks with formatTagFilterCompletionSummary output if none remain. Includes 8 new tests for the exported formatter."
             }
-          ],
-          "startedAt": "2026-04-24T15:25:12.963Z",
-          "completedAt": "2026-04-24T15:25:12.963Z"
+          ]
         }
       ]
     },

@@ -17,6 +17,12 @@ export {
 export type { PRDFileResolution } from "./prd-discovery.js";
 export { migrateLegacyPRD } from "./prd-migration.js";
 export type { MigrationResult } from "./prd-migration.js";
+export {
+  migrateJsonPrdToMarkdown,
+  PRD_MARKDOWN_FILENAME,
+  PRDMarkdownMigrationError,
+} from "./prd-md-migration.js";
+export type { MarkdownMigrationResult } from "./prd-md-migration.js";
 export { withLock, acquireLock } from "./file-lock.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
@@ -70,6 +76,7 @@ import { getDefaultRegistry } from "./adapter-registry.js";
 import { dirname } from "node:path";
 import { resolveGitBranch } from "./branch-naming.js";
 import { findPRDFileForBranch } from "./prd-discovery.js";
+import { PRD_MARKDOWN_FILENAME } from "./prd-md-migration.js";
 import type { PRDStore } from "./contracts.js";
 import type { NotionAdapterConfig } from "./notion-client.js";
 
@@ -116,8 +123,10 @@ export function createNotionStore(
  *
  * Always returns a FileStore. Reads aggregate all branch-scoped PRD files
  * (`prd_{branch}_{date}.json`) plus `prd.json` into one in-memory document.
- * When a branch-scoped file already exists for the current git branch, new
- * root-level items are routed there; otherwise they go to `prd.json`.
+ * On first load after the markdown-storage upgrade, `prd.md` is generated from
+ * `prd.json` when the markdown file is missing. When a branch-scoped file
+ * already exists for the current git branch, new root-level items are routed
+ * there; otherwise they go to `prd.json`.
  *
  * CLI commands that write new root items should call {@link resolvePRDFile}
  * before writing to ensure the branch file exists and the store targets it.

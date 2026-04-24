@@ -82,7 +82,7 @@ export function serializeDocument(doc: PRDDocument): string {
   parts.push("");
 
   for (const item of doc.items) {
-    parts.push(...serializeItemSection(item));
+    parts.push(...serializeItemSection(item, true));
   }
 
   // Ensure exactly one trailing newline
@@ -92,7 +92,7 @@ export function serializeDocument(doc: PRDDocument): string {
 
 // ── Item serialization ────────────────────────────────────────────────────────
 
-function serializeItemSection(item: PRDItem): string[] {
+function serializeItemSection(item: PRDItem, isRoot: boolean): string[] {
   const depth = LEVEL_TO_DEPTH[item.level];
   const hashes = "#".repeat(depth);
   const lines: string[] = [];
@@ -102,7 +102,7 @@ function serializeItemSection(item: PRDItem): string[] {
 
   // rex-meta fenced block
   lines.push("```rex-meta");
-  const meta = buildMetaObject(item);
+  const meta = buildMetaObject(item, isRoot);
   const yamlBody = serializeMapping(meta, "");
   if (yamlBody) lines.push(yamlBody);
   lines.push("```");
@@ -117,7 +117,7 @@ function serializeItemSection(item: PRDItem): string[] {
   // Children (DFS pre-order)
   if (item.children && item.children.length > 0) {
     for (const child of item.children) {
-      lines.push(...serializeItemSection(child));
+      lines.push(...serializeItemSection(child, false));
     }
   }
 
@@ -130,8 +130,12 @@ function serializeItemSection(item: PRDItem): string[] {
  * 2. Remaining known fields, alphabetically
  * 3. Unknown fields collected into _passthrough
  */
-function buildMetaObject(item: PRDItem): Record<string, unknown> {
+function buildMetaObject(item: PRDItem, isRoot: boolean): Record<string, unknown> {
   const meta: Record<string, unknown> = {};
+
+  if (isRoot && item.level !== "epic") {
+    meta.root = true;
+  }
 
   // Step 1: ordered first
   for (const key of ORDERED_FIRST) {

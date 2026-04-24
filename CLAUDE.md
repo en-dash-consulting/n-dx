@@ -6,7 +6,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 ## Packages
 
 - **sourcevision** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption.
-- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores state in `.rex/prd.json`.
+- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores primary PRD state as Markdown in `.rex/prd.md`, with branch-scoped companion files such as `.rex/prd_{branch}_{date}.md` when work is split by branch. `.rex/prd.json` is a secondary sync artifact for consumers that still expect structured JSON.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 
 ## Monorepo Structure
@@ -184,16 +184,18 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 | Command pair | Safe? | Notes |
 |-------------|-------|-------|
 | `ndx start` + `ndx status` | ✅ | Status is read-only |
-| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`, server reads `.rex/prd.json` — no conflict |
-| `ndx start` + `ndx plan` | ⚠️ | Plan writes `.rex/prd.json` which the server reads — server may see partial writes. Restart server after plan. |
-| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` and `.rex/prd.json` concurrently |
-| `ndx plan` + `ndx work` | ❌ | Both write `.rex/prd.json` — data corruption risk |
+| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`; the server only reads the PRD Markdown set and derived `.rex/prd.json` |
+| `ndx start` + `ndx plan` | ⚠️ | Plan rewrites PRD Markdown files and refreshes `.rex/prd.json`; the server may see partial updates. Restart server after plan. |
+| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` plus PRD Markdown and sync files concurrently |
+| `ndx plan` + `ndx work` | ❌ | Both write the PRD backend (`.rex/prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md`, and `.rex/prd.json`) |
 | `ndx refresh` + any write command | ❌ | Refresh writes `.sourcevision/` and rebuilds web assets |
 | `ndx config` + `ndx config` | ❌ | Concurrent config writes may lose updates (no file locking) |
 
-**General rule:** Commands that write to `.rex/prd.json`, `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
+**General rule:** Commands that write to the PRD backend (`.rex/prd.md`, any `.rex/prd_{branch}_{date}.md`, or the derived `.rex/prd.json`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
-**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) also write to `.rex/prd.json`. Never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
+**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) mutate the Markdown PRD files first and then refresh `.rex/prd.json` as secondary sync output. In multi-file mode a single write may touch both `.rex/prd.md` and one or more branch-scoped `.rex/prd_{branch}_{date}.md` files, so never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
+
+**PRD multi-file invariant.** The writable PRD source of truth is the Markdown set: `.rex/prd.md` plus any branch-scoped `.rex/prd_{branch}_{date}.md` files. `.rex/prd.json` is derived sync output, not the primary store. Readers and writers therefore need to treat the whole PRD file set as one mutable unit: a command that appears to update one task may still rewrite the base Markdown file, a branch-scoped Markdown file, and then the JSON sync artifact. Avoid parallel writers even when they seem to target different branches.
 
 #### HTTP-request concurrency (web server)
 
@@ -201,11 +203,11 @@ When `ndx start` is running, the web server holds in-process caches (aggregation
 
 | Scenario | Risk | Mitigation |
 |----------|------|------------|
-| Dashboard reads PRD while `ndx plan` writes `.rex/prd.json` | Partial JSON read → parse error or stale tree | Restart server after plan (`ndx start stop && ndx start`) |
+| Dashboard reads PRD while `ndx plan` writes `.rex/prd.md` or branch-scoped PRD Markdown | Partial aggregate read or stale derived JSON | Restart server after plan (`ndx start stop && ndx start`) |
 | MCP request during `ndx work` PRD update | Momentarily stale status — hench writes are small atomic updates | Acceptable — dashboard polls and self-corrects within seconds |
 | Concurrent dashboard API requests | Safe — Express serializes requests per-connection; no shared mutable state between request handlers | No action needed |
 
-**General rule for HTTP:** The web server treats disk files as read-only and never holds write locks. Any command that rewrites `.rex/prd.json` or `.sourcevision/` in bulk (plan, ci, refresh) should be followed by a server restart to flush stale caches.
+**General rule for HTTP:** The web server treats disk files as read-only and never holds write locks. Any command that rewrites the PRD Markdown set, refreshes `.rex/prd.json`, or rewrites `.sourcevision/` in bulk (plan, ci, refresh) should be followed by a server restart to flush stale caches.
 
 
 ### Package conventions
@@ -341,6 +343,8 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 
 ### Rex MCP tools
 
+Rex mutations persist to the Markdown PRD backend first (`.rex/prd.md` and, when present, branch-scoped `.rex/prd_{branch}_{date}.md` files). `.rex/prd.json` is refreshed as a derived sync artifact rather than treated as the source of truth.
+
 - `get_prd_status` — PRD title, overall stats, and per-epic stats
 - `get_next_task` — next actionable task based on priority and dependencies
 - `update_task_status` — update item status
@@ -356,6 +360,7 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 - `facets` — list configured facets with distribution
 - `append_log` — write structured log entry
 - `sync_with_remote` — sync with remote adapter (e.g. Notion)
+- `get_token_usage` — roll up hench run token totals per PRD item (self/descendants/total) with orphans surfaced separately
 - `get_capabilities` — server capabilities and configuration
 
 ### Sourcevision MCP tools
@@ -388,12 +393,15 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 |------|---------|
 | `.sourcevision/CONTEXT.md` | AI-readable codebase summary |
 | `.sourcevision/manifest.json` | Analysis metadata and version |
-| `.rex/prd.json` | PRD tree (epics → features → tasks → subtasks) |
+| `.rex/prd.md` | Primary PRD storage in Markdown; base document for epics → features → tasks → subtasks |
+| `.rex/prd_{branch}_{date}.md` | Branch-scoped PRD companion files used when branch work is split into separate Markdown documents |
+| `.rex/prd.json` | Derived JSON sync artifact generated from the Markdown PRD files for tools that still consume structured JSON |
+| `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
 | `.rex/workflow.md` | Human-readable workflow state |
 | `.rex/config.json` | Rex project configuration |
+| `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
 | `.hench/config.json` | Hench agent configuration (model, max turns) |
 | `.hench/runs/` | Run history and transcripts |
-| `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
 | `.n-dx-web.pid` | Background web server PID file (auto-managed) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
@@ -402,3 +410,5 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
+
+> **PRD file layout.** `.rex/prd.md` is the primary PRD document. Branch-scoped work may add sibling Markdown files named `prd_{branch}_{date}.md`; together these Markdown files make up the writable PRD source of truth. `.rex/prd.json` is regenerated from that Markdown set as a compatibility and sync artifact, so documentation and tooling should treat the Markdown files as authoritative for writes and `prd.json` as secondary.

@@ -314,7 +314,9 @@ async function dispatchCommand(
   // init creates it; analyze handles its own graceful fallback.
   // Commands whose first positional arg is an ID (not a dir) must handle
   // their own dir resolution and requireRexDir check inside the case block.
-  const SKIP_DIR_CHECK = new Set(["init", "analyze", "import", "update", "move", "add", "reshape", "remove"]);
+  const SKIP_DIR_CHECK = new Set([
+    "init", "analyze", "import", "update", "move", "add", "reshape", "remove",
+  ]);
   if (!SKIP_DIR_CHECK.has(command)) {
     requireRexDir(resolveDir(positional));
   }
@@ -445,6 +447,11 @@ async function dispatchCommand(
       await startMcpServer(resolveDir(positional));
       break;
     }
+    case "migrate-to-md": {
+      const { cmdMigrateToMd } = await import("./commands/migrate-to-md.js");
+      await cmdMigrateToMd(resolveDir(positional));
+      break;
+    }
     default: {
       // Check if the user tried an ndx-only orchestration command
       const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -468,6 +475,7 @@ async function dispatchCommand(
         "init", "status", "next", "add", "update", "move", "remove", "reshape",
         "prune", "validate", "fix", "sync", "usage", "report", "verify",
         "recommend", "analyze", "import", "adapter", "reorganize", "health", "mcp",
+        "migrate-to-md",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
       throw new CLIError(

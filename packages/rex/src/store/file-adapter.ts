@@ -8,6 +8,10 @@ import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWriteJSON } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
+import {
+  migrateJsonPrdToMarkdown,
+  PRDMarkdownMigrationError,
+} from "./prd-md-migration.js";
 import type { PRDStore, StoreCapabilities } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -149,6 +153,18 @@ export class FileStore implements PRDStore {
    * @throws If `prd.json` is missing, invalid JSON, or fails schema validation.
    */
   async loadDocument(): Promise<PRDDocument> {
+    try {
+      await migrateJsonPrdToMarkdown(this.rexDir);
+    } catch (error) {
+      if (
+        error instanceof PRDMarkdownMigrationError
+        && (error.code === "json-parse-failed" || error.code === "invalid-document")
+      ) {
+        // Let the normal JSON load path surface the canonical validation error.
+      } else {
+        throw error;
+      }
+    }
     const branchFiles = await discoverPRDFiles(this.rexDir);
 
     if (branchFiles.length === 0) {

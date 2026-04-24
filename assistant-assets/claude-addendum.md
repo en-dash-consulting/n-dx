@@ -128,18 +128,18 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 | Command pair | Safe? | Notes |
 |-------------|-------|-------|
 | `ndx start` + `ndx status` | ✅ | Status is read-only |
-| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`, server reads `.rex/prd.json` — no conflict |
-| `ndx start` + `ndx plan` | ⚠️ | Plan writes `.rex/prd.json` which the server reads — server may see partial writes. Restart server after plan. |
-| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` and `.rex/prd.json` concurrently |
-| `ndx plan` + `ndx work` | ❌ | Both write `.rex/prd.json` — data corruption risk |
+| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`; the server only reads the PRD Markdown set and derived `.rex/prd.json` |
+| `ndx start` + `ndx plan` | ⚠️ | Plan rewrites PRD Markdown files and refreshes `.rex/prd.json`; the server may see partial updates. Restart server after plan. |
+| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` plus PRD Markdown and sync files concurrently |
+| `ndx plan` + `ndx work` | ❌ | Both write the PRD backend (`.rex/prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md`, and `.rex/prd.json`) |
 | `ndx refresh` + any write command | ❌ | Refresh writes `.sourcevision/` and rebuilds web assets |
 | `ndx config` + `ndx config` | ❌ | Concurrent config writes may lose updates (no file locking) |
 
-**General rule:** Commands that write to `.rex/prd.json`, `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
+**General rule:** Commands that write to the PRD backend (`.rex/prd.md`, any `.rex/prd_{branch}_{date}.md`, or the derived `.rex/prd.json`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
-**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) also write to `.rex/prd.json`. Never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
+**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) mutate the Markdown PRD files first and then refresh `.rex/prd.json` as secondary sync output. In multi-file mode a single write may touch both `.rex/prd.md` and one or more branch-scoped `.rex/prd_{branch}_{date}.md` files, so never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
 
-**Single-file PRD invariant.** The PRD is one canonical file: `.rex/prd.json`. There are no branch-scoped or multi-file writers — every reader and writer (CLI, hench, MCP, dashboard) touches the same file. The one exception is a one-time on-load migration that consolidates any legacy `prd_{branch}_{date}.json` files into `prd.json` and renames the sources to `<name>.backup.<timestamp>`. The migration runs inside the same store resolution as a regular read, is idempotent, and never touches `.backup.*` files — so it races only with concurrent writers to `.rex/prd.json`. To avoid the race on first upgrade, run a read-only command (e.g. `ndx status`) once to settle the migration before kicking off parallel writers.
+**PRD multi-file invariant.** The writable PRD source of truth is the Markdown set: `.rex/prd.md` plus any branch-scoped `.rex/prd_{branch}_{date}.md` files. `.rex/prd.json` is derived sync output, not the primary store. Readers and writers therefore need to treat the whole PRD file set as one mutable unit: a command that appears to update one task may still rewrite the base Markdown file, a branch-scoped Markdown file, and then the JSON sync artifact. Avoid parallel writers even when they seem to target different branches.
 
 #### HTTP-request concurrency (web server)
 
@@ -147,8 +147,8 @@ When `ndx start` is running, the web server holds in-process caches (aggregation
 
 | Scenario | Risk | Mitigation |
 |----------|------|------------|
-| Dashboard reads PRD while `ndx plan` writes `.rex/prd.json` | Partial JSON read → parse error or stale tree | Restart server after plan (`ndx start stop && ndx start`) |
+| Dashboard reads PRD while `ndx plan` writes `.rex/prd.md` or branch-scoped PRD Markdown | Partial aggregate read or stale derived JSON | Restart server after plan (`ndx start stop && ndx start`) |
 | MCP request during `ndx work` PRD update | Momentarily stale status — hench writes are small atomic updates | Acceptable — dashboard polls and self-corrects within seconds |
 | Concurrent dashboard API requests | Safe — Express serializes requests per-connection; no shared mutable state between request handlers | No action needed |
 
-**General rule for HTTP:** The web server treats disk files as read-only and never holds write locks. Any command that rewrites `.rex/prd.json` or `.sourcevision/` in bulk (plan, ci, refresh) should be followed by a server restart to flush stale caches.
+**General rule for HTTP:** The web server treats disk files as read-only and never holds write locks. Any command that rewrites the PRD Markdown set, refreshes `.rex/prd.json`, or rewrites `.sourcevision/` in bulk (plan, ci, refresh) should be followed by a server restart to flush stale caches.

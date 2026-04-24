@@ -129,6 +129,20 @@ describe("round-trip: item levels", () => {
     ]);
     assertRoundTrip(doc);
   });
+
+  it("mixed root levels round-trip correctly", () => {
+    const doc = minimalDoc([
+      epic({ id: "11111111-1111-1111-1111-111111111111", title: "Epic A" }),
+      task({ id: "33333333-3333-3333-3333-333333333333", title: "Root Task" }),
+      feature({ id: "22222222-2222-2222-2222-222222222222", title: "Root Feature" }),
+    ]);
+    const firstPass = serializeDocument(doc);
+    expect(firstPass).toContain("root: true");
+    const parsed = parseDocument(firstPass);
+    if (!parsed.ok) throw parsed.error;
+    expect(parsed.data).toEqual(doc);
+    assertRoundTrip(doc);
+  });
 });
 
 // ── All status values ─────────────────────────────────────────────────────────

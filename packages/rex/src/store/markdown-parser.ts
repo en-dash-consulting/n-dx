@@ -14,7 +14,6 @@
  * - Heading depth is authoritative for item level; `level` in rex-meta is
  *   cross-checked but not used as the source of truth.
  * - _passthrough map is unpacked into the top-level item object.
- * - `duration` is dropped when `activeIntervals` is present (advisory per spec).
  * - Parser returns ParseResult (never throws).
  * - Unknown front-matter keys are preserved on the document.
  *
@@ -229,9 +228,13 @@ function parseItemSections(lines: string[], startLine: number): ItemSectionsResu
       };
     }
 
-    const item = buildItem(title, level, description, rawMeta);
+    const { item, forceRoot } = buildItem(title, level, description, rawMeta);
 
     // Tree placement
+    if (forceRoot) {
+      stack.length = 0;
+    }
+
     while (stack.length > 0 && stack[stack.length - 1].depth >= depth) {
       stack.pop();
     }
@@ -255,14 +258,9 @@ function buildItem(
   level: ItemLevel,
   description: string | undefined,
   meta: Record<string, unknown>,
-): PRDItem {
-  const { _passthrough, duration, ...restMeta } = meta;
-
-  // duration is advisory when activeIntervals is present (spec §Duration)
-  const finalMeta: Record<string, unknown> = { ...restMeta };
-  if (finalMeta["activeIntervals"] === undefined && duration !== undefined) {
-    finalMeta["duration"] = duration;
-  }
+): { item: PRDItem; forceRoot: boolean } {
+  const { _passthrough, root, ...finalMeta } = meta;
+  const forceRoot = root === true;
 
   // Unpack _passthrough into top-level item
   const passthroughFields: Record<string, unknown> =
@@ -291,7 +289,7 @@ function buildItem(
     item.description = description;
   }
 
-  return item;
+  return { item, forceRoot };
 }
 
 function extractDescription(lines: string[]): string | undefined {

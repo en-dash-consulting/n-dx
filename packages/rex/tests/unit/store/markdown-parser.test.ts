@@ -481,7 +481,7 @@ mergedProposals:
     expect(proposals[0].mergedAt).toBe("2026-01-10T09:00:00.000Z");
   });
 
-  it("ignores duration when activeIntervals is present", () => {
+  it("preserves duration when activeIntervals is present", () => {
     const input = md(`\
 ## Epic
 \`\`\`rex-meta
@@ -491,23 +491,6 @@ status: pending
 activeIntervals:
   - start: "2026-01-01T09:00:00.000Z"
     end: "2026-01-01T17:00:00.000Z"
-duration:
-  totalMs: 28800000
-  runningMs: 0
-\`\`\`
-`);
-    const result = parseDocument(input);
-    if (!result.ok) throw result.error;
-    expect(result.data.items[0]["duration"]).toBeUndefined();
-  });
-
-  it("preserves duration when activeIntervals is absent", () => {
-    const input = md(`\
-## Epic
-\`\`\`rex-meta
-id: "11111111-1111-1111-1111-111111111111"
-level: epic
-status: pending
 duration:
   totalMs: 28800000
   runningMs: 0

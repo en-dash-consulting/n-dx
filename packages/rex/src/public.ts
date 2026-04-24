@@ -82,6 +82,12 @@ export type { PRDFileResolution } from "./store/prd-discovery.js";
 
 export { migrateLegacyPRD } from "./store/prd-migration.js";
 export type { MigrationResult } from "./store/prd-migration.js";
+export {
+  migrateJsonPrdToMarkdown,
+  PRD_MARKDOWN_FILENAME,
+  PRDMarkdownMigrationError,
+} from "./store/prd-md-migration.js";
+export type { MarkdownMigrationResult } from "./store/prd-md-migration.js";
 
 // ---- Integration schema system ----------------------------------------------
 
