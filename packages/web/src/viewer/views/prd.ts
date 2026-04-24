@@ -298,6 +298,14 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
           title: "Prune completed",
           "aria-label": "Remove completed subtrees",
         }, "\u2702"),
+        navigateTo
+          ? h("button", {
+              class: "prd-search-action",
+              onClick: () => navigateTo("merge-graph"),
+              title: "Context Graph \u2014 view PRD/merge linkage",
+              "aria-label": "Open context graph",
+            }, "\u29c9")
+          : null,
       ),
       // Facet filter chips (tags for search, statuses for tree visibility)
       h(FacetFilter, {

@@ -44,6 +44,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "section", label: "REX", product: "rex" },
   { type: "item", id: "rex-dashboard", icon: "\u25A8", label: "Dashboard", minPass: 0 },
   { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
+  { type: "item", id: "merge-graph", icon: "\u29c9", label: "Context Graph", minPass: 0 },
   { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
   { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0, featureGate: "rex.integrations" },
   { type: "section", label: "HENCH", product: "hench" },

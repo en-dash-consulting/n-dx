@@ -16,3 +16,4 @@ export { TokenUsageView } from "./token-usage.js";
 export { ValidationView } from "./validation.js";
 export { TaskAuditView } from "./task-audit.js";
 export { WorkflowOptimizationView } from "./workflow-optimization.js";
+export { MergeGraphView } from "./merge-graph.js";

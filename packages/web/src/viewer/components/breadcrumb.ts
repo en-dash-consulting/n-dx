@@ -68,6 +68,7 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "commands":            { product: "global",       label: "ndx export",         productLabel: "Settings" },
   "llm-provider":        { product: "global",       label: "General",            productLabel: "Settings" },
   "project-settings":    { product: "global",       label: "ndx analyze / plan", productLabel: "Settings" },
+  "merge-graph":         { product: "rex",          label: "Context Graph",       productLabel: "Rex" },
 };
 
 // ---------------------------------------------------------------------------

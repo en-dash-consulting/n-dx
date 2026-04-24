@@ -22,6 +22,7 @@ export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
 export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "rex-dashboard",
   "prd",
+  "merge-graph",
   "validation",
   "notion-config",
   "integrations",

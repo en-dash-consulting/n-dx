@@ -1,0 +1,453 @@
+/* ── Merge Graph View ─────────────────────────────────────────────────────── */
+
+.mg-loading,
+.mg-error {
+  padding: var(--space-8);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.mg-retry {
+  margin-top: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  cursor: pointer;
+  font-size: var(--font-sm);
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+.mg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+
+.mg-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.mg-title {
+  font-size: var(--font-lg);
+  font-weight: var(--weight-semibold);
+  margin: 0;
+  color: var(--text);
+}
+
+.mg-stats {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.mg-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mg-nav-btn,
+.mg-filter-btn {
+  padding: var(--space-1-5) var(--space-3);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.mg-nav-btn:hover,
+.mg-filter-btn:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.mg-filter-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Filter bar ────────────────────────────────────────────────────────────── */
+
+.mg-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.mg-filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.mg-filter-label {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  white-space: nowrap;
+}
+
+.mg-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.mg-chip {
+  padding: 2px var(--space-2);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mg-chip.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mg-chip:hover:not(.active) {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.mg-date-input {
+  padding: 2px var(--space-2);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.mg-date-sep {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+}
+
+.mg-clear-btn {
+  padding: 2px var(--space-3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.mg-clear-btn:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* ── Notice banner ─────────────────────────────────────────────────────────── */
+
+.mg-notice {
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Canvas ───────────────────────────────────────────────────────────────── */
+
+.mg-canvas {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.mg-svg {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  display: block;
+}
+
+.mg-svg.grabbing {
+  cursor: grabbing;
+}
+
+/* ── Zoom controls ─────────────────────────────────────────────────────────── */
+
+.mg-zoom-controls {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 10;
+}
+
+.mg-zoom-controls button {
+  width: 28px;
+  height: 28px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.mg-zoom-controls button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* ── Legend ───────────────────────────────────────────────────────────────── */
+
+.mg-legend {
+  position: absolute;
+  bottom: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  gap: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1-5) var(--space-3);
+  z-index: 10;
+}
+
+.mg-legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+/* ── SVG node styles (applied via inline attributes but documented here) ────── */
+
+.mg-hit { pointer-events: all; cursor: pointer; }
+
+.mg-node { cursor: pointer; }
+
+.mg-node.selected .mg-circle,
+.mg-node.selected .mg-diamond {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.mg-label {
+  fill: var(--text-dim);
+  pointer-events: none;
+  dominant-baseline: middle;
+}
+
+.mg-merge-label {
+  fill: var(--text-muted);
+}
+
+.mg-col-label {
+  fill: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+.mg-edge-tree {
+  stroke: var(--border);
+  stroke-width: 1px;
+  stroke-opacity: 0.5;
+  pointer-events: none;
+}
+
+.mg-edge-tree.highlighted {
+  stroke-opacity: 0.9;
+  stroke: var(--border-strong);
+}
+
+.mg-edge-link {
+  stroke-width: 1.5px;
+  pointer-events: none;
+  stroke-dasharray: none;
+}
+
+.mg-edge-link.highlighted {
+  stroke-width: 2px;
+}
+
+/* ── Detail panel ─────────────────────────────────────────────────────────── */
+
+.mg-detail {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  width: 280px;
+  max-height: calc(100% - var(--space-6));
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.mg-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.mg-detail-title {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.mg-detail-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.mg-detail-close:hover { color: var(--text); }
+
+.mg-detail-subject {
+  padding: var(--space-3) var(--space-4) 0;
+  margin: 0;
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  line-height: var(--leading-tight);
+  word-break: break-word;
+  flex-shrink: 0;
+}
+
+.mg-detail-meta {
+  padding: var(--space-2) var(--space-4) 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.mg-detail-branch {
+  padding: var(--space-1) var(--space-4) 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.mg-detail-summary {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.mg-detail-total {
+  color: var(--text-muted);
+}
+
+.mg-detail-links {
+  padding: var(--space-2) var(--space-4);
+  flex-shrink: 0;
+}
+
+.mg-detail-links-label {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+}
+
+.mg-detail-empty {
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── File list ────────────────────────────────────────────────────────────── */
+
+.mg-file-list {
+  margin: 0;
+  padding: var(--space-2) 0 var(--space-3);
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.mg-file-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: 2px var(--space-4);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.mg-file-item:hover {
+  background: var(--bg-hover);
+}
+
+.mg-file-icon {
+  flex-shrink: 0;
+  font-family: monospace;
+  width: 12px;
+  text-align: center;
+}
+
+.mg-file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.mg-file-added { color: var(--green); }
+.mg-file-deleted { color: var(--brand-rose); }
+.mg-file-renamed { color: var(--brand-orange); }
