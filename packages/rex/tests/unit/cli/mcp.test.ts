@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createRexMcpServer, startMcpServer } from "../../../src/cli/mcp.js";
-import { ensureRexDir } from "../../../src/store/index.js";
+import { ensureRexDir, resolveStore } from "../../../src/store/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import { SCHEMA_VERSION } from "../../../src/schema/v1.js";
 import { parseDocument } from "../../../src/store/markdown-parser.js";
@@ -32,6 +33,16 @@ const EXPECTED_TOOLS = [
 ];
 
 const EXPECTED_RESOURCES = ["prd", "workflow", "log"];
+
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
+}
+
+function initRepo(dir: string): void {
+  git(dir, "init", "--initial-branch=main");
+  git(dir, "config", "user.email", "test@test.com");
+  git(dir, "config", "user.name", "Test");
+}
 
 async function expectCanonicalFilesInSync(rexDir: string): Promise<PRDDocument> {
   const jsonDoc = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8")) as PRDDocument;
@@ -212,6 +223,43 @@ describe("Rex MCP server factory", () => {
     const synced = await expectCanonicalFilesInSync(rexDir);
     const executionEpic = synced.items.find((item) => item.id === targetEpic.id);
     expect(executionEpic?.children?.some((item) => item.id === feature.id)).toBe(true);
+
+    await client.close();
+    await server.close();
+  });
+
+  it("applies branch attribution across MCP add/edit/status write paths", async () => {
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "checkout", "-b", "feature/mcp-attrib");
+
+    const server = await createRexMcpServer(tmpDir);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const epicResult = await client.callTool({
+      name: "add_item",
+      arguments: { title: "Attributed Epic", level: "epic" },
+    });
+    const epic = JSON.parse((epicResult.content as Array<{ text: string }>)[0].text);
+
+    await client.callTool({
+      name: "edit_item",
+      arguments: { id: epic.id, description: "Edited via MCP" },
+    });
+
+    await client.callTool({
+      name: "update_task_status",
+      arguments: { id: epic.id, status: "in_progress" },
+    });
+
+    const store = await resolveStore(rexDir);
+    const doc = await store.loadDocument();
+    expect(doc.items[0].branch).toBe("feature/mcp-attrib");
+    expect(doc.items[0].sourceFile).toMatch(/^\.rex\/prd_feature-mcp-attrib_.*\.md$/);
 
     await client.close();
     await server.close();

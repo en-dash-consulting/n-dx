@@ -13,7 +13,8 @@ import {
 } from "./prd-md-migration.js";
 import { parseDocument } from "./markdown-parser.js";
 import { serializeDocument } from "./markdown-serializer.js";
-import type { PRDStore, StoreCapabilities } from "./contracts.js";
+import { resolveGitBranch } from "./branch-naming.js";
+import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
 export const PRD_FILENAME = "prd.json";
@@ -66,6 +67,35 @@ export class FileStore implements PRDStore {
 
   private lockPathForFile(filename: string): string {
     return this.path(`${filename}.lock`);
+  }
+
+  private toAttributedSourceFile(filename: string): string {
+    const markdownName = filename === PRD_FILENAME
+      ? PRD_MARKDOWN_FILENAME
+      : filename.replace(/\.json$/i, ".md");
+    return `.rex/${markdownName}`;
+  }
+
+  private applyWriteAttribution<T extends PRDItem | Partial<PRDItem>>(
+    value: T,
+    filename: string,
+    options?: WriteOptions,
+  ): T {
+    if (!options?.applyAttribution) {
+      return value;
+    }
+
+    const attributed = {
+      ...value,
+      sourceFile: this.toAttributedSourceFile(filename),
+    };
+    const branch = resolveGitBranch(options.projectDir ?? join(this.rexDir, ".."));
+    if (branch !== "unknown") {
+      attributed.branch = branch;
+    } else {
+      delete attributed.branch;
+    }
+    return attributed as T;
   }
 
   private async loadSingleFile(filename: string): Promise<PRDDocument> {
@@ -333,7 +363,7 @@ export class FileStore implements PRDStore {
     return entry ? (entry.item as PRDItem) : null;
   }
 
-  async addItem(item: PRDItem, parentId?: string): Promise<void> {
+  async addItem(item: PRDItem, parentId?: string, options?: WriteOptions): Promise<void> {
     if (parentId) {
       let owner: string;
       try {
@@ -341,27 +371,30 @@ export class FileStore implements PRDStore {
       } catch {
         throw new Error(`Parent "${parentId}" not found`);
       }
+      const attributedItem = this.applyWriteAttribution(item, owner, options);
       await this.withFileTransaction(owner, async (doc) => {
-        if (!insertChild(doc.items, parentId, item)) {
+        if (!insertChild(doc.items, parentId, attributedItem)) {
           throw new Error(`Parent "${parentId}" not found`);
         }
       });
-      this.itemToFile.set(item.id, owner);
+      this.itemToFile.set(attributedItem.id, owner);
       this.ownershipLoaded = true;
       return;
     }
 
+    const attributedItem = this.applyWriteAttribution(item, this.currentBranchFile, options);
     await this.withFileTransaction(this.currentBranchFile, async (doc) => {
-      doc.items.push(item);
+      doc.items.push(attributedItem);
     });
-    this.itemToFile.set(item.id, this.currentBranchFile);
+    this.itemToFile.set(attributedItem.id, this.currentBranchFile);
     this.ownershipLoaded = true;
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>): Promise<void> {
+  async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     const owner = await this.resolveOwnerFile(id);
+    const attributedUpdates = this.applyWriteAttribution(updates, owner, options);
     await this.withFileTransaction(owner, async (doc) => {
-      if (!updateInTree(doc.items, id, updates)) {
+      if (!updateInTree(doc.items, id, attributedUpdates)) {
         throw new Error(`Item "${id}" not found`);
       }
     });

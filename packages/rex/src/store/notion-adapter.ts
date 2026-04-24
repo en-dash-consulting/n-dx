@@ -30,7 +30,7 @@ import {
   extractSyncMeta,
 } from "../core/sync.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
-import type { PRDStore, StoreCapabilities } from "./contracts.js";
+import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 import type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -166,7 +166,7 @@ export class NotionStore implements PRDStore {
     return entry ? (entry.item as PRDItem) : null;
   }
 
-  async addItem(item: PRDItem, parentId?: string): Promise<void> {
+  async addItem(item: PRDItem, parentId?: string, _options?: WriteOptions): Promise<void> {
     const idMap = await this.buildIdMap();
 
     // Validate that the parent exists when parentId is provided
@@ -186,7 +186,7 @@ export class NotionStore implements PRDStore {
     this.invalidateCache();
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>): Promise<void> {
+  async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
     const notionId = await this.resolveNotionId(id);
     if (!notionId) {
       throw new Error(`Item "${id}" not found`);

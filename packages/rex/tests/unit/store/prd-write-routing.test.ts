@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 import { FileStore, ensureRexDir } from "../../../src/store/file-adapter.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
@@ -32,13 +33,24 @@ async function readPRDFile(rexDir: string, filename: string): Promise<PRDDocumen
   return JSON.parse(raw) as PRDDocument;
 }
 
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
+}
+
+function initRepo(dir: string): void {
+  git(dir, "init", "--initial-branch=main");
+  git(dir, "config", "user.email", "test@test.com");
+  git(dir, "config", "user.name", "Test");
+}
+
 describe("PRDStore write routing", () => {
+  let projectDir: string;
   let rexDir: string;
   let store: FileStore;
 
   beforeEach(async () => {
-    const tmpDir = await mkdtemp(join(tmpdir(), "rex-write-route-"));
-    rexDir = join(tmpDir, ".rex");
+    projectDir = await mkdtemp(join(tmpdir(), "rex-write-route-"));
+    rexDir = join(projectDir, ".rex");
     await ensureRexDir(rexDir);
     store = new FileStore(rexDir);
 
@@ -735,6 +747,59 @@ describe("PRDStore write routing", () => {
       const primary = await readPRDFile(rexDir, "prd.json");
       expect(primary.items[0].children).toHaveLength(1);
       expect(primary.items[0].children![0].id).toBe("f2");
+    });
+  });
+
+  describe("write attribution", () => {
+    it("stamps branch and markdown-equivalent sourceFile on attributed root adds", async () => {
+      initRepo(projectDir);
+      git(projectDir, "commit", "--allow-empty", "-m", "init");
+      git(projectDir, "checkout", "-b", "feature/attrib");
+
+      await writeFile(
+        join(rexDir, "prd_feature-attrib_2025-01-01.json"),
+        toCanonicalJSON(makeDoc("Branch", [])),
+        "utf-8",
+      );
+
+      store.setCurrentBranchFile("prd_feature-attrib_2025-01-01.json");
+      await store.addItem(makeItem("e1", "Attributed Epic"), undefined, { applyAttribution: true });
+
+      const branch = await readPRDFile(rexDir, "prd_feature-attrib_2025-01-01.json");
+      expect(branch.items[0].branch).toBe("feature/attrib");
+      expect(branch.items[0].sourceFile).toBe(".rex/prd_feature-attrib_2025-01-01.md");
+    });
+
+    it("stamps branch and owner sourceFile on attributed updates", async () => {
+      initRepo(projectDir);
+      git(projectDir, "commit", "--allow-empty", "-m", "init");
+      git(projectDir, "checkout", "-b", "feature/attrib-update");
+
+      await writeFile(
+        join(rexDir, "prd_branch_2025-01-01.json"),
+        toCanonicalJSON(makeDoc("Branch", [makeItem("e1", "Branch Epic")])),
+        "utf-8",
+      );
+
+      await store.updateItem("e1", { status: "in_progress" }, { applyAttribution: true });
+
+      const branch = await readPRDFile(rexDir, "prd_branch_2025-01-01.json");
+      expect(branch.items[0].branch).toBe("feature/attrib-update");
+      expect(branch.items[0].sourceFile).toBe(".rex/prd_branch_2025-01-01.md");
+    });
+
+    it("omits branch when git is unavailable but still records sourceFile", async () => {
+      await writeFile(
+        join(rexDir, "prd.json"),
+        toCanonicalJSON(makeDoc("Primary", [])),
+        "utf-8",
+      );
+
+      await store.addItem(makeItem("e1", "No Git"), undefined, { applyAttribution: true });
+
+      const primary = await readPRDFile(rexDir, "prd.json");
+      expect(primary.items[0].branch).toBeUndefined();
+      expect(primary.items[0].sourceFile).toBe(".rex/prd.md");
     });
   });
 

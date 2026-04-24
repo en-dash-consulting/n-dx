@@ -108,7 +108,10 @@ export async function toolRexUpdateStatus(
   if (params.status === "completed" && params.resolutionType) {
     statusUpdates.resolutionType = params.resolutionType as ResolutionType;
   }
-  await store.updateItem(taskId, statusUpdates);
+  await store.updateItem(taskId, statusUpdates, {
+    applyAttribution: true,
+    ...(options?.projectDir ? { projectDir: options.projectDir } : {}),
+  });
   await store.appendLog({
     timestamp: new Date().toISOString(),
     event: "status_updated",
@@ -152,6 +155,9 @@ export async function toolRexUpdateStatus(
       await store.updateItem(item.id, {
         status: "completed" as ItemStatus,
         ...parentTsUpdates,
+      }, {
+        applyAttribution: true,
+        ...(options?.projectDir ? { projectDir: options.projectDir } : {}),
       });
       await store.appendLog({
         timestamp: new Date().toISOString(),
@@ -207,7 +213,7 @@ export async function toolRexAddSubtask(
     priority: params.priority as "critical" | "high" | "medium" | "low" | undefined,
   };
 
-  await store.addItem(subtask, taskId);
+  await store.addItem(subtask, taskId, { applyAttribution: true });
   await store.appendLog({
     timestamp: new Date().toISOString(),
     event: "subtask_added",

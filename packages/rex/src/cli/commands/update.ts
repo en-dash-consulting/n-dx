@@ -142,7 +142,7 @@ export async function cmdUpdate(
     }
   }
 
-  await store.updateItem(id, updates);
+  await store.updateItem(id, updates, { applyAttribution: true, projectDir: dir });
 
   // Log the update
   await store.appendLog({
@@ -173,7 +173,7 @@ export async function cmdUpdate(
       await store.updateItem(item.id, {
         status: "completed" as ItemStatus,
         ...parentTsUpdates,
-      });
+      }, { applyAttribution: true, projectDir: dir });
       await store.appendLog({
         timestamp: new Date().toISOString(),
         event: "auto_completed",

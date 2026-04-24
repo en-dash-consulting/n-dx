@@ -20,7 +20,7 @@
  * @module core/parent-reset
  */
 
-import type { PRDStore } from "../store/contracts.js";
+import type { PRDStore, WriteOptions } from "../store/contracts.js";
 import type { PRDItem } from "../schema/index.js";
 import { findItem } from "./tree.js";
 
@@ -95,6 +95,7 @@ export interface CascadeResetResult {
 export async function cascadeParentReset(
   store: PRDStore,
   parentId: string | undefined,
+  options?: WriteOptions,
 ): Promise<CascadeResetResult> {
   if (!parentId) return { resetItems: [] };
 
@@ -110,7 +111,7 @@ export async function cascadeParentReset(
     await store.updateItem(id, {
       status: "pending",
       completedAt: undefined,
-    });
+    }, options);
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "status_reset",

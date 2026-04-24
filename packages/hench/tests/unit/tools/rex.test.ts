@@ -35,6 +35,7 @@ describe("toolRexUpdateStatus", () => {
     expect(store.updateItem).toHaveBeenCalledWith(
       "task-1",
       expect.objectContaining({ status: "in_progress", startedAt: expect.any(String) }),
+      expect.objectContaining({ applyAttribution: true }),
     );
     expect(store.appendLog).toHaveBeenCalled();
   });
@@ -97,6 +98,7 @@ describe("toolRexUpdateStatus", () => {
     expect(store.updateItem).toHaveBeenCalledWith(
       "feature-1",
       expect.objectContaining({ status: "completed" }),
+      expect.objectContaining({ applyAttribution: true }),
     );
   });
 
@@ -115,6 +117,7 @@ describe("toolRexUpdateStatus", () => {
     expect(store.updateItem).toHaveBeenCalledWith(
       "task-1",
       expect.objectContaining({ status: "blocked" }),
+      expect.objectContaining({ applyAttribution: true }),
     );
   });
 
@@ -233,6 +236,7 @@ describe("toolRexAddSubtask", () => {
         priority: "high",
       }),
       "task-1",
+      expect.objectContaining({ applyAttribution: true }),
     );
   });
 

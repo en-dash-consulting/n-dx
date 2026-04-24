@@ -42,6 +42,23 @@ export interface StoreCapabilities {
   supportsWatch: boolean;
 }
 
+/**
+ * Optional write-time behavior flags for item mutations.
+ */
+export interface WriteOptions {
+  /**
+   * When true, stamp branch/sourceFile attribution for the write path.
+   * Kept opt-in so proposal imports can preserve their original sourceFile.
+   */
+  applyAttribution?: boolean;
+
+  /**
+   * Project directory used for git branch resolution.
+   * Implementations may fall back to their own local project root.
+   */
+  projectDir?: string;
+}
+
 // ---------------------------------------------------------------------------
 // PRDStore — the adapter interface
 // ---------------------------------------------------------------------------
@@ -97,7 +114,7 @@ export interface PRDStore {
    *   under that parent; when omitted it is appended at the root.
    * @throws If `parentId` is provided but does not exist.
    */
-  addItem(item: PRDItem, parentId?: string): Promise<void>;
+  addItem(item: PRDItem, parentId?: string, options?: WriteOptions): Promise<void>;
 
   /**
    * Apply a partial update to an existing item.
@@ -105,7 +122,7 @@ export interface PRDStore {
    * @param updates - Fields to merge into the existing item.
    * @throws If the item does not exist.
    */
-  updateItem(id: string, updates: Partial<PRDItem>): Promise<void>;
+  updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void>;
 
   /**
    * Remove an item (and its descendants) from the tree.

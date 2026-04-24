@@ -34,6 +34,7 @@ import {
   type ItemDurationTotals,
 } from "../core/item-duration-rollup.js";
 import { TOOL_VERSION } from "./commands/constants.js";
+import { FileStore, resolvePRDFile } from "../store/index.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
 
@@ -103,6 +104,7 @@ export async function handleGetNextTask(
 
 export async function handleUpdateTaskStatus(
   store: PRDStore,
+  projectDir: string,
   args: { id: string; status: string; force?: boolean; reason?: string; resolutionType?: string; resolutionDetail?: string },
 ): Promise<McpResult> {
   try {
@@ -155,7 +157,7 @@ export async function handleUpdateTaskStatus(
     if (status === "completed" && resolutionDetail) {
       statusUpdates.resolutionDetail = resolutionDetail;
     }
-    await store.updateItem(id, statusUpdates);
+    await store.updateItem(id, statusUpdates, { applyAttribution: true, projectDir });
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "status_changed",
@@ -181,7 +183,7 @@ export async function handleUpdateTaskStatus(
         await store.updateItem(item.id, {
           status: "completed" as ItemStatus,
           ...parentTsUpdates,
-        });
+        }, { applyAttribution: true, projectDir });
         await store.appendLog({
           timestamp: new Date().toISOString(),
           event: "auto_completed",
@@ -208,6 +210,8 @@ export async function handleUpdateTaskStatus(
 
 export async function handleAddItem(
   store: PRDStore,
+  projectDir: string,
+  rexDir: string,
   args: {
     title: string;
     level: string;
@@ -221,6 +225,11 @@ export async function handleAddItem(
   },
 ): Promise<McpResult> {
   try {
+    if (!args.parentId && store instanceof FileStore) {
+      const resolution = await resolvePRDFile(rexDir, projectDir);
+      store.setCurrentBranchFile(resolution.filename);
+    }
+
     const id = randomUUID();
     const item: PRDItem = {
       id,
@@ -248,10 +257,13 @@ export async function handleAddItem(
       }
     }
 
-    await store.addItem(item, args.parentId);
+    await store.addItem(item, args.parentId, { applyAttribution: true, projectDir });
 
     // Reset completed ancestors when adding under a completed parent
-    const { resetItems } = await cascadeParentReset(store, args.parentId);
+    const { resetItems } = await cascadeParentReset(store, args.parentId, {
+      applyAttribution: true,
+      projectDir,
+    });
 
     await store.appendLog({
       timestamp: new Date().toISOString(),
@@ -619,6 +631,7 @@ export async function handleFacets(
 
 export async function handleEditItem(
   store: PRDStore,
+  projectDir: string,
   args: {
     id: string;
     title?: string;
@@ -682,7 +695,7 @@ export async function handleEditItem(
       );
     }
 
-    await store.updateItem(args.id, updates);
+    await store.updateItem(args.id, updates, { applyAttribution: true, projectDir });
 
     const changedFields = Object.keys(updates);
     await store.appendLog({

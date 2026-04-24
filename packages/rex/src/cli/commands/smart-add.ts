@@ -478,6 +478,7 @@ export async function applyDuplicateProposalMerges(
 }> {
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+  const attributionOptions = { applyAttribution: true, projectDir: dir } as const;
   const proposalNodeIndex = buildMergeableProposalNodeIndex(proposals);
   const mergeTargetsByNodeKey: Record<string, string> = {};
   const reopenedItemIds: string[] = [];
@@ -545,7 +546,7 @@ export async function applyDuplicateProposalMerges(
     updates.mergedProposals = [...existingRecords, mergedRecord];
 
     if (Object.keys(updates).length > 0) {
-      await store.updateItem(existing.id, updates as Partial<PRDItem>);
+      await store.updateItem(existing.id, updates as Partial<PRDItem>, attributionOptions);
       mergedCount++;
       mergeTargetsByNodeKey[match.node.key] = existing.id;
     }
@@ -759,6 +760,7 @@ async function acceptProposals(
   }
 
   const parentLevel = await resolveParentLevel(dir, parentId);
+  const attributionOptions = { applyAttribution: true, projectDir: dir } as const;
 
   let addedCount = 0;
   // Track newly created container IDs so we can clean up empty ones after merges
@@ -788,7 +790,7 @@ async function acceptProposals(
           reusedContainerIds.push(epicExistingRef);
           // Update title if the LLM expanded the scope
           if (p.epic.title && p.epic.title !== existing.item.title) {
-            await store.updateItem(epicExistingRef, { title: p.epic.title });
+            await store.updateItem(epicExistingRef, { title: p.epic.title }, attributionOptions);
           }
         }
         // If not found, fall through to create a new epic (LLM hallucinated the ID)
@@ -802,7 +804,7 @@ async function acceptProposals(
           status: "pending",
           source: "smart-add",
           ...(epicMarker ? { overrideMarker: epicMarker } : {}),
-        });
+        }, undefined, attributionOptions);
         addedCount++;
         newContainerIds.push(epicId);
       }
@@ -827,7 +829,7 @@ async function acceptProposals(
             featureReused = true;
             reusedContainerIds.push(featureExistingRef);
             if (f.title && f.title !== existing.item.title) {
-              await store.updateItem(featureExistingRef, { title: f.title });
+              await store.updateItem(featureExistingRef, { title: f.title }, attributionOptions);
             }
           }
         }
@@ -844,6 +846,7 @@ async function acceptProposals(
               ...(featureMarker ? { overrideMarker: featureMarker } : {}),
             },
             epicId,
+            attributionOptions,
           );
           addedCount++;
           newContainerIds.push(featureId);
@@ -871,6 +874,7 @@ async function acceptProposals(
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             featureId,
+            attributionOptions,
           );
           addedCount++;
         }
@@ -897,6 +901,7 @@ async function acceptProposals(
               ...(featureMarker ? { overrideMarker: featureMarker } : {}),
             },
             parentId,
+            attributionOptions,
           );
           addedCount++;
           newContainerIds.push(featureId);
@@ -924,6 +929,7 @@ async function acceptProposals(
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             featureId,
+            attributionOptions,
           );
           addedCount++;
         }
@@ -955,6 +961,7 @@ async function acceptProposals(
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             parentId,
+            attributionOptions,
           );
           addedCount++;
         }
@@ -985,6 +992,7 @@ async function acceptProposals(
               ...(taskMarker ? { overrideMarker: taskMarker } : {}),
             },
             parentId,
+            attributionOptions,
           );
           addedCount++;
         }
@@ -1022,16 +1030,16 @@ async function acceptProposals(
   }
 
   // Reset completed ancestors when adding under a completed parent
-  await cascadeParentReset(store, parentId);
+  await cascadeParentReset(store, parentId, attributionOptions);
 
   // Reset completed reused containers (existingId) and their ancestors
   for (const id of reusedContainerIds) {
-    await cascadeParentReset(store, id);
+    await cascadeParentReset(store, id, attributionOptions);
   }
 
   // Cascade-reset reopened merge targets and their ancestors
   for (const id of reopenedItemIds) {
-    await cascadeParentReset(store, id);
+    await cascadeParentReset(store, id, attributionOptions);
   }
 
   const overrideCount = overrideMarkersByNodeKey

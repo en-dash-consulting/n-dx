@@ -141,10 +141,13 @@ export async function cmdAdd(
     }
   }
 
-  await store.addItem(item, parentId);
+  await store.addItem(item, parentId, { applyAttribution: true, projectDir: dir });
 
   // Reset completed ancestors when adding under a completed parent
-  const { resetItems } = await cascadeParentReset(store, parentId);
+  const { resetItems } = await cascadeParentReset(store, parentId, {
+    applyAttribution: true,
+    projectDir: dir,
+  });
 
   // Log the addition
   await store.appendLog({

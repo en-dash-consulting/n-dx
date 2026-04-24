@@ -724,7 +724,7 @@
         {
           "id": "578686b2-4fab-45a3-a452-28a8dc45231f",
           "title": "Branch Attribution Metadata on PRD Items",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Extend the PRD item schema and write paths so each item records the git branch and source file it was created or last modified on, enabling provenance tracking across the tool chain.",
           "source": "smart-add",
@@ -757,7 +757,7 @@
             {
               "id": "07714a07-008e-4254-a0cd-56b15766afa4",
               "title": "Populate branch attribution on item create and edit across all write paths",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "When a PRD item is created or updated through any write path — `rex add`, `ndx add`, MCP `add_item`/`edit_item`/`update_task_status`, or a hench run — automatically capture the current git branch and PRD file path as attribution metadata. This makes attribution automatic rather than opt-in, ensuring the UI has data to display without requiring user action.",
               "acceptanceCriteria": [
@@ -775,9 +775,13 @@
                 "mcp",
                 "backend"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T16:45:55.383Z",
+              "completedAt": "2026-04-24T16:57:13.824Z"
             }
-          ]
+          ],
+          "startedAt": "2026-04-24T16:57:13.842Z",
+          "completedAt": "2026-04-24T16:57:13.842Z"
         },
         {
           "id": "9f96a45d-092e-4ea2-a76d-b21551cedbba",

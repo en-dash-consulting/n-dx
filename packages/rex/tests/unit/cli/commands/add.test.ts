@@ -1,12 +1,23 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 import { CLIError } from "../../../../src/cli/errors.js";
 import { cmdAdd } from "../../../../src/cli/commands/add.js";
 
 function makePrd(items: unknown[] = []) {
   return JSON.stringify({ schema: "rex/v1", title: "test", items });
+}
+
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim();
+}
+
+function initRepo(dir: string): void {
+  git(dir, "init", "--initial-branch=main");
+  git(dir, "config", "user.email", "test@test.com");
+  git(dir, "config", "user.name", "Test");
 }
 
 describe("cmdAdd", () => {
@@ -67,6 +78,22 @@ describe("cmdAdd", () => {
 
   it("succeeds for valid epic with title", async () => {
     await expect(cmdAdd(tmp, "epic", { title: "My Epic" })).resolves.toBeUndefined();
+  });
+
+  it("stamps branch attribution on created items when git is available", async () => {
+    initRepo(tmp);
+    git(tmp, "commit", "--allow-empty", "-m", "init");
+    git(tmp, "checkout", "-b", "feature/rex-add");
+
+    await cmdAdd(tmp, "epic", { title: "My Epic" });
+
+    const branchFile = readdirSync(join(tmp, ".rex"))
+      .find((name) => name.startsWith("prd_feature-rex-add_") && name.endsWith(".json"));
+    expect(branchFile).toBeDefined();
+
+    const prd = JSON.parse(readFileSync(join(tmp, ".rex", branchFile!), "utf-8"));
+    expect(prd.items[0].branch).toBe("feature/rex-add");
+    expect(prd.items[0].sourceFile).toBe(branchFile!.replace(/^/, ".rex/").replace(/\.json$/, ".md"));
   });
 });
 

@@ -76,7 +76,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       resolutionType: z.enum(["code-change", "config-override", "acknowledgment", "deferred", "unclassified"]).optional().describe("How the task was resolved (required when status is 'completed')"),
       resolutionDetail: z.string().optional().describe("Brief description of how the resolution was achieved"),
     },
-    async (args) => handleUpdateTaskStatus(store, args),
+    async (args) => handleUpdateTaskStatus(store, dir, args),
   );
 
   server.tool(
@@ -93,7 +93,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       source: z.string().optional().describe("Source of this item"),
       blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),
     },
-    async (args) => handleAddItem(store, args),
+    async (args) => handleAddItem(store, dir, rexDir, args),
   );
 
   server.tool(
@@ -110,7 +110,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       source: z.string().optional().describe("New source"),
       blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
     },
-    async (args) => handleEditItem(store, args),
+    async (args) => handleEditItem(store, dir, args),
   );
 
   server.tool(
