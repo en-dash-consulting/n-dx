@@ -13,7 +13,7 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
-import { computeStats, collectCompletedIds, findNextTask } from "./rex-gateway.js";
+import { computeStats, collectCompletedIds, findNextTask, walkTree } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
 
@@ -37,6 +37,15 @@ export interface SourceVisionStatus {
   modulesTotal: number;
 }
 
+/** Per-item branch and source-file attribution, serialized from PRDItem fields. */
+export interface PRDItemAttribution {
+  id: string;
+  /** Git branch the item was attributed to, or null when unset. */
+  branch: string | null;
+  /** Source PRD file path, or null when unset. */
+  sourceFile: string | null;
+}
+
 export interface RexStatus {
   /** Whether a PRD exists. */
   exists: boolean;
@@ -50,6 +59,8 @@ export interface RexStatus {
   hasPending: boolean;
   /** Title of the next actionable task, or null. */
   nextTaskTitle: string | null;
+  /** Attribution data for every PRD item: branch and sourceFile, null when absent. */
+  items: PRDItemAttribution[];
 }
 
 export interface HenchStatus {
@@ -147,6 +158,18 @@ function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
   }
 }
 
+function collectItemAttribution(doc: PRDDocument): PRDItemAttribution[] {
+  const result: PRDItemAttribution[] = [];
+  for (const { item } of walkTree(doc.items)) {
+    result.push({
+      id: item.id,
+      branch: item.branch ?? null,
+      sourceFile: item.sourceFile ?? null,
+    });
+  }
+  return result;
+}
+
 function extractRexStatus(ctx: ServerContext): RexStatus {
   const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
@@ -157,6 +180,7 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
       hasInProgress: false,
       hasPending: false,
       nextTaskTitle: null,
+      items: [],
     };
   }
 
@@ -174,6 +198,7 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
       hasInProgress: stats.inProgress > 0,
       hasPending: stats.pending > 0,
       nextTaskTitle: nextEntry?.item.title ?? null,
+      items: collectItemAttribution(doc),
     };
   } catch {
     return {
@@ -183,6 +208,7 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
       hasInProgress: false,
       hasPending: false,
       nextTaskTitle: null,
+      items: [],
     };
   }
 }

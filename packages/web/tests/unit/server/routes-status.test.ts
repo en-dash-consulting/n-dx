@@ -204,6 +204,88 @@ describe("Status API routes", () => {
       expect(data.rex.hasPending).toBe(false);
       expect(data.rex.hasInProgress).toBe(false);
     });
+
+    describe("item attribution", () => {
+      it("returns empty items array when no PRD exists", async () => {
+        const res = await fetch(`http://localhost:${port}/api/status`);
+        const data = await res.json();
+        expect(data.rex.items).toEqual([]);
+      });
+
+      it("includes all item nodes with null attribution when no fields set", async () => {
+        const prd = {
+          schema: "rex/v1",
+          title: "Test PRD",
+          version: "1.0",
+          items: [
+            {
+              id: "e1",
+              title: "Epic 1",
+              level: "epic",
+              status: "pending",
+              children: [
+                { id: "t1", title: "Task 1", level: "task", status: "pending", children: [] },
+              ],
+            },
+          ],
+        };
+        await writeFile(join(ctx.rexDir, "prd.json"), JSON.stringify(prd));
+
+        clearStatusCache();
+        const res = await fetch(`http://localhost:${port}/api/status`);
+        const data = await res.json();
+
+        expect(data.rex.items).toHaveLength(2);
+        for (const item of data.rex.items) {
+          expect(item).toHaveProperty("id");
+          expect(item.branch).toBeNull();
+          expect(item.sourceFile).toBeNull();
+        }
+      });
+
+      it("propagates branch and sourceFile when set, null when absent", async () => {
+        const prd = {
+          schema: "rex/v1",
+          title: "Branch PRD",
+          version: "1.0",
+          items: [
+            {
+              id: "e1",
+              title: "Epic 1",
+              level: "epic",
+              status: "in_progress",
+              branch: "feature/my-epic",
+              sourceFile: ".rex/prd_feature-my-epic_20260101.md",
+              children: [
+                {
+                  id: "t1",
+                  title: "Task 1",
+                  level: "task",
+                  status: "pending",
+                  children: [],
+                  // no branch or sourceFile
+                },
+              ],
+            },
+          ],
+        };
+        await writeFile(join(ctx.rexDir, "prd.json"), JSON.stringify(prd));
+
+        clearStatusCache();
+        const res = await fetch(`http://localhost:${port}/api/status`);
+        const data = await res.json();
+
+        const byId = Object.fromEntries(
+          (data.rex.items as Array<{ id: string; branch: string | null; sourceFile: string | null }>)
+            .map((item) => [item.id, item]),
+        );
+
+        expect(byId["e1"].branch).toBe("feature/my-epic");
+        expect(byId["e1"].sourceFile).toBe(".rex/prd_feature-my-epic_20260101.md");
+        expect(byId["t1"].branch).toBeNull();
+        expect(byId["t1"].sourceFile).toBeNull();
+      });
+    });
   });
 
   describe("Hench status", () => {

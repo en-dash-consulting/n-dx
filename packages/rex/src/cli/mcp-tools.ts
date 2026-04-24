@@ -61,6 +61,8 @@ export async function handleGetPrdStatus(store: PRDStore): Promise<McpResult> {
       id: item.id,
       title: item.title,
       status: item.status,
+      branch: item.branch ?? null,
+      sourceFile: item.sourceFile ?? null,
       stats: item.children ? computeStats(item.children) : null,
     }));
     return textResult(JSON.stringify({ title: doc.title, overall, epics }, null, 2));

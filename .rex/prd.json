@@ -802,7 +802,7 @@
             {
               "id": "d355da37-c17c-4a29-a18b-96ad2e854555",
               "title": "Include branch and file attribution in rex API and MCP status responses",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "The web server `/api/status` route and the `get_prd_status` MCP tool must propagate `branch` and `sourceFile` fields from PRD items into their response payloads so the dashboard viewer has the data it needs to render attribution badges. This is the data plumbing prerequisite for the UI rendering task.",
               "acceptanceCriteria": [
@@ -819,7 +819,11 @@
                 "rex",
                 "mcp"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-24T20:19:01.121Z",
+              "completedAt": "2026-04-24T20:30:36.537Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added branch/sourceFile attribution to get_prd_status epics, /api/status item nodes, and PRDItemData viewer type"
             },
             {
               "id": "982777ca-fa74-4b7a-ae46-5c4329cf8ace",

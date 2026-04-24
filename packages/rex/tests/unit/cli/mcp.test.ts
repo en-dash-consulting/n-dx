@@ -165,6 +165,88 @@ describe("Rex MCP server factory", () => {
     await server.close();
   });
 
+  it("get_prd_status includes branch and sourceFile on epics — null when absent, value when set", async () => {
+    // Use git so add_item gets branch attribution automatically
+    initRepo(tmpDir);
+    git(tmpDir, "commit", "--allow-empty", "-m", "init");
+    git(tmpDir, "checkout", "-b", "feature/status-attrib");
+
+    const server = await createRexMcpServer(tmpDir);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    // Add an epic — store auto-attributes branch/sourceFile
+    const epicResult = await client.callTool({
+      name: "add_item",
+      arguments: { title: "Attributed Epic", level: "epic" },
+    });
+    const epic = JSON.parse((epicResult.content as Array<{ text: string }>)[0].text);
+
+    const result = await client.callTool({ name: "get_prd_status", arguments: {} });
+    expect(result.isError).toBeFalsy();
+    const parsed = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+
+    expect(parsed.epics).toHaveLength(1);
+    const [epicEntry] = parsed.epics as Array<{
+      id: string;
+      branch: string | null;
+      sourceFile: string | null;
+    }>;
+
+    // branch and sourceFile must be present keys (not omitted), with real values
+    expect(Object.prototype.hasOwnProperty.call(epicEntry, "branch")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(epicEntry, "sourceFile")).toBe(true);
+    expect(epicEntry.id).toBe(epic.id);
+    expect(epicEntry.branch).toBe("feature/status-attrib");
+    expect(epicEntry.sourceFile).toMatch(/^\.rex\/prd_feature-status-attrib_.*\.md$/);
+
+    await client.close();
+    await server.close();
+  });
+
+  it("get_prd_status serializes missing branch and sourceFile as null (not omitted)", async () => {
+    // No git repo → store falls back to prd.json without branch attribution
+    const server = await createRexMcpServer(tmpDir);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    // Manually write a PRD with an epic that has no branch/sourceFile
+    const store = await resolveStore(rexDir);
+    const doc = await store.loadDocument();
+    doc.title = "Null Attribution Test";
+    doc.items = [{
+      id: "epic-no-branch",
+      title: "Epic Without Branch",
+      level: "epic",
+      status: "pending",
+      children: [],
+    }];
+    await store.saveDocument(doc);
+
+    const result = await client.callTool({ name: "get_prd_status", arguments: {} });
+    expect(result.isError).toBeFalsy();
+    const parsed = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+
+    expect(parsed.epics).toHaveLength(1);
+    const [epicEntry] = parsed.epics as Array<{
+      id: string;
+      branch: string | null;
+      sourceFile: string | null;
+    }>;
+    // Keys must be present and explicitly null — not omitted
+    expect(Object.prototype.hasOwnProperty.call(epicEntry, "branch")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(epicEntry, "sourceFile")).toBe(true);
+    expect(epicEntry.branch).toBeNull();
+    expect(epicEntry.sourceFile).toBeNull();
+
+    await client.close();
+    await server.close();
+  });
+
   it("keeps prd.md and prd.json synchronized across MCP mutations", async () => {
     const server = await createRexMcpServer(tmpDir);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
