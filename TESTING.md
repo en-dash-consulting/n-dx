@@ -22,7 +22,7 @@ tests that exercise in-process contract scenarios.
 
 | Package | Required integration scenarios |
 |---------|-------------------------------|
-| rex | Store mutation correctness, tree traversal pipeline, task selection with real PRDStore, legacy multi-file PRD migration into the single canonical `prd.json`, cross-vendor authoring regression (smart-add / recommend / reshape / reorganize / prune across Claude and Codex) |
+| rex | Store mutation correctness, tree traversal pipeline, task selection with real PRDStore, legacy multi-file PRD migration into the canonical `prd.md` + `prd.json` pair (and JSON-only → markdown migration on first load), markdown dual-write invariants, cross-vendor authoring regression (smart-add / recommend / reshape / reorganize / prune across Claude and Codex) |
 | sourcevision | Analyzer pipeline phases in-process, zone detection with real file inventory |
 | hench | Gateway re-export validation, agent loop with mocked LLM responses, self-heal test gate (`runTestGate` succeeds on green, fails fast on red), Codex-batch self-heal fallback |
 | web | Cross-zone boundary checks, gateway re-export validation, messaging pipeline integration, cross-vendor pair-programming review (primary→reviewer direction, test-command pass/fail, reviewer-unavailable fallback) |
@@ -33,6 +33,8 @@ Test-file pointers for the scenarios added above:
 | Scenario | File |
 |----------|------|
 | Legacy multi-file PRD migration | `packages/rex/tests/unit/store/prd-migration.test.ts` |
+| JSON → `prd.md` migration (one-shot + on-load) | `packages/rex/tests/unit/store/prd-md-migration.test.ts`, `packages/rex/tests/unit/store/file-adapter-markdown-migration.test.ts` |
+| Markdown round-trip and dual-write | `packages/rex/tests/unit/store/markdown-roundtrip.test.ts`, `packages/rex/tests/unit/store/prd-write-routing.test.ts` |
 | Cross-vendor rex authoring regression | `packages/rex/tests/integration/vendor-regression.test.ts` |
 | Self-heal test gate | `packages/hench/tests/integration/test-gate.test.ts` |
 | Self-heal Codex-batch fallback | `packages/hench/tests/integration/self-heal-codex-batch.test.ts` |

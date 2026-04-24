@@ -290,13 +290,14 @@ Satellite zones that survive the merge (because they have strong internal cohesi
 
 The `.rex/` directory is a **shared mutable data zone** — readable by rex, hench, and web without creating import-graph coupling. This is an intentional design: packages share state via filesystem rather than runtime imports. However, concurrent write safety depends on the following protocol.
 
-**Single-file PRD invariant.** `.rex/prd.json` is the one canonical PRD file. There are no branch-scoped or multi-file writers — every reader and writer (rex CLI, hench, MCP, web dashboard) touches the same file. A one-time on-load migration consolidates any legacy `prd_{branch}_{date}.json` files into `prd.json` and renames the sources to `<name>.backup.<timestamp>`; no user action is required. `rex add` / `ndx add` therefore target `prd.json` unconditionally — any documentation or tooling that still references branch-scoped PRD targeting is stale and should be updated.
+**Markdown-primary PRD invariant.** `.rex/prd.md` is the canonical PRD document, and `.rex/prd.json` is a derived sync artifact dual-written on every save. There are no branch-scoped or multi-file writers in the current layout — every reader and writer (rex CLI, hench, MCP, web dashboard) observes the same pair of files. `FileStore.saveDocument()` writes `prd.json` first (atomic JSON) and then `prd.md` (atomic markdown via the rex/v1 serializer); `FileStore.loadDocument()` prefers `prd.md` when it exists and falls back to migrating `prd.json` on first read. A one-time on-load migration also consolidates any legacy `prd_{branch}_{date}.json` files into `prd.json` and renames the sources to `<name>.backup.<timestamp>`; no user action is required, and a manual migration is available via `rex migrate-to-md` if you need to generate `prd.md` ahead of the first read. `rex add` / `ndx add` therefore target the canonical pair unconditionally — any documentation or tooling that still references branch-scoped PRD targeting, or that treats `prd.json` as authoritative for edits, is stale and should be updated to point at `prd.md`.
 
 ### Write ownership
 
 | File | Owner (writer) | Readers | Write pattern |
 |---|---|---|---|
-| `prd.json` | **rex** (FileStore) | hench, web | Atomic read-modify-write via `saveDocument()` |
+| `prd.md` | **rex** (FileStore) | hench, web | Atomic read-modify-write via `saveDocument()` (primary, dual-written alongside `prd.json`) |
+| `prd.json` | **rex** (FileStore) | hench, web | Atomic read-modify-write via `saveDocument()` (derived sync artifact) |
 | `config.json` | **rex** (FileStore) | hench, web | Written at init; updated via `rex config` |
 | `execution-log.jsonl` | **rex** (FileStore) | web | Append-only via `appendLog()` |
 | `workflow.md` | **rex** (FileStore) | web | Overwritten on status transitions |
@@ -306,8 +307,8 @@ The `.rex/` directory is a **shared mutable data zone** — readable by rex, hen
 
 ### Rules
 
-1. **Single writer per file** — only the owning package writes to each file. Hench and web read `.rex/` files but never write to them; they modify PRD state by invoking rex APIs (CLI or library).
+1. **Single writer per file** — only the owning package writes to each file. Hench and web read `.rex/` files but never write to them; they modify PRD state by invoking rex APIs (CLI or library). In particular, no consumer may write `prd.md` or `prd.json` directly — both flow through `FileStore.saveDocument()` so the dual-write stays in lockstep.
 2. **No file locking** — the current design assumes sequential access (one `ndx work` process at a time). The hench concurrency limiter enforces this at the process level.
 3. **Append-only logs** — `execution-log.jsonl` uses `appendFile()`, which is atomic for small writes on local filesystems. Rotation is numeric-suffix-based (`.1.jsonl`).
-4. **Graceful degradation** — readers (web, hench) treat missing or malformed `.rex/` files as non-fatal. The web cleanup scheduler skips its cycle if `prd.json` is unavailable.
-5. **Never write from the agent** — the hench agent prompt explicitly forbids direct modification of `.rex/` files. All PRD mutations go through rex's store layer.
+4. **Graceful degradation** — readers (web, hench) treat missing or malformed `.rex/` files as non-fatal. The web cleanup scheduler skips its cycle if the PRD is unavailable; readers that still consume JSON directly should accept either `prd.md`-derived or `prd.json` sources and must not assume one without the other.
+5. **Never write from the agent** — the hench agent prompt explicitly forbids direct modification of `.rex/` files. All PRD mutations go through rex's store layer, which guarantees the `prd.md` + `prd.json` dual-write.
