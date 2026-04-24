@@ -624,7 +624,7 @@ async function runOne(
   extraContext?: string,
   autonomous?: boolean,
   runNumber?: number,
-): Promise<{ status: string }> {
+): Promise<{ status: string; taskTitle: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
   await assertSchemaCompatibility(store);
@@ -735,7 +735,7 @@ async function runOne(
     output(`\n${red("Error:")} ${run.error}`);
   }
 
-  return { status: run.status };
+  return { status: run.status, taskTitle: run.taskTitle };
 }
 
 // ---------------------------------------------------------------------------
@@ -746,6 +746,60 @@ const NO_TASKS_MSG = "No actionable tasks found in PRD";
 
 function isNoTasksError(err: unknown): boolean {
   return err instanceof Error && err.message.includes(NO_TASKS_MSG);
+}
+
+// ---------------------------------------------------------------------------
+// Tag-filter completion helpers (used by runLoop for self-heal mode)
+// ---------------------------------------------------------------------------
+
+/** Returns true if there are still actionable tasks matching the given tags. */
+async function hasPendingTaggedTasks(rexDir: string, tags: string[]): Promise<boolean> {
+  const store = await resolveStore(rexDir);
+  const doc = await store.loadDocument();
+  const completedIds = collectCompletedIds(doc.items);
+  const remaining = findActionable(doc.items, completedIds, 1, { tags });
+  return remaining.length > 0;
+}
+
+interface CompletedItem {
+  title: string;
+  status: string;
+}
+
+/**
+ * Build the completion summary lines for a tag-filtered loop run.
+ * Returns an array of lines (without leading newlines) so callers can
+ * either print them or assert on the content in tests.
+ */
+export function formatTagFilterCompletionSummary(
+  tags: string[],
+  items: CompletedItem[],
+  processedCount: number,
+): string[] {
+  const tagLabel = tags.join(", ");
+  const lines: string[] = [
+    `All [${tagLabel}] tasks complete — ${processedCount} task(s) processed.`,
+  ];
+  if (items.length > 0) {
+    lines.push("Resolved tasks:");
+    for (const item of items) {
+      const icon = item.status === "completed" ? green("✓") : red("✗");
+      lines.push(`  ${icon} ${item.title} (${item.status})`);
+    }
+  }
+  return lines;
+}
+
+/** Print the per-task summary emitted when all tagged items are resolved. */
+function printTagFilterCompletionSummary(
+  tags: string[],
+  items: CompletedItem[],
+  processedCount: number,
+): void {
+  const lines = formatTagFilterCompletionSummary(tags, items, processedCount);
+  for (const line of lines) {
+    info(`\n${line}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1145,6 +1199,8 @@ async function runLoop(
   process.on("SIGINT", onSignal);
 
   let completed = 0;
+  // Tracks per-task outcomes when a tag filter is active (e.g. self-heal mode).
+  const taggedCompletedItems: CompletedItem[] = [];
 
   try {
     const scope = epicId ? "epic tasks" : "all tasks";
@@ -1203,6 +1259,9 @@ async function runLoop(
             completed,
           );
           status = result.status;
+          if (tags?.length) {
+            taggedCompletedItems.push({ title: result.taskTitle, status: result.status });
+          }
           // Close the banner opened by the lifecycle loop. Mirrors the
           // start banner's format so each run is visually bracketed in
           // long --loop transcripts.
@@ -1214,10 +1273,25 @@ async function runLoop(
       } catch (err) {
         if (isNoTasksError(err)) {
           const scope = epicId ? " in epic" : "";
-          info(`\nAll tasks${scope} complete — loop finished after ${completed - 1} task(s).`);
+          if (tags?.length) {
+            printTagFilterCompletionSummary(tags, taggedCompletedItems, completed - 1);
+          } else {
+            info(`\nAll tasks${scope} complete — loop finished after ${completed - 1} task(s).`);
+          }
           break;
         }
         throw err;
+      }
+
+      // After each completed task, check whether any tagged items remain.
+      // This satisfies the "evaluated after each task" requirement and avoids
+      // a spurious extra iteration that would end in isNoTasksError.
+      if (tags?.length && !dryRun) {
+        const stillPending = await hasPendingTaggedTasks(rexDir, tags);
+        if (!stillPending) {
+          printTagFilterCompletionSummary(tags, taggedCompletedItems, completed);
+          break;
+        }
       }
 
       // Emit quota log line(s) at the inter-run boundary.

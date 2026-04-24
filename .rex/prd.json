@@ -863,7 +863,7 @@
         {
           "id": "ae28134a-cb7d-4427-87f0-55094e3500d0",
           "title": "Self-Heal Scoped Task Selection and Auto-Termination",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "description": "Restrict hench task selection during self-heal runs to only pick up items tagged 'self-heal', and automatically stop the loop once all such items are resolved — without spilling into unrelated PRD work.",
           "source": "smart-add",
@@ -895,7 +895,7 @@
             {
               "id": "ed9b7154-5527-4646-b421-dc25b5095a84",
               "title": "Implement self-heal loop auto-termination when all self-heal items are completed",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "description": "After each hench iteration within a self-heal run, check whether any pending self-heal tagged items remain. If none remain, exit the loop cleanly and report completion — rather than continuing to the next generic PRD task or looping indefinitely.",
               "acceptanceCriteria": [
@@ -908,6 +908,74 @@
               "tags": [
                 "self-heal",
                 "hench"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-24T15:18:06.587Z",
+              "completedAt": "2026-04-24T15:25:12.939Z",
+              "resolutionType": "code-change",
+              "resolutionDetail": "Added post-task tag-filter check in runLoop: after each runOne call when tags are set, hasPendingTaggedTasks queries the PRD and breaks with formatTagFilterCompletionSummary output if none remain. Includes 8 new tests for the exported formatter."
+            }
+          ],
+          "startedAt": "2026-04-24T15:25:12.963Z",
+          "completedAt": "2026-04-24T15:25:12.963Z"
+        }
+      ]
+    },
+    {
+      "id": "cbe4e682-3315-4e77-a4a9-aea17c51a8e2",
+      "title": "Hench Autonomous Execution Improvements",
+      "status": "pending",
+      "level": "epic",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "469c7900-cd34-4919-bc40-5f474a96654a",
+          "title": "Ctrl-C Interrupt Rollback Prompt Coordination",
+          "status": "pending",
+          "level": "feature",
+          "description": "When the user interrupts the work loop with Ctrl-C, the existing SIGINT handler (which calls process.exit(1) on a second Ctrl-C) remains active while the rollback confirmation prompt is waiting for readline input. Any Ctrl-C during the prompt immediately kills the process before the user can answer. The handler must be suspended for the duration of the rollback prompt and restored (or replaced with the default) afterward.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "5cfeee22-c15d-40ec-aa66-0983959703f5",
+              "title": "Suspend custom SIGINT handler during rollback confirmation prompt",
+              "status": "pending",
+              "level": "task",
+              "description": "In shared.ts's performRollbackIfNeeded (and the promptRollbackConfirm helper it calls), the outer runLoop/epicByEpicLoop SIGINT handler is still registered and will call process.exit(1) on a second Ctrl-C. Before opening the readline prompt, temporarily remove the custom SIGINT listener (or restore SIG_DFL) so that the terminal behaves normally during the interactive question. Re-register (or re-override) the handler after the readline closes. The same issue exists in promptCommitConfirm — apply the same fix there. The fix should be coordinated so that callers pass a cleanup/suspend callback, or promptRollbackConfirm accepts an AbortSignal that lets it cleanly cancel if the outer loop is torn down.",
+              "acceptanceCriteria": [
+                "After a single Ctrl-C during a running task, the 'Roll back N uncommitted file(s)? [Y/n]' prompt appears and remains active",
+                "A second Ctrl-C while the rollback prompt is displayed does NOT call process.exit(1); it either cancels the readline cleanly or is ignored until the user types a response",
+                "Answering 'y' at the rollback prompt reverts files and exits cleanly",
+                "Answering 'n' at the rollback prompt skips the rollback and exits cleanly",
+                "The same fix applies to the commit confirmation prompt (promptCommitConfirm) — a Ctrl-C during that prompt does not bypass the question",
+                "Non-interactive mode (--yes or non-TTY) is unaffected"
+              ],
+              "priority": "high",
+              "tags": [
+                "hench",
+                "ux",
+                "signal-handling"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "20bbb688-65c2-4331-a508-5b5700272200",
+              "title": "Add integration tests for Ctrl-C interrupt and rollback prompt interaction",
+              "status": "pending",
+              "level": "task",
+              "description": "The interrupt-to-rollback path currently has no automated coverage. Add integration tests that simulate a SIGINT mid-run, verify the rollback prompt is displayed, and assert correct behavior for both 'confirm' and 'skip' responses. Cover the edge case where a second SIGINT arrives while the prompt is open.",
+              "acceptanceCriteria": [
+                "Test confirms that after SIGINT the rollback prompt is presented when dirty files exist",
+                "Test confirms that responding 'y' causes revertChanges to be called",
+                "Test confirms that responding 'n' leaves files in place and exits without error",
+                "Test confirms that a second SIGINT during the prompt does not call process.exit(1) and allows the readline to complete",
+                "Tests run in CI without requiring a real TTY (use isTTY mocking or pipe-mode)"
+              ],
+              "priority": "medium",
+              "tags": [
+                "hench",
+                "testing",
+                "signal-handling"
               ],
               "source": "smart-add"
             }
