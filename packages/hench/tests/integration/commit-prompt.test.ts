@@ -141,6 +141,12 @@ describe("performCommitPromptIfNeeded (commit approval bypass)", () => {
           cb("n"); // decline — leaves the staged change in place
         },
         close: () => {},
+        // The SIGINT-suspension shim in shared.ts registers a
+        // rl.on("SIGINT", ...) listener around the question. Provide
+        // no-op implementations so the fake readline satisfies the
+        // expected surface without doing anything.
+        on: () => {},
+        removeListener: () => {},
       }),
     }));
     vi.resetModules();

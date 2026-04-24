@@ -638,19 +638,77 @@ async function listDirtyPaths(projectDir: string): Promise<string[]> {
 }
 
 /**
- * Ask the user to confirm rollback via stdin (TTY only).
- * Returns true when the user accepts (empty input or 'y'/'yes').
+ * Run an interactive y/n readline prompt with the outer SIGINT handlers
+ * temporarily suspended for the duration of the question.
+ *
+ * The run-loop in `run.ts` registers a SIGINT handler that calls
+ * `process.exit(1)` on a second Ctrl-C. Without suspension that handler
+ * would kill the process while the user is answering a rollback or
+ * commit prompt. This helper snapshots the existing SIGINT listeners,
+ * removes them while the readline is open, and restores them on exit.
+ *
+ * A Ctrl-C received during the prompt is treated as "cancel cleanly —
+ * decline": the readline closes and the promise resolves with `false`.
+ * This matches the decline path (skip rollback / skip commit) so the
+ * agent loop shuts down without bypassing the question.
+ *
+ * @param question  The question to display (with trailing space).
+ * @returns         true on accept (empty input, 'y', 'yes');
+ *                  false on explicit decline or Ctrl-C cancellation.
  */
-async function promptRollbackConfirm(count: number): Promise<boolean> {
+async function askYesNoWithSuspendedSigint(question: string): Promise<boolean> {
   const { createInterface } = await import("node:readline");
+
+  // Snapshot any existing SIGINT listeners — typically the run-loop's
+  // force-exit handler from run.ts — and remove them before opening the
+  // prompt so Ctrl-C does not bypass the question.
+  const savedListeners = process.listeners("SIGINT") as Array<(...args: unknown[]) => void>;
+  for (const listener of savedListeners) {
+    process.removeListener("SIGINT", listener);
+  }
+
   const rl = createInterface({ input: process.stdin, output: process.stdout });
+
   return new Promise<boolean>((resolve) => {
-    rl.question(`\nRoll back ${count} uncommitted file(s)? [Y/n] `, (answer) => {
+    let settled = false;
+    const onInterrupt = (): void => finish(false);
+
+    const finish = (value: boolean): void => {
+      if (settled) return;
+      settled = true;
+      process.removeListener("SIGINT", onInterrupt);
+      rl.removeListener("SIGINT", onInterrupt);
       rl.close();
+      // Restore the outer SIGINT listeners exactly as they were so the
+      // run-loop reclaims ownership of Ctrl-C after the prompt closes.
+      for (const listener of savedListeners) {
+        process.on("SIGINT", listener);
+      }
+      resolve(value);
+    };
+
+    process.on("SIGINT", onInterrupt);
+    // Some terminals surface Ctrl-C via readline's own SIGINT event in
+    // TTY raw mode — listen on both surfaces so any delivery channel
+    // unblocks the prompt cleanly.
+    rl.on("SIGINT", onInterrupt);
+
+    rl.question(question, (answer) => {
       const trimmed = answer.trim().toLowerCase();
-      resolve(trimmed === "" || trimmed === "y" || trimmed === "yes");
+      finish(trimmed === "" || trimmed === "y" || trimmed === "yes");
     });
   });
+}
+
+/**
+ * Ask the user to confirm rollback via stdin (TTY only).
+ * Returns true when the user accepts (empty input or 'y'/'yes').
+ * A Ctrl-C during the prompt cancels cleanly and returns false.
+ */
+async function promptRollbackConfirm(count: number): Promise<boolean> {
+  return askYesNoWithSuspendedSigint(
+    `\nRoll back ${count} uncommitted file(s)? [Y/n] `,
+  );
 }
 
 /**
@@ -692,15 +750,12 @@ async function performRollbackIfNeeded(projectDir: string, yes?: boolean): Promi
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
 
 async function promptCommitConfirm(fileCount: number): Promise<boolean> {
-  const { createInterface } = await import("node:readline");
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise<boolean>((resolve) => {
-    rl.question(`\nCommit ${fileCount} staged file(s) with the above message? [Y/n] `, (answer) => {
-      rl.close();
-      const trimmed = answer.trim().toLowerCase();
-      resolve(trimmed === "" || trimmed === "y" || trimmed === "yes");
-    });
-  });
+  // Uses the same SIGINT-suspension shim as the rollback prompt so a
+  // Ctrl-C while the user is answering does not trigger the outer
+  // run-loop's force-exit handler.
+  return askYesNoWithSuspendedSigint(
+    `\nCommit ${fileCount} staged file(s) with the above message? [Y/n] `,
+  );
 }
 
 async function countStagedFiles(projectDir: string): Promise<number> {
