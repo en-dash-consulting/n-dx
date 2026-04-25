@@ -113,6 +113,13 @@ function installFakeReadline(): { fakes: FakeReadlineHandle[] } {
   return { fakes };
 }
 
+async function waitForFakePrompt(fakes: FakeReadlineHandle[]): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (fakes.length === 0 && Date.now() < deadline) {
+    await new Promise<void>((r) => setTimeout(r, 10));
+  }
+}
+
 /** Snapshot existing SIGINT listeners and clear the slot for a test. */
 function detachExistingSigintListeners(): Array<(...a: unknown[]) => void> {
   const saved = process.listeners("SIGINT") as Array<(...a: unknown[]) => void>;
@@ -191,7 +198,7 @@ describe("prompt SIGINT suspension", () => {
       });
 
       // Give the async prompt setup a tick to open.
-      await new Promise<void>((r) => setTimeout(r, 30));
+      await waitForFakePrompt(fakes);
 
       expect(fakes).toHaveLength(1);
       // Outer handler is suspended while the prompt is visible.
@@ -239,7 +246,7 @@ describe("prompt SIGINT suspension", () => {
         rollbackOnFailure: true,
       });
 
-      await new Promise<void>((r) => setTimeout(r, 30));
+      await waitForFakePrompt(fakes);
       expect(fakes).toHaveLength(1);
 
       // Emit a process-level SIGINT while the prompt is visible. The
@@ -305,7 +312,7 @@ describe("prompt SIGINT suspension", () => {
       });
 
       // Let the prompt open.
-      await new Promise<void>((r) => setTimeout(r, 30));
+      await waitForFakePrompt(fakes);
       expect(fakes).toHaveLength(1);
       // Precondition: the outer force-exit handler is detached while
       // the prompt is open.
@@ -362,7 +369,7 @@ describe("prompt SIGINT suspension", () => {
         rollbackOnFailure: true,
       });
 
-      await new Promise<void>((r) => setTimeout(r, 30));
+      await waitForFakePrompt(fakes);
       expect(fakes).toHaveLength(1);
 
       fakes[0].emitRlSigint();
@@ -399,7 +406,7 @@ describe("prompt SIGINT suspension", () => {
         rollbackOnFailure: true,
       });
 
-      await new Promise<void>((r) => setTimeout(r, 30));
+      await waitForFakePrompt(fakes);
       expect(fakes).toHaveLength(1);
 
       // Accept the rollback.
@@ -446,7 +453,7 @@ describe("prompt SIGINT suspension", () => {
         /* autonomous */ false,
       );
 
-      await new Promise<void>((r) => setTimeout(r, 30));
+      await waitForFakePrompt(fakes);
       expect(fakes).toHaveLength(1);
 
       // Outer handler is suspended — a SIGINT during the commit prompt
