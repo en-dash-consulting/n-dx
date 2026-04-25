@@ -195,12 +195,13 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=all" });
     const itemsAll = flattenItems(await readPrdItems(tmpDir));
 
-    // Reset PRD
+    // Reset PRD (both prd.json and prd.md — prd.md is the primary read surface)
     await writeFile(
       join(tmpDir, ".rex", "prd.json"),
       JSON.stringify({ schema: "rex/v1", title: "test-project", items: [] }),
       "utf-8",
     );
+    await rm(join(tmpDir, ".rex", "prd.md"), { force: true });
 
     // Accept with true (legacy)
     await cmdRecommend(tmpDir, { accept: "true" });
@@ -232,12 +233,13 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=." });
     const itemsDot = flattenItems(await readPrdItems(tmpDir));
 
-    // Reset PRD
+    // Reset PRD (both prd.json and prd.md — prd.md is the primary read surface)
     await writeFile(
       join(tmpDir, ".rex", "prd.json"),
       JSON.stringify({ schema: "rex/v1", title: "test-project", items: [] }),
       "utf-8",
     );
+    await rm(join(tmpDir, ".rex", "prd.md"), { force: true });
 
     // Accept with =all
     await cmdRecommend(tmpDir, { accept: "=all" });

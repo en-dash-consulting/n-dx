@@ -104,6 +104,7 @@ const REX_COMMANDS = [
   "health",
   "sync",
   "adapter",
+  "migrate-to-md",
   "mcp",
 ];
 

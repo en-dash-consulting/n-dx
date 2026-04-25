@@ -293,6 +293,7 @@ describe("atomic task state transitions", () => {
           status: "in_progress",
           startedAt: expect.any(String),
         }),
+        expect.anything(),
       );
     });
 
@@ -341,6 +342,7 @@ describe("atomic task state transitions", () => {
           status: "completed",
           completedAt: expect.any(String),
         }),
+        expect.anything(),
       );
     });
 
@@ -393,6 +395,7 @@ describe("atomic task state transitions", () => {
           startedAt: expect.any(String),
           completedAt: expect.any(String),
         }),
+        expect.anything(),
       );
     });
   });

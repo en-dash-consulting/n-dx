@@ -99,6 +99,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
     expect(store.updateItem).toHaveBeenCalledWith(
       "task-1",
       expect.objectContaining({ status: "completed" }),
+      expect.anything(),
     );
   });
 
@@ -156,6 +157,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
     expect(store.updateItem).toHaveBeenCalledWith(
       "task-1",
       expect.objectContaining({ status: "in_progress" }),
+      expect.anything(),
     );
   });
 
@@ -300,6 +302,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
     expect(store.updateItem).toHaveBeenCalledWith(
       "task-1",
       expect.objectContaining({ status: "deferred" }),
+      expect.anything(),
     );
   });
 });
