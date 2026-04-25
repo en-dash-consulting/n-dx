@@ -333,6 +333,30 @@ describe("detectSubAnalyses", () => {
     expect(result).toEqual([]);
   });
 
+  it("skips fixture sub-analyses such as sv-evals outputs", () => {
+    const n = (s: string) => s.replace(/\\/g, "/");
+    mockedReaddirSync.mockImplementation((dir: any) => {
+      const d = n(String(dir));
+      if (d === "/root") return ["tests", "packages"] as any;
+      if (d === "/root/tests") return ["fixtures"] as any;
+      if (d === "/root/packages") return [] as any;
+      return [] as any;
+    });
+
+    mockedStatSync.mockImplementation(() => ({ isDirectory: () => true } as any));
+    mockedExistsSync.mockImplementation((p: any) => {
+      const pathStr = n(String(p));
+      return pathStr === "/root/tests/fixtures/sv-evals/toy-app/.sourcevision" ||
+        pathStr === "/root/tests/fixtures/sv-evals/toy-app/.sourcevision/manifest.json";
+    });
+
+    const result = detectSubAnalyses("/root");
+
+    const readdirCalls = mockedReaddirSync.mock.calls.map((c) => n(String(c[0])));
+    expect(readdirCalls).not.toContain("/root/tests/fixtures");
+    expect(result).toEqual([]);
+  });
+
   it("skips root .sourcevision directory", () => {
     const n = (s: string) => s.replace(/\\/g, "/");
     mockedReaddirSync.mockImplementation((dir: any) => {
