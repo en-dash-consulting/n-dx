@@ -10,6 +10,7 @@ import { withLock } from "./file-lock.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import {
   PRD_MARKDOWN_FILENAME,
+  toMarkdownSourcePath,
 } from "./prd-md-migration.js";
 import { parseDocument } from "./markdown-parser.js";
 import { serializeDocument } from "./markdown-serializer.js";
@@ -71,10 +72,7 @@ export class FileStore implements PRDStore {
   }
 
   private toAttributedSourceFile(filename: string): string {
-    const markdownName = filename === PRD_FILENAME
-      ? PRD_MARKDOWN_FILENAME
-      : filename.replace(/\.json$/i, ".md");
-    return `.rex/${markdownName}`;
+    return toMarkdownSourcePath(filename);
   }
 
   private applyWriteAttribution<T extends PRDItem | Partial<PRDItem>>(

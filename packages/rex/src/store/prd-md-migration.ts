@@ -9,6 +9,30 @@ import { PRD_FILENAME } from "./file-adapter.js";
 
 export const PRD_MARKDOWN_FILENAME = "prd.md";
 
+/**
+ * Convert a PRD JSON filename (e.g. `prd.json` or `prd_feature-x_2026-04-26.json`)
+ * to its markdown counterpart filename (`prd.md` / `prd_feature-x_2026-04-26.md`).
+ *
+ * Branch-scoped JSON files map to a sibling `.md` filename; the canonical
+ * `prd.json` maps to `PRD_MARKDOWN_FILENAME`.
+ */
+export function jsonToMarkdownFilename(jsonFilename: string): string {
+  if (jsonFilename === PRD_FILENAME) return PRD_MARKDOWN_FILENAME;
+  return jsonFilename.replace(/\.json$/i, ".md");
+}
+
+/**
+ * Repo-relative markdown source path for a PRD JSON filename.
+ *
+ * Example: `prd.json` → `.rex/prd.md`,
+ * `prd_feature-x_2026-04-26.json` → `.rex/prd_feature-x_2026-04-26.md`.
+ *
+ * Mirrors the value written into `sourceFile` when items are attributed.
+ */
+export function toMarkdownSourcePath(jsonFilename: string): string {
+  return `.rex/${jsonToMarkdownFilename(jsonFilename)}`;
+}
+
 type MarkdownMigrationSkipReason = "markdown-exists" | "json-missing";
 
 export interface MarkdownMigrationResult {

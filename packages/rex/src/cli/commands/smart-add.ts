@@ -10,6 +10,7 @@ import {
   findPRDFileForBranch,
   resolveGitBranch,
   resolvePRDFilename,
+  toMarkdownSourcePath,
 } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
@@ -729,6 +730,12 @@ async function validateMergeTarget(
   return mergeTargetId;
 }
 
+interface AcceptProposalsResult {
+  added: number;
+  /** Repo-relative markdown paths of PRD files that received new items. Empty for non-FileStore adapters. */
+  prdPaths: string[];
+}
+
 async function acceptProposals(
   dir: string,
   proposals: Proposal[],
@@ -739,7 +746,7 @@ async function acceptProposals(
     mergedCount?: number;
     reopenedItemIds?: string[];
   } = {},
-): Promise<number> {
+): Promise<AcceptProposalsResult> {
   const {
     parentId,
     overrideMarkersByNodeKey,
@@ -767,6 +774,8 @@ async function acceptProposals(
   const newContainerIds: string[] = [];
   // Track existing containers reused via existingId so we cascade-reset them
   const reusedContainerIds: string[] = [];
+  // Track every newly added item ID so we can resolve which PRD files received writes.
+  const addedItemIds: string[] = [];
 
   for (let pIdx = 0; pIdx < proposals.length; pIdx++) {
     const p = proposals[pIdx];
@@ -806,6 +815,7 @@ async function acceptProposals(
           ...(epicMarker ? { overrideMarker: epicMarker } : {}),
         }, undefined, attributionOptions);
         addedCount++;
+        addedItemIds.push(epicId);
         newContainerIds.push(epicId);
       }
 
@@ -849,6 +859,7 @@ async function acceptProposals(
             attributionOptions,
           );
           addedCount++;
+          addedItemIds.push(featureId);
           newContainerIds.push(featureId);
         }
 
@@ -860,9 +871,10 @@ async function acceptProposals(
           );
           if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
+          const taskId = randomUUID();
           await store.addItem(
             {
-              id: randomUUID(),
+              id: taskId,
               title: t.title,
               level: "task",
               status: "pending",
@@ -877,6 +889,7 @@ async function acceptProposals(
             attributionOptions,
           );
           addedCount++;
+          addedItemIds.push(taskId);
         }
       }
     } else if (parentLevel === "epic") {
@@ -904,6 +917,7 @@ async function acceptProposals(
             attributionOptions,
           );
           addedCount++;
+          addedItemIds.push(featureId);
           newContainerIds.push(featureId);
         }
 
@@ -915,9 +929,10 @@ async function acceptProposals(
           );
           if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
+          const taskId = randomUUID();
           await store.addItem(
             {
-              id: randomUUID(),
+              id: taskId,
               title: t.title,
               level: "task",
               status: "pending",
@@ -932,6 +947,7 @@ async function acceptProposals(
             attributionOptions,
           );
           addedCount++;
+          addedItemIds.push(taskId);
         }
       }
     } else if (parentLevel === "feature") {
@@ -947,9 +963,10 @@ async function acceptProposals(
           );
           if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
+          const taskId = randomUUID();
           await store.addItem(
             {
-              id: randomUUID(),
+              id: taskId,
               title: t.title,
               level: "task",
               status: "pending",
@@ -964,6 +981,7 @@ async function acceptProposals(
             attributionOptions,
           );
           addedCount++;
+          addedItemIds.push(taskId);
         }
       }
     } else if (parentLevel === "task") {
@@ -978,9 +996,10 @@ async function acceptProposals(
           );
           if (taskMergeTarget) continue;
           const taskMarker = overrideMarkersByNodeKey?.[`p${pIdx}:task:${fIdx}:${tIdx}`];
+          const subtaskId = randomUUID();
           await store.addItem(
             {
-              id: randomUUID(),
+              id: subtaskId,
               title: t.title,
               level: "subtask",
               status: "pending",
@@ -995,6 +1014,7 @@ async function acceptProposals(
             attributionOptions,
           );
           addedCount++;
+          addedItemIds.push(subtaskId);
         }
       }
     }
@@ -1053,7 +1073,24 @@ async function acceptProposals(
 
   await clearPending(dir);
 
-  return addedCount;
+  // Resolve which PRD files received writes by inspecting the file ownership
+  // map (FileStore only). Items removed by the empty-container cleanup above
+  // are dropped from the map by removeItem(), so they're naturally excluded.
+  const prdPaths: string[] = [];
+  if (store instanceof FileStore) {
+    const map = store.getItemFileMap();
+    const seen = new Set<string>();
+    for (const id of addedItemIds) {
+      const file = map.get(id);
+      if (file && !seen.has(file)) {
+        seen.add(file);
+        prdPaths.push(toMarkdownSourcePath(file));
+      }
+    }
+    prdPaths.sort();
+  }
+
+  return { added: addedCount, prdPaths };
 }
 
 type SmartAddInput = {
@@ -1154,9 +1191,22 @@ async function replayCachedIfRequested(
   }
 
   info(`Accepting ${cached.proposals.length} cached proposal(s)...`);
-  const added = await acceptProposals(dir, cached.proposals, { parentId: cached.parentId });
-  result(`Added ${added} items to PRD.`);
+  const acceptResult = await acceptProposals(dir, cached.proposals, { parentId: cached.parentId });
+  emitPrdPaths(acceptResult.prdPaths);
+  result(`Added ${acceptResult.added} items to PRD.`);
   return true;
+}
+
+/**
+ * Emit a human-readable "Added to: <path>" line per touched PRD file.
+ *
+ * Called before the "Added N items to PRD." summary so users see exactly
+ * which Markdown PRD file(s) received the new items.
+ */
+function emitPrdPaths(prdPaths: string[]): void {
+  for (const p of prdPaths) {
+    result(`Added to: ${p}`);
+  }
 }
 
 async function resolveSmartAddModel(
@@ -1457,17 +1507,18 @@ async function runInteractiveSmartAddApproval(params: {
         }
       }
 
-      const added = await acceptProposals(dir, currentProposals, {
+      const acceptResult = await acceptProposals(dir, currentProposals, {
         parentId,
         overrideMarkersByNodeKey,
         mergeTargetsByNodeKey,
         mergedCount,
         reopenedItemIds,
       });
+      emitPrdPaths(acceptResult.prdPaths);
       if (mergedCount > 0) {
-        result(`Merged ${mergedCount} duplicate node(s) and added ${added} new item(s) to PRD.`);
+        result(`Merged ${mergedCount} duplicate node(s) and added ${acceptResult.added} new item(s) to PRD.`);
       } else {
-        result(`Added ${added} items to PRD.`);
+        result(`Added ${acceptResult.added} items to PRD.`);
       }
       done = true;
       continue;
@@ -1521,17 +1572,18 @@ async function runInteractiveSmartAddApproval(params: {
       }
     }
 
-    const added = await acceptProposals(dir, selected, {
+    const acceptResult = await acceptProposals(dir, selected, {
       parentId,
       overrideMarkersByNodeKey,
       mergeTargetsByNodeKey,
       mergedCount,
       reopenedItemIds,
     });
+    emitPrdPaths(acceptResult.prdPaths);
     if (mergedCount > 0) {
-      result(`Merged ${mergedCount} duplicate node(s) and added ${added} new item(s) to PRD.`);
+      result(`Merged ${mergedCount} duplicate node(s) and added ${acceptResult.added} new item(s) to PRD.`);
     } else {
-      result(`Added ${added} items to PRD.`);
+      result(`Added ${acceptResult.added} items to PRD.`);
     }
 
     const rejected = currentProposals.filter((_, i) => !decision.approved.includes(i));
@@ -1592,16 +1644,28 @@ async function finalizeSmartAdd(params: {
       return;
     }
 
-    const added = await acceptProposals(dir, proposals, { parentId });
+    const acceptResult = await acceptProposals(dir, proposals, { parentId });
     if (isJson) {
-      result(JSON.stringify({ proposals, added, qualityIssues }, null, 2));
+      result(
+        JSON.stringify(
+          {
+            proposals,
+            added: acceptResult.added,
+            qualityIssues,
+            ...(acceptResult.prdPaths.length > 0 ? { prdPaths: acceptResult.prdPaths } : {}),
+          },
+          null,
+          2,
+        ),
+      );
       return;
     }
 
     if (qualityIssues.length > 0) {
       warn(`Accepted with ${qualityIssues.length} quality warning(s).`);
     }
-    result(`Added ${added} items to PRD.`);
+    emitPrdPaths(acceptResult.prdPaths);
+    result(`Added ${acceptResult.added} items to PRD.`);
     return;
   }
 

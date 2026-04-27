@@ -80,6 +80,39 @@ describe("cmdAdd", () => {
     await expect(cmdAdd(tmp, "epic", { title: "My Epic" })).resolves.toBeUndefined();
   });
 
+  it("prints 'Added to: .rex/prd.md' for canonical (non-git) writes", async () => {
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]): void => { lines.push(args.join(" ")); };
+    try {
+      await cmdAdd(tmp, "epic", { title: "Pathful Epic" });
+    } finally {
+      console.log = original;
+    }
+
+    expect(lines.some((l) => l.includes("Added to: .rex/prd.md"))).toBe(true);
+    // Path line precedes "Created" summary
+    const addedIdx = lines.findIndex((l) => l.includes("Added to:"));
+    const createdIdx = lines.findIndex((l) => l.includes("Created epic"));
+    expect(addedIdx).toBeGreaterThanOrEqual(0);
+    expect(createdIdx).toBeGreaterThan(addedIdx);
+  });
+
+  it("includes prdPath in JSON output for canonical writes", async () => {
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]): void => { lines.push(args.join(" ")); };
+    try {
+      await cmdAdd(tmp, "epic", { title: "Json Epic", format: "json" });
+    } finally {
+      console.log = original;
+    }
+
+    const parsed = JSON.parse(lines.join("\n"));
+    expect(parsed.prdPath).toBe(".rex/prd.md");
+    expect(parsed.title).toBe("Json Epic");
+  });
+
   it("stamps branch attribution on created items when git is available", async () => {
     initRepo(tmp);
     git(tmp, "commit", "--allow-empty", "-m", "init");

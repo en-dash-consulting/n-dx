@@ -5,6 +5,7 @@ import {
   FileStore,
   resolvePRDFile,
   resolveGitBranch,
+  toMarkdownSourcePath,
 } from "../../store/index.js";
 import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js";
 import { findItem } from "../../core/tree.js";
@@ -157,9 +158,27 @@ export async function cmdAdd(
     detail: `Added ${resolvedLevel}: ${title}`,
   });
 
+  // Resolve the PRD file the item was actually written to.
+  // For FileStore, addItem populates the item-to-file map; non-FileStore
+  // adapters (e.g. Notion) leave prdPath undefined.
+  let prdPath: string | undefined;
+  if (store instanceof FileStore) {
+    const ownerFile = store.getItemFileMap().get(id) ?? store.getCurrentBranchFile();
+    prdPath = toMarkdownSourcePath(ownerFile);
+  }
+
   if (flags.format === "json") {
-    result(JSON.stringify({ id, level: resolvedLevel, title, resetItems }, null, 2));
+    result(
+      JSON.stringify(
+        { id, level: resolvedLevel, title, resetItems, ...(prdPath ? { prdPath } : {}) },
+        null,
+        2,
+      ),
+    );
   } else {
+    if (prdPath) {
+      result(`Added to: ${prdPath}`);
+    }
     result(`Created ${resolvedLevel}: ${title}`);
     result(`  ID: ${id}`);
     for (const ri of resetItems) {

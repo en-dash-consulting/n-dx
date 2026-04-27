@@ -158,6 +158,53 @@ describe("Branch-scoped add targeting", () => {
       expect(mainDoc.items[0].title).toBe("Existing");
     });
 
+    it("prints branch-scoped 'Added to: .rex/prd_<branch>_<date>.md' line", async () => {
+      initGitRepo(tmpDir, "main");
+      checkoutBranch(tmpDir, "feature/add-output");
+
+      await writeFile(
+        join(rexDir, "prd.json"),
+        toCanonicalJSON(makeDoc("Project", [])),
+        "utf-8",
+      );
+
+      const lines: string[] = [];
+      const original = console.log;
+      console.log = (...args: unknown[]): void => { lines.push(args.join(" ")); };
+      try {
+        await cmdAdd(tmpDir, "epic", { title: "Branch Output Epic" });
+      } finally {
+        console.log = original;
+      }
+
+      const addedLine = lines.find((l) => l.startsWith("Added to:"));
+      expect(addedLine).toBeDefined();
+      expect(addedLine).toMatch(/^Added to: \.rex\/prd_feature-add-output_\d{4}-\d{2}-\d{2}\.md$/);
+    });
+
+    it("includes branch-scoped prdPath in JSON output", async () => {
+      initGitRepo(tmpDir, "main");
+      checkoutBranch(tmpDir, "feature/json-path");
+
+      await writeFile(
+        join(rexDir, "prd.json"),
+        toCanonicalJSON(makeDoc("Project", [])),
+        "utf-8",
+      );
+
+      const lines: string[] = [];
+      const original = console.log;
+      console.log = (...args: unknown[]): void => { lines.push(args.join(" ")); };
+      try {
+        await cmdAdd(tmpDir, "epic", { title: "Json Branch Epic", format: "json" });
+      } finally {
+        console.log = original;
+      }
+
+      const parsed = JSON.parse(lines.join("\n"));
+      expect(parsed.prdPath).toMatch(/^\.rex\/prd_feature-json-path_\d{4}-\d{2}-\d{2}\.md$/);
+    });
+
     it("adds child items to the parent's owning file, not the branch file", async () => {
       initGitRepo(tmpDir, "main");
 
