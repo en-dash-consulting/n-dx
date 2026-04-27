@@ -86,7 +86,11 @@ describe("Rex MCP server factory", () => {
       items: [],
     };
     await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
-    await writeFile(join(rexDir, "prd.md"), `---\nschema: ${SCHEMA_VERSION}\n---\n\n# MCP Test\n`, "utf-8");
+    await writeFile(
+      join(rexDir, "prd.md"),
+      `---\nschema: ${SCHEMA_VERSION}\ntitle: MCP Test\nitems: []\n---\n\n# MCP Test\n`,
+      "utf-8",
+    );
     await writeFile(
       join(rexDir, "config.json"),
       toCanonicalJSON({ schema: SCHEMA_VERSION, project: "test", adapter: "file" }),

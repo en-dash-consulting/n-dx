@@ -1,0 +1,48 @@
+{
+  "proposals": [
+    {
+      "epic": {
+        "title": "PRD Markdown Storage Format",
+        "source": "llm"
+      },
+      "features": [
+        {
+          "title": "PRD Store Integration with Dual-Write and First-Run Migration",
+          "source": "llm",
+          "tasks": [
+            {
+              "title": "Add regression test for ndx add stability after markdown migration",
+              "source": "llm",
+              "sourceFile": "",
+              "description": "After the markdown-first PRD storage migration, ndx add was observed to crash in post-migration environments. This task adds a targeted regression test that initializes a legacy prd.json project, runs the migration to prd.md, then invokes ndx add with a sample description and asserts it exits cleanly without crashing, preventing recurrence of this failure mode.",
+              "acceptanceCriteria": [
+                "Test scaffolds a project with legacy prd.json format, runs migration to prd.md, then invokes ndx add with a sample description",
+                "Test asserts ndx add exits with code 0 (no crash) in a post-migration project directory",
+                "Test asserts the resulting PRD contains the newly added item without data corruption or loss of pre-migration items",
+                "Test is registered in the integration or e2e suite and executes in CI on each PR"
+              ],
+              "priority": "high",
+              "tags": [
+                "regression",
+                "markdown-migration",
+                "rex",
+                "ndx-add"
+              ],
+              "duplicateReason": {
+                "type": "completed_item_match",
+                "matchedItem": {
+                  "id": "caf6319e-35fa-4b12-90b9-74440b2a753f",
+                  "title": "Add regression test for ndx add CLI delegation",
+                  "level": "task",
+                  "status": "completed"
+                },
+                "explanation": "Matches completed task \"Add regression test for ndx add CLI delegation\"."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "prdHash": "8f767623cfd3"
+}
