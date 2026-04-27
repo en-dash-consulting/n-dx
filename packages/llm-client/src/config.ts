@@ -34,7 +34,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-4-6",
-  codex: "gpt-5.1-codex-max",
+  codex: "gpt-5.5",
 };
 
 /**
@@ -52,7 +52,7 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
     standard: NEWEST_MODELS.claude,
   },
   codex: {
-    light: "gpt-5.1-codex-mini",
+    light: "gpt-5.4-mini",
     standard: NEWEST_MODELS.codex,
   },
 };
@@ -60,6 +60,8 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
 const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
   "gpt-5-codex": NEWEST_MODELS.codex,
   "gpt-5.4mini": TIER_MODELS.codex.light,
+  "gpt-5.1-codex-max": NEWEST_MODELS.codex,
+  "gpt-5.1-codex-mini": TIER_MODELS.codex.light,
 };
 
 /**
@@ -117,7 +119,7 @@ export function normalizeCodexModel(model: string): string {
  * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
- * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.1-codex-mini)
+ * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.4-mini)
  * - `'standard'` or omitted — resolves to full-capability models (sonnet, gpt-5)
  *
  * For the 'light' weight, if `lightModel` is configured, it takes precedence

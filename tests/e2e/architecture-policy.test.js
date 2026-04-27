@@ -824,9 +824,7 @@ const COHESION_THRESHOLD = 0.5;
  * Each entry must explain why the zone cannot meet the threshold and
  * what structural condition would allow removing the exemption.
  */
-const COHESION_EXCEPTIONS = new Map([
-  ["web-server-unit", "Mixed zone intentionally co-locating aggregation-cache.ts and routes-token-usage.ts with their unit tests (5 files total). The production-plus-tests composition keeps cohesion at 0.4, just below threshold, but the zone description documents this as a boundary case — splitting tests out would reduce the zone below sourcevision's minimum zone size."],
-]);
+const COHESION_EXCEPTIONS = new Map();
 
 describe("architecture policy: zone cohesion gate", () => {
   it(`all production zones meet minimum cohesion threshold (${COHESION_THRESHOLD})`, () => {

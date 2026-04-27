@@ -270,8 +270,8 @@ describe("TIER_MODELS", () => {
     expect(TIER_MODELS.claude.light).toBe("claude-haiku-4-20250414");
   });
 
-  it("codex.light maps to gpt-5.1-codex-mini", () => {
-    expect(TIER_MODELS.codex.light).toBe("gpt-5.1-codex-mini");
+  it("codex.light maps to gpt-5.4-mini", () => {
+    expect(TIER_MODELS.codex.light).toBe("gpt-5.4-mini");
   });
 
   it("defines both tiers for both vendors", () => {

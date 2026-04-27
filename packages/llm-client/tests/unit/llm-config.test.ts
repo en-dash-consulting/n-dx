@@ -78,8 +78,8 @@ describe("loadLLMConfig", () => {
       JSON.stringify({
         llm: {
           codex: {
-            model: "gpt-5",
-            lightModel: "gpt-5.1-codex-mini",
+            model: "gpt-5.5",
+            lightModel: "gpt-5.4-mini",
           },
         },
       }, null, 2),
@@ -87,8 +87,8 @@ describe("loadLLMConfig", () => {
     );
 
     const cfg = await loadLLMConfig(tmpDir);
-    expect(cfg.codex?.model).toBe("gpt-5");
-    expect(cfg.codex?.lightModel).toBe("gpt-5.1-codex-mini");
+    expect(cfg.codex?.model).toBe("gpt-5.5");
+    expect(cfg.codex?.lightModel).toBe("gpt-5.4-mini");
   });
 
   it("ignores non-string lightModel values", async () => {

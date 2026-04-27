@@ -22,7 +22,7 @@ import { getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js"
 
 const SUPPORTED_PROVIDERS = ["codex", "claude"];
 const LEGACY_CATALOG_MODEL_ALIASES = {
-  codex: ["gpt-5-codex"],
+  codex: ["gpt-5-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"],
   claude: [],
 };
 

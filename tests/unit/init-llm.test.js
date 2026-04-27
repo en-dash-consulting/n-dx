@@ -37,13 +37,13 @@ describe("resolveInitLLMSelection", () => {
 
     it("uses both provider and model from flags when both are given", () => {
       const result = resolveInitLLMSelection({
-        flags: { provider: "codex", model: "gpt-5-codex" },
+        flags: { provider: "codex", model: "gpt-5.5" },
         existingConfig: {},
         isTTY: true,
       });
       expect(result.provider).toBe("codex");
       expect(result.providerSource).toBe("flag");
-      expect(result.model).toBe("gpt-5-codex");
+      expect(result.model).toBe("gpt-5.5");
       expect(result.modelSource).toBe("flag");
       expect(result.needsProviderPrompt).toBe(false);
       expect(result.needsModelPrompt).toBe(false);
@@ -70,12 +70,12 @@ describe("resolveInitLLMSelection", () => {
     it("uses existing codex vendor and model without prompting", () => {
       const result = resolveInitLLMSelection({
         flags: {},
-        existingConfig: { vendor: "codex", model: "gpt-5-codex" },
+        existingConfig: { vendor: "codex", model: "gpt-5.5" },
         isTTY: true,
       });
       expect(result.provider).toBe("codex");
       expect(result.providerSource).toBe("config");
-      expect(result.model).toBe("gpt-5-codex");
+      expect(result.model).toBe("gpt-5.5");
       expect(result.modelSource).toBe("config");
       expect(result.needsProviderPrompt).toBe(false);
       expect(result.needsModelPrompt).toBe(false);
@@ -140,12 +140,12 @@ describe("resolveInitLLMSelection", () => {
 
     it("uses flags in non-TTY when provided", () => {
       const result = resolveInitLLMSelection({
-        flags: { provider: "codex", model: "gpt-5-codex" },
+        flags: { provider: "codex", model: "gpt-5.5" },
         existingConfig: {},
         isTTY: false,
       });
       expect(result.provider).toBe("codex");
-      expect(result.model).toBe("gpt-5-codex");
+      expect(result.model).toBe("gpt-5.5");
       expect(result.providerSource).toBe("flag");
       expect(result.modelSource).toBe("flag");
       expect(result.needsProviderPrompt).toBe(false);
@@ -290,7 +290,7 @@ describe("promptLLMSelection", () => {
     it("returns flag-resolved provider and model unchanged", async () => {
       const resolution = {
         provider: "codex",
-        model: "gpt-5-codex",
+        model: "gpt-5.5",
         providerSource: "flag",
         modelSource: "flag",
         needsProviderPrompt: false,
@@ -299,7 +299,7 @@ describe("promptLLMSelection", () => {
       const result = await promptLLMSelection(resolution);
       expect(result).toEqual({
         provider: "codex",
-        model: "gpt-5-codex",
+        model: "gpt-5.5",
         providerSource: "flag",
         modelSource: "flag",
         cancelled: false,
@@ -336,7 +336,7 @@ describe("promptLLMSelection", () => {
       };
       const result = await promptLLMSelection(resolution, {
         promptProvider: async () => "codex",
-        promptModel: async () => "gpt-5-codex",
+        promptModel: async () => "gpt-5.5",
       });
       expect(result.provider).toBe("codex");
       expect(result.providerSource).toBe("prompt");
@@ -394,7 +394,7 @@ describe("promptLLMSelection", () => {
       await promptLLMSelection(resolution, {
         promptModel: async (provider) => {
           receivedProvider = provider;
-          return "gpt-5-codex";
+          return "gpt-5.5";
         },
       });
       expect(receivedProvider).toBe("codex");
@@ -487,7 +487,7 @@ describe("promptLLMSelection", () => {
       };
       const result = await promptLLMSelection(resolution, {
         promptProvider: async () => "codex",
-        promptModel: async () => "gpt-5-codex",
+        promptModel: async () => "gpt-5.5",
       });
       expect(result.cancelled).toBe(false);
     });
@@ -526,11 +526,11 @@ describe("promptLLMSelection", () => {
       };
       const result = await promptLLMSelection(resolution, {
         promptProvider: async () => "codex",
-        promptModel: async () => "gpt-5-codex",
+        promptModel: async () => "gpt-5.5",
       });
       expect(result).toEqual({
         provider: "codex",
-        model: "gpt-5-codex",
+        model: "gpt-5.5",
         providerSource: "prompt",
         modelSource: "prompt",
         cancelled: false,
@@ -742,9 +742,9 @@ describe("LLM_MODEL_CATALOG", () => {
     expect(recommended.id).toBe("claude-sonnet-4-6");
   });
 
-  it("recommended Codex model is gpt-5.1-codex-max", () => {
+  it("recommended Codex model is gpt-5.5", () => {
     const recommended = LLM_MODEL_CATALOG.codex.find((m) => m.recommended);
-    expect(recommended.id).toBe("gpt-5.1-codex-max");
+    expect(recommended.id).toBe("gpt-5.5");
   });
 });
 
@@ -776,7 +776,7 @@ describe("getRecommendedModel", () => {
     const recommended = getRecommendedModel("codex");
     expect(recommended).toBeDefined();
     expect(recommended.recommended).toBe(true);
-    expect(recommended.id).toBe("gpt-5.1-codex-max");
+    expect(recommended.id).toBe("gpt-5.5");
   });
 
   it("returns undefined for unknown vendor", () => {
@@ -798,7 +798,7 @@ describe("promptLLMSelection model prompt integration", () => {
         needsModelPrompt: true,
       };
       const result = await promptLLMSelection(resolution);
-      expect(result.model).toBe("gpt-5.1-codex-max");
+      expect(result.model).toBe("gpt-5.5");
       expect(result.modelSource).toBe("prompt");
     });
   });
@@ -819,7 +819,7 @@ describe("promptLLMSelection model prompt integration", () => {
         // No promptModel override — uses default, which selects the recommended catalog model
       });
       expect(result.provider).toBe("codex");
-      expect(result.model).toBe("gpt-5.1-codex-max");
+      expect(result.model).toBe("gpt-5.5");
       expect(result.modelSource).toBe("prompt");
     });
   });
@@ -888,7 +888,7 @@ describe("validateInitFlags", () => {
     });
 
     it("returns no errors for --codex-model alone", () => {
-      const { errors } = validateInitFlags({ codexModel: "gpt-5-codex" });
+      const { errors } = validateInitFlags({ codexModel: "gpt-5.5" });
       expect(errors).toEqual([]);
     });
 
@@ -898,7 +898,7 @@ describe("validateInitFlags", () => {
     });
 
     it("returns no errors for --provider=codex + --codex-model (same vendor)", () => {
-      const { errors } = validateInitFlags({ provider: "codex", codexModel: "gpt-5-codex" });
+      const { errors } = validateInitFlags({ provider: "codex", codexModel: "gpt-5.5" });
       expect(errors).toEqual([]);
     });
   });
@@ -912,12 +912,12 @@ describe("validateInitFlags", () => {
     });
 
     it("accepts --provider=claude + --codex-model (cross-vendor)", () => {
-      const { errors } = validateInitFlags({ provider: "claude", codexModel: "gpt-5-codex" });
+      const { errors } = validateInitFlags({ provider: "claude", codexModel: "gpt-5.5" });
       expect(errors).toEqual([]);
     });
 
     it("accepts both --claude-model and --codex-model together", () => {
-      const { errors } = validateInitFlags({ claudeModel: "claude-sonnet-4-6", codexModel: "gpt-5-codex" });
+      const { errors } = validateInitFlags({ claudeModel: "claude-sonnet-4-6", codexModel: "gpt-5.5" });
       expect(errors).toEqual([]);
     });
 
@@ -925,7 +925,7 @@ describe("validateInitFlags", () => {
       const { errors } = validateInitFlags({
         provider: "codex",
         claudeModel: "claude-sonnet-4-6",
-        codexModel: "gpt-5-codex",
+        codexModel: "gpt-5.5",
       });
       expect(errors).toEqual([]);
     });
@@ -941,7 +941,7 @@ describe("validateInitFlags", () => {
     });
 
     it("errors when --codex-model and --model are both set", () => {
-      const { errors } = validateInitFlags({ codexModel: "gpt-5-codex", model: "gpt-5-codex" });
+      const { errors } = validateInitFlags({ codexModel: "gpt-5.5", model: "gpt-5.5" });
       expect(errors).toHaveLength(1);
       expect(errors[0]).toContain("Cannot set both --codex-model and --model");
     });
@@ -980,6 +980,11 @@ describe("validateInitFlags", () => {
     });
 
     it("does not warn when codex model is in codex catalog", () => {
+      const { warnings } = validateInitFlags({ codexModel: "gpt-5.5" });
+      expect(warnings).toEqual([]);
+    });
+
+    it("does not warn when codex model is a legacy alias", () => {
       const { warnings } = validateInitFlags({ codexModel: "gpt-5-codex" });
       expect(warnings).toEqual([]);
     });

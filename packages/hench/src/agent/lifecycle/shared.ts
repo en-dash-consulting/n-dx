@@ -44,8 +44,8 @@ import { loadLLMConfig } from "../../store/project-config.js";
 /**
  * Shorten a model ID for stream-log labels by dropping numeric version
  * identifiers. Examples: "claude-sonnet-4-6" → "claude-sonnet",
- * "claude-haiku-4-20250414" → "claude-haiku", "gpt-5.1-codex-max" →
- * "gpt-codex-max". Falls back to the fallback label when model is empty.
+ * "claude-haiku-4-20250414" → "claude-haiku", "gpt-5.4-mini" →
+ * "gpt-mini". Falls back to the fallback label when model is empty.
  */
 export function formatModelLabel(model?: string, fallback = "Agent"): string {
   if (!model) return fallback;

@@ -966,7 +966,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
                                     light tier use this model.
-                                    Falls back to gpt-5.4mini if not set.
+                                    Falls back to gpt-5.4-mini if not set.
 
 Claude preflight error codes:
   NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED  Claude CLI is not installed; install it before retrying

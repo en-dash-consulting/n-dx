@@ -10,7 +10,7 @@
 
 Yes, selecting a Codex model during `ndx init` is the right move.
 
-The current Codex path already supports an explicit model through `llm.codex.model`, and the runtime falls back to `gpt-5-codex` only when that setting is absent. Making the model explicit at init time is a good fit for parity, reproducibility, and supportability:
+The current Codex path already supports an explicit model through `llm.codex.model`, and the runtime falls back to `gpt-5.5` only when that setting is absent. Making the model explicit at init time is a good fit for parity, reproducibility, and supportability:
 
 - Codex execution already passes `-m <model>` when a model is resolved.
 - Leaving model choice implicit makes behavior depend on runtime defaults and future vendor drift.
@@ -38,10 +38,10 @@ The key constraint is scope: the model should be stored in `.n-dx.json` under `l
 The runtime already has vendor-specific model settings and defaults:
 
 - `packages/llm-client/src/codex-cli-provider.ts`
-  - default Codex model: `gpt-5-codex`
+  - default Codex model: `gpt-5.5`
 - `packages/sourcevision/src/analyzers/claude-client.ts`
   - default Claude model: `claude-sonnet-4-6`
-  - default Codex model for sourcevision/rex bridge use: `gpt-5-codex`
+  - default Codex model for sourcevision/rex bridge use: `gpt-5.5`
 - `packages/core/config.js`
   - already validates `llm.claude.model` and `llm.codex.model`
 
@@ -172,7 +172,7 @@ n-dx init
 
 LLM setup
   Provider: [Codex] [Claude]
-  Model:    [gpt-5-codex] [other vendor-supported models]
+  Model:    [gpt-5.5] [other vendor-supported models]
 ```
 
 After confirmation:
@@ -180,7 +180,7 @@ After confirmation:
 ```text
 LLM configuration
   Provider      codex
-  Model         gpt-5-codex
+  Model         gpt-5.5
 ```
 
 Then normal init summary continues.
@@ -219,8 +219,10 @@ Example shape:
   - `claude-opus-4-20250514`
   - `claude-haiku-4-20250414`
 - Codex
-  - `gpt-5-codex` recommended default
-  - optional additional OpenAI/Codex-compatible models only if they are already supported by the team
+  - `gpt-5.5` recommended default
+  - `gpt-5.4` rollout fallback
+  - `gpt-5.4-mini` lighter coding/subagent option
+  - `gpt-5.3-codex` coding-specialized option
 
 The prompt should show friendly labels while persisting canonical model IDs.
 
@@ -247,7 +249,7 @@ Suggested shape:
 ```js
 {
   provider: "codex",
-  model: "gpt-5-codex",
+  model: "gpt-5.5",
   providerSource: "selected",
   modelSource: "selected"
 }
@@ -275,7 +277,10 @@ Example shape:
 ```js
 export const LLM_MODEL_CATALOG = {
   codex: [
-    { id: "gpt-5-codex", label: "GPT-5 Codex", recommended: true },
+    { id: "gpt-5.5", label: "GPT-5.5", recommended: true },
+    { id: "gpt-5.4", label: "GPT-5.4", recommended: false },
+    { id: "gpt-5.4-mini", label: "GPT-5.4 Mini", recommended: false },
+    { id: "gpt-5.3-codex", label: "GPT-5.3 Codex", recommended: false },
   ],
   claude: [
     { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", recommended: true },
@@ -403,7 +408,7 @@ Add explicit config coverage for:
 Add a small contract test that asserts:
 
 - core recommended Claude model equals the expected shared Claude default
-- core recommended Codex model equals `gpt-5-codex`
+- core recommended Codex model equals `gpt-5.5`
 
 This guards against catalog drift between init UX and runtime defaults.
 

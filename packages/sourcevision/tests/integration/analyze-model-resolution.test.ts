@@ -62,7 +62,7 @@ describe("sourcevision analyze respects .n-dx.json model config", () => {
   });
 
   it("changing llm.codex.model in .n-dx.json is reflected in token event metadata", async () => {
-    const customModel = "gpt-5.1-codex-mini";
+    const customModel = "gpt-5.4-mini";
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({ llm: { vendor: "codex", codex: { model: customModel } } }),
@@ -91,7 +91,7 @@ describe("sourcevision analyze respects .n-dx.json model config", () => {
     // Codex with override
     await writeFile(
       join(tmpDir, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "codex", codex: { model: "gpt-5.1-codex-max" } } }),
+      JSON.stringify({ llm: { vendor: "codex", codex: { model: "gpt-5.5" } } }),
     );
     llmConfig = await loadLLMConfig(tmpDir);
     setLLMConfig(llmConfig);

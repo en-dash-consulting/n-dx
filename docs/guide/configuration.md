@@ -20,7 +20,10 @@ On re-init, if the vendor and model are already configured the LLM prompts are s
 | `claude` | `claude-sonnet-4-6` | Claude Sonnet 4.6 | yes |
 | `claude` | `claude-opus-4-20250514` | Claude Opus 4 | |
 | `claude` | `claude-haiku-4-20250414` | Claude Haiku 4 | |
-| `codex` | `gpt-5-codex` | GPT-5 Codex | yes |
+| `codex` | `gpt-5.5` | GPT-5.5 | yes |
+| `codex` | `gpt-5.4` | GPT-5.4 | |
+| `codex` | `gpt-5.4-mini` | GPT-5.4 Mini | |
+| `codex` | `gpt-5.3-codex` | GPT-5.3 Codex | |
 
 The model catalog is curated and local — init works offline without querying vendor APIs. Unknown model IDs are accepted with a warning, so you can use models not yet in the catalog.
 
@@ -42,7 +45,7 @@ Examples:
 ndx init --provider=claude --model=claude-sonnet-4-6 .
 
 # Configure both vendors in a single call
-ndx init --provider=claude --claude-model=claude-sonnet-4-6 --codex-model=gpt-5-codex .
+ndx init --provider=claude --claude-model=claude-sonnet-4-6 --codex-model=gpt-5.5 .
 
 # A lone vendor-specific flag implies the provider
 ndx init --claude-model=claude-opus-4-20250514 .   # implies --provider=claude
