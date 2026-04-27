@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { CLIError } from "../../../../src/cli/errors.js";
 import { cmdRemove } from "../../../../src/cli/commands/remove.js";
@@ -459,6 +459,68 @@ describe("cmdRemove", () => {
       const entries = logContent.trim().split("\n").map((l: string) => JSON.parse(l));
       const autoEntry = entries.find((e: { event: string }) => e.event === "auto_completed");
       expect(autoEntry).toBeDefined();
+    });
+  });
+
+  // ── Folder tree persistence ──────────────────────────────────────────
+
+  describe("folder tree persistence", () => {
+    it("removes epic folder from tree after epic removal", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+
+      await cmdRemove(tmp, "e1", "epic", { yes: "true" });
+
+      const treeRoot = join(tmp, ".rex", "tree");
+      expect(existsSync(treeRoot)).toBe(true);
+
+      // e1: title "Epic One", id "e1" → slug "epic-one-e1"
+      expect(existsSync(join(treeRoot, "epic-one-e1"))).toBe(false);
+
+      // e2: title "Epic Two", id "e2" → slug "epic-two-e2" — should still exist
+      expect(existsSync(join(treeRoot, "epic-two-e2"))).toBe(true);
+    });
+
+    it("removes task folder from tree after task removal", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+
+      await cmdRemove(tmp, "t1", "task", { yes: "true" });
+
+      const treeRoot = join(tmp, ".rex", "tree");
+      // e1 → "epic-one-e1", f1 → "feature-1-f1", t1 → "task-1-t1"
+      const taskDir = join(treeRoot, "epic-one-e1", "feature-1-f1", "task-1-t1");
+      expect(existsSync(taskDir)).toBe(false);
+
+      // t2 should still exist: "task-2-t2"
+      const task2Dir = join(treeRoot, "epic-one-e1", "feature-1-f1", "task-2-t2");
+      expect(existsSync(task2Dir)).toBe(true);
+    });
+
+    it("removes feature folder from tree after feature removal", async () => {
+      const items = [
+        {
+          id: "e1", title: "Epic One", level: "epic", status: "pending",
+          children: [
+            {
+              id: "f1", title: "Feature One", level: "feature", status: "pending",
+              children: [
+                { id: "t1", title: "Task One", level: "task", status: "pending" },
+              ],
+            },
+            {
+              id: "f2", title: "Feature Two", level: "feature", status: "pending",
+            },
+          ],
+        },
+      ];
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(items));
+
+      await cmdRemove(tmp, "f1", "feature", { yes: "true" });
+
+      const treeRoot = join(tmp, ".rex", "tree");
+      // f1 → "feature-one-f1"
+      expect(existsSync(join(treeRoot, "epic-one-e1", "feature-one-f1"))).toBe(false);
+      // f2 still exists → "feature-two-f2"
+      expect(existsSync(join(treeRoot, "epic-one-e1", "feature-two-f2"))).toBe(true);
     });
   });
 });

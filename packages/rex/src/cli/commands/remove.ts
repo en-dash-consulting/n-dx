@@ -10,6 +10,7 @@ import { findItem } from "../../core/tree.js";
 import { countSubtree } from "../../core/prune.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { REX_DIR } from "./constants.js";
+import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError } from "../errors.js";
 import { info, warn, result } from "../output.js";
 import type { ItemStatus } from "../../schema/index.js";
@@ -133,6 +134,8 @@ export async function cmdRemove(
       detail: epicResult.detail,
     });
 
+    await syncFolderTree(rexDir, store);
+
     if (flags.format === "json") {
       result(JSON.stringify({
         removed: { id, title: item.title, level: item.level },
@@ -177,6 +180,8 @@ export async function cmdRemove(
       itemId: id,
       detail: featureResult.detail,
     });
+
+    await syncFolderTree(rexDir, store);
 
     if (flags.format === "json") {
       result(JSON.stringify({
@@ -236,6 +241,8 @@ export async function cmdRemove(
       itemId: id,
       detail: taskResult.detail,
     });
+
+    await syncFolderTree(rexDir, store);
 
     if (flags.format === "json") {
       result(JSON.stringify({

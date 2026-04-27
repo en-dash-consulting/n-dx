@@ -26,6 +26,10 @@ export {
 } from "./prd-md-migration.js";
 export type { MarkdownMigrationResult } from "./prd-md-migration.js";
 export { serializeDocument } from "./markdown-serializer.js";
+export { serializeFolderTree } from "./folder-tree-serializer.js";
+export type { SerializeResult } from "./folder-tree-serializer.js";
+export { parseFolderTree } from "./folder-tree-parser.js";
+export type { FolderParseResult, ParseWarning } from "./folder-tree-parser.js";
 export {
   SELF_HEAL_TAG,
   SELF_HEAL_ENV_VAR,

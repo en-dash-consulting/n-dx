@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { CLIError } from "../../../../src/cli/errors.js";
@@ -432,5 +432,54 @@ describe("cmdAdd – blockedBy support", () => {
     const chained = prd.items.find((i: { title: string }) => i.title === "Chained");
     expect(chained).toBeDefined();
     expect(chained.blockedBy).toEqual(["t1"]);
+  });
+
+  // ── Folder tree persistence ──────────────────────────────────────────
+
+  describe("folder tree persistence", () => {
+    it("creates folder tree entry after adding an epic", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd());
+
+      await cmdAdd(tmp, "epic", { title: "My Epic", format: "json" });
+
+      const treeRoot = join(tmp, ".rex", "tree");
+      expect(existsSync(treeRoot)).toBe(true);
+
+      // There should be exactly one directory under the tree root
+      const entries = readdirSync(treeRoot);
+      expect(entries.length).toBe(1);
+
+      // The epic directory should contain an index.md with the epic's title
+      const indexMd = join(treeRoot, entries[0], "index.md");
+      expect(existsSync(indexMd)).toBe(true);
+      const content = readFileSync(indexMd, "utf-8");
+      expect(content).toContain("My Epic");
+      expect(content).toContain("level: \"epic\"");
+    });
+
+    it("creates nested folder tree for feature under epic", async () => {
+      const epicItems = [
+        { id: "epic-aa", title: "Parent Epic", level: "epic", status: "pending" },
+      ];
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(epicItems));
+
+      await cmdAdd(tmp, "feature", { title: "Child Feature", parent: "epic-aa", format: "json" });
+
+      const treeRoot = join(tmp, ".rex", "tree");
+      // epic-aa: title "Parent Epic" → slug "parent-epic-epicaa"
+      // (id.replace(/-/g,"").slice(0,8) = "epicaa")
+      const epicDir = join(treeRoot, "parent-epic-epicaa");
+      expect(existsSync(epicDir)).toBe(true);
+
+      // The feature should be nested under the epic
+      const featureEntries = readdirSync(epicDir).filter(e => e !== "index.md");
+      expect(featureEntries.length).toBe(1);
+
+      const featureIndexMd = join(epicDir, featureEntries[0], "index.md");
+      expect(existsSync(featureIndexMd)).toBe(true);
+      const content = readFileSync(featureIndexMd, "utf-8");
+      expect(content).toContain("Child Feature");
+      expect(content).toContain("level: \"feature\"");
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { CLIError } from "../../../../src/cli/errors.js";
 import { cmdUpdate } from "../../../../src/cli/commands/update.js";
@@ -382,6 +382,50 @@ describe("cmdUpdate", () => {
       const item = readItem();
       expect(item.startedAt).toBeUndefined();
       expect(item.completedAt).toBeUndefined();
+    });
+  });
+
+  // --- Folder tree persistence ---
+
+  describe("folder tree persistence", () => {
+    it("writes folder tree after a status update", async () => {
+      await cmdUpdate(tmp, itemId, { status: "in_progress" });
+
+      // itemId = "test-item-123", title = "Test item"
+      // slugify("Test item", "test-item-123") → body="test-item", id8="testitem" → "test-item-testitem"
+      const treeRoot = join(tmp, ".rex", "tree");
+      expect(existsSync(treeRoot)).toBe(true);
+      const epicDir = join(treeRoot, "test-item-testitem");
+      expect(existsSync(epicDir)).toBe(true);
+      const indexMd = join(epicDir, "index.md");
+      expect(existsSync(indexMd)).toBe(true);
+      const content = readFileSync(indexMd, "utf-8");
+      expect(content).toContain("in_progress");
+    });
+
+    it("writes folder tree after a title update", async () => {
+      await cmdUpdate(tmp, itemId, { title: "New title" });
+
+      const treeRoot = join(tmp, ".rex", "tree");
+      expect(existsSync(treeRoot)).toBe(true);
+      const entries = readdirSync(treeRoot);
+      expect(entries.length).toBe(1);
+      const indexMd = join(treeRoot, entries[0], "index.md");
+      expect(existsSync(indexMd)).toBe(true);
+      const content = readFileSync(indexMd, "utf-8");
+      expect(content).toContain("New title");
+    });
+
+    it("writes folder tree after deletion (removes epic folder)", async () => {
+      // First, write the tree by updating status
+      await cmdUpdate(tmp, itemId, { status: "in_progress" });
+      const treeRoot = join(tmp, ".rex", "tree");
+      expect(existsSync(treeRoot)).toBe(true);
+
+      // Deleting removes the item; the folder tree should have no subdirectories
+      await cmdUpdate(tmp, itemId, { status: "deleted", force: "true" });
+      const entries = readdirSync(treeRoot).filter(e => statSync(join(treeRoot, e)).isDirectory());
+      expect(entries.length).toBe(0);
     });
   });
 });

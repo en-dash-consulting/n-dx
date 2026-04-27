@@ -1194,12 +1194,21 @@
         {
           "id": "7286f1c2-ad19-4f85-baa9-cebb3c77a49d",
           "title": "Folder-Based PRD Schema Design and Serialization",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "branch": "feature/new-PRD-design",
           "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
           "description": "Define and implement a folder-tree layout where each PRD level (epic → feature → task) maps to a directory containing an index.md. Parent directories recursively summarize everything below them. Tasks are leaf folders — their index.md contains subtasks as sections rather than nested directories.",
           "source": "smart-add",
+          "startedAt": "2026-04-27T19:20:57.818Z",
+          "completedAt": "2026-04-27T19:20:57.818Z",
+          "endedAt": "2026-04-27T19:20:57.818Z",
+          "activeIntervals": [
+            {
+              "start": "2026-04-27T19:20:57.818Z",
+              "end": "2026-04-27T19:20:57.818Z"
+            }
+          ],
           "children": [
             {
               "id": "69ff9538-093b-45d6-b968-33a46270a048",
@@ -1236,7 +1245,7 @@
             {
               "id": "3b80109b-5158-4236-8052-6571bb9f69e9",
               "title": "Implement PRD-to-folder-tree serializer that writes nested directories with index.md files",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1257,9 +1266,12 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-27T19:02:03.328Z",
+              "completedAt": "2026-04-27T19:20:57.471Z",
+              "endedAt": "2026-04-27T19:20:57.471Z",
               "activeIntervals": [
                 {
-                  "start": "2026-04-27T19:02:03.328Z"
+                  "start": "2026-04-27T19:02:03.328Z",
+                  "end": "2026-04-27T19:20:57.471Z"
                 }
               ]
             },
@@ -1320,7 +1332,7 @@
             {
               "id": "a90cf2ff-f346-43bb-9df0-c6ec954a712a",
               "title": "Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation",
-              "status": "pending",
+              "status": "deferred",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1339,7 +1351,14 @@
                 "cli",
                 "write"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-27T19:21:11.109Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-27T19:21:11.109Z",
+                  "end": "2026-04-27T19:36:11.692Z"
+                }
+              ]
             },
             {
               "id": "1e04af28-ca65-4104-941e-af798af61373",

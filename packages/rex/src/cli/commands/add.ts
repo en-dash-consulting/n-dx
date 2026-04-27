@@ -11,6 +11,7 @@ import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js
 import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";
 import { REX_DIR } from "./constants.js";
+import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -157,6 +158,9 @@ export async function cmdAdd(
     itemId: id,
     detail: `Added ${resolvedLevel}: ${title}`,
   });
+
+  // Persist the updated tree to the folder structure.
+  await syncFolderTree(rexDir, store);
 
   // Resolve the PRD file the item was actually written to.
   // For FileStore, addItem populates the item-to-file map; non-FileStore

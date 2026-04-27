@@ -4,6 +4,7 @@ import { atomicWriteJSON } from "../../store/atomic-write.js";
 import { randomUUID } from "node:crypto";
 import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
+import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { parseIntSafe } from "../validate-input.js";
 import { info, warn, result, startSpinner } from "../output.js";
@@ -302,6 +303,7 @@ async function acceptProposals(
 
   await clearPending(dir);
   await clearSentinel(dir);
+  await syncFolderTree(rexDir, store);
 
   // Show formatted summary when batch record is available, else simple message
   if (batchRecord) {

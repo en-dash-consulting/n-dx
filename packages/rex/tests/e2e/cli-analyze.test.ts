@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -130,6 +130,72 @@ describe("Billing", () => {
       await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
     );
     expect(prd.items.length).toBeGreaterThan(0);
+  });
+
+  it("folder tree item count matches PRD item count after --accept", async () => {
+    run(["init", tmpDir]);
+
+    await writeFile(
+      join(tmpDir, "spec.json"),
+      JSON.stringify([
+        {
+          epic: { title: "Auth" },
+          features: [
+            { title: "Login", tasks: [{ title: "Validate email" }, { title: "Rate limit" }] },
+            { title: "Signup", tasks: [{ title: "Create account" }] },
+          ],
+        },
+        {
+          epic: { title: "Dashboard" },
+          features: [
+            { title: "Charts", tasks: [{ title: "Render chart" }] },
+          ],
+        },
+      ]),
+    );
+
+    run(["analyze", "--file=spec.json", "--accept", tmpDir]);
+
+    // Count non-subtask items in prd.json
+    const prd = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
+    function countNonSubtasks(items: { level: string; children?: unknown[] }[]): number {
+      let count = 0;
+      for (const item of items) {
+        if (item.level !== "subtask") {
+          count++;
+          if (Array.isArray(item.children)) {
+            count += countNonSubtasks(item.children as { level: string; children?: unknown[] }[]);
+          }
+        }
+      }
+      return count;
+    }
+    const prdNonSubtaskCount = countNonSubtasks(prd.items);
+
+    // Count index.md files in the folder tree
+    async function countIndexFiles(dir: string): Promise<number> {
+      let count = 0;
+      try {
+        const entries = await readdir(dir);
+        for (const entry of entries) {
+          const entryPath = join(dir, entry);
+          const s = await stat(entryPath);
+          if (s.isDirectory()) {
+            count += await countIndexFiles(entryPath);
+          } else if (entry === "index.md") {
+            count++;
+          }
+        }
+      } catch {
+        // directory doesn't exist
+      }
+      return count;
+    }
+    const treeRoot = join(tmpDir, ".rex", "tree");
+    const treeIndexCount = await countIndexFiles(treeRoot);
+
+    expect(treeIndexCount).toBe(prdNonSubtaskCount);
+    expect(treeIndexCount).toBeGreaterThan(0);
   });
 
   it("logs batch acceptance record to execution log", async () => {

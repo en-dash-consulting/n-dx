@@ -28784,8 +28784,13 @@ items:
       - id: "7286f1c2-ad19-4f85-baa9-cebb3c77a49d"
         level: feature
         title: Folder-Based PRD Schema Design and Serialization
-        status: pending
+        status: completed
+        activeIntervals:
+          - start: "2026-04-27T19:20:57.818Z"
+            end: "2026-04-27T19:20:57.818Z"
         branch: feature/new-PRD-design
+        completedAt: "2026-04-27T19:20:57.818Z"
+        endedAt: "2026-04-27T19:20:57.818Z"
         overrideMarker:
           createdAt: "2026-04-27T18:46:33.810Z"
           matchedItemId: "6687abd2-80f8-43e0-973e-f5242b635378"
@@ -28797,6 +28802,7 @@ items:
           type: duplicate_guard_override
         source: smart-add
         sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        startedAt: "2026-04-27T19:20:57.818Z"
         description: Define and implement a folder-tree layout where each PRD level (epic → feature → task) maps to a directory containing an index.md. Parent directories recursively summarize everything below them. Tasks are leaf folders — their index.md contains subtasks as sections rather than nested directories.
         children:
           - id: "69ff9538-093b-45d6-b968-33a46270a048"
@@ -28827,7 +28833,7 @@ items:
           - id: "3b80109b-5158-4236-8052-6571bb9f69e9"
             level: task
             title: Implement PRD-to-folder-tree serializer that writes nested directories with index.md files
-            status: in_progress
+            status: completed
             priority: critical
             acceptanceCriteria:
               - Running the serializer on a known PRD produces the expected folder tree with correct nesting depth
@@ -28838,7 +28844,10 @@ items:
               - Re-running serializer on an unchanged tree produces no file writes (idempotent)
             activeIntervals:
               - start: "2026-04-27T19:02:03.328Z"
+                end: "2026-04-27T19:20:57.471Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-27T19:20:57.471Z"
+            endedAt: "2026-04-27T19:20:57.471Z"
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
             startedAt: "2026-04-27T19:02:03.328Z"
@@ -28884,7 +28893,7 @@ items:
           - id: "a90cf2ff-f346-43bb-9df0-c6ec954a712a"
             level: task
             title: Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation
-            status: pending
+            status: deferred
             priority: critical
             acceptanceCriteria:
               - rex add creates the correct folder hierarchy and updates all ancestor index.md summary sections
@@ -28893,9 +28902,13 @@ items:
               - rex move relocates the folder to the new parent directory and updates both origin and destination parent summaries
               - No command leaves orphaned folders or stale parent summary entries after completion
               - All four commands complete without observable latency regression vs single-file baseline
+            activeIntervals:
+              - start: "2026-04-27T19:21:11.109Z"
+                end: "2026-04-27T19:36:11.692Z"
             branch: feature/new-PRD-design
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-27T19:21:11.109Z"
             tags:
               - prd
               - cli
@@ -38569,7 +38582,7 @@ Tracking task for optimization PRs enabled by the eval harness. Each becomes its
 *epic · pending*
 
 ### Folder-Based PRD Schema Design and Serialization
-*feature · pending*
+*feature · completed · started 2026-04-27 · completed 2026-04-27*
 
 Define and implement a folder-tree layout where each PRD level (epic → feature → task) maps to a directory containing an index.md. Parent directories recursively summarize everything below them. Tasks are leaf folders — their index.md contains subtasks as sections rather than nested directories.
 
@@ -38579,7 +38592,7 @@ Define and implement a folder-tree layout where each PRD level (epic → feature
 Produce a written spec covering: directory-naming rules (slugified title + short ID suffix for collision resistance), mandatory fields per level in index.md (title, status, description, acceptance criteria, LoE), and the recursive children-summary block that every non-leaf index.md must include. The spec becomes the contract for serializer and parser implementations and must be committed to docs/ and referenced from CLAUDE.md.
 
 #### Implement PRD-to-folder-tree serializer that writes nested directories with index.md files
-*task · in_progress · priority: critical · started 2026-04-27 · tags: prd, storage, serializer*
+*task · completed · priority: critical · started 2026-04-27 · completed 2026-04-27 · tags: prd, storage, serializer*
 
 Build the serializer that takes the in-memory PRD tree and writes it to disk as a nested folder hierarchy under .rex/prd/. Epic folders contain feature subfolders; feature folders contain task subfolders; task folders contain only index.md. Each parent index.md includes a human-readable summary of all items below it. Serialization must be incremental: only changed subtrees are rewritten.
 
@@ -38594,7 +38607,7 @@ Build the inverse of the serializer: traverse the .rex/prd/ folder hierarchy, pa
 Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation.
 
 #### Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation
-*task · pending · priority: critical · tags: prd, cli, write*
+*task · deferred · priority: critical · started 2026-04-27 · tags: prd, cli, write*
 
 Modify rex add, edit, remove, and move so that after every write to PRDStore, the affected subtree is re-serialized to the folder structure on disk. add creates a new folder and updates all ancestor index.md summaries; edit rewrites the item's index.md and propagates summary changes upward; remove deletes the folder and cleans parent summaries; move relocates the folder and updates both old and new parent summaries.
 

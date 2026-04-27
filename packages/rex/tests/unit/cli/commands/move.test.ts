@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { CLIError } from "../../../../src/cli/errors.js";
 import { cmdMove } from "../../../../src/cli/commands/move.js";
@@ -206,5 +206,55 @@ describe("cmdMove", () => {
     expect(output.id).toBe("f1");
     expect(output.previousParentId).toBe("e1");
     expect(output.newParentId).toBe("e2");
+  });
+
+  // ── Folder tree persistence ─────────────────────────────────────────
+
+  describe("folder tree persistence", () => {
+    it("writes folder tree after a move", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+
+      await cmdMove(tmp, "f1", { parent: "e2" });
+
+      // Tree root should be created
+      const treeRoot = join(tmp, ".rex", "tree");
+      expect(existsSync(treeRoot)).toBe(true);
+
+      // Epic 1 (id "e1") → slug "epic-1-e1"
+      const epic1Dir = join(treeRoot, "epic-1-e1");
+      expect(existsSync(epic1Dir)).toBe(true);
+
+      // Epic 2 (id "e2") → slug "epic-2-e2"
+      // After move, f1 should be a child of e2
+      const epic2Dir = join(treeRoot, "epic-2-e2");
+      expect(existsSync(epic2Dir)).toBe(true);
+
+      // Feature 1 (id "f1") should now be under epic-2-e2
+      // slug "feature-1-f1"
+      const feature1UnderE2 = join(epic2Dir, "feature-1-f1");
+      expect(existsSync(feature1UnderE2)).toBe(true);
+
+      // Feature 1 should no longer be under epic-1-e1
+      const feature1UnderE1 = join(epic1Dir, "feature-1-f1");
+      expect(existsSync(feature1UnderE1)).toBe(false);
+    });
+
+    it("updates parent index.md Children section after move", async () => {
+      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+
+      await cmdMove(tmp, "f1", { parent: "e2" });
+
+      const treeRoot = join(tmp, ".rex", "tree");
+
+      // e1 index.md should NOT reference feature-1-f1
+      const e1Index = join(treeRoot, "epic-1-e1", "index.md");
+      const e1Content = readFileSync(e1Index, "utf-8");
+      expect(e1Content).not.toContain("feature-1-f1");
+
+      // e2 index.md SHOULD reference feature-1-f1
+      const e2Index = join(treeRoot, "epic-2-e2", "index.md");
+      const e2Content = readFileSync(e2Index, "utf-8");
+      expect(e2Content).toContain("feature-1-f1");
+    });
   });
 });

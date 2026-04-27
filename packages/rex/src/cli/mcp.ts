@@ -120,7 +120,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       id: z.string().describe("Item ID to move"),
       parentId: z.string().optional().describe("New parent ID (omit to move to root)"),
     },
-    async (args) => handleMoveItem(store, args),
+    async (args) => handleMoveItem(store, rexDir, args),
   );
 
   server.tool(
@@ -133,7 +133,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
       title: z.string().optional().describe("New title for the merged item (default: keep target's title)"),
       description: z.string().optional().describe("New description (default: combine all descriptions)"),
     },
-    async (args) => handleMergeItems(store, args),
+    async (args) => handleMergeItems(store, rexDir, args),
   );
 
   server.tool(

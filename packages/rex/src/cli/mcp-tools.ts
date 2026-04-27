@@ -33,8 +33,10 @@ import {
   aggregateItemDurations,
   type ItemDurationTotals,
 } from "../core/item-duration-rollup.js";
-import { TOOL_VERSION } from "./commands/constants.js";
+import { join } from "node:path";
+import { TOOL_VERSION, REX_DIR } from "./commands/constants.js";
 import { FileStore, resolvePRDFile } from "../store/index.js";
+import { syncFolderTree } from "./commands/folder-tree-sync.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
 
@@ -137,6 +139,8 @@ export async function handleUpdateTaskStatus(
         detail: `Deleted ${existing.level}: ${existing.title} (${deletedIds.length} item(s) removed)`,
       });
 
+      await syncFolderTree(join(projectDir, REX_DIR), store);
+
       return textResult(
         JSON.stringify({
           id,
@@ -195,6 +199,8 @@ export async function handleUpdateTaskStatus(
         autoCompleted.push(item);
       }
     }
+
+    await syncFolderTree(join(projectDir, REX_DIR), store);
 
     return textResult(
       JSON.stringify({
@@ -274,6 +280,8 @@ export async function handleAddItem(
       detail: `Added ${args.level}: ${args.title}`,
     });
 
+    await syncFolderTree(rexDir, store);
+
     return textResult(JSON.stringify({ id, level: args.level, title: args.title, resetItems }));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);
@@ -282,6 +290,7 @@ export async function handleAddItem(
 
 export async function handleMoveItem(
   store: PRDStore,
+  rexDir: string,
   args: { id: string; parentId?: string },
 ): Promise<McpResult> {
   try {
@@ -308,6 +317,8 @@ export async function handleMoveItem(
       detail: `Moved ${result.item.level} "${result.item.title}" from ${fromLabel} to ${toLabel}`,
     });
 
+    await syncFolderTree(rexDir, store);
+
     return textResult(
       JSON.stringify({
         id,
@@ -324,6 +335,7 @@ export async function handleMoveItem(
 
 export async function handleMergeItems(
   store: PRDStore,
+  rexDir: string,
   args: {
     sourceIds: string[];
     targetId: string;
@@ -363,6 +375,8 @@ export async function handleMergeItems(
       itemId: targetId,
       detail: `Merged ${sourceIds.length} items into "${targetId}". Absorbed: ${absorbedTitles}. ${result.reparentedChildIds.length} children reparented, ${result.rewrittenDependencyCount} dependency references rewritten.`,
     });
+
+    await syncFolderTree(rexDir, store);
 
     return textResult(JSON.stringify(result, null, 2));
   } catch (err) {
@@ -706,6 +720,8 @@ export async function handleEditItem(
       itemId: args.id,
       detail: `Edited ${existing.level} "${existing.title}": ${changedFields.join(", ")}`,
     });
+
+    await syncFolderTree(join(projectDir, REX_DIR), store);
 
     const updated = await store.getItem(args.id);
     return textResult(
