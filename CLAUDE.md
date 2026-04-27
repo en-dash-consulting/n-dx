@@ -412,3 +412,5 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 
 > **PRD file layout.** `.rex/prd.md` is the primary PRD document. Branch-scoped work may add sibling Markdown files named `prd_{branch}_{date}.md`; together these Markdown files make up the writable PRD source of truth. `.rex/prd.json` is regenerated from that Markdown set as a compatibility and sync artifact, so documentation and tooling should treat the Markdown files as authoritative for writes and `prd.json` as secondary.
+
+> **PRD folder tree schema.** An alternative hierarchical on-disk layout maps each PRD level (epic → feature → task) to a directory containing an `index.md`. Subtasks are encoded as sections within the parent task's `index.md`. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
