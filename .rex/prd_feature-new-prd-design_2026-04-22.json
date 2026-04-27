@@ -26,7 +26,7 @@
               "title": "Audit past-week merges and produce a documentation delta report",
               "status": "completed",
               "level": "task",
-              "description": "Run git log for the last 7 days on main and feature branches, categorize each merged change by whether it affects the PRD structure, CLI surface, MCP tools, or architectural conventions, and produce a delta report mapping each change to the markdown files that need updating (README.md, CLAUDE.md, AGENTS.md, PACKAGE_GUIDELINES.md, TESTING.md, and per-package READMEs). The recent commits include cross-PRD duplicate detection, branch-scoped PRD file targeting, multi-file PRD migration, and MCP/CLI/dashboard multi-file validation \u2014 each of these likely has doc implications.",
+              "description": "Run git log for the last 7 days on main and feature branches, categorize each merged change by whether it affects the PRD structure, CLI surface, MCP tools, or architectural conventions, and produce a delta report mapping each change to the markdown files that need updating (README.md, CLAUDE.md, AGENTS.md, PACKAGE_GUIDELINES.md, TESTING.md, and per-package READMEs). The recent commits include cross-PRD duplicate detection, branch-scoped PRD file targeting, multi-file PRD migration, and MCP/CLI/dashboard multi-file validation — each of these likely has doc implications.",
               "acceptanceCriteria": [
                 "git log --since='7 days ago' output captured and each merge categorized",
                 "Delta report lists every merge with affected doc files and a one-line description of what needs to change",
@@ -89,7 +89,7 @@
               "startedAt": "2026-04-23T03:02:59.730Z",
               "completedAt": "2026-04-23T03:06:08.854Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Added legacy-migration note to README.md \u00a7Output Files and packages/rex/README.md \u00a7Project structure (new \u00a7PRD file layout subsection with before/after file tree). Other package READMEs already match current single-file PRD behavior \u2014 no edits needed for PRD scope."
+              "resolutionDetail": "Added legacy-migration note to README.md §Output Files and packages/rex/README.md §Project structure (new §PRD file layout subsection with before/after file tree). Other package READMEs already match current single-file PRD behavior — no edits needed for PRD scope."
             },
             {
               "id": "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae",
@@ -154,7 +154,7 @@
               "startedAt": "2026-04-23T03:09:12.193Z",
               "completedAt": "2026-04-23T03:10:36.889Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Added markdown image-syntax placeholders with the literal label 'img_here' plus descriptive captions in two primary doc locations: root README.md (after the \u00a7Output Files legacy PRD migration note) and packages/rex/README.md (in the \u00a7PRD file layout subsection). Captions describe the intended diagram \u2014 the legacy branch-scoped multi-file layout (prd_{branch}_{date}.json) and its consolidation into the single canonical .rex/prd.json with sources renamed to .backup.<timestamp> on first load. The image syntax `![img_here](img_here)` is trivially find-and-replaceable when the real image is produced."
+              "resolutionDetail": "Added markdown image-syntax placeholders with the literal label 'img_here' plus descriptive captions in two primary doc locations: root README.md (after the §Output Files legacy PRD migration note) and packages/rex/README.md (in the §PRD file layout subsection). Captions describe the intended diagram — the legacy branch-scoped multi-file layout (prd_{branch}_{date}.json) and its consolidation into the single canonical .rex/prd.json with sources renamed to .backup.<timestamp> on first load. The image syntax `![img_here](img_here)` is trivially find-and-replaceable when the real image is produced."
             },
             {
               "id": "9a7cb6af-cd94-4904-9e5a-1274e996fc09",
@@ -166,7 +166,7 @@
                 "PACKAGE_GUIDELINES.md references to PRD layout or rex add pipelines are current",
                 "TESTING.md reflects any new or updated required tests from recent merges (e.g. multi-file validation)",
                 "Any workflow documentation describing the add/recommend pipeline matches current branch-scoped targeting behavior",
-                "All updated docs are cross-checked against the audit delta report \u2014 no listed change is missing a corresponding doc update",
+                "All updated docs are cross-checked against the audit delta report — no listed change is missing a corresponding doc update",
                 "Running a spell/link check or equivalent confirms no broken internal links introduced by edits"
               ],
               "priority": "medium",
@@ -179,7 +179,7 @@
               "startedAt": "2026-04-23T03:10:48.937Z",
               "completedAt": "2026-04-23T03:15:07.826Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Updated TESTING.md Required Coverage table + scenario-to-file pointer table for legacy multi-file PRD migration, cross-vendor authoring regression, self-heal test gate, Codex-batch fallback, and pair-programming cross-vendor review. Added single-file PRD invariant paragraph to PACKAGE_GUIDELINES.md \u00a7.rex/ Write-Access Protocol. Verified no workflow guide docs reference branch-scoped or multi-file layouts (grep-clean across docs/guide/*). Cross-checked with docs/doc-delta-audit.md \u00a73.4/\u00a73.5/\u00a76. Docs-only \u2014 no code or link breakage."
+              "resolutionDetail": "Updated TESTING.md Required Coverage table + scenario-to-file pointer table for legacy multi-file PRD migration, cross-vendor authoring regression, self-heal test gate, Codex-batch fallback, and pair-programming cross-vendor review. Added single-file PRD invariant paragraph to PACKAGE_GUIDELINES.md §.rex/ Write-Access Protocol. Verified no workflow guide docs reference branch-scoped or multi-file layouts (grep-clean across docs/guide/*). Cross-checked with docs/doc-delta-audit.md §3.4/§3.5/§6. Docs-only — no code or link breakage."
             },
             {
               "id": "8894ca28-c09b-4fb7-a704-cde878a0990f",
@@ -203,7 +203,7 @@
               "startedAt": "2026-04-24T20:51:00.332Z",
               "completedAt": "2026-04-24T20:55:20.172Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Added Storage section to packages/rex/README.md documenting prd.md as primary, dual-write to prd.json, automatic on-load migration, manual migration via rex migrate-to-md, required vs optional fields, and how to edit prd.md by hand. Updated PACKAGE_GUIDELINES.md (.rex/ write-access protocol) to describe markdown-primary with prd.json as derived sync artifact, dual-write invariant, and updated write-ownership table. Updated TESTING.md rex integration scenario list to call out JSON\u2192markdown migration and dual-write, and added test-file pointers for prd-md-migration, file-adapter-markdown-migration, markdown-roundtrip, and prd-write-routing."
+              "resolutionDetail": "Added Storage section to packages/rex/README.md documenting prd.md as primary, dual-write to prd.json, automatic on-load migration, manual migration via rex migrate-to-md, required vs optional fields, and how to edit prd.md by hand. Updated PACKAGE_GUIDELINES.md (.rex/ write-access protocol) to describe markdown-primary with prd.json as derived sync artifact, dual-write invariant, and updated write-ownership table. Updated TESTING.md rex integration scenario list to call out JSON→markdown migration and dual-write, and added test-file pointers for prd-md-migration, file-adapter-markdown-migration, markdown-roundtrip, and prd-write-routing."
             }
           ]
         }
@@ -322,7 +322,7 @@
               "startedAt": "2026-04-23T03:15:37.947Z",
               "completedAt": "2026-04-23T03:25:03.702Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Added `autonomous` flag to SharedLoopOptions/FinalizeRunOptions, computed as `auto || loop || epicByEpic` in run.ts, and propagated it through runOne \u2192 cliLoop/agentLoop \u2192 finalizeRun \u2192 performCommitPromptIfNeeded. The approval prompt is now bypassed when either `yes` or `autonomous` is set (same mechanism that already gates task autoselect). Exported performCommitPromptIfNeeded for direct unit testing; new integration test packages/hench/tests/integration/commit-prompt.test.ts covers three cases: autonomous bypass (commits using the proposed message, no prompt), interactive path (readline is invoked and user decision respected), and --yes bypass. All 2483 hench tests pass; typecheck clean across the monorepo. Two pre-existing zone-cohesion e2e failures (tick zone cohesion 0.44 < 0.5; stale `sync` entry in COHESION_EXCEPTIONS) are unrelated to this change \u2014 verified against git stash. No commit-config toggle was introduced; reused existing auto/loop flag state per AC #4."
+              "resolutionDetail": "Added `autonomous` flag to SharedLoopOptions/FinalizeRunOptions, computed as `auto || loop || epicByEpic` in run.ts, and propagated it through runOne → cliLoop/agentLoop → finalizeRun → performCommitPromptIfNeeded. The approval prompt is now bypassed when either `yes` or `autonomous` is set (same mechanism that already gates task autoselect). Exported performCommitPromptIfNeeded for direct unit testing; new integration test packages/hench/tests/integration/commit-prompt.test.ts covers three cases: autonomous bypass (commits using the proposed message, no prompt), interactive path (readline is invoked and user decision respected), and --yes bypass. All 2483 hench tests pass; typecheck clean across the monorepo. Two pre-existing zone-cohesion e2e failures (tick zone cohesion 0.44 < 0.5; stale `sync` entry in COHESION_EXCEPTIONS) are unrelated to this change — verified against git stash. No commit-config toggle was introduced; reused existing auto/loop flag state per AC #4."
             }
           ]
         }
@@ -369,7 +369,7 @@
               "startedAt": "2026-04-23T15:38:24.782Z",
               "completedAt": "2026-04-23T15:50:43.494Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Added RunTokens `{input, output, cached, total}` schema + normalizeRunTokens() helper. saveRun() auto-stamps the tuple on every write so failed/aborted/zero-usage runs all persist joinable totals. Added store/run-token-index.ts with listCompletedRunTokens() returning {runId, itemId, tokens, status, finishedAt} tuples for every terminal-state run \u2014 reads structured run JSON only, no transcript parsing. Exposed via public.ts. Extended Zod validator to accept the tokens field and the previously-missing 'cancelled' run status. Added 11 unit tests covering task ID, subtask ID, aborted mid-loop (cancelled + failed), zero usage, legacy-record fallback, and multi-status filtering."
+              "resolutionDetail": "Added RunTokens `{input, output, cached, total}` schema + normalizeRunTokens() helper. saveRun() auto-stamps the tuple on every write so failed/aborted/zero-usage runs all persist joinable totals. Added store/run-token-index.ts with listCompletedRunTokens() returning {runId, itemId, tokens, status, finishedAt} tuples for every terminal-state run — reads structured run JSON only, no transcript parsing. Exposed via public.ts. Extended Zod validator to accept the tokens field and the previously-missing 'cancelled' run status. Added 11 unit tests covering task ID, subtask ID, aborted mid-loop (cancelled + failed), zero usage, legacy-record fallback, and multi-status filtering."
             },
             {
               "id": "61022482-f8de-4c2b-8cc0-78946df52c94",
@@ -393,7 +393,7 @@
               "startedAt": "2026-04-23T15:52:30.570Z",
               "completedAt": "2026-04-23T16:02:11.645Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Added pure per-PRD-item token rollup (aggregateItemTokenUsage) in packages/rex/src/core/item-token-rollup.ts + get_token_usage MCP tool. Tests cover self/descendants/total rollup, property-style invariant on random trees, orphan handling, and sub-50ms perf on 500 items \u00d7 5k runs."
+              "resolutionDetail": "Added pure per-PRD-item token rollup (aggregateItemTokenUsage) in packages/rex/src/core/item-token-rollup.ts + get_token_usage MCP tool. Tests cover self/descendants/total rollup, property-style invariant on random trees, orphan handling, and sub-50ms perf on 500 items × 5k runs."
             }
           ]
         },
@@ -477,8 +477,8 @@
                 "PRD tree rows display `tokens` (formatted with thousands separators) and `duration` (human-readable: `1.2s`, `4m 10s`, `2h 15m`) for tasks, features, and epics",
                 "Rows for in-progress tasks update their duration at least once per second without refetching the whole tree",
                 "Rollup values on a parent row visually distinguish self vs. descendant contribution (e.g. tooltip or secondary text) so users can tell whether an epic's cost is concentrated in one task",
-                "UI remains usable on a PRD with 500 items \u2014 rendering and live updates stay under a 16ms-per-frame budget in a profiled test",
-                "Empty states (no runs yet, task never started) render as `\u2014` rather than `0` to avoid implying work was done"
+                "UI remains usable on a PRD with 500 items — rendering and live updates stay under a 16ms-per-frame budget in a profiled test",
+                "Empty states (no runs yet, task never started) render as `—` rather than `0` to avoid implying work was done"
               ],
               "priority": "high",
               "tags": [
@@ -520,7 +520,7 @@
               "title": "Build merge history data pipeline linking git merges to PRD items",
               "status": "completed",
               "level": "task",
-              "description": "Create a backend data pipeline that walks the git log for merge commits, extracts the files and PRD item IDs affected in each merge (via commit message parsing and hench run attribution), and serves the merged graph data through a new dashboard API endpoint. This is the data foundation for the visualization \u2014 without accurate merge-to-PRD linkage, the visual graph is just a tree.",
+              "description": "Create a backend data pipeline that walks the git log for merge commits, extracts the files and PRD item IDs affected in each merge (via commit message parsing and hench run attribution), and serves the merged graph data through a new dashboard API endpoint. This is the data foundation for the visualization — without accurate merge-to-PRD linkage, the visual graph is just a tree.",
               "acceptanceCriteria": [
                 "New dashboard API endpoint returns a graph payload containing PRD nodes, merge nodes, and edges between them",
                 "Merge commits are correlated to PRD items using commit message references, hench run metadata, and branch names",
@@ -594,12 +594,12 @@
               "title": "Design and document the markdown schema for full-fidelity PRD tree representation",
               "status": "completed",
               "level": "task",
-              "description": "Define a markdown structure that captures every PRD field (id, status, priority, tags, description, acceptanceCriteria, loe, loeRationale, loeConfidence, startedAt, completedAt, tokenUsage, duration) without loss. The schema must be both human-readable and machine-parseable. Hierarchy (epic \u2192 feature \u2192 task \u2192 subtask) is encoded via heading levels; metadata fields use a consistent encoding such as YAML front-matter blocks or structured HTML comment annotations. Produce a spec document under the rex package to serve as the authoritative reference for parser and serializer implementations.",
+              "description": "Define a markdown structure that captures every PRD field (id, status, priority, tags, description, acceptanceCriteria, loe, loeRationale, loeConfidence, startedAt, completedAt, tokenUsage, duration) without loss. The schema must be both human-readable and machine-parseable. Hierarchy (epic → feature → task → subtask) is encoded via heading levels; metadata fields use a consistent encoding such as YAML front-matter blocks or structured HTML comment annotations. Produce a spec document under the rex package to serve as the authoritative reference for parser and serializer implementations.",
               "acceptanceCriteria": [
                 "Schema spec document exists at packages/rex/docs/prd-markdown-schema.md",
                 "All current PRD field types are covered: strings, arrays (tags, acceptanceCriteria), numbers (loe), enums (status, priority, loeConfidence), ISO timestamps (startedAt, completedAt), and nested token/duration objects",
                 "Hierarchy levels epic/feature/task/subtask are distinguishable from markdown heading level alone",
-                "Metadata encoding is consistent and unambiguous \u2014 a field present in JSON must have exactly one encoding in markdown with no information collision",
+                "Metadata encoding is consistent and unambiguous — a field present in JSON must have exactly one encoding in markdown with no information collision",
                 "Edge cases documented: null/undefined fields, empty arrays, special characters in titles, multi-line descriptions"
               ],
               "priority": "critical",
@@ -612,21 +612,21 @@
               "startedAt": "2026-04-23T19:26:31.234Z",
               "completedAt": "2026-04-23T19:46:56.962Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Created packages/rex/docs/prd-markdown-schema.md \u2014 authoritative spec for the PRD markdown format covering all fields, hierarchy encoding, edge cases, and parser/serializer contracts."
+              "resolutionDetail": "Created packages/rex/docs/prd-markdown-schema.md — authoritative spec for the PRD markdown format covering all fields, hierarchy encoding, edge cases, and parser/serializer contracts."
             },
             {
               "id": "35ccf9ee-0cb4-48b8-8aa3-185d76939c20",
               "title": "Implement bidirectional markdown serializer and parser with round-trip fidelity tests",
               "status": "completed",
               "level": "task",
-              "description": "Build a markdown serializer (PRD tree \u2192 .md string) and a markdown parser (.md string \u2192 PRD tree) inside the rex package, conforming to the schema spec. All fields must survive a round-trip without loss or mutation. Include comprehensive tests covering the full field set, multi-level nesting, and edge cases such as empty descriptions, missing optional fields, and special characters.",
+              "description": "Build a markdown serializer (PRD tree → .md string) and a markdown parser (.md string → PRD tree) inside the rex package, conforming to the schema spec. All fields must survive a round-trip without loss or mutation. Include comprehensive tests covering the full field set, multi-level nesting, and edge cases such as empty descriptions, missing optional fields, and special characters.",
               "acceptanceCriteria": [
                 "Serializer converts a complete in-memory PRD tree to a markdown string that matches the schema spec",
                 "Parser reconstructs the exact PRD tree from a valid serialized markdown string",
                 "Round-trip invariant holds: serialize(parse(serialize(tree))) deep-equals serialize(tree) for any valid PRD tree",
                 "All field types survive round-trip without type coercion (numbers stay numbers, arrays stay arrays)",
                 "Parser returns a typed error (not an uncaught exception) for malformed input",
-                "Unit tests achieve \u226590% line coverage for both serializer and parser modules"
+                "Unit tests achieve ≥90% line coverage for both serializer and parser modules"
               ],
               "priority": "critical",
               "tags": [
@@ -707,7 +707,7 @@
               "level": "task",
               "description": "Add integration and e2e tests that exercise the full lifecycle of prd.md as primary storage: initialization, mutation via CLI and MCP tools, dual-write consistency, fallback path, and concurrent write safety. Ensure the existing domain-isolation and PRD storage tests are updated to cover the markdown layer.",
               "acceptanceCriteria": [
-                "Integration test covers: init \u2192 add \u2192 edit \u2192 update_status \u2192 move using prd.md as primary, verifying prd.json stays in sync after each step",
+                "Integration test covers: init → add → edit → update_status → move using prd.md as primary, verifying prd.json stays in sync after each step",
                 "Fallback path test: PRDStore.load() with only prd.json present triggers migration and subsequent reads come from prd.md",
                 "Concurrent write test: two rapid mutations do not corrupt prd.md or produce a prd.json that diverges from it",
                 "Existing PRD storage tests in tests/integration/ updated to validate both prd.md and prd.json after mutations",
@@ -767,22 +767,22 @@
               "source": "smart-add",
               "startedAt": "2026-04-24T16:39:25.070Z",
               "completedAt": "2026-04-24T16:44:27.245Z",
+              "endedAt": "2026-04-24T16:44:27.245Z",
               "resolutionType": "code-change",
-              "resolutionDetail": "Added optional branch/sourceFile fields to PRD item typing and validation, preserved them in markdown serialization, and added validation, store round-trip, and status JSON coverage.",
-              "endedAt": "2026-04-24T16:44:27.245Z"
+              "resolutionDetail": "Added optional branch/sourceFile fields to PRD item typing and validation, preserved them in markdown serialization, and added validation, store round-trip, and status JSON coverage."
             },
             {
               "id": "07714a07-008e-4254-a0cd-56b15766afa4",
               "title": "Populate branch attribution on item create and edit across all write paths",
               "status": "completed",
               "level": "task",
-              "description": "When a PRD item is created or updated through any write path \u2014 `rex add`, `ndx add`, MCP `add_item`/`edit_item`/`update_task_status`, or a hench run \u2014 automatically capture the current git branch and PRD file path as attribution metadata. This makes attribution automatic rather than opt-in, ensuring the UI has data to display without requiring user action.",
+              "description": "When a PRD item is created or updated through any write path — `rex add`, `ndx add`, MCP `add_item`/`edit_item`/`update_task_status`, or a hench run — automatically capture the current git branch and PRD file path as attribution metadata. This makes attribution automatic rather than opt-in, ensuring the UI has data to display without requiring user action.",
               "acceptanceCriteria": [
                 "`rex add` and `ndx add` set `branch` to the current git branch on newly created items",
                 "MCP `add_item` and `edit_item` set `branch` to the current git branch at call time",
                 "Hench runs set `branch` on the task they act on at run start",
                 "`update_task_status` updates `branch` to reflect the branch active at the time of the status change",
-                "Branch detection fails gracefully when git is unavailable \u2014 field is omitted rather than crashing",
+                "Branch detection fails gracefully when git is unavailable — field is omitted rather than crashing",
                 "`sourceFile` is set to the resolved path of the active `.rex/prd.json` (or markdown equivalent) at write time"
               ],
               "priority": "high",
@@ -891,7 +891,7 @@
               "title": "Auto-tag PRD items created during self-heal runs with 'self-heal' marker",
               "status": "completed",
               "level": "task",
-              "description": "When ndx self-heal creates new PRD items (via rex add, recommend --accept, or direct MCP writes), automatically apply the 'self-heal' tag to each item at creation time. This covers items created during the analyze \u2192 recommend \u2192 execute cycle within a self-heal run.",
+              "description": "When ndx self-heal creates new PRD items (via rex add, recommend --accept, or direct MCP writes), automatically apply the 'self-heal' tag to each item at creation time. This covers items created during the analyze → recommend → execute cycle within a self-heal run.",
               "acceptanceCriteria": [
                 "All PRD items created via ndx self-heal carry the 'self-heal' tag",
                 "Items created outside of self-heal (manual adds, ndx plan) do NOT receive the tag",
@@ -917,7 +917,7 @@
           "title": "Self-Heal Scoped Task Selection and Auto-Termination",
           "status": "completed",
           "level": "feature",
-          "description": "Restrict hench task selection during self-heal runs to only pick up items tagged 'self-heal', and automatically stop the loop once all such items are resolved \u2014 without spilling into unrelated PRD work.",
+          "description": "Restrict hench task selection during self-heal runs to only pick up items tagged 'self-heal', and automatically stop the loop once all such items are resolved — without spilling into unrelated PRD work.",
           "source": "smart-add",
           "startedAt": "2026-04-24T15:25:12.963Z",
           "completedAt": "2026-04-24T15:25:12.963Z",
@@ -951,7 +951,7 @@
               "title": "Implement self-heal loop auto-termination when all self-heal items are completed",
               "status": "completed",
               "level": "task",
-              "description": "After each hench iteration within a self-heal run, check whether any pending self-heal tagged items remain. If none remain, exit the loop cleanly and report completion \u2014 rather than continuing to the next generic PRD task or looping indefinitely.",
+              "description": "After each hench iteration within a self-heal run, check whether any pending self-heal tagged items remain. If none remain, exit the loop cleanly and report completion — rather than continuing to the next generic PRD task or looping indefinitely.",
               "acceptanceCriteria": [
                 "Loop exits with a success message when zero pending 'self-heal' items remain",
                 "Loop does NOT continue to non-self-heal tasks after completing all self-heal items",
@@ -997,13 +997,13 @@
               "title": "Suspend custom SIGINT handler during rollback confirmation prompt",
               "status": "completed",
               "level": "task",
-              "description": "In shared.ts's performRollbackIfNeeded (and the promptRollbackConfirm helper it calls), the outer runLoop/epicByEpicLoop SIGINT handler is still registered and will call process.exit(1) on a second Ctrl-C. Before opening the readline prompt, temporarily remove the custom SIGINT listener (or restore SIG_DFL) so that the terminal behaves normally during the interactive question. Re-register (or re-override) the handler after the readline closes. The same issue exists in promptCommitConfirm \u2014 apply the same fix there. The fix should be coordinated so that callers pass a cleanup/suspend callback, or promptRollbackConfirm accepts an AbortSignal that lets it cleanly cancel if the outer loop is torn down.",
+              "description": "In shared.ts's performRollbackIfNeeded (and the promptRollbackConfirm helper it calls), the outer runLoop/epicByEpicLoop SIGINT handler is still registered and will call process.exit(1) on a second Ctrl-C. Before opening the readline prompt, temporarily remove the custom SIGINT listener (or restore SIG_DFL) so that the terminal behaves normally during the interactive question. Re-register (or re-override) the handler after the readline closes. The same issue exists in promptCommitConfirm — apply the same fix there. The fix should be coordinated so that callers pass a cleanup/suspend callback, or promptRollbackConfirm accepts an AbortSignal that lets it cleanly cancel if the outer loop is torn down.",
               "acceptanceCriteria": [
                 "After a single Ctrl-C during a running task, the 'Roll back N uncommitted file(s)? [Y/n]' prompt appears and remains active",
                 "A second Ctrl-C while the rollback prompt is displayed does NOT call process.exit(1); it either cancels the readline cleanly or is ignored until the user types a response",
                 "Answering 'y' at the rollback prompt reverts files and exits cleanly",
                 "Answering 'n' at the rollback prompt skips the rollback and exits cleanly",
-                "The same fix applies to the commit confirmation prompt (promptCommitConfirm) \u2014 a Ctrl-C during that prompt does not bypass the question",
+                "The same fix applies to the commit confirmation prompt (promptCommitConfirm) — a Ctrl-C during that prompt does not bypass the question",
                 "Non-interactive mode (--yes or non-TTY) is unaffected"
               ],
               "priority": "high",
@@ -1179,6 +1179,319 @@
           "level": "task",
           "description": "Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.",
           "priority": "medium"
+        }
+      ]
+    },
+    {
+      "id": "79e50af8-c363-4345-970a-23006d04e1f4",
+      "title": "PRD Hierarchical Folder Tree Storage",
+      "status": "pending",
+      "level": "epic",
+      "branch": "feature/new-PRD-design",
+      "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+      "source": "smart-add",
+      "children": [
+        {
+          "id": "7286f1c2-ad19-4f85-baa9-cebb3c77a49d",
+          "title": "Folder-Based PRD Schema Design and Serialization",
+          "status": "pending",
+          "level": "feature",
+          "branch": "feature/new-PRD-design",
+          "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+          "description": "Define and implement a folder-tree layout where each PRD level (epic → feature → task) maps to a directory containing an index.md. Parent directories recursively summarize everything below them. Tasks are leaf folders — their index.md contains subtasks as sections rather than nested directories.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "69ff9538-093b-45d6-b968-33a46270a048",
+              "title": "Design folder naming conventions, index.md content schema, and recursive summary contract for each PRD level",
+              "status": "completed",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Produce a written spec covering: directory-naming rules (slugified title + short ID suffix for collision resistance), mandatory fields per level in index.md (title, status, description, acceptance criteria, LoE), and the recursive children-summary block that every non-leaf index.md must include. The spec becomes the contract for serializer and parser implementations and must be committed to docs/ and referenced from CLAUDE.md.",
+              "acceptanceCriteria": [
+                "Naming convention handles unicode, long titles, and slug collisions without ambiguity",
+                "index.md schema is fully specified for epic, feature, and task levels with example output",
+                "Recursive summary block in parent index.md lists all direct children with title and status",
+                "Task-level index.md encodes subtasks as markdown sections rather than nested folders",
+                "Spec is committed to docs/ and linked from CLAUDE.md architecture section"
+              ],
+              "priority": "critical",
+              "tags": [
+                "prd",
+                "storage",
+                "design"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-27T18:47:10.450Z",
+              "completedAt": "2026-04-27T18:52:58.283Z",
+              "endedAt": "2026-04-27T18:52:58.283Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-27T18:47:10.450Z",
+                  "end": "2026-04-27T18:52:58.283Z"
+                }
+              ]
+            },
+            {
+              "id": "3b80109b-5158-4236-8052-6571bb9f69e9",
+              "title": "Implement PRD-to-folder-tree serializer that writes nested directories with index.md files",
+              "status": "in_progress",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Build the serializer that takes the in-memory PRD tree and writes it to disk as a nested folder hierarchy under .rex/prd/. Epic folders contain feature subfolders; feature folders contain task subfolders; task folders contain only index.md. Each parent index.md includes a human-readable summary of all items below it. Serialization must be incremental: only changed subtrees are rewritten.",
+              "acceptanceCriteria": [
+                "Running the serializer on a known PRD produces the expected folder tree with correct nesting depth",
+                "Each index.md contains the item's full metadata: title, status, description, acceptance criteria, tags, LoE",
+                "Every non-leaf index.md includes a children-summary section listing direct children with title and status",
+                "Task index.md encodes subtasks as level-3 sections within the same file",
+                "Slug collisions are resolved deterministically by appending a short ID suffix",
+                "Re-running serializer on an unchanged tree produces no file writes (idempotent)"
+              ],
+              "priority": "critical",
+              "tags": [
+                "prd",
+                "storage",
+                "serializer"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-27T19:02:03.328Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-27T19:02:03.328Z"
+                }
+              ]
+            },
+            {
+              "id": "21053225-b2aa-42d4-aa96-266c5da07491",
+              "title": "Implement folder-tree-to-PRD parser that aggregates index.md files into the PRD item tree",
+              "status": "completed",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Build the inverse of the serializer: traverse the .rex/prd/ folder hierarchy, parse each index.md, and reconstruct the full PRD item tree in memory. The parser must handle missing files, malformed frontmatter, and partial trees without aborting, and must emit structured warnings for any items it cannot read.",
+              "acceptanceCriteria": [
+                "Round-trip fidelity: serialize then parse a 100-item PRD and assert zero data loss across all fields",
+                "Parser emits structured warnings for missing or malformed index.md files without throwing",
+                "Parse order is deterministic (alphabetical by folder name) and matches serializer write order",
+                "Parser correctly reconstructs parent-child relationships solely from folder nesting depth",
+                "Parsing a 200-item PRD tree completes in under 500 ms on a cold filesystem"
+              ],
+              "priority": "critical",
+              "tags": [
+                "prd",
+                "storage",
+                "parser"
+              ],
+              "source": "smart-add",
+              "startedAt": "2026-04-27T18:53:00.057Z",
+              "completedAt": "2026-04-27T19:02:01.536Z",
+              "endedAt": "2026-04-27T19:02:01.536Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-27T18:53:00.057Z",
+                  "end": "2026-04-27T19:02:01.536Z"
+                }
+              ]
+            }
+          ],
+          "overrideMarker": {
+            "type": "duplicate_guard_override",
+            "reason": "semantic_title",
+            "reasonRef": "semantic_title:6687abd2-80f8-43e0-973e-f5242b635378",
+            "matchedItemId": "6687abd2-80f8-43e0-973e-f5242b635378",
+            "matchedItemTitle": "Markdown Schema Design and Bidirectional Serialization",
+            "matchedItemLevel": "feature",
+            "matchedItemStatus": "completed",
+            "createdAt": "2026-04-27T18:46:33.810Z"
+          }
+        },
+        {
+          "id": "ce2ecf83-8a69-4ccc-ad43-6243d4c3646b",
+          "title": "CLI and MCP Write Command Integration with Folder Tree",
+          "status": "pending",
+          "level": "feature",
+          "branch": "feature/new-PRD-design",
+          "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+          "description": "Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "a90cf2ff-f346-43bb-9df0-c6ec954a712a",
+              "title": "Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation",
+              "status": "pending",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Modify rex add, edit, remove, and move so that after every write to PRDStore, the affected subtree is re-serialized to the folder structure on disk. add creates a new folder and updates all ancestor index.md summaries; edit rewrites the item's index.md and propagates summary changes upward; remove deletes the folder and cleans parent summaries; move relocates the folder and updates both old and new parent summaries.",
+              "acceptanceCriteria": [
+                "rex add creates the correct folder hierarchy and updates all ancestor index.md summary sections",
+                "rex edit rewrites target index.md with new field values and updates parent summaries where title or status changed",
+                "rex remove deletes the item folder and removes it from all parent summary sections",
+                "rex move relocates the folder to the new parent directory and updates both origin and destination parent summaries",
+                "No command leaves orphaned folders or stale parent summary entries after completion",
+                "All four commands complete without observable latency regression vs single-file baseline"
+              ],
+              "priority": "critical",
+              "tags": [
+                "prd",
+                "cli",
+                "write"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "1e04af28-ca65-4104-941e-af798af61373",
+              "title": "Update rex read commands (status, next, validate) to read PRD from folder tree",
+              "status": "pending",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Wire rex status, rex next, and rex validate to read the PRD from the folder tree via the parser rather than from the legacy single-file store. Verify that command output is byte-for-byte identical to the single-file baseline for the same dataset, and that commands fall back gracefully when neither format is present.",
+              "acceptanceCriteria": [
+                "rex status output is identical when reading from folder tree vs single prd.md for the same PRD dataset",
+                "rex next selects the same task regardless of storage backend",
+                "rex validate reports the same issues whether reading from folder tree or single file",
+                "Commands emit a clear error when .rex/prd/ is absent and prd.md is also missing",
+                "Fallback detection: if prd/ folder is absent but prd.md exists, auto-trigger migration before reading"
+              ],
+              "priority": "high",
+              "tags": [
+                "prd",
+                "cli",
+                "read"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "f16ab364-971a-43ab-94e7-173a891264d1",
+              "title": "Update ndx plan, ndx recommend, and all MCP write tools to propagate writes to the folder tree",
+              "status": "pending",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Ensure that ndx plan --accept, ndx recommend --accept, and all MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) route their writes through the folder-tree serializer after every mutation. MCP tools must complete within existing latency budgets.",
+              "acceptanceCriteria": [
+                "ndx plan --accept creates the correct folder structure for all accepted proposals",
+                "ndx recommend --accept creates folders for all accepted recommendations and updates parent summaries",
+                "Each MCP write tool call leaves the folder tree consistent: correct folders, updated index.md, updated parent summaries",
+                "MCP write tools complete within existing tool-call latency budgets (no regression measured in mcp-transport.test.js)",
+                "Integration test confirms folder tree item count matches PRD item count after a full ndx plan --accept run"
+              ],
+              "priority": "high",
+              "tags": [
+                "prd",
+                "mcp",
+                "orchestration"
+              ],
+              "source": "smart-add"
+            }
+          ]
+        },
+        {
+          "id": "568a1a3c-eacd-4304-a46e-9f8c42d9901f",
+          "title": "Folder Tree Migration, Initialization, and Auto-Trigger",
+          "status": "pending",
+          "level": "feature",
+          "branch": "feature/new-PRD-design",
+          "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+          "description": "Provide a first-run migration path from prd.md to the folder-tree format, integrate folder scaffolding into ndx init, and implement automatic migration detection so existing projects upgrade transparently.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "93517780-f058-4e22-b52b-7bbba2c45c2d",
+              "title": "Implement rex migrate-to-folder-tree command and auto-trigger detection",
+              "status": "pending",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Build a one-shot CLI command (rex migrate-to-folder-tree) that reads the existing prd.md, runs the serializer, and writes the full folder tree to .rex/prd/. Auto-trigger this migration transparently the first time any read or write command runs and detects prd.md without a prd/ folder. The command must be idempotent and print a creation summary.",
+              "acceptanceCriteria": [
+                "Running the command on an existing prd.md produces a complete folder tree with zero data loss",
+                "Command is idempotent: re-running on an already-migrated repo updates changed items without duplicating folders",
+                "Command prints a creation summary: N folders created, M index.md files written",
+                "Auto-trigger fires transparently on first read/write when prd/ is absent but prd.md exists, printing a one-line migration notice",
+                "ndx init scaffolds .rex/prd/ and writes a root index.md stub on new projects"
+              ],
+              "priority": "high",
+              "tags": [
+                "prd",
+                "migration",
+                "cli",
+                "init"
+              ],
+              "source": "smart-add",
+              "overrideMarker": {
+                "type": "duplicate_guard_override",
+                "reason": "content_overlap",
+                "reasonRef": "content_overlap:7143e2a0-7c77-45ed-b3e5-d588a11b3b27",
+                "matchedItemId": "7143e2a0-7c77-45ed-b3e5-d588a11b3b27",
+                "matchedItemTitle": "Build automatic first-run migration and explicit rex migrate-to-md CLI command",
+                "matchedItemLevel": "task",
+                "matchedItemStatus": "completed",
+                "createdAt": "2026-04-27T18:46:33.810Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "db58ca72-ee01-426d-8bb0-d0190678cf14",
+          "title": "Test Suite Updates for Folder-Tree PRD Storage",
+          "status": "pending",
+          "level": "feature",
+          "branch": "feature/new-PRD-design",
+          "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+          "description": "Update all existing PRD-related unit, integration, and e2e tests to exercise the folder-tree storage backend, and add new tests covering the serializer, parser, round-trip fidelity, and full CLI pipeline correctness.",
+          "source": "smart-add",
+          "children": [
+            {
+              "id": "3effa16b-1466-4b82-a963-c1f21afaedeb",
+              "title": "Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures",
+              "status": "pending",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Refactor existing PRDStore unit tests in packages/rex/tests/ to use folder-tree fixtures. Add focused unit tests for the serializer (assert correct folder structure for known PRD input) and parser (assert correct item tree for known folder structure). Assert that parent index.md summary sections are updated after every write.",
+              "acceptanceCriteria": [
+                "All existing PRDStore unit tests pass with the folder-tree backend without modification to test assertions",
+                "Serializer unit tests: create item → correct folder and index.md, edit item → updated index.md and parent summary, delete item → folder removed and parent summary cleaned, move item → folder relocated and both parents updated",
+                "Parser unit tests: known folder fixture → correct item tree, missing index.md → structured warning emitted, malformed frontmatter → partial load with warning",
+                "Round-trip test: serialize known PRD → parse output → assert zero diff from original"
+              ],
+              "priority": "high",
+              "tags": [
+                "prd",
+                "tests",
+                "unit"
+              ],
+              "source": "smart-add"
+            },
+            {
+              "id": "3e7f193b-6134-47a0-b90c-fc8d0cd262f3",
+              "title": "Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands",
+              "status": "pending",
+              "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "description": "Update rex CLI integration tests (add, edit, remove, move, status, next, validate) to assert correct folder-tree state after each command. Add an e2e test that runs the full ndx plan --accept → folder tree → rex status pipeline and asserts folder tree consistency. All test cases must use temporary directories and clean up after themselves.",
+              "acceptanceCriteria": [
+                "All rex CLI integration tests pass with folder-tree storage and assert folder structure after each write command",
+                "E2e pipeline test: ndx plan --accept creates folder tree → rex status reads it → rex next selects correct task — all three steps pass",
+                "MCP write-tool integration test asserts folder tree item count and parent summary correctness after each tool call",
+                "Test isolation: every test case uses a fresh temporary directory and cleans up on exit",
+                "No test hardcodes prd.md paths; all tests reference .rex/prd/ folder tree"
+              ],
+              "priority": "high",
+              "tags": [
+                "prd",
+                "tests",
+                "integration",
+                "e2e"
+              ],
+              "source": "smart-add"
+            }
+          ]
         }
       ]
     }

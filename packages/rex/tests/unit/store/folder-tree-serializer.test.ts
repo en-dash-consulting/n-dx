@@ -1,0 +1,664 @@
+/**
+ * Tests for the PRD-to-folder-tree serializer.
+ *
+ * Acceptance criteria:
+ *   - Serializer produces the expected folder tree with correct nesting depth
+ *   - Each index.md contains full metadata (title, status, description, AC, tags, loe)
+ *   - Non-leaf index.md includes a ## Children section listing direct children
+ *   - Task index.md encodes subtasks as ## Subtask: sections
+ *   - Slug collisions are resolved deterministically via id8 suffix
+ *   - Re-running on unchanged tree produces no file writes (idempotent)
+ *   - Stale directories (removed items) are cleaned up
+ *   - Round-trip with parser: serialize then parse yields the original items
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { serializeFolderTree, slugify } from "../../../src/store/folder-tree-serializer.js";
+import { parseFolderTree } from "../../../src/store/folder-tree-parser.js";
+import type { PRDItem } from "../../../src/schema/index.js";
+
+// ── Test setup ────────────────────────────────────────────────────────────────
+
+let testDir: string;
+
+beforeEach(async () => {
+  testDir = join(
+    tmpdir(),
+    `folder-tree-serializer-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  await mkdir(testDir, { recursive: true });
+});
+
+afterEach(async () => {
+  await rm(testDir, { recursive: true, force: true });
+});
+
+// ── Item factory helpers ──────────────────────────────────────────────────────
+
+function makeEpic(id: string, title: string, extra: Partial<PRDItem> = {}): PRDItem {
+  return { id, title, status: "pending", level: "epic", ...extra };
+}
+
+function makeFeature(id: string, title: string, extra: Partial<PRDItem> = {}): PRDItem {
+  return { id, title, status: "pending", level: "feature", acceptanceCriteria: [], ...extra };
+}
+
+function makeTask(id: string, title: string, extra: Partial<PRDItem> = {}): PRDItem {
+  return { id, title, status: "pending", level: "task", acceptanceCriteria: [], ...extra };
+}
+
+function makeSubtask(id: string, title: string, extra: Partial<PRDItem> = {}): PRDItem {
+  return { id, title, status: "pending", level: "subtask", ...extra };
+}
+
+// ── Slug algorithm ────────────────────────────────────────────────────────────
+
+describe("slugify", () => {
+  it("produces basic hyphenated slug with id8 suffix", () => {
+    expect(slugify("Web Dashboard", "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7")).toBe(
+      "web-dashboard-4d62fa6c",
+    );
+  });
+
+  it("strips non-ASCII and unicode combining chars", () => {
+    // Héros → heros after NFKD + combining strip + non-ASCII strip
+    expect(slugify("Héros & Légendes", "a1b2c3d4-0000-0000-0000-000000000000")).toBe(
+      "heros-legendes-a1b2c3d4",
+    );
+  });
+
+  it("falls back to bare id8 when title produces empty body", () => {
+    expect(slugify("日本語タイトル", "f0e1d2c3-0000-0000-0000-000000000000")).toBe("f0e1d2c3");
+    expect(slugify("--- !!!", "11223344-0000-0000-0000-000000000000")).toBe("11223344");
+  });
+
+  it("truncates at ≤40 chars on segment boundary", () => {
+    // "hot-reload-mcp-tool-schemas-on-http-transport-without-server-restart"
+    // first 40 chars: "hot-reload-mcp-tool-schemas-on-http-tran"
+    // last hyphen before 40: position 36 ("…-http")
+    // body: "hot-reload-mcp-tool-schemas-on-http"
+    const slug = slugify(
+      "Hot-reload MCP tool schemas on HTTP transport without server restart",
+      "5dd63e4e-0000-0000-0000-000000000000",
+    );
+    expect(slug).toBe("hot-reload-mcp-tool-schemas-on-http-5dd63e4e");
+  });
+
+  it("two items with the same title but different IDs get different slugs", () => {
+    const s1 = slugify("Auth Feature", "aaaaaaaa-0000-0000-0000-000000000000");
+    const s2 = slugify("Auth Feature", "bbbbbbbb-0000-0000-0000-000000000000");
+    expect(s1).not.toBe(s2);
+    expect(s1).toMatch(/aaaaaaaa$/);
+    expect(s2).toMatch(/bbbbbbbb$/);
+  });
+});
+
+// ── Directory structure ───────────────────────────────────────────────────────
+
+describe("serializeFolderTree: directory structure", () => {
+  it("creates treeRoot if it does not exist", async () => {
+    const root = join(testDir, "new-root");
+    await serializeFolderTree([], root);
+    const s = await stat(root);
+    expect(s.isDirectory()).toBe(true);
+  });
+
+  it("creates epic directory at depth 1", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "My Epic");
+    await serializeFolderTree([epic], testDir);
+    const epicDir = join(testDir, slugify(epic.title, epic.id));
+    const s = await stat(epicDir);
+    expect(s.isDirectory()).toBe(true);
+  });
+
+  it("creates feature directory at depth 2 inside epic", async () => {
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "My Feature");
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "My Epic", {
+      children: [feature],
+    });
+    await serializeFolderTree([epic], testDir);
+    const featureDir = join(
+      testDir,
+      slugify(epic.title, epic.id),
+      slugify(feature.title, feature.id),
+    );
+    const s = await stat(featureDir);
+    expect(s.isDirectory()).toBe(true);
+  });
+
+  it("creates task directory at depth 3 inside feature", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "My Task");
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "My Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "My Epic", {
+      children: [feature],
+    });
+    await serializeFolderTree([epic], testDir);
+    const taskDir = join(
+      testDir,
+      slugify(epic.title, epic.id),
+      slugify(feature.title, feature.id),
+      slugify(task.title, task.id),
+    );
+    const s = await stat(taskDir);
+    expect(s.isDirectory()).toBe(true);
+  });
+});
+
+// ── index.md content: epic ────────────────────────────────────────────────────
+
+describe("serializeFolderTree: epic index.md", () => {
+  it("writes required frontmatter fields", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Auth Epic", {
+      status: "in_progress",
+      description: "Auth system.",
+    });
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    expect(content).toContain('id: "11111111-0000-0000-0000-000000000000"');
+    expect(content).toContain("level: \"epic\"");
+    expect(content).toContain('title: "Auth Epic"');
+    expect(content).toContain("status: \"in_progress\"");
+    expect(content).toContain('description: "Auth system."');
+  });
+
+  it("writes optional fields: priority, tags, timestamps, resolutionType", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Full Epic", {
+      status: "completed",
+      priority: "high",
+      tags: ["auth", "security"],
+      source: "manual",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-02T00:00:00.000Z",
+      endedAt: "2026-01-02T00:00:00.000Z",
+      resolutionType: "code-change",
+      resolutionDetail: "Did the work.",
+    });
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    expect(content).toContain("priority: \"high\"");
+    expect(content).toContain("tags:");
+    expect(content).toContain('"auth"');
+    expect(content).toContain('"security"');
+    expect(content).toContain("source: \"manual\"");
+    expect(content).toContain("startedAt:");
+    expect(content).toContain("completedAt:");
+    expect(content).toContain("endedAt:");
+    expect(content).toContain("resolutionType: \"code-change\"");
+    expect(content).toContain('resolutionDetail: "Did the work."');
+  });
+
+  it("omits optional fields that are absent", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Bare Epic");
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    expect(content).not.toContain("priority:");
+    expect(content).not.toContain("tags:");
+    expect(content).not.toContain("startedAt:");
+    expect(content).not.toContain("completedAt:");
+  });
+
+  it("includes ## Children section when epic has features", async () => {
+    const f1 = makeFeature("22222222-0000-0000-0000-000000000000", "Feature Alpha");
+    const f2 = makeFeature("33333333-0000-0000-0000-000000000000", "Feature Beta");
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [f1, f2],
+    });
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    expect(content).toContain("## Children");
+    expect(content).toContain("Feature Alpha");
+    expect(content).toContain("Feature Beta");
+    // Links use relative paths
+    expect(content).toMatch(/\.\//);
+    expect(content).toContain("/index.md");
+  });
+
+  it("omits ## Children section when epic has no features", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Empty Epic");
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    expect(content).not.toContain("## Children");
+  });
+});
+
+// ── index.md content: feature ─────────────────────────────────────────────────
+
+describe("serializeFolderTree: feature index.md", () => {
+  it("writes acceptanceCriteria and loe fields", async () => {
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Auth Feature", {
+      acceptanceCriteria: ["Users can log in", "Session expires after 24h"],
+      loe: "m",
+    } as Partial<PRDItem>);
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [feature],
+    });
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(
+        testDir,
+        slugify(epic.title, epic.id),
+        slugify(feature.title, feature.id),
+        "index.md",
+      ),
+      "utf8",
+    );
+    expect(content).toContain("acceptanceCriteria:");
+    expect(content).toContain('"Users can log in"');
+    expect(content).toContain('"Session expires after 24h"');
+    expect(content).toContain('loe: "m"');
+  });
+
+  it("writes acceptanceCriteria: [] when empty", async () => {
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature");
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(
+        testDir,
+        slugify(epic.title, epic.id),
+        slugify(feature.title, feature.id),
+        "index.md",
+      ),
+      "utf8",
+    );
+    expect(content).toContain("acceptanceCriteria: []");
+  });
+});
+
+// ── index.md content: task ────────────────────────────────────────────────────
+
+describe("serializeFolderTree: task index.md", () => {
+  async function readTaskContent(epic: PRDItem, feature: PRDItem, task: PRDItem): Promise<string> {
+    return readFile(
+      join(
+        testDir,
+        slugify(epic.title, epic.id),
+        slugify(feature.title, feature.id),
+        slugify(task.title, task.id),
+        "index.md",
+      ),
+      "utf8",
+    );
+  }
+
+  it("writes task frontmatter fields including acceptanceCriteria and loe", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "My Task", {
+      acceptanceCriteria: ["It works"],
+      loe: "s",
+      description: "Task description.",
+    } as Partial<PRDItem>);
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
+    await serializeFolderTree([epic], testDir);
+    const content = await readTaskContent(epic, feature, task);
+    expect(content).toContain('level: "task"');
+    expect(content).toContain('"It works"');
+    expect(content).toContain('loe: "s"');
+    expect(content).toContain('description: "Task description."');
+  });
+
+  it("does NOT include ## Children section for tasks", async () => {
+    const subtask = makeSubtask("44444444-0000-0000-0000-000000000000", "Subtask");
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", {
+      children: [subtask],
+    });
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
+    await serializeFolderTree([epic], testDir);
+    const content = await readTaskContent(epic, feature, task);
+    expect(content).not.toContain("## Children");
+  });
+});
+
+// ── Subtask sections ──────────────────────────────────────────────────────────
+
+describe("serializeFolderTree: subtask sections", () => {
+  it("encodes subtasks as ## Subtask: sections with ID, Status, Priority", async () => {
+    const st = makeSubtask("44444444-0000-0000-0000-000000000000", "First Subtask", {
+      status: "completed",
+      priority: "high",
+    });
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st] });
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(
+        testDir,
+        slugify(epic.title, epic.id),
+        slugify(feature.title, feature.id),
+        slugify(task.title, task.id),
+        "index.md",
+      ),
+      "utf8",
+    );
+    expect(content).toContain("## Subtask: First Subtask");
+    expect(content).toContain("**ID:** `44444444-0000-0000-0000-000000000000`");
+    expect(content).toContain("**Status:** completed");
+    expect(content).toContain("**Priority:** high");
+  });
+
+  it("encodes subtask description and acceptanceCriteria", async () => {
+    const st = makeSubtask("44444444-0000-0000-0000-000000000000", "Detailed Subtask", {
+      description: "Do the thing.",
+      acceptanceCriteria: ["AC one", "AC two"],
+    });
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st] });
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(
+        testDir,
+        slugify(epic.title, epic.id),
+        slugify(feature.title, feature.id),
+        slugify(task.title, task.id),
+        "index.md",
+      ),
+      "utf8",
+    );
+    expect(content).toContain("Do the thing.");
+    expect(content).toContain("**Acceptance Criteria**");
+    expect(content).toContain("- AC one");
+    expect(content).toContain("- AC two");
+  });
+
+  it("omits Priority line when subtask has no priority", async () => {
+    const st = makeSubtask("44444444-0000-0000-0000-000000000000", "No-Priority Subtask");
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st] });
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(
+        testDir,
+        slugify(epic.title, epic.id),
+        slugify(feature.title, feature.id),
+        slugify(task.title, task.id),
+        "index.md",
+      ),
+      "utf8",
+    );
+    expect(content).toContain("## Subtask: No-Priority Subtask");
+    expect(content).not.toContain("**Priority:**");
+  });
+});
+
+// ── Idempotency ───────────────────────────────────────────────────────────────
+
+describe("serializeFolderTree: idempotency", () => {
+  it("second run produces no file writes when tree is unchanged", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", {
+      acceptanceCriteria: ["AC"],
+    });
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
+
+    await serializeFolderTree([epic], testDir);
+    const r2 = await serializeFolderTree([epic], testDir);
+
+    expect(r2.filesWritten).toBe(0);
+    expect(r2.filesSkipped).toBeGreaterThan(0);
+  });
+
+  it("first run reports files written, second run reports same count as skipped", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic");
+    const r1 = await serializeFolderTree([epic], testDir);
+    const r2 = await serializeFolderTree([epic], testDir);
+
+    expect(r1.filesWritten).toBe(1);  // 1 epic index.md
+    expect(r2.filesWritten).toBe(0);
+    expect(r2.filesSkipped).toBe(1);
+  });
+
+  it("re-runs after a content change writes exactly the changed file", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      description: "Before.",
+    });
+    await serializeFolderTree([epic], testDir);
+
+    const updated = { ...epic, description: "After." };
+    const r2 = await serializeFolderTree([updated], testDir);
+
+    expect(r2.filesWritten).toBe(1);
+    const content = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    expect(content).toContain('"After."');
+  });
+});
+
+// ── Stale directory cleanup ───────────────────────────────────────────────────
+
+describe("serializeFolderTree: stale directory removal", () => {
+  it("removes epic directory when epic is removed from the tree", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Removed Epic");
+    await serializeFolderTree([epic], testDir);
+    const epicDir = join(testDir, slugify(epic.title, epic.id));
+
+    // Confirm it exists
+    await stat(epicDir);
+
+    // Remove from PRD
+    const r2 = await serializeFolderTree([], testDir);
+    expect(r2.directoriesRemoved).toBe(1);
+    await expect(stat(epicDir)).rejects.toThrow();
+  });
+
+  it("removes stale feature directory when feature is removed", async () => {
+    const f1 = makeFeature("22222222-0000-0000-0000-000000000000", "Feature A");
+    const f2 = makeFeature("33333333-0000-0000-0000-000000000000", "Feature B");
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [f1, f2],
+    });
+    await serializeFolderTree([epic], testDir);
+
+    // Remove f2
+    const updated = { ...epic, children: [f1] };
+    const r2 = await serializeFolderTree([updated], testDir);
+    expect(r2.directoriesRemoved).toBe(1);
+
+    const f2Dir = join(
+      testDir,
+      slugify(epic.title, epic.id),
+      slugify(f2.title, f2.id),
+    );
+    await expect(stat(f2Dir)).rejects.toThrow();
+  });
+
+  it("preserves sibling directories when only one is removed", async () => {
+    const f1 = makeFeature("22222222-0000-0000-0000-000000000000", "Feature A");
+    const f2 = makeFeature("33333333-0000-0000-0000-000000000000", "Feature B");
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [f1, f2],
+    });
+    await serializeFolderTree([epic], testDir);
+
+    const updated = { ...epic, children: [f1] };
+    await serializeFolderTree([updated], testDir);
+
+    const f1Dir = join(testDir, slugify(epic.title, epic.id), slugify(f1.title, f1.id));
+    const s = await stat(f1Dir);
+    expect(s.isDirectory()).toBe(true);
+  });
+});
+
+// ── Round-trip fidelity with parser ──────────────────────────────────────────
+
+describe("serializeFolderTree: round-trip with parseFolderTree", () => {
+  it("round-trips a full epic → feature → task → subtask tree", async () => {
+    const subtask = makeSubtask("44444444-0000-0000-0000-000000000000", "The Subtask", {
+      status: "completed",
+      priority: "critical",
+      description: "Subtask description.",
+      acceptanceCriteria: ["AC1", "AC2"],
+    });
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "The Task", {
+      status: "in_progress",
+      priority: "high",
+      description: "Task description.",
+      acceptanceCriteria: ["Do it"],
+      loe: "s",
+      children: [subtask],
+    } as Partial<PRDItem>);
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "The Feature", {
+      status: "pending",
+      acceptanceCriteria: ["Feature AC"],
+      loe: "m",
+      children: [task],
+    } as Partial<PRDItem>);
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "The Epic", {
+      description: "Epic description.",
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+    const parsed = await parseFolderTree(testDir);
+
+    expect(parsed.warnings).toHaveLength(0);
+    expect(parsed.items).toHaveLength(1);
+
+    const pe = parsed.items[0];
+    expect(pe.id).toBe(epic.id);
+    expect(pe.title).toBe(epic.title);
+    expect(pe.description).toBe("Epic description.");
+    expect(pe.children).toHaveLength(1);
+
+    const pf = pe.children![0];
+    expect(pf.id).toBe(feature.id);
+    expect(pf.acceptanceCriteria).toEqual(["Feature AC"]);
+    expect((pf as Record<string, unknown>)["loe"]).toBe("m");
+    expect(pf.children).toHaveLength(1);
+
+    const pt = pf.children![0];
+    expect(pt.id).toBe(task.id);
+    expect(pt.status).toBe("in_progress");
+    expect(pt.priority).toBe("high");
+    expect(pt.description).toBe("Task description.");
+    expect(pt.acceptanceCriteria).toEqual(["Do it"]);
+    expect((pt as Record<string, unknown>)["loe"]).toBe("s");
+    expect(pt.children).toHaveLength(1);
+
+    const ps = pt.children![0];
+    expect(ps.id).toBe(subtask.id);
+    expect(ps.title).toBe("The Subtask");
+    expect(ps.status).toBe("completed");
+    expect(ps.priority).toBe("critical");
+    expect(ps.description).toBe("Subtask description.");
+    expect(ps.acceptanceCriteria).toEqual(["AC1", "AC2"]);
+  });
+
+  it("round-trips 100-item tree with zero warnings", async () => {
+    const epics: PRDItem[] = [];
+    let seq = 0;
+    const nextId = () => {
+      seq++;
+      const h = seq.toString(16).padStart(8, "0");
+      return `${h}0000-0000-0000-0000-${"0".repeat(12)}`;
+    };
+
+    for (let e = 0; e < 3; e++) {
+      const features: PRDItem[] = [];
+      for (let f = 0; f < 3; f++) {
+        const tasks: PRDItem[] = [];
+        for (let t = 0; t < 3; t++) {
+          tasks.push(makeTask(nextId(), `Task ${e}-${f}-${t}`, {
+            description: "desc",
+            acceptanceCriteria: ["AC"],
+            children: [makeSubtask(nextId(), `St ${e}-${f}-${t}`)],
+          }));
+        }
+        features.push(makeFeature(nextId(), `Feature ${e}-${f}`, { children: tasks }));
+      }
+      epics.push(makeEpic(nextId(), `Epic ${e}`, { children: features }));
+    }
+
+    await serializeFolderTree(epics, testDir);
+    const result = await parseFolderTree(testDir);
+
+    expect(result.warnings).toHaveLength(0);
+    expect(result.items).toHaveLength(3);
+    // Each epic has 3 features × 3 tasks each
+    for (const pe of result.items) {
+      expect(pe.children).toHaveLength(3);
+      for (const pf of pe.children!) {
+        expect(pf.children).toHaveLength(3);
+        for (const pt of pf.children!) {
+          expect(pt.children).toHaveLength(1); // one subtask
+        }
+      }
+    }
+  });
+
+  it("preserves unknown frontmatter fields through round-trip", async () => {
+    // Simulate an item with an unknown extra field "myCustomField"
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic") as PRDItem & {
+      myCustomField: string;
+    };
+    (epic as Record<string, unknown>)["myCustomField"] = "custom-value";
+
+    await serializeFolderTree([epic], testDir);
+    const content = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    expect(content).toContain("myCustomField");
+    expect(content).toContain('"custom-value"');
+  });
+});
+
+// ── SerializeResult stats ─────────────────────────────────────────────────────
+
+describe("serializeFolderTree: result stats", () => {
+  it("reports correct filesWritten count for a new tree", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task");
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
+    const result = await serializeFolderTree([epic], testDir);
+    // 1 epic + 1 feature + 1 task = 3 index.md files
+    expect(result.filesWritten).toBe(3);
+    expect(result.filesSkipped).toBe(0);
+  });
+
+  it("reports directoriesCreated for a new tree", async () => {
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic");
+    // testDir already exists; epic dir is new
+    const result = await serializeFolderTree([epic], testDir);
+    expect(result.directoriesCreated).toBeGreaterThanOrEqual(1);
+  });
+});

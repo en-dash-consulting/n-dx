@@ -3234,56 +3234,56 @@ items:
                   - ux
                   - layout
                 description: Each Rex view currently places primary actions (Add, Prune, Filter, Refresh) in different positions — some inline with section headers, some floating, some embedded mid-content. Define a single page-header action bar pattern and apply it consistently across Dashboard, PRD tree, proposals, and validation pages.
-          - id: "1e417c6a-b2bf-4139-86eb-58db312cfa0c"
-            level: task
-            title: Diagnose and fix Codex proposal generation failures in rex add command
-            status: completed
-            priority: critical
-            acceptanceCriteria:
-              - rex add completes the proposal generation step without error using a Codex vendor configuration
-              - Generated proposals are displayed in the interactive review flow when using Codex
-              - Codex response parsing correctly handles any format differences relative to Claude
-              - No regression in Claude-based proposal generation
-            completedAt: "2026-04-16T16:45:24.344Z"
-            source: smart-add
-            startedAt: "2026-04-16T16:31:19.679Z"
-            tags:
-              - codex
-              - rex
-              - add
-              - proposals
-            parentId: "2e70fa19-0875-4c5e-82c4-cd33bfb12c37"
-            description: Investigate why rex add fails to produce a proposal when Codex is the active vendor. Likely causes include prompt formatting incompatibilities, Codex response shape differences, or JSON extraction failure on non-standard completions. Identify the root cause across the proposal pipeline and implement targeted fixes so proposals are generated and presented for review end-to-end with Codex.
-          - id: "9bb8cd7a-c478-4008-acb1-be7b6168c13e"
-            level: task
-            title: Add cross-vendor regression tests for PRD authoring CLI commands
-            status: completed
-            priority: high
-            acceptanceCriteria:
-              - Integration tests cover rex add proposal generation with mocked Claude and Codex responses
-              - A rate limit retry test verifies backoff fires and the command succeeds on a subsequent attempt
-              - Tests run in CI without live LLM credentials via response mocking
-              - Test failure output identifies the vendor and command that regressed
-            completedAt: "2026-04-16T16:54:16.541Z"
-            overrideMarker:
-              createdAt: "2026-04-16T16:31:05.193Z"
-              matchedItemId: "0270df79-5844-45ea-8bd9-da2df2ae8a26"
-              matchedItemLevel: task
-              matchedItemStatus: completed
-              matchedItemTitle: Add regression tests for vendor-scoped model selection in rex commands
-              reason: content_overlap
-              reasonRef: content_overlap:0270df79-5844-45ea-8bd9-da2df2ae8a26
-              type: duplicate_guard_override
-            source: smart-add
-            startedAt: "2026-04-16T16:45:28.240Z"
-            tags:
-              - codex
-              - claude
-              - testing
-              - rex
-              - regression
-            parentId: "2e70fa19-0875-4c5e-82c4-cd33bfb12c37"
-            description: Add integration tests that exercise rex add, rex analyze, and rex recommend against both Claude and Codex vendor configurations using mocked LLM responses. Tests should cover the happy path for each command and the rate limit retry scenario. This prevents future vendor-specific regressions from shipping silently.
+      - id: "1e417c6a-b2bf-4139-86eb-58db312cfa0c"
+        level: task
+        title: Diagnose and fix Codex proposal generation failures in rex add command
+        status: completed
+        priority: critical
+        acceptanceCriteria:
+          - rex add completes the proposal generation step without error using a Codex vendor configuration
+          - Generated proposals are displayed in the interactive review flow when using Codex
+          - Codex response parsing correctly handles any format differences relative to Claude
+          - No regression in Claude-based proposal generation
+        completedAt: "2026-04-16T16:45:24.344Z"
+        source: smart-add
+        startedAt: "2026-04-16T16:31:19.679Z"
+        tags:
+          - codex
+          - rex
+          - add
+          - proposals
+        parentId: "2e70fa19-0875-4c5e-82c4-cd33bfb12c37"
+        description: Investigate why rex add fails to produce a proposal when Codex is the active vendor. Likely causes include prompt formatting incompatibilities, Codex response shape differences, or JSON extraction failure on non-standard completions. Identify the root cause across the proposal pipeline and implement targeted fixes so proposals are generated and presented for review end-to-end with Codex.
+      - id: "9bb8cd7a-c478-4008-acb1-be7b6168c13e"
+        level: task
+        title: Add cross-vendor regression tests for PRD authoring CLI commands
+        status: completed
+        priority: high
+        acceptanceCriteria:
+          - Integration tests cover rex add proposal generation with mocked Claude and Codex responses
+          - A rate limit retry test verifies backoff fires and the command succeeds on a subsequent attempt
+          - Tests run in CI without live LLM credentials via response mocking
+          - Test failure output identifies the vendor and command that regressed
+        completedAt: "2026-04-16T16:54:16.541Z"
+        overrideMarker:
+          createdAt: "2026-04-16T16:31:05.193Z"
+          matchedItemId: "0270df79-5844-45ea-8bd9-da2df2ae8a26"
+          matchedItemLevel: task
+          matchedItemStatus: completed
+          matchedItemTitle: Add regression tests for vendor-scoped model selection in rex commands
+          reason: content_overlap
+          reasonRef: content_overlap:0270df79-5844-45ea-8bd9-da2df2ae8a26
+          type: duplicate_guard_override
+        source: smart-add
+        startedAt: "2026-04-16T16:45:28.240Z"
+        tags:
+          - codex
+          - claude
+          - testing
+          - rex
+          - regression
+        parentId: "2e70fa19-0875-4c5e-82c4-cd33bfb12c37"
+        description: Add integration tests that exercise rex add, rex analyze, and rex recommend against both Claude and Codex vendor configurations using mocked LLM responses. Tests should cover the happy path for each command and the rate limit retry scenario. This prevents future vendor-specific regressions from shipping silently.
   - id: "0de5be78-d295-4f71-be5d-38594a355240"
     level: epic
     title: "Code Health: 14 findings across 11 zones"
@@ -5952,7 +5952,7 @@ items:
         children:
           - id: "593877d6-4afb-41fa-b7c0-4b63bb5562dc"
             level: task
-            title: "Fix structural in autonomous-agent-engine: No automated intra-zone boundary assertions exist yet; at 208 files the zone is"
+            title: "Fix structural in autonomous-agent-engine: No automated intra-zone boundary assertions exist yet; at 208 files the zone is "
             status: completed
             priority: high
             completedAt: "2026-04-18T15:04:20.376Z"
@@ -5987,7 +5987,7 @@ items:
         children:
           - id: "d2cc6bff-e96a-467e-bbd6-37bcf5fdc915"
             level: task
-            title: "Fix structural in config-validation-gauntlet: The gauntlet/ directory sits outside the established e2e/ and integration/ test"
+            title: "Fix structural in config-validation-gauntlet: The gauntlet/ directory sits outside the established e2e/ and integration/ test "
             status: completed
             priority: high
             completedAt: "2026-04-18T15:10:02.108Z"
@@ -6127,7 +6127,7 @@ items:
         children:
           - id: "ff8800f8-7724-4a29-a553-c7a19f7a8029"
             level: task
-            title: "Fix structural in project-scaffold: Zone cohesion is 0 — files share no import relationships, confirming this is an"
+            title: "Fix structural in project-scaffold: Zone cohesion is 0 — files share no import relationships, confirming this is an "
             status: completed
             priority: high
             completedAt: "2026-04-19T02:41:05.131Z"
@@ -6341,7 +6341,7 @@ items:
         children:
           - id: "6a22c989-085b-45a3-9a8f-ac785ad2add2"
             level: task
-            title: "Fix structural in viewer-data-hooks: Bidirectional imports between this hook zone and the web platform zone (3 edges"
+            title: "Fix structural in viewer-data-hooks: Bidirectional imports between this hook zone and the web platform zone (3 edges "
             status: completed
             priority: high
             completedAt: "2026-04-19T02:59:59.438Z"
@@ -25746,7 +25746,7 @@ items:
         children:
           - id: "4fc913c5-82c4-4fb0-958f-ba5836822c0d"
             level: task
-            title: "Fix code in rex: packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree,"
+            title: "Fix code in rex: packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, "
             status: completed
             priority: high
             completedAt: "2026-04-14T01:20:10.484Z"
@@ -26141,7 +26141,7 @@ items:
         children:
           - id: "8d046ac6-f628-4bbb-91e9-39db17263341"
             level: task
-            title: "Fix code in rex-recommend: Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum,"
+            title: "Fix code in rex-recommend: Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, "
             status: completed
             priority: high
             completedAt: "2026-04-14T01:14:13.346Z"
@@ -28736,6 +28736,294 @@ items:
               - cli
               - status
             description: Extend ndx status (and rex status) with a --show-individual flag that, instead of showing the merged aggregate tree, prints status sections grouped by source PRD file. Each section should include the PRD file path, a header, and the same stats/tree the default status produces but scoped to items originating from that file. Honor existing flags (--format=json, filters) by emitting an array of per-PRD status objects in JSON mode.
+  - id: "4f87bb38-11d7-48e9-a143-d9efa9f251ab"
+    level: epic
+    title: Sourcevision LLM eval harness & token reduction
+    status: pending
+    priority: high
+    description: "Build an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk."
+    children:
+      - id: "5a86a130-d6ca-4ad1-b251-faac76a6d6b4"
+        level: task
+        title: Bootstrap eval fixtures and golden recording pipeline
+        status: completed
+        priority: high
+        completedAt: "2026-04-18T05:55:28.011Z"
+        startedAt: "2026-04-18T05:48:01.591Z"
+        description: Add tests/fixtures/sv-evals/toy-app/ and tests/fixtures/sv-evals/medium-app/ checked-in source trees. Add tests/gauntlet/sourcevision-evals/record-goldens.ts that runs sv analyze on each fixture and writes golden.json with per-file archetype + zone partition by file membership only. Wire pnpm gauntlet:evals:record.
+      - id: "7ccd1f5b-8e7f-4a3a-93ed-147f5ad8eaf3"
+        level: task
+        title: Implement scoring functions and eval test gate
+        status: completed
+        priority: high
+        completedAt: "2026-04-18T05:58:13.548Z"
+        startedAt: "2026-04-18T05:56:15.891Z"
+        description: "tests/gauntlet/sourcevision-evals/score.ts exports two pure scorers: archetype accuracy (% files where archetype matches golden) and zone partition similarity (avg Jaccard of file sets, zones matched by greatest overlap). Unit-test identity + perturbation cases. evals.test.ts runs sv analyze per fixture, scores vs golden, asserts >= floor (likely 0.9, calibrated during implementation). Wire pnpm gauntlet:evals — NOT in default pnpm gauntlet (LLM cost). Acceptance: passes baseline; perturbing fixture fails."
+      - id: "78032008-f730-44ed-9452-566ebc252c84"
+        level: task
+        title: Document eval harness usage
+        status: completed
+        priority: medium
+        completedAt: "2026-04-18T05:59:37.821Z"
+        startedAt: "2026-04-18T05:58:55.065Z"
+        description: "tests/gauntlet/sourcevision-evals/README.md covering: how to run (pnpm gauntlet:evals), how to update goldens (pnpm gauntlet:evals:record), why excluded from default gauntlet (LLM cost), what is deferred (CI integration, semantic zone-name scoring, cached LLM replay). Acceptance: a contributor unfamiliar with the harness can run and update it from the README alone."
+      - id: "4069767f-ac75-4db1-8857-08813fa93b29"
+        level: task
+        title: Follow-up optimization PRs (gated on harness)
+        status: pending
+        priority: medium
+        description: Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.
+  - id: "79e50af8-c363-4345-970a-23006d04e1f4"
+    level: epic
+    title: PRD Hierarchical Folder Tree Storage
+    status: pending
+    branch: feature/new-PRD-design
+    source: smart-add
+    sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+    children:
+      - id: "7286f1c2-ad19-4f85-baa9-cebb3c77a49d"
+        level: feature
+        title: Folder-Based PRD Schema Design and Serialization
+        status: pending
+        branch: feature/new-PRD-design
+        overrideMarker:
+          createdAt: "2026-04-27T18:46:33.810Z"
+          matchedItemId: "6687abd2-80f8-43e0-973e-f5242b635378"
+          matchedItemLevel: feature
+          matchedItemStatus: completed
+          matchedItemTitle: Markdown Schema Design and Bidirectional Serialization
+          reason: semantic_title
+          reasonRef: semantic_title:6687abd2-80f8-43e0-973e-f5242b635378
+          type: duplicate_guard_override
+        source: smart-add
+        sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        description: Define and implement a folder-tree layout where each PRD level (epic → feature → task) maps to a directory containing an index.md. Parent directories recursively summarize everything below them. Tasks are leaf folders — their index.md contains subtasks as sections rather than nested directories.
+        children:
+          - id: "69ff9538-093b-45d6-b968-33a46270a048"
+            level: task
+            title: Design folder naming conventions, index.md content schema, and recursive summary contract for each PRD level
+            status: completed
+            priority: critical
+            acceptanceCriteria:
+              - Naming convention handles unicode, long titles, and slug collisions without ambiguity
+              - index.md schema is fully specified for epic, feature, and task levels with example output
+              - Recursive summary block in parent index.md lists all direct children with title and status
+              - Task-level index.md encodes subtasks as markdown sections rather than nested folders
+              - Spec is committed to docs/ and linked from CLAUDE.md architecture section
+            activeIntervals:
+              - start: "2026-04-27T18:47:10.450Z"
+                end: "2026-04-27T18:52:58.283Z"
+            branch: feature/new-PRD-design
+            completedAt: "2026-04-27T18:52:58.283Z"
+            endedAt: "2026-04-27T18:52:58.283Z"
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-27T18:47:10.450Z"
+            tags:
+              - prd
+              - storage
+              - design
+            description: "Produce a written spec covering: directory-naming rules (slugified title + short ID suffix for collision resistance), mandatory fields per level in index.md (title, status, description, acceptance criteria, LoE), and the recursive children-summary block that every non-leaf index.md must include. The spec becomes the contract for serializer and parser implementations and must be committed to docs/ and referenced from CLAUDE.md."
+          - id: "3b80109b-5158-4236-8052-6571bb9f69e9"
+            level: task
+            title: Implement PRD-to-folder-tree serializer that writes nested directories with index.md files
+            status: in_progress
+            priority: critical
+            acceptanceCriteria:
+              - Running the serializer on a known PRD produces the expected folder tree with correct nesting depth
+              - "Each index.md contains the item's full metadata: title, status, description, acceptance criteria, tags, LoE"
+              - Every non-leaf index.md includes a children-summary section listing direct children with title and status
+              - Task index.md encodes subtasks as level-3 sections within the same file
+              - Slug collisions are resolved deterministically by appending a short ID suffix
+              - Re-running serializer on an unchanged tree produces no file writes (idempotent)
+            activeIntervals:
+              - start: "2026-04-27T19:02:03.328Z"
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-27T19:02:03.328Z"
+            tags:
+              - prd
+              - storage
+              - serializer
+            description: "Build the serializer that takes the in-memory PRD tree and writes it to disk as a nested folder hierarchy under .rex/prd/. Epic folders contain feature subfolders; feature folders contain task subfolders; task folders contain only index.md. Each parent index.md includes a human-readable summary of all items below it. Serialization must be incremental: only changed subtrees are rewritten."
+          - id: "21053225-b2aa-42d4-aa96-266c5da07491"
+            level: task
+            title: Implement folder-tree-to-PRD parser that aggregates index.md files into the PRD item tree
+            status: completed
+            priority: critical
+            acceptanceCriteria:
+              - "Round-trip fidelity: serialize then parse a 100-item PRD and assert zero data loss across all fields"
+              - Parser emits structured warnings for missing or malformed index.md files without throwing
+              - Parse order is deterministic (alphabetical by folder name) and matches serializer write order
+              - Parser correctly reconstructs parent-child relationships solely from folder nesting depth
+              - Parsing a 200-item PRD tree completes in under 500 ms on a cold filesystem
+            activeIntervals:
+              - start: "2026-04-27T18:53:00.057Z"
+                end: "2026-04-27T19:02:01.536Z"
+            branch: feature/new-PRD-design
+            completedAt: "2026-04-27T19:02:01.536Z"
+            endedAt: "2026-04-27T19:02:01.536Z"
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-27T18:53:00.057Z"
+            tags:
+              - prd
+              - storage
+              - parser
+            description: "Build the inverse of the serializer: traverse the .rex/prd/ folder hierarchy, parse each index.md, and reconstruct the full PRD item tree in memory. The parser must handle missing files, malformed frontmatter, and partial trees without aborting, and must emit structured warnings for any items it cannot read."
+      - id: "ce2ecf83-8a69-4ccc-ad43-6243d4c3646b"
+        level: feature
+        title: CLI and MCP Write Command Integration with Folder Tree
+        status: pending
+        branch: feature/new-PRD-design
+        source: smart-add
+        sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        description: Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation.
+        children:
+          - id: "a90cf2ff-f346-43bb-9df0-c6ec954a712a"
+            level: task
+            title: Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation
+            status: pending
+            priority: critical
+            acceptanceCriteria:
+              - rex add creates the correct folder hierarchy and updates all ancestor index.md summary sections
+              - rex edit rewrites target index.md with new field values and updates parent summaries where title or status changed
+              - rex remove deletes the item folder and removes it from all parent summary sections
+              - rex move relocates the folder to the new parent directory and updates both origin and destination parent summaries
+              - No command leaves orphaned folders or stale parent summary entries after completion
+              - All four commands complete without observable latency regression vs single-file baseline
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - prd
+              - cli
+              - write
+            description: Modify rex add, edit, remove, and move so that after every write to PRDStore, the affected subtree is re-serialized to the folder structure on disk. add creates a new folder and updates all ancestor index.md summaries; edit rewrites the item's index.md and propagates summary changes upward; remove deletes the folder and cleans parent summaries; move relocates the folder and updates both old and new parent summaries.
+          - id: "1e04af28-ca65-4104-941e-af798af61373"
+            level: task
+            title: Update rex read commands (status, next, validate) to read PRD from folder tree
+            status: pending
+            priority: high
+            acceptanceCriteria:
+              - rex status output is identical when reading from folder tree vs single prd.md for the same PRD dataset
+              - rex next selects the same task regardless of storage backend
+              - rex validate reports the same issues whether reading from folder tree or single file
+              - Commands emit a clear error when .rex/prd/ is absent and prd.md is also missing
+              - "Fallback detection: if prd/ folder is absent but prd.md exists, auto-trigger migration before reading"
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - prd
+              - cli
+              - read
+            description: Wire rex status, rex next, and rex validate to read the PRD from the folder tree via the parser rather than from the legacy single-file store. Verify that command output is byte-for-byte identical to the single-file baseline for the same dataset, and that commands fall back gracefully when neither format is present.
+          - id: "f16ab364-971a-43ab-94e7-173a891264d1"
+            level: task
+            title: Update ndx plan, ndx recommend, and all MCP write tools to propagate writes to the folder tree
+            status: pending
+            priority: high
+            acceptanceCriteria:
+              - ndx plan --accept creates the correct folder structure for all accepted proposals
+              - ndx recommend --accept creates folders for all accepted recommendations and updates parent summaries
+              - "Each MCP write tool call leaves the folder tree consistent: correct folders, updated index.md, updated parent summaries"
+              - MCP write tools complete within existing tool-call latency budgets (no regression measured in mcp-transport.test.js)
+              - Integration test confirms folder tree item count matches PRD item count after a full ndx plan --accept run
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - prd
+              - mcp
+              - orchestration
+            description: Ensure that ndx plan --accept, ndx recommend --accept, and all MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) route their writes through the folder-tree serializer after every mutation. MCP tools must complete within existing latency budgets.
+      - id: "568a1a3c-eacd-4304-a46e-9f8c42d9901f"
+        level: feature
+        title: Folder Tree Migration, Initialization, and Auto-Trigger
+        status: pending
+        branch: feature/new-PRD-design
+        source: smart-add
+        sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        description: Provide a first-run migration path from prd.md to the folder-tree format, integrate folder scaffolding into ndx init, and implement automatic migration detection so existing projects upgrade transparently.
+        children:
+          - id: "93517780-f058-4e22-b52b-7bbba2c45c2d"
+            level: task
+            title: Implement rex migrate-to-folder-tree command and auto-trigger detection
+            status: pending
+            priority: high
+            acceptanceCriteria:
+              - Running the command on an existing prd.md produces a complete folder tree with zero data loss
+              - "Command is idempotent: re-running on an already-migrated repo updates changed items without duplicating folders"
+              - "Command prints a creation summary: N folders created, M index.md files written"
+              - Auto-trigger fires transparently on first read/write when prd/ is absent but prd.md exists, printing a one-line migration notice
+              - ndx init scaffolds .rex/prd/ and writes a root index.md stub on new projects
+            branch: feature/new-PRD-design
+            overrideMarker:
+              createdAt: "2026-04-27T18:46:33.810Z"
+              matchedItemId: "7143e2a0-7c77-45ed-b3e5-d588a11b3b27"
+              matchedItemLevel: task
+              matchedItemStatus: completed
+              matchedItemTitle: Build automatic first-run migration and explicit rex migrate-to-md CLI command
+              reason: content_overlap
+              reasonRef: content_overlap:7143e2a0-7c77-45ed-b3e5-d588a11b3b27
+              type: duplicate_guard_override
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - prd
+              - migration
+              - cli
+              - init
+            description: Build a one-shot CLI command (rex migrate-to-folder-tree) that reads the existing prd.md, runs the serializer, and writes the full folder tree to .rex/prd/. Auto-trigger this migration transparently the first time any read or write command runs and detects prd.md without a prd/ folder. The command must be idempotent and print a creation summary.
+      - id: "db58ca72-ee01-426d-8bb0-d0190678cf14"
+        level: feature
+        title: Test Suite Updates for Folder-Tree PRD Storage
+        status: pending
+        branch: feature/new-PRD-design
+        source: smart-add
+        sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        description: Update all existing PRD-related unit, integration, and e2e tests to exercise the folder-tree storage backend, and add new tests covering the serializer, parser, round-trip fidelity, and full CLI pipeline correctness.
+        children:
+          - id: "3effa16b-1466-4b82-a963-c1f21afaedeb"
+            level: task
+            title: Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
+            status: pending
+            priority: high
+            acceptanceCriteria:
+              - All existing PRDStore unit tests pass with the folder-tree backend without modification to test assertions
+              - "Serializer unit tests: create item → correct folder and index.md, edit item → updated index.md and parent summary, delete item → folder removed and parent summary cleaned, move item → folder relocated and both parents updated"
+              - "Parser unit tests: known folder fixture → correct item tree, missing index.md → structured warning emitted, malformed frontmatter → partial load with warning"
+              - "Round-trip test: serialize known PRD → parse output → assert zero diff from original"
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - prd
+              - tests
+              - unit
+            description: Refactor existing PRDStore unit tests in packages/rex/tests/ to use folder-tree fixtures. Add focused unit tests for the serializer (assert correct folder structure for known PRD input) and parser (assert correct item tree for known folder structure). Assert that parent index.md summary sections are updated after every write.
+          - id: "3e7f193b-6134-47a0-b90c-fc8d0cd262f3"
+            level: task
+            title: Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands
+            status: pending
+            priority: high
+            acceptanceCriteria:
+              - All rex CLI integration tests pass with folder-tree storage and assert folder structure after each write command
+              - "E2e pipeline test: ndx plan --accept creates folder tree → rex status reads it → rex next selects correct task — all three steps pass"
+              - MCP write-tool integration test asserts folder tree item count and parent summary correctness after each tool call
+              - "Test isolation: every test case uses a fresh temporary directory and cleans up on exit"
+              - No test hardcodes prd.md paths; all tests reference .rex/prd/ folder tree
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - prd
+              - tests
+              - integration
+              - e2e
+            description: Update rex CLI integration tests (add, edit, remove, move, status, next, validate) to assert correct folder-tree state after each command. Add an e2e test that runs the full ndx plan --accept → folder tree → rex status pipeline and asserts folder tree consistency. All test cases must use temporary directories and clean up after themselves.
 ---
 
 <!-- Auto-generated by rex. Edit the YAML front-matter above; body changes are not preserved. -->
@@ -30623,7 +30911,7 @@ Automated recommendations from SourceVision analysis. 26 zone+category groups co
 
 - No automated intra-zone boundary assertions exist yet; at 208 files the zone is approaching the scale where sub-zone drift becomes difficult to detect without test-enforced checks.
 
-#### Fix structural in autonomous-agent-engine: No automated intra-zone boundary assertions exist yet; at 208 files the zone is
+#### Fix structural in autonomous-agent-engine: No automated intra-zone boundary assertions exist yet; at 208 files the zone is 
 *task · completed · priority: high · started 2026-04-18 · completed 2026-04-18*
 
 - No automated intra-zone boundary assertions exist yet; at 208 files the zone is approaching the scale where sub-zone drift becomes difficult to detect without test-enforced checks.
@@ -30633,7 +30921,7 @@ Automated recommendations from SourceVision analysis. 26 zone+category groups co
 
 - The gauntlet/ directory sits outside the established e2e/ and integration/ test directory conventions, which may cause it to be excluded from standard test runs if glob patterns are not kept in sync.
 
-#### Fix structural in config-validation-gauntlet: The gauntlet/ directory sits outside the established e2e/ and integration/ test
+#### Fix structural in config-validation-gauntlet: The gauntlet/ directory sits outside the established e2e/ and integration/ test 
 *task · completed · priority: high · started 2026-04-18 · completed 2026-04-18*
 
 - The gauntlet/ directory sits outside the established e2e/ and integration/ test directory conventions, which may cause it to be excluded from standard test runs if glob patterns are not kept in sync.
@@ -30673,7 +30961,7 @@ Automated recommendations from SourceVision analysis. 26 zone+category groups co
 
 - Zone cohesion is 0 — files share no import relationships, confirming this is an incidental grouping of config, brand, and utility scripts rather than a coherent module.
 
-#### Fix structural in project-scaffold: Zone cohesion is 0 — files share no import relationships, confirming this is an
+#### Fix structural in project-scaffold: Zone cohesion is 0 — files share no import relationships, confirming this is an 
 *task · completed · priority: high · started 2026-04-19 · completed 2026-04-19*
 
 - Zone cohesion is 0 — files share no import relationships, confirming this is an incidental grouping of config, brand, and utility scripts rather than a coherent module.
@@ -30735,7 +31023,7 @@ Automated recommendations from SourceVision analysis. 26 zone+category groups co
 
 - Bidirectional imports between this hook zone and the web platform zone (3 edges each direction) suggest the hooks may be reaching back into platform code rather than receiving dependencies via props or context.
 
-#### Fix structural in viewer-data-hooks: Bidirectional imports between this hook zone and the web platform zone (3 edges
+#### Fix structural in viewer-data-hooks: Bidirectional imports between this hook zone and the web platform zone (3 edges 
 *task · completed · priority: high · started 2026-04-19 · completed 2026-04-19*
 
 - Bidirectional imports between this hook zone and the web platform zone (3 edges each direction) suggest the hooks may be reaching back into platform code rather than receiving dependencies via props or context.
@@ -37340,7 +37628,7 @@ Automated recommendations from SourceVision analysis. 24 zone+category groups co
 
 - packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, core/stats, schema/index, recommend/conflict-detection, fix/index, and 30+ others) with no boundary assertion preventing the surface from expanding. public.ts exports ~30 symbols but CLI commands bypass it entirely, creating a de-facto second internal API that is invisible to external consumers and to domain-isolation.test.js. Adding a boundary assertion — 'cli/commands/ may only import from public.ts or core/ directly' — would cap growth of this surface and make the privileged-consumer pattern explicit.
 
-#### Fix code in rex: packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree,
+#### Fix code in rex: packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, 
 *task · completed · priority: high · started 2026-04-14 · completed 2026-04-14*
 
 - packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, core/stats, schema/index, recommend/conflict-detection, fix/index, and 30+ others) with no boundary assertion preventing the surface from expanding. public.ts exports ~30 symbols but CLI commands bypass it entirely, creating a de-facto second internal API that is invisible to external consumers and to domain-isolation.test.js. Adding a boundary assertion — 'cli/commands/ may only import from public.ts or core/ directly' — would cap growth of this surface and make the privileged-consumer pattern explicit.
@@ -37462,7 +37750,7 @@ Automated recommendations from SourceVision analysis. 24 zone+category groups co
 
 - Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, test the core similarity scoring function with known inputs and expected outputs, edge cases (empty inputs, exact duplicates, zero-similarity pairs). similarity.ts is the only substantial untested implementation file in the recommend zone and is on the critical path for recommendation quality — a logic error here produces incorrect recommendations with no test catching it.
 
-#### Fix code in rex-recommend: Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum,
+#### Fix code in rex-recommend: Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, 
 *task · completed · priority: high · started 2026-04-14 · completed 2026-04-14*
 
 - Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, test the core similarity scoring function with known inputs and expected outputs, edge cases (empty inputs, exact duplicates, zero-similarity pairs). similarity.ts is the only substantial untested implementation file in the recommend zone and is on the critical path for recommendation quality — a logic error here produces incorrect recommendations with no test catching it.
@@ -38251,3 +38539,96 @@ Add a --show-individual flag to ndx status so users can see status broken down p
 *task · completed · priority: medium · started 2026-04-27 · completed 2026-04-27 · tags: rex, cli, status*
 
 Extend ndx status (and rex status) with a --show-individual flag that, instead of showing the merged aggregate tree, prints status sections grouped by source PRD file. Each section should include the PRD file path, a header, and the same stats/tree the default status produces but scoped to items originating from that file. Honor existing flags (--format=json, filters) by emitting an array of per-PRD status objects in JSON mode.
+
+## Sourcevision LLM eval harness & token reduction
+*epic · pending · priority: high*
+
+Build an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk.
+
+#### Bootstrap eval fixtures and golden recording pipeline
+*task · completed · priority: high · started 2026-04-18 · completed 2026-04-18*
+
+Add tests/fixtures/sv-evals/toy-app/ and tests/fixtures/sv-evals/medium-app/ checked-in source trees. Add tests/gauntlet/sourcevision-evals/record-goldens.ts that runs sv analyze on each fixture and writes golden.json with per-file archetype + zone partition by file membership only. Wire pnpm gauntlet:evals:record.
+
+#### Implement scoring functions and eval test gate
+*task · completed · priority: high · started 2026-04-18 · completed 2026-04-18*
+
+tests/gauntlet/sourcevision-evals/score.ts exports two pure scorers: archetype accuracy (% files where archetype matches golden) and zone partition similarity (avg Jaccard of file sets, zones matched by greatest overlap). Unit-test identity + perturbation cases. evals.test.ts runs sv analyze per fixture, scores vs golden, asserts >= floor (likely 0.9, calibrated during implementation). Wire pnpm gauntlet:evals — NOT in default pnpm gauntlet (LLM cost). Acceptance: passes baseline; perturbing fixture fails.
+
+#### Document eval harness usage
+*task · completed · priority: medium · started 2026-04-18 · completed 2026-04-18*
+
+tests/gauntlet/sourcevision-evals/README.md covering: how to run (pnpm gauntlet:evals), how to update goldens (pnpm gauntlet:evals:record), why excluded from default gauntlet (LLM cost), what is deferred (CI integration, semantic zone-name scoring, cached LLM replay). Acceptance: a contributor unfamiliar with the harness can run and update it from the README alone.
+
+#### Follow-up optimization PRs (gated on harness)
+*task · pending · priority: medium*
+
+Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.
+
+## PRD Hierarchical Folder Tree Storage
+*epic · pending*
+
+### Folder-Based PRD Schema Design and Serialization
+*feature · pending*
+
+Define and implement a folder-tree layout where each PRD level (epic → feature → task) maps to a directory containing an index.md. Parent directories recursively summarize everything below them. Tasks are leaf folders — their index.md contains subtasks as sections rather than nested directories.
+
+#### Design folder naming conventions, index.md content schema, and recursive summary contract for each PRD level
+*task · completed · priority: critical · started 2026-04-27 · completed 2026-04-27 · tags: prd, storage, design*
+
+Produce a written spec covering: directory-naming rules (slugified title + short ID suffix for collision resistance), mandatory fields per level in index.md (title, status, description, acceptance criteria, LoE), and the recursive children-summary block that every non-leaf index.md must include. The spec becomes the contract for serializer and parser implementations and must be committed to docs/ and referenced from CLAUDE.md.
+
+#### Implement PRD-to-folder-tree serializer that writes nested directories with index.md files
+*task · in_progress · priority: critical · started 2026-04-27 · tags: prd, storage, serializer*
+
+Build the serializer that takes the in-memory PRD tree and writes it to disk as a nested folder hierarchy under .rex/prd/. Epic folders contain feature subfolders; feature folders contain task subfolders; task folders contain only index.md. Each parent index.md includes a human-readable summary of all items below it. Serialization must be incremental: only changed subtrees are rewritten.
+
+#### Implement folder-tree-to-PRD parser that aggregates index.md files into the PRD item tree
+*task · completed · priority: critical · started 2026-04-27 · completed 2026-04-27 · tags: prd, storage, parser*
+
+Build the inverse of the serializer: traverse the .rex/prd/ folder hierarchy, parse each index.md, and reconstruct the full PRD item tree in memory. The parser must handle missing files, malformed frontmatter, and partial trees without aborting, and must emit structured warnings for any items it cannot read.
+
+### CLI and MCP Write Command Integration with Folder Tree
+*feature · pending*
+
+Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation.
+
+#### Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation
+*task · pending · priority: critical · tags: prd, cli, write*
+
+Modify rex add, edit, remove, and move so that after every write to PRDStore, the affected subtree is re-serialized to the folder structure on disk. add creates a new folder and updates all ancestor index.md summaries; edit rewrites the item's index.md and propagates summary changes upward; remove deletes the folder and cleans parent summaries; move relocates the folder and updates both old and new parent summaries.
+
+#### Update rex read commands (status, next, validate) to read PRD from folder tree
+*task · pending · priority: high · tags: prd, cli, read*
+
+Wire rex status, rex next, and rex validate to read the PRD from the folder tree via the parser rather than from the legacy single-file store. Verify that command output is byte-for-byte identical to the single-file baseline for the same dataset, and that commands fall back gracefully when neither format is present.
+
+#### Update ndx plan, ndx recommend, and all MCP write tools to propagate writes to the folder tree
+*task · pending · priority: high · tags: prd, mcp, orchestration*
+
+Ensure that ndx plan --accept, ndx recommend --accept, and all MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) route their writes through the folder-tree serializer after every mutation. MCP tools must complete within existing latency budgets.
+
+### Folder Tree Migration, Initialization, and Auto-Trigger
+*feature · pending*
+
+Provide a first-run migration path from prd.md to the folder-tree format, integrate folder scaffolding into ndx init, and implement automatic migration detection so existing projects upgrade transparently.
+
+#### Implement rex migrate-to-folder-tree command and auto-trigger detection
+*task · pending · priority: high · tags: prd, migration, cli, init*
+
+Build a one-shot CLI command (rex migrate-to-folder-tree) that reads the existing prd.md, runs the serializer, and writes the full folder tree to .rex/prd/. Auto-trigger this migration transparently the first time any read or write command runs and detects prd.md without a prd/ folder. The command must be idempotent and print a creation summary.
+
+### Test Suite Updates for Folder-Tree PRD Storage
+*feature · pending*
+
+Update all existing PRD-related unit, integration, and e2e tests to exercise the folder-tree storage backend, and add new tests covering the serializer, parser, round-trip fidelity, and full CLI pipeline correctness.
+
+#### Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
+*task · pending · priority: high · tags: prd, tests, unit*
+
+Refactor existing PRDStore unit tests in packages/rex/tests/ to use folder-tree fixtures. Add focused unit tests for the serializer (assert correct folder structure for known PRD input) and parser (assert correct item tree for known folder structure). Assert that parent index.md summary sections are updated after every write.
+
+#### Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands
+*task · pending · priority: high · tags: prd, tests, integration, e2e*
+
+Update rex CLI integration tests (add, edit, remove, move, status, next, validate) to assert correct folder-tree state after each command. Add an e2e test that runs the full ndx plan --accept → folder tree → rex status pipeline and asserts folder tree consistency. All test cases must use temporary directories and clean up after themselves.
