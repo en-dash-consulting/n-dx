@@ -270,6 +270,9 @@ export class FileStore implements PRDStore {
       if (!parsed.ok) {
         throw new Error(`Invalid ${PRD_MARKDOWN_FILENAME}: ${parsed.error.message}`);
       }
+      // Markdown is a merged view — ownership lives in the JSON sources.
+      // Populate the ownership map so subsequent writes route per-file.
+      await this.ensureOwnershipMap();
       return parsed.data;
     } catch (error) {
       const code = (error as NodeJS.ErrnoException | undefined)?.code;

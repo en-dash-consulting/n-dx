@@ -4,1041 +4,6 @@ schema: rex/v1
 
 # n-dx-internal
 
-## Documentation Refresh for Recent PRD Changes
-
-```rex-meta
-id: "5687b9ba-5dae-4a5f-b1d4-d43176351357"
-level: epic
-status: completed
-completedAt: "2026-04-23T03:15:07.843Z"
-source: smart-add
-startedAt: "2026-04-23T03:15:07.843Z"
-```
-
-### Audit Recent Merges and Catalog Documentation Gaps
-
-```rex-meta
-id: "4c28fbf8-94bd-4950-8ad8-24578929ab44"
-level: feature
-status: completed
-completedAt: "2026-04-23T02:50:03.489Z"
-source: smart-add
-startedAt: "2026-04-23T02:50:03.489Z"
-```
-
-Review merges from the past week to identify all user-facing behavior changes, then map each change to the documentation files that need updating. Produces a working list that drives the rest of the documentation work.
-
-#### Audit past-week merges and produce a documentation delta report
-
-```rex-meta
-id: "292dff9b-7b0c-406e-b1db-468128d58a11"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - git log --since='7 days ago' output captured and each merge categorized
-  - Delta report lists every merge with affected doc files and a one-line description of what needs to change
-  - "Report covers at minimum: branch-scoped PRD targeting, cross-PRD duplicate detection, multi-file PRD migration, and multi-file backend validation"
-  - Report identifies documentation files with zero required changes so they can be skipped explicitly
-completedAt: "2026-04-23T02:50:03.477Z"
-resolutionDetail: "Produced docs/doc-delta-audit.md: categorized all 7 past-week main-branch merges + 10 feature/new-PRD-design commits, mapped each to required edits in README.md / CLAUDE.md / AGENTS.md / PACKAGE_GUIDELINES.md / TESTING.md / per-package READMEs, and listed doc files requiring zero changes."
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T02:44:58.277Z"
-tags:
-  - documentation
-  - audit
-```
-
-Run git log for the last 7 days on main and feature branches, categorize each merged change by whether it affects the PRD structure, CLI surface, MCP tools, or architectural conventions, and produce a delta report mapping each change to the markdown files that need updating (README.md, CLAUDE.md, AGENTS.md, PACKAGE_GUIDELINES.md, TESTING.md, and per-package READMEs). The recent commits include cross-PRD duplicate detection, branch-scoped PRD file targeting, multi-file PRD migration, and MCP/CLI/dashboard multi-file validation — each of these likely has doc implications.
-
-### Update Documentation for New PRD Structure
-
-```rex-meta
-id: "ef9224cb-e708-4ff4-9dcd-954a86905915"
-level: feature
-status: pending
-mergedProposals:
-  - proposalNodeKey: p0:feature:2
-    proposalTitle: Documentation Updates for Markdown-First PRD Storage
-    proposalKind: feature
-    reason: semantic_title
-    score: 0.6206896551724138
-    mergedAt: "2026-04-23T19:21:18.765Z"
-    source: smart-add
-source: smart-add
-startedAt: "2026-04-23T03:15:07.837Z"
-```
-
-Apply the documentation changes identified in the audit across all markdown files, ensuring the new multi-file branch-scoped PRD structure is accurately described everywhere it is referenced. Includes a reserved slot for a structural diagram.
-
-#### Update root and package READMEs for new PRD structure and recent merges
-
-```rex-meta
-id: "1132550d-e4dc-4103-b86a-c849b46d60f5"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - All README files referencing .rex/prd.json describe the multi-file format accurately
-  - Migration behavior from single prd.json to branch-scoped format is documented with before/after file layout
-  - Cross-PRD duplicate detection is described where add/recommend workflows are documented
-  - CLI examples and command output in READMEs match current behavior for ndx add, rex add, and related commands
-  - No broken cross-references between READMEs remain after edits
-completedAt: "2026-04-23T03:06:08.854Z"
-resolutionDetail: Added legacy-migration note to README.md §Output Files and packages/rex/README.md §Project structure (new §PRD file layout subsection with before/after file tree). Other package READMEs already match current single-file PRD behavior — no edits needed for PRD scope.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T03:02:59.730Z"
-tags:
-  - documentation
-  - readme
-```
-
-Revise README.md, packages/rex/README.md, packages/core/README.md, and any other package READMEs that reference .rex/prd.json or PRD workflow to reflect the branch-scoped multi-file PRD format, the migration path from single-file prd.json, cross-PRD duplicate detection behavior, and any CLI/MCP surface changes from recent merges. Replace outdated examples and command output snippets where the behavior has changed.
-
-#### Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend
-
-```rex-meta
-id: "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - assistant-assets/project-guidance.md updated with multi-file PRD layout and branch-scoping behavior
-  - claude-addendum.md updated if any Claude-specific deep sections reference PRD file layout
-  - CLAUDE.md Key Files table reflects actual .rex/ directory contents under multi-file format
-  - AGENTS.md regenerated from updated source and contains the same PRD-structure updates
-  - MCP concurrency contract section mentions multi-file write implications if applicable
-  - ndx init regeneration verified to produce no unexpected diffs beyond the intended updates
-  - CLAUDE.md Key Files table lists .rex/prd.md as primary PRD storage; .rex/prd.json entry notes it is a sync artifact
-  - AGENTS.md Key Files table updated consistently with CLAUDE.md
-  - Concurrency contract table rows that reference .rex/prd.json are updated to .rex/prd.md
-  - MCP write tools documentation notes that mutations write to prd.md (with prd.json as secondary sync)
-  - assistant-assets/project-guidance.md updated so ndx init regenerates correct instruction files
-  - No remaining documentation references prd.json as the sole or primary PRD storage location
-completedAt: "2026-04-24T15:41:44.804Z"
-mergedProposals:
-  - proposalNodeKey: p0:task:2:0
-    proposalTitle: Update CLAUDE.md, AGENTS.md, and assistant-assets to reference prd.md as primary storage
-    proposalKind: task
-    reason: content_overlap
-    score: 0.7461046133853151
-    mergedAt: "2026-04-23T19:21:18.765Z"
-    source: smart-add
-source: smart-add
-startedAt: "2026-04-23T02:51:02.824Z"
-tags:
-  - documentation
-  - assistant-instructions
-  - docs
-  - rex
-```
-
-Update CLAUDE.md and AGENTS.md (plus their shared source assistant-assets/project-guidance.md and claude-addendum.md) so assistant instructions reflect the multi-file branch-scoped PRD layout, the .rex/ directory structure under the new format, and the MCP concurrency rules as they apply to multi-file writes. Ensure the 'Key Files' table and any PRD-related examples are current. Regenerate AGENTS.md and CLAUDE.md via ndx init after editing the assistant-assets source so both stay in sync.
-
-#### Add PRD structure diagram placeholder with 'img_here' label
-
-```rex-meta
-id: "2e6f0a74-f49b-4bd6-92ab-088db5568c58"
-level: task
-status: completed
-priority: medium
-acceptanceCriteria:
-  - A placeholder block with the literal text 'img_here' is present in the PRD-structure documentation section
-  - The placeholder is accompanied by a caption or surrounding text describing the intended diagram content
-  - The placeholder appears in at minimum one primary doc location where readers first encounter the PRD structure
-  - The placeholder uses a markdown-friendly format (e.g. image syntax or clearly marked block) that renders cleanly and is easy to find-and-replace
-completedAt: "2026-04-23T03:10:36.889Z"
-resolutionDetail: "Added markdown image-syntax placeholders with the literal label 'img_here' plus descriptive captions in two primary doc locations: root README.md (after the §Output Files legacy PRD migration note) and packages/rex/README.md (in the §PRD file layout subsection). Captions describe the intended diagram — the legacy branch-scoped multi-file layout (prd_{branch}_{date}.json) and its consolidation into the single canonical .rex/prd.json with sources renamed to .backup.<timestamp> on first load. The image syntax `![img_here](img_here)` is trivially find-and-replaceable when the real image is produced."
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T03:09:12.193Z"
-tags:
-  - documentation
-  - diagram
-```
-
-Insert a reserved placeholder for a diagram of the new PRD structure in the primary documentation location (README.md and/or CLAUDE.md where the PRD format is first introduced) using the literal label 'img_here' so the user can replace it with the actual image later. Include a short caption describing what the diagram should depict (branch-scoped multi-file layout and their relationships) so the replacement image has clear intent.
-
-#### Update supporting docs (PACKAGE_GUIDELINES, TESTING, workflow docs) for recent merges
-
-```rex-meta
-id: "9a7cb6af-cd94-4904-9e5a-1274e996fc09"
-level: task
-status: completed
-priority: medium
-acceptanceCriteria:
-  - PACKAGE_GUIDELINES.md references to PRD layout or rex add pipelines are current
-  - TESTING.md reflects any new or updated required tests from recent merges (e.g. multi-file validation)
-  - Any workflow documentation describing the add/recommend pipeline matches current branch-scoped targeting behavior
-  - All updated docs are cross-checked against the audit delta report — no listed change is missing a corresponding doc update
-  - Running a spell/link check or equivalent confirms no broken internal links introduced by edits
-completedAt: "2026-04-23T03:15:07.826Z"
-resolutionDetail: Updated TESTING.md Required Coverage table + scenario-to-file pointer table for legacy multi-file PRD migration, cross-vendor authoring regression, self-heal test gate, Codex-batch fallback, and pair-programming cross-vendor review. Added single-file PRD invariant paragraph to PACKAGE_GUIDELINES.md §.rex/ Write-Access Protocol. Verified no workflow guide docs reference branch-scoped or multi-file layouts (grep-clean across docs/guide/*). Cross-checked with docs/doc-delta-audit.md §3.4/§3.5/§6. Docs-only — no code or link breakage.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T03:10:48.937Z"
-tags:
-  - documentation
-  - testing
-  - architecture
-```
-
-Update PACKAGE_GUIDELINES.md, TESTING.md, and any workflow or architecture documents that reference PRD file layout, add/recommend pipelines, or duplicate detection behavior. Ensure test documentation reflects any new required tests or validation from the multi-file backend validation merge, and that architectural guidance mentions the new file-targeting behavior where relevant.
-
-#### Update rex package README and PACKAGE_GUIDELINES for markdown-first storage
-
-```rex-meta
-id: "8894ca28-c09b-4fb7-a704-cde878a0990f"
-level: task
-status: pending
-priority: medium
-acceptanceCriteria:
-  - packages/rex/README.md contains a Storage section documenting prd.md as primary, dual-write to prd.json, and the automatic migration path
-  - PACKAGE_GUIDELINES.md updated to reference prd.md wherever prd.json storage format is discussed
-  - TESTING.md updated if any test guidance references prd.json as the file to inspect or seed
-  - "Migration path is clearly described: automatic on first load, or manual via `rex migrate-to-md`"
-  - README documents how to read and manually edit prd.md, including which fields are required vs optional
-source: smart-add
-tags:
-  - docs
-  - rex
-```
-
-Update packages/rex/README.md to document the new markdown storage format with a Storage section covering the schema overview, dual-write behavior, and migration path. Update PACKAGE_GUIDELINES.md and TESTING.md wherever prd.json file format or storage conventions are referenced to reflect the markdown-primary model.
-
-## PRD Storage Consolidation
-
-```rex-meta
-id: "1c4e4162-d5e6-4e2b-ad45-ead62b9a5508"
-level: epic
-status: completed
-completedAt: "2026-04-23T02:30:34.826Z"
-source: smart-add
-startedAt: "2026-04-23T02:30:34.826Z"
-```
-
-### Consolidate PRD Files into Single 'prd' File
-
-```rex-meta
-id: "be363df5-da5d-42a8-b5fa-6bfaf294982d"
-level: feature
-status: completed
-completedAt: "2026-04-23T02:30:34.820Z"
-source: smart-add
-startedAt: "2026-04-23T02:30:34.820Z"
-```
-
-Unify the branch-scoped multi-file PRD storage back into a single canonical file named 'prd' for both newly generated and existing PRDs, including migration of any existing split files.
-
-#### Merge branch-scoped PRD files into single canonical 'prd' file
-
-```rex-meta
-id: "37c43e3c-bcce-432c-a953-9685f1618999"
-level: task
-status: completed
-priority: critical
-acceptanceCriteria:
-  - Rex store reads and writes a single file named 'prd' at the new canonical location
-  - Existing multi-file / branch-scoped PRD layouts are auto-migrated into the unified 'prd' file on first load
-  - No PRD items, logs, or metadata are lost during migration (verified by round-trip test)
-  - CLI commands (rex add, ndx add, plan, status) operate against the unified file
-  - MCP write tools (add_item, edit_item, update_task_status, merge_items, move_item) target the unified file
-completedAt: "2026-04-23T01:54:23.844Z"
-source: smart-add
-startedAt: "2026-04-23T01:33:12.091Z"
-tags:
-  - rex
-  - storage
-  - migration
-```
-
-Replace the current multi-file branch-scoped PRD storage with a single consolidated file named 'prd' at the new canonical location. Combine content from any existing split files during load, write to the unified location on save, and add a one-time migration path that folds legacy multi-file layouts into the new single-file format without data loss.
-
-#### Update PRD storage tests for single-file 'prd' location
-
-```rex-meta
-id: "54be143d-cb14-4fe1-89e1-376b8a224755"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - All rex store tests reference the new single 'prd' file path
-  - Tests covering branch-scoped multi-file behavior are either removed or converted into migration tests
-  - New test verifies legacy multi-file fixture migrates into the unified file with identical item/log content
-  - Integration tests for ndx add, rex add, plan, and status pass against the new location
-  - pnpm test passes across rex and web packages with the updated layout
-completedAt: "2026-04-23T02:30:34.809Z"
-resolutionDetail: Added legacy multi-file fixture under packages/rex/tests/fixtures/legacy-multifile-prd/ and a new prd-migration.test.ts describe block that copies the fixture into a fresh .rex/, runs migrateLegacyPRD (and resolveStore), and asserts the merged prd.json has identical item content and that execution-log.jsonl is preserved byte-for-byte. Prior multi-file test suites had already been removed/converted; every remaining rex and web test references the single prd.json. Full rex (3457) and web (2618) test suites pass.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T02:22:15.872Z"
-tags:
-  - rex
-  - tests
-  - migration
-```
-
-Revise unit, integration, and e2e tests that assume the branch-scoped multi-file PRD layout so they target the new single 'prd' file location. Add migration coverage that exercises loading a legacy multi-file fixture and verifying it collapses correctly into the unified file.
-
-## Hench Autonomous Execution Improvements
-
-```rex-meta
-id: "365af34f-65ef-4fa0-adc5-bf07665d9efa"
-level: epic
-status: completed
-completedAt: "2026-04-23T03:25:03.721Z"
-source: smart-add
-startedAt: "2026-04-23T03:25:03.721Z"
-```
-
-### Commit Approval Bypass for Autonomous Runs
-
-```rex-meta
-id: "3ca4d0d8-070b-476f-8c90-79bf6b349021"
-level: feature
-status: completed
-completedAt: "2026-04-23T03:25:03.715Z"
-source: smart-add
-startedAt: "2026-04-23T03:25:03.715Z"
-```
-
-Allow ndx work invocations running in non-interactive autonomous modes (--auto, --loop) to skip the interactive commit message approval gate, so unattended runs don't stall waiting for user input.
-
-#### Bypass commit message approval when ndx work runs with --auto or --loop
-
-```rex-meta
-id: "eee22417-50e4-41a3-8749-cd55f3190d8a"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - ndx work --auto completes commits without prompting for commit message approval
-  - ndx work --loop completes commits without prompting for commit message approval
-  - ndx work (no auto/loop flags) still prompts for commit message approval as before
-  - The bypass is driven by the same flag state that governs other autonomous behaviors, not a separate toggle
-  - Unit or integration test covers both the bypass and the interactive path
-completedAt: "2026-04-23T03:25:03.702Z"
-resolutionDetail: "Added `autonomous` flag to SharedLoopOptions/FinalizeRunOptions, computed as `auto || loop || epicByEpic` in run.ts, and propagated it through runOne → cliLoop/agentLoop → finalizeRun → performCommitPromptIfNeeded. The approval prompt is now bypassed when either `yes` or `autonomous` is set (same mechanism that already gates task autoselect). Exported performCommitPromptIfNeeded for direct unit testing; new integration test packages/hench/tests/integration/commit-prompt.test.ts covers three cases: autonomous bypass (commits using the proposed message, no prompt), interactive path (readline is invoked and user decision respected), and --yes bypass. All 2483 hench tests pass; typecheck clean across the monorepo. Two pre-existing zone-cohesion e2e failures (tick zone cohesion 0.44 < 0.5; stale `sync` entry in COHESION_EXCEPTIONS) are unrelated to this change — verified against git stash. No commit-config toggle was introduced; reused existing auto/loop flag state per AC #4."
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T03:15:37.947Z"
-tags:
-  - hench
-  - agent
-  - cli
-```
-
-The hench agent's commit workflow currently prompts the user to approve generated commit messages before finalizing a commit. In autonomous modes (--auto, --loop), there is no interactive user to respond, causing runs to hang or time out. Detect these flags at the point the commit-approval check is invoked and skip the prompt, falling back to the generated commit message without confirmation. Preserve the existing interactive behavior for normal (non-autonomous) runs.
-
-## Token Usage and Duration Tracking for PRD Items
-
-```rex-meta
-id: "bf433438-aa34-4026-a98b-6eb65866c30f"
-level: epic
-status: completed
-completedAt: "2026-04-23T17:11:13.169Z"
-source: smart-add
-startedAt: "2026-04-23T17:11:13.169Z"
-```
-
-### Token Usage Attribution per PRD Item
-
-```rex-meta
-id: "aa92ccd9-989b-4296-8935-c83c771f34d0"
-level: feature
-status: completed
-completedAt: "2026-04-23T16:02:11.657Z"
-source: smart-add
-startedAt: "2026-04-23T16:02:11.657Z"
-```
-
-Capture and aggregate LLM token usage (input, output, cached, total) against the PRD item each hench run is working on, then roll those totals up the tree so tasks, features, and epics each expose their own usage.
-
-#### Attribute hench run token usage to the active PRD task
-
-```rex-meta
-id: "34344b18-f2a4-43d0-822c-27c7d2e97837"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - Each entry written under `.hench/runs/` includes the rex item ID the run targeted and an aggregated token-usage object (input, output, cached, total)
-  - A rex/hench gateway helper returns `{ itemId, tokens }` tuples for all completed runs without re-parsing transcripts on every call
-  - Runs that fail or are aborted still record whatever usage was consumed so rollups are not silently undercounted
-  - "Unit tests cover: run with a task ID, run with a subtask ID, run aborted mid-loop, and run with zero usage"
-completedAt: "2026-04-23T15:50:43.494Z"
-resolutionDetail: Added RunTokens `{input, output, cached, total}` schema + normalizeRunTokens() helper. saveRun() auto-stamps the tuple on every write so failed/aborted/zero-usage runs all persist joinable totals. Added store/run-token-index.ts with listCompletedRunTokens() returning {runId, itemId, tokens, status, finishedAt} tuples for every terminal-state run — reads structured run JSON only, no transcript parsing. Exposed via public.ts. Extended Zod validator to accept the tokens field and the previously-missing 'cancelled' run status. Added 11 unit tests covering task ID, subtask ID, aborted mid-loop (cancelled + failed), zero usage, legacy-record fallback, and multi-status filtering.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T15:38:24.782Z"
-tags:
-  - hench
-  - rex
-  - telemetry
-```
-
-Extend the hench run recorder to stamp each run with the rex task/subtask ID it executed against and persist per-run token totals (input, output, cached, total) in a form that can be joined back to the PRD. Today `.hench/runs/` captures usage per run but there is no durable link from a run to the specific PRD item, which blocks any per-task or per-feature rollup.
-
-#### Roll up token usage from subtasks to tasks, features, and epics
-
-```rex-meta
-id: "61022482-f8de-4c2b-8cc0-78946df52c94"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - A pure function `aggregateTokenUsage(prd, runs)` returns a map of `itemId -> { self, descendants, total }` token counts
-  - Totals on a parent equal the sum of its own usage plus all descendant usage, verified by a property-style test on a synthetic tree
-  - Aggregation handles items with no runs, items archived/pruned, and orphan run entries whose item IDs are no longer in the PRD (orphans reported separately, not silently dropped)
-  - The aggregator is exposed through the existing rex MCP surface (new tool or extension of `get_prd_status`) and returns in under 50ms on a PRD with 500 items and 5k runs in a benchmark test
-completedAt: "2026-04-23T16:02:11.645Z"
-resolutionDetail: Added pure per-PRD-item token rollup (aggregateItemTokenUsage) in packages/rex/src/core/item-token-rollup.ts + get_token_usage MCP tool. Tests cover self/descendants/total rollup, property-style invariant on random trees, orphan handling, and sub-50ms perf on 500 items × 5k runs.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T15:52:30.570Z"
-tags:
-  - rex
-  - aggregation
-  - mcp
-```
-
-Add a rex-side aggregator that walks the PRD tree and sums per-item token usage from hench run data, exposing totals on every node so the dashboard and MCP consumers can read usage at any level without recomputing. Rollups must stay consistent with the single-file PRD invariant and be cheap enough to compute on every dashboard poll.
-
-### Task Duration Tracking
-
-```rex-meta
-id: "db3f2b10-1f3d-46be-a276-9274fceff25d"
-level: feature
-status: completed
-completedAt: "2026-04-23T17:11:13.162Z"
-source: smart-add
-startedAt: "2026-04-23T17:11:13.162Z"
-```
-
-Record start and end timestamps for work on a task so the system can report either elapsed duration (completed) or running duration (in progress), and roll those durations up to features and epics alongside token usage.
-
-#### Record task start and end timestamps from hench runs and status transitions
-
-```rex-meta
-id: "89bd6c5d-093b-480d-91ba-965289768925"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - "`.rex/prd.json` items gain `startedAt`, `endedAt`, and `activeIntervals: [{start, end}]` fields, backfilled as optional so existing PRDs load unchanged"
-  - Starting a task that is already in-progress does not overwrite the original `startedAt`; re-opening a completed task appends a new interval
-  - "A helper `getTaskDuration(item, now)` returns `{ elapsedMs, isRunning }` and is unit-tested for: never-started, running, completed, and re-opened tasks"
-  - Writes go through the existing PRD store so the single-file invariant and on-load migration behavior are preserved
-completedAt: "2026-04-23T16:16:21.009Z"
-resolutionDetail: Added startedAt/endedAt/activeIntervals timing fields to PRDItem; extended computeTimestampUpdates to stamp them on every status transition; shipped getTaskDuration helper with 14 unit tests.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T16:03:02.619Z"
-tags:
-  - rex
-  - prd
-  - timing
-```
-
-Whenever a task transitions to in-progress (via `update_task_status`, `ndx work`, or MCP) capture a `startedAt`; when it transitions to completed capture an `endedAt`. Persist both on the PRD item in `.rex/prd.json` so duration is derivable without replaying the execution log. Handle the case where a task is picked up multiple times by accumulating active intervals rather than overwriting.
-
-#### Aggregate durations up the PRD tree and expose alongside token usage
-
-```rex-meta
-id: "8f8ab3e2-bd78-4dff-8f01-5545ad395728"
-level: task
-status: completed
-priority: medium
-acceptanceCriteria:
-  - The PRD status accessor returns `{ tokens, duration }` for every item, where `duration` is `{ totalMs, runningMs, isRunning }`
-  - Running duration updates on each call based on `now` without mutating stored state
-  - Completed subtrees report a stable `totalMs` that does not change between calls
-  - "Tests cover: epic with all completed tasks, epic with one running task, and epic with a re-opened task whose intervals overlap chronologically"
-completedAt: "2026-04-23T17:11:13.151Z"
-resolutionDetail: Added pure aggregateItemDurations to rex core (packages/rex/src/core/item-duration-rollup.ts), extended the get_token_usage MCP handler to return { tokens, duration } per item, wired duration through the web rex-gateway and /api/hench/task-usage endpoint, and updated the dashboard viewer to consume rolled-up duration for parent rows. 12 new rex tests + 2 new web wire tests. Completed subtrees report stable totalMs; running subtrees report live runningMs via injected `now`. No mutation of stored interval state.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T16:54:46.650Z"
-tags:
-  - rex
-  - aggregation
-  - mcp
-```
-
-Extend the rollup layer so features and epics report total time spent (sum of descendant task durations) and, for in-progress subtrees, a live running duration. Expose these values through the same rex accessor/MCP tool that serves token rollups so the dashboard can fetch both in one call.
-
-### Dashboard UI for Usage and Duration
-
-```rex-meta
-id: "ab5ab1c8-0e01-4db6-ada2-025504b83c89"
-level: feature
-status: completed
-completedAt: "2026-04-23T16:54:04.708Z"
-source: smart-add
-startedAt: "2026-04-23T16:54:04.708Z"
-```
-
-Surface per-item token usage and duration in the web dashboard so users can see, at a glance, how much LLM spend and wall-clock time each task, feature, and epic has consumed.
-
-#### Render token usage and duration columns on the PRD tree view
-
-```rex-meta
-id: "4fdeed51-b742-4d6e-a321-42d2be246084"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - "PRD tree rows display `tokens` (formatted with thousands separators) and `duration` (human-readable: `1.2s`, `4m 10s`, `2h 15m`) for tasks, features, and epics"
-  - Rows for in-progress tasks update their duration at least once per second without refetching the whole tree
-  - Rollup values on a parent row visually distinguish self vs. descendant contribution (e.g. tooltip or secondary text) so users can tell whether an epic's cost is concentrated in one task
-  - UI remains usable on a PRD with 500 items — rendering and live updates stay under a 16ms-per-frame budget in a profiled test
-  - Empty states (no runs yet, task never started) render as `—` rather than `0` to avoid implying work was done
-completedAt: "2026-04-23T16:54:04.691Z"
-resolutionDetail: Added token-rollup and live-duration columns to the PRD tree view.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T16:17:13.092Z"
-tags:
-  - web
-  - ui
-  - dashboard
-```
-
-Add columns (or inline badges) to the existing PRD tree view in the web dashboard showing total tokens and duration for every task, feature, and epic. Running tasks should show a live-updating elapsed time; completed tasks show their final duration. Values come from the new rex accessor so no client-side aggregation is needed.
-
-## PRD Context Graph Visualization
-
-```rex-meta
-id: "e4f88e2c-6c5a-4e6e-89cf-3376e5ecadf2"
-level: epic
-status: pending
-source: smart-add
-```
-
-### PRD Merge Context Graph View
-
-```rex-meta
-id: "a32f8a34-2c34-4ea1-9652-d85d0ba4e8d2"
-level: feature
-status: pending
-source: smart-add
-```
-
-Interactive visual graph in the dashboard that shows the PRD tree as a context graph overlaid with git merge history, so users can see which PRD items correspond to which merges and what code changes were introduced in each merge.
-
-#### Build merge history data pipeline linking git merges to PRD items
-
-```rex-meta
-id: "3b7bdd81-eb20-42c7-89b1-145131665551"
-level: task
-status: pending
-priority: high
-acceptanceCriteria:
-  - New dashboard API endpoint returns a graph payload containing PRD nodes, merge nodes, and edges between them
-  - Merge commits are correlated to PRD items using commit message references, hench run metadata, and branch names
-  - Endpoint returns file change summaries (added/modified/deleted paths) per merge
-  - Payload is incrementally cacheable and invalidates when new merges land or PRD is updated
-  - Unit and integration tests cover merge-to-PRD correlation, including merges with no PRD linkage
-completedAt: "2026-04-23T19:26:28.368Z"
-source: smart-add
-startedAt: "2026-04-23T19:16:08.551Z"
-tags:
-  - web
-  - backend
-  - prd
-  - git
-```
-
-Create a backend data pipeline that walks the git log for merge commits, extracts the files and PRD item IDs affected in each merge (via commit message parsing and hench run attribution), and serves the merged graph data through a new dashboard API endpoint. This is the data foundation for the visualization — without accurate merge-to-PRD linkage, the visual graph is just a tree.
-
-#### Render interactive PRD-and-merge context graph in the dashboard
-
-```rex-meta
-id: "72855b7e-99c5-47cb-a742-45a160e0cf58"
-level: task
-status: pending
-priority: high
-acceptanceCriteria:
-  - New route in the dashboard renders PRD items and merge commits as a connected graph
-  - Clicking a merge node shows the list of files added, modified, and deleted in that merge
-  - Clicking a PRD node highlights all merges that contributed to it
-  - View supports filtering by epic, feature, date range, and completion status
-  - Graph degrades gracefully for repos with no merge history and for PRD items with no associated merges
-  - View is reachable from the existing PRD tree view with a clear toggle or link
-source: smart-add
-tags:
-  - web
-  - frontend
-  - viewer
-  - ui
-```
-
-Build a new dashboard view that renders the PRD tree as a force-directed or hierarchical context graph with merge commit nodes attached to the PRD items they implemented. Users should be able to pan, zoom, select a merge node to see the files it added/changed, and filter by epic, feature, or time range. This gives users a single visual surface to understand how code shipped into the repo maps back to planned work.
-
-## PRD Markdown Storage Format
-
-```rex-meta
-id: "fe673c36-ffc7-45c4-b6d2-09f7112eb214"
-level: epic
-status: completed
-completedAt: "2026-04-24T16:20:10.167Z"
-source: smart-add
-startedAt: "2026-04-24T16:20:10.167Z"
-```
-
-### Markdown Schema Design and Bidirectional Serialization
-
-```rex-meta
-id: "6687abd2-80f8-43e0-973e-f5242b635378"
-level: feature
-status: completed
-completedAt: "2026-04-24T14:24:27.208Z"
-source: smart-add
-startedAt: "2026-04-24T14:24:27.208Z"
-```
-
-Define a human-readable markdown format that encodes all PRD fields with full fidelity, and implement serializers/parsers for converting between the in-memory PRD tree and markdown representations.
-
-#### Design and document the markdown schema for full-fidelity PRD tree representation
-
-```rex-meta
-id: "52811e0d-fa0f-4cf8-9879-020d35f90473"
-level: task
-status: completed
-priority: critical
-acceptanceCriteria:
-  - Schema spec document exists at packages/rex/docs/prd-markdown-schema.md
-  - "All current PRD field types are covered: strings, arrays (tags, acceptanceCriteria), numbers (loe), enums (status, priority, loeConfidence), ISO timestamps (startedAt, completedAt), and nested token/duration objects"
-  - Hierarchy levels epic/feature/task/subtask are distinguishable from markdown heading level alone
-  - Metadata encoding is consistent and unambiguous — a field present in JSON must have exactly one encoding in markdown with no information collision
-  - "Edge cases documented: null/undefined fields, empty arrays, special characters in titles, multi-line descriptions"
-completedAt: "2026-04-23T19:46:56.962Z"
-resolutionDetail: Created packages/rex/docs/prd-markdown-schema.md — authoritative spec for the PRD markdown format covering all fields, hierarchy encoding, edge cases, and parser/serializer contracts.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T19:26:31.234Z"
-tags:
-  - rex
-  - storage
-  - markdown
-```
-
-Define a markdown structure that captures every PRD field (id, status, priority, tags, description, acceptanceCriteria, loe, loeRationale, loeConfidence, startedAt, completedAt, tokenUsage, duration) without loss. The schema must be both human-readable and machine-parseable. Hierarchy (epic → feature → task → subtask) is encoded via heading levels; metadata fields use a consistent encoding such as YAML front-matter blocks or structured HTML comment annotations. Produce a spec document under the rex package to serve as the authoritative reference for parser and serializer implementations.
-
-#### Implement bidirectional markdown serializer and parser with round-trip fidelity tests
-
-```rex-meta
-id: "35ccf9ee-0cb4-48b8-8aa3-185d76939c20"
-level: task
-status: completed
-priority: critical
-acceptanceCriteria:
-  - Serializer converts a complete in-memory PRD tree to a markdown string that matches the schema spec
-  - Parser reconstructs the exact PRD tree from a valid serialized markdown string
-  - "Round-trip invariant holds: serialize(parse(serialize(tree))) deep-equals serialize(tree) for any valid PRD tree"
-  - All field types survive round-trip without type coercion (numbers stay numbers, arrays stay arrays)
-  - Parser returns a typed error (not an uncaught exception) for malformed input
-  - Unit tests achieve ≥90% line coverage for both serializer and parser modules
-completedAt: "2026-04-24T14:24:27.185Z"
-resolutionDetail: Implemented markdown-serializer.ts and markdown-parser.ts with self-contained YAML codec. Exported from public.ts. 128 new tests covering full field set, round-trip invariant, and all edge cases. All 3711 existing tests pass.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-23T19:49:17.111Z"
-tags:
-  - rex
-  - storage
-  - markdown
-  - testing
-```
-
-Build a markdown serializer (PRD tree → .md string) and a markdown parser (.md string → PRD tree) inside the rex package, conforming to the schema spec. All fields must survive a round-trip without loss or mutation. Include comprehensive tests covering the full field set, multi-level nesting, and edge cases such as empty descriptions, missing optional fields, and special characters.
-
-### PRD Store Integration with Dual-Write and First-Run Migration
-
-```rex-meta
-id: "1306e659-dcaf-4303-b890-a8fdd5b706c8"
-level: feature
-status: completed
-completedAt: "2026-04-24T16:20:10.156Z"
-source: smart-add
-startedAt: "2026-04-24T16:20:10.156Z"
-```
-
-Integrate the markdown format as the primary read/write target in the PRD store while keeping prd.json synchronized for backward compatibility, and automate migration from existing JSON files on first use.
-
-#### Integrate markdown as primary read/write format in PRDStore with JSON dual-write
-
-```rex-meta
-id: "97b24996-6ca7-46de-a2bf-1355ebc12e9f"
-level: task
-status: deferred
-priority: critical
-acceptanceCriteria:
-  - PRDStore.load() reads from .rex/prd.md when the file exists; falls back to .rex/prd.json when prd.md is absent
-  - PRDStore.save() writes .rex/prd.md first, then syncs .rex/prd.json; a write error on the json sync is logged but does not throw
-  - All rex commands (status, next, add, edit, update, move, merge) operate correctly with markdown as primary storage
-  - MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) persist to prd.md and the json sync follows
-  - prd.json content equals JSON.stringify(parse(prd.md)) after every mutation
-  - All existing PRDStore unit and integration tests pass without modification
-source: smart-add
-startedAt: "2026-04-24T15:54:10.082Z"
-tags:
-  - rex
-  - storage
-  - refactor
-```
-
-Update the PRD store (packages/rex/src/core/) to read from and write to .rex/prd.md as the primary storage file. On every save, also write the equivalent JSON to .rex/prd.json to keep it current for backward-compatible tooling. All existing store operations (load, save, add, edit, update, merge, move) must work transparently. The store falls back to reading .rex/prd.json if .rex/prd.md does not exist, enabling the migration path. Dual-write failure must not leave prd.md in an inconsistent state.
-
-#### Build automatic first-run migration and explicit rex migrate-to-md CLI command
-
-```rex-meta
-id: "7143e2a0-7c77-45ed-b3e5-d588a11b3b27"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - Automatic migration fires in PRDStore.load() when .rex/prd.md is absent and .rex/prd.json is present, producing .rex/prd.md
-  - "`rex migrate-to-md` command exists, is documented in `rex --help`, and produces .rex/prd.md from .rex/prd.json"
-  - "Migration output passes the round-trip fidelity test: parse(migrate(prd.json)) deep-equals the original in-memory tree"
-  - All fields are preserved including timestamps, token usage, duration, and completed/in_progress status
-  - Original .rex/prd.json is NOT deleted or modified by either migration path
-  - Migration emits a clear success message including the output path; errors surface as typed failures with actionable messages
-completedAt: "2026-04-24T16:05:53.263Z"
-source: smart-add
-startedAt: "2026-04-24T15:55:40.852Z"
-tags:
-  - rex
-  - migration
-  - storage
-```
-
-Implement a migration that runs automatically in PRDStore.load() the first time a project is opened after the update (prd.md absent, prd.json present) and converts the existing JSON PRD to markdown. Expose the same logic as an explicit `rex migrate-to-md` CLI command for manual invocation. The original prd.json must not be modified. No data loss is acceptable.
-
-#### Write end-to-end and concurrency tests for markdown-primary PRD storage
-
-```rex-meta
-id: "3b442642-e7e9-49a4-96fc-debd8da30fc1"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - "Integration test covers: init → add → edit → update_status → move using prd.md as primary, verifying prd.json stays in sync after each step"
-  - "Fallback path test: PRDStore.load() with only prd.json present triggers migration and subsequent reads come from prd.md"
-  - "Concurrent write test: two rapid mutations do not corrupt prd.md or produce a prd.json that diverges from it"
-  - Existing PRD storage tests in tests/integration/ updated to validate both prd.md and prd.json after mutations
-  - Test suite passes on both macOS and Linux CI environments
-completedAt: "2026-04-24T16:20:10.138Z"
-source: smart-add
-startedAt: "2026-04-24T16:08:51.271Z"
-tags:
-  - rex
-  - testing
-  - storage
-```
-
-Add integration and e2e tests that exercise the full lifecycle of prd.md as primary storage: initialization, mutation via CLI and MCP tools, dual-write consistency, fallback path, and concurrent write safety. Ensure the existing domain-isolation and PRD storage tests are updated to cover the markdown layer.
-
-## PRD Item Branch and File Attribution
-
-```rex-meta
-id: "b81be3e0-2651-4773-9127-420132e31604"
-level: epic
-status: pending
-source: smart-add
-```
-
-### Branch Attribution Metadata on PRD Items
-
-```rex-meta
-id: "578686b2-4fab-45a3-a452-28a8dc45231f"
-level: feature
-status: pending
-source: smart-add
-```
-
-Extend the PRD item schema and write paths so each item records the git branch and source file it was created or last modified on, enabling provenance tracking across the tool chain.
-
-#### Add branch and source-file fields to PRD item schema and storage
-
-```rex-meta
-id: "95037bd6-871c-4a16-bf90-90a081dbfe9e"
-level: task
-status: completed
-priority: high
-acceptanceCriteria:
-  - "PRD item schema accepts optional `branch: string` and `sourceFile: string` fields at all levels (epic, feature, task, subtask)"
-  - Fields are preserved through JSON serialization and deserialization without data loss
-  - Existing items that lack these fields remain valid and load without error
-  - "`rex status --format=json` output includes `branch` and `sourceFile` when present on an item"
-completedAt: "2026-04-24T16:44:27.245Z"
-endedAt: "2026-04-24T16:44:27.245Z"
-resolutionDetail: Added optional branch/sourceFile fields to PRD item typing and validation, preserved them in markdown serialization, and added validation, store round-trip, and status JSON coverage.
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-24T16:39:25.070Z"
-tags:
-  - rex
-  - schema
-  - backend
-```
-
-PRD items currently carry no record of which git branch or PRD file they originate from. Adding optional `branch` and `sourceFile` fields to the item schema is the prerequisite for all downstream attribution display. The fields must survive JSON round-trips and remain backward-compatible so existing PRD files need no migration.
-
-#### Populate branch attribution on item create and edit across all write paths
-
-```rex-meta
-id: "07714a07-008e-4254-a0cd-56b15766afa4"
-level: task
-status: pending
-priority: high
-acceptanceCriteria:
-  - "`rex add` and `ndx add` set `branch` to the current git branch on newly created items"
-  - MCP `add_item` and `edit_item` set `branch` to the current git branch at call time
-  - Hench runs set `branch` on the task they act on at run start
-  - "`update_task_status` updates `branch` to reflect the branch active at the time of the status change"
-  - Branch detection fails gracefully when git is unavailable — field is omitted rather than crashing
-  - "`sourceFile` is set to the resolved path of the active `.rex/prd.json` (or markdown equivalent) at write time"
-source: smart-add
-tags:
-  - rex
-  - hench
-  - mcp
-  - backend
-```
-
-When a PRD item is created or updated through any write path — `rex add`, `ndx add`, MCP `add_item`/`edit_item`/`update_task_status`, or a hench run — automatically capture the current git branch and PRD file path as attribution metadata. This makes attribution automatic rather than opt-in, ensuring the UI has data to display without requiring user action.
-
-### Branch Attribution Display in PRD Dashboard
-
-```rex-meta
-id: "9f96a45d-092e-4ea2-a76d-b21551cedbba"
-level: feature
-status: pending
-source: smart-add
-```
-
-Surface branch and file attribution visually in the dashboard PRD tree view so users can immediately see which items are actively being worked on and on which branch, without leaving the dashboard.
-
-#### Include branch and file attribution in rex API and MCP status responses
-
-```rex-meta
-id: "d355da37-c17c-4a29-a18b-96ad2e854555"
-level: task
-status: pending
-priority: high
-acceptanceCriteria:
-  - "`GET /api/status` response includes `branch` and `sourceFile` on each item node when present"
-  - "`get_prd_status` MCP tool response includes the same fields"
-  - The `LoadedData` TypeScript schema in `external.ts` is updated to carry the new fields
-  - Items without attribution serialize as `null` (not empty string or omitted key) for consistent client-side checks
-  - No regression in existing status response fields or structure
-source: smart-add
-tags:
-  - web
-  - api
-  - rex
-  - mcp
-```
-
-The web server `/api/status` route and the `get_prd_status` MCP tool must propagate `branch` and `sourceFile` fields from PRD items into their response payloads so the dashboard viewer has the data it needs to render attribution badges. This is the data plumbing prerequisite for the UI rendering task.
-
-#### Render branch badges on PRD tree rows and add branch filter to toolbar
-
-```rex-meta
-id: "982777ca-fa74-4b7a-ae46-5c4329cf8ace"
-level: task
-status: pending
-priority: high
-acceptanceCriteria:
-  - Each tree row renders a visually distinct badge showing the branch name when the item has `branch` set
-  - Items without `branch` attribution show no badge and no empty placeholder
-  - Hovering or clicking the branch badge shows a tooltip with the full `sourceFile` path
-  - Branch badges are visually distinct from existing status badges (color, shape, or prefix)
-  - A branch filter dropdown appears in the PRD tree toolbar only when items from more than one branch are present in the loaded data
-  - Selecting a branch in the filter hides items whose `branch` does not match; selecting 'All' restores the full tree
-  - Filter state is preserved through same-session navigation (e.g., switching tabs and returning)
-  - No visual regression on tree rows that have no attribution data
-source: smart-add
-tags:
-  - web
-  - ui
-  - dashboard
-  - preact
-```
-
-Display a compact branch badge on each PRD tree row (epic, feature, task, subtask) when `branch` is set, and add a branch filter control to the tree toolbar so users can focus the view on items belonging to a specific branch. Items without attribution display no badge. The filter should be unobtrusive when only one branch is present.
-
-## Self-Heal Loop Scoped Execution
-
-```rex-meta
-id: "0feb4eb5-79e3-435d-83ab-5cbf4eb7f235"
-level: epic
-status: pending
-source: smart-add
-```
-
-### Self-Heal Tag Attribution on Created PRD Items
-
-```rex-meta
-id: "2e184cee-25e9-4811-af0a-da72bb9c366f"
-level: feature
-status: pending
-source: smart-add
-```
-
-Ensure that every PRD item created or added during a self-heal run is automatically tagged with 'self-heal', making it easy to distinguish autonomously-created remediation work from manually-authored PRD items.
-
-#### Auto-tag PRD items created during self-heal runs with 'self-heal' marker
-
-```rex-meta
-id: "a699a497-d58e-4c3d-afc7-b029b2b3c2ee"
-level: task
-status: pending
-priority: high
-acceptanceCriteria:
-  - All PRD items created via ndx self-heal carry the 'self-heal' tag
-  - Items created outside of self-heal (manual adds, ndx plan) do NOT receive the tag
-  - Tag is written to prd storage at item creation time, not applied post-hoc
-  - Existing PRD items without the tag are not modified by a self-heal run
-source: smart-add
-tags:
-  - self-heal
-  - rex
-  - hench
-```
-
-When ndx self-heal creates new PRD items (via rex add, recommend --accept, or direct MCP writes), automatically apply the 'self-heal' tag to each item at creation time. This covers items created during the analyze → recommend → execute cycle within a self-heal run.
-
-### Self-Heal Scoped Task Selection and Auto-Termination
-
-```rex-meta
-id: "ae28134a-cb7d-4427-87f0-55094e3500d0"
-level: feature
-status: completed
-completedAt: "2026-04-24T15:25:12.963Z"
-source: smart-add
-startedAt: "2026-04-24T15:25:12.963Z"
-```
-
-Restrict hench task selection during self-heal runs to only pick up items tagged 'self-heal', and automatically stop the loop once all such items are resolved — without spilling into unrelated PRD work.
-
-#### Filter hench task selection to self-heal tagged items when running in self-heal mode
-
-```rex-meta
-id: "4fc2aacd-651b-4499-8555-2a6f2c8007ba"
-level: task
-status: completed
-priority: critical
-acceptanceCriteria:
-  - ndx self-heal passes a 'self-heal' tag constraint to hench/rex task selection
-  - rex get_next_task returns only tasks tagged 'self-heal' when the filter is active
-  - Non-self-heal tasks are never started or modified during a self-heal run
-  - Tag filter is reflected in the hench run brief and run logs
-completedAt: "2026-04-24T15:03:15.777Z"
-resolutionDetail: Added tags filter to PrioritizationOptions, findNextTask, findActionableTasks; threaded through hench run via --tags flag; ndx self-heal now passes --tags=self-heal
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-24T14:36:54.749Z"
-tags:
-  - self-heal
-  - hench
-  - rex
-```
-
-Pass a tag filter from ndx self-heal into the hench run invocation so that rex get_next_task only surfaces self-heal tagged items. Prevents the agent from accidentally picking up and completing unrelated PRD tasks during a self-heal session.
-
-#### Implement self-heal loop auto-termination when all self-heal items are completed
-
-```rex-meta
-id: "ed9b7154-5527-4646-b421-dc25b5095a84"
-level: task
-status: completed
-priority: critical
-acceptanceCriteria:
-  - Loop exits with a success message when zero pending 'self-heal' items remain
-  - Loop does NOT continue to non-self-heal tasks after completing all self-heal items
-  - Termination condition is evaluated after each completed task, not only at loop start
-  - Final status output lists the self-heal items resolved in the run and their outcome
-completedAt: "2026-04-24T15:25:12.939Z"
-resolutionDetail: "Added post-task tag-filter check in runLoop: after each runOne call when tags are set, hasPendingTaggedTasks queries the PRD and breaks with formatTagFilterCompletionSummary output if none remain. Includes 8 new tests for the exported formatter."
-resolutionType: code-change
-source: smart-add
-startedAt: "2026-04-24T15:18:06.587Z"
-tags:
-  - self-heal
-  - hench
-```
-
-After each hench iteration within a self-heal run, check whether any pending self-heal tagged items remain. If none remain, exit the loop cleanly and report completion — rather than continuing to the next generic PRD task or looping indefinitely.
-
-## Hench Autonomous Execution Improvements
-
-```rex-meta
-id: "cbe4e682-3315-4e77-a4a9-aea17c51a8e2"
-level: epic
-status: pending
-source: smart-add
-```
-
-### Ctrl-C Interrupt Rollback Prompt Coordination
-
-```rex-meta
-id: "469c7900-cd34-4919-bc40-5f474a96654a"
-level: feature
-status: pending
-source: smart-add
-```
-
-When the user interrupts the work loop with Ctrl-C, the existing SIGINT handler (which calls process.exit(1) on a second Ctrl-C) remains active while the rollback confirmation prompt is waiting for readline input. Any Ctrl-C during the prompt immediately kills the process before the user can answer. The handler must be suspended for the duration of the rollback prompt and restored (or replaced with the default) afterward.
-
-#### Suspend custom SIGINT handler during rollback confirmation prompt
-
-```rex-meta
-id: "5cfeee22-c15d-40ec-aa66-0983959703f5"
-level: task
-status: pending
-priority: high
-acceptanceCriteria:
-  - After a single Ctrl-C during a running task, the 'Roll back N uncommitted file(s)? [Y/n]' prompt appears and remains active
-  - A second Ctrl-C while the rollback prompt is displayed does NOT call process.exit(1); it either cancels the readline cleanly or is ignored until the user types a response
-  - Answering 'y' at the rollback prompt reverts files and exits cleanly
-  - Answering 'n' at the rollback prompt skips the rollback and exits cleanly
-  - The same fix applies to the commit confirmation prompt (promptCommitConfirm) — a Ctrl-C during that prompt does not bypass the question
-  - Non-interactive mode (--yes or non-TTY) is unaffected
-source: smart-add
-tags:
-  - hench
-  - ux
-  - signal-handling
-```
-
-In shared.ts's performRollbackIfNeeded (and the promptRollbackConfirm helper it calls), the outer runLoop/epicByEpicLoop SIGINT handler is still registered and will call process.exit(1) on a second Ctrl-C. Before opening the readline prompt, temporarily remove the custom SIGINT listener (or restore SIG_DFL) so that the terminal behaves normally during the interactive question. Re-register (or re-override) the handler after the readline closes. The same issue exists in promptCommitConfirm — apply the same fix there. The fix should be coordinated so that callers pass a cleanup/suspend callback, or promptRollbackConfirm accepts an AbortSignal that lets it cleanly cancel if the outer loop is torn down.
-
-#### Add integration tests for Ctrl-C interrupt and rollback prompt interaction
-
-```rex-meta
-id: "20bbb688-65c2-4331-a508-5b5700272200"
-level: task
-status: pending
-priority: medium
-acceptanceCriteria:
-  - Test confirms that after SIGINT the rollback prompt is presented when dirty files exist
-  - Test confirms that responding 'y' causes revertChanges to be called
-  - Test confirms that responding 'n' leaves files in place and exits without error
-  - Test confirms that a second SIGINT during the prompt does not call process.exit(1) and allows the readline to complete
-  - Tests run in CI without requiring a real TTY (use isTTY mocking or pipe-mode)
-source: smart-add
-tags:
-  - hench
-  - testing
-  - signal-handling
-```
-
-The interrupt-to-rollback path currently has no automated coverage. Add integration tests that simulate a SIGINT mid-run, verify the rollback prompt is displayed, and assert correct behavior for both 'confirm' and 'skip' responses. Cover the edge case where a second SIGINT arrives while the prompt is open.
-
 ## Web Dashboard
 
 ```rex-meta
@@ -36608,3 +35573,1178 @@ tags:
 ```
 
 After the agent loop exits due to a Ctrl+C cancellation, invoke the same rollback prompt flow that already exists for failed runs. If the user confirms, revert all git-tracked file changes made during the run and reset the PRD task status back to its pre-run value (e.g. 'pending'). If the user declines, leave changes in place and mark the task status appropriately (e.g. 'in_progress' or 'pending'). This reuses the existing rollback infrastructure — the goal is to route the cancellation path through it.
+
+## Documentation Refresh for Recent PRD Changes
+
+```rex-meta
+id: "5687b9ba-5dae-4a5f-b1d4-d43176351357"
+level: epic
+status: completed
+completedAt: "2026-04-23T03:15:07.843Z"
+source: smart-add
+startedAt: "2026-04-23T03:15:07.843Z"
+```
+
+### Audit Recent Merges and Catalog Documentation Gaps
+
+```rex-meta
+id: "4c28fbf8-94bd-4950-8ad8-24578929ab44"
+level: feature
+status: completed
+completedAt: "2026-04-23T02:50:03.489Z"
+source: smart-add
+startedAt: "2026-04-23T02:50:03.489Z"
+```
+
+Review merges from the past week to identify all user-facing behavior changes, then map each change to the documentation files that need updating. Produces a working list that drives the rest of the documentation work.
+
+#### Audit past-week merges and produce a documentation delta report
+
+```rex-meta
+id: "292dff9b-7b0c-406e-b1db-468128d58a11"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - git log --since='7 days ago' output captured and each merge categorized
+  - Delta report lists every merge with affected doc files and a one-line description of what needs to change
+  - "Report covers at minimum: branch-scoped PRD targeting, cross-PRD duplicate detection, multi-file PRD migration, and multi-file backend validation"
+  - Report identifies documentation files with zero required changes so they can be skipped explicitly
+completedAt: "2026-04-23T02:50:03.477Z"
+resolutionDetail: "Produced docs/doc-delta-audit.md: categorized all 7 past-week main-branch merges + 10 feature/new-PRD-design commits, mapped each to required edits in README.md / CLAUDE.md / AGENTS.md / PACKAGE_GUIDELINES.md / TESTING.md / per-package READMEs, and listed doc files requiring zero changes."
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T02:44:58.277Z"
+tags:
+  - documentation
+  - audit
+```
+
+Run git log for the last 7 days on main and feature branches, categorize each merged change by whether it affects the PRD structure, CLI surface, MCP tools, or architectural conventions, and produce a delta report mapping each change to the markdown files that need updating (README.md, CLAUDE.md, AGENTS.md, PACKAGE_GUIDELINES.md, TESTING.md, and per-package READMEs). The recent commits include cross-PRD duplicate detection, branch-scoped PRD file targeting, multi-file PRD migration, and MCP/CLI/dashboard multi-file validation — each of these likely has doc implications.
+
+### Update Documentation for New PRD Structure
+
+```rex-meta
+id: "ef9224cb-e708-4ff4-9dcd-954a86905915"
+level: feature
+status: completed
+completedAt: "2026-04-24T20:55:20.195Z"
+mergedProposals:
+  - proposalNodeKey: p0:feature:2
+    proposalTitle: Documentation Updates for Markdown-First PRD Storage
+    proposalKind: feature
+    reason: semantic_title
+    score: 0.6206896551724138
+    mergedAt: "2026-04-23T19:21:18.765Z"
+    source: smart-add
+source: smart-add
+startedAt: "2026-04-23T03:15:07.837Z"
+```
+
+Apply the documentation changes identified in the audit across all markdown files, ensuring the new multi-file branch-scoped PRD structure is accurately described everywhere it is referenced. Includes a reserved slot for a structural diagram.
+
+#### Update root and package READMEs for new PRD structure and recent merges
+
+```rex-meta
+id: "1132550d-e4dc-4103-b86a-c849b46d60f5"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - All README files referencing .rex/prd.json describe the multi-file format accurately
+  - Migration behavior from single prd.json to branch-scoped format is documented with before/after file layout
+  - Cross-PRD duplicate detection is described where add/recommend workflows are documented
+  - CLI examples and command output in READMEs match current behavior for ndx add, rex add, and related commands
+  - No broken cross-references between READMEs remain after edits
+completedAt: "2026-04-23T03:06:08.854Z"
+resolutionDetail: Added legacy-migration note to README.md §Output Files and packages/rex/README.md §Project structure (new §PRD file layout subsection with before/after file tree). Other package READMEs already match current single-file PRD behavior — no edits needed for PRD scope.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T03:02:59.730Z"
+tags:
+  - documentation
+  - readme
+```
+
+Revise README.md, packages/rex/README.md, packages/core/README.md, and any other package READMEs that reference .rex/prd.json or PRD workflow to reflect the branch-scoped multi-file PRD format, the migration path from single-file prd.json, cross-PRD duplicate detection behavior, and any CLI/MCP surface changes from recent merges. Replace outdated examples and command output snippets where the behavior has changed.
+
+#### Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend
+
+```rex-meta
+id: "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - assistant-assets/project-guidance.md updated with multi-file PRD layout and branch-scoping behavior
+  - claude-addendum.md updated if any Claude-specific deep sections reference PRD file layout
+  - CLAUDE.md Key Files table reflects actual .rex/ directory contents under multi-file format
+  - AGENTS.md regenerated from updated source and contains the same PRD-structure updates
+  - MCP concurrency contract section mentions multi-file write implications if applicable
+  - ndx init regeneration verified to produce no unexpected diffs beyond the intended updates
+  - CLAUDE.md Key Files table lists .rex/prd.md as primary PRD storage; .rex/prd.json entry notes it is a sync artifact
+  - AGENTS.md Key Files table updated consistently with CLAUDE.md
+  - Concurrency contract table rows that reference .rex/prd.json are updated to .rex/prd.md
+  - MCP write tools documentation notes that mutations write to prd.md (with prd.json as secondary sync)
+  - assistant-assets/project-guidance.md updated so ndx init regenerates correct instruction files
+  - No remaining documentation references prd.json as the sole or primary PRD storage location
+completedAt: "2026-04-24T15:41:44.804Z"
+mergedProposals:
+  - proposalNodeKey: p0:task:2:0
+    proposalTitle: Update CLAUDE.md, AGENTS.md, and assistant-assets to reference prd.md as primary storage
+    proposalKind: task
+    reason: content_overlap
+    score: 0.7461046133853151
+    mergedAt: "2026-04-23T19:21:18.765Z"
+    source: smart-add
+source: smart-add
+startedAt: "2026-04-23T02:51:02.824Z"
+tags:
+  - documentation
+  - assistant-instructions
+  - docs
+  - rex
+```
+
+Update CLAUDE.md and AGENTS.md (plus their shared source assistant-assets/project-guidance.md and claude-addendum.md) so assistant instructions reflect the multi-file branch-scoped PRD layout, the .rex/ directory structure under the new format, and the MCP concurrency rules as they apply to multi-file writes. Ensure the 'Key Files' table and any PRD-related examples are current. Regenerate AGENTS.md and CLAUDE.md via ndx init after editing the assistant-assets source so both stay in sync.
+
+#### Add PRD structure diagram placeholder with 'img_here' label
+
+```rex-meta
+id: "2e6f0a74-f49b-4bd6-92ab-088db5568c58"
+level: task
+status: completed
+priority: medium
+acceptanceCriteria:
+  - A placeholder block with the literal text 'img_here' is present in the PRD-structure documentation section
+  - The placeholder is accompanied by a caption or surrounding text describing the intended diagram content
+  - The placeholder appears in at minimum one primary doc location where readers first encounter the PRD structure
+  - The placeholder uses a markdown-friendly format (e.g. image syntax or clearly marked block) that renders cleanly and is easy to find-and-replace
+completedAt: "2026-04-23T03:10:36.889Z"
+resolutionDetail: "Added markdown image-syntax placeholders with the literal label 'img_here' plus descriptive captions in two primary doc locations: root README.md (after the §Output Files legacy PRD migration note) and packages/rex/README.md (in the §PRD file layout subsection). Captions describe the intended diagram — the legacy branch-scoped multi-file layout (prd_{branch}_{date}.json) and its consolidation into the single canonical .rex/prd.json with sources renamed to .backup.<timestamp> on first load. The image syntax `![img_here](img_here)` is trivially find-and-replaceable when the real image is produced."
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T03:09:12.193Z"
+tags:
+  - documentation
+  - diagram
+```
+
+Insert a reserved placeholder for a diagram of the new PRD structure in the primary documentation location (README.md and/or CLAUDE.md where the PRD format is first introduced) using the literal label 'img_here' so the user can replace it with the actual image later. Include a short caption describing what the diagram should depict (branch-scoped multi-file layout and their relationships) so the replacement image has clear intent.
+
+#### Update supporting docs (PACKAGE_GUIDELINES, TESTING, workflow docs) for recent merges
+
+```rex-meta
+id: "9a7cb6af-cd94-4904-9e5a-1274e996fc09"
+level: task
+status: completed
+priority: medium
+acceptanceCriteria:
+  - PACKAGE_GUIDELINES.md references to PRD layout or rex add pipelines are current
+  - TESTING.md reflects any new or updated required tests from recent merges (e.g. multi-file validation)
+  - Any workflow documentation describing the add/recommend pipeline matches current branch-scoped targeting behavior
+  - All updated docs are cross-checked against the audit delta report — no listed change is missing a corresponding doc update
+  - Running a spell/link check or equivalent confirms no broken internal links introduced by edits
+completedAt: "2026-04-23T03:15:07.826Z"
+resolutionDetail: Updated TESTING.md Required Coverage table + scenario-to-file pointer table for legacy multi-file PRD migration, cross-vendor authoring regression, self-heal test gate, Codex-batch fallback, and pair-programming cross-vendor review. Added single-file PRD invariant paragraph to PACKAGE_GUIDELINES.md §.rex/ Write-Access Protocol. Verified no workflow guide docs reference branch-scoped or multi-file layouts (grep-clean across docs/guide/*). Cross-checked with docs/doc-delta-audit.md §3.4/§3.5/§6. Docs-only — no code or link breakage.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T03:10:48.937Z"
+tags:
+  - documentation
+  - testing
+  - architecture
+```
+
+Update PACKAGE_GUIDELINES.md, TESTING.md, and any workflow or architecture documents that reference PRD file layout, add/recommend pipelines, or duplicate detection behavior. Ensure test documentation reflects any new required tests or validation from the multi-file backend validation merge, and that architectural guidance mentions the new file-targeting behavior where relevant.
+
+#### Update rex package README and PACKAGE_GUIDELINES for markdown-first storage
+
+```rex-meta
+id: "8894ca28-c09b-4fb7-a704-cde878a0990f"
+level: task
+status: completed
+priority: medium
+acceptanceCriteria:
+  - packages/rex/README.md contains a Storage section documenting prd.md as primary, dual-write to prd.json, and the automatic migration path
+  - PACKAGE_GUIDELINES.md updated to reference prd.md wherever prd.json storage format is discussed
+  - TESTING.md updated if any test guidance references prd.json as the file to inspect or seed
+  - "Migration path is clearly described: automatic on first load, or manual via `rex migrate-to-md`"
+  - README documents how to read and manually edit prd.md, including which fields are required vs optional
+completedAt: "2026-04-24T20:55:20.172Z"
+resolutionDetail: Added Storage section to packages/rex/README.md documenting prd.md as primary, dual-write to prd.json, automatic on-load migration, manual migration via rex migrate-to-md, required vs optional fields, and how to edit prd.md by hand. Updated PACKAGE_GUIDELINES.md (.rex/ write-access protocol) to describe markdown-primary with prd.json as derived sync artifact, dual-write invariant, and updated write-ownership table. Updated TESTING.md rex integration scenario list to call out JSON→markdown migration and dual-write, and added test-file pointers for prd-md-migration, file-adapter-markdown-migration, markdown-roundtrip, and prd-write-routing.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T20:51:00.332Z"
+tags:
+  - docs
+  - rex
+```
+
+Update packages/rex/README.md to document the new markdown storage format with a Storage section covering the schema overview, dual-write behavior, and migration path. Update PACKAGE_GUIDELINES.md and TESTING.md wherever prd.json file format or storage conventions are referenced to reflect the markdown-primary model.
+
+## PRD Storage Consolidation
+
+```rex-meta
+id: "1c4e4162-d5e6-4e2b-ad45-ead62b9a5508"
+level: epic
+status: completed
+completedAt: "2026-04-23T02:30:34.826Z"
+source: smart-add
+startedAt: "2026-04-23T02:30:34.826Z"
+```
+
+### Consolidate PRD Files into Single 'prd' File
+
+```rex-meta
+id: "be363df5-da5d-42a8-b5fa-6bfaf294982d"
+level: feature
+status: completed
+completedAt: "2026-04-23T02:30:34.820Z"
+source: smart-add
+startedAt: "2026-04-23T02:30:34.820Z"
+```
+
+Unify the branch-scoped multi-file PRD storage back into a single canonical file named 'prd' for both newly generated and existing PRDs, including migration of any existing split files.
+
+#### Merge branch-scoped PRD files into single canonical 'prd' file
+
+```rex-meta
+id: "37c43e3c-bcce-432c-a953-9685f1618999"
+level: task
+status: completed
+priority: critical
+acceptanceCriteria:
+  - Rex store reads and writes a single file named 'prd' at the new canonical location
+  - Existing multi-file / branch-scoped PRD layouts are auto-migrated into the unified 'prd' file on first load
+  - No PRD items, logs, or metadata are lost during migration (verified by round-trip test)
+  - CLI commands (rex add, ndx add, plan, status) operate against the unified file
+  - MCP write tools (add_item, edit_item, update_task_status, merge_items, move_item) target the unified file
+completedAt: "2026-04-23T01:54:23.844Z"
+source: smart-add
+startedAt: "2026-04-23T01:33:12.091Z"
+tags:
+  - rex
+  - storage
+  - migration
+```
+
+Replace the current multi-file branch-scoped PRD storage with a single consolidated file named 'prd' at the new canonical location. Combine content from any existing split files during load, write to the unified location on save, and add a one-time migration path that folds legacy multi-file layouts into the new single-file format without data loss.
+
+#### Update PRD storage tests for single-file 'prd' location
+
+```rex-meta
+id: "54be143d-cb14-4fe1-89e1-376b8a224755"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - All rex store tests reference the new single 'prd' file path
+  - Tests covering branch-scoped multi-file behavior are either removed or converted into migration tests
+  - New test verifies legacy multi-file fixture migrates into the unified file with identical item/log content
+  - Integration tests for ndx add, rex add, plan, and status pass against the new location
+  - pnpm test passes across rex and web packages with the updated layout
+completedAt: "2026-04-23T02:30:34.809Z"
+resolutionDetail: Added legacy multi-file fixture under packages/rex/tests/fixtures/legacy-multifile-prd/ and a new prd-migration.test.ts describe block that copies the fixture into a fresh .rex/, runs migrateLegacyPRD (and resolveStore), and asserts the merged prd.json has identical item content and that execution-log.jsonl is preserved byte-for-byte. Prior multi-file test suites had already been removed/converted; every remaining rex and web test references the single prd.json. Full rex (3457) and web (2618) test suites pass.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T02:22:15.872Z"
+tags:
+  - rex
+  - tests
+  - migration
+```
+
+Revise unit, integration, and e2e tests that assume the branch-scoped multi-file PRD layout so they target the new single 'prd' file location. Add migration coverage that exercises loading a legacy multi-file fixture and verifying it collapses correctly into the unified file.
+
+## Hench Autonomous Execution Improvements
+
+```rex-meta
+id: "365af34f-65ef-4fa0-adc5-bf07665d9efa"
+level: epic
+status: completed
+completedAt: "2026-04-23T03:25:03.721Z"
+source: smart-add
+startedAt: "2026-04-23T03:25:03.721Z"
+```
+
+### Commit Approval Bypass for Autonomous Runs
+
+```rex-meta
+id: "3ca4d0d8-070b-476f-8c90-79bf6b349021"
+level: feature
+status: completed
+completedAt: "2026-04-23T03:25:03.715Z"
+source: smart-add
+startedAt: "2026-04-23T03:25:03.715Z"
+```
+
+Allow ndx work invocations running in non-interactive autonomous modes (--auto, --loop) to skip the interactive commit message approval gate, so unattended runs don't stall waiting for user input.
+
+#### Bypass commit message approval when ndx work runs with --auto or --loop
+
+```rex-meta
+id: "eee22417-50e4-41a3-8749-cd55f3190d8a"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - ndx work --auto completes commits without prompting for commit message approval
+  - ndx work --loop completes commits without prompting for commit message approval
+  - ndx work (no auto/loop flags) still prompts for commit message approval as before
+  - The bypass is driven by the same flag state that governs other autonomous behaviors, not a separate toggle
+  - Unit or integration test covers both the bypass and the interactive path
+completedAt: "2026-04-23T03:25:03.702Z"
+resolutionDetail: "Added `autonomous` flag to SharedLoopOptions/FinalizeRunOptions, computed as `auto || loop || epicByEpic` in run.ts, and propagated it through runOne → cliLoop/agentLoop → finalizeRun → performCommitPromptIfNeeded. The approval prompt is now bypassed when either `yes` or `autonomous` is set (same mechanism that already gates task autoselect). Exported performCommitPromptIfNeeded for direct unit testing; new integration test packages/hench/tests/integration/commit-prompt.test.ts covers three cases: autonomous bypass (commits using the proposed message, no prompt), interactive path (readline is invoked and user decision respected), and --yes bypass. All 2483 hench tests pass; typecheck clean across the monorepo. Two pre-existing zone-cohesion e2e failures (tick zone cohesion 0.44 < 0.5; stale `sync` entry in COHESION_EXCEPTIONS) are unrelated to this change — verified against git stash. No commit-config toggle was introduced; reused existing auto/loop flag state per AC #4."
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T03:15:37.947Z"
+tags:
+  - hench
+  - agent
+  - cli
+```
+
+The hench agent's commit workflow currently prompts the user to approve generated commit messages before finalizing a commit. In autonomous modes (--auto, --loop), there is no interactive user to respond, causing runs to hang or time out. Detect these flags at the point the commit-approval check is invoked and skip the prompt, falling back to the generated commit message without confirmation. Preserve the existing interactive behavior for normal (non-autonomous) runs.
+
+## Token Usage and Duration Tracking for PRD Items
+
+```rex-meta
+id: "bf433438-aa34-4026-a98b-6eb65866c30f"
+level: epic
+status: completed
+completedAt: "2026-04-23T17:11:13.169Z"
+source: smart-add
+startedAt: "2026-04-23T17:11:13.169Z"
+```
+
+### Token Usage Attribution per PRD Item
+
+```rex-meta
+id: "aa92ccd9-989b-4296-8935-c83c771f34d0"
+level: feature
+status: completed
+completedAt: "2026-04-23T16:02:11.657Z"
+source: smart-add
+startedAt: "2026-04-23T16:02:11.657Z"
+```
+
+Capture and aggregate LLM token usage (input, output, cached, total) against the PRD item each hench run is working on, then roll those totals up the tree so tasks, features, and epics each expose their own usage.
+
+#### Attribute hench run token usage to the active PRD task
+
+```rex-meta
+id: "34344b18-f2a4-43d0-822c-27c7d2e97837"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - Each entry written under `.hench/runs/` includes the rex item ID the run targeted and an aggregated token-usage object (input, output, cached, total)
+  - A rex/hench gateway helper returns `{ itemId, tokens }` tuples for all completed runs without re-parsing transcripts on every call
+  - Runs that fail or are aborted still record whatever usage was consumed so rollups are not silently undercounted
+  - "Unit tests cover: run with a task ID, run with a subtask ID, run aborted mid-loop, and run with zero usage"
+completedAt: "2026-04-23T15:50:43.494Z"
+resolutionDetail: Added RunTokens `{input, output, cached, total}` schema + normalizeRunTokens() helper. saveRun() auto-stamps the tuple on every write so failed/aborted/zero-usage runs all persist joinable totals. Added store/run-token-index.ts with listCompletedRunTokens() returning {runId, itemId, tokens, status, finishedAt} tuples for every terminal-state run — reads structured run JSON only, no transcript parsing. Exposed via public.ts. Extended Zod validator to accept the tokens field and the previously-missing 'cancelled' run status. Added 11 unit tests covering task ID, subtask ID, aborted mid-loop (cancelled + failed), zero usage, legacy-record fallback, and multi-status filtering.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T15:38:24.782Z"
+tags:
+  - hench
+  - rex
+  - telemetry
+```
+
+Extend the hench run recorder to stamp each run with the rex task/subtask ID it executed against and persist per-run token totals (input, output, cached, total) in a form that can be joined back to the PRD. Today `.hench/runs/` captures usage per run but there is no durable link from a run to the specific PRD item, which blocks any per-task or per-feature rollup.
+
+#### Roll up token usage from subtasks to tasks, features, and epics
+
+```rex-meta
+id: "61022482-f8de-4c2b-8cc0-78946df52c94"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - A pure function `aggregateTokenUsage(prd, runs)` returns a map of `itemId -> { self, descendants, total }` token counts
+  - Totals on a parent equal the sum of its own usage plus all descendant usage, verified by a property-style test on a synthetic tree
+  - Aggregation handles items with no runs, items archived/pruned, and orphan run entries whose item IDs are no longer in the PRD (orphans reported separately, not silently dropped)
+  - The aggregator is exposed through the existing rex MCP surface (new tool or extension of `get_prd_status`) and returns in under 50ms on a PRD with 500 items and 5k runs in a benchmark test
+completedAt: "2026-04-23T16:02:11.645Z"
+resolutionDetail: Added pure per-PRD-item token rollup (aggregateItemTokenUsage) in packages/rex/src/core/item-token-rollup.ts + get_token_usage MCP tool. Tests cover self/descendants/total rollup, property-style invariant on random trees, orphan handling, and sub-50ms perf on 500 items × 5k runs.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T15:52:30.570Z"
+tags:
+  - rex
+  - aggregation
+  - mcp
+```
+
+Add a rex-side aggregator that walks the PRD tree and sums per-item token usage from hench run data, exposing totals on every node so the dashboard and MCP consumers can read usage at any level without recomputing. Rollups must stay consistent with the single-file PRD invariant and be cheap enough to compute on every dashboard poll.
+
+### Task Duration Tracking
+
+```rex-meta
+id: "db3f2b10-1f3d-46be-a276-9274fceff25d"
+level: feature
+status: completed
+completedAt: "2026-04-23T17:11:13.162Z"
+source: smart-add
+startedAt: "2026-04-23T17:11:13.162Z"
+```
+
+Record start and end timestamps for work on a task so the system can report either elapsed duration (completed) or running duration (in progress), and roll those durations up to features and epics alongside token usage.
+
+#### Record task start and end timestamps from hench runs and status transitions
+
+```rex-meta
+id: "89bd6c5d-093b-480d-91ba-965289768925"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - "`.rex/prd.json` items gain `startedAt`, `endedAt`, and `activeIntervals: [{start, end}]` fields, backfilled as optional so existing PRDs load unchanged"
+  - Starting a task that is already in-progress does not overwrite the original `startedAt`; re-opening a completed task appends a new interval
+  - "A helper `getTaskDuration(item, now)` returns `{ elapsedMs, isRunning }` and is unit-tested for: never-started, running, completed, and re-opened tasks"
+  - Writes go through the existing PRD store so the single-file invariant and on-load migration behavior are preserved
+completedAt: "2026-04-23T16:16:21.009Z"
+resolutionDetail: Added startedAt/endedAt/activeIntervals timing fields to PRDItem; extended computeTimestampUpdates to stamp them on every status transition; shipped getTaskDuration helper with 14 unit tests.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T16:03:02.619Z"
+tags:
+  - rex
+  - prd
+  - timing
+```
+
+Whenever a task transitions to in-progress (via `update_task_status`, `ndx work`, or MCP) capture a `startedAt`; when it transitions to completed capture an `endedAt`. Persist both on the PRD item in `.rex/prd.json` so duration is derivable without replaying the execution log. Handle the case where a task is picked up multiple times by accumulating active intervals rather than overwriting.
+
+#### Aggregate durations up the PRD tree and expose alongside token usage
+
+```rex-meta
+id: "8f8ab3e2-bd78-4dff-8f01-5545ad395728"
+level: task
+status: completed
+priority: medium
+acceptanceCriteria:
+  - The PRD status accessor returns `{ tokens, duration }` for every item, where `duration` is `{ totalMs, runningMs, isRunning }`
+  - Running duration updates on each call based on `now` without mutating stored state
+  - Completed subtrees report a stable `totalMs` that does not change between calls
+  - "Tests cover: epic with all completed tasks, epic with one running task, and epic with a re-opened task whose intervals overlap chronologically"
+completedAt: "2026-04-23T17:11:13.151Z"
+resolutionDetail: Added pure aggregateItemDurations to rex core (packages/rex/src/core/item-duration-rollup.ts), extended the get_token_usage MCP handler to return { tokens, duration } per item, wired duration through the web rex-gateway and /api/hench/task-usage endpoint, and updated the dashboard viewer to consume rolled-up duration for parent rows. 12 new rex tests + 2 new web wire tests. Completed subtrees report stable totalMs; running subtrees report live runningMs via injected `now`. No mutation of stored interval state.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T16:54:46.650Z"
+tags:
+  - rex
+  - aggregation
+  - mcp
+```
+
+Extend the rollup layer so features and epics report total time spent (sum of descendant task durations) and, for in-progress subtrees, a live running duration. Expose these values through the same rex accessor/MCP tool that serves token rollups so the dashboard can fetch both in one call.
+
+### Dashboard UI for Usage and Duration
+
+```rex-meta
+id: "ab5ab1c8-0e01-4db6-ada2-025504b83c89"
+level: feature
+status: completed
+completedAt: "2026-04-23T16:54:04.708Z"
+source: smart-add
+startedAt: "2026-04-23T16:54:04.708Z"
+```
+
+Surface per-item token usage and duration in the web dashboard so users can see, at a glance, how much LLM spend and wall-clock time each task, feature, and epic has consumed.
+
+#### Render token usage and duration columns on the PRD tree view
+
+```rex-meta
+id: "4fdeed51-b742-4d6e-a321-42d2be246084"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - "PRD tree rows display `tokens` (formatted with thousands separators) and `duration` (human-readable: `1.2s`, `4m 10s`, `2h 15m`) for tasks, features, and epics"
+  - Rows for in-progress tasks update their duration at least once per second without refetching the whole tree
+  - Rollup values on a parent row visually distinguish self vs. descendant contribution (e.g. tooltip or secondary text) so users can tell whether an epic's cost is concentrated in one task
+  - UI remains usable on a PRD with 500 items — rendering and live updates stay under a 16ms-per-frame budget in a profiled test
+  - Empty states (no runs yet, task never started) render as `—` rather than `0` to avoid implying work was done
+completedAt: "2026-04-23T16:54:04.691Z"
+resolutionDetail: Added token-rollup and live-duration columns to the PRD tree view.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T16:17:13.092Z"
+tags:
+  - web
+  - ui
+  - dashboard
+```
+
+Add columns (or inline badges) to the existing PRD tree view in the web dashboard showing total tokens and duration for every task, feature, and epic. Running tasks should show a live-updating elapsed time; completed tasks show their final duration. Values come from the new rex accessor so no client-side aggregation is needed.
+
+## PRD Context Graph Visualization
+
+```rex-meta
+id: "e4f88e2c-6c5a-4e6e-89cf-3376e5ecadf2"
+level: epic
+status: completed
+completedAt: "2026-04-24T19:59:27.577Z"
+source: smart-add
+startedAt: "2026-04-24T19:59:27.577Z"
+```
+
+### PRD Merge Context Graph View
+
+```rex-meta
+id: "a32f8a34-2c34-4ea1-9652-d85d0ba4e8d2"
+level: feature
+status: completed
+completedAt: "2026-04-24T19:59:27.566Z"
+source: smart-add
+startedAt: "2026-04-24T19:59:27.566Z"
+```
+
+Interactive visual graph in the dashboard that shows the PRD tree as a context graph overlaid with git merge history, so users can see which PRD items correspond to which merges and what code changes were introduced in each merge.
+
+#### Build merge history data pipeline linking git merges to PRD items
+
+```rex-meta
+id: "3b7bdd81-eb20-42c7-89b1-145131665551"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - New dashboard API endpoint returns a graph payload containing PRD nodes, merge nodes, and edges between them
+  - Merge commits are correlated to PRD items using commit message references, hench run metadata, and branch names
+  - Endpoint returns file change summaries (added/modified/deleted paths) per merge
+  - Payload is incrementally cacheable and invalidates when new merges land or PRD is updated
+  - Unit and integration tests cover merge-to-PRD correlation, including merges with no PRD linkage
+completedAt: "2026-04-24T19:31:22.575Z"
+source: smart-add
+startedAt: "2026-04-23T19:16:08.551Z"
+tags:
+  - web
+  - backend
+  - prd
+  - git
+```
+
+Create a backend data pipeline that walks the git log for merge commits, extracts the files and PRD item IDs affected in each merge (via commit message parsing and hench run attribution), and serves the merged graph data through a new dashboard API endpoint. This is the data foundation for the visualization — without accurate merge-to-PRD linkage, the visual graph is just a tree.
+
+#### Render interactive PRD-and-merge context graph in the dashboard
+
+```rex-meta
+id: "72855b7e-99c5-47cb-a742-45a160e0cf58"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - New route in the dashboard renders PRD items and merge commits as a connected graph
+  - Clicking a merge node shows the list of files added, modified, and deleted in that merge
+  - Clicking a PRD node highlights all merges that contributed to it
+  - View supports filtering by epic, feature, date range, and completion status
+  - Graph degrades gracefully for repos with no merge history and for PRD items with no associated merges
+  - View is reachable from the existing PRD tree view with a clear toggle or link
+completedAt: "2026-04-24T19:59:27.544Z"
+resolutionDetail: Built MergeGraphView component with hierarchical layout, pan/zoom, node selection, detail panel, and filter bar. Added merge-graph route, sidebar entry, and PRD view toggle.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T19:50:57.819Z"
+tags:
+  - web
+  - frontend
+  - viewer
+  - ui
+```
+
+Build a new dashboard view that renders the PRD tree as a force-directed or hierarchical context graph with merge commit nodes attached to the PRD items they implemented. Users should be able to pan, zoom, select a merge node to see the files it added/changed, and filter by epic, feature, or time range. This gives users a single visual surface to understand how code shipped into the repo maps back to planned work.
+
+## PRD Markdown Storage Format
+
+```rex-meta
+id: "fe673c36-ffc7-45c4-b6d2-09f7112eb214"
+level: epic
+status: completed
+completedAt: "2026-04-24T16:20:10.167Z"
+source: smart-add
+startedAt: "2026-04-24T16:20:10.167Z"
+```
+
+### Markdown Schema Design and Bidirectional Serialization
+
+```rex-meta
+id: "6687abd2-80f8-43e0-973e-f5242b635378"
+level: feature
+status: completed
+completedAt: "2026-04-24T14:24:27.208Z"
+source: smart-add
+startedAt: "2026-04-24T14:24:27.208Z"
+```
+
+Define a human-readable markdown format that encodes all PRD fields with full fidelity, and implement serializers/parsers for converting between the in-memory PRD tree and markdown representations.
+
+#### Design and document the markdown schema for full-fidelity PRD tree representation
+
+```rex-meta
+id: "52811e0d-fa0f-4cf8-9879-020d35f90473"
+level: task
+status: completed
+priority: critical
+acceptanceCriteria:
+  - Schema spec document exists at packages/rex/docs/prd-markdown-schema.md
+  - "All current PRD field types are covered: strings, arrays (tags, acceptanceCriteria), numbers (loe), enums (status, priority, loeConfidence), ISO timestamps (startedAt, completedAt), and nested token/duration objects"
+  - Hierarchy levels epic/feature/task/subtask are distinguishable from markdown heading level alone
+  - Metadata encoding is consistent and unambiguous — a field present in JSON must have exactly one encoding in markdown with no information collision
+  - "Edge cases documented: null/undefined fields, empty arrays, special characters in titles, multi-line descriptions"
+completedAt: "2026-04-23T19:46:56.962Z"
+resolutionDetail: Created packages/rex/docs/prd-markdown-schema.md — authoritative spec for the PRD markdown format covering all fields, hierarchy encoding, edge cases, and parser/serializer contracts.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T19:26:31.234Z"
+tags:
+  - rex
+  - storage
+  - markdown
+```
+
+Define a markdown structure that captures every PRD field (id, status, priority, tags, description, acceptanceCriteria, loe, loeRationale, loeConfidence, startedAt, completedAt, tokenUsage, duration) without loss. The schema must be both human-readable and machine-parseable. Hierarchy (epic → feature → task → subtask) is encoded via heading levels; metadata fields use a consistent encoding such as YAML front-matter blocks or structured HTML comment annotations. Produce a spec document under the rex package to serve as the authoritative reference for parser and serializer implementations.
+
+#### Implement bidirectional markdown serializer and parser with round-trip fidelity tests
+
+```rex-meta
+id: "35ccf9ee-0cb4-48b8-8aa3-185d76939c20"
+level: task
+status: completed
+priority: critical
+acceptanceCriteria:
+  - Serializer converts a complete in-memory PRD tree to a markdown string that matches the schema spec
+  - Parser reconstructs the exact PRD tree from a valid serialized markdown string
+  - "Round-trip invariant holds: serialize(parse(serialize(tree))) deep-equals serialize(tree) for any valid PRD tree"
+  - All field types survive round-trip without type coercion (numbers stay numbers, arrays stay arrays)
+  - Parser returns a typed error (not an uncaught exception) for malformed input
+  - Unit tests achieve ≥90% line coverage for both serializer and parser modules
+completedAt: "2026-04-24T14:24:27.185Z"
+resolutionDetail: Implemented markdown-serializer.ts and markdown-parser.ts with self-contained YAML codec. Exported from public.ts. 128 new tests covering full field set, round-trip invariant, and all edge cases. All 3711 existing tests pass.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-23T19:49:17.111Z"
+tags:
+  - rex
+  - storage
+  - markdown
+  - testing
+```
+
+Build a markdown serializer (PRD tree → .md string) and a markdown parser (.md string → PRD tree) inside the rex package, conforming to the schema spec. All fields must survive a round-trip without loss or mutation. Include comprehensive tests covering the full field set, multi-level nesting, and edge cases such as empty descriptions, missing optional fields, and special characters.
+
+### PRD Store Integration with Dual-Write and First-Run Migration
+
+```rex-meta
+id: "1306e659-dcaf-4303-b890-a8fdd5b706c8"
+level: feature
+status: completed
+completedAt: "2026-04-24T16:20:10.156Z"
+source: smart-add
+startedAt: "2026-04-24T16:20:10.156Z"
+```
+
+Integrate the markdown format as the primary read/write target in the PRD store while keeping prd.json synchronized for backward compatibility, and automate migration from existing JSON files on first use.
+
+#### Integrate markdown as primary read/write format in PRDStore with JSON dual-write
+
+```rex-meta
+id: "97b24996-6ca7-46de-a2bf-1355ebc12e9f"
+level: task
+status: deferred
+priority: critical
+acceptanceCriteria:
+  - PRDStore.load() reads from .rex/prd.md when the file exists; falls back to .rex/prd.json when prd.md is absent
+  - PRDStore.save() writes .rex/prd.md first, then syncs .rex/prd.json; a write error on the json sync is logged but does not throw
+  - All rex commands (status, next, add, edit, update, move, merge) operate correctly with markdown as primary storage
+  - MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) persist to prd.md and the json sync follows
+  - prd.json content equals JSON.stringify(parse(prd.md)) after every mutation
+  - All existing PRDStore unit and integration tests pass without modification
+source: smart-add
+startedAt: "2026-04-24T15:54:10.082Z"
+tags:
+  - rex
+  - storage
+  - refactor
+```
+
+Update the PRD store (packages/rex/src/core/) to read from and write to .rex/prd.md as the primary storage file. On every save, also write the equivalent JSON to .rex/prd.json to keep it current for backward-compatible tooling. All existing store operations (load, save, add, edit, update, merge, move) must work transparently. The store falls back to reading .rex/prd.json if .rex/prd.md does not exist, enabling the migration path. Dual-write failure must not leave prd.md in an inconsistent state.
+
+#### Build automatic first-run migration and explicit rex migrate-to-md CLI command
+
+```rex-meta
+id: "7143e2a0-7c77-45ed-b3e5-d588a11b3b27"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - Automatic migration fires in PRDStore.load() when .rex/prd.md is absent and .rex/prd.json is present, producing .rex/prd.md
+  - "`rex migrate-to-md` command exists, is documented in `rex --help`, and produces .rex/prd.md from .rex/prd.json"
+  - "Migration output passes the round-trip fidelity test: parse(migrate(prd.json)) deep-equals the original in-memory tree"
+  - All fields are preserved including timestamps, token usage, duration, and completed/in_progress status
+  - Original .rex/prd.json is NOT deleted or modified by either migration path
+  - Migration emits a clear success message including the output path; errors surface as typed failures with actionable messages
+completedAt: "2026-04-24T16:05:53.263Z"
+source: smart-add
+startedAt: "2026-04-24T15:55:40.852Z"
+tags:
+  - rex
+  - migration
+  - storage
+```
+
+Implement a migration that runs automatically in PRDStore.load() the first time a project is opened after the update (prd.md absent, prd.json present) and converts the existing JSON PRD to markdown. Expose the same logic as an explicit `rex migrate-to-md` CLI command for manual invocation. The original prd.json must not be modified. No data loss is acceptable.
+
+#### Write end-to-end and concurrency tests for markdown-primary PRD storage
+
+```rex-meta
+id: "3b442642-e7e9-49a4-96fc-debd8da30fc1"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - "Integration test covers: init → add → edit → update_status → move using prd.md as primary, verifying prd.json stays in sync after each step"
+  - "Fallback path test: PRDStore.load() with only prd.json present triggers migration and subsequent reads come from prd.md"
+  - "Concurrent write test: two rapid mutations do not corrupt prd.md or produce a prd.json that diverges from it"
+  - Existing PRD storage tests in tests/integration/ updated to validate both prd.md and prd.json after mutations
+  - Test suite passes on both macOS and Linux CI environments
+completedAt: "2026-04-24T16:20:10.138Z"
+source: smart-add
+startedAt: "2026-04-24T16:08:51.271Z"
+tags:
+  - rex
+  - testing
+  - storage
+```
+
+Add integration and e2e tests that exercise the full lifecycle of prd.md as primary storage: initialization, mutation via CLI and MCP tools, dual-write consistency, fallback path, and concurrent write safety. Ensure the existing domain-isolation and PRD storage tests are updated to cover the markdown layer.
+
+## PRD Item Branch and File Attribution
+
+```rex-meta
+id: "b81be3e0-2651-4773-9127-420132e31604"
+level: epic
+status: completed
+completedAt: "2026-04-24T20:41:18.643Z"
+source: smart-add
+startedAt: "2026-04-24T20:41:18.643Z"
+```
+
+### Branch Attribution Metadata on PRD Items
+
+```rex-meta
+id: "578686b2-4fab-45a3-a452-28a8dc45231f"
+level: feature
+status: completed
+completedAt: "2026-04-24T16:57:13.842Z"
+source: smart-add
+startedAt: "2026-04-24T16:57:13.842Z"
+```
+
+Extend the PRD item schema and write paths so each item records the git branch and source file it was created or last modified on, enabling provenance tracking across the tool chain.
+
+#### Add branch and source-file fields to PRD item schema and storage
+
+```rex-meta
+id: "95037bd6-871c-4a16-bf90-90a081dbfe9e"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - "PRD item schema accepts optional `branch: string` and `sourceFile: string` fields at all levels (epic, feature, task, subtask)"
+  - Fields are preserved through JSON serialization and deserialization without data loss
+  - Existing items that lack these fields remain valid and load without error
+  - "`rex status --format=json` output includes `branch` and `sourceFile` when present on an item"
+completedAt: "2026-04-24T16:44:27.245Z"
+endedAt: "2026-04-24T16:44:27.245Z"
+resolutionDetail: Added optional branch/sourceFile fields to PRD item typing and validation, preserved them in markdown serialization, and added validation, store round-trip, and status JSON coverage.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T16:39:25.070Z"
+tags:
+  - rex
+  - schema
+  - backend
+```
+
+PRD items currently carry no record of which git branch or PRD file they originate from. Adding optional `branch` and `sourceFile` fields to the item schema is the prerequisite for all downstream attribution display. The fields must survive JSON round-trips and remain backward-compatible so existing PRD files need no migration.
+
+#### Populate branch attribution on item create and edit across all write paths
+
+```rex-meta
+id: "07714a07-008e-4254-a0cd-56b15766afa4"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - "`rex add` and `ndx add` set `branch` to the current git branch on newly created items"
+  - MCP `add_item` and `edit_item` set `branch` to the current git branch at call time
+  - Hench runs set `branch` on the task they act on at run start
+  - "`update_task_status` updates `branch` to reflect the branch active at the time of the status change"
+  - Branch detection fails gracefully when git is unavailable — field is omitted rather than crashing
+  - "`sourceFile` is set to the resolved path of the active `.rex/prd.json` (or markdown equivalent) at write time"
+completedAt: "2026-04-24T16:57:13.824Z"
+source: smart-add
+startedAt: "2026-04-24T16:45:55.383Z"
+tags:
+  - rex
+  - hench
+  - mcp
+  - backend
+```
+
+When a PRD item is created or updated through any write path — `rex add`, `ndx add`, MCP `add_item`/`edit_item`/`update_task_status`, or a hench run — automatically capture the current git branch and PRD file path as attribution metadata. This makes attribution automatic rather than opt-in, ensuring the UI has data to display without requiring user action.
+
+### Branch Attribution Display in PRD Dashboard
+
+```rex-meta
+id: "9f96a45d-092e-4ea2-a76d-b21551cedbba"
+level: feature
+status: completed
+completedAt: "2026-04-24T20:41:18.632Z"
+source: smart-add
+startedAt: "2026-04-24T20:41:18.632Z"
+```
+
+Surface branch and file attribution visually in the dashboard PRD tree view so users can immediately see which items are actively being worked on and on which branch, without leaving the dashboard.
+
+#### Include branch and file attribution in rex API and MCP status responses
+
+```rex-meta
+id: "d355da37-c17c-4a29-a18b-96ad2e854555"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - "`GET /api/status` response includes `branch` and `sourceFile` on each item node when present"
+  - "`get_prd_status` MCP tool response includes the same fields"
+  - The `LoadedData` TypeScript schema in `external.ts` is updated to carry the new fields
+  - Items without attribution serialize as `null` (not empty string or omitted key) for consistent client-side checks
+  - No regression in existing status response fields or structure
+completedAt: "2026-04-24T20:30:36.537Z"
+resolutionDetail: Added branch/sourceFile attribution to get_prd_status epics, /api/status item nodes, and PRDItemData viewer type
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T20:19:01.121Z"
+tags:
+  - web
+  - api
+  - rex
+  - mcp
+```
+
+The web server `/api/status` route and the `get_prd_status` MCP tool must propagate `branch` and `sourceFile` fields from PRD items into their response payloads so the dashboard viewer has the data it needs to render attribution badges. This is the data plumbing prerequisite for the UI rendering task.
+
+#### Render branch badges on PRD tree rows and add branch filter to toolbar
+
+```rex-meta
+id: "982777ca-fa74-4b7a-ae46-5c4329cf8ace"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - Each tree row renders a visually distinct badge showing the branch name when the item has `branch` set
+  - Items without `branch` attribution show no badge and no empty placeholder
+  - Hovering or clicking the branch badge shows a tooltip with the full `sourceFile` path
+  - Branch badges are visually distinct from existing status badges (color, shape, or prefix)
+  - A branch filter dropdown appears in the PRD tree toolbar only when items from more than one branch are present in the loaded data
+  - Selecting a branch in the filter hides items whose `branch` does not match; selecting 'All' restores the full tree
+  - Filter state is preserved through same-session navigation (e.g., switching tabs and returning)
+  - No visual regression on tree rows that have no attribution data
+completedAt: "2026-04-24T20:41:18.610Z"
+resolutionDetail: Added branch badge to tree rows and branch filter dropdown to toolbar, with URL-persisted filter state.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T20:33:05.022Z"
+tags:
+  - web
+  - ui
+  - dashboard
+  - preact
+```
+
+Display a compact branch badge on each PRD tree row (epic, feature, task, subtask) when `branch` is set, and add a branch filter control to the tree toolbar so users can focus the view on items belonging to a specific branch. Items without attribution display no badge. The filter should be unobtrusive when only one branch is present.
+
+## Self-Heal Loop Scoped Execution
+
+```rex-meta
+id: "0feb4eb5-79e3-435d-83ab-5cbf4eb7f235"
+level: epic
+status: completed
+completedAt: "2026-04-24T18:55:40.254Z"
+source: smart-add
+startedAt: "2026-04-24T18:55:40.254Z"
+```
+
+### Self-Heal Tag Attribution on Created PRD Items
+
+```rex-meta
+id: "2e184cee-25e9-4811-af0a-da72bb9c366f"
+level: feature
+status: completed
+completedAt: "2026-04-24T18:55:40.239Z"
+source: smart-add
+startedAt: "2026-04-24T18:55:40.239Z"
+```
+
+Ensure that every PRD item created or added during a self-heal run is automatically tagged with 'self-heal', making it easy to distinguish autonomously-created remediation work from manually-authored PRD items.
+
+#### Auto-tag PRD items created during self-heal runs with 'self-heal' marker
+
+```rex-meta
+id: "a699a497-d58e-4c3d-afc7-b029b2b3c2ee"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - All PRD items created via ndx self-heal carry the 'self-heal' tag
+  - Items created outside of self-heal (manual adds, ndx plan) do NOT receive the tag
+  - Tag is written to prd storage at item creation time, not applied post-hoc
+  - Existing PRD items without the tag are not modified by a self-heal run
+completedAt: "2026-04-24T18:55:40.211Z"
+resolutionDetail: Added NDX_SELF_HEAL env var propagation in core self-heal, plus withSelfHealTag helper that rex's FileStore.addItem and createItemsFromRecommendations use to stamp the 'self-heal' tag at creation time. Tests cover both self-heal and non-self-heal paths, and the updateItem path is confirmed not to retag existing items.
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T18:45:57.994Z"
+tags:
+  - self-heal
+  - rex
+  - hench
+```
+
+When ndx self-heal creates new PRD items (via rex add, recommend --accept, or direct MCP writes), automatically apply the 'self-heal' tag to each item at creation time. This covers items created during the analyze → recommend → execute cycle within a self-heal run.
+
+### Self-Heal Scoped Task Selection and Auto-Termination
+
+```rex-meta
+id: "ae28134a-cb7d-4427-87f0-55094e3500d0"
+level: feature
+status: completed
+completedAt: "2026-04-24T15:25:12.963Z"
+source: smart-add
+startedAt: "2026-04-24T15:25:12.963Z"
+```
+
+Restrict hench task selection during self-heal runs to only pick up items tagged 'self-heal', and automatically stop the loop once all such items are resolved — without spilling into unrelated PRD work.
+
+#### Filter hench task selection to self-heal tagged items when running in self-heal mode
+
+```rex-meta
+id: "4fc2aacd-651b-4499-8555-2a6f2c8007ba"
+level: task
+status: completed
+priority: critical
+acceptanceCriteria:
+  - ndx self-heal passes a 'self-heal' tag constraint to hench/rex task selection
+  - rex get_next_task returns only tasks tagged 'self-heal' when the filter is active
+  - Non-self-heal tasks are never started or modified during a self-heal run
+  - Tag filter is reflected in the hench run brief and run logs
+completedAt: "2026-04-24T15:03:15.777Z"
+resolutionDetail: Added tags filter to PrioritizationOptions, findNextTask, findActionableTasks; threaded through hench run via --tags flag; ndx self-heal now passes --tags=self-heal
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T14:36:54.749Z"
+tags:
+  - self-heal
+  - hench
+  - rex
+```
+
+Pass a tag filter from ndx self-heal into the hench run invocation so that rex get_next_task only surfaces self-heal tagged items. Prevents the agent from accidentally picking up and completing unrelated PRD tasks during a self-heal session.
+
+#### Implement self-heal loop auto-termination when all self-heal items are completed
+
+```rex-meta
+id: "ed9b7154-5527-4646-b421-dc25b5095a84"
+level: task
+status: completed
+priority: critical
+acceptanceCriteria:
+  - Loop exits with a success message when zero pending 'self-heal' items remain
+  - Loop does NOT continue to non-self-heal tasks after completing all self-heal items
+  - Termination condition is evaluated after each completed task, not only at loop start
+  - Final status output lists the self-heal items resolved in the run and their outcome
+completedAt: "2026-04-24T15:25:12.939Z"
+resolutionDetail: "Added post-task tag-filter check in runLoop: after each runOne call when tags are set, hasPendingTaggedTasks queries the PRD and breaks with formatTagFilterCompletionSummary output if none remain. Includes 8 new tests for the exported formatter."
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T15:18:06.587Z"
+tags:
+  - self-heal
+  - hench
+```
+
+After each hench iteration within a self-heal run, check whether any pending self-heal tagged items remain. If none remain, exit the loop cleanly and report completion — rather than continuing to the next generic PRD task or looping indefinitely.
+
+## Hench Autonomous Execution Improvements
+
+```rex-meta
+id: "cbe4e682-3315-4e77-a4a9-aea17c51a8e2"
+level: epic
+status: completed
+completedAt: "2026-04-24T21:00:00.725Z"
+source: smart-add
+startedAt: "2026-04-24T21:00:00.725Z"
+```
+
+### Ctrl-C Interrupt Rollback Prompt Coordination
+
+```rex-meta
+id: "469c7900-cd34-4919-bc40-5f474a96654a"
+level: feature
+status: completed
+completedAt: "2026-04-24T21:00:00.715Z"
+source: smart-add
+startedAt: "2026-04-24T21:00:00.715Z"
+```
+
+When the user interrupts the work loop with Ctrl-C, the existing SIGINT handler (which calls process.exit(1) on a second Ctrl-C) remains active while the rollback confirmation prompt is waiting for readline input. Any Ctrl-C during the prompt immediately kills the process before the user can answer. The handler must be suspended for the duration of the rollback prompt and restored (or replaced with the default) afterward.
+
+#### Suspend custom SIGINT handler during rollback confirmation prompt
+
+```rex-meta
+id: "5cfeee22-c15d-40ec-aa66-0983959703f5"
+level: task
+status: completed
+priority: high
+acceptanceCriteria:
+  - After a single Ctrl-C during a running task, the 'Roll back N uncommitted file(s)? [Y/n]' prompt appears and remains active
+  - A second Ctrl-C while the rollback prompt is displayed does NOT call process.exit(1); it either cancels the readline cleanly or is ignored until the user types a response
+  - Answering 'y' at the rollback prompt reverts files and exits cleanly
+  - Answering 'n' at the rollback prompt skips the rollback and exits cleanly
+  - The same fix applies to the commit confirmation prompt (promptCommitConfirm) — a Ctrl-C during that prompt does not bypass the question
+  - Non-interactive mode (--yes or non-TTY) is unaffected
+completedAt: "2026-04-24T20:50:21.821Z"
+resolutionDetail: "Added askYesNoWithSuspendedSigint helper in shared.ts that snapshots and detaches existing SIGINT listeners around the readline prompt, installs a temporary onInterrupt that cancels readline cleanly on Ctrl-C (resolving false = decline), and restores the original listeners in finally. Both promptRollbackConfirm and promptCommitConfirm now delegate to this helper. Added 5 integration tests in tests/integration/sigint-prompt.test.ts verifying: outer handler detached/restored around the prompt, SIGINT during prompt cancels cleanly without invoking the outer handler, readline-surface SIGINT works the same way, accept path still rolls back, and the same suspension applies to the commit-approval prompt."
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T20:42:30.170Z"
+tags:
+  - hench
+  - ux
+  - signal-handling
+```
+
+In shared.ts's performRollbackIfNeeded (and the promptRollbackConfirm helper it calls), the outer runLoop/epicByEpicLoop SIGINT handler is still registered and will call process.exit(1) on a second Ctrl-C. Before opening the readline prompt, temporarily remove the custom SIGINT listener (or restore SIG_DFL) so that the terminal behaves normally during the interactive question. Re-register (or re-override) the handler after the readline closes. The same issue exists in promptCommitConfirm — apply the same fix there. The fix should be coordinated so that callers pass a cleanup/suspend callback, or promptRollbackConfirm accepts an AbortSignal that lets it cleanly cancel if the outer loop is torn down.
+
+#### Add integration tests for Ctrl-C interrupt and rollback prompt interaction
+
+```rex-meta
+id: "20bbb688-65c2-4331-a508-5b5700272200"
+level: task
+status: completed
+priority: medium
+acceptanceCriteria:
+  - Test confirms that after SIGINT the rollback prompt is presented when dirty files exist
+  - Test confirms that responding 'y' causes revertChanges to be called
+  - Test confirms that responding 'n' leaves files in place and exits without error
+  - Test confirms that a second SIGINT during the prompt does not call process.exit(1) and allows the readline to complete
+  - Tests run in CI without requiring a real TTY (use isTTY mocking or pipe-mode)
+completedAt: "2026-04-24T21:00:00.697Z"
+resolutionDetail: "Added a 6th integration test in packages/hench/tests/integration/sigint-prompt.test.ts that explicitly asserts criterion 4 of the acceptance list (\"a second SIGINT during the prompt does not call process.exit(1) and allows the readline to complete\") using vi.spyOn(process, \"exit\") and an outer handler shaped like run.ts's force-exit branch (unconditional process.exit(1)). Confirms: exitSpy never called; outerForceExit never called; readline closed cleanly; outer handler restored exactly once. The previous 5 tests from the sibling commit already covered the other acceptance criteria (prompt presented when dirty files exist, 'y' reverts files, 'n' leaves them, TTY mocking in lieu of real TTY); the new test closes the remaining gap by pinning the no-exit guarantee with a direct process.exit spy."
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-24T20:56:08.084Z"
+tags:
+  - hench
+  - testing
+  - signal-handling
+```
+
+The interrupt-to-rollback path currently has no automated coverage. Add integration tests that simulate a SIGINT mid-run, verify the rollback prompt is displayed, and assert correct behavior for both 'confirm' and 'skip' responses. Cover the edge case where a second SIGINT arrives while the prompt is open.
+
+## PRD Visibility and Multi-PRD Status Reporting
+
+```rex-meta
+id: "f200b1f3-8c59-4ff4-86c9-788ee6e2f1db"
+level: epic
+status: completed
+completedAt: "2026-04-27T13:13:51.820Z"
+source: smart-add
+startedAt: "2026-04-27T13:13:51.820Z"
+```
+
+### Show Target PRD in ndx add Output
+
+```rex-meta
+id: "e430a1e2-ce7a-454d-a15f-42d52652f0e0"
+level: feature
+status: completed
+completedAt: "2026-04-27T03:46:02.112Z"
+source: smart-add
+startedAt: "2026-04-27T03:46:02.112Z"
+```
+
+Surface which PRD file (canonical or branch-scoped) receives newly added items so users have clear feedback about where their work landed.
+
+#### Display target PRD path in ndx add command output
+
+```rex-meta
+id: "efc7dfe8-6d04-44b7-8eb2-beb9111fafad"
+level: task
+status: completed
+priority: medium
+acceptanceCriteria:
+  - "Human-readable ndx add output includes a line like 'Added to: .rex/prd.md' identifying the target PRD file"
+  - JSON output mode includes a 'prdPath' field with the absolute or repo-relative path of the target PRD file
+  - Branch-scoped writes show the correct branch-scoped filename when multi-file mode is active
+  - Output is shown for both single-task and bulk (--file) add invocations
+  - Unit or integration test verifies the path appears in stdout for at least one canonical and one branch-scoped scenario
+completedAt: "2026-04-27T03:46:02.093Z"
+resolutionDetail: "Added prdPath display to cmdAdd and cmdSmartAdd. Text output prints `Added to: .rex/prd.md` (or branch-scoped `.rex/prd_{branch}_{date}.md`) before the summary; JSON output includes `prdPath` (string) for cmdAdd and `prdPaths` (array) for smart-add accept. Path is resolved from FileStore.getItemFileMap() so child items routed to a parent's owning branch file are reported correctly. Shared toMarkdownSourcePath helper added to prd-md-migration.ts and re-exported from store/index.ts. Added unit test for canonical (.rex/prd.md) and integration test for branch-scoped scenarios in add.test.ts and branch-scoped-add.test.ts; both verify text output ordering and JSON prdPath field."
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-27T03:23:33.524Z"
+tags:
+  - rex
+  - cli
+  - ux
+```
+
+When ndx add (and rex add) creates new items, print the resolved PRD file path the items were written to (e.g. .rex/prd.md or a branch-scoped .rex/prd_{branch}_{date}.md). The message should appear after successful write, before the summary of created items, and should respect --json output mode by including a prdPath field in the JSON payload.
+
+### Per-PRD Status Breakdown via --show-individual
+
+```rex-meta
+id: "73fc1ee2-42b8-4be6-b743-c269308f0868"
+level: feature
+status: completed
+completedAt: "2026-04-27T13:13:51.806Z"
+source: smart-add
+startedAt: "2026-04-27T13:13:51.806Z"
+```
+
+Add a --show-individual flag to ndx status so users can see status broken down per PRD file when multiple branch-scoped PRD files exist alongside the canonical prd.md.
+
+#### Implement --show-individual flag for ndx status with per-PRD breakdown
+
+```rex-meta
+id: "df292b37-e2f6-448f-ba8b-22f6f301a41e"
+level: task
+status: completed
+priority: medium
+acceptanceCriteria:
+  - ndx status --show-individual prints one labeled section per PRD file (canonical .rex/prd.md plus any branch-scoped .rex/prd_{branch}_{date}.md)
+  - Each section shows the PRD file path and per-file completion stats (total/completed/pending counts)
+  - Items are attributed to their source PRD file using existing branch/source-file metadata; no item appears in more than one section
+  - --format=json with --show-individual emits an array where each element has prdPath, stats, and items fields
+  - When only one PRD file exists, the flag still works and produces a single section without error
+  - Help text for ndx status documents the new flag with a brief usage example
+  - Integration test covers both single-PRD and multi-PRD scenarios in human and JSON output modes
+completedAt: "2026-04-27T13:13:51.778Z"
+resolutionDetail: Implemented --show-individual flag for ndx/rex status with per-PRD breakdown (sections + JSON array)
+resolutionType: code-change
+source: smart-add
+startedAt: "2026-04-27T05:35:57.785Z"
+tags:
+  - rex
+  - cli
+  - status
+```
+
+Extend ndx status (and rex status) with a --show-individual flag that, instead of showing the merged aggregate tree, prints status sections grouped by source PRD file. Each section should include the PRD file path, a header, and the same stats/tree the default status produces but scoped to items originating from that file. Honor existing flags (--format=json, filters) by emitting an array of per-PRD status objects in JSON mode.

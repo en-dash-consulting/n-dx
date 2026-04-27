@@ -1,4 +1,4 @@
-import { readdir, stat, rename, writeFile } from "node:fs/promises";
+import { readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeBranchName, resolveGitBranch, getFirstCommitDate, generatePRDFilename } from "./branch-naming.js";
 import { SCHEMA_VERSION } from "../schema/v1.js";
@@ -66,12 +66,13 @@ export interface PRDFileResolution {
 /**
  * Resolve (or create) the branch-scoped PRD file for the current git branch.
  *
+ * The branch-scoped file holds only items added on this branch — `prd.json`
+ * is preserved as the canonical PRD and remains untouched.
+ *
  * Resolution order:
  * 1. If a branch file already exists for this branch, return it unchanged.
- * 2. If no branch file exists but `prd.json` does, rename `prd.json` to the
- *    new branch-scoped name (one-time migration) and return it.
- * 3. If neither exists, create an empty branch-scoped PRD file.
- * 4. Falls back to `prd.json` when the branch cannot be resolved.
+ * 2. Otherwise create an empty branch-scoped PRD file alongside `prd.json`.
+ * 3. Falls back to `prd.json` when the branch cannot be resolved.
  */
 export async function resolvePRDFile(
   rexDir: string,
@@ -93,17 +94,9 @@ export async function resolvePRDFile(
   const filename = generatePRDFilename(branch, date);
   const targetPath = join(rexDir, filename);
 
-  // Migrate prd.json → branch file when prd.json exists
-  const canonicalPath = join(rexDir, "prd.json");
-  try {
-    await stat(canonicalPath);
-    await rename(canonicalPath, targetPath);
-    return { filename, path: targetPath, created: false };
-  } catch {
-    // prd.json does not exist — fall through to create an empty branch file
-  }
-
-  // Create an empty branch-scoped PRD file titled with the branch name
+  // Create an empty branch-scoped PRD file titled with the branch name.
+  // `prd.json` is left in place as the canonical PRD; new items added on this
+  // branch are written to the branch file only.
   const sanitized = sanitizeBranchName(branch);
   const doc: PRDDocument = {
     schema: SCHEMA_VERSION,

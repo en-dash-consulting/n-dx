@@ -272,7 +272,7 @@ describe("resolvePRDFile", () => {
     expect(doc.items).toEqual([]);
   });
 
-  it("migrates prd.json to branch-scoped file when prd.json exists", async () => {
+  it("preserves prd.json and creates an empty branch-scoped file alongside it", async () => {
     initRepo(tmpDir);
     execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
       cwd: tmpDir,
@@ -291,17 +291,18 @@ describe("resolvePRDFile", () => {
 
     const result = await resolvePRDFile(rexDir, tmpDir);
     expect(result.filename).toBe("prd_main_2025-03-01.json");
-    expect(result.created).toBe(false);
+    expect(result.created).toBe(true);
 
-    // prd.json is gone
-    const { access } = await import("node:fs/promises");
-    await expect(access(join(rexDir, "prd.json"))).rejects.toThrow();
+    // prd.json is left untouched as the canonical PRD
+    const canonicalRaw = await readFile(join(rexDir, "prd.json"), "utf-8");
+    const canonical = JSON.parse(canonicalRaw);
+    expect(canonical.items).toHaveLength(1);
+    expect(canonical.items[0].id).toBe("e1");
 
-    // Content preserved in the new file
-    const raw = await readFile(result.path, "utf-8");
-    const doc = JSON.parse(raw);
-    expect(doc.items).toHaveLength(1);
-    expect(doc.items[0].id).toBe("e1");
+    // Branch file is empty — only items added on this branch land here
+    const branchRaw = await readFile(result.path, "utf-8");
+    const branchDoc = JSON.parse(branchRaw);
+    expect(branchDoc.items).toEqual([]);
   });
 
   it("does not overwrite PRD files for other branches", async () => {
