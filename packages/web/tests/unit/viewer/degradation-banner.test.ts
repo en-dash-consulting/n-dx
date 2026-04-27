@@ -70,7 +70,7 @@ describe("DegradationBanner", () => {
       h(DegradationBanner, makeProps({
         tier: "warning",
         summary: "High memory usage detected.",
-        disabledFeatures: new Set<DegradableFeature>(["autoRefresh", "deferredLoading", "graphRendering", "animations"]),
+        disabledFeatures: new Set<DegradableFeature>(["autoRefresh", "deferredLoading", "animations"]),
       })),
       root,
     );
@@ -84,7 +84,7 @@ describe("DegradationBanner", () => {
       h(DegradationBanner, makeProps({
         tier: "critical",
         summary: "Critical memory pressure.",
-        disabledFeatures: new Set<DegradableFeature>(["autoRefresh", "deferredLoading", "graphRendering", "animations", "detailPanel"]),
+        disabledFeatures: new Set<DegradableFeature>(["autoRefresh", "deferredLoading", "animations", "detailPanel"]),
       })),
       root,
     );
@@ -131,19 +131,18 @@ describe("DegradationBanner", () => {
     expect(btn!.getAttribute("aria-label")).toBe("Dismiss degradation notice");
   });
 
-  it("shows all five features at critical tier", () => {
+  it("shows all four features at critical tier", () => {
     render(
       h(DegradationBanner, makeProps({
         tier: "critical",
         disabledFeatures: new Set<DegradableFeature>([
-          "autoRefresh", "deferredLoading", "graphRendering", "animations", "detailPanel",
+          "autoRefresh", "deferredLoading", "animations", "detailPanel",
         ]),
       })),
       root,
     );
     expect(root.textContent).toContain("Auto-refresh");
     expect(root.textContent).toContain("Background loading");
-    expect(root.textContent).toContain("Graph view");
     expect(root.textContent).toContain("Animations");
     expect(root.textContent).toContain("Detail panel");
   });

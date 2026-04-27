@@ -910,7 +910,6 @@ describe("end-to-end suspension and recovery scenarios", { timeout: 120_000 }, (
     expect(state.tier).toBe("warning");
     expect(state.isDegraded).toBe(true);
     expect(state.disabledFeatures.has("autoRefresh")).toBe(true);
-    expect(state.disabledFeatures.has("graphRendering")).toBe(true);
     expect(state.disabledFeatures.has("animations")).toBe(true);
 
     // Foreground — degradation unchanged.

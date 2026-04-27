@@ -36,23 +36,21 @@ describe("featuresForTier", () => {
     expect(features.size).toBe(2);
   });
 
-  it("disables graphRendering and animations at warning tier (cumulative)", () => {
+  it("disables animations at warning tier (cumulative)", () => {
     const features = featuresForTier("warning");
     expect(features.has("autoRefresh")).toBe(true);
     expect(features.has("deferredLoading")).toBe(true);
-    expect(features.has("graphRendering")).toBe(true);
     expect(features.has("animations")).toBe(true);
-    expect(features.size).toBe(4);
+    expect(features.size).toBe(3);
   });
 
   it("disables detailPanel at critical tier (cumulative)", () => {
     const features = featuresForTier("critical");
     expect(features.has("autoRefresh")).toBe(true);
     expect(features.has("deferredLoading")).toBe(true);
-    expect(features.has("graphRendering")).toBe(true);
     expect(features.has("animations")).toBe(true);
     expect(features.has("detailPanel")).toBe(true);
-    expect(features.size).toBe(5);
+    expect(features.size).toBe(4);
   });
 });
 
@@ -69,8 +67,7 @@ describe("summaryForTier", () => {
 
   it("returns a message for warning tier", () => {
     const summary = summaryForTier("warning");
-    expect(summary).toContain("graph view");
-    expect(summary).toContain("animations");
+    expect(summary).toContain("Animations");
   });
 
   it("returns a message for critical tier", () => {
@@ -107,7 +104,7 @@ describe("degradation lifecycle", () => {
 
   it("reports no features disabled initially", () => {
     expect(isFeatureDisabled("autoRefresh")).toBe(false);
-    expect(isFeatureDisabled("graphRendering")).toBe(false);
+    expect(isFeatureDisabled("animations")).toBe(false);
     expect(isFeatureDisabled("detailPanel")).toBe(false);
   });
 
@@ -127,7 +124,7 @@ describe("degradation lifecycle", () => {
     expect(getCurrentTier()).toBe("elevated");
     expect(isFeatureDisabled("autoRefresh")).toBe(true);
     expect(isFeatureDisabled("deferredLoading")).toBe(true);
-    expect(isFeatureDisabled("graphRendering")).toBe(false);
+    expect(isFeatureDisabled("animations")).toBe(false);
 
     // Restore
     if (originalMemory === undefined) {
@@ -150,7 +147,6 @@ describe("degradation lifecycle", () => {
     startDegradation();
 
     expect(getCurrentTier()).toBe("warning");
-    expect(isFeatureDisabled("graphRendering")).toBe(true);
     expect(isFeatureDisabled("animations")).toBe(true);
     expect(isFeatureDisabled("detailPanel")).toBe(false);
 
@@ -207,7 +203,7 @@ describe("degradation lifecycle", () => {
     vi.advanceTimersByTime(1000);
     expect(getCurrentTier()).toBe("normal");
     expect(isFeatureDisabled("autoRefresh")).toBe(false);
-    expect(isFeatureDisabled("graphRendering")).toBe(false);
+    expect(isFeatureDisabled("animations")).toBe(false);
     expect(getDegradationState().isDegraded).toBe(false);
 
     if (originalMemory === undefined) {

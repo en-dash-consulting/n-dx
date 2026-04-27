@@ -9,7 +9,7 @@
  *
  *   normal   → All features active.
  *   elevated → Pause data polling, skip deferred module loading.
- *   warning  → Disable graph rendering & CSS animations.
+ *   warning  → Disable CSS animations (and other non-essential UI motion).
  *   critical → Disable detail panel, reduce to minimal UI.
  *
  * Designed as a standalone module with zero framework dependencies —
@@ -31,7 +31,6 @@ import { onSnapshot, getCurrentLevel, getLatestSnapshot } from "./memory-monitor
 export type DegradableFeature =
   | "autoRefresh"      // Data polling for live updates
   | "deferredLoading"  // Background loading of non-critical data modules
-  | "graphRendering"   // Force-directed graph view (heaviest single view)
   | "animations"       // CSS transitions and animations
   | "detailPanel";     // Side detail panel for file/zone inspection
 
@@ -70,8 +69,8 @@ export interface DegradationConfig {
 const TIER_FEATURES: Record<MemoryLevel, DegradableFeature[]> = {
   normal: [],
   elevated: ["autoRefresh", "deferredLoading"],
-  warning: ["autoRefresh", "deferredLoading", "graphRendering", "animations"],
-  critical: ["autoRefresh", "deferredLoading", "graphRendering", "animations", "detailPanel"],
+  warning: ["autoRefresh", "deferredLoading", "animations"],
+  critical: ["autoRefresh", "deferredLoading", "animations", "detailPanel"],
 };
 
 const TIER_SUMMARIES: Record<MemoryLevel, string> = {
@@ -79,7 +78,7 @@ const TIER_SUMMARIES: Record<MemoryLevel, string> = {
   elevated:
     "Memory usage is elevated. Auto-refresh and background data loading have been paused to conserve memory.",
   warning:
-    "High memory usage detected. The graph view and animations have been disabled. Close unused tabs or refresh the page.",
+    "High memory usage detected. Animations have been disabled. Close unused tabs or refresh the page.",
   critical:
     "Critical memory pressure. Most features are disabled to prevent a crash. Refresh the page to restore full functionality.",
 };

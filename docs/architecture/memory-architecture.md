@@ -232,7 +232,7 @@ Progressively disables UI features based on memory tier. Features are re-enabled
 |---|---|
 | `normal` | None |
 | `elevated` | `autoRefresh`, `deferredLoading` |
-| `warning` | + `graphRendering`, `animations` |
+| `warning` | + `animations` |
 | `critical` | + `detailPanel` (minimal UI only) |
 
 Components check feature availability via `isFeatureDisabled(feature)` before rendering expensive content.

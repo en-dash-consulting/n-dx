@@ -112,16 +112,14 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const projectMeta = useProjectMetadata();
 
   // Feature-gated nav items: subscribe to toggle state
-  const callGraphEnabled = useFeatureToggle("sourcevision.callGraph", false);
   const notionSyncEnabled = useFeatureToggle("rex.notionSync", false);
   const integrationsEnabled = useFeatureToggle("rex.integrations", false);
   const enabledGates = useMemo(() => {
     const m = new Map<string, boolean>();
-    m.set("sourcevision.callGraph", callGraphEnabled);
     m.set("rex.notionSync", notionSyncEnabled);
     m.set("rex.integrations", integrationsEnabled);
     return m;
-  }, [callGraphEnabled, notionSyncEnabled, integrationsEnabled]);
+  }, [notionSyncEnabled, integrationsEnabled]);
 
   /** Sections filtered by scope and feature gates. */
   const visibleSections = useMemo(() => {

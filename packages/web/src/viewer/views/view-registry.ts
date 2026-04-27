@@ -81,15 +81,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "overview": ({ data }) =>
     h(Overview, { data }),
 
-  "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo, isFeatureDisabled }) => {
-    if (isFeatureDisabled("graphRendering")) {
-      return h("div", { class: "degraded-view-placeholder", role: "status" },
-        h("h2", null, "Graph view unavailable"),
-        h("p", null, "The graph view has been temporarily disabled to conserve memory. It will be re-enabled automatically when memory usage decreases, or you can refresh the page."),
-      );
-    }
-    return h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo });
-  },
+  "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
+    h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),
 
   "zones": ({ data, setDetail, navigateTo }) =>
     h(ZonesView, { data, onSelect: setDetail, navigateTo }),

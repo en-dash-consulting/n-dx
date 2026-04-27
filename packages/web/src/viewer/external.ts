@@ -20,6 +20,8 @@
 export type {
   Manifest,
   Inventory,
+  ImportEdge,
+  ImportType,
   Imports,
   Zones,
   Components,

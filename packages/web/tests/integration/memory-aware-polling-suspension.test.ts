@@ -268,7 +268,6 @@ describe("all three polling loops stop under memory pressure", { timeout: 120_00
     expect(pollers.noneEnabled()).toBe(true);
     expect(getCurrentTier()).toBe("warning");
     expect(isFeatureDisabled("autoRefresh")).toBe(true);
-    expect(isFeatureDisabled("graphRendering")).toBe(true);
     expect(isFeatureDisabled("animations")).toBe(true);
 
     pollers.disposeAll();
@@ -542,7 +541,7 @@ describe("polling restart when memory pressure clears", { timeout: 120_000 }, ()
     let state = getDegradationState();
     expect(state.isDegraded).toBe(true);
     expect(state.tier).toBe("critical");
-    expect(state.disabledFeatures.size).toBe(5);
+    expect(state.disabledFeatures.size).toBe(4);
 
     // Clear pressure.
     setMemoryUsage(0.10);

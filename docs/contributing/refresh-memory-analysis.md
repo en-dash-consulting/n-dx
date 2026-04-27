@@ -197,7 +197,7 @@ structural comparison (~4–6 MB transient).
 |-------|-------------------|
 | **normal** | None |
 | **elevated** | `autoRefresh`, `deferredLoading` |
-| **warning** | + `graphRendering`, `animations` |
+| **warning** | + `animations` |
 | **critical** | + `detailPanel` (minimal UI) |
 
 ### Refresh Throttle (`refresh-throttle.ts`)

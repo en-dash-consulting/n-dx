@@ -35,7 +35,7 @@ export interface UseGracefulDegradationResult {
  * Usage:
  * ```tsx
  * const { isDegraded, isDisabled, summary } = useGracefulDegradation();
- * if (isDisabled("graphRendering")) return h("p", null, "Graph disabled");
+ * if (isDisabled("animations")) return h("p", null, "Reduced motion");
  * ```
  */
 export function useGracefulDegradation(): UseGracefulDegradationResult {

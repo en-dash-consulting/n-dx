@@ -20,7 +20,7 @@ export interface SourceVisionTab {
 
 export const SOURCEVISION_TABS: readonly SourceVisionTab[] = [
   { id: "overview", icon: "\u25A3", label: "Overview", minPass: 0 },
-  { id: "graph", icon: "\u2B95", label: "Import Graph", minPass: 0, featureGate: "sourcevision.callGraph" },
+  { id: "graph", icon: "\u2B95", label: "Import Graph", minPass: 0 },
   { id: "zones", icon: "\u2B22", label: "Zones", minPass: 0 },
   { id: "files", icon: "\u2630", label: "Files", minPass: 0 },
   { id: "routes", icon: "\u25C7", label: "Routes", minPass: 0 },

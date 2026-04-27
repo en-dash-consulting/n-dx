@@ -29,7 +29,6 @@ export interface DegradationBannerProps {
 const FEATURE_LABELS: Record<DegradableFeature, string> = {
   autoRefresh: "Auto-refresh",
   deferredLoading: "Background loading",
-  graphRendering: "Graph view",
   animations: "Animations",
   detailPanel: "Detail panel",
 };

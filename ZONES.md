@@ -77,7 +77,7 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
 - `packages/web/src/viewer/views/status-filter.ts` → `web-viewer`
 - `packages/web/src/viewer/views/{enrichment-thresholds,graph,sourcevision-tabs,token-usage,prd}.ts` → `web-viewer`
 - `packages/web/src/viewer/usage/{constants,index}.ts` → `web-viewer`
-- `packages/web/src/viewer/graph/{index,physics,renderer}.ts` → `web-viewer`
+- `packages/web/src/viewer/views/import-graph/{model,layout}.ts` → `web-viewer`
 - `packages/web/src/viewer/components/prd-tree/bulk-actions.ts` → `web-viewer` — viewer-prd-interaction zone containment
 - `packages/web/src/viewer/hooks/{use-feature-toggle,use-toast}.ts` → `web-viewer` — contained hooks
 - `packages/web/tests/unit/viewer/{accessibility,status-filter}.test.ts` → `web-viewer`
