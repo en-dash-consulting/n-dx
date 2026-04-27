@@ -67,6 +67,24 @@ export class FileStore implements PRDStore {
     return this.itemToFile;
   }
 
+  /**
+   * Ensure the item-to-file ownership map is populated, then return it.
+   *
+   * Forces a JSON-source read so the map reflects all on-disk PRD files
+   * even when {@link loadDocument} was satisfied by the markdown cache.
+   * Use this when callers need authoritative per-file attribution
+   * (e.g. `rex status --show-individual`).
+   */
+  async loadFileOwnership(): Promise<ReadonlyMap<string, string>> {
+    await this.ensureOwnershipMap();
+    return this.itemToFile;
+  }
+
+  /** Filenames known to the store after ownership has been loaded. */
+  getKnownFiles(): ReadonlyArray<string> {
+    return [...this.fileMetadata.keys()];
+  }
+
   private lockPathForFile(filename: string): string {
     return this.path(`${filename}.lock`);
   }

@@ -19,6 +19,9 @@ import {
   renderTokenUsageSection,
   renderAutoCompletableHints,
   renderStaleWarnings,
+  buildPerPRDSections,
+  renderShowIndividualJson,
+  renderShowIndividualHuman,
 } from "./status-sections.js";
 
 // Re-export shared utilities so existing consumers (tests, etc.) keep working.
@@ -80,6 +83,7 @@ export async function cmdStatus(
   const showAll = flags.all === "true";
   const groupBy = flags["group-by"];
   const showStaleOnly = flags.stale === "true";
+  const showIndividual = flags["show-individual"] === "true";
 
   if (format && !VALID_FORMATS.includes(format as (typeof VALID_FORMATS)[number])) {
     throw new CLIError(
@@ -106,6 +110,20 @@ export async function cmdStatus(
   const tokenFilter: TokenUsageFilter = {};
   if (flags.since) tokenFilter.since = flags.since;
   if (flags.until) tokenFilter.until = flags.until;
+
+  // --show-individual: render per-PRD sections instead of the merged tree.
+  if (showIndividual) {
+    const sections = await buildPerPRDSections(doc, store, rexDir, { showAll });
+    if (format === "json") {
+      renderShowIndividualJson(sections);
+      return;
+    }
+    result(`PRD: ${doc.title}`);
+    result("");
+    const coverageMap = verifyResult ? buildCoverageMap(verifyResult) : undefined;
+    renderShowIndividualHuman(sections, { showAll, coverageMap });
+    return;
+  }
 
   if (format === "json") {
     await renderJsonOutput(doc, {

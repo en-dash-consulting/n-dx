@@ -6,6 +6,7 @@
  */
 
 import { computeStats } from "../../core/stats.js";
+import type { TreeStats } from "../../core/stats.js";
 import {
   aggregateTokenUsage,
   checkBudget,
@@ -15,6 +16,12 @@ import { walkTree } from "../../core/tree.js";
 import { info, warn, result } from "../output.js";
 import type { PRDItem, ItemStatus } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
+import {
+  FileStore,
+  PRD_MARKDOWN_FILENAME,
+  toMarkdownSourcePath,
+  discoverPRDFiles,
+} from "../../store/index.js";
 import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
 import type { CoverageMap } from "./status-shared.js";
@@ -249,6 +256,137 @@ export function renderAutoCompletableHints(items: PRDItem[]): void {
   info("Auto-completable:");
   for (const ac of autoCompletable) {
     info(`  ● ${ac.title} — all children done, can be marked completed`);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Per-PRD breakdown (--show-individual)                             */
+/* ------------------------------------------------------------------ */
+
+/** A single PRD file's contribution to the status report. */
+export interface PerPRDStatusSection {
+  /** Repo-relative markdown path, e.g. ".rex/prd.md". */
+  prdPath: string;
+  /** Stats computed over this section's items only. */
+  stats: TreeStats;
+  /** Items belonging to this PRD file (deleted-filtered when showAll=false). */
+  items: PRDItem[];
+}
+
+/**
+ * Group root items by their owning PRD file.
+ *
+ * Each root item (and its full subtree) is attributed to exactly one file:
+ * 1. Prefer the explicit `sourceFile` field when present (already a markdown
+ *    path like `.rex/prd_branch_date.md`).
+ * 2. Fall back to the FileStore ownership map (JSON filename → markdown path).
+ * 3. Fall back to the canonical PRD path when neither is known.
+ *
+ * The function never duplicates an item across files.
+ */
+export function splitItemsByFile(
+  items: PRDItem[],
+  fileMap: ReadonlyMap<string, string>,
+  defaultPath: string = `.rex/${PRD_MARKDOWN_FILENAME}`,
+): Map<string, PRDItem[]> {
+  const buckets = new Map<string, PRDItem[]>();
+  for (const item of items) {
+    let path: string | undefined;
+    if (typeof item.sourceFile === "string" && item.sourceFile.length > 0) {
+      path = item.sourceFile;
+    } else {
+      const ownerJson = fileMap.get(item.id);
+      if (ownerJson) path = toMarkdownSourcePath(ownerJson);
+    }
+    const target = path ?? defaultPath;
+    if (!buckets.has(target)) buckets.set(target, []);
+    buckets.get(target)!.push(item);
+  }
+  return buckets;
+}
+
+/**
+ * Build per-PRD sections from a loaded document and a FileStore.
+ *
+ * Always includes the canonical `.rex/prd.md` path (even when empty) so a
+ * single-PRD project still produces one section. Branch-scoped files
+ * discovered on disk that have no items are also included with empty stats.
+ */
+export async function buildPerPRDSections(
+  doc: { items: PRDItem[] },
+  store: PRDStore,
+  rexDir: string,
+  opts: { showAll: boolean },
+): Promise<PerPRDStatusSection[]> {
+  let fileMap: ReadonlyMap<string, string> = new Map();
+  if (store instanceof FileStore) {
+    fileMap = await store.loadFileOwnership();
+  }
+
+  const visibleItems = opts.showAll ? doc.items : filterDeleted(doc.items);
+  const buckets = splitItemsByFile(visibleItems, fileMap);
+
+  // Ensure canonical path is always present, plus any discovered branch files.
+  const canonicalPath = `.rex/${PRD_MARKDOWN_FILENAME}`;
+  if (!buckets.has(canonicalPath)) buckets.set(canonicalPath, []);
+
+  const branchFiles = await discoverPRDFiles(rexDir);
+  for (const filename of branchFiles) {
+    const path = toMarkdownSourcePath(filename);
+    if (!buckets.has(path)) buckets.set(path, []);
+  }
+
+  const sections: PerPRDStatusSection[] = [];
+  // Sort canonical first, then branch-scoped files alphabetically.
+  const paths = [...buckets.keys()].sort((a, b) => {
+    if (a === canonicalPath) return -1;
+    if (b === canonicalPath) return 1;
+    return a.localeCompare(b);
+  });
+  for (const path of paths) {
+    const sectionItems = buckets.get(path)!;
+    sections.push({
+      prdPath: path,
+      stats: computeStats(sectionItems),
+      items: sectionItems,
+    });
+  }
+  return sections;
+}
+
+/** Render the per-PRD breakdown as JSON: an array of sections. */
+export function renderShowIndividualJson(sections: PerPRDStatusSection[]): void {
+  result(JSON.stringify(sections, null, 2));
+}
+
+/** Render the per-PRD breakdown as a sequence of labeled tree sections. */
+export function renderShowIndividualHuman(
+  sections: PerPRDStatusSection[],
+  opts: { showAll: boolean; coverageMap?: CoverageMap },
+): void {
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i];
+    if (i > 0) result("");
+    result(`── ${section.prdPath} ──`);
+    result("");
+
+    if (section.items.length === 0) {
+      info("  (no items)");
+      info(formatStats(section.stats));
+      continue;
+    }
+
+    const displayItems = opts.showAll
+      ? section.items
+      : filterDeleted(filterCompleted(section.items));
+    const hidingCompleted =
+      !opts.showAll && (section.stats.completed > 0 || section.stats.deleted > 0);
+
+    for (const line of renderTree(displayItems, 0, opts.coverageMap)) {
+      result(line);
+    }
+    info("");
+    info(formatStats(section.stats, { hidingCompleted }));
   }
 }
 
