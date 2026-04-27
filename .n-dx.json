@@ -1,8 +1,10 @@
 {
   "llm": {
     "vendor": "claude",
-    "model": "claude-sonnet-4-6",
-    "claude": {},
+    "model": "claude-haiku-4-5",
+    "claude": {
+      "model": "claude-sonnet-4-6"
+    },
     "codex": {}
   },
   "sourcevision": {
@@ -167,7 +169,22 @@
         "web-unit": "test",
         "web-4": "test",
         "rex-2": "test",
-        "rex-unit": "test"
+        "rex-unit": "test",
+        "sv-eval-harness": "test",
+        "tests-fixtures-sv-evals-medium-app:client": "test",
+        "tests-fixtures-sv-evals-medium-app:client-components": "test",
+        "tests-fixtures-sv-evals-medium-app:server": "test",
+        "tests-fixtures-sv-evals-medium-app:server-middleware": "test",
+        "tests-fixtures-sv-evals-medium-app:shared": "test",
+        "tests-fixtures-sv-evals-medium-app:user": "test",
+        "tests-fixtures-sv-evals-toy-app:src": "test",
+        "tests-fixtures-sv-evals-medium-app-client": "test",
+        "tests-fixtures-sv-evals-medium-app-client-components": "test",
+        "tests-fixtures-sv-evals-medium-app-server": "test",
+        "tests-fixtures-sv-evals-medium-app-server-middleware": "test",
+        "tests-fixtures-sv-evals-medium-app-shared": "test",
+        "tests-fixtures-sv-evals-medium-app-user": "test",
+        "tests-fixtures-sv-evals-toy-app-src": "test"
       }
     }
   },

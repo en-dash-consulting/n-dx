@@ -1,0 +1,51 @@
+{
+  "recordedWith": "fast",
+  "svVersion": "0.1.0",
+  "files": [
+    {
+      "path": "src/components/Button.tsx",
+      "archetype": "component"
+    },
+    {
+      "path": "src/config.ts",
+      "archetype": "config"
+    },
+    {
+      "path": "src/hooks/useToggle.ts",
+      "archetype": "hook"
+    },
+    {
+      "path": "src/index.ts",
+      "archetype": "entrypoint"
+    },
+    {
+      "path": "src/models/user.ts",
+      "archetype": "model"
+    },
+    {
+      "path": "src/services/api.ts",
+      "archetype": "service"
+    },
+    {
+      "path": "src/types.ts",
+      "archetype": "types"
+    },
+    {
+      "path": "src/utils/format.ts",
+      "archetype": "utility"
+    }
+  ],
+  "zones": [
+    {
+      "id": "src",
+      "files": [
+        "src/config.ts",
+        "src/index.ts",
+        "src/models/user.ts",
+        "src/services/api.ts",
+        "src/types.ts",
+        "src/utils/format.ts"
+      ]
+    }
+  ]
+}

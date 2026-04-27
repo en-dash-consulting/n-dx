@@ -32070,6 +32070,54 @@
           ]
         }
       ]
+    },
+    {
+      "id": "4f87bb38-11d7-48e9-a143-d9efa9f251ab",
+      "title": "Sourcevision LLM eval harness & token reduction",
+      "status": "pending",
+      "level": "epic",
+      "description": "Build an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk.",
+      "priority": "high",
+      "children": [
+        {
+          "id": "5a86a130-d6ca-4ad1-b251-faac76a6d6b4",
+          "title": "Bootstrap eval fixtures and golden recording pipeline",
+          "status": "completed",
+          "level": "task",
+          "description": "Add tests/fixtures/sv-evals/toy-app/ and tests/fixtures/sv-evals/medium-app/ checked-in source trees. Add tests/gauntlet/sourcevision-evals/record-goldens.ts that runs sv analyze on each fixture and writes golden.json with per-file archetype + zone partition by file membership only. Wire pnpm gauntlet:evals:record.",
+          "priority": "high",
+          "startedAt": "2026-04-18T05:48:01.591Z",
+          "completedAt": "2026-04-18T05:55:28.011Z"
+        },
+        {
+          "id": "7ccd1f5b-8e7f-4a3a-93ed-147f5ad8eaf3",
+          "title": "Implement scoring functions and eval test gate",
+          "status": "completed",
+          "level": "task",
+          "description": "tests/gauntlet/sourcevision-evals/score.ts exports two pure scorers: archetype accuracy (% files where archetype matches golden) and zone partition similarity (avg Jaccard of file sets, zones matched by greatest overlap). Unit-test identity + perturbation cases. evals.test.ts runs sv analyze per fixture, scores vs golden, asserts >= floor (likely 0.9, calibrated during implementation). Wire pnpm gauntlet:evals — NOT in default pnpm gauntlet (LLM cost). Acceptance: passes baseline; perturbing fixture fails.",
+          "priority": "high",
+          "startedAt": "2026-04-18T05:56:15.891Z",
+          "completedAt": "2026-04-18T05:58:13.548Z"
+        },
+        {
+          "id": "78032008-f730-44ed-9452-566ebc252c84",
+          "title": "Document eval harness usage",
+          "status": "completed",
+          "level": "task",
+          "description": "tests/gauntlet/sourcevision-evals/README.md covering: how to run (pnpm gauntlet:evals), how to update goldens (pnpm gauntlet:evals:record), why excluded from default gauntlet (LLM cost), what is deferred (CI integration, semantic zone-name scoring, cached LLM replay). Acceptance: a contributor unfamiliar with the harness can run and update it from the README alone.",
+          "priority": "medium",
+          "startedAt": "2026-04-18T05:58:55.065Z",
+          "completedAt": "2026-04-18T05:59:37.821Z"
+        },
+        {
+          "id": "4069767f-ac75-4db1-8857-08813fa93b29",
+          "title": "Follow-up optimization PRs (gated on harness)",
+          "status": "pending",
+          "level": "task",
+          "description": "Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.",
+          "priority": "medium"
+        }
+      ]
     }
   ]
 }

@@ -821,7 +821,7 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["sync", "4-file rex sync cluster (sync.ts, sync-engine.ts + their tests); sync.ts and sync-engine.ts are independent sibling modules that do not import each other — they are separate entry points for sync operations that share rex domain modules (tree, schema, store). No internal edges, so the graph-based cohesion metric reports 0.2."],
+  ["web-server-unit", "Mixed zone intentionally co-locating aggregation-cache.ts and routes-token-usage.ts with their unit tests (5 files total). The production-plus-tests composition keeps cohesion at 0.4, just below threshold, but the zone description documents this as a boundary case — splitting tests out would reduce the zone below sourcevision's minimum zone size."],
 ]);
 
 describe("architecture policy: zone cohesion gate", () => {

@@ -1,0 +1,193 @@
+{
+  "recordedWith": "fast",
+  "svVersion": "0.1.0",
+  "files": [
+    {
+      "path": "src/client/App.tsx",
+      "archetype": "component"
+    },
+    {
+      "path": "src/client/components/Button.tsx",
+      "archetype": "component"
+    },
+    {
+      "path": "src/client/components/Card.tsx",
+      "archetype": "component"
+    },
+    {
+      "path": "src/client/components/Input.tsx",
+      "archetype": "component"
+    },
+    {
+      "path": "src/client/components/Nav.tsx",
+      "archetype": "component"
+    },
+    {
+      "path": "src/client/hooks/useAuth.ts",
+      "archetype": "hook"
+    },
+    {
+      "path": "src/client/hooks/useFetch.ts",
+      "archetype": "hook"
+    },
+    {
+      "path": "src/client/index.tsx",
+      "archetype": "entrypoint"
+    },
+    {
+      "path": "src/client/pages/HomePage.tsx",
+      "archetype": "page"
+    },
+    {
+      "path": "src/client/pages/UserPage.tsx",
+      "archetype": "page"
+    },
+    {
+      "path": "src/client/stores/postStore.ts",
+      "archetype": "store"
+    },
+    {
+      "path": "src/client/stores/userStore.ts",
+      "archetype": "store"
+    },
+    {
+      "path": "src/server/app.ts",
+      "archetype": null
+    },
+    {
+      "path": "src/server/index.ts",
+      "archetype": "entrypoint"
+    },
+    {
+      "path": "src/server/middleware/auth.ts",
+      "archetype": "middleware"
+    },
+    {
+      "path": "src/server/middleware/logger.ts",
+      "archetype": "middleware"
+    },
+    {
+      "path": "src/server/models/post.ts",
+      "archetype": "model"
+    },
+    {
+      "path": "src/server/models/user.ts",
+      "archetype": "model"
+    },
+    {
+      "path": "src/server/routes/auth.ts",
+      "archetype": "route-handler"
+    },
+    {
+      "path": "src/server/routes/posts.ts",
+      "archetype": "route-handler"
+    },
+    {
+      "path": "src/server/routes/users.ts",
+      "archetype": "route-handler"
+    },
+    {
+      "path": "src/server/services/post-service.ts",
+      "archetype": "service"
+    },
+    {
+      "path": "src/server/services/user-service.ts",
+      "archetype": "service"
+    },
+    {
+      "path": "src/shared/constants.ts",
+      "archetype": "types"
+    },
+    {
+      "path": "src/shared/index.ts",
+      "archetype": "entrypoint"
+    },
+    {
+      "path": "src/shared/schemas/post.ts",
+      "archetype": "schema"
+    },
+    {
+      "path": "src/shared/schemas/user.ts",
+      "archetype": "schema"
+    },
+    {
+      "path": "src/shared/types.ts",
+      "archetype": "types"
+    },
+    {
+      "path": "src/shared/utils/format.ts",
+      "archetype": "utility"
+    },
+    {
+      "path": "src/shared/utils/parse.ts",
+      "archetype": "utility"
+    },
+    {
+      "path": "src/shared/utils/validate.ts",
+      "archetype": "utility"
+    }
+  ],
+  "zones": [
+    {
+      "id": "client",
+      "files": [
+        "src/client/App.tsx",
+        "src/client/components/Button.tsx",
+        "src/client/components/Nav.tsx",
+        "src/client/index.tsx"
+      ]
+    },
+    {
+      "id": "client-components",
+      "files": [
+        "src/client/components/Card.tsx",
+        "src/client/pages/HomePage.tsx",
+        "src/client/stores/postStore.ts"
+      ]
+    },
+    {
+      "id": "server",
+      "files": [
+        "src/server/app.ts",
+        "src/server/index.ts",
+        "src/server/models/user.ts",
+        "src/server/routes/auth.ts",
+        "src/server/routes/posts.ts",
+        "src/server/routes/users.ts",
+        "src/server/services/post-service.ts",
+        "src/server/services/user-service.ts"
+      ]
+    },
+    {
+      "id": "server-middleware",
+      "files": [
+        "src/server/middleware/auth.ts",
+        "src/server/middleware/logger.ts"
+      ]
+    },
+    {
+      "id": "shared",
+      "files": [
+        "src/server/models/post.ts",
+        "src/shared/constants.ts",
+        "src/shared/index.ts",
+        "src/shared/schemas/post.ts",
+        "src/shared/schemas/user.ts",
+        "src/shared/types.ts",
+        "src/shared/utils/format.ts",
+        "src/shared/utils/parse.ts",
+        "src/shared/utils/validate.ts"
+      ]
+    },
+    {
+      "id": "user",
+      "files": [
+        "src/client/components/Input.tsx",
+        "src/client/hooks/useAuth.ts",
+        "src/client/hooks/useFetch.ts",
+        "src/client/pages/UserPage.tsx",
+        "src/client/stores/userStore.ts"
+      ]
+    }
+  ]
+}
