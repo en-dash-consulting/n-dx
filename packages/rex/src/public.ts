@@ -57,6 +57,11 @@ export { serializeDocument } from "./store/markdown-serializer.js";
 export { parseDocument, MarkdownParseError } from "./store/markdown-parser.js";
 export type { ParseResult } from "./store/markdown-parser.js";
 
+// ---- Folder-tree parser -----------------------------------------------------
+
+export { parseFolderTree } from "./store/folder-tree-parser.js";
+export type { ParseWarning, FolderParseResult } from "./store/folder-tree-parser.js";
+
 // ---- Store: git branch helpers and PRD filename composers ------------------
 
 export {
