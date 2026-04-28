@@ -1322,12 +1322,21 @@
         {
           "id": "ce2ecf83-8a69-4ccc-ad43-6243d4c3646b",
           "title": "CLI and MCP Write Command Integration with Folder Tree",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "branch": "feature/new-PRD-design",
           "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
           "description": "Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation.",
           "source": "smart-add",
+          "startedAt": "2026-04-28T00:06:30.996Z",
+          "completedAt": "2026-04-28T00:06:30.996Z",
+          "endedAt": "2026-04-28T00:06:30.996Z",
+          "activeIntervals": [
+            {
+              "start": "2026-04-28T00:06:30.996Z",
+              "end": "2026-04-28T00:06:30.996Z"
+            }
+          ],
           "children": [
             {
               "id": "a90cf2ff-f346-43bb-9df0-c6ec954a712a",
@@ -1369,7 +1378,7 @@
             {
               "id": "1e04af28-ca65-4104-941e-af798af61373",
               "title": "Update rex read commands (status, next, validate) to read PRD from folder tree",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1389,9 +1398,12 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-27T23:36:47.595Z",
+              "completedAt": "2026-04-28T00:06:30.846Z",
+              "endedAt": "2026-04-28T00:06:30.846Z",
               "activeIntervals": [
                 {
-                  "start": "2026-04-27T23:36:47.595Z"
+                  "start": "2026-04-27T23:36:47.595Z",
+                  "end": "2026-04-28T00:06:30.846Z"
                 }
               ]
             },
@@ -1442,7 +1454,7 @@
             {
               "id": "93517780-f058-4e22-b52b-7bbba2c45c2d",
               "title": "Implement rex migrate-to-folder-tree command and auto-trigger detection",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1471,7 +1483,13 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-04-27T18:46:33.810Z"
-              }
+              },
+              "startedAt": "2026-04-28T09:53:22.896Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-28T09:53:22.896Z"
+                }
+              ]
             }
           ]
         },

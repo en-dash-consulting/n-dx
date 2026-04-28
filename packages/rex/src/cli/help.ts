@@ -541,6 +541,22 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["reorganize", "report", "validate"],
   },
+  "migrate-to-folder-tree": {
+    tool: "rex",
+    command: "migrate-to-folder-tree",
+    summary: "migrate prd.md to the .rex/tree/ folder-tree format",
+    usage: "rex migrate-to-folder-tree [dir]",
+    description:
+      "Reads the current PRD from .rex/prd.md (or prd.json) and writes the full\n" +
+      "folder tree to .rex/tree/. Idempotent: re-running updates changed items\n" +
+      "without duplicating folders. Prints a summary of folders created and\n" +
+      "index.md files written.",
+    examples: [
+      { command: "rex migrate-to-folder-tree", description: "Migrate current project" },
+      { command: "rex migrate-to-folder-tree ./my-project", description: "Migrate a specific project" },
+    ],
+    related: ["init", "status", "validate"],
+  },
   "migrate-to-md": {
     tool: "rex",
     command: "migrate-to-md",
@@ -600,6 +616,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   reorganize: ["health", "prune", "reshape"],
   health: ["reorganize", "report", "validate"],
   "migrate-to-md": ["init", "validate", "status"],
+  "migrate-to-folder-tree": ["init", "status", "validate"],
   mcp: [],
 };
 

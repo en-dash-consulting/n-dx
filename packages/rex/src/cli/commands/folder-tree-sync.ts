@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { serializeFolderTree, parseFolderTree } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
+import { warn } from "../output.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDItem } from "../../schema/index.js";
 
@@ -73,7 +74,8 @@ export async function loadItemsPreferFolderTree(
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
   if (!await hasFolderTreeContent(treeRoot)) {
-    // Tree absent: auto-migrate from store (prd.md → tree).
+    // Tree absent: auto-migrate from store (prd.md → tree) on first use.
+    warn(`Migrating .rex/prd.md → .rex/${FOLDER_TREE_SUBDIR}/ (first run)`);
     await syncFolderTree(rexDir, store);
   }
 

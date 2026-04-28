@@ -28884,10 +28884,16 @@ items:
       - id: "ce2ecf83-8a69-4ccc-ad43-6243d4c3646b"
         level: feature
         title: CLI and MCP Write Command Integration with Folder Tree
-        status: pending
+        status: completed
+        activeIntervals:
+          - start: "2026-04-28T00:06:30.996Z"
+            end: "2026-04-28T00:06:30.996Z"
         branch: feature/new-PRD-design
+        completedAt: "2026-04-28T00:06:30.996Z"
+        endedAt: "2026-04-28T00:06:30.996Z"
         source: smart-add
         sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        startedAt: "2026-04-28T00:06:30.996Z"
         description: Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation.
         children:
           - id: "a90cf2ff-f346-43bb-9df0-c6ec954a712a"
@@ -28921,7 +28927,7 @@ items:
           - id: "1e04af28-ca65-4104-941e-af798af61373"
             level: task
             title: Update rex read commands (status, next, validate) to read PRD from folder tree
-            status: in_progress
+            status: completed
             priority: high
             acceptanceCriteria:
               - rex status output is identical when reading from folder tree vs single prd.md for the same PRD dataset
@@ -28931,7 +28937,10 @@ items:
               - "Fallback detection: if prd/ folder is absent but prd.md exists, auto-trigger migration before reading"
             activeIntervals:
               - start: "2026-04-27T23:36:47.595Z"
+                end: "2026-04-28T00:06:30.846Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-28T00:06:30.846Z"
+            endedAt: "2026-04-28T00:06:30.846Z"
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
             startedAt: "2026-04-27T23:36:47.595Z"
@@ -28977,7 +28986,7 @@ items:
           - id: "93517780-f058-4e22-b52b-7bbba2c45c2d"
             level: task
             title: Implement rex migrate-to-folder-tree command and auto-trigger detection
-            status: pending
+            status: in_progress
             priority: high
             acceptanceCriteria:
               - Running the command on an existing prd.md produces a complete folder tree with zero data loss
@@ -28985,6 +28994,8 @@ items:
               - "Command prints a creation summary: N folders created, M index.md files written"
               - Auto-trigger fires transparently on first read/write when prd/ is absent but prd.md exists, printing a one-line migration notice
               - ndx init scaffolds .rex/prd/ and writes a root index.md stub on new projects
+            activeIntervals:
+              - start: "2026-04-28T09:53:22.896Z"
             branch: feature/new-PRD-design
             overrideMarker:
               createdAt: "2026-04-27T18:46:33.810Z"
@@ -28997,6 +29008,7 @@ items:
               type: duplicate_guard_override
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-28T09:53:22.896Z"
             tags:
               - prd
               - migration
@@ -38615,7 +38627,7 @@ Build the serializer that takes the in-memory PRD tree and writes it to disk as 
 Build the inverse of the serializer: traverse the .rex/prd/ folder hierarchy, parse each index.md, and reconstruct the full PRD item tree in memory. The parser must handle missing files, malformed frontmatter, and partial trees without aborting, and must emit structured warnings for any items it cannot read.
 
 ### CLI and MCP Write Command Integration with Folder Tree
-*feature · pending*
+*feature · completed · started 2026-04-28 · completed 2026-04-28*
 
 Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation.
 
@@ -38625,7 +38637,7 @@ Update every rex CLI command and MCP tool that modifies PRD state to persist cha
 Modify rex add, edit, remove, and move so that after every write to PRDStore, the affected subtree is re-serialized to the folder structure on disk. add creates a new folder and updates all ancestor index.md summaries; edit rewrites the item's index.md and propagates summary changes upward; remove deletes the folder and cleans parent summaries; move relocates the folder and updates both old and new parent summaries.
 
 #### Update rex read commands (status, next, validate) to read PRD from folder tree
-*task · in_progress · priority: high · started 2026-04-27 · tags: prd, cli, read*
+*task · completed · priority: high · started 2026-04-27 · completed 2026-04-28 · tags: prd, cli, read*
 
 Wire rex status, rex next, and rex validate to read the PRD from the folder tree via the parser rather than from the legacy single-file store. Verify that command output is byte-for-byte identical to the single-file baseline for the same dataset, and that commands fall back gracefully when neither format is present.
 
@@ -38640,7 +38652,7 @@ Ensure that ndx plan --accept, ndx recommend --accept, and all MCP write tools (
 Provide a first-run migration path from prd.md to the folder-tree format, integrate folder scaffolding into ndx init, and implement automatic migration detection so existing projects upgrade transparently.
 
 #### Implement rex migrate-to-folder-tree command and auto-trigger detection
-*task · pending · priority: high · tags: prd, migration, cli, init*
+*task · in_progress · priority: high · started 2026-04-28 · tags: prd, migration, cli, init*
 
 Build a one-shot CLI command (rex migrate-to-folder-tree) that reads the existing prd.md, runs the serializer, and writes the full folder tree to .rex/prd/. Auto-trigger this migration transparently the first time any read or write command runs and detects prd.md without a prd/ folder. The command must be idempotent and print a creation summary.
 

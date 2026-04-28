@@ -452,6 +452,11 @@ async function dispatchCommand(
       await cmdMigrateToMd(resolveDir(positional));
       break;
     }
+    case "migrate-to-folder-tree": {
+      const { cmdMigrateToFolderTree } = await import("./commands/migrate-to-folder-tree.js");
+      await cmdMigrateToFolderTree(resolveDir(positional));
+      break;
+    }
     default: {
       // Check if the user tried an ndx-only orchestration command
       const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -475,7 +480,7 @@ async function dispatchCommand(
         "init", "status", "next", "add", "update", "move", "remove", "reshape",
         "prune", "validate", "fix", "sync", "usage", "report", "verify",
         "recommend", "analyze", "import", "adapter", "reorganize", "health", "mcp",
-        "migrate-to-md",
+        "migrate-to-md", "migrate-to-folder-tree",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
       throw new CLIError(
