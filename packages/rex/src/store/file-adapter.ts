@@ -174,6 +174,66 @@ export class FileStore implements PRDStore {
     return file;
   }
 
+  /**
+   * Sync the derived `prd.json` artifact from an in-memory document.
+   *
+   * A write error is logged to stderr but never propagated — prd.md is already
+   * consistent, and `prd.json` is a backward-compat artifact.
+   */
+  private async syncJsonSilent(doc: PRDDocument): Promise<void> {
+    try {
+      await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
+    } catch (err) {
+      process.stderr.write(
+        `[rex] Warning: failed to sync prd.json: ${(err as Error).message}\n`,
+      );
+    }
+  }
+
+  /**
+   * Build a merged PRD snapshot from all source files, substituting the
+   * in-memory `mutatedDoc` for `mutatedFilename` instead of reading it from
+   * disk. Used to generate the prd.md content *before* writing the JSON file.
+   */
+  private async buildMergedSnapshotPreWrite(
+    mutatedFilename: string,
+    mutatedDoc: PRDDocument,
+  ): Promise<PRDDocument> {
+    const branchFiles = await discoverPRDFiles(this.rexDir);
+
+    // Determine sources in merge order (prd.json first, then branch files)
+    type Source = { filename: string; doc: PRDDocument };
+    const sources: Source[] = [];
+
+    if (mutatedFilename === PRD_FILENAME) {
+      sources.push({ filename: PRD_FILENAME, doc: mutatedDoc });
+    } else {
+      try {
+        const primary = await this.loadSingleFile(PRD_FILENAME);
+        sources.push({ filename: PRD_FILENAME, doc: primary });
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException | undefined)?.code;
+        if (code !== "ENOENT") throw err;
+      }
+    }
+
+    for (const branchFile of branchFiles) {
+      if (branchFile === mutatedFilename) {
+        sources.push({ filename: branchFile, doc: mutatedDoc });
+      } else {
+        const bd = await this.loadSingleFile(branchFile);
+        sources.push({ filename: branchFile, doc: bd });
+      }
+    }
+
+    if (sources.length === 0) return mutatedDoc;
+    if (sources.length === 1) return sources[0].doc;
+
+    const allItems = sources.flatMap((s) => s.doc.items);
+    const primary = sources[0].doc;
+    return { schema: primary.schema, title: primary.title, items: allItems };
+  }
+
   private async withFileTransaction<T>(
     filename: string,
     fn: (doc: PRDDocument) => Promise<T>,
@@ -185,9 +245,12 @@ export class FileStore implements PRDStore {
       if (!valid.ok) {
         throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
       }
+      // Build merged snapshot in-memory (before writing the JSON file)
+      const snapshot = await this.buildMergedSnapshotPreWrite(filename, doc);
+      // Write prd.md FIRST (primary storage)
+      await atomicWrite(this.markdownPath, serializeDocument(snapshot));
+      // Write the specific JSON file SECOND
       await atomicWriteJSON(this.path(filename), doc, toCanonicalJSON);
-      const snapshot = await this.loadDocumentFromJsonSources();
-      await this.saveMarkdownDocument(snapshot);
       return result;
     });
   }
@@ -291,7 +354,11 @@ export class FileStore implements PRDStore {
   }
 
   /**
-   * Persist a PRD document to the canonical `prd.json` file.
+   * Persist a PRD document.
+   *
+   * `prd.md` is written first (primary storage). `prd.json` is then synced as
+   * a derived backward-compat artifact — a write error there is logged but does
+   * not propagate so that the primary write is never rolled back.
    *
    * When not inside a {@link withTransaction}, acquires a per-file lock
    * so concurrent writers serialize safely.
@@ -304,18 +371,20 @@ export class FileStore implements PRDStore {
 
     if (!this.ownershipLoaded) {
       if (this.inTransaction) {
-        await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
-        await this.saveMarkdownDocument(doc);
+        // Write prd.md FIRST (primary), then sync prd.json (non-fatal)
+        await atomicWrite(this.markdownPath, serializeDocument(doc));
+        await this.syncJsonSilent(doc);
         return;
       }
 
       await withLock(this.prdLockPath, async () => {
-        await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
-        await this.saveMarkdownDocument(doc);
+        await atomicWrite(this.markdownPath, serializeDocument(doc));
+        await this.syncJsonSilent(doc);
       });
       return;
     }
 
+    // Multi-file ownership mode: route items to their owning files
     const fileItems = new Map<string, PRDItem[]>();
     for (const filename of this.fileMetadata.keys()) {
       fileItems.set(filename, []);
@@ -329,30 +398,31 @@ export class FileStore implements PRDStore {
 
     const filenames = [...fileItems.keys()].sort();
     const writeAll = async () => {
+      // Write prd.md FIRST (primary — merged view of all items)
+      await atomicWrite(this.markdownPath, serializeDocument(doc));
+
+      // Write per-file JSON SECOND; prd.json write is non-fatal
       for (const filename of filenames) {
         const items = fileItems.get(filename)!;
         const meta =
           filename === this.primaryFile
             ? { schema: doc.schema, title: doc.title }
             : this.fileMetadata.get(filename) ?? { schema: doc.schema, title: doc.title };
-        await atomicWriteJSON(
-          this.path(filename),
-          { schema: meta.schema, title: meta.title, items },
-          toCanonicalJSON,
-        );
+        const fileDoc = { schema: meta.schema, title: meta.title, items };
+        if (filename === PRD_FILENAME) {
+          await this.syncJsonSilent(fileDoc);
+        } else {
+          await atomicWriteJSON(this.path(filename), fileDoc, toCanonicalJSON);
+        }
       }
     };
 
     if (this.inTransaction) {
       await writeAll();
-      await this.saveMarkdownDocument(doc);
       return;
     }
 
-    await this.withNestedLocks(filenames, async () => {
-      await writeAll();
-      await this.saveMarkdownDocument(doc);
-    });
+    await this.withNestedLocks(filenames, writeAll);
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
