@@ -656,8 +656,10 @@
             {
               "id": "97b24996-6ca7-46de-a2bf-1355ebc12e9f",
               "title": "Integrate markdown as primary read/write format in PRDStore with JSON dual-write",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
+              "branch": "feature/new-PRD-design",
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
               "description": "Update the PRD store (packages/rex/src/core/) to read from and write to .rex/prd.md as the primary storage file. On every save, also write the equivalent JSON to .rex/prd.json to keep it current for backward-compatible tooling. All existing store operations (load, save, add, edit, update, merge, move) must work transparently. The store falls back to reading .rex/prd.json if .rex/prd.md does not exist, enabling the migration path. Dual-write failure must not leave prd.md in an inconsistent state.",
               "acceptanceCriteria": [
                 "PRDStore.load() reads from .rex/prd.md when the file exists; falls back to .rex/prd.json when prd.md is absent",
@@ -675,13 +677,14 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-24T15:54:10.082Z",
+              "completedAt": "2026-04-28T15:08:27.304Z",
+              "endedAt": "2026-04-28T15:08:27.304Z",
               "activeIntervals": [
                 {
-                  "start": "2026-04-28T13:50:45.648Z"
+                  "start": "2026-04-28T13:50:45.648Z",
+                  "end": "2026-04-28T15:08:27.304Z"
                 }
-              ],
-              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
-              "branch": "feature/new-PRD-design"
+              ]
             },
             {
               "id": "7143e2a0-7c77-45ed-b3e5-d588a11b3b27",
@@ -1185,7 +1188,15 @@
           "status": "pending",
           "level": "task",
           "description": "Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.",
-          "priority": "medium"
+          "priority": "medium",
+          "startedAt": "2026-04-28T15:08:29.416Z",
+          "activeIntervals": [
+            {
+              "start": "2026-04-28T15:08:29.416Z"
+            }
+          ],
+          "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+          "branch": "feature/new-PRD-design"
         }
       ]
     },

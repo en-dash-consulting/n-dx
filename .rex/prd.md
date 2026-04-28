@@ -28351,7 +28351,7 @@ items:
           - id: "97b24996-6ca7-46de-a2bf-1355ebc12e9f"
             level: task
             title: Integrate markdown as primary read/write format in PRDStore with JSON dual-write
-            status: in_progress
+            status: completed
             priority: critical
             acceptanceCriteria:
               - PRDStore.load() reads from .rex/prd.md when the file exists; falls back to .rex/prd.json when prd.md is absent
@@ -28362,7 +28362,10 @@ items:
               - All existing PRDStore unit and integration tests pass without modification
             activeIntervals:
               - start: "2026-04-28T13:50:45.648Z"
+                end: "2026-04-28T15:08:27.304Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-28T15:08:27.304Z"
+            endedAt: "2026-04-28T15:08:27.304Z"
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
             startedAt: "2026-04-24T15:54:10.082Z"
@@ -28774,8 +28777,13 @@ items:
       - id: "4069767f-ac75-4db1-8857-08813fa93b29"
         level: task
         title: Follow-up optimization PRs (gated on harness)
-        status: pending
+        status: in_progress
         priority: medium
+        activeIntervals:
+          - start: "2026-04-28T15:08:29.416Z"
+        branch: feature/new-PRD-design
+        sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        startedAt: "2026-04-28T15:08:29.416Z"
         description: Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.
   - id: "79e50af8-c363-4345-970a-23006d04e1f4"
     level: epic
@@ -38501,7 +38509,7 @@ Build a markdown serializer (PRD tree → .md string) and a markdown parser (.md
 Integrate the markdown format as the primary read/write target in the PRD store while keeping prd.json synchronized for backward compatibility, and automate migration from existing JSON files on first use.
 
 #### Integrate markdown as primary read/write format in PRDStore with JSON dual-write
-*task · in_progress · priority: critical · started 2026-04-24 · tags: rex, storage, refactor*
+*task · completed · priority: critical · started 2026-04-24 · completed 2026-04-28 · tags: rex, storage, refactor*
 
 Update the PRD store (packages/rex/src/core/) to read from and write to .rex/prd.md as the primary storage file. On every save, also write the equivalent JSON to .rex/prd.json to keep it current for backward-compatible tooling. All existing store operations (load, save, add, edit, update, merge, move) must work transparently. The store falls back to reading .rex/prd.json if .rex/prd.md does not exist, enabling the migration path. Dual-write failure must not leave prd.md in an inconsistent state.
 
@@ -38638,7 +38646,7 @@ tests/gauntlet/sourcevision-evals/score.ts exports two pure scorers: archetype a
 tests/gauntlet/sourcevision-evals/README.md covering: how to run (pnpm gauntlet:evals), how to update goldens (pnpm gauntlet:evals:record), why excluded from default gauntlet (LLM cost), what is deferred (CI integration, semantic zone-name scoring, cached LLM replay). Acceptance: a contributor unfamiliar with the harness can run and update it from the README alone.
 
 #### Follow-up optimization PRs (gated on harness)
-*task · pending · priority: medium*
+*task · in_progress · priority: medium · started 2026-04-28*
 
 Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.
 
