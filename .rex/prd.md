@@ -28746,8 +28746,16 @@ items:
   - id: "4f87bb38-11d7-48e9-a143-d9efa9f251ab"
     level: epic
     title: Sourcevision LLM eval harness & token reduction
-    status: pending
+    status: completed
     priority: high
+    activeIntervals:
+      - start: "2026-04-28T15:11:46.163Z"
+        end: "2026-04-28T15:11:46.163Z"
+    branch: feature/new-PRD-design
+    completedAt: "2026-04-28T15:11:46.163Z"
+    endedAt: "2026-04-28T15:11:46.163Z"
+    sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+    startedAt: "2026-04-28T15:11:46.163Z"
     description: "Build an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk."
     children:
       - id: "5a86a130-d6ca-4ad1-b251-faac76a6d6b4"
@@ -28777,11 +28785,16 @@ items:
       - id: "4069767f-ac75-4db1-8857-08813fa93b29"
         level: task
         title: Follow-up optimization PRs (gated on harness)
-        status: in_progress
+        status: completed
         priority: medium
         activeIntervals:
           - start: "2026-04-28T15:08:29.416Z"
+            end: "2026-04-28T15:11:03.824Z"
+          - start: "2026-04-28T15:11:23.335Z"
+            end: "2026-04-28T15:11:45.772Z"
         branch: feature/new-PRD-design
+        completedAt: "2026-04-28T15:11:45.772Z"
+        endedAt: "2026-04-28T15:11:45.772Z"
         sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
         startedAt: "2026-04-28T15:08:29.416Z"
         description: Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.
@@ -38626,7 +38639,7 @@ Add a --show-individual flag to ndx status so users can see status broken down p
 Extend ndx status (and rex status) with a --show-individual flag that, instead of showing the merged aggregate tree, prints status sections grouped by source PRD file. Each section should include the PRD file path, a header, and the same stats/tree the default status produces but scoped to items originating from that file. Honor existing flags (--format=json, filters) by emitting an array of per-PRD status objects in JSON mode.
 
 ## Sourcevision LLM eval harness & token reduction
-*epic · pending · priority: high*
+*epic · completed · priority: high · started 2026-04-28 · completed 2026-04-28*
 
 Build an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk.
 
@@ -38646,7 +38659,7 @@ tests/gauntlet/sourcevision-evals/score.ts exports two pure scorers: archetype a
 tests/gauntlet/sourcevision-evals/README.md covering: how to run (pnpm gauntlet:evals), how to update goldens (pnpm gauntlet:evals:record), why excluded from default gauntlet (LLM cost), what is deferred (CI integration, semantic zone-name scoring, cached LLM replay). Acceptance: a contributor unfamiliar with the harness can run and update it from the README alone.
 
 #### Follow-up optimization PRs (gated on harness)
-*task · in_progress · priority: medium · started 2026-04-28*
+*task · completed · priority: medium · started 2026-04-28 · completed 2026-04-28*
 
 Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.
 

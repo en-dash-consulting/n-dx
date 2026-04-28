@@ -1147,7 +1147,7 @@
     {
       "id": "4f87bb38-11d7-48e9-a143-d9efa9f251ab",
       "title": "Sourcevision LLM eval harness & token reduction",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "description": "Build an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk.",
       "priority": "high",
@@ -1185,20 +1185,38 @@
         {
           "id": "4069767f-ac75-4db1-8857-08813fa93b29",
           "title": "Follow-up optimization PRs (gated on harness)",
-          "status": "pending",
+          "status": "completed",
           "level": "task",
+          "branch": "feature/new-PRD-design",
+          "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
           "description": "Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.",
           "priority": "medium",
           "startedAt": "2026-04-28T15:08:29.416Z",
+          "completedAt": "2026-04-28T15:11:45.772Z",
+          "endedAt": "2026-04-28T15:11:45.772Z",
           "activeIntervals": [
             {
-              "start": "2026-04-28T15:08:29.416Z"
+              "start": "2026-04-28T15:08:29.416Z",
+              "end": "2026-04-28T15:11:03.824Z"
+            },
+            {
+              "start": "2026-04-28T15:11:23.335Z",
+              "end": "2026-04-28T15:11:45.772Z"
             }
-          ],
-          "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
-          "branch": "feature/new-PRD-design"
+          ]
         }
-      ]
+      ],
+      "startedAt": "2026-04-28T15:11:46.163Z",
+      "completedAt": "2026-04-28T15:11:46.163Z",
+      "endedAt": "2026-04-28T15:11:46.163Z",
+      "activeIntervals": [
+        {
+          "start": "2026-04-28T15:11:46.163Z",
+          "end": "2026-04-28T15:11:46.163Z"
+        }
+      ],
+      "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+      "branch": "feature/new-PRD-design"
     },
     {
       "id": "79e50af8-c363-4345-970a-23006d04e1f4",
