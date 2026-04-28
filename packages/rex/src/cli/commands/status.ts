@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { resolveStore } from "../../store/index.js";
+import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { computeStats } from "../../core/stats.js";
 import { verify } from "../../core/verify.js";
 import { CLIError } from "../errors.js";
@@ -95,6 +96,7 @@ export async function cmdStatus(
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
+  doc.items = await loadItemsPreferFolderTree(rexDir, store);
 
   // Compute coverage if requested
   let verifyResult: VerifyResult | undefined;

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdValidate } from "../../../../src/cli/commands/validate.js";
+import { serializeFolderTree } from "../../../../src/store/index.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
@@ -590,5 +591,113 @@ describe("cmdValidate", () => {
       expect(report.summary).toBeDefined();
       expect(report.summary.failed).toBeGreaterThan(0);
     });
+  });
+});
+
+// ── Folder-tree read path ──────────────────────────────────────────────────────
+
+const VALID_CONFIG_FOR_TREE = {
+  schema: "rex/v1",
+  project: "tree-validate-test",
+  adapter: "file",
+};
+
+const VALID_PRD_FOR_TREE: PRDDocument = {
+  schema: "rex/v1",
+  title: "Tree Validate Test",
+  items: [
+    {
+      id: "e1",
+      title: "Epic One",
+      level: "epic",
+      status: "pending",
+      children: [
+        {
+          id: "f1",
+          title: "Feature One",
+          level: "feature",
+          status: "pending",
+          acceptanceCriteria: ["Criterion A"],
+        },
+      ],
+    },
+  ],
+};
+
+describe("cmdValidate — folder tree read path", () => {
+  let tmpDir: string;
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "rex-validate-tree-test-"));
+    mkdirSync(join(tmpDir, ".rex"), { recursive: true });
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
+    stdoutSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    exitSpy.mockRestore();
+    stdoutSpy.mockRestore();
+  });
+
+  it("passes all structural checks when tree exists and items are valid", async () => {
+    writeFileSync(join(tmpDir, ".rex", "config.json"), JSON.stringify(VALID_CONFIG_FOR_TREE));
+    writeFileSync(join(tmpDir, ".rex", "prd.json"), JSON.stringify(VALID_PRD_FOR_TREE));
+    await serializeFolderTree(VALID_PRD_FOR_TREE.items, join(tmpDir, ".rex", "tree"));
+
+    await cmdValidate(tmpDir, {});
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  it("auto-migrates to tree when tree is absent, structural checks pass", async () => {
+    writeFileSync(join(tmpDir, ".rex", "config.json"), JSON.stringify(VALID_CONFIG_FOR_TREE));
+    writeFileSync(join(tmpDir, ".rex", "prd.json"), JSON.stringify(VALID_PRD_FOR_TREE));
+    // No tree pre-created.
+
+    await cmdValidate(tmpDir, {});
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(existsSync(join(tmpDir, ".rex", "tree"))).toBe(true);
+  });
+
+  it("reports same issues from tree as from prd.json (empty-container warning)", async () => {
+    const prdWithEmptyEpic: PRDDocument = {
+      schema: "rex/v1",
+      title: "Tree Validate Test",
+      items: [
+        {
+          id: "e1",
+          title: "Empty Epic",
+          level: "epic",
+          status: "pending",
+          // no children → empty container warning
+        },
+      ],
+    };
+
+    writeFileSync(join(tmpDir, ".rex", "config.json"), JSON.stringify(VALID_CONFIG_FOR_TREE));
+    writeFileSync(join(tmpDir, ".rex", "prd.json"), JSON.stringify(prdWithEmptyEpic));
+    await serializeFolderTree(prdWithEmptyEpic.items, join(tmpDir, ".rex", "tree"));
+
+    await cmdValidate(tmpDir, { format: "json" });
+
+    const jsonCall = stdoutSpy.mock.calls.find((c) => {
+      try {
+        const parsed = JSON.parse(c[0]);
+        return parsed && "ok" in parsed;
+      } catch {
+        return false;
+      }
+    });
+    const report = JSON.parse(jsonCall![0]);
+    const emptyCheck = report.checks.find(
+      (c: { name: string }) => c.name === "empty containers",
+    );
+    expect(emptyCheck).toBeDefined();
+    expect(emptyCheck.pass).toBe(false);
   });
 });

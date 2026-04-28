@@ -1332,7 +1332,7 @@
             {
               "id": "a90cf2ff-f346-43bb-9df0-c6ec954a712a",
               "title": "Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation",
-              "status": "deferred",
+              "status": "completed",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1353,17 +1353,23 @@
               ],
               "source": "smart-add",
               "startedAt": "2026-04-27T19:21:11.109Z",
+              "completedAt": "2026-04-27T23:29:18.791Z",
+              "endedAt": "2026-04-27T23:29:18.791Z",
               "activeIntervals": [
                 {
                   "start": "2026-04-27T19:21:11.109Z",
                   "end": "2026-04-27T19:36:11.692Z"
+                },
+                {
+                  "start": "2026-04-27T23:26:48.488Z",
+                  "end": "2026-04-27T23:29:18.791Z"
                 }
               ]
             },
             {
               "id": "1e04af28-ca65-4104-941e-af798af61373",
               "title": "Update rex read commands (status, next, validate) to read PRD from folder tree",
-              "status": "pending",
+              "status": "in_progress",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1381,12 +1387,18 @@
                 "cli",
                 "read"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-27T23:36:47.595Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-27T23:36:47.595Z"
+                }
+              ]
             },
             {
               "id": "f16ab364-971a-43ab-94e7-173a891264d1",
               "title": "Update ndx plan, ndx recommend, and all MCP write tools to propagate writes to the folder tree",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1404,7 +1416,16 @@
                 "mcp",
                 "orchestration"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-27T23:29:20.129Z",
+              "completedAt": "2026-04-27T23:36:46.270Z",
+              "endedAt": "2026-04-27T23:36:46.270Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-27T23:29:20.129Z",
+                  "end": "2026-04-27T23:36:46.270Z"
+                }
+              ]
             }
           ]
         },

@@ -9,10 +9,12 @@ import {
   applyEpiclessResolutions,
 } from "./validate-interactive.js";
 import { resolveStore } from "../../store/index.js";
+import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { green, yellow, red } from "@n-dx/llm-client";
 import type { PRDDocument } from "../../schema/index.js";
+import type { PRDStore } from "../../store/index.js";
 import type { PromptFn } from "./validate-interactive.js";
 
 interface CheckResult {
@@ -64,6 +66,7 @@ export async function cmdValidate(
 
   // Check prd.json schema
   let doc: PRDDocument | null = null;
+  let store: PRDStore | null = null;
   try {
     const raw = await readFile(join(rexDir, "prd.json"), "utf-8");
     const parsed = JSON.parse(raw);
@@ -84,6 +87,17 @@ export async function cmdValidate(
       pass: false,
       errors: [(err as Error).message],
     });
+  }
+
+  // Override with folder-tree items for structural checks (auto-migrates if tree absent).
+  // Falls back to prd.json items on any error so existing checks still run.
+  if (doc) {
+    try {
+      store = await resolveStore(rexDir);
+      doc.items = await loadItemsPreferFolderTree(rexDir, store);
+    } catch {
+      // Tree load failed: structural checks will use items already in doc.
+    }
   }
 
   // Check schema version compatibility
@@ -247,9 +261,9 @@ export async function cmdValidate(
     if (actionable.length > 0) {
       const mutated = applyEpiclessResolutions(doc!, resolutions);
       if (mutated > 0) {
-        const store = await resolveStore(rexDir);
-        await store.saveDocument(doc!);
-        await store.appendLog({
+        const saveStore = store ?? await resolveStore(rexDir);
+        await saveStore.saveDocument(doc!);
+        await saveStore.appendLog({
           timestamp: new Date().toISOString(),
           event: "validate_interactive_fix",
           detail: `Resolved ${mutated} epicless feature${mutated === 1 ? "" : "s"} during interactive validation`,

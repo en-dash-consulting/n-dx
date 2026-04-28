@@ -28893,7 +28893,7 @@ items:
           - id: "a90cf2ff-f346-43bb-9df0-c6ec954a712a"
             level: task
             title: Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation
-            status: deferred
+            status: completed
             priority: critical
             acceptanceCriteria:
               - rex add creates the correct folder hierarchy and updates all ancestor index.md summary sections
@@ -28905,7 +28905,11 @@ items:
             activeIntervals:
               - start: "2026-04-27T19:21:11.109Z"
                 end: "2026-04-27T19:36:11.692Z"
+              - start: "2026-04-27T23:26:48.488Z"
+                end: "2026-04-27T23:29:18.791Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-27T23:29:18.791Z"
+            endedAt: "2026-04-27T23:29:18.791Z"
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
             startedAt: "2026-04-27T19:21:11.109Z"
@@ -28917,7 +28921,7 @@ items:
           - id: "1e04af28-ca65-4104-941e-af798af61373"
             level: task
             title: Update rex read commands (status, next, validate) to read PRD from folder tree
-            status: pending
+            status: in_progress
             priority: high
             acceptanceCriteria:
               - rex status output is identical when reading from folder tree vs single prd.md for the same PRD dataset
@@ -28925,9 +28929,12 @@ items:
               - rex validate reports the same issues whether reading from folder tree or single file
               - Commands emit a clear error when .rex/prd/ is absent and prd.md is also missing
               - "Fallback detection: if prd/ folder is absent but prd.md exists, auto-trigger migration before reading"
+            activeIntervals:
+              - start: "2026-04-27T23:36:47.595Z"
             branch: feature/new-PRD-design
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-27T23:36:47.595Z"
             tags:
               - prd
               - cli
@@ -28936,7 +28943,7 @@ items:
           - id: "f16ab364-971a-43ab-94e7-173a891264d1"
             level: task
             title: Update ndx plan, ndx recommend, and all MCP write tools to propagate writes to the folder tree
-            status: pending
+            status: completed
             priority: high
             acceptanceCriteria:
               - ndx plan --accept creates the correct folder structure for all accepted proposals
@@ -28944,9 +28951,15 @@ items:
               - "Each MCP write tool call leaves the folder tree consistent: correct folders, updated index.md, updated parent summaries"
               - MCP write tools complete within existing tool-call latency budgets (no regression measured in mcp-transport.test.js)
               - Integration test confirms folder tree item count matches PRD item count after a full ndx plan --accept run
+            activeIntervals:
+              - start: "2026-04-27T23:29:20.129Z"
+                end: "2026-04-27T23:36:46.270Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-27T23:36:46.270Z"
+            endedAt: "2026-04-27T23:36:46.270Z"
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-27T23:29:20.129Z"
             tags:
               - prd
               - mcp
@@ -38607,17 +38620,17 @@ Build the inverse of the serializer: traverse the .rex/prd/ folder hierarchy, pa
 Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation.
 
 #### Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation
-*task · deferred · priority: critical · started 2026-04-27 · tags: prd, cli, write*
+*task · completed · priority: critical · started 2026-04-27 · completed 2026-04-27 · tags: prd, cli, write*
 
 Modify rex add, edit, remove, and move so that after every write to PRDStore, the affected subtree is re-serialized to the folder structure on disk. add creates a new folder and updates all ancestor index.md summaries; edit rewrites the item's index.md and propagates summary changes upward; remove deletes the folder and cleans parent summaries; move relocates the folder and updates both old and new parent summaries.
 
 #### Update rex read commands (status, next, validate) to read PRD from folder tree
-*task · pending · priority: high · tags: prd, cli, read*
+*task · in_progress · priority: high · started 2026-04-27 · tags: prd, cli, read*
 
 Wire rex status, rex next, and rex validate to read the PRD from the folder tree via the parser rather than from the legacy single-file store. Verify that command output is byte-for-byte identical to the single-file baseline for the same dataset, and that commands fall back gracefully when neither format is present.
 
 #### Update ndx plan, ndx recommend, and all MCP write tools to propagate writes to the folder tree
-*task · pending · priority: high · tags: prd, mcp, orchestration*
+*task · completed · priority: high · started 2026-04-27 · completed 2026-04-27 · tags: prd, mcp, orchestration*
 
 Ensure that ndx plan --accept, ndx recommend --accept, and all MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) route their writes through the folder-tree serializer after every mutation. MCP tools must complete within existing latency budgets.
 

@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { resolveStore } from "../../store/index.js";
+import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
@@ -21,6 +22,7 @@ export async function cmdNext(
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
+  doc.items = await loadItemsPreferFolderTree(rexDir, store);
 
   if (doc.items.length === 0) {
     result("No items in PRD. Run: rex add epic --title=\"...\" " + dir);

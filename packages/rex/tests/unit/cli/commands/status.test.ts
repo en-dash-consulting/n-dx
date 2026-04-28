@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { serializeFolderTree } from "../../../../src/store/index.js";
 import {
   cmdStatus,
   renderProgressBar,
@@ -1386,5 +1387,100 @@ describe("formatStats with hidingCompleted option", () => {
     const stats = { total: 5, completed: 3, inProgress: 1, pending: 1, deferred: 0, blocked: 0, deleted: 0 };
     const line = formatStats(stats);
     expect(line).not.toContain("--all");
+  });
+});
+
+// ── Folder-tree read path ──────────────────────────────────────────────────────
+
+const FOLDER_TREE_PRD: PRDDocument = {
+  schema: "rex/v1",
+  title: "Folder Tree Test",
+  items: [
+    {
+      id: "e1",
+      title: "Epic One",
+      level: "epic",
+      status: "in_progress",
+      children: [
+        {
+          id: "f1",
+          title: "Feature Alpha",
+          level: "feature",
+          status: "pending",
+          acceptanceCriteria: [],
+          children: [
+            {
+              id: "t1",
+              title: "Task Bravo",
+              level: "task",
+              status: "pending",
+              acceptanceCriteria: [],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+describe("cmdStatus — folder tree read path", () => {
+  let tmp: string;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "rex-status-tree-test-"));
+    mkdirSync(join(tmp, ".rex"), { recursive: true });
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    rmSync(tmp, { recursive: true });
+  });
+
+  function output(): string {
+    return logSpy.mock.calls.map((c) => c[0] ?? "").join("\n");
+  }
+
+  it("reads items from tree when tree already exists", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(FOLDER_TREE_PRD));
+    await serializeFolderTree(FOLDER_TREE_PRD.items, join(tmp, ".rex", "tree"));
+
+    await cmdStatus(tmp, { format: "tree", all: "true" });
+    const out = output();
+
+    expect(out).toContain("Epic One");
+    expect(out).toContain("Feature Alpha");
+    expect(out).toContain("Task Bravo");
+  });
+
+  it("auto-migrates to tree when tree is absent, then reads from tree", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(FOLDER_TREE_PRD));
+    // No tree directory pre-created.
+
+    await cmdStatus(tmp, { format: "tree", all: "true" });
+
+    // Tree should have been created as a side effect.
+    expect(existsSync(join(tmp, ".rex", "tree"))).toBe(true);
+    const out = output();
+    expect(out).toContain("Epic One");
+    expect(out).toContain("Feature Alpha");
+    expect(out).toContain("Task Bravo");
+  });
+
+  it("produces identical output on consecutive runs (tree path vs migration path)", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(FOLDER_TREE_PRD));
+
+    // First run: tree absent → auto-migrate → read from tree
+    await cmdStatus(tmp, { format: "tree", all: "true" });
+    const firstOut = output();
+
+    logSpy.mockClear();
+
+    // Second run: tree present → read directly from tree
+    await cmdStatus(tmp, { format: "tree", all: "true" });
+    const secondOut = output();
+
+    expect(secondOut).toBe(firstOut);
   });
 });
