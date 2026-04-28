@@ -1,0 +1,8 @@
+---
+id: "4f87bb38-11d7-48e9-a143-d9efa9f251ab"
+level: "epic"
+title: "Sourcevision LLM eval harness & token reduction"
+status: "pending"
+priority: "high"
+description: "Build an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk."
+---

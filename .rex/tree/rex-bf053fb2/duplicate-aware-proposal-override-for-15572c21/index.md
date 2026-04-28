@@ -1,0 +1,19 @@
+---
+id: "15572c21-1d8f-4aa1-b105-82b516e71ad0"
+level: "feature"
+title: "Duplicate-aware Proposal Override for rex add"
+status: "completed"
+source: "smart-add"
+startedAt: "2026-02-22T21:18:12.472Z"
+completedAt: "2026-02-22T21:18:12.472Z"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Duplicate Detection and Reason Classification](./duplicate-detection-and-reason-3fdee105/index.md) | completed |
+| [Interactive Duplicate Override Decision Flow](./interactive-duplicate-override-decision-e28b4532/index.md) | completed |
+| [Force-create Auditability and Visibility](./force-create-auditability-and-visibility-0926d1fd/index.md) | completed |
+| [Documentation and Test Coverage for Duplicate Overrides](./documentation-and-test-coverage-for-4355a9e7/index.md) | completed |
+| [Orphaned Parent Cleanup After Smart-Add Merge](./orphaned-parent-cleanup-after-smart-add-8e04e63b/index.md) | completed |

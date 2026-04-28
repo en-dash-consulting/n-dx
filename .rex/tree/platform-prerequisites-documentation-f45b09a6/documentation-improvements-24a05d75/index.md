@@ -1,0 +1,18 @@
+---
+id: "24a05d75-a370-4ebd-a4b9-8e52395b622d"
+level: "feature"
+title: "Documentation improvements"
+status: "completed"
+priority: "medium"
+startedAt: "2026-04-13T18:35:49.604Z"
+completedAt: "2026-03-24T13:06:25.502Z"
+description: "Docs match the product vision: ndx is the interface, no package internals needed."
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Write a 5-minute quickstart tutorial](./write-a-5-minute-quickstart-tutorial-addc40f1/index.md) | completed |
+| [Add troubleshooting guide for common issues](./add-troubleshooting-guide-for-common-c9f50a60/index.md) | completed |
+| [Rewrite commands.md to be user-centric](./rewrite-commandsmd-to-be-user-centric-22625730/index.md) | completed |

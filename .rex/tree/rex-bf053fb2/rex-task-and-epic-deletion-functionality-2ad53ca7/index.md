@@ -1,0 +1,18 @@
+---
+id: "2ad53ca7-841a-4c3e-861a-d7f0eb6301d5"
+level: "feature"
+title: "Rex Task and Epic Deletion Functionality"
+status: "completed"
+source: "smart-add"
+startedAt: "2026-02-24T17:27:43.138Z"
+completedAt: "2026-02-24T17:27:43.138Z"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Backend Deletion API Implementation](./backend-deletion-api-implementation-d5f21901/index.md) | completed |
+| [Rex UI Deletion Interface](./rex-ui-deletion-interface-e7080a46/index.md) | completed |
+| [Documentation and Help Updates](./documentation-and-help-updates-c2b3377b/index.md) | completed |
+| [Request deduplication infrastructure](./request-deduplication-infrastructure-66d94a74/index.md) | completed |

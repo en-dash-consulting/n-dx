@@ -1,0 +1,27 @@
+---
+id: "0fb7be48-74a2-495d-a184-dced4d6d2d87"
+level: "feature"
+title: "Timeout Guardrails for Hanging Tests"
+status: "completed"
+source: "smart-add"
+startedAt: "2026-04-02T17:37:00.910Z"
+completedAt: "2026-04-02T17:37:00.910Z"
+description: "Prevent indefinite hangs in long-running tests by applying explicit timeout limits to suites that can block CI or local validation."
+parentId: "61746a37-64cd-4291-802e-aa54e969ec4e"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Review test suites for observable hang-risk patterns](./review-test-suites-for-observable-hang-1f2d2024/index.md) | completed |
+| [Document timeout strategies for at-risk suites](./document-timeout-strategies-for-at-risk-1052726c/index.md) | completed |
+| [Configure explicit timeouts on identified hanging-test candidates](./configure-explicit-timeouts-on-55d8280d/index.md) | completed |
+| [Verify timeout failures surface as standard Vitest errors](./verify-timeout-failures-surface-as-f792fbaf/index.md) | completed |
+| [Implement default long timeout with per-command override support](./implement-default-long-timeout-with-per-d8f5d40d/index.md) | completed |
+| [Group failing suites by shared production-side root cause](./group-failing-suites-by-shared-cf78aa03/index.md) | completed |
+| [Separate legitimate timeout work from red-to-green defect fixes](./separate-legitimate-timeout-work-from-c097f90b/index.md) | completed |
+| [Implement root-cause fixes in production or configuration code](./implement-root-cause-fixes-in-7a0ed21e/index.md) | completed |
+| [Catalog reusable helper-function patterns in unit tests](./catalog-reusable-helper-function-40d16bdb/index.md) | completed |
+| [Define a test-only consolidation baseline and scope](./define-a-test-only-consolidation-794b70a1/index.md) | completed |
+| [Create shared test-only utility modules for duplicated setup code](./create-shared-test-only-utility-modules-71e079b5/index.md) | completed |

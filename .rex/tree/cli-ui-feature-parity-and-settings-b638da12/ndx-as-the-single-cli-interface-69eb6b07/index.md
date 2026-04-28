@@ -1,0 +1,18 @@
+---
+id: "69eb6b07-7b69-49cb-8fd9-f1a67a4460ee"
+level: "feature"
+title: "ndx as the single CLI interface"
+status: "completed"
+priority: "high"
+startedAt: "2026-04-13T18:35:49.604Z"
+completedAt: "2026-03-24T13:06:25.502Z"
+description: "Every user-facing command accessible through ndx. Users never need to know which package owns what."
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Audit and surface all package commands through ndx](./audit-and-surface-all-package-commands-70cd90a1/index.md) | completed |
+| [Helpful error when users run package commands that belong to ndx](./helpful-error-when-users-run-package-926c6deb/index.md) | completed |
+| [Rewrite ndx --help to be user-centric](./rewrite-ndx-help-to-be-user-centric-6440a3d3/index.md) | completed |

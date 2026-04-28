@@ -1,0 +1,16 @@
+---
+id: "6923ff61-6f80-4eab-a875-3b4af1de2bd2"
+level: "feature"
+title: "Memory-Aware Polling Loop Management"
+status: "completed"
+source: "smart-add"
+startedAt: "2026-02-27T04:11:56.344Z"
+completedAt: "2026-02-27T04:11:56.344Z"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Memory Pressure Polling Suspension](./memory-pressure-polling-suspension-e385d455/index.md) | completed |
+| [Memory-Aware Polling Validation](./memory-aware-polling-validation-2351e3d1/index.md) | completed |

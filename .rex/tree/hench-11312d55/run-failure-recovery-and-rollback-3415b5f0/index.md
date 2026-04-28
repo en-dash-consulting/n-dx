@@ -1,0 +1,18 @@
+---
+id: "3415b5f0-3496-4813-8cc9-9f571044d49c"
+level: "feature"
+title: "Run Failure Recovery and Rollback"
+status: "completed"
+source: "smart-add"
+startedAt: "2026-04-16T15:21:00.385Z"
+completedAt: "2026-04-16T15:21:00.385Z"
+description: "When an ndx work run fails, automatically revert uncommitted file changes and reset the PRD task status back to pending so the user can retry without manual cleanup."
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Implement git change rollback on failed hench runs](./implement-git-change-rollback-on-failed-a6199e02/index.md) | completed |
+| [Add regression tests for Codex multi-line 'tokens used' output format](./add-regression-tests-for-codex-multi-c57e4a98/index.md) | completed |
+| [Add rollback configuration, confirmation UX, and regression tests](./add-rollback-configuration-confirmation-03d9f52f/index.md) | completed |

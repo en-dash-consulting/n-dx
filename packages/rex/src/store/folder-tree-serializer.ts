@@ -219,7 +219,7 @@ function renderTaskIndexMd(task: PRDItem): string {
  * `children` is always omitted (handled structurally).
  */
 const ORDERED_FIELDS: ReadonlyArray<string> = [
-  "id", "level", "title", "status", "priority", "tags", "source",
+  "id", "level", "title", "status", "priority", "tags", "blockedBy", "source",
   "startedAt", "completedAt", "endedAt",
   "resolutionType", "resolutionDetail", "failureReason",
   "acceptanceCriteria", "loe", "description",
@@ -230,7 +230,7 @@ const ORDERED_FIELDS: ReadonlyArray<string> = [
  * from folder-tree frontmatter because they are not item content.
  */
 const STORAGE_FIELDS = new Set([
-  "children", "branch", "sourceFile", "blockedBy", "requirements",
+  "children", "branch", "sourceFile", "requirements",
   "activeIntervals", "overrideMarker", "mergedProposals",
   "tokenUsage", "duration", "loeRationale", "loeConfidence",
 ]);

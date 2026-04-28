@@ -662,3 +662,169 @@ describe("serializeFolderTree: result stats", () => {
     expect(result.directoriesCreated).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ── Parent summary (## Children table) updates ────────────────────────────────
+
+describe("serializeFolderTree: parent ## Children table updates", () => {
+  it("create item → correct folder, index.md, and parent summary", async () => {
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature Alpha", {
+      acceptanceCriteria: ["Feature works"],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+
+    const epicDir = join(testDir, slugify(epic.title, epic.id));
+    const featureSlug = slugify(feature.title, feature.id);
+    const featureDir = join(epicDir, featureSlug);
+    await stat(featureDir);
+
+    const featureIndex = await readFile(join(featureDir, "index.md"), "utf8");
+    expect(featureIndex).toContain('id: "22222222-0000-0000-0000-000000000000"');
+    expect(featureIndex).toContain('title: "Feature Alpha"');
+    expect(featureIndex).toContain('"Feature works"');
+
+    const epicIndex = await readFile(join(epicDir, "index.md"), "utf8");
+    expect(epicIndex).toContain(`| [Feature Alpha](./${featureSlug}/index.md) | pending |`);
+  });
+
+  it("edit item → updated parent ## Children status column", async () => {
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature Alpha", {
+      status: "pending",
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [feature],
+    });
+    await serializeFolderTree([epic], testDir);
+
+    // Re-serialize with feature status changed to "completed"
+    const updated = { ...epic, children: [{ ...feature, status: "completed" as const }] };
+    await serializeFolderTree([updated], testDir);
+
+    const epicIndex = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    // Children table should reflect the new status.
+    // Table format: `| [Feature Alpha](./slug/index.md) | completed |`
+    expect(epicIndex).toContain("Feature Alpha");
+    expect(epicIndex).toContain("completed");
+    expect(epicIndex).not.toContain("| pending |");
+  });
+
+  it("delete item → parent ## Children table row removed", async () => {
+    const f1 = makeFeature("22222222-0000-0000-0000-000000000000", "Feature Keep");
+    const f2 = makeFeature("33333333-0000-0000-0000-000000000000", "Feature Remove");
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [f1, f2],
+    });
+    await serializeFolderTree([epic], testDir);
+
+    // Verify both features appear in Children table
+    let epicIndex = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    expect(epicIndex).toContain("Feature Keep");
+    expect(epicIndex).toContain("Feature Remove");
+
+    // Re-serialize without f2
+    const updated = { ...epic, children: [f1] };
+    await serializeFolderTree([updated], testDir);
+
+    epicIndex = await readFile(
+      join(testDir, slugify(epic.title, epic.id), "index.md"),
+      "utf8",
+    );
+    // f1 remains, f2 is gone from Children table
+    expect(epicIndex).toContain("Feature Keep");
+    expect(epicIndex).not.toContain("Feature Remove");
+    // f2's directory is also removed
+    const f2Dir = join(testDir, slugify(epic.title, epic.id), slugify(f2.title, f2.id));
+    await expect(stat(f2Dir)).rejects.toThrow();
+  });
+
+  it("move item → folder relocated and both parents updated", async () => {
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Moved Feature");
+    const epicA = makeEpic("aaaaaaaa-0000-0000-0000-000000000000", "Epic A", {
+      children: [feature],
+    });
+    const epicB = makeEpic("bbbbbbbb-0000-0000-0000-000000000000", "Epic B", {
+      children: [],
+    });
+
+    // Initial: feature under epicA
+    await serializeFolderTree([epicA, epicB], testDir);
+
+    const epicADir = join(testDir, slugify(epicA.title, epicA.id));
+    const epicBDir = join(testDir, slugify(epicB.title, epicB.id));
+    const featureSlug = slugify(feature.title, feature.id);
+
+    // Verify initial placement
+    await stat(join(epicADir, featureSlug));  // feature is under epicA
+    await expect(stat(join(epicBDir, featureSlug))).rejects.toThrow(); // not under epicB
+
+    // Move: feature now under epicB
+    const updatedA = { ...epicA, children: [] };
+    const updatedB = { ...epicB, children: [feature] };
+    await serializeFolderTree([updatedA, updatedB], testDir);
+
+    // Feature directory moved from epicA to epicB
+    await expect(stat(join(epicADir, featureSlug))).rejects.toThrow();
+    await stat(join(epicBDir, featureSlug));  // now under epicB
+
+    // epicA's Children table no longer contains "Moved Feature"
+    const epicAIndex = await readFile(join(epicADir, "index.md"), "utf8");
+    expect(epicAIndex).not.toContain("Moved Feature");
+    expect(epicAIndex).not.toContain("## Children");
+
+    // epicB's Children table now contains "Moved Feature"
+    const epicBIndex = await readFile(join(epicBDir, "index.md"), "utf8");
+    expect(epicBIndex).toContain("## Children");
+    expect(epicBIndex).toContain("Moved Feature");
+  });
+});
+
+// ── Strict round-trip deep equality ──────────────────────────────────────────
+
+describe("serializeFolderTree: strict round-trip deep equality", () => {
+  it("serialize → parse → zero diff from original for known PRD", async () => {
+    const subtask = makeSubtask("44444444-0000-0000-0000-000000000000", "Sub", {
+      status: "completed",
+      priority: "high",
+      description: "Subtask desc.",
+      acceptanceCriteria: ["Must pass"],
+    });
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", {
+      status: "in_progress",
+      priority: "critical",
+      description: "Task desc.",
+      blockedBy: ["dep-task"],
+      acceptanceCriteria: ["Task AC"],
+      loe: "s",
+      children: [subtask],
+    } as Partial<PRDItem>);
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      status: "pending",
+      acceptanceCriteria: ["Feature AC"],
+      loe: "m",
+      children: [task],
+    } as Partial<PRDItem>);
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      status: "in_progress",
+      description: "Epic desc.",
+      priority: "high",
+      tags: ["core"],
+      children: [feature],
+    });
+
+    const originalItems = [epic];
+    await serializeFolderTree(originalItems, testDir);
+    const { items: parsedItems, warnings } = await parseFolderTree(testDir);
+
+    expect(warnings).toHaveLength(0);
+    expect(parsedItems).toEqual(originalItems);
+  });
+});

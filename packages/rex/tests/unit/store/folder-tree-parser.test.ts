@@ -19,6 +19,7 @@ import type { PRDItem } from "../../../src/schema/index.js";
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
 let testDir: string;
+const FIXTURE_ROOT = join(import.meta.dirname, "../../fixtures/folder-tree");
 
 beforeEach(async () => {
   testDir = join(tmpdir(), `folder-tree-parser-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -208,6 +209,96 @@ function strip(item: PRDItem): Omit<PRDItem, "children"> {
   const { children: _children, ...rest } = item;
   return rest;
 }
+
+// ── Fixture parsing ──────────────────────────────────────────────────────────
+
+describe("parseFolderTree: folder-tree fixtures", () => {
+  it("known folder fixture → correct item tree", async () => {
+    const result = await parseFolderTree(join(FIXTURE_ROOT, "known-prd"));
+
+    expect(result.warnings).toEqual([]);
+    expect(result.items).toEqual([
+      {
+        id: "11111111-1111-1111-1111-111111111111",
+        title: "Auth Platform",
+        status: "in_progress",
+        level: "epic",
+        description: "Authentication platform rollout.",
+        priority: "high",
+        tags: ["auth", "platform"],
+        source: "fixture",
+        children: [
+          {
+            id: "22222222-2222-2222-2222-222222222222",
+            title: "Login Flow",
+            status: "pending",
+            level: "feature",
+            description: "Primary login workflow.",
+            acceptanceCriteria: [
+              "Users can sign in",
+              "Sessions expire after inactivity",
+            ],
+            loe: "m",
+            children: [
+              {
+                id: "33333333-3333-3333-3333-333333333333",
+                title: "Password Login",
+                status: "blocked",
+                level: "task",
+                description: "Build password-based authentication.",
+                priority: "critical",
+                blockedBy: ["dep-password-policy"],
+                acceptanceCriteria: [
+                  "Valid passwords authenticate users",
+                  "Invalid passwords show a generic error",
+                ],
+                loe: "s",
+                children: [
+                  {
+                    id: "44444444-4444-4444-4444-444444444444",
+                    title: "Add password form",
+                    status: "completed",
+                    level: "subtask",
+                    description: "Render email and password fields.",
+                    priority: "high",
+                    acceptanceCriteria: [
+                      "Fields are labelled",
+                      "Submit is disabled while pending",
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("missing index.md → structured warning emitted", async () => {
+    const result = await parseFolderTree(join(FIXTURE_ROOT, "missing-index"));
+
+    expect(result.items.map(item => item.title)).toEqual(["Good Epic"]);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        path: expect.stringContaining("missing-epic-bbbbbbbb/index.md"),
+        message: "index.md not found or unreadable",
+      }),
+    ]);
+  });
+
+  it("malformed frontmatter → partial load with warning", async () => {
+    const result = await parseFolderTree(join(FIXTURE_ROOT, "malformed-frontmatter"));
+
+    expect(result.items.map(item => item.title)).toEqual(["Good Epic"]);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        path: expect.stringContaining("broken-epic-bbbbbbbb/index.md"),
+        message: "Unclosed frontmatter block (missing closing ---)",
+      }),
+    ]);
+  });
+});
 
 // ── Basic parsing ─────────────────────────────────────────────────────────────
 

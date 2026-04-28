@@ -28351,7 +28351,7 @@ items:
           - id: "97b24996-6ca7-46de-a2bf-1355ebc12e9f"
             level: task
             title: Integrate markdown as primary read/write format in PRDStore with JSON dual-write
-            status: deferred
+            status: in_progress
             priority: critical
             acceptanceCriteria:
               - PRDStore.load() reads from .rex/prd.md when the file exists; falls back to .rex/prd.json when prd.md is absent
@@ -28360,7 +28360,11 @@ items:
               - MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) persist to prd.md and the json sync follows
               - prd.json content equals JSON.stringify(parse(prd.md)) after every mutation
               - All existing PRDStore unit and integration tests pass without modification
+            activeIntervals:
+              - start: "2026-04-28T13:50:45.648Z"
+            branch: feature/new-PRD-design
             source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
             startedAt: "2026-04-24T15:54:10.082Z"
             tags:
               - rex
@@ -28776,10 +28780,16 @@ items:
   - id: "79e50af8-c363-4345-970a-23006d04e1f4"
     level: epic
     title: PRD Hierarchical Folder Tree Storage
-    status: pending
+    status: completed
+    activeIntervals:
+      - start: "2026-04-28T10:43:59.641Z"
+        end: "2026-04-28T10:43:59.641Z"
     branch: feature/new-PRD-design
+    completedAt: "2026-04-28T10:43:59.641Z"
+    endedAt: "2026-04-28T10:43:59.641Z"
     source: smart-add
     sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+    startedAt: "2026-04-28T10:43:59.641Z"
     children:
       - id: "7286f1c2-ad19-4f85-baa9-cebb3c77a49d"
         level: feature
@@ -28977,16 +28987,22 @@ items:
       - id: "568a1a3c-eacd-4304-a46e-9f8c42d9901f"
         level: feature
         title: Folder Tree Migration, Initialization, and Auto-Trigger
-        status: pending
+        status: completed
+        activeIntervals:
+          - start: "2026-04-28T10:06:18.341Z"
+            end: "2026-04-28T10:06:18.341Z"
         branch: feature/new-PRD-design
+        completedAt: "2026-04-28T10:06:18.341Z"
+        endedAt: "2026-04-28T10:06:18.341Z"
         source: smart-add
         sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        startedAt: "2026-04-28T10:06:18.341Z"
         description: Provide a first-run migration path from prd.md to the folder-tree format, integrate folder scaffolding into ndx init, and implement automatic migration detection so existing projects upgrade transparently.
         children:
           - id: "93517780-f058-4e22-b52b-7bbba2c45c2d"
             level: task
             title: Implement rex migrate-to-folder-tree command and auto-trigger detection
-            status: in_progress
+            status: completed
             priority: high
             acceptanceCriteria:
               - Running the command on an existing prd.md produces a complete folder tree with zero data loss
@@ -28996,7 +29012,10 @@ items:
               - ndx init scaffolds .rex/prd/ and writes a root index.md stub on new projects
             activeIntervals:
               - start: "2026-04-28T09:53:22.896Z"
+                end: "2026-04-28T10:06:18.113Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-28T10:06:18.113Z"
+            endedAt: "2026-04-28T10:06:18.113Z"
             overrideMarker:
               createdAt: "2026-04-27T18:46:33.810Z"
               matchedItemId: "7143e2a0-7c77-45ed-b3e5-d588a11b3b27"
@@ -29018,25 +29037,39 @@ items:
       - id: "db58ca72-ee01-426d-8bb0-d0190678cf14"
         level: feature
         title: Test Suite Updates for Folder-Tree PRD Storage
-        status: pending
+        status: completed
+        activeIntervals:
+          - start: "2026-04-28T10:43:59.529Z"
+            end: "2026-04-28T10:43:59.529Z"
         branch: feature/new-PRD-design
+        completedAt: "2026-04-28T10:43:59.529Z"
+        endedAt: "2026-04-28T10:43:59.529Z"
         source: smart-add
         sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        startedAt: "2026-04-28T10:43:59.529Z"
         description: Update all existing PRD-related unit, integration, and e2e tests to exercise the folder-tree storage backend, and add new tests covering the serializer, parser, round-trip fidelity, and full CLI pipeline correctness.
         children:
           - id: "3effa16b-1466-4b82-a963-c1f21afaedeb"
             level: task
             title: Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
-            status: pending
+            status: completed
             priority: high
             acceptanceCriteria:
               - All existing PRDStore unit tests pass with the folder-tree backend without modification to test assertions
               - "Serializer unit tests: create item → correct folder and index.md, edit item → updated index.md and parent summary, delete item → folder removed and parent summary cleaned, move item → folder relocated and both parents updated"
               - "Parser unit tests: known folder fixture → correct item tree, missing index.md → structured warning emitted, malformed frontmatter → partial load with warning"
               - "Round-trip test: serialize known PRD → parse output → assert zero diff from original"
+            activeIntervals:
+              - start: "2026-04-28T10:19:31.855Z"
+                end: "2026-04-28T10:43:59.377Z"
+              - start: "2026-04-28T13:41:10.111Z"
+                end: "2026-04-28T13:49:34.833Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-28T13:49:34.833Z"
+            endedAt: "2026-04-28T13:49:34.833Z"
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-28T10:19:31.855Z"
             tags:
               - prd
               - tests
@@ -29045,7 +29078,7 @@ items:
           - id: "3e7f193b-6134-47a0-b90c-fc8d0cd262f3"
             level: task
             title: Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands
-            status: pending
+            status: completed
             priority: high
             acceptanceCriteria:
               - All rex CLI integration tests pass with folder-tree storage and assert folder structure after each write command
@@ -29053,9 +29086,15 @@ items:
               - MCP write-tool integration test asserts folder tree item count and parent summary correctness after each tool call
               - "Test isolation: every test case uses a fresh temporary directory and cleans up on exit"
               - No test hardcodes prd.md paths; all tests reference .rex/prd/ folder tree
+            activeIntervals:
+              - start: "2026-04-28T10:06:19.732Z"
+                end: "2026-04-28T10:19:30.611Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-28T10:19:30.611Z"
+            endedAt: "2026-04-28T10:19:30.611Z"
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-28T10:06:19.732Z"
             tags:
               - prd
               - tests
@@ -38462,7 +38501,7 @@ Build a markdown serializer (PRD tree → .md string) and a markdown parser (.md
 Integrate the markdown format as the primary read/write target in the PRD store while keeping prd.json synchronized for backward compatibility, and automate migration from existing JSON files on first use.
 
 #### Integrate markdown as primary read/write format in PRDStore with JSON dual-write
-*task · deferred · priority: critical · started 2026-04-24 · tags: rex, storage, refactor*
+*task · in_progress · priority: critical · started 2026-04-24 · tags: rex, storage, refactor*
 
 Update the PRD store (packages/rex/src/core/) to read from and write to .rex/prd.md as the primary storage file. On every save, also write the equivalent JSON to .rex/prd.json to keep it current for backward-compatible tooling. All existing store operations (load, save, add, edit, update, merge, move) must work transparently. The store falls back to reading .rex/prd.json if .rex/prd.md does not exist, enabling the migration path. Dual-write failure must not leave prd.md in an inconsistent state.
 
@@ -38604,7 +38643,7 @@ tests/gauntlet/sourcevision-evals/README.md covering: how to run (pnpm gauntlet:
 Tracking task for optimization PRs enabled by the eval harness. Each becomes its own PR with eval-score + token/wall-clock deltas. (1) Haiku swap for enrichment + classification with heuristic-first escalation. (2) Raise MAX_CONCURRENT_ZONES above 3 + trim prompt payload (drop other-zone summaries, stop re-sending archetype catalog per batch). (3) Skip-trivial-zones short-circuit + --full pass signature dedup. (4) Cached LLM replay for CI + semantic zone-name similarity scoring. Promote each to its own task when picked up.
 
 ## PRD Hierarchical Folder Tree Storage
-*epic · pending*
+*epic · completed · started 2026-04-28 · completed 2026-04-28*
 
 ### Folder-Based PRD Schema Design and Serialization
 *feature · completed · started 2026-04-27 · completed 2026-04-27*
@@ -38647,26 +38686,26 @@ Wire rex status, rex next, and rex validate to read the PRD from the folder tree
 Ensure that ndx plan --accept, ndx recommend --accept, and all MCP write tools (add_item, edit_item, update_task_status, move_item, merge_items) route their writes through the folder-tree serializer after every mutation. MCP tools must complete within existing latency budgets.
 
 ### Folder Tree Migration, Initialization, and Auto-Trigger
-*feature · pending*
+*feature · completed · started 2026-04-28 · completed 2026-04-28*
 
 Provide a first-run migration path from prd.md to the folder-tree format, integrate folder scaffolding into ndx init, and implement automatic migration detection so existing projects upgrade transparently.
 
 #### Implement rex migrate-to-folder-tree command and auto-trigger detection
-*task · in_progress · priority: high · started 2026-04-28 · tags: prd, migration, cli, init*
+*task · completed · priority: high · started 2026-04-28 · completed 2026-04-28 · tags: prd, migration, cli, init*
 
 Build a one-shot CLI command (rex migrate-to-folder-tree) that reads the existing prd.md, runs the serializer, and writes the full folder tree to .rex/prd/. Auto-trigger this migration transparently the first time any read or write command runs and detects prd.md without a prd/ folder. The command must be idempotent and print a creation summary.
 
 ### Test Suite Updates for Folder-Tree PRD Storage
-*feature · pending*
+*feature · completed · started 2026-04-28 · completed 2026-04-28*
 
 Update all existing PRD-related unit, integration, and e2e tests to exercise the folder-tree storage backend, and add new tests covering the serializer, parser, round-trip fidelity, and full CLI pipeline correctness.
 
 #### Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
-*task · pending · priority: high · tags: prd, tests, unit*
+*task · completed · priority: high · started 2026-04-28 · completed 2026-04-28 · tags: prd, tests, unit*
 
 Refactor existing PRDStore unit tests in packages/rex/tests/ to use folder-tree fixtures. Add focused unit tests for the serializer (assert correct folder structure for known PRD input) and parser (assert correct item tree for known folder structure). Assert that parent index.md summary sections are updated after every write.
 
 #### Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands
-*task · pending · priority: high · tags: prd, tests, integration, e2e*
+*task · completed · priority: high · started 2026-04-28 · completed 2026-04-28 · tags: prd, tests, integration, e2e*
 
 Update rex CLI integration tests (add, edit, remove, move, status, next, validate) to assert correct folder-tree state after each command. Add an e2e test that runs the full ndx plan --accept → folder tree → rex status pipeline and asserts folder tree consistency. All test cases must use temporary directories and clean up after themselves.

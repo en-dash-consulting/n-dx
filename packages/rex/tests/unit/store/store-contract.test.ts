@@ -18,6 +18,7 @@ import type { PRDItem, PRDDocument } from "../../../src/schema/index.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import { FileStore, ensureRexDir } from "../../../src/store/file-adapter.js";
+import { FolderTreeStore, ensureFolderTreeRexDir } from "../../../src/store/folder-tree-store.js";
 import { NotionStore, ensureNotionRexDir } from "../../../src/store/notion-adapter.js";
 import type { NotionClient, NotionAdapterConfig } from "../../../src/store/notion-client.js";
 
@@ -522,6 +523,40 @@ describeStoreContract("FileStore", () => ({
     await writeFile(join(rexDir, "workflow.md"), "# Workflow", "utf-8");
 
     const store = new FileStore(rexDir);
+    return {
+      store,
+      cleanup: async () => rm(tmpDir, { recursive: true, force: true }),
+    };
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Run the contract against the FolderTreeStore adapter
+// ---------------------------------------------------------------------------
+
+describeStoreContract("FolderTreeStore", () => ({
+  // Nested-object values are coerced to strings in YAML frontmatter;
+  // the `customMeta` passthrough test would fail for this adapter.
+  supportsPassthrough: false,
+  setup: async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "rex-contract-ft-"));
+    const rexDir = join(tmpDir, ".rex");
+    await ensureFolderTreeRexDir(rexDir);
+
+    // Seed the minimal files FolderTreeStore expects
+    await writeFile(
+      join(rexDir, "config.json"),
+      toCanonicalJSON({
+        schema: SCHEMA_VERSION,
+        project: "contract-test",
+        adapter: "folder-tree",
+      }),
+      "utf-8",
+    );
+    await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
+    await writeFile(join(rexDir, "workflow.md"), "# Workflow", "utf-8");
+
+    const store = new FolderTreeStore(rexDir);
     return {
       store,
       cleanup: async () => rm(tmpDir, { recursive: true, force: true }),

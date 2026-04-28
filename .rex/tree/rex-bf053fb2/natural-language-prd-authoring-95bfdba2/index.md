@@ -1,0 +1,17 @@
+---
+id: "95bfdba2-2cba-4921-b614-3a34779e0892"
+level: "feature"
+title: "Natural language PRD authoring"
+status: "completed"
+source: "llm"
+startedAt: "2026-02-09T12:56:47.925Z"
+completedAt: "2026-02-09T12:56:47.925Z"
+description: "Enable natural language input for PRD creation, allowing users to describe features in plain English and have them automatically structured into proper epic/feature/task hierarchies with AI assistance"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Smart add functionality](./smart-add-functionality-5b558cbb/index.md) | completed |
+| [Bulk natural language input](./bulk-natural-language-input-4c522dcd/index.md) | completed |

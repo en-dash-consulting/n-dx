@@ -1,0 +1,16 @@
+---
+id: "b7aeaf13-916f-44d7-8b4f-2226d77a5d4e"
+level: "epic"
+title: "Local Testing Infrastructure and Gauntlet Config Validation"
+status: "completed"
+source: "smart-add"
+startedAt: "2026-04-20T19:44:11.415Z"
+completedAt: "2026-04-20T19:44:11.415Z"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [macOS Local Docker Test Suite](./macos-local-docker-test-suite-9dbecc75/index.md) | completed |
+| [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main-5a24a938/index.md) | completed |

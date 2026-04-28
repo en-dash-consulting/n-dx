@@ -656,7 +656,7 @@
             {
               "id": "97b24996-6ca7-46de-a2bf-1355ebc12e9f",
               "title": "Integrate markdown as primary read/write format in PRDStore with JSON dual-write",
-              "status": "deferred",
+              "status": "in_progress",
               "level": "task",
               "description": "Update the PRD store (packages/rex/src/core/) to read from and write to .rex/prd.md as the primary storage file. On every save, also write the equivalent JSON to .rex/prd.json to keep it current for backward-compatible tooling. All existing store operations (load, save, add, edit, update, merge, move) must work transparently. The store falls back to reading .rex/prd.json if .rex/prd.md does not exist, enabling the migration path. Dual-write failure must not leave prd.md in an inconsistent state.",
               "acceptanceCriteria": [
@@ -674,7 +674,14 @@
                 "refactor"
               ],
               "source": "smart-add",
-              "startedAt": "2026-04-24T15:54:10.082Z"
+              "startedAt": "2026-04-24T15:54:10.082Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-28T13:50:45.648Z"
+                }
+              ],
+              "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
+              "branch": "feature/new-PRD-design"
             },
             {
               "id": "7143e2a0-7c77-45ed-b3e5-d588a11b3b27",
@@ -1185,11 +1192,20 @@
     {
       "id": "79e50af8-c363-4345-970a-23006d04e1f4",
       "title": "PRD Hierarchical Folder Tree Storage",
-      "status": "pending",
+      "status": "completed",
       "level": "epic",
       "branch": "feature/new-PRD-design",
       "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
       "source": "smart-add",
+      "startedAt": "2026-04-28T10:43:59.641Z",
+      "completedAt": "2026-04-28T10:43:59.641Z",
+      "endedAt": "2026-04-28T10:43:59.641Z",
+      "activeIntervals": [
+        {
+          "start": "2026-04-28T10:43:59.641Z",
+          "end": "2026-04-28T10:43:59.641Z"
+        }
+      ],
       "children": [
         {
           "id": "7286f1c2-ad19-4f85-baa9-cebb3c77a49d",
@@ -1444,17 +1460,26 @@
         {
           "id": "568a1a3c-eacd-4304-a46e-9f8c42d9901f",
           "title": "Folder Tree Migration, Initialization, and Auto-Trigger",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "branch": "feature/new-PRD-design",
           "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
           "description": "Provide a first-run migration path from prd.md to the folder-tree format, integrate folder scaffolding into ndx init, and implement automatic migration detection so existing projects upgrade transparently.",
           "source": "smart-add",
+          "startedAt": "2026-04-28T10:06:18.341Z",
+          "completedAt": "2026-04-28T10:06:18.341Z",
+          "endedAt": "2026-04-28T10:06:18.341Z",
+          "activeIntervals": [
+            {
+              "start": "2026-04-28T10:06:18.341Z",
+              "end": "2026-04-28T10:06:18.341Z"
+            }
+          ],
           "children": [
             {
               "id": "93517780-f058-4e22-b52b-7bbba2c45c2d",
               "title": "Implement rex migrate-to-folder-tree command and auto-trigger detection",
-              "status": "in_progress",
+              "status": "completed",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1474,6 +1499,15 @@
                 "init"
               ],
               "source": "smart-add",
+              "startedAt": "2026-04-28T09:53:22.896Z",
+              "completedAt": "2026-04-28T10:06:18.113Z",
+              "endedAt": "2026-04-28T10:06:18.113Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-28T09:53:22.896Z",
+                  "end": "2026-04-28T10:06:18.113Z"
+                }
+              ],
               "overrideMarker": {
                 "type": "duplicate_guard_override",
                 "reason": "content_overlap",
@@ -1483,30 +1517,33 @@
                 "matchedItemLevel": "task",
                 "matchedItemStatus": "completed",
                 "createdAt": "2026-04-27T18:46:33.810Z"
-              },
-              "startedAt": "2026-04-28T09:53:22.896Z",
-              "activeIntervals": [
-                {
-                  "start": "2026-04-28T09:53:22.896Z"
-                }
-              ]
+              }
             }
           ]
         },
         {
           "id": "db58ca72-ee01-426d-8bb0-d0190678cf14",
           "title": "Test Suite Updates for Folder-Tree PRD Storage",
-          "status": "pending",
+          "status": "completed",
           "level": "feature",
           "branch": "feature/new-PRD-design",
           "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
           "description": "Update all existing PRD-related unit, integration, and e2e tests to exercise the folder-tree storage backend, and add new tests covering the serializer, parser, round-trip fidelity, and full CLI pipeline correctness.",
           "source": "smart-add",
+          "startedAt": "2026-04-28T10:43:59.529Z",
+          "completedAt": "2026-04-28T10:43:59.529Z",
+          "endedAt": "2026-04-28T10:43:59.529Z",
+          "activeIntervals": [
+            {
+              "start": "2026-04-28T10:43:59.529Z",
+              "end": "2026-04-28T10:43:59.529Z"
+            }
+          ],
           "children": [
             {
               "id": "3effa16b-1466-4b82-a963-c1f21afaedeb",
               "title": "Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1523,12 +1560,25 @@
                 "tests",
                 "unit"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-28T10:19:31.855Z",
+              "completedAt": "2026-04-28T13:49:34.833Z",
+              "endedAt": "2026-04-28T13:49:34.833Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-28T10:19:31.855Z",
+                  "end": "2026-04-28T10:43:59.377Z"
+                },
+                {
+                  "start": "2026-04-28T13:41:10.111Z",
+                  "end": "2026-04-28T13:49:34.833Z"
+                }
+              ]
             },
             {
               "id": "3e7f193b-6134-47a0-b90c-fc8d0cd262f3",
               "title": "Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands",
-              "status": "pending",
+              "status": "completed",
               "level": "task",
               "branch": "feature/new-PRD-design",
               "sourceFile": ".rex/prd_feature-new-prd-design_2026-04-22.md",
@@ -1547,7 +1597,16 @@
                 "integration",
                 "e2e"
               ],
-              "source": "smart-add"
+              "source": "smart-add",
+              "startedAt": "2026-04-28T10:06:19.732Z",
+              "completedAt": "2026-04-28T10:19:30.611Z",
+              "endedAt": "2026-04-28T10:19:30.611Z",
+              "activeIntervals": [
+                {
+                  "start": "2026-04-28T10:06:19.732Z",
+                  "end": "2026-04-28T10:19:30.611Z"
+                }
+              ]
             }
           ]
         }

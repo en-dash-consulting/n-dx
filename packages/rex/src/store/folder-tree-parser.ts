@@ -212,6 +212,9 @@ function buildItem(
   const tags = asStringList(fm["tags"]);
   if (tags !== null) item.tags = tags;
 
+  const blockedBy = asStringList(fm["blockedBy"]);
+  if (blockedBy !== null) item.blockedBy = blockedBy;
+
   const source = asString(fm["source"]);
   if (source !== null) item.source = source;
 
@@ -233,20 +236,23 @@ function buildItem(
   const failureReason = asString(fm["failureReason"]);
   if (failureReason !== null) item.failureReason = failureReason;
 
-  if (expectedLevel === "feature" || expectedLevel === "task") {
-    const ac = asStringList(fm["acceptanceCriteria"]);
-    if (ac !== null) item.acceptanceCriteria = ac;
-    else item.acceptanceCriteria = [];
-
-    const loe = asString(fm["loe"]);
-    if (loe !== null) (item as PRDItem & { loe: string }).loe = loe;
+  // acceptanceCriteria: preserve whenever present in frontmatter (any level).
+  // Feature and task items default to [] when the field is absent; epics do not.
+  const ac = asStringList(fm["acceptanceCriteria"]);
+  if (ac !== null) {
+    item.acceptanceCriteria = ac;
+  } else if (expectedLevel === "feature" || expectedLevel === "task") {
+    item.acceptanceCriteria = [];
   }
+
+  const loe = asString(fm["loe"]);
+  if (loe !== null) (item as PRDItem & { loe: string }).loe = loe;
 
   // Preserve unknown fields (forward-compat: round-trip fidelity for future extensions)
   const knownKeys = new Set([
-    "id", "level", "title", "status", "description", "priority", "tags", "source",
-    "startedAt", "completedAt", "endedAt", "resolutionType", "resolutionDetail",
-    "failureReason", "acceptanceCriteria", "loe",
+    "id", "level", "title", "status", "description", "priority", "tags", "blockedBy",
+    "source", "startedAt", "completedAt", "endedAt", "resolutionType",
+    "resolutionDetail", "failureReason", "acceptanceCriteria", "loe",
   ]);
   for (const [k, v] of Object.entries(fm)) {
     if (!knownKeys.has(k) && v !== null && v !== undefined) {
