@@ -29125,18 +29125,30 @@ items:
   - id: "e4b77ef9-2342-4495-838f-2c3e0b895251"
     level: epic
     title: PRD Markdown Storage Format
-    status: pending
+    status: completed
+    activeIntervals:
+      - start: "2026-04-29T03:45:50.222Z"
+        end: "2026-04-29T03:45:50.222Z"
     branch: feature/new-PRD-design
+    completedAt: "2026-04-29T03:45:50.222Z"
+    endedAt: "2026-04-29T03:45:50.222Z"
     source: smart-add
     sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+    startedAt: "2026-04-29T03:45:50.222Z"
     children:
       - id: "21a86676-166a-4af7-bc57-39af1f47d2ba"
         level: feature
         title: JSON Write Path Removal and Markdown-Only Enforcement
-        status: pending
+        status: completed
+        activeIntervals:
+          - start: "2026-04-29T03:45:50.036Z"
+            end: "2026-04-29T03:45:50.036Z"
         branch: feature/new-PRD-design
+        completedAt: "2026-04-29T03:45:50.036Z"
+        endedAt: "2026-04-29T03:45:50.036Z"
         source: smart-add
         sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        startedAt: "2026-04-29T03:45:50.036Z"
         description: Remove all code that writes to .rex/prd.json (and any branch-scoped .rex/prd_*.json files) from PRD mutation paths. After the dual-write migration phase, only Markdown files should be written by ndx add, rex CLI commands, and MCP write tools. The only permitted JSON write is the ephemeral .rex/.cache/prd.json produced by ndx start.
         children:
           - id: "72581f11-f8ee-46fd-8e2f-60bf6055850e"
@@ -29196,7 +29208,7 @@ items:
           - id: "67246c10-3996-4481-86c9-6e753b0cb52a"
             level: task
             title: Add regression tests asserting no JSON writes occur outside ndx start
-            status: in_progress
+            status: completed
             priority: medium
             acceptanceCriteria:
               - Integration test runs ndx add with a new item description and asserts .rex/prd.json is not created or modified
@@ -29205,7 +29217,16 @@ items:
               - Tests are added to the existing e2e or integration suite and pass in CI without requiring ndx start
             activeIntervals:
               - start: "2026-04-29T03:39:51.660Z"
+                end: "2026-04-29T03:45:49.798Z"
+              - start: "2026-04-29T12:55:48.258Z"
+                end: "2026-04-29T13:04:36.413Z"
+              - start: "2026-04-29T13:07:23.659Z"
+                end: "2026-04-29T13:08:47.420Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-29T13:08:47.420Z"
+            endedAt: "2026-04-29T13:08:47.420Z"
+            resolutionDetail: Added cli-prd-no-json-writes.test.js with 7 tests across 3 suites (ndx add, rex update, rex prune) — each suite asserts prd.json is neither created nor modified. All pass.
+            resolutionType: code-change
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
             startedAt: "2026-04-29T03:39:51.660Z"
@@ -38824,10 +38845,10 @@ Refactor existing PRDStore unit tests in packages/rex/tests/ to use folder-tree 
 Update rex CLI integration tests (add, edit, remove, move, status, next, validate) to assert correct folder-tree state after each command. Add an e2e test that runs the full ndx plan --accept → folder tree → rex status pipeline and asserts folder tree consistency. All test cases must use temporary directories and clean up after themselves.
 
 ## PRD Markdown Storage Format
-*epic · pending*
+*epic · completed · started 2026-04-29 · completed 2026-04-29*
 
 ### JSON Write Path Removal and Markdown-Only Enforcement
-*feature · pending*
+*feature · completed · started 2026-04-29 · completed 2026-04-29*
 
 Remove all code that writes to .rex/prd.json (and any branch-scoped .rex/prd_*.json files) from PRD mutation paths. After the dual-write migration phase, only Markdown files should be written by ndx add, rex CLI commands, and MCP write tools. The only permitted JSON write is the ephemeral .rex/.cache/prd.json produced by ndx start.
 
@@ -38842,6 +38863,6 @@ Locate the dual-write code in PRDStore.saveDocument() and related storage helper
 Systematically audit all rex CLI command handlers (add, edit, remove, move, prune, reshape, reorganize, analyze, recommend) and MCP write tool handlers (add_item, edit_item, update_task_status, move_item, merge_items) for any direct or indirect JSON write calls that bypass PRDStore. Remove these call sites and ensure every mutation flows through the Markdown-only write path.
 
 #### Add regression tests asserting no JSON writes occur outside ndx start
-*task · in_progress · priority: medium · started 2026-04-29 · tags: rex, testing, prd-storage*
+*task · completed · priority: medium · started 2026-04-29 · completed 2026-04-29 · tags: rex, testing, prd-storage*
 
 Add integration tests that run key PRD-mutating commands and assert that .rex/prd.json is never created or modified as a side effect. These tests guard against future regression where code accidentally reintroduces a JSON write path.
