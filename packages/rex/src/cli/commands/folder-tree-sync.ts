@@ -10,10 +10,8 @@
  */
 
 import { join } from "node:path";
-import { readdir } from "node:fs/promises";
 import { serializeFolderTree, parseFolderTree } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
-import { warn } from "../output.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDItem } from "../../schema/index.js";
 
@@ -33,32 +31,20 @@ export async function syncFolderTree(rexDir: string, store: PRDStore): Promise<v
 }
 
 /**
- * Return true if the folder tree at `treeRoot` exists and contains at least
- * one entry (i.e. at least one epic directory). Returns false when the
- * directory is absent, empty, or unreadable.
- */
-async function hasFolderTreeContent(treeRoot: string): Promise<boolean> {
-  try {
-    const entries = await readdir(treeRoot);
-    return entries.length > 0;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Load PRD items, preferring the folder tree at `<rexDir>/tree/`.
+ * Load PRD items from the folder tree at `<rexDir>/tree/`.
  *
- * Reads from the folder tree (auto-migrating from `prd.md`/`prd.json` when
- * the tree is absent) and merges the parsed items with the full-fidelity
+ * Reads from the folder tree and merges the parsed items with the full-fidelity
  * store items to reattach routing/metadata fields that the tree format does
  * not store (e.g. `blockedBy`, `overrideMarker`, `branch`, `sourceFile`).
  *
  * The merge preserves store item ordering (insertion order) so that command
- * output is byte-for-byte identical to the prd.md baseline for the same
- * dataset.  Items present in the store but absent from the tree (e.g. tasks
- * placed directly under an epic without an intermediate feature) are
- * preserved from the store.
+ * output is byte-for-byte identical across multiple reads of the same dataset.
+ * Items present in the store but absent from the tree (e.g. tasks placed
+ * directly under an epic without an intermediate feature) are preserved from
+ * the store.
+ *
+ * The folder tree is required. If absent, an error is thrown directing the user
+ * to run 'rex migrate-to-folder-tree'.
  *
  * The caller is expected to have already successfully called
  * `store.loadDocument()` before invoking this function. This ensures that if
@@ -72,12 +58,6 @@ export async function loadItemsPreferFolderTree(
   store: PRDStore,
 ): Promise<PRDItem[]> {
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
-
-  if (!await hasFolderTreeContent(treeRoot)) {
-    // Tree absent: auto-migrate from store (prd.md → tree) on first use.
-    warn(`Migrating .rex/prd.md → .rex/${FOLDER_TREE_SUBDIR}/ (first run)`);
-    await syncFolderTree(rexDir, store);
-  }
 
   const [{ items: treeItems }, doc] = await Promise.all([
     parseFolderTree(treeRoot),

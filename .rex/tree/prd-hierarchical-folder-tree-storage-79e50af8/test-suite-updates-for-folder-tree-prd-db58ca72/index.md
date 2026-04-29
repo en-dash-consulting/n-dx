@@ -14,5 +14,5 @@ description: "Update all existing PRD-related unit, integration, and e2e tests t
 
 | Title | Status |
 |-------|--------|
-| [Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures](./update-prdstore-unit-tests-and-add-3effa16b/index.md) | completed |
+| [Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures](./update-prdstore-unit-tests-and-add-3effa16b/index.md) | pending |
 | [Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands](./update-cli-integration-tests-and-add-3e7f193b/index.md) | completed |

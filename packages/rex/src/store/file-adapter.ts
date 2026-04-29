@@ -2,6 +2,7 @@ import { readFile, writeFile, appendFile, mkdir, rename, stat } from "node:fs/pr
 import { join } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
+import { SCHEMA_VERSION } from "../schema/index.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
@@ -14,6 +15,7 @@ import {
 } from "./prd-md-migration.js";
 import { parseDocument } from "./markdown-parser.js";
 import { serializeDocument } from "./markdown-serializer.js";
+import { parseFolderTree } from "./folder-tree-parser.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
@@ -56,6 +58,10 @@ export class FileStore implements PRDStore {
 
   private get markdownLockPath(): string {
     return this.path(`${PRD_MARKDOWN_FILENAME}.lock`);
+  }
+
+  private get treeRoot(): string {
+    return this.path("tree");
   }
 
   setCurrentBranchFile(filename: string): void {
@@ -308,48 +314,50 @@ export class FileStore implements PRDStore {
   /**
    * Load and validate the consolidated PRD document.
    *
-   * `prd.md` is the sole writable storage. If `prd.md` is absent and legacy
-   * `prd.json` / branch-scoped JSON files exist, this performs a one-shot
-   * migration: read the JSON sources, write `prd.md`, and from that point on
-   * `prd.md` is authoritative.
+   * Reads exclusively from the folder-tree format at `.rex/tree/`. The folder-tree
+   * is the sole authoritative PRD backend. No fallback to prd.md or prd.json.
    *
-   * @throws If the backing files are missing, invalid, or fail validation.
+   * Document title is read from `tree-meta.json` if present; defaults to "PRD".
+   *
+   * @throws If the folder tree is missing or invalid. Error message includes
+   *         migration command suggestion.
    */
   async loadDocument(): Promise<PRDDocument> {
+    // Read document title from tree-meta.json
+    let title = "PRD";
     try {
-      const markdown = await readFile(this.markdownPath, "utf-8");
-      const parsed = parseDocument(markdown);
-      if (!parsed.ok) {
-        throw new Error(`Invalid ${PRD_MARKDOWN_FILENAME}: ${parsed.error.message}`);
-      }
-      this.rebuildOwnershipFromItems(parsed.data);
-      return parsed.data;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException | undefined)?.code;
-      if (code !== "ENOENT") {
-        throw error;
+      const raw = await readFile(this.path("tree-meta.json"), "utf-8");
+      const meta = JSON.parse(raw) as Record<string, unknown>;
+      if (typeof meta["title"] === "string") title = meta["title"];
+    } catch (err) {
+      if (!this.isMissingFileError(err)) {
+        throw err;
       }
     }
 
-    // Legacy migration path: prd.md is missing, so fall back to JSON sources
-    // (loadDocumentFromJsonSources sets ownershipLoaded internally) and write
-    // prd.md once. After this returns, every subsequent loadDocument hits the
-    // markdown branch above. Stamp `sourceFile` onto items lacking it so the
-    // ownership map survives the migration into single-file Markdown — without
-    // this, `rebuildOwnershipFromItems` on the next read collapses every item
-    // onto `currentBranchFile` and `--show-individual` loses its grouping.
-    const doc = await this.loadDocumentFromJsonSources();
-    for (const [id, filename] of this.itemToFile) {
-      const expected = this.toAttributedSourceFile(filename);
-      const entry = findItem(doc.items, id);
-      if (!entry) continue;
-      const item = entry.item as PRDItem & { sourceFile?: string };
-      if (!item.sourceFile) {
-        item.sourceFile = expected;
+    // Parse items from the folder tree
+    try {
+      const { items } = await parseFolderTree(this.treeRoot);
+      this.rebuildOwnershipFromItems({ schema: SCHEMA_VERSION, title, items });
+      return { schema: SCHEMA_VERSION, title, items };
+    } catch (error) {
+      // Check if the tree directory is missing
+      if (this.isMissingFileError(error)) {
+        throw new Error(
+          `No PRD found at .rex/tree/. ` +
+            `Run 'rex migrate-to-folder-tree' to initialize the folder-tree backend.`,
+        );
       }
+      // Re-throw other errors (parse errors, permission errors, etc.)
+      throw error;
     }
-    await this.saveMarkdownDocument(doc);
-    return doc;
+  }
+
+  /**
+   * Check if an error is a file-not-found error (ENOENT).
+   */
+  private isMissingFileError(err: unknown): boolean {
+    return (err as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
   }
 
   private async saveMarkdownDocument(doc: PRDDocument): Promise<void> {

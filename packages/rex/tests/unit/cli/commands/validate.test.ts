@@ -3,16 +3,8 @@ import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdValidate } from "../../../../src/cli/commands/validate.js";
-import { serializeFolderTree } from "../../../../src/store/index.js";
+import { writePRD, writeConfig } from "../../../helpers/rex-dir-test-support.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
-
-function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
-}
-
-function writeConfig(dir: string, config: Record<string, unknown>): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
-}
 
 const VALID_CONFIG = {
   schema: "rex/v1",

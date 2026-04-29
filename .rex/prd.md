@@ -3257,14 +3257,26 @@ items:
       - id: "9bb8cd7a-c478-4008-acb1-be7b6168c13e"
         level: task
         title: Add cross-vendor regression tests for PRD authoring CLI commands
-        status: completed
+        status: pending
         priority: high
         acceptanceCriteria:
           - Integration tests cover rex add proposal generation with mocked Claude and Codex responses
           - A rate limit retry test verifies backoff fires and the command succeeds on a subsequent attempt
           - Tests run in CI without live LLM credentials via response mocking
           - Test failure output identifies the vendor and command that regressed
-        completedAt: "2026-04-16T16:54:16.541Z"
+          - Test suite asserts prd.md does not exist after rex add, edit, remove, move, and merge operations
+          - Test suite asserts no prd_{branch}_{date}.md file is created by any CLI or MCP write operation
+          - Tests are added to the existing regression test file used for JSON/markdown write validation
+          - All new regression tests pass in CI on a clean clone with no pre-existing prd.md
+        branch: feature/new-PRD-design
+        mergedProposals:
+          - mergedAt: "2026-04-29T13:47:25.935Z"
+            proposalKind: task
+            proposalNodeKey: p0:task:2:2
+            proposalTitle: Add regression tests asserting prd.md is never written by any PRD mutation path
+            reason: semantic_title
+            score: 0.6429999999999999
+            source: smart-add
         overrideMarker:
           createdAt: "2026-04-16T16:31:05.193Z"
           matchedItemId: "0270df79-5844-45ea-8bd9-da2df2ae8a26"
@@ -3275,6 +3287,7 @@ items:
           reasonRef: content_overlap:0270df79-5844-45ea-8bd9-da2df2ae8a26
           type: duplicate_guard_override
         source: smart-add
+        sourceFile: .rex/prd.md
         startedAt: "2026-04-16T16:45:28.240Z"
         tags:
           - codex
@@ -3282,8 +3295,9 @@ items:
           - testing
           - rex
           - regression
+          - prd
         parentId: "2e70fa19-0875-4c5e-82c4-cd33bfb12c37"
-        description: Add integration tests that exercise rex add, rex analyze, and rex recommend against both Claude and Codex vendor configurations using mocked LLM responses. Tests should cover the happy path for each command and the rate limit retry scenario. This prevents future vendor-specific regressions from shipping silently.
+        description: Extend the existing no-JSON-write regression test suite to also assert that no prd.md or branch-scoped prd_{branch}_{date}.md file is created or modified by any PRD mutation. Cover rex CLI add/edit/remove/move/merge, all MCP write tools, and PRDStore.saveDocument directly. Wire the tests into CI to block any future regression.
   - id: "0de5be78-d295-4f71-be5d-38594a355240"
     level: epic
     title: "Code Health: 14 findings across 11 zones"
@@ -29073,21 +29087,33 @@ items:
           - id: "3effa16b-1466-4b82-a963-c1f21afaedeb"
             level: task
             title: Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
-            status: completed
+            status: pending
             priority: high
             acceptanceCriteria:
               - All existing PRDStore unit tests pass with the folder-tree backend without modification to test assertions
               - "Serializer unit tests: create item → correct folder and index.md, edit item → updated index.md and parent summary, delete item → folder removed and parent summary cleaned, move item → folder relocated and both parents updated"
               - "Parser unit tests: known folder fixture → correct item tree, missing index.md → structured warning emitted, malformed frontmatter → partial load with warning"
               - "Round-trip test: serialize known PRD → parse output → assert zero diff from original"
+              - Serializer creates directories named by title slug (e.g., .rex/prd/user-authentication/oauth2-integration/implement-callback-handler/)
+              - Parser reads slug-named directories and correctly reconstructs the full PRD tree including all metadata fields
+              - "Round-trip test: serialize → parse produces an item-for-item identical PRD tree"
+              - Existing folder-tree unit tests updated to use slug-based fixture paths
+              - Serializer and parser agree on the mapping between slug paths and PRD item IDs so renames do not silently duplicate items
             activeIntervals:
               - start: "2026-04-28T10:19:31.855Z"
                 end: "2026-04-28T10:43:59.377Z"
               - start: "2026-04-28T13:41:10.111Z"
                 end: "2026-04-28T13:49:34.833Z"
             branch: feature/new-PRD-design
-            completedAt: "2026-04-28T13:49:34.833Z"
             endedAt: "2026-04-28T13:49:34.833Z"
+            mergedProposals:
+              - mergedAt: "2026-04-29T13:47:25.935Z"
+                proposalKind: task
+                proposalNodeKey: p0:task:1:1
+                proposalTitle: Update folder-tree serializer and parser to use slug-based directory names and validate round-trip fidelity
+                reason: content_overlap
+                score: 0.6396642212189616
+                source: smart-add
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
             startedAt: "2026-04-28T10:19:31.855Z"
@@ -29095,7 +29121,10 @@ items:
               - prd
               - tests
               - unit
-            description: Refactor existing PRDStore unit tests in packages/rex/tests/ to use folder-tree fixtures. Add focused unit tests for the serializer (assert correct folder structure for known PRD input) and parser (assert correct item tree for known folder structure). Assert that parent index.md summary sections are updated after every write.
+              - storage
+              - serializer
+              - parser
+            description: Integrate the slug function into the existing folder-tree serializer so created directories follow the <epic-slug>/<feature-slug>/<task-slug>/<subtask-slug> naming hierarchy. Update the parser to reconstruct PRD items from slug-named directories without relying on ID-based path conventions. Verify that serialize → parse produces an identical PRD tree to confirm no data is lost under the new convention.
           - id: "3e7f193b-6134-47a0-b90c-fc8d0cd262f3"
             level: task
             title: Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands
@@ -29155,19 +29184,33 @@ items:
             level: task
             title: Remove JSON dual-write from PRDStore save operations
             status: completed
-            priority: high
+            priority: critical
             acceptanceCriteria:
               - PRDStore.saveDocument() writes only to .rex/prd.md and branch-scoped .rex/prd_*.md files — no .rex/prd.json
               - No method on PRDStore creates or modifies .rex/prd.json
               - Running ndx add on a project with no pre-existing prd.json does not create one
               - Running ndx add on a project with a pre-existing prd.json does not modify it
               - All existing PRDStore unit tests pass with the JSON write path removed
+              - PRDStore.saveDocument writes only to the folder-tree; prd.md is not created or updated on any mutation
+              - Branch-scoped prd_{branch}_{date}.md files are also never written by the store
+              - Existing unit tests for saveDocument pass against the folder-tree-only backend
+              - A regression test confirms prd.md does not exist after add, edit, remove, move, and merge operations
             activeIntervals:
               - start: "2026-04-29T02:16:51.764Z"
                 end: "2026-04-29T02:27:45.111Z"
+              - start: "2026-04-29T13:47:37.806Z"
+                end: "2026-04-29T13:57:27.832Z"
             branch: feature/new-PRD-design
-            completedAt: "2026-04-29T02:27:45.111Z"
-            endedAt: "2026-04-29T02:27:45.111Z"
+            completedAt: "2026-04-29T13:57:27.832Z"
+            endedAt: "2026-04-29T13:57:27.832Z"
+            mergedProposals:
+              - mergedAt: "2026-04-29T13:47:25.935Z"
+                proposalKind: task
+                proposalNodeKey: p0:task:0:1
+                proposalTitle: Remove prd.md write path from PRDStore and eliminate all dual-write logic
+                reason: content_overlap
+                score: 0.6552010412377198
+                source: smart-add
             resolutionDetail: Dual-write was already removed in commit 348f2f9c. Updated test fixtures to seed prd.md and added 5 regression tests asserting saveDocument/addItem never create or modify prd.json.
             resolutionType: code-change
             source: smart-add
@@ -29177,7 +29220,9 @@ items:
               - rex
               - prd-storage
               - cleanup
-            description: Locate the dual-write code in PRDStore.saveDocument() and related storage helpers introduced during the Markdown migration. Remove the JSON write side entirely, keeping only the Markdown (.md) write path. Verify that prd.json is no longer created or modified by any PRDStore method after the change.
+              - prd
+              - storage
+            description: Update PRDStore.saveDocument (and any dual-write helpers) to write exclusively to the folder-tree structure. Remove any conditional that writes or syncs to prd.md or branch-scoped prd_{branch}_{date}.md files. The folder-tree must be the only write target for all PRD mutations so that prd.md is never created or updated by normal operation.
           - id: "eb208a9e-1443-4fd0-8d1c-899dea1a2ba8"
             level: task
             title: Audit and remove residual JSON write calls from rex CLI and MCP handlers
@@ -29235,6 +29280,147 @@ items:
               - testing
               - prd-storage
             description: Add integration tests that run key PRD-mutating commands and assert that .rex/prd.json is never created or modified as a side effect. These tests guard against future regression where code accidentally reintroduces a JSON write path.
+  - id: "e97d385e-68db-4791-a6ea-3f65c1b503d9"
+    level: epic
+    title: "PRD Folder-Tree Promotion: Eliminate prd.md and Enforce Hierarchical Layout"
+    status: pending
+    branch: feature/new-PRD-design
+    source: smart-add
+    sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+    children:
+      - id: "7145d6bc-5c6c-46bb-af89-cc65da8337f2"
+        level: feature
+        title: Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend
+        status: pending
+        branch: feature/new-PRD-design
+        source: smart-add
+        sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        description: Flip the PRDStore read/write layer so the epic → feature → task → subtask folder tree is the sole authoritative storage. Remove all remaining paths that read from or write to prd.md so that file is never created, consulted, or maintained by any part of the system.
+        children:
+          - id: "6fa1218b-b843-429c-886e-154b93c16145"
+            level: task
+            title: Audit all read and write call sites that still reference prd.md as primary storage
+            status: completed
+            priority: critical
+            acceptanceCriteria:
+              - All prd.md read callers are identified with file and line references
+              - All prd.md write callers are identified with file and line references
+              - Branch-scoped prd_{branch}_{date}.md paths are included in the audit
+              - Audit output is committed as a short-lived doc or comment block consumed by follow-up tasks
+            activeIntervals:
+              - start: "2026-04-29T13:57:29.197Z"
+                end: "2026-04-29T13:59:19.174Z"
+            branch: feature/new-PRD-design
+            completedAt: "2026-04-29T13:59:19.174Z"
+            endedAt: "2026-04-29T13:59:19.174Z"
+            resolutionDetail: "Created AUDIT-prd-md-calls.md documenting all prd.md read/write paths with line references, callers, and folder-tree replacement targets. Identified 3 write paths in file-adapter.ts + 1 in prd-md-migration.ts, 2 read paths in file-adapter.ts and parse-md.ts. All abstract through FileStore; minimal code changes needed for most consumers once backend swaps to folder-tree. Committed as 92a86e77.\""
+            resolutionType: code-change
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-29T13:57:29.197Z"
+            tags:
+              - prd
+              - storage
+              - audit
+            description: Trace every code path in PRDStore, rex CLI commands, MCP handlers, ndx orchestration scripts, and the web server that reads from or writes to prd.md (including branch-scoped variants). Produce a prioritized change list mapping each path to its folder-tree replacement before any implementation begins.
+          - id: "1e7c95da-5153-4634-8c19-f137a1195ebf"
+            level: task
+            title: Remove prd.md read fallback from PRDStore and all CLI, MCP, and web consumers
+            status: in_progress
+            priority: critical
+            acceptanceCriteria:
+              - PRDStore.loadDocument reads only from the folder tree; no prd.md read path exists
+              - All rex CLI commands and MCP tools obtain PRD data through the folder-tree backend
+              - Web server PRD aggregator sources data from the folder tree when ndx start is running
+              - When no folder tree is present, the error message names the migration command
+              - Integration tests confirm correct behavior with a folder-tree-only backend (no prd.md present)
+            activeIntervals:
+              - start: "2026-04-29T13:59:33.665Z"
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            startedAt: "2026-04-29T13:59:33.665Z"
+            tags:
+              - prd
+              - storage
+              - rex
+              - mcp
+              - web
+            description: Update PRDStore.loadDocument and every caller (rex CLI commands, MCP tools, web server PRD aggregator, ndx status) to read exclusively from the folder tree. Remove fallback logic that reads prd.md when a folder tree is absent. When no folder tree is found, emit a clear error directing the user to run the migration command rather than silently falling back.
+      - id: "f9376f14-b575-4878-bec0-097c24f26970"
+        level: feature
+        title: Epic-Scoped Slug Naming Convention for Folder-Tree Directories
+        status: pending
+        branch: feature/new-PRD-design
+        source: smart-add
+        sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        description: "Define and implement a deterministic slug-based naming convention for the full PRD hierarchy so that each directory name is derived from the PRD item title rather than an opaque ID. Folder paths will read as human-legible representations of the PRD tree: .rex/prd/<epic-slug>/<feature-slug>/<task-slug>/<subtask-slug>/."
+        children:
+          - id: "c9c4ea2f-cfc6-4ff3-946e-3021df15d4e8"
+            level: task
+            title: Define and implement slug generation rules for PRD folder names at all hierarchy levels
+            status: pending
+            priority: high
+            acceptanceCriteria:
+              - Slug function produces lowercase, hyphen-separated names with no special characters or path separators
+              - "Slug is deterministic: the same title always produces the same slug"
+              - Titles exceeding 60 characters are truncated at a word boundary and appended with the first 6 characters of the item ID to guarantee uniqueness
+              - Collision-avoidance appends a short ID suffix when two siblings produce the same slug without the ID
+              - "Unit tests cover: normal ASCII titles, Unicode characters, all-special-character titles, long titles, and sibling collision cases"
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - prd
+              - storage
+              - naming
+            description: "Implement a deterministic slug function that converts PRD item titles into safe, stable directory names (lowercase, hyphens, no special characters, max length). Define truncation and collision-avoidance rules for sibling items that produce the same slug. Apply the convention to all four PRD levels: epics, features, tasks, and subtasks."
+      - id: "fcc28148-7187-4a28-b9fd-9f7d10cd2c89"
+        level: feature
+        title: Migration, Documentation, and Regression Coverage for Folder-Tree-Only Storage
+        status: pending
+        branch: feature/new-PRD-design
+        source: smart-add
+        sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        description: Update the existing migration command to produce slug-named folders and offer prd.md removal, revise all documentation to reflect the folder tree as the sole storage format, and add regression tests that prevent any future re-introduction of prd.md write paths.
+        children:
+          - id: "3907de2e-6713-42b3-a260-47f05c6dbe71"
+            level: task
+            title: Update rex migrate-to-folder-tree to produce slug-named directories and offer prd.md removal
+            status: pending
+            priority: high
+            acceptanceCriteria:
+              - Migration command produces folder tree with slug-based directory names at all four levels
+              - Migration command prompts to delete prd.md (and branch-scoped variants) after successful migration
+              - Re-running migration on an already-migrated folder tree is a no-op with an informational message
+              - Migration command emits a summary showing item counts per PRD level
+              - Auto-trigger detection (first-run migration) updated to produce slug-based paths
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - prd
+              - migration
+              - rex
+            description: Extend the existing migration command to generate the slug-based folder naming convention and, after a successful migration, prompt the user to delete prd.md and any branch-scoped prd_{branch}_{date}.md files. Ensure the command is idempotent so re-running it on an already-migrated tree is a safe no-op.
+          - id: "60a8e23e-106e-4313-b253-612a55b65d27"
+            level: task
+            title: Update CLAUDE.md, README, and Key Files documentation to reflect folder-tree as sole PRD storage
+            status: pending
+            priority: medium
+            acceptanceCriteria:
+              - CLAUDE.md Key Files table lists .rex/prd/<epic-slug>/... as the primary PRD storage path
+              - PRD invariant note updated to name the folder tree as the sole writable surface
+              - Concurrency contract rows referencing prd.md writes updated to reference folder-tree mutation paths
+              - README quick start and workflow sections do not mention prd.md as a user-facing file
+              - docs/architecture/prd-folder-tree-schema.md updated with slug naming convention and examples
+            branch: feature/new-PRD-design
+            source: smart-add
+            sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+            tags:
+              - documentation
+              - prd
+            description: Revise all documentation references that describe prd.md or branch-scoped prd_{branch}_{date}.md files as primary writable PRD surfaces. Update the Key Files table, PRD file layout note, PRD invariant, concurrency contract, and README workflow sections to describe the slug-based folder tree as the only authoritative format.
 ---
 
 <!-- Auto-generated by rex. Edit the YAML front-matter above; body changes are not preserved. -->
@@ -30284,9 +30470,9 @@ Each Rex view currently places primary actions (Add, Prune, Filter, Refresh) in 
 Investigate why rex add fails to produce a proposal when Codex is the active vendor. Likely causes include prompt formatting incompatibilities, Codex response shape differences, or JSON extraction failure on non-standard completions. Identify the root cause across the proposal pipeline and implement targeted fixes so proposals are generated and presented for review end-to-end with Codex.
 
 #### Add cross-vendor regression tests for PRD authoring CLI commands
-*task · completed · priority: high · started 2026-04-16 · completed 2026-04-16 · tags: codex, claude, testing, rex, regression*
+*task · pending · priority: high · started 2026-04-16 · tags: codex, claude, testing, rex, regression, prd*
 
-Add integration tests that exercise rex add, rex analyze, and rex recommend against both Claude and Codex vendor configurations using mocked LLM responses. Tests should cover the happy path for each command and the rate limit retry scenario. This prevents future vendor-specific regressions from shipping silently.
+Extend the existing no-JSON-write regression test suite to also assert that no prd.md or branch-scoped prd_{branch}_{date}.md file is created or modified by any PRD mutation. Cover rex CLI add/edit/remove/move/merge, all MCP write tools, and PRDStore.saveDocument directly. Wire the tests into CI to block any future regression.
 
 ## Code Health: 14 findings across 11 zones
 *epic · completed · priority: high · started 2026-04-16 · completed 2026-04-16*
@@ -38835,9 +39021,9 @@ Build a one-shot CLI command (rex migrate-to-folder-tree) that reads the existin
 Update all existing PRD-related unit, integration, and e2e tests to exercise the folder-tree storage backend, and add new tests covering the serializer, parser, round-trip fidelity, and full CLI pipeline correctness.
 
 #### Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
-*task · completed · priority: high · started 2026-04-28 · completed 2026-04-28 · tags: prd, tests, unit*
+*task · pending · priority: high · started 2026-04-28 · ended 2026-04-28 · tags: prd, tests, unit, storage, serializer, parser*
 
-Refactor existing PRDStore unit tests in packages/rex/tests/ to use folder-tree fixtures. Add focused unit tests for the serializer (assert correct folder structure for known PRD input) and parser (assert correct item tree for known folder structure). Assert that parent index.md summary sections are updated after every write.
+Integrate the slug function into the existing folder-tree serializer so created directories follow the <epic-slug>/<feature-slug>/<task-slug>/<subtask-slug> naming hierarchy. Update the parser to reconstruct PRD items from slug-named directories without relying on ID-based path conventions. Verify that serialize → parse produces an identical PRD tree to confirm no data is lost under the new convention.
 
 #### Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands
 *task · completed · priority: high · started 2026-04-28 · completed 2026-04-28 · tags: prd, tests, integration, e2e*
@@ -38853,9 +39039,9 @@ Update rex CLI integration tests (add, edit, remove, move, status, next, validat
 Remove all code that writes to .rex/prd.json (and any branch-scoped .rex/prd_*.json files) from PRD mutation paths. After the dual-write migration phase, only Markdown files should be written by ndx add, rex CLI commands, and MCP write tools. The only permitted JSON write is the ephemeral .rex/.cache/prd.json produced by ndx start.
 
 #### Remove JSON dual-write from PRDStore save operations
-*task · completed · priority: high · started 2026-04-29 · completed 2026-04-29 · tags: rex, prd-storage, cleanup*
+*task · completed · priority: critical · started 2026-04-29 · completed 2026-04-29 · tags: rex, prd-storage, cleanup, prd, storage*
 
-Locate the dual-write code in PRDStore.saveDocument() and related storage helpers introduced during the Markdown migration. Remove the JSON write side entirely, keeping only the Markdown (.md) write path. Verify that prd.json is no longer created or modified by any PRDStore method after the change.
+Update PRDStore.saveDocument (and any dual-write helpers) to write exclusively to the folder-tree structure. Remove any conditional that writes or syncs to prd.md or branch-scoped prd_{branch}_{date}.md files. The folder-tree must be the only write target for all PRD mutations so that prd.md is never created or updated by normal operation.
 
 #### Audit and remove residual JSON write calls from rex CLI and MCP handlers
 *task · completed · priority: high · started 2026-04-29 · completed 2026-04-29 · tags: rex, cli, mcp, cleanup*
@@ -38866,3 +39052,46 @@ Systematically audit all rex CLI command handlers (add, edit, remove, move, prun
 *task · completed · priority: medium · started 2026-04-29 · completed 2026-04-29 · tags: rex, testing, prd-storage*
 
 Add integration tests that run key PRD-mutating commands and assert that .rex/prd.json is never created or modified as a side effect. These tests guard against future regression where code accidentally reintroduces a JSON write path.
+
+## PRD Folder-Tree Promotion: Eliminate prd.md and Enforce Hierarchical Layout
+*epic · pending*
+
+### Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend
+*feature · pending*
+
+Flip the PRDStore read/write layer so the epic → feature → task → subtask folder tree is the sole authoritative storage. Remove all remaining paths that read from or write to prd.md so that file is never created, consulted, or maintained by any part of the system.
+
+#### Audit all read and write call sites that still reference prd.md as primary storage
+*task · completed · priority: critical · started 2026-04-29 · completed 2026-04-29 · tags: prd, storage, audit*
+
+Trace every code path in PRDStore, rex CLI commands, MCP handlers, ndx orchestration scripts, and the web server that reads from or writes to prd.md (including branch-scoped variants). Produce a prioritized change list mapping each path to its folder-tree replacement before any implementation begins.
+
+#### Remove prd.md read fallback from PRDStore and all CLI, MCP, and web consumers
+*task · in_progress · priority: critical · started 2026-04-29 · tags: prd, storage, rex, mcp, web*
+
+Update PRDStore.loadDocument and every caller (rex CLI commands, MCP tools, web server PRD aggregator, ndx status) to read exclusively from the folder tree. Remove fallback logic that reads prd.md when a folder tree is absent. When no folder tree is found, emit a clear error directing the user to run the migration command rather than silently falling back.
+
+### Epic-Scoped Slug Naming Convention for Folder-Tree Directories
+*feature · pending*
+
+Define and implement a deterministic slug-based naming convention for the full PRD hierarchy so that each directory name is derived from the PRD item title rather than an opaque ID. Folder paths will read as human-legible representations of the PRD tree: .rex/prd/<epic-slug>/<feature-slug>/<task-slug>/<subtask-slug>/.
+
+#### Define and implement slug generation rules for PRD folder names at all hierarchy levels
+*task · pending · priority: high · tags: prd, storage, naming*
+
+Implement a deterministic slug function that converts PRD item titles into safe, stable directory names (lowercase, hyphens, no special characters, max length). Define truncation and collision-avoidance rules for sibling items that produce the same slug. Apply the convention to all four PRD levels: epics, features, tasks, and subtasks.
+
+### Migration, Documentation, and Regression Coverage for Folder-Tree-Only Storage
+*feature · pending*
+
+Update the existing migration command to produce slug-named folders and offer prd.md removal, revise all documentation to reflect the folder tree as the sole storage format, and add regression tests that prevent any future re-introduction of prd.md write paths.
+
+#### Update rex migrate-to-folder-tree to produce slug-named directories and offer prd.md removal
+*task · pending · priority: high · tags: prd, migration, rex*
+
+Extend the existing migration command to generate the slug-based folder naming convention and, after a successful migration, prompt the user to delete prd.md and any branch-scoped prd_{branch}_{date}.md files. Ensure the command is idempotent so re-running it on an already-migrated tree is a safe no-op.
+
+#### Update CLAUDE.md, README, and Key Files documentation to reflect folder-tree as sole PRD storage
+*task · pending · priority: medium · tags: documentation, prd*
+
+Revise all documentation references that describe prd.md or branch-scoped prd_{branch}_{date}.md files as primary writable PRD surfaces. Update the Key Files table, PRD file layout note, PRD invariant, concurrency contract, and README workflow sections to describe the slug-based folder tree as the only authoritative format.

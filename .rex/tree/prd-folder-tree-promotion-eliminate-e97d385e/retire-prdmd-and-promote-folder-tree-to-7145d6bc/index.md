@@ -1,0 +1,15 @@
+---
+id: "7145d6bc-5c6c-46bb-af89-cc65da8337f2"
+level: "feature"
+title: "Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend"
+status: "pending"
+source: "smart-add"
+description: "Flip the PRDStore read/write layer so the epic → feature → task → subtask folder tree is the sole authoritative storage. Remove all remaining paths that read from or write to prd.md so that file is never created, consulted, or maintained by any part of the system."
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Audit all read and write call sites that still reference prd.md as primary storage](./audit-all-read-and-write-call-sites-6fa1218b/index.md) | completed |
+| [Remove prd.md read fallback from PRDStore and all CLI, MCP, and web consumers](./remove-prdmd-read-fallback-from-1e7c95da/index.md) | pending |
