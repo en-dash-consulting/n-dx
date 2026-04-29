@@ -90,6 +90,21 @@ export function formatLoopIterationSeparator(): string {
 }
 
 /**
+ * Format the iteration boundary banner emitted between loop iterations.
+ *
+ * - Fixed mode (--iterations=N): `=== Iteration n/total ===`
+ * - Unbounded mode (--loop):     `=== Iteration n ===`
+ *
+ * Uses bold() so it stands out against surrounding transcript lines and
+ * respects NO_COLOR (bold() degrades to plain text when color is disabled).
+ * Exported for testing.
+ */
+export function formatIterationBanner(n: number, total?: number): string {
+  const label = total !== undefined ? `${n}/${total}` : `${n}`;
+  return bold(`=== Iteration ${label} ===`);
+}
+
+/**
  * Format a "no actionable tasks" advisory block for epic scope mode.
  * All three lines are rendered in yellow (colorWarn) to signal an advisory
  * state without alarming the user.
@@ -1110,8 +1125,11 @@ async function runIterations(
   autonomous?: boolean,
 ): Promise<void> {
   for (let i = 0; i < iterations; i++) {
-    if (iterations > 1) {
-      info(`\n${bold(`=== Iteration ${i + 1}/${iterations} ===`)}`);
+    // Banner between iterations: printed before iteration i+1 starts,
+    // i.e. after iteration i's commit and run summary have been rendered.
+    // Not emitted before the first iteration (i === 0).
+    if (i > 0) {
+      info(`\n${formatIterationBanner(i + 1, iterations)}`);
     }
 
     // For autoselected iterations, skip stuck tasks
@@ -1215,7 +1233,10 @@ async function runLoop(
       }
 
       completed++;
-      info(`\n${bold(`=== Loop iteration ${completed} ===`)}`);
+      // Banner between iterations: not emitted before the first iteration.
+      if (completed > 1) {
+        info(`\n${formatIterationBanner(completed)}`);
+      }
 
       // Show queue status if there are pending tasks
       if (queue) logQueueStatus(queue);

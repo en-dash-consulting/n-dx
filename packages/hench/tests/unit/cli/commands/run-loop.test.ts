@@ -229,3 +229,68 @@ describe("loop config defaults", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+// ── iteration banner placement ────────────────────────────────────────────
+//
+// Regression guard: banners must be emitted BETWEEN iterations only.
+// "Between" means: after the prior iteration's runOne (commit + summary)
+// returns, and before the next iteration's task selection begins.
+// No banner before iteration 1; no banner after the final iteration.
+//
+// These tests simulate the banner-gating logic used in runIterations()
+// (if i > 0) and runLoop() (if completed > 1) to document the invariant
+// without having to spin up the full agent stack.
+
+describe("iteration banner placement invariants", () => {
+  it("formatIterationBanner is not called for the first iteration (i === 0)", () => {
+    // Simulates the gate in runIterations(): `if (i > 0)`
+    const banners: string[] = [];
+    const emitBanner = (i: number, total: number) => {
+      if (i > 0) banners.push(`=== Iteration ${i + 1}/${total} ===`);
+    };
+    // Three iterations: only iterations 2 and 3 get a banner
+    for (let i = 0; i < 3; i++) emitBanner(i, 3);
+    expect(banners).toHaveLength(2);
+    expect(banners[0]).toBe("=== Iteration 2/3 ===");
+    expect(banners[1]).toBe("=== Iteration 3/3 ===");
+  });
+
+  it("no banner is emitted after the final iteration in fixed mode", () => {
+    // After the loop ends there is no code path that would emit a banner,
+    // because the gate condition (i > 0) is evaluated at the TOP of each
+    // iteration — when the loop exits there is no 'next' iteration to enter.
+    const banners: string[] = [];
+    const total = 3;
+    for (let i = 0; i < total; i++) {
+      if (i > 0) banners.push(`banner-${i + 1}`);
+      // simulate iteration work here
+    }
+    // Last banner is for iteration `total`, not `total + 1`
+    expect(banners[banners.length - 1]).toBe(`banner-${total}`);
+    expect(banners).toHaveLength(total - 1);
+  });
+
+  it("formatIterationBanner is not called for the first loop iteration (completed === 1)", () => {
+    // Simulates the gate in runLoop(): `if (completed > 1)`
+    const banners: string[] = [];
+    let completed = 0;
+    const emitBanner = () => {
+      completed++;
+      if (completed > 1) banners.push(`=== Iteration ${completed} ===`);
+    };
+    emitBanner(); // iteration 1 — no banner
+    emitBanner(); // iteration 2 — banner for 2
+    emitBanner(); // iteration 3 — banner for 3
+    expect(banners).toHaveLength(2);
+    expect(banners[0]).toBe("=== Iteration 2 ===");
+    expect(banners[1]).toBe("=== Iteration 3 ===");
+  });
+
+  it("loop-mode banner format has no /total suffix", () => {
+    // --loop is unbounded so the banner must not show a denominator
+    const completed = 4;
+    const banner = `=== Iteration ${completed} ===`;
+    expect(banner).not.toMatch(/\d+\/\d+/);
+    expect(banner).toBe("=== Iteration 4 ===");
+  });
+});

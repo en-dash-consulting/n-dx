@@ -2,7 +2,7 @@
 id: "7b4ff540-8a22-4f56-9b0b-dcf9e68f6675"
 level: "task"
 title: "Print '=== Iteration n/total ===' banner between hench run loop iterations"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "hench"
@@ -10,6 +10,7 @@ tags:
   - "run-loop"
   - "output"
 source: "smart-add"
+startedAt: "2026-04-29T18:16:35.551Z"
 acceptanceCriteria:
   - "Banner '=== Iteration n/[total] ===' is emitted between each pair of iterations in --iterations=N mode"
   - "Banner '=== Iteration n ===' (no total) is emitted between iterations in unbounded --loop mode"
