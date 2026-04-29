@@ -36,7 +36,46 @@ function makeTmpProject(items) {
     title: "Gateway Test",
     items: items || [],
   };
-  writeFileSync(join(rexDir, "prd.json"), JSON.stringify(doc), "utf-8");
+
+  // Write tree-meta.json with the document title
+  writeFileSync(
+    join(rexDir, "tree-meta.json"),
+    JSON.stringify({ title: doc.title }),
+    "utf-8",
+  );
+
+  // Create minimal folder-tree structure for tests
+  mkdirSync(join(rexDir, "tree"), { recursive: true });
+
+  // Write each item to the folder tree
+  // Simple implementation: just write epics for now (test items are simple)
+  for (const item of doc.items) {
+    const itemDir = join(rexDir, "tree", item.id);
+    mkdirSync(itemDir, { recursive: true });
+    const markdown = createItemMarkdown(item);
+    writeFileSync(join(itemDir, "index.md"), markdown, "utf-8");
+
+    // Handle nested items (features, tasks, etc.)
+    if (item.children && Array.isArray(item.children)) {
+      for (const child of item.children) {
+        const childDir = join(itemDir, child.id);
+        mkdirSync(childDir, { recursive: true });
+        const childMarkdown = createItemMarkdown(child);
+        writeFileSync(join(childDir, "index.md"), childMarkdown, "utf-8");
+
+        // Handle nested tasks
+        if (child.children && Array.isArray(child.children)) {
+          for (const grandchild of child.children) {
+            const grandchildDir = join(childDir, grandchild.id);
+            mkdirSync(grandchildDir, { recursive: true });
+            const grandchildMarkdown = createItemMarkdown(grandchild);
+            writeFileSync(join(grandchildDir, "index.md"), grandchildMarkdown, "utf-8");
+          }
+        }
+      }
+    }
+  }
+
   writeFileSync(
     join(rexDir, "config.json"),
     JSON.stringify({
@@ -48,6 +87,22 @@ function makeTmpProject(items) {
   );
 
   return { tmpDir, rexDir };
+}
+
+function createItemMarkdown(item) {
+  const lines = ["---"];
+  lines.push(`id: "${item.id}"`);
+  lines.push(`level: "${item.level}"`);
+  lines.push(`title: "${item.title}"`);
+  lines.push(`status: "${item.status}"`);
+  lines.push(`priority: "${item.priority || "medium"}"`);
+  if (item.description) {
+    lines.push(`description: "${item.description}"`);
+  }
+  lines.push("---");
+  lines.push("");
+  lines.push(`# ${item.title}`);
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
