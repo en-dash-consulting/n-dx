@@ -1,9 +1,6 @@
-import { readdir, writeFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { sanitizeBranchName, resolveGitBranch, getFirstCommitDate, generatePRDFilename } from "./branch-naming.js";
-import { SCHEMA_VERSION } from "../schema/v1.js";
-import { toCanonicalJSON } from "../core/canonical.js";
-import type { PRDDocument } from "../schema/v1.js";
 
 const PRD_FILENAME_RE = /^prd_(.+)_(\d{4}-\d{2}-\d{2})\.json$/;
 
@@ -59,19 +56,19 @@ export interface PRDFileResolution {
   filename: string;
   /** Full path to the file. */
   path: string;
-  /** `true` when the file was created by this call (first add on this branch). */
+  /** Always `false` — no JSON file is created by this call. */
   created: boolean;
 }
 
 /**
- * Resolve (or create) the branch-scoped PRD file for the current git branch.
+ * Resolve the branch-scoped attribution filename for the current git branch.
  *
- * The branch-scoped file holds only items added on this branch — `prd.json`
- * is preserved as the canonical PRD and remains untouched.
+ * Does not create any file on disk. The returned filename is used only to
+ * set the `sourceFile` attribution on new items written to `prd.md`.
  *
  * Resolution order:
- * 1. If a branch file already exists for this branch, return it unchanged.
- * 2. Otherwise create an empty branch-scoped PRD file alongside `prd.json`.
+ * 1. If a branch-scoped JSON file already exists on disk, return it (legacy).
+ * 2. Otherwise compute the canonical branch-scoped filename for attribution.
  * 3. Falls back to `prd.json` when the branch cannot be resolved.
  */
 export async function resolvePRDFile(
@@ -89,20 +86,12 @@ export async function resolvePRDFile(
     return { filename: existing, path: join(rexDir, existing), created: false };
   }
 
-  // Generate the target branch-scoped filename
+  // Generate the target branch-scoped filename.
+  // No JSON file is created — prd.md is the sole writable PRD surface.
+  // The filename is used only for item attribution (sourceFile field).
   const date = getFirstCommitDate(cwd);
   const filename = generatePRDFilename(branch, date);
   const targetPath = join(rexDir, filename);
 
-  // Create an empty branch-scoped PRD file titled with the branch name.
-  // `prd.json` is left in place as the canonical PRD; new items added on this
-  // branch are written to the branch file only.
-  const sanitized = sanitizeBranchName(branch);
-  const doc: PRDDocument = {
-    schema: SCHEMA_VERSION,
-    title: sanitized,
-    items: [],
-  };
-  await writeFile(targetPath, toCanonicalJSON(doc), "utf-8");
-  return { filename, path: targetPath, created: true };
+  return { filename, path: targetPath, created: false };
 }

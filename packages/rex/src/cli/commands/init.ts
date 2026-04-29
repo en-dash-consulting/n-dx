@@ -2,7 +2,7 @@ import { join, basename } from "node:path";
 import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
-import { ensureRexDir, PRD_FILENAME, PRD_MARKDOWN_FILENAME, serializeDocument } from "../../store/index.js";
+import { ensureRexDir, PRD_MARKDOWN_FILENAME, serializeDocument } from "../../store/index.js";
 import { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "../../workflow/default.js";
 import { REX_DIR } from "./constants.js";
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
@@ -28,21 +28,6 @@ export async function cmdInit(
     const config = DEFAULT_CONFIG(project);
     await writeFile(configPath, toCanonicalJSON(config), "utf-8");
     info("Created config.json");
-  }
-
-  // prd.json — always the single canonical PRD file.
-  const prdPath = join(rexDir, PRD_FILENAME);
-  try {
-    await access(prdPath);
-    info(`${PRD_FILENAME} already exists, skipping`);
-  } catch {
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: project,
-      items: [],
-    };
-    await writeFile(prdPath, toCanonicalJSON(doc), "utf-8");
-    info(`Created ${PRD_FILENAME}`);
   }
 
   // prd.md — canonical markdown mirror of the PRD document.

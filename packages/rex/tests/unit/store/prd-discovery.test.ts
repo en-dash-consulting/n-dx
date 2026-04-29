@@ -249,7 +249,7 @@ describe("resolvePRDFile", () => {
     expect(result.path).toBe(join(rexDir, existingFile));
   });
 
-  it("creates a new empty PRD file when no match exists", async () => {
+  it("returns the computed filename without creating a file", async () => {
     initRepo(tmpDir);
     execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
       cwd: tmpDir,
@@ -263,16 +263,15 @@ describe("resolvePRDFile", () => {
 
     const result = await resolvePRDFile(rexDir, tmpDir);
     expect(result.filename).toBe("prd_main_2025-06-01.json");
-    expect(result.created).toBe(true);
+    expect(result.created).toBe(false);
     expect(result.path).toBe(join(rexDir, "prd_main_2025-06-01.json"));
 
-    const raw = await readFile(result.path, "utf-8");
-    const doc = JSON.parse(raw);
-    expect(doc.schema).toBe(SCHEMA_VERSION);
-    expect(doc.items).toEqual([]);
+    // No JSON file created — prd.md is the sole writable PRD surface
+    const exists = await readFile(result.path, "utf-8").then(() => true).catch(() => false);
+    expect(exists).toBe(false);
   });
 
-  it("preserves prd.json and creates an empty branch-scoped file alongside it", async () => {
+  it("leaves legacy prd.json untouched when computing branch attribution filename", async () => {
     initRepo(tmpDir);
     execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
       cwd: tmpDir,
@@ -291,18 +290,13 @@ describe("resolvePRDFile", () => {
 
     const result = await resolvePRDFile(rexDir, tmpDir);
     expect(result.filename).toBe("prd_main_2025-03-01.json");
-    expect(result.created).toBe(true);
+    expect(result.created).toBe(false);
 
-    // prd.json is left untouched as the canonical PRD
+    // prd.json is left untouched as the legacy canonical PRD
     const canonicalRaw = await readFile(join(rexDir, "prd.json"), "utf-8");
     const canonical = JSON.parse(canonicalRaw);
     expect(canonical.items).toHaveLength(1);
     expect(canonical.items[0].id).toBe("e1");
-
-    // Branch file is empty — only items added on this branch land here
-    const branchRaw = await readFile(result.path, "utf-8");
-    const branchDoc = JSON.parse(branchRaw);
-    expect(branchDoc.items).toEqual([]);
   });
 
   it("does not overwrite PRD files for other branches", async () => {
@@ -325,7 +319,7 @@ describe("resolvePRDFile", () => {
     await writeFile(join(rexDir, "prd_develop_2025-02-01.json"), JSON.stringify(otherDoc));
 
     const result = await resolvePRDFile(rexDir, tmpDir);
-    expect(result.created).toBe(true);
+    expect(result.created).toBe(false);
     expect(result.filename).toBe("prd_main_2025-01-15.json");
 
     const otherRaw = await readFile(join(rexDir, "prd_develop_2025-02-01.json"), "utf-8");
@@ -358,9 +352,9 @@ describe("resolvePRDFile", () => {
 
     const result = await resolvePRDFile(rexDir, tmpDir);
     expect(result.filename).toBe("prd_feature-cool-thing_2025-04-01.json");
-    expect(result.created).toBe(true);
+    expect(result.created).toBe(false);
 
-    // Resolve again — should find the existing file
+    // Resolve again — same computed filename, no file created
     const second = await resolvePRDFile(rexDir, tmpDir);
     expect(second.filename).toBe("prd_feature-cool-thing_2025-04-01.json");
     expect(second.created).toBe(false);
