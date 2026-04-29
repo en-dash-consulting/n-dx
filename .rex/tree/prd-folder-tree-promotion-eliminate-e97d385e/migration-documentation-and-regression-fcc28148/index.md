@@ -12,5 +12,5 @@ description: "Update the existing migration command to produce slug-named folder
 
 | Title | Status |
 |-------|--------|
-| [Update CLAUDE.md, README, and Key Files documentation to reflect folder-tree as sole PRD storage](./update-claudemd-readme-and-key-files-60a8e23e/index.md) | pending |
+| [Update CLAUDE.md, README, and Key Files documentation to reflect folder-tree as sole PRD storage](./update-claudemd-readme-and-key-files-60a8e23e/index.md) | in_progress |
 | [Update rex migrate-to-folder-tree to produce slug-named directories and offer prd.md removal](./update-rex-migrate-to-folder-tree-to-3907de2e/index.md) | completed |

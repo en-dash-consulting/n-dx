@@ -1,6 +1,6 @@
 # PRD Folder Tree Schema
 
-Normative contract for the serializer (PRD → folders) and parser (folders → PRD) implementations. See also: sibling tasks `Implement PRD-to-folder-tree serializer` and `Implement folder-tree-to-PRD parser`.
+Normative contract for the serializer (PRD → folder tree) and parser (folder tree → PRD) implementations. This is the sole authoritative PRD storage format; `.rex/prd.md` and `.rex/prd.json` are legacy migration sources (absent after running `rex migrate-to-folder-tree`).
 
 ---
 

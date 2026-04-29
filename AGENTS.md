@@ -7,7 +7,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 ## Packages
 
 - **sourcevision** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption.
-- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores primary PRD state as Markdown in `.rex/prd.md`, with branch-scoped companion files such as `.rex/prd_{branch}_{date}.md` when work is split by branch. `.rex/prd.json` is a secondary sync artifact for consumers that still expect structured JSON.
+- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 
 ## Monorepo Structure
@@ -151,9 +151,9 @@ sv <command> [args]               # alias for sourcevision
 |------|---------|
 | `.sourcevision/CONTEXT.md` | AI-readable codebase summary |
 | `.sourcevision/manifest.json` | Analysis metadata and version |
-| `.rex/prd.md` | Primary PRD storage in Markdown; base document for epics → features → tasks → subtasks |
-| `.rex/prd_{branch}_{date}.md` | Branch-scoped PRD companion files used when branch work is split into separate Markdown documents |
-| `.rex/prd.json` | Derived JSON sync artifact generated from the Markdown PRD files for tools that still consume structured JSON |
+| `.rex/tree/` | PRD storage root — slug-based folder tree; one directory per item (epic/feature/task) containing `index.md` |
+| `.rex/prd.md` | (Legacy) flat Markdown PRD; migration source for `rex migrate-to-folder-tree`. Absent after migration. |
+| `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
 | `.rex/workflow.md` | Human-readable workflow state |
 | `.rex/config.json` | Rex project configuration |
@@ -169,7 +169,7 @@ sv <command> [args]               # alias for sourcevision
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 
-> **PRD file layout.** `.rex/prd.md` is the primary PRD document. Branch-scoped work may add sibling Markdown files named `prd_{branch}_{date}.md`; together these Markdown files make up the writable PRD source of truth. `.rex/prd.json` is regenerated from that Markdown set as a compatibility and sync artifact, so documentation and tooling should treat the Markdown files as authoritative for writes and `prd.json` as secondary.
+> **PRD file layout.** `.rex/tree/` is the sole writable PRD surface. Each item (epic/feature/task) maps to a slug-named directory containing `index.md`; subtasks are encoded as sections within the parent task's `index.md`. No JSON files are written by the rex CLI, MCP tools, or `rex update`. `.rex/prd.md` and `.rex/prd.json` are legacy migration sources — absent after running `rex migrate-to-folder-tree`.
 
 ## Workflow
 

@@ -6,7 +6,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 ## Packages
 
 - **sourcevision** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption.
-- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state as Markdown in `.rex/prd.md`, with branch-scoped companion files such as `.rex/prd_{branch}_{date}.md` when work is split by branch. No JSON files are written by PRD mutations.
+- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 
 ## Monorepo Structure
@@ -184,18 +184,18 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 | Command pair | Safe? | Notes |
 |-------------|-------|-------|
 | `ndx start` + `ndx status` | ✅ | Status is read-only |
-| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`; the server reads `prd.md` via `.rex/.cache/prd.json` (refreshed by file watcher) |
-| `ndx start` + `ndx plan` | ⚠️ | Plan rewrites `prd.md`; the server's `prd.md` watcher refreshes `.rex/.cache/prd.json` automatically, but a restart flushes all in-process caches. |
-| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` plus PRD Markdown and sync files concurrently |
-| `ndx plan` + `ndx work` | ❌ | Both write `prd.md` (and any branch-scoped `.rex/prd_{branch}_{date}.md` files) |
+| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`; the server reads the folder tree via `.rex/.cache/prd.json` (refreshed by file watcher) |
+| `ndx start` + `ndx plan` | ⚠️ | Plan rewrites the folder tree; the server's tree watcher refreshes `.rex/.cache/prd.json` automatically, but a restart flushes all in-process caches. |
+| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` plus the folder tree and sync files concurrently |
+| `ndx plan` + `ndx work` | ❌ | Both write the folder tree (`.rex/tree/`) |
 | `ndx refresh` + any write command | ❌ | Refresh writes `.sourcevision/` and rebuilds web assets |
 | `ndx config` + `ndx config` | ❌ | Concurrent config writes may lose updates (no file locking) |
 
-**General rule:** Commands that write to the PRD backend (`.rex/prd.md` or any `.rex/prd_{branch}_{date}.md` files), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
+**General rule:** Commands that write to the PRD backend (`.rex/tree/`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
-**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to Markdown (`prd.md`). No JSON files are produced. A write may touch both `.rex/prd.md` and one or more branch-scoped `.rex/prd_{branch}_{date}.md` files, so never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
+**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/tree/`). No JSON files are produced. Never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
 
-**PRD invariant.** The sole writable PRD surface is the Markdown set: `.rex/prd.md` plus any branch-scoped `.rex/prd_{branch}_{date}.md` files. No PRD mutation (CLI, MCP, or `rex update`) writes `.rex/prd.json`. Avoid parallel writers even when they appear to target different branches.
+**PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
 
 #### HTTP-request concurrency (web server)
 
@@ -203,11 +203,11 @@ When `ndx start` is running, the web server holds in-process caches (aggregation
 
 | Scenario | Risk | Mitigation |
 |----------|------|------------|
-| Dashboard reads PRD while `ndx plan` writes `.rex/prd.md` or branch-scoped PRD Markdown | Partial aggregate read or stale derived JSON | Restart server after plan (`ndx start stop && ndx start`) |
+| Dashboard reads PRD while `ndx plan` writes to `.rex/tree/` | Partial aggregate read or stale derived JSON | Restart server after plan (`ndx start stop && ndx start`) |
 | MCP request during `ndx work` PRD update | Momentarily stale status — hench writes are small atomic updates | Acceptable — dashboard polls and self-corrects within seconds |
 | Concurrent dashboard API requests | Safe — Express serializes requests per-connection; no shared mutable state between request handlers | No action needed |
 
-**General rule for HTTP:** The web server treats disk files as read-only and never holds write locks. The `prd.md` file watcher refreshes `.rex/.cache/prd.json` automatically for most PRD mutations. Any command that bulk-rewrites `.sourcevision/` (ci, refresh) should be followed by a server restart to flush stale caches.
+**General rule for HTTP:** The web server treats disk files as read-only and never holds write locks. The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most PRD mutations. Any command that bulk-rewrites `.sourcevision/` (ci, refresh) should be followed by a server restart to flush stale caches.
 
 
 ### Package conventions
@@ -343,7 +343,7 @@ Benefits of HTTP over stdio: single process, shared port with the web dashboard,
 
 ### Rex MCP tools
 
-Rex mutations write only to Markdown (`.rex/prd.md` and, when present, branch-scoped `.rex/prd_{branch}_{date}.md` files). No JSON files are produced by MCP write operations.
+Rex mutations write only to the folder tree (`.rex/tree/`). No JSON files are produced by MCP write operations.
 
 - `get_prd_status` — PRD title, overall stats, and per-epic stats
 - `get_next_task` — next actionable task based on priority and dependencies
@@ -393,9 +393,9 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 |------|---------|
 | `.sourcevision/CONTEXT.md` | AI-readable codebase summary |
 | `.sourcevision/manifest.json` | Analysis metadata and version |
-| `.rex/prd.md` | Primary PRD storage in Markdown; base document for epics → features → tasks → subtasks |
-| `.rex/prd_{branch}_{date}.md` | Branch-scoped PRD companion files used when branch work is split into separate Markdown documents |
-| `.rex/prd.json` | (Legacy) one-shot migration source if `prd.md` is absent; otherwise unused. Web dashboard uses `.rex/.cache/prd.json` while the server is running. |
+| `.rex/tree/` | PRD storage root — slug-based folder tree; one directory per item (epic/feature/task) containing `index.md` |
+| `.rex/prd.md` | (Legacy) flat Markdown PRD; migration source for `rex migrate-to-folder-tree`. Absent after migration. |
+| `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/.cache/prd.json` | Ephemeral JSON cache written by `ndx start` for the web dashboard. Removed on server shutdown. Do not edit; do not read from other code paths. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
 | `.rex/workflow.md` | Human-readable workflow state |
@@ -412,6 +412,6 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 
-> **PRD file layout.** `.rex/prd.md` is the primary PRD document and the sole writable surface for all PRD mutations. Branch-scoped work may add sibling Markdown files named `prd_{branch}_{date}.md`. Together these Markdown files are the source of truth — no JSON files are written by the rex CLI, MCP tools, or `rex update`. `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running; do not read it from code outside the web server.
+> **PRD file layout.** `.rex/tree/` is the sole writable PRD surface. Each item (epic/feature/task) maps to a slug-named directory containing `index.md`; subtasks are encoded as sections within the parent task's `index.md`. No JSON files are written by the rex CLI, MCP tools, or `rex update`. `.rex/prd.md` and branch-scoped `.rex/prd_{branch}_{date}.md` files are legacy migration sources — absent after running `rex migrate-to-folder-tree`. `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running; do not read it from code outside the web server.
 
-> **PRD folder tree schema.** An alternative hierarchical on-disk layout maps each PRD level (epic → feature → task) to a directory containing an `index.md`. Subtasks are encoded as sections within the parent task's `index.md`. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
+> **PRD folder tree schema.** The primary PRD storage format maps each PRD level (epic → feature → task) to a directory containing an `index.md`. Subtasks are encoded as sections within the parent task's `index.md`. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.

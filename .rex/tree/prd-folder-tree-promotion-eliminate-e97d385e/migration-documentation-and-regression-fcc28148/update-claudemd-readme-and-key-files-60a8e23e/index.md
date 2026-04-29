@@ -2,12 +2,13 @@
 id: "60a8e23e-106e-4313-b253-612a55b65d27"
 level: "task"
 title: "Update CLAUDE.md, README, and Key Files documentation to reflect folder-tree as sole PRD storage"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "documentation"
   - "prd"
 source: "smart-add"
+startedAt: "2026-04-29T18:21:59.248Z"
 acceptanceCriteria:
   - "CLAUDE.md Key Files table lists .rex/prd/<epic-slug>/... as the primary PRD storage path"
   - "PRD invariant note updated to name the folder tree as the sole writable surface"
