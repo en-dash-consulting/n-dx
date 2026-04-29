@@ -37,7 +37,6 @@ const FAVICON_PNGS: Record<Product | "ndx", string> = {
 const VIEW_TO_PRODUCT: Partial<Record<ViewId, Product>> = {
   overview: "sourcevision",
   graph: "sourcevision",
-  zones: "sourcevision",
   files: "sourcevision",
   routes: "sourcevision",
   architecture: "sourcevision",

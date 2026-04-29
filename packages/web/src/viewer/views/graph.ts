@@ -3,26 +3,22 @@
  */
 
 import { h } from "preact";
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
-import type { ImportType } from "../external.js";
-import { BrandedHeader, SearchFilter } from "../components/index.js";
+import { BrandedHeader } from "../components/index.js";
 import { basename } from "../utils.js";
 import {
   aggregateDirectedZoneFlows,
-  allImportTypes,
   buildFileDegrees,
   collectFilePaths,
   defaultFocusPath,
   defaultFocusPathInZone,
   expandNeighborhood,
   fileToZoneId,
-  filesInCycles,
   filterEdgesInBall,
   findExternal,
   isCrossZoneEdge,
   partitionNeighbors,
-  restrictBallToZone,
   zoneDisplayName,
 } from "./import-graph/model.js";
 import {
@@ -42,12 +38,24 @@ interface GraphProps {
   navigateTo?: NavigateTo;
 }
 
-const DEPTH_OPTIONS = [1, 2, 3, 4] as const;
-const EXPLORE_ROW_CAP = 400;
 const ZONE_FLOW_CAP = 24;
+const DEFAULT_DEPTH = 2;
+const CODEBASE_MAP_EXPAND_TOP_PX = 24;
+const ACTIVE_ZONE_FILE_CAP = 20;
+const ZONE_FILE_NODE_W = 158;
+const ZONE_FILE_NODE_H = 58;
+const ZONE_EXTERNAL_NODE_W = 124;
+const ZONE_EXTERNAL_NODE_H = 48;
+const ZONE_DIR_NODE_W = 148;
+const ZONE_DIR_NODE_H = 42;
 
-type PageTab = "explore" | "graph";
-type ExploreSort = "path" | "in" | "out" | "total";
+type FocusSource =
+  | { kind: "default" }
+  | { kind: "zone"; zoneId: string }
+  | { kind: "file"; path: string }
+  | { kind: "hub"; path: string }
+  | { kind: "package"; packageName: string }
+  | { kind: "cycle"; path: string };
 
 /** Readable basename / package label inside SVG boxes (avoid tiny monospace overflow). */
 function truncateNodeLabel(label: string, kind: NodeKind): string {
@@ -62,20 +70,186 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }: GraphProps) {
-  const { imports, zones, inventory } = data;
+function parentContext(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  if (parts.length <= 1) return "";
+  return parts.slice(Math.max(0, parts.length - 3), -1).join("/");
+}
 
-  const [pageTab, setPageTab] = useState<PageTab>("explore");
-  const [exploreSort, setExploreSort] = useState<ExploreSort>("total");
+function workingDirectory(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  if (parts.length <= 1) return "(root)";
+  return parts.slice(0, -1).join("/");
+}
+
+function wrapZoneLabel(label: string, maxLineLength = 13): string[] {
+  const normalized = label.replace(/[-_/]+/g, " ").replace(/\s+/g, " ").trim();
+  const words = normalized ? normalized.split(" ") : [label];
+  const lines: string[] = [];
+  for (const word of words) {
+    const current = lines[lines.length - 1] ?? "";
+    if (!current) {
+      lines.push(word);
+    } else if (`${current} ${word}`.length <= maxLineLength) {
+      lines[lines.length - 1] = `${current} ${word}`;
+    } else if (lines.length < 2) {
+      lines.push(word);
+    } else {
+      lines[1] = `${lines[1]} ${word}`;
+    }
+  }
+  return lines.slice(0, 2).map((line) => line.length > maxLineLength + 2 ? `${line.slice(0, maxLineLength + 1)}…` : line);
+}
+
+function wrapFileLabel(fileName: string): string[] {
+  const stem = fileName.replace(/\.[^.]+$/, "");
+  const extension = fileName.startsWith(stem) ? fileName.slice(stem.length) : "";
+  const words = stem.split(/[-_]/).filter(Boolean);
+  if (fileName.length <= 22 || words.length <= 1) return [fileName];
+  const lines: string[] = [""];
+  for (const word of words) {
+    const current = lines[lines.length - 1];
+    if (!current) lines[lines.length - 1] = word;
+    else if (`${current}-${word}`.length <= 18) lines[lines.length - 1] = `${current}-${word}`;
+    else if (lines.length < 2) lines.push(word);
+    else lines[1] = `${lines[1]}-${word}`;
+  }
+  if (lines.length === 1) return [`${lines[0]}${extension}`];
+  lines[1] = `${lines[1]}${extension}`;
+  return lines.map((line) => line.length > 22 ? `${line.slice(0, 21)}…` : line);
+}
+
+type Viewport = { x: number; y: number; k: number };
+type Point = { x: number; y: number };
+type SurfaceKind = "codebase" | "zone" | "dep";
+type DragState =
+  | { kind: "pan"; surface: SurfaceKind; startX: number; startY: number; origin: Viewport }
+  | { kind: "zone-node"; id: string; startX: number; startY: number; origin: Point }
+  | { kind: "file-node"; path: string; startX: number; startY: number; origin: Point }
+  | { kind: "dep-node"; id: string; startX: number; startY: number; origin: Point };
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function panViewport(view: Viewport, dx: number, dy: number): Viewport {
+  return { ...view, x: view.x + dx, y: view.y + dy };
+}
+
+function zoomViewport(view: Viewport, deltaY: number): Viewport {
+  return { ...view, k: clamp(view.k * (deltaY < 0 ? 1.12 : 0.88), 0.55, 2.6) };
+}
+
+function wheelViewport(view: Viewport, event: WheelEvent): Viewport {
+  if (event.ctrlKey || event.metaKey) return zoomViewport(view, event.deltaY);
+  return panViewport(view, -event.deltaX, -event.deltaY);
+}
+
+function offsetFromDrag(dx: number, dy: number, view: Viewport): Point {
+  return { x: dx / view.k, y: dy / view.k };
+}
+
+function layoutZoneMapNodes<T extends { id: string; n: number }>(
+  zones: T[],
+  flows: { fromZone: string; toZone: string; count: number }[],
+  statsFor: (id: string) => { in: number; out: number },
+  w: number,
+  h: number,
+): Array<T & { x: number; y: number; r: number; stats: { in: number; out: number } }> {
+  if (!zones.length) return [];
+  const maxFiles = Math.max(...zones.map((z) => z.n), 1);
+  const strength = new Map<string, number>();
+  for (const zone of zones) strength.set(zone.id, zone.n);
+  for (const flow of flows) {
+    strength.set(flow.fromZone, (strength.get(flow.fromZone) ?? 0) + flow.count * 2);
+    strength.set(flow.toZone, (strength.get(flow.toZone) ?? 0) + flow.count * 2);
+  }
+  const ordered = [...zones].sort((a, b) =>
+    (strength.get(b.id) ?? 0) - (strength.get(a.id) ?? 0) || a.id.localeCompare(b.id),
+  );
+  const centerX = w / 2;
+  const centerY = h / 2;
+  const rx = w * 0.38;
+  const ry = h * 0.32;
+  const placed = ordered.map((zone, i) => {
+    const angle = -Math.PI / 2 + (i / ordered.length) * Math.PI * 2;
+    const pull = 1 - Math.min(0.36, ((strength.get(zone.id) ?? 0) / Math.max(1, maxFiles * 6)) * 0.1);
+    return {
+      ...zone,
+      x: centerX + Math.cos(angle) * rx * pull,
+      y: centerY + Math.sin(angle) * ry * pull,
+      r: Math.max(18, Math.min(44, 16 + Math.sqrt(zone.n) * 5)),
+      stats: statsFor(zone.id),
+    };
+  });
+  for (let iter = 0; iter < 42; iter += 1) {
+    for (const flow of flows) {
+      const a = placed.find((z) => z.id === flow.fromZone);
+      const b = placed.find((z) => z.id === flow.toZone);
+      if (!a || !b) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const factor = Math.min(0.015, flow.count / 1200);
+      a.x += dx * factor;
+      a.y += dy * factor;
+      b.x -= dx * factor;
+      b.y -= dy * factor;
+    }
+    for (let i = 0; i < placed.length; i += 1) {
+      for (let j = i + 1; j < placed.length; j += 1) {
+        const a = placed[i];
+        const b = placed[j];
+        const dx = b.x - a.x || 0.1;
+        const dy = b.y - a.y || 0.1;
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const minDist = a.r + b.r + 34;
+        if (dist >= minDist) continue;
+        const push = (minDist - dist) / dist / 2;
+        a.x -= dx * push;
+        a.y -= dy * push;
+        b.x += dx * push;
+        b.y += dy * push;
+      }
+    }
+    for (const node of placed) {
+      node.x = clamp(node.x, node.r + 28, w - node.r - 28);
+      node.y = clamp(node.y, node.r + 26, h - node.r - 26);
+    }
+  }
+  return placed;
+}
+
+export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphProps) {
+  const { imports, zones, inventory } = data;
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const graphPanelRef = useRef<HTMLDivElement | null>(null);
+  const heroRef = useRef<HTMLElement | null>(null);
+  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressNodeClickRef = useRef(false);
+
   const [mode, setMode] = useState<"file" | "package">("file");
   const [focusFile, setFocusFile] = useState<string | null>(null);
   const [focusPackage, setFocusPackage] = useState<string | null>(null);
-  const [depth, setDepth] = useState<number>(2);
-  const [search, setSearch] = useState("");
+  const [focusSource, setFocusSource] = useState<FocusSource>({ kind: "default" });
   const [zoneFilter, setZoneFilter] = useState<string>("");
-  const [crossZoneOnly, setCrossZoneOnly] = useState(false);
-  const [cyclesOnly, setCyclesOnly] = useState(false);
-  const [importTypes, setImportTypes] = useState<Set<ImportType>>(() => new Set(allImportTypes()));
+  const [streetViewMode, setStreetViewMode] = useState<"closed" | "preview" | "dialog">("closed");
+  const [codebaseMapExpanded, setCodebaseMapExpanded] = useState(false);
+  const [codebaseView, setCodebaseView] = useState<Viewport>({ x: 0, y: 0, k: 1 });
+  const [zoneView, setZoneView] = useState<Viewport>({ x: 0, y: 0, k: 1 });
+  const [depView, setDepView] = useState<Viewport>({ x: 0, y: 0, k: 1 });
+  const [zoneNodeOffsets, setZoneNodeOffsets] = useState<Record<string, Point>>({});
+  const [fileNodeOffsets, setFileNodeOffsets] = useState<Record<string, Point>>({});
+  const [depNodeOffsets, setDepNodeOffsets] = useState<Record<string, Point>>({});
+  const [hoverPreviewFile, setHoverPreviewFile] = useState<string | null>(null);
+  const [hoverPreviewSide, setHoverPreviewSide] = useState<"left" | "right">("right");
+  const [hoverExternalZoneId, setHoverExternalZoneId] = useState<string | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [focusHistory, setFocusHistory] = useState<string[]>([]);
+  const [focusHistoryIndex, setFocusHistoryIndex] = useState(-1);
+
+  useEffect(() => () => {
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+  }, []);
 
   const inventoryMap = useMemo(() => {
     const map = new Map<string, { language: string; size: number; lines: number; role: string; category: string }>();
@@ -113,30 +287,24 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
     if (selectedFile) {
       setMode("file");
       setFocusFile(selectedFile);
-      setPageTab("graph");
+      setFocusSource({ kind: "file", path: selectedFile });
     }
   }, [selectedFile]);
 
   useEffect(() => {
     if (selectedZone && zones?.zones.some((z) => z.id === selectedZone)) {
+      setCodebaseMapExpanded(false);
       setZoneFilter(selectedZone);
     }
   }, [selectedZone, zones]);
 
-  const typeFilterSet = useMemo(() => {
-    const all = allImportTypes();
-    if (importTypes.size === all.length) return null;
-    return importTypes;
-  }, [importTypes]);
-
   const subgraph = useMemo(() => {
     if (!imports || !focusFile || mode !== "file") return null;
-    let ball = expandNeighborhood(focusFile, imports, depth);
-    ball = restrictBallToZone(ball, focusFile, zoneFilter || null, zones);
+    let ball = expandNeighborhood(focusFile, imports, DEFAULT_DEPTH);
     const edges = filterEdgesInBall(ball, imports, {
-      importTypes: typeFilterSet,
-      crossZoneOnly,
-      cyclesOnly,
+      importTypes: null,
+      crossZoneOnly: false,
+      cyclesOnly: false,
       zones,
     });
     const { predecessors, successors } = partitionNeighbors(focusFile, ball, edges);
@@ -146,7 +314,7 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
       successors,
     });
     return { ball, edges, layout };
-  }, [imports, focusFile, mode, depth, typeFilterSet, crossZoneOnly, cyclesOnly, zoneFilter, zones]);
+  }, [imports, focusFile, mode, zones]);
 
   const packageSubgraph = useMemo(() => {
     if (!imports || mode !== "package" || !focusPackage) return null;
@@ -183,38 +351,39 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
     [mode, packageSubgraph, subgraph],
   );
 
-  const selectFileDetail = useCallback(
-    (path: string) => {
-      const inv = inventoryMap.get(path);
-      const zid = fileToZoneId(path, zones);
-      const zoneName = zid && zones ? zones.zones.find((z) => z.id === zid)?.name : undefined;
-      const detail: DetailItem = {
-        type: "file",
-        title: basename(path),
-        path,
-        zone: zoneName,
-        ...(inv
-          ? {
-              language: inv.language,
-              size: formatSize(inv.size),
-              lines: inv.lines,
-              role: inv.role,
-              category: inv.category,
-            }
-          : {}),
-      };
-      onSelect(detail);
-    },
-    [inventoryMap, onSelect, zones],
-  );
+  useEffect(() => {
+    setDepView({ x: 0, y: 0, k: 1 });
+    setDepNodeOffsets({});
+  }, [focusFile, focusPackage, mode, streetViewMode]);
+
+  useEffect(() => {
+    if (!focusFile || focusHistory.length) return;
+    setFocusHistory([focusFile]);
+    setFocusHistoryIndex(0);
+  }, [focusFile, focusHistory.length]);
+
+  const rememberFocusFile = useCallback((path: string) => {
+    setFocusHistory((prev) => {
+      const current = focusHistoryIndex >= 0 ? prev[focusHistoryIndex] : null;
+      if (current === path) return prev;
+      const base = focusHistoryIndex >= 0 ? prev.slice(0, focusHistoryIndex + 1) : [];
+      const next = [...base, path].slice(-24);
+      setFocusHistoryIndex(next.length - 1);
+      return next;
+    });
+  }, [focusHistoryIndex]);
 
   const handleFileClick = useCallback(
-    (path: string) => {
+    (path: string, source: FocusSource = { kind: "file", path }) => {
       setMode("file");
       setFocusFile(path);
-      selectFileDetail(path);
+      setFocusSource(source);
+      setHoverPreviewFile(null);
+      setStreetViewMode("dialog");
+      rememberFocusFile(path);
+      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
     },
-    [selectFileDetail],
+    [rememberFocusFile],
   );
 
   const handleFileDblClick = useCallback(
@@ -234,30 +403,6 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
     [imports, zones],
   );
 
-  const cycleSet = useMemo(() => (imports ? filesInCycles(imports) : new Set<string>()), [imports]);
-
-  const exploreRows = useMemo(() => {
-    if (!imports) return [];
-    const q = search.trim().toLowerCase();
-    let rows = allFiles.map((path) => ({
-      path,
-      zoneId: fileToZoneId(path, zones),
-      inD: inDegree.get(path) ?? 0,
-      outD: outDegree.get(path) ?? 0,
-      inCycle: cycleSet.has(path),
-    }));
-    if (zoneFilter) rows = rows.filter((r) => r.zoneId === zoneFilter);
-    if (q) rows = rows.filter((r) => r.path.toLowerCase().includes(q));
-    const cmp = (a: (typeof rows)[0], b: (typeof rows)[0]) => {
-      if (exploreSort === "path") return a.path.localeCompare(b.path);
-      if (exploreSort === "in") return b.inD - a.inD || a.path.localeCompare(b.path);
-      if (exploreSort === "out") return b.outD - a.outD || a.path.localeCompare(b.path);
-      return b.inD + b.outD - (a.inD + a.outD) || a.path.localeCompare(b.path);
-    };
-    rows.sort(cmp);
-    return rows;
-  }, [imports, allFiles, zones, zoneFilter, search, exploreSort, inDegree, outDegree, cycleSet]);
-
   const zoneCards = useMemo(() => {
     if (!zones) return [];
     return [...zones.zones]
@@ -271,36 +416,106 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
       const p = defaultFocusPathInZone(imports, zoneId, zones);
       if (!p) return;
       setZoneFilter(zoneId);
-      setPageTab("graph");
       setMode("file");
       setFocusFile(p);
-      selectFileDetail(p);
+      setFocusSource({ kind: "zone", zoneId });
+      setFocusHistory([p]);
+      setFocusHistoryIndex(0);
+      setHoverPreviewFile(null);
+      setCodebaseMapExpanded(false);
+      setStreetViewMode("closed");
+      requestAnimationFrame(() => {
+        const scrollIntoView = heroRef.current?.scrollIntoView;
+        if (typeof scrollIntoView === "function") scrollIntoView.call(heroRef.current, { behavior: "smooth", block: "nearest" });
+      });
     },
-    [imports, zones, selectFileDetail],
+    [imports, zones],
   );
 
   const drillFileToGraph = useCallback(
-    (path: string) => {
-      setPageTab("graph");
-      handleFileClick(path);
+    (path: string, source: FocusSource = { kind: "file", path }) => {
+      handleFileClick(path, source);
     },
     [handleFileClick],
   );
 
-  const filteredFileList = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return allFiles;
-    return allFiles.filter((p) => p.toLowerCase().includes(q));
-  }, [allFiles, search]);
-
-  const toggleImportType = useCallback((t: ImportType) => {
-    setImportTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
-      if (next.size === 0) return new Set(allImportTypes());
+  const moveFocusHistory = useCallback((direction: -1 | 1) => {
+    setFocusHistoryIndex((current) => {
+      const next = current + direction;
+      if (next < 0 || next >= focusHistory.length) return current;
+      const path = focusHistory[next];
+      setMode("file");
+      setFocusFile(path);
+      setFocusSource({ kind: "file", path });
+      setHoverPreviewFile(null);
+      setStreetViewMode("dialog");
+      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
       return next;
     });
+  }, [focusHistory]);
+
+  const updateSurfaceView = useCallback((surface: SurfaceKind, updater: (view: Viewport) => Viewport) => {
+    if (surface === "codebase") setCodebaseView(updater);
+    else if (surface === "zone") setZoneView(updater);
+    else setDepView(updater);
+  }, []);
+
+  const viewFor = useCallback((surface: SurfaceKind) => {
+    if (surface === "codebase") return codebaseView;
+    if (surface === "zone") return zoneView;
+    return depView;
+  }, [codebaseView, zoneView, depView]);
+
+  const beginPan = useCallback((surface: SurfaceKind, event: PointerEvent) => {
+    if (event.button !== 0) return;
+    (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+    setDragState({ kind: "pan", surface, startX: event.clientX, startY: event.clientY, origin: viewFor(surface) });
+  }, [viewFor]);
+
+  const handlePointerMove = useCallback((event: PointerEvent) => {
+    if (!dragState) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (Math.hypot(dx, dy) > 4) suppressNodeClickRef.current = true;
+    if (dragState.kind === "pan") {
+      updateSurfaceView(dragState.surface, () => panViewport(dragState.origin, dx, dy));
+      return;
+    }
+    if (dragState.kind === "zone-node") {
+      const next = offsetFromDrag(dx, dy, codebaseView);
+      setZoneNodeOffsets((prev) => ({ ...prev, [dragState.id]: { x: dragState.origin.x + next.x, y: dragState.origin.y + next.y } }));
+      return;
+    }
+    if (dragState.kind === "file-node") {
+      const next = offsetFromDrag(dx, dy, zoneView);
+      setFileNodeOffsets((prev) => ({ ...prev, [dragState.path]: { x: dragState.origin.x + next.x, y: dragState.origin.y + next.y } }));
+      return;
+    }
+    const next = offsetFromDrag(dx, dy, depView);
+    setDepNodeOffsets((prev) => ({ ...prev, [dragState.id]: { x: dragState.origin.x + next.x, y: dragState.origin.y + next.y } }));
+  }, [codebaseView, depView, dragState, updateSurfaceView, zoneView]);
+
+  const endDrag = useCallback(() => setDragState(null), []);
+
+  const openHoverPreview = useCallback((path: string, side: "left" | "right" = "right") => {
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+    setHoverPreviewFile(path);
+    setHoverPreviewSide(side);
+    setMode("file");
+    setFocusFile(path);
+    setFocusSource({ kind: "file", path });
+    setStreetViewMode((current) => current === "dialog" ? current : "preview");
+  }, []);
+
+  const closeHoverPreview = useCallback((path: string) => {
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+    hoverCloseTimerRef.current = setTimeout(() => {
+      setHoverPreviewFile((current) => {
+        if (current !== path) return current;
+        setStreetViewMode((mode) => mode === "preview" ? "closed" : mode);
+        return null;
+      });
+    }, 120);
   }, []);
 
   if (!imports) {
@@ -323,35 +538,415 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
   const summary = imports.summary;
   const fileCount = allFiles.length;
   const extList = [...imports.external].sort((a, b) => a.package.localeCompare(b.package));
+  const focusInv = focusFile ? inventoryMap.get(focusFile) : undefined;
+  const focusZoneId = focusFile ? fileToZoneId(focusFile, zones) : null;
+  const focusZoneName = focusZoneId && zones ? zones.zones.find((z) => z.id === focusZoneId)?.name : undefined;
+  const focusPackageImporters = focusPackage ? findExternal(imports, focusPackage)?.importedBy.length ?? 0 : 0;
+  const activeZoneName = zoneFilter && zones ? zoneDisplayName(zones, zoneFilter) : null;
+  const activeZone = zoneFilter && zones ? zones.zones.find((z) => z.id === zoneFilter) : null;
+  const activeZoneFiles = activeZone ? new Set(activeZone.files) : null;
+  const activeZoneNetworkW = 980;
+  const activeZoneNetworkH = 640;
+  const activeZoneBoundaryByFile = new Map<string, { incoming: string[]; outgoing: string[] }>();
+  const activeZoneBoundaryLinks: {
+    edge: (typeof imports.edges)[number];
+    filePath: string;
+    externalZoneId: string;
+    externalZoneName: string;
+    direction: "incoming" | "outgoing";
+  }[] = [];
+  if (activeZoneFiles && zones) {
+    for (const edge of imports.edges) {
+      const fromInside = activeZoneFiles.has(edge.from);
+      const toInside = activeZoneFiles.has(edge.to);
+      if (fromInside === toInside) continue;
+      const path = fromInside ? edge.from : edge.to;
+      const entry = activeZoneBoundaryByFile.get(path) ?? { incoming: [], outgoing: [] };
+      if (fromInside) {
+        const toZone = fileToZoneId(edge.to, zones);
+        if (toZone) {
+          const name = zoneDisplayName(zones, toZone);
+          entry.outgoing.push(name);
+          activeZoneBoundaryLinks.push({ edge, filePath: path, externalZoneId: toZone, externalZoneName: name, direction: "outgoing" });
+        }
+      } else {
+        const fromZone = fileToZoneId(edge.from, zones);
+        if (fromZone) {
+          const name = zoneDisplayName(zones, fromZone);
+          entry.incoming.push(name);
+          activeZoneBoundaryLinks.push({ edge, filePath: path, externalZoneId: fromZone, externalZoneName: name, direction: "incoming" });
+        }
+      }
+      activeZoneBoundaryByFile.set(path, entry);
+    }
+  }
+  const boundaryLinkCountByFile = new Map<string, number>();
+  const boundaryLinkCountByZone = new Map<string, number>();
+  for (const link of activeZoneBoundaryLinks) {
+    boundaryLinkCountByFile.set(link.filePath, (boundaryLinkCountByFile.get(link.filePath) ?? 0) + 1);
+    boundaryLinkCountByZone.set(link.externalZoneId, (boundaryLinkCountByZone.get(link.externalZoneId) ?? 0) + 1);
+  }
+  const activeZoneFileRank = activeZone
+    ? [...activeZone.files].sort((a, b) =>
+        (boundaryLinkCountByFile.get(b) ?? 0) - (boundaryLinkCountByFile.get(a) ?? 0) ||
+        (inDegree.get(b) ?? 0) + (outDegree.get(b) ?? 0) - ((inDegree.get(a) ?? 0) + (outDegree.get(a) ?? 0)) ||
+        a.localeCompare(b),
+      )
+    : [];
+  const activeZoneVisibleFiles: string[] = [];
+  const activeZoneVisibleSet = new Set<string>();
+  const addActiveZoneFile = (path: string) => {
+    if (activeZoneVisibleSet.has(path) || activeZoneVisibleFiles.length >= ACTIVE_ZONE_FILE_CAP) return;
+    activeZoneVisibleSet.add(path);
+    activeZoneVisibleFiles.push(path);
+  };
+  const externalZonesByTraffic = [...boundaryLinkCountByZone.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  for (const [externalZoneId] of externalZonesByTraffic) {
+    const bestLink = activeZoneBoundaryLinks
+      .filter((link) => link.externalZoneId === externalZoneId)
+      .sort((a, b) =>
+        (boundaryLinkCountByFile.get(b.filePath) ?? 0) - (boundaryLinkCountByFile.get(a.filePath) ?? 0) ||
+        activeZoneFileRank.indexOf(a.filePath) - activeZoneFileRank.indexOf(b.filePath),
+      )[0];
+    if (bestLink) addActiveZoneFile(bestLink.filePath);
+  }
+  for (const path of activeZoneFileRank) addActiveZoneFile(path);
+  const visibleBoundaryLinks = activeZoneBoundaryLinks.filter((link) => activeZoneVisibleSet.has(link.filePath));
+  const activeZoneConnectionFocus = streetViewMode === "dialog" && focusFile && activeZoneVisibleSet.has(focusFile)
+    ? focusFile
+    : null;
+  const hoveredZoneFile = hoverPreviewFile && activeZoneVisibleSet.has(hoverPreviewFile)
+    ? hoverPreviewFile
+    : null;
+  const activeZoneRouteFocus = hoveredZoneFile ?? activeZoneConnectionFocus;
+  const activeZoneLayoutFocus = activeZoneConnectionFocus;
+  const routeFocusLinks = activeZoneRouteFocus
+    ? visibleBoundaryLinks.filter((link) => link.filePath === activeZoneRouteFocus).slice(0, 8)
+    : [];
+  const externalFocusLinks = hoverExternalZoneId
+    ? visibleBoundaryLinks.filter((link) => link.externalZoneId === hoverExternalZoneId).slice(0, 12)
+    : [];
+  const layoutFocusLinks = activeZoneLayoutFocus
+    ? visibleBoundaryLinks.filter((link) => link.filePath === activeZoneLayoutFocus).slice(0, 8)
+    : [];
+  const routeFocusFileEdges = activeZoneRouteFocus
+    ? imports.edges.filter((e) => activeZoneVisibleSet.has(e.from) && activeZoneVisibleSet.has(e.to) && (e.from === activeZoneRouteFocus || e.to === activeZoneRouteFocus))
+    : [];
+  const activeZoneRouteFileEdges = routeFocusFileEdges;
+  const activeZoneRouteFileSet = new Set(activeZoneRouteFileEdges.flatMap((edge) => [edge.from, edge.to]));
+  const activeZoneRouteLinkSet = new Set(routeFocusLinks.map((link) => `${link.edge.from}->${link.edge.to}:${link.edge.type}`));
+  const activeZoneExternalRouteLinkSet = new Set(externalFocusLinks.map((link) => `${link.edge.from}->${link.edge.to}:${link.edge.type}`));
+  const activeZoneRouteNodeSet = new Set<string>([
+    ...(activeZoneRouteFocus ? [activeZoneRouteFocus] : []),
+    ...activeZoneRouteFileSet,
+    ...routeFocusLinks.map((link) => link.filePath),
+    ...externalFocusLinks.map((link) => link.filePath),
+  ]);
+  const mapHasRouteFocus = activeZoneRouteNodeSet.size > 0 || activeZoneRouteLinkSet.size > 0 || activeZoneExternalRouteLinkSet.size > 0;
+  const activeZoneFocusNode = activeZoneRouteFocus ?? (focusFile && activeZoneVisibleSet.has(focusFile)
+      ? focusFile
+      : null);
+  const representativeBoundaryLinks = [...visibleBoundaryLinks]
+    .sort((a, b) =>
+      (boundaryLinkCountByZone.get(b.externalZoneId) ?? 0) - (boundaryLinkCountByZone.get(a.externalZoneId) ?? 0) ||
+      (boundaryLinkCountByFile.get(b.filePath) ?? 0) - (boundaryLinkCountByFile.get(a.filePath) ?? 0) ||
+      a.filePath.localeCompare(b.filePath),
+    )
+    .filter((link, index, links) =>
+      links.findIndex((candidate) => candidate.externalZoneId === link.externalZoneId && candidate.direction === link.direction) === index,
+    );
+  const boundaryLinksForMap = hoverExternalZoneId ? externalFocusLinks : routeFocusLinks;
+  const boundaryLinksForLayout = [
+    ...representativeBoundaryLinks.slice(0, 8),
+    ...layoutFocusLinks,
+  ].filter((link, index, links) => links.findIndex((candidate) => candidate.edge === link.edge) === index);
+  const activeZoneExternalStats = new Map<string, { name: string; fromExternal: number; toExternal: number }>();
+  for (const link of boundaryLinksForLayout) {
+    const stat = activeZoneExternalStats.get(link.externalZoneId) ?? { name: link.externalZoneName, fromExternal: 0, toExternal: 0 };
+    if (link.direction === "incoming") stat.fromExternal += 1;
+    else stat.toExternal += 1;
+    activeZoneExternalStats.set(link.externalZoneId, stat);
+  }
+  const activeZoneOrderedFiles = [...activeZoneVisibleFiles].sort((a, b) =>
+    (boundaryLinkCountByFile.get(b) ?? 0) - (boundaryLinkCountByFile.get(a) ?? 0) ||
+    (inDegree.get(b) ?? 0) + (outDegree.get(b) ?? 0) - ((inDegree.get(a) ?? 0) + (outDegree.get(a) ?? 0)) ||
+    a.localeCompare(b),
+  );
+  const activeZoneDirectoryGroups = activeZone
+    ? [...activeZone.files]
+        .filter((path) => !activeZoneVisibleSet.has(path))
+        .reduce((groups, path) => {
+          const dir = workingDirectory(path);
+          const entry = groups.get(dir) ?? { id: `dir:${dir}`, dir, count: 0 };
+          entry.count += 1;
+          groups.set(dir, entry);
+          return groups;
+        }, new Map<string, { id: string; dir: string; count: number }>())
+    : new Map<string, { id: string; dir: string; count: number }>();
+  const activeZoneNetworkNodesBase = activeZoneOrderedFiles.map((path, i) => {
+    const angle = -Math.PI / 2 + (i / Math.max(1, activeZoneOrderedFiles.length)) * Math.PI * 2;
+    const ring = activeZoneBoundaryByFile.has(path) ? 0.36 : 0.20;
+    return {
+      path,
+      x: activeZoneNetworkW / 2 + Math.cos(angle) * activeZoneNetworkW * ring,
+      y: activeZoneNetworkH / 2 + Math.sin(angle) * activeZoneNetworkH * ring * 0.82,
+      degree: (inDegree.get(path) ?? 0) + (outDegree.get(path) ?? 0),
+    };
+  });
+  const activeZoneDirectoryNodesBase = [...activeZoneDirectoryGroups.values()]
+    .sort((a, b) => b.count - a.count || a.dir.localeCompare(b.dir))
+    .slice(0, 10)
+    .map((group, i, arr) => {
+      const angle = Math.PI / 2 + (i / Math.max(1, arr.length)) * Math.PI * 2;
+      return {
+        ...group,
+        x: activeZoneNetworkW / 2 + Math.cos(angle) * activeZoneNetworkW * 0.31,
+        y: activeZoneNetworkH / 2 + Math.sin(angle) * activeZoneNetworkH * 0.28,
+      };
+    });
+  const activeZoneNetworkNodeBaseByPath = new Map(activeZoneNetworkNodesBase.map((n) => [n.path, n]));
+  const activeZoneExternalNodesBase = [...activeZoneExternalStats.entries()]
+    .sort((a, b) => b[1].fromExternal + b[1].toExternal - (a[1].fromExternal + a[1].toExternal) || a[1].name.localeCompare(b[1].name))
+    .slice(0, 8)
+    .map(([id, stat], i, arr) => {
+      const connected = visibleBoundaryLinks
+        .filter((link) => link.externalZoneId === id)
+        .map((link) => activeZoneNetworkNodeBaseByPath.get(link.filePath))
+        .filter((node): node is NonNullable<typeof node> => node !== undefined);
+      const centroid = connected.length
+        ? {
+            x: connected.reduce((sum, node) => sum + node.x, 0) / connected.length,
+            y: connected.reduce((sum, node) => sum + node.y, 0) / connected.length,
+          }
+        : { x: activeZoneNetworkW / 2, y: activeZoneNetworkH / 2 };
+      const dx = centroid.x - activeZoneNetworkW / 2;
+      const dy = centroid.y - activeZoneNetworkH / 2;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      const fallbackAngle = -Math.PI / 2 + (i / Math.max(1, arr.length)) * Math.PI * 2;
+      return {
+        id,
+        name: stat.name,
+        fromExternal: stat.fromExternal,
+        toExternal: stat.toExternal,
+        x: activeZoneNetworkW / 2 + (connected.length ? dx / dist : Math.cos(fallbackAngle)) * activeZoneNetworkW * 0.44,
+        y: activeZoneNetworkH / 2 + (connected.length ? dy / dist : Math.sin(fallbackAngle)) * activeZoneNetworkH * 0.40,
+      };
+    });
+  for (let iter = 0; iter < 90; iter += 1) {
+    const allNodes = [
+      ...activeZoneNetworkNodesBase.map((node) => ({ node, r: Math.hypot(ZONE_FILE_NODE_W, ZONE_FILE_NODE_H) / 2, external: false })),
+      ...activeZoneDirectoryNodesBase.map((node) => ({ node, r: Math.hypot(ZONE_DIR_NODE_W, ZONE_DIR_NODE_H) / 2, external: false })),
+      ...activeZoneExternalNodesBase.map((node) => ({ node, r: Math.hypot(ZONE_EXTERNAL_NODE_W, ZONE_EXTERNAL_NODE_H) / 2, external: true })),
+    ] as Array<{ node: { x: number; y: number }; r: number; external: boolean }>;
+    for (let i = 0; i < allNodes.length; i += 1) {
+      for (let j = i + 1; j < allNodes.length; j += 1) {
+        const a = allNodes[i];
+        const b = allNodes[j];
+        const dx = b.node.x - a.node.x || 0.1;
+        const dy = b.node.y - a.node.y || 0.1;
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const minDist = a.r + b.r + (a.external || b.external ? 34 : 24);
+        if (dist >= minDist) continue;
+        const push = (minDist - dist) / dist / 2;
+        a.node.x -= dx * push;
+        a.node.y -= dy * push;
+        b.node.x += dx * push;
+        b.node.y += dy * push;
+      }
+    }
+    for (const edge of imports.edges.filter((e) => activeZoneVisibleSet.has(e.from) && activeZoneVisibleSet.has(e.to))) {
+      const from = activeZoneNetworkNodeBaseByPath.get(edge.from);
+      const to = activeZoneNetworkNodeBaseByPath.get(edge.to);
+      if (!from || !to) continue;
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      from.x += dx * 0.004;
+      from.y += dy * 0.004;
+      to.x -= dx * 0.004;
+      to.y -= dy * 0.004;
+    }
+    const externalById = new Map(activeZoneExternalNodesBase.map((node) => [node.id, node]));
+    for (const link of boundaryLinksForLayout) {
+      const fileNode = activeZoneNetworkNodeBaseByPath.get(link.filePath);
+      const zoneNode = externalById.get(link.externalZoneId);
+      if (!fileNode || !zoneNode) continue;
+      const dx = zoneNode.x - fileNode.x;
+      const dy = zoneNode.y - fileNode.y;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      const target = 190;
+      const pull = (dist - target) / dist * 0.01;
+      fileNode.x += dx * pull;
+      fileNode.y += dy * pull;
+      zoneNode.x -= dx * pull;
+      zoneNode.y -= dy * pull;
+    }
+    for (const node of activeZoneNetworkNodesBase) {
+      node.x += (activeZoneNetworkW / 2 - node.x) * 0.002;
+      node.y += (activeZoneNetworkH / 2 - node.y) * 0.002;
+      node.x = clamp(node.x, ZONE_FILE_NODE_W / 2 + 14, activeZoneNetworkW - ZONE_FILE_NODE_W / 2 - 14);
+      node.y = clamp(node.y, ZONE_FILE_NODE_H / 2 + 18, activeZoneNetworkH - ZONE_FILE_NODE_H / 2 - 26);
+    }
+    for (const node of activeZoneDirectoryNodesBase) {
+      node.x += (activeZoneNetworkW / 2 - node.x) * 0.0015;
+      node.y += (activeZoneNetworkH / 2 - node.y) * 0.0015;
+      node.x = clamp(node.x, ZONE_DIR_NODE_W / 2 + 14, activeZoneNetworkW - ZONE_DIR_NODE_W / 2 - 14);
+      node.y = clamp(node.y, ZONE_DIR_NODE_H / 2 + 18, activeZoneNetworkH - ZONE_DIR_NODE_H / 2 - 26);
+    }
+    for (const node of activeZoneExternalNodesBase) {
+      const dx = node.x - activeZoneNetworkW / 2 || 0.1;
+      const dy = node.y - activeZoneNetworkH / 2 || 0.1;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      const targetX = activeZoneNetworkW / 2 + (dx / dist) * activeZoneNetworkW * 0.46;
+      const targetY = activeZoneNetworkH / 2 + (dy / dist) * activeZoneNetworkH * 0.41;
+      node.x += (targetX - node.x) * 0.018;
+      node.y += (targetY - node.y) * 0.018;
+      node.x = clamp(node.x, ZONE_EXTERNAL_NODE_W / 2 + 16, activeZoneNetworkW - ZONE_EXTERNAL_NODE_W / 2 - 16);
+      node.y = clamp(node.y, ZONE_EXTERNAL_NODE_H / 2 + 16, activeZoneNetworkH - ZONE_EXTERNAL_NODE_H / 2 - 22);
+    }
+  }
+  const activeZoneNetworkNodes = activeZoneNetworkNodesBase.map((node) => {
+    const offset = fileNodeOffsets[node.path] ?? { x: 0, y: 0 };
+    return { ...node, x: node.x + offset.x, y: node.y + offset.y };
+  });
+  const activeZoneExternalNodes = activeZoneExternalNodesBase.map((node) => {
+    const offset = fileNodeOffsets[`zone:${node.id}`] ?? { x: 0, y: 0 };
+    return { ...node, x: node.x + offset.x, y: node.y + offset.y };
+  });
+  const activeZoneDirectoryNodes = activeZoneDirectoryNodesBase.map((node) => {
+    const offset = fileNodeOffsets[node.id] ?? { x: 0, y: 0 };
+    return { ...node, x: node.x + offset.x, y: node.y + offset.y };
+  });
+  const activeZoneNetworkNodeByPath = new Map(activeZoneNetworkNodes.map((n) => [n.path, n]));
+  const activeZoneExternalNodeById = new Map(activeZoneExternalNodes.map((n) => [n.id, n]));
+  const activeZoneNetworkEdges = activeZone
+    ? imports.edges
+        .filter((e) => activeZoneVisibleSet.has(e.from) && activeZoneVisibleSet.has(e.to))
+        .filter((e) => activeZoneRouteFocus ? e.from === activeZoneRouteFocus || e.to === activeZoneRouteFocus : false)
+        .sort((a, b) =>
+          (inDegree.get(b.from) ?? 0) + (outDegree.get(b.from) ?? 0) + (inDegree.get(b.to) ?? 0) + (outDegree.get(b.to) ?? 0) -
+          ((inDegree.get(a.from) ?? 0) + (outDegree.get(a.from) ?? 0) + (inDegree.get(a.to) ?? 0) + (outDegree.get(a.to) ?? 0)) ||
+          a.from.localeCompare(b.from) ||
+          a.to.localeCompare(b.to),
+        )
+        .slice(0, activeZoneRouteFocus ? 10 : 6)
+    : [];
+  const activeZoneCrossZoneEdges = activeZone && zones
+    ? boundaryLinksForMap
+        .map((edge) => {
+          const fromInside = edge.direction === "outgoing";
+          const fileNode = activeZoneNetworkNodeByPath.get(edge.filePath);
+          const zoneNode = activeZoneExternalNodeById.get(edge.externalZoneId);
+          if (!fileNode || !zoneNode) return null;
+          return { ...edge.edge, fromInside, fileNode, zoneNode };
+        })
+        .filter((edge): edge is NonNullable<typeof edge> => edge !== null)
+        .slice(0, 72)
+    : [];
+  const activeZoneInternalEdges = activeZoneFiles
+    ? imports.edges.filter((e) => activeZoneFiles.has(e.from) && activeZoneFiles.has(e.to)).length
+    : 0;
+  const activeZoneOutbound = zoneFilter
+    ? zoneFlows.filter((f) => f.fromZone === zoneFilter).reduce((sum, f) => sum + f.count, 0)
+    : 0;
+  const activeZoneInbound = zoneFilter
+    ? zoneFlows.filter((f) => f.toZone === zoneFilter).reduce((sum, f) => sum + f.count, 0)
+    : 0;
+  const activeZoneBoundaryFlows = zoneFilter
+    ? zoneFlows.filter((f) => f.fromZone === zoneFilter || f.toZone === zoneFilter).slice(0, 8)
+    : zoneFlows.slice(0, 8);
+  const zoneBoundaryStats = new Map<string, { in: number; out: number }>();
+  for (const flow of zoneFlows) {
+    const from = zoneBoundaryStats.get(flow.fromZone) ?? { in: 0, out: 0 };
+    from.out += flow.count;
+    zoneBoundaryStats.set(flow.fromZone, from);
+    const to = zoneBoundaryStats.get(flow.toZone) ?? { in: 0, out: 0 };
+    to.in += flow.count;
+    zoneBoundaryStats.set(flow.toZone, to);
+  }
+  const zoneMapW = 920;
+  const zoneMapH = 360;
+  const zoneMapZones = zoneCards.slice(0, 10);
+  const zoneMapNodes = layoutZoneMapNodes(
+    zoneMapZones,
+    zoneFlows,
+    (id) => zoneBoundaryStats.get(id) ?? { in: 0, out: 0 },
+    zoneMapW,
+    zoneMapH,
+  ).map((zone) => {
+    const offset = zoneNodeOffsets[zone.id] ?? { x: 0, y: 0 };
+    return { ...zone, x: zone.x + offset.x, y: zone.y + offset.y };
+  });
+  const zoneMapNodeById = new Map(zoneMapNodes.map((node) => [node.id, node]));
+  const zoneMapFlows = zoneFlows
+    .filter((flow) => zoneMapNodeById.has(flow.fromZone) && zoneMapNodeById.has(flow.toZone))
+    .slice(0, 12)
+    .map((flow, i) => {
+      const from = zoneMapNodeById.get(flow.fromZone)!;
+      const to = zoneMapNodeById.get(flow.toZone)!;
+      const midX = (from.x + to.x) / 2;
+      const midY = (from.y + to.y) / 2 - 30 - (i % 3) * 10;
+      return { ...flow, from, to, midX, midY };
+    });
+  const graphNodeCount = layoutNodes?.length ?? 0;
+  const graphScopeLabel = mode === "package"
+    ? "external package importers"
+    : activeZoneName
+      ? `${activeZoneName} neighborhood`
+      : "selected file neighborhood";
+  const focusReason =
+    focusSource.kind === "zone" && zones
+      ? `Driven by zone: ${zoneDisplayName(zones, focusSource.zoneId)}`
+      : focusSource.kind === "hub"
+        ? `Driven by hub: ${basename(focusSource.path)}`
+        : focusSource.kind === "file"
+          ? `Driven by file: ${basename(focusSource.path)}`
+          : focusSource.kind === "package"
+            ? `Driven by package: ${focusSource.packageName}`
+            : focusSource.kind === "cycle"
+              ? `Driven by cycle: ${basename(focusSource.path)}`
+              : "Default starting point";
+  const canGoBack = focusHistoryIndex > 0;
+  const canGoForward = focusHistoryIndex >= 0 && focusHistoryIndex < focusHistory.length - 1;
 
-  const edgePaths: { d: string; cross: boolean; key: string }[] = [];
+  const edgePaths: { d: string; cross: boolean; key: string; label?: string; labelX?: number; labelY?: number }[] = [];
   const kindOf = (id: string): NodeKind => nodeKindById.get(id) ?? "file";
 
   const svgW = svgDims.w;
   const svgH = svgDims.h;
+  const visualPosMap = new Map(posMap);
+  for (const [id, offset] of Object.entries(depNodeOffsets)) {
+    const pos = visualPosMap.get(id);
+    if (pos) visualPosMap.set(id, { x: pos.x + offset.x, y: pos.y + offset.y });
+  }
 
   if (mode === "file" && subgraph) {
     const { edges } = subgraph;
     for (const e of edges) {
-      const a = posMap.get(e.from);
-      const b = posMap.get(e.to);
+      const a = visualPosMap.get(e.from);
+      const b = visualPosMap.get(e.to);
       if (!a || !b) continue;
       const wFrom = nodeHalfWidth(kindOf(e.from));
       const wTo = nodeHalfWidth(kindOf(e.to));
+      const fromZone = fileToZoneId(e.from, zones);
+      const toZone = fileToZoneId(e.to, zones);
+      const cross = isCrossZoneEdge(e.from, e.to, zones);
       edgePaths.push({
         key: `${e.from}->${e.to}:${e.type}`,
         d: elbowPath(a.x + wFrom, a.y, b.x - wTo, b.y),
-        cross: isCrossZoneEdge(e.from, e.to, zones),
+        cross,
+        label: cross && zones && fromZone && toZone ? `${zoneDisplayName(zones, fromZone)} -> ${zoneDisplayName(zones, toZone)}` : undefined,
+        labelX: (a.x + b.x) / 2,
+        labelY: (a.y + b.y) / 2 - 8,
       });
     }
   } else if (mode === "package" && packageSubgraph && focusPackage) {
     const pkgId = `pkg:${focusPackage}`;
-    const pkgPos = posMap.get(pkgId);
+    const pkgPos = visualPosMap.get(pkgId);
     if (pkgPos) {
       const wPkg = nodeHalfWidth("package");
       const wFile = nodeHalfWidth("file");
       for (const f of packageSubgraph.files.slice(0, 48)) {
-        const fp = posMap.get(f);
+        const fp = visualPosMap.get(f);
         if (!fp) continue;
         edgePaths.push({
           key: `${f}->${pkgId}`,
@@ -361,300 +956,495 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
       }
     }
   }
+  const graphEdgeCount = edgePaths.length;
+  const graphCrossEdgeCount = edgePaths.filter((edge) => edge.cross).length;
 
-  const hubList = (summary.mostImported ?? []).slice(0, 12);
-  const cycleList = (summary.circulars ?? []).slice(0, 8);
-
-  const shownExplore = exploreRows.length > EXPLORE_ROW_CAP ? EXPLORE_ROW_CAP : exploreRows.length;
-
-  return h("div", { class: "ig-page" },
+  return h("div", {
+    ref: pageRef,
+    class: "ig-page",
+    onWheelCapture: (event: WheelEvent) => {
+      const scrollParent = pageRef.current?.closest(".main") as HTMLElement | null;
+      const scrollTop = scrollParent?.scrollTop ?? window.scrollY;
+      if (
+        zoneFilter &&
+        !codebaseMapExpanded &&
+        event.deltaY < -4 &&
+        scrollTop <= CODEBASE_MAP_EXPAND_TOP_PX
+      ) {
+        setCodebaseMapExpanded(true);
+      } else if (zoneFilter && codebaseMapExpanded && event.deltaY > 4) {
+        setCodebaseMapExpanded(false);
+      }
+    },
+  },
     h("div", { class: "view-header" },
       h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
     ),
 
-    h("header", { class: "ig-topbar" },
-      h("div", { class: "ig-topbar-row" },
-        h("div", { class: "ig-topbar-lead" },
-          h("h2", { class: "ig-page-title" }, "Import Graph"),
-          h("p", { class: "ig-topbar-metrics" },
-            `${fileCount.toLocaleString()} files · ${summary.totalEdges.toLocaleString()} edges · `,
-            `${summary.totalExternal.toLocaleString()} package${summary.totalExternal === 1 ? "" : "s"} · `,
-            `${summary.circularCount} cycle${summary.circularCount === 1 ? "" : "s"}`,
-            zones ? ` · ${zones.zones.length} zones` : "",
-          ),
-        ),
-        h("div", { class: "ig-segments", role: "tablist", "aria-label": "Import graph mode" },
-          h("button", {
-            type: "button",
-            role: "tab",
-            id: "ig-tab-explore",
-            "aria-selected": pageTab === "explore",
-            "aria-controls": "ig-explore-panel",
-            class: `ig-segment${pageTab === "explore" ? " ig-segment-active" : ""}`,
-            onClick: () => setPageTab("explore"),
-          }, "Explore codebase"),
-          h("button", {
-            type: "button",
-            role: "tab",
-            id: "ig-tab-graph",
-            "aria-selected": pageTab === "graph",
-            "aria-controls": "ig-graph-panel",
-            class: `ig-segment${pageTab === "graph" ? " ig-segment-active" : ""}`,
-            onClick: () => {
-              setPageTab("graph");
-              if (!focusFile) setFocusFile(defaultFocusPath(imports));
+    h("section", { class: `ig-explore${activeZone ? " ig-explore-selected" : ""}`, id: "ig-explore-panel", "aria-label": "Choose a zone to inspect" },
+      h("div", { class: `ig-codebase-morph${activeZone && !codebaseMapExpanded ? " ig-codebase-morph-mini" : " ig-codebase-morph-full"}` },
+        h("div", {
+            class: "ig-codebase-mini",
+            role: "navigation",
+            "aria-label": "Codebase mini selector",
+            onWheel: (event: WheelEvent) => {
+              const scrollParent = pageRef.current?.closest(".main") as HTMLElement | null;
+              const scrollTop = scrollParent?.scrollTop ?? window.scrollY;
+              if (event.deltaY < 0 && scrollTop <= CODEBASE_MAP_EXPAND_TOP_PX) setCodebaseMapExpanded(true);
             },
-          }, "File graph"),
-        ),
-      ),
-      h("p", { class: "ig-topbar-hint" },
-        pageTab === "explore"
-          ? "Scan every file, sort by traffic, filter by zone, then open the local graph when you are ready."
-          : "Neighborhood view around one file or package — tune depth and edge types to match what you need.",
-      ),
-    ),
-
-    pageTab === "explore"
-      ? h("div", { class: "ig-explore", id: "ig-explore-panel", role: "tabpanel", "aria-labelledby": "ig-tab-explore" },
-          h("div", { class: "ig-explore-toolbar" },
-            h("label", { class: "ig-field" },
-              "Sort by",
-              h("select", {
-                value: exploreSort,
-                onChange: (e: Event) => setExploreSort((e.target as HTMLSelectElement).value as ExploreSort),
+          },
+            h("button", {
+              type: "button",
+              class: "ig-mini-reset",
+              onClick: () => {
+                setCodebaseMapExpanded(true);
               },
-                h("option", { value: "total" }, "Total degree (in + out)"),
-                h("option", { value: "in" }, "Incoming imports"),
-                h("option", { value: "out" }, "Outgoing imports"),
-                h("option", { value: "path" }, "Path A–Z"),
-              ),
-            ),
-            zoneFilter
-              ? h("button", {
+            }, "Codebase map"),
+            h("div", { class: "ig-mini-zones" },
+              ...zoneMapZones.slice(0, 8).map((zone) => {
+                const stats = zoneBoundaryStats.get(zone.id) ?? { in: 0, out: 0 };
+                return h("button", {
+                  key: zone.id,
                   type: "button",
-                  class: "ig-btn-secondary",
-                  onClick: () => setZoneFilter(""),
-                }, "Clear zone filter")
-              : null,
-            h("span", { class: "ig-explore-count" },
-              `${shownExplore.toLocaleString()} shown`,
-              exploreRows.length !== allFiles.length || exploreRows.length > EXPLORE_ROW_CAP
-                ? ` · ${exploreRows.length.toLocaleString()} match${exploreRows.length === 1 ? "" : "es"}`
-                : "",
-              exploreRows.length > EXPLORE_ROW_CAP ? ` (cap ${EXPLORE_ROW_CAP})` : "",
+                  class: `ig-mini-zone${zoneFilter === zone.id ? " ig-mini-zone-active" : ""}`,
+                  title: `${zone.name}: ${zone.n} files, ${stats.in} in / ${stats.out} out`,
+                  onClick: () => openZoneInGraph(zone.id),
+                }, zone.name);
+              }),
+            ),
+            h("span", { class: "ig-mini-current" },
+              activeZone ? `${activeZone.name} · ${activeZoneInbound} in / ${activeZoneOutbound} out` : "All zones",
             ),
           ),
-          h("div", { class: "ig-search-wrap ig-search-wrap--explore" },
-            h(SearchFilter, {
-              placeholder: "Filter by path substring…",
-              value: search,
-              onInput: setSearch,
-              resultCount: exploreRows.length,
-              totalCount: allFiles.length,
-            }),
+        h("div", { class: `ig-scope-card${activeZone ? " ig-scope-card-filtered" : ""}` },
+          h("div", { class: "ig-card-head" },
+            h("div", null,
+              h("h3", { class: "ig-explore-section-title" }, "Codebase map"),
+              h("p", { class: "ig-explore-section-desc" }, "Zones are positioned by boundary traffic. Select one to inspect its file-level map."),
+            ),
           ),
-          zoneCards.length
-            ? h("section", { class: "ig-explore-zones" },
-                h("h3", { class: "ig-explore-section-title" }, "Zones"),
-                h("p", { class: "ig-explore-section-desc" },
-                  "Filter the table to one zone, or jump straight into the graph at a hub inside that zone.",
+          h("div", { class: "ig-zone-selector-grid" },
+            h("div", { class: "ig-zone-map", "aria-label": "Zone boundary map" },
+              h("svg", {
+                viewBox: `0 0 ${zoneMapW} ${zoneMapH}`,
+                role: "img",
+                onPointerMove: handlePointerMove,
+                onPointerUp: endDrag,
+                onPointerLeave: endDrag,
+              },
+                h("defs", null,
+                  h("marker", {
+                    id: "ig-zone-map-arrow",
+                    viewBox: "0 0 10 8",
+                    refX: 9,
+                    refY: 4,
+                    markerWidth: 8,
+                    markerHeight: 6,
+                    orient: "auto",
+                  }, h("path", { d: "M 0 0 L 10 4 L 0 8 z", fill: "var(--orange)" })),
                 ),
-                h("div", { class: "ig-zone-cards" },
-                  ...zoneCards.map((z) =>
-                    h("div", { key: z.id, class: `ig-zone-card${zoneFilter === z.id ? " ig-zone-card-active" : ""}` },
-                      h("div", { class: "ig-zone-card-head" },
-                        h("span", { class: "ig-zone-card-name" }, z.name),
-                        h("span", { class: "ig-zone-card-count" }, `${z.n} files`),
-                      ),
-                      h("div", { class: "ig-zone-card-actions" },
-                        h("button", {
-                          type: "button",
-                          class: "ig-btn-secondary",
-                          onClick: () => setZoneFilter(zoneFilter === z.id ? "" : z.id),
-                        }, zoneFilter === z.id ? "Clear table filter" : "Filter table"),
-                        h("button", {
-                          type: "button",
-                          class: "ig-btn-primary",
-                          onClick: () => openZoneInGraph(z.id),
-                        }, "Open in graph"),
-                        navigateTo
-                          ? h("button", {
-                              type: "button",
-                              class: "ig-btn-ghost",
-                              onClick: () => navigateTo("zones", { zone: z.id }),
-                            }, "Zones view")
-                          : null,
+                h("g", { transform: `translate(${codebaseView.x} ${codebaseView.y}) scale(${codebaseView.k})` },
+                  h("g", { class: "ig-zone-map-flows" },
+                    ...zoneMapFlows.map((flow) =>
+                      h("g", { key: `${flow.fromZone}->${flow.toZone}` },
+                        h("path", {
+                          d: `M ${flow.from.x} ${flow.from.y} Q ${flow.midX} ${flow.midY} ${flow.to.x} ${flow.to.y}`,
+                          markerEnd: "url(#ig-zone-map-arrow)",
+                        }),
+                        h("text", { x: flow.midX, y: flow.midY - 5, textAnchor: "middle" },
+                          `${zones ? zoneDisplayName(zones, flow.fromZone) : flow.fromZone} -> ${zones ? zoneDisplayName(zones, flow.toZone) : flow.toZone}`,
+                        ),
+                        h("text", { class: "ig-zone-map-flow-count", x: flow.midX, y: flow.midY + 10, textAnchor: "middle" },
+                          `${flow.count} import${flow.count === 1 ? "" : "s"}`,
+                        ),
                       ),
                     ),
                   ),
+                  h("g", { class: "ig-zone-map-nodes" },
+                    ...zoneMapNodes.map((zone) =>
+                      {
+                        const labelLines = wrapZoneLabel(zone.name);
+                        return h("g", {
+                          key: zone.id,
+                          class: `ig-zone-map-node${zoneFilter === zone.id ? " ig-zone-map-node-active" : ""}`,
+                          transform: `translate(${zone.x}, ${zone.y})`,
+                          onPointerDown: (event: PointerEvent) => {
+                            event.stopPropagation();
+                            suppressNodeClickRef.current = false;
+                            (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+                            setDragState({
+                              kind: "zone-node",
+                              id: zone.id,
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              origin: zoneNodeOffsets[zone.id] ?? { x: 0, y: 0 },
+                            });
+                          },
+                          onClick: () => {
+                            if (suppressNodeClickRef.current) {
+                              suppressNodeClickRef.current = false;
+                              return;
+                            }
+                            openZoneInGraph(zone.id);
+                          },
+                        },
+                          h("title", null, zone.name),
+                          h("rect", { x: -58, y: -28, width: 116, height: 56, rx: 16 }),
+                          h("text", { class: "ig-zone-map-name", y: labelLines.length === 1 ? -7 : -13, textAnchor: "middle" },
+                            ...labelLines.map((line, index) =>
+                              h("tspan", { key: `${zone.id}-line-${index}`, x: 0, dy: index === 0 ? 0 : 12 }, line),
+                            ),
+                          ),
+                          h("text", { class: "ig-zone-map-meta", y: 17, textAnchor: "middle" },
+                            `${zone.n} files`,
+                          ),
+                        );
+                      }
+                    ),
+                  ),
                 ),
-              )
-            : null,
-          zoneFlows.length
-            ? h("section", { class: "ig-cross-zone" },
-                h("h3", { class: "ig-explore-section-title" }, "Cross-zone imports"),
-                h("p", { class: "ig-explore-section-desc" },
-                  "Directed counts of internal edges that cross zone boundaries (importer zone → imported zone).",
-                ),
-                h("div", { class: "ig-table-scroll" },
-                  h("table", { class: "ig-table" },
-                    h("thead", null,
-                      h("tr", null,
-                        h("th", null, "From"),
-                        h("th", null, "To"),
-                        h("th", { class: "ig-th-num" }, "Edges"),
+              ),
+            ),
+            h("div", { class: "ig-boundary-strip" },
+              h("h4", null, activeZone ? "Boundaries in focus" : "Busiest boundaries"),
+              activeZoneBoundaryFlows.length
+                ? h("div", { class: "ig-boundary-list" },
+                    ...activeZoneBoundaryFlows.map((flow) =>
+                      h("div", { class: "ig-boundary-row", key: `${flow.fromZone}->${flow.toZone}` },
+                        h("span", { class: "ig-boundary-route" },
+                          zones ? zoneDisplayName(zones, flow.fromZone) : flow.fromZone,
+                          " -> ",
+                          zones ? zoneDisplayName(zones, flow.toZone) : flow.toZone,
+                        ),
+                        h("span", { class: "ig-boundary-count" }, flow.count.toLocaleString()),
                       ),
                     ),
-                    h("tbody", null,
-                      ...zoneFlows.map((f) =>
-                        h("tr", { key: `${f.fromZone}->${f.toZone}` },
-                          h("td", null, zones ? zoneDisplayName(zones, f.fromZone) : f.fromZone),
-                          h("td", null, zones ? zoneDisplayName(zones, f.toZone) : f.toZone),
-                          h("td", { class: "ig-td-num" }, String(f.count)),
+                  )
+                : h("p", { class: "ig-boundary-empty" }, "No cross-zone imports for this scope."),
+            ),
+          ),
+        ),
+      ),
+    ),
+
+    h("header", { ref: heroRef, class: "ig-atlas-hero" },
+      h("div", { class: "ig-atlas-copy" },
+        h("p", { class: "ig-kicker" }, activeZoneName ? "Map of Zone:" : "Map"),
+        h("h2", { class: "ig-page-title" }, activeZoneName ? activeZoneName : "Codebase import map"),
+      ),
+      h("div", { class: "ig-atlas-metrics", role: "list" },
+        h("div", { class: "ig-metric-tile", role: "listitem" },
+          h("span", { class: "ig-metric-value" }, fileCount.toLocaleString()),
+          h("span", { class: "ig-metric-label" }, "files"),
+        ),
+        h("div", { class: "ig-metric-tile", role: "listitem" },
+          h("span", { class: "ig-metric-value" }, summary.totalEdges.toLocaleString()),
+          h("span", { class: "ig-metric-label" }, "imports"),
+        ),
+        h("div", { class: "ig-metric-tile", role: "listitem" },
+          h("span", { class: "ig-metric-value" }, summary.totalExternal.toLocaleString()),
+          h("span", { class: "ig-metric-label" }, "packages"),
+        ),
+        h("div", { class: "ig-metric-tile", role: "listitem" },
+          h("span", { class: "ig-metric-value" }, zones ? zones.zones.length.toLocaleString() : "—"),
+          h("span", { class: "ig-metric-label" }, "zones"),
+        ),
+      ),
+      activeZoneName
+        ? null
+        : h("div", { class: "ig-atlas-footer" },
+            h("span", { class: "ig-atlas-mode" }, "All zones"),
+            h("p", { class: "ig-atlas-summary" },
+              `${summary.totalEdges.toLocaleString()} imports · ${summary.circularCount} cycle${summary.circularCount === 1 ? "" : "s"} · ${summary.avgImportsPerFile.toFixed(2)} avg imports/file`,
+            ),
+        ),
+    ),
+
+    h("div", { ref: graphPanelRef, class: `ig-graph-shell${activeZone ? " ig-graph-shell-zone" : ""} ig-street-view-${streetViewMode}`, id: "ig-graph-panel" },
+    h("div", { class: "ig-main" },
+      h("section", { class: "ig-zone-overview ig-zone-minimap", "aria-label": activeZone ? `${activeZone.name} zone map` : "Zone map" },
+        activeZone
+          ? [
+              h("div", { class: "ig-zone-overview-head", key: "head" },
+                h("div", null,
+                  h("span", { class: "ig-zone-overview-kicker" }, "Zone map"),
+                  h("h3", null, activeZone.name),
+                ),
+                h("div", { class: "ig-zone-overview-stats" },
+                  h("span", null, `${activeZone.files.length} files`),
+                  h("span", null, `${activeZoneInternalEdges} internal imports`),
+                  h("span", null, `${activeZoneInbound} in / ${activeZoneOutbound} out`),
+                ),
+              ),
+              h("div", { class: "ig-zone-network", key: "network" },
+                h("svg", {
+                  viewBox: `0 0 ${activeZoneNetworkW} ${activeZoneNetworkH}`,
+                  role: "img",
+                  "aria-label": `${activeZone.name} dependency zone map`,
+                  onPointerMove: handlePointerMove,
+                  onPointerUp: endDrag,
+                  onPointerLeave: endDrag,
+                },
+                  h("defs", null,
+                    h("marker", {
+                      id: "ig-zone-arrow",
+                      viewBox: "0 0 10 8",
+                      refX: 9,
+                      refY: 4,
+                      markerWidth: 7,
+                      markerHeight: 5,
+                      orient: "auto",
+                    }, h("path", { d: "M 0 0 L 10 4 L 0 8 z", fill: "var(--text-muted, #888)" })),
+                    h("marker", {
+                      id: "ig-zone-arrow-external",
+                      viewBox: "0 0 10 8",
+                      refX: 9,
+                      refY: 4,
+                      markerWidth: 8,
+                      markerHeight: 6,
+                      orient: "auto",
+                    }, h("path", { d: "M 0 0 L 10 4 L 0 8 z", fill: "var(--orange)" })),
+                  ),
+                  h("rect", {
+                    class: "ig-zone-network-bg",
+                    x: 0,
+                    y: 0,
+                    width: activeZoneNetworkW,
+                    height: activeZoneNetworkH,
+                    onClick: () => {
+                      setHoverPreviewFile(null);
+                      setStreetViewMode("closed");
+                    },
+                  }),
+                  h("g", { transform: `translate(${zoneView.x} ${zoneView.y}) scale(${zoneView.k})` },
+                    h("g", { class: "ig-zone-network-edges" },
+                      ...activeZoneNetworkEdges.map((edge) => {
+                        const from = activeZoneNetworkNodeByPath.get(edge.from);
+                        const to = activeZoneNetworkNodeByPath.get(edge.to);
+                        if (!from || !to) return null;
+                        const isRouteEdge = activeZoneRouteFileSet.has(edge.from) && activeZoneRouteFileSet.has(edge.to);
+                        return h("g", {
+                          key: `${edge.from}->${edge.to}:${edge.type}`,
+                          class: mapHasRouteFocus ? isRouteEdge ? "ig-zone-network-edge-active" : "ig-zone-network-edge-muted" : undefined,
+                        },
+                          h("path", {
+                            d: `M ${from.x} ${from.y} Q ${(from.x + to.x) / 2} ${(from.y + to.y) / 2 - 18} ${to.x} ${to.y}`,
+                            markerEnd: "url(#ig-zone-arrow)",
+                          }),
+                        );
+                      }),
+                      ...activeZoneCrossZoneEdges.map((edge) => {
+                        const from = edge.fromInside ? edge.fileNode : edge.zoneNode;
+                        const to = edge.fromInside ? edge.zoneNode : edge.fileNode;
+                        const edgeKey = `${edge.from}->${edge.to}:${edge.type}`;
+                        const isRouteEdge = activeZoneRouteLinkSet.has(edgeKey) || activeZoneExternalRouteLinkSet.has(edgeKey);
+                        const label = edge.fromInside
+                          ? `${basename(edge.fileNode.path)} imports from ${edge.zoneNode.name}`
+                          : `${edge.zoneNode.name} imports ${basename(edge.fileNode.path)}`;
+                        return h("g", {
+                          key: `cross-${edge.from}->${edge.to}:${edge.type}`,
+                          class: `ig-zone-network-edge-external${mapHasRouteFocus ? isRouteEdge ? " ig-zone-network-edge-active" : " ig-zone-network-edge-muted" : ""}`,
+                        },
+                          h("title", null, label),
+                          h("path", {
+                            d: `M ${from.x} ${from.y} Q ${(from.x + to.x) / 2} ${(from.y + to.y) / 2 - 26} ${to.x} ${to.y}`,
+                            markerEnd: "url(#ig-zone-arrow-external)",
+                          }),
+                        );
+                      }),
+                    ),
+                    h("g", { class: "ig-zone-network-nodes" },
+                      ...activeZoneNetworkNodes.map((node) => {
+                        const fileLabelLines = wrapFileLabel(basename(node.path));
+                        const isRouteNode = activeZoneRouteNodeSet.has(node.path);
+                        return h("g", {
+                          key: node.path,
+                          class: `ig-zone-network-node${activeZoneFocusNode === node.path ? " ig-zone-network-node-active" : ""}${hoverPreviewFile === node.path ? " ig-zone-network-node-preview" : ""}${mapHasRouteFocus && !isRouteNode ? " ig-zone-network-node-muted" : ""}`,
+                          transform: `translate(${node.x}, ${node.y})`,
+                          onPointerDown: (event: PointerEvent) => {
+                            event.stopPropagation();
+                            suppressNodeClickRef.current = false;
+                            (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+                            setDragState({
+                              kind: "file-node",
+                              path: node.path,
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              origin: fileNodeOffsets[node.path] ?? { x: 0, y: 0 },
+                            });
+                          },
+                          onPointerEnter: () => openHoverPreview(node.path, node.x > activeZoneNetworkW / 2 ? "left" : "right"),
+                          onPointerLeave: () => closeHoverPreview(node.path),
+                          onClick: (event: MouseEvent) => {
+                            event.stopPropagation();
+                            if (suppressNodeClickRef.current) {
+                              suppressNodeClickRef.current = false;
+                              return;
+                            }
+                            drillFileToGraph(node.path);
+                          },
+                        },
+                          h("rect", { class: "ig-zone-network-file-box", x: -ZONE_FILE_NODE_W / 2, y: -ZONE_FILE_NODE_H / 2, width: ZONE_FILE_NODE_W, height: ZONE_FILE_NODE_H, rx: 12 }),
+                          activeZoneBoundaryByFile.has(node.path)
+                            ? h("circle", { class: "ig-zone-network-boundary-pin", cx: -ZONE_FILE_NODE_W / 2 + 10, cy: -ZONE_FILE_NODE_H / 2 + 10, r: 3.5 })
+                            : null,
+                          h("text", { class: "ig-zone-network-dir", x: -ZONE_FILE_NODE_W / 2 + 16, y: -10 }, parentContext(node.path)),
+                          h("text", { class: "ig-zone-network-label", x: -ZONE_FILE_NODE_W / 2 + 16, y: fileLabelLines.length === 1 ? 12 : 5 },
+                            ...fileLabelLines.map((line, index) =>
+                              h("tspan", { key: `${node.path}-line-${index}`, x: -ZONE_FILE_NODE_W / 2 + 16, dy: index === 0 ? 0 : 13 }, line),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    h("g", { class: "ig-zone-dir-nodes" },
+                      ...activeZoneDirectoryNodes.map((node) =>
+                        h("g", {
+                          key: node.id,
+                          class: "ig-zone-dir-node",
+                          transform: `translate(${node.x}, ${node.y})`,
+                          onPointerDown: (event: PointerEvent) => {
+                            event.stopPropagation();
+                            suppressNodeClickRef.current = false;
+                            (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+                            setDragState({
+                              kind: "file-node",
+                              path: node.id,
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              origin: fileNodeOffsets[node.id] ?? { x: 0, y: 0 },
+                            });
+                          },
+                        },
+                          h("rect", { x: -ZONE_DIR_NODE_W / 2, y: -ZONE_DIR_NODE_H / 2, width: ZONE_DIR_NODE_W, height: ZONE_DIR_NODE_H, rx: 12 }),
+                          h("text", { class: "ig-zone-dir-label", x: -ZONE_DIR_NODE_W / 2 + 12, y: -2 }, truncateNodeLabel(node.dir, "file")),
+                          h("text", { class: "ig-zone-dir-meta", x: -ZONE_DIR_NODE_W / 2 + 12, y: 13 }, `${node.count} more file${node.count === 1 ? "" : "s"}`),
+                        ),
+                      ),
+                    ),
+                    h("g", { class: "ig-zone-external-nodes" },
+                      ...activeZoneExternalNodes.map((node) =>
+                        h("g", {
+                          key: node.id,
+                          class: `ig-zone-external-node${hoverExternalZoneId === node.id ? " ig-zone-external-node-preview" : ""}`,
+                          transform: `translate(${node.x}, ${node.y})`,
+                          onPointerDown: (event: PointerEvent) => {
+                            event.stopPropagation();
+                            suppressNodeClickRef.current = false;
+                            (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
+                            setDragState({
+                              kind: "file-node",
+                              path: `zone:${node.id}`,
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              origin: fileNodeOffsets[`zone:${node.id}`] ?? { x: 0, y: 0 },
+                            });
+                          },
+                          onPointerEnter: () => {
+                            setHoverExternalZoneId(node.id);
+                            setHoverPreviewSide(node.x > activeZoneNetworkW / 2 ? "left" : "right");
+                            setStreetViewMode((current) => current === "dialog" ? current : "preview");
+                          },
+                          onPointerLeave: () => {
+                            setHoverExternalZoneId((current) => current === node.id ? null : current);
+                            setStreetViewMode((current) => current === "preview" ? "closed" : current);
+                          },
+                        },
+                          h("rect", { x: -48, y: -18, width: 96, height: 36, rx: 10 }),
+                          h("text", { class: "ig-zone-external-label", y: -2, textAnchor: "middle" }, truncateNodeLabel(node.name, "package")),
+                          h("text", { class: "ig-zone-external-meta", y: 12, textAnchor: "middle" },
+                            `${node.fromExternal} from / ${node.toExternal} to`,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              )
-            : null,
-          h("section", { class: "ig-explore-files" },
-            h("h3", { class: "ig-explore-section-title" }, "All files"),
-            h("p", { class: "ig-explore-section-desc" },
-              "Click a row to open the file graph centered on that file. Double-click is not needed here.",
-            ),
-            h("div", { class: "ig-table-scroll ig-table-scroll--tall" },
-              h("table", { class: "ig-table" },
-                h("thead", null,
-                  h("tr", null,
-                    h("th", null, "Path"),
-                    h("th", null, "Zone"),
-                    h("th", { class: "ig-th-num" }, "In"),
-                    h("th", { class: "ig-th-num" }, "Out"),
-                    h("th", { class: "ig-th-center" }, "Cycle"),
-                  ),
-                ),
-                h("tbody", null,
-                  ...exploreRows.slice(0, EXPLORE_ROW_CAP).map((row) =>
-                    h("tr", {
-                      key: row.path,
-                      class: "ig-table-row-click",
-                      onClick: () => drillFileToGraph(row.path),
-                    },
-                      h("td", { class: "ig-td-path", title: row.path }, row.path),
-                      h("td", { class: "ig-td-zone" },
-                        row.zoneId && zones ? zoneDisplayName(zones, row.zoneId) : "—",
-                      ),
-                      h("td", { class: "ig-td-num" }, String(row.inD)),
-                      h("td", { class: "ig-td-num" }, String(row.outD)),
-                      h("td", { class: "ig-td-center" }, row.inCycle ? "Yes" : ""),
-                    ),
-                  ),
-                ),
+                activeZone.files.length > activeZoneVisibleFiles.length
+                  ? h("p", { class: "ig-zone-network-note" },
+                      `Showing ${activeZoneVisibleFiles.length} high-signal files; directory cards represent the remaining ${activeZone.files.length - activeZoneVisibleFiles.length}.`,
+                    )
+                  : null,
               ),
+            ]
+          : h("div", { class: "ig-zone-overview-empty" },
+              h("span", { class: "ig-zone-overview-kicker" }, "Zone map"),
+              h("h3", null, "Select a zone"),
+              h("p", null, "Choose a zone above to open its file relationship map."),
+            ),
+      ),
+      h("div", { class: `ig-graph-column ig-graph-column-${hoverPreviewSide}` },
+        hoverExternalZoneId && streetViewMode !== "dialog"
+          ? h("div", { class: "ig-external-zone-preview" },
+              (() => {
+                const external = activeZoneExternalNodes.find((node) => node.id === hoverExternalZoneId);
+                const linkedFiles = visibleBoundaryLinks
+                  .filter((link) => link.externalZoneId === hoverExternalZoneId)
+                  .map((link) => link.filePath)
+                  .filter((path, index, arr) => arr.indexOf(path) === index)
+                  .slice(0, 6);
+                return [
+                  h("span", { class: "ig-graph-head-label", key: "label" }, "External zone"),
+                  h("h3", { key: "title" }, external?.name ?? hoverExternalZoneId),
+                  h("p", { key: "meta" }, `${external?.fromExternal ?? 0} imports from this zone · ${external?.toExternal ?? 0} imports to it`),
+                  linkedFiles.length
+                    ? h("div", { class: "ig-external-zone-files", key: "files" },
+                        ...linkedFiles.map((path) => h("span", { key: path, title: path }, basename(path))),
+                      )
+                    : null,
+                ];
+              })(),
+            )
+          : [
+        h("div", { class: "ig-graph-head", key: "head" },
+          h("div", { class: "ig-graph-title-block" },
+            h("span", { class: "ig-graph-head-label" },
+              streetViewMode === "dialog" ? "File street view" : "Dependency preview",
+            ),
+            h("p", { class: "ig-graph-scope" },
+              `${graphNodeCount} nodes · ${graphEdgeCount} imports shown · ${graphCrossEdgeCount} cross-boundary · ${graphScopeLabel}`,
             ),
           ),
-        )
-      : null,
-
-    pageTab === "graph"
-      ? h("div", { class: "ig-graph-shell", id: "ig-graph-panel", role: "tabpanel", "aria-labelledby": "ig-tab-graph" },
-    h("div", { class: "ig-controls" },
-    h("div", { class: "ig-toolbar" },
-      h("label", null, "Focus",
-        h("select", {
-          value: mode,
-          onChange: (e: Event) => {
-            const v = (e.target as HTMLSelectElement).value as "file" | "package";
-            setMode(v);
-            if (v === "file" && !focusFile) setFocusFile(defaultFocusPath(imports));
-          },
-        },
-          h("option", { value: "file" }, "File"),
-          h("option", { value: "package" }, "External package"),
-        ),
-      ),
-      mode === "file"
-        ? h("label", null, "Depth",
-            h("select", {
-              value: String(depth),
-              onChange: (e: Event) => setDepth(parseInt((e.target as HTMLSelectElement).value, 10) || 2),
-            },
-              ...DEPTH_OPTIONS.map((d) => h("option", { value: String(d), key: d }, String(d))),
-            ),
-          )
-        : null,
-      h("label", null, "Zone",
-        h("select", {
-          value: zoneFilter,
-          onChange: (e: Event) => setZoneFilter((e.target as HTMLSelectElement).value),
-        },
-          h("option", { value: "" }, "All zones"),
-          ...(zones?.zones.map((z) =>
-            h("option", { key: z.id, value: z.id }, z.name),
-          ) ?? []),
-        ),
-      ),
-      h("label", null,
-        h("input", {
-          type: "checkbox",
-          checked: crossZoneOnly,
-          onChange: (e: Event) => setCrossZoneOnly((e.target as HTMLInputElement).checked),
-        }),
-        "Cross-zone only",
-      ),
-      h("label", null,
-        h("input", {
-          type: "checkbox",
-          checked: cyclesOnly,
-          onChange: (e: Event) => setCyclesOnly((e.target as HTMLInputElement).checked),
-        }),
-        "Cycle files only",
-      ),
-    ),
-
-    h("div", { class: "ig-type-toggles" },
-      h("span", { class: "ig-type-toggles-label" }, "Edge types"),
-      ...allImportTypes().map((t) =>
-        h("label", { key: t },
-          h("input", {
-            type: "checkbox",
-            checked: importTypes.has(t),
-            onChange: () => toggleImportType(t),
-          }),
-          t,
-        ),
-      ),
-    ),
-    ),
-
-    h("div", { class: "ig-search-wrap" },
-      h(SearchFilter, {
-        placeholder: "Filter files by path…",
-        value: search,
-        onInput: setSearch,
-        resultCount: filteredFileList.length,
-        totalCount: allFiles.length,
-      }),
-    ),
-
-    h("div", { class: "ig-main" },
-      h("div", { class: "ig-graph-column" },
-        h("div", { class: "ig-graph-head" },
-          h("span", { class: "ig-graph-head-label" },
-            mode === "package" ? "Package importers" : "Focused subgraph",
+          h("div", { class: "ig-preview-history", "aria-label": "Dependency preview history" },
+            h("button", {
+              type: "button",
+              class: "ig-preview-history-btn",
+              disabled: !canGoBack,
+              onClick: () => moveFocusHistory(-1),
+            }, "Back"),
+            h("button", {
+              type: "button",
+              class: "ig-preview-history-btn",
+              disabled: !canGoForward,
+              onClick: () => moveFocusHistory(1),
+            }, "Forward"),
           ),
+          streetViewMode === "dialog"
+            ? h("button", {
+                type: "button",
+                class: "ig-btn-ghost",
+                onClick: () => setStreetViewMode("closed"),
+              }, "Close")
+            : null,
           mode === "file" && focusFile
             ? h("span", { class: "ig-focus-chip", title: focusFile }, basename(focusFile))
             : mode === "package" && focusPackage
               ? h("span", { class: "ig-focus-chip ig-focus-chip-pkg", title: focusPackage }, focusPackage)
               : null,
         ),
-        h("div", { class: "ig-svg-wrap" },
+        h("div", { class: "ig-svg-wrap", key: "svg" },
           h("svg", {
             viewBox: `0 0 ${svgW} ${svgH}`,
             preserveAspectRatio: "xMidYMid meet",
             "aria-label": "Focused import graph",
+            onPointerDown: (event: PointerEvent) => beginPan("dep", event),
+            onPointerMove: handlePointerMove,
+            onPointerUp: endDrag,
+            onPointerLeave: endDrag,
+            onWheel: (event: WheelEvent) => {
+              event.preventDefault();
+              setDepView((view) => wheelViewport(view, event));
+            },
           },
             h("rect", {
               class: "ig-svg-bg",
@@ -674,55 +1464,79 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
                 orient: "auto",
               }, h("path", { d: "M 0 0 L 10 4 L 0 8 z", fill: "var(--text-muted, #888)" })),
             ),
-            h("g", { class: "ig-edges" },
-              ...edgePaths.map((ep) =>
-                h("path", {
-                  key: ep.key,
-                  class: `ig-edge${ep.cross ? " ig-edge-cross" : ""}`,
-                  d: ep.d,
-                  "marker-end": "url(#ig-arrow)",
-                }),
+            h("g", { transform: `translate(${depView.x} ${depView.y}) scale(${depView.k})` },
+              h("g", { class: "ig-edges" },
+                ...edgePaths.map((ep) =>
+                  h("path", {
+                    key: ep.key,
+                    class: `ig-edge${ep.cross ? " ig-edge-cross" : ""}`,
+                    d: ep.d,
+                    "marker-end": "url(#ig-arrow)",
+                  }),
+                ),
               ),
-            ),
-            h("g", { class: "ig-nodes" },
-              ...(layoutNodes ?? []).map((n) => {
-                const isCenter = mode === "file" && n.kind === "file" && n.id === focusFile;
-                const isSel = n.kind === "file" && selectedFile === n.id;
-                const { w, h: hgt } = nodeBox(n.kind);
-                const tip =
-                  n.kind === "file"
-                    ? n.id
-                    : n.id.startsWith("pkg:")
-                      ? n.id.slice(4)
-                      : n.label;
-                const labelText = truncateNodeLabel(n.label, n.kind);
-                return h("g", {
-                  key: n.id,
-                  class: `ig-node ig-node-${n.kind}${isCenter ? " ig-node-center" : ""}${isSel ? " ig-node-selected" : ""}`,
-                  transform: `translate(${n.x - w / 2},${n.y - hgt / 2})`,
-                  title: tip,
-                  onClick: (ev: MouseEvent) => {
-                    ev.stopPropagation();
-                    if (n.kind === "file") handleFileClick(n.id);
+              h("g", { class: "ig-edge-labels" },
+                ...edgePaths.filter((ep) => ep.label && ep.labelX !== undefined && ep.labelY !== undefined).map((ep) =>
+                  h("text", {
+                    key: `label-${ep.key}`,
+                    x: ep.labelX,
+                    y: ep.labelY,
+                    textAnchor: "middle",
+                  }, ep.label),
+                ),
+              ),
+              h("g", { class: "ig-nodes" },
+                ...(layoutNodes ?? []).map((n) => {
+                  const isCenter = mode === "file" && n.kind === "file" && n.id === focusFile;
+                  const isSel = n.kind === "file" && selectedFile === n.id;
+                  const { w, h: hgt } = nodeBox(n.kind);
+                  const pos = visualPosMap.get(n.id) ?? { x: n.x, y: n.y };
+                  const tip =
+                    n.kind === "file"
+                      ? n.id
+                      : n.id.startsWith("pkg:")
+                        ? n.id.slice(4)
+                        : n.label;
+                  const labelText = truncateNodeLabel(n.label, n.kind);
+                  const contextText = n.kind === "file" ? truncateNodeLabel(parentContext(n.id), "file") : "";
+                  return h("g", {
+                    key: n.id,
+                    class: `ig-node ig-node-${n.kind}${isCenter ? " ig-node-center" : ""}${isSel ? " ig-node-selected" : ""}`,
+                    transform: `translate(${pos.x - w / 2},${pos.y - hgt / 2})`,
+                    title: tip,
+                    onPointerDown: (ev: PointerEvent) => {
+                      ev.stopPropagation();
+                      (ev.currentTarget as Element).setPointerCapture?.(ev.pointerId);
+                      setDragState({
+                        kind: "dep-node",
+                        id: n.id,
+                        startX: ev.clientX,
+                        startY: ev.clientY,
+                        origin: depNodeOffsets[n.id] ?? { x: 0, y: 0 },
+                      });
+                    },
+                    onClick: (ev: MouseEvent) => {
+                      ev.stopPropagation();
+                      if (n.kind === "file") handleFileClick(n.id);
+                    },
+                    onDblClick: (ev: MouseEvent) => {
+                      ev.stopPropagation();
+                      if (n.kind === "file") handleFileDblClick(n.id);
+                    },
                   },
-                  onDblClick: (ev: MouseEvent) => {
-                    ev.stopPropagation();
-                    if (n.kind === "file") handleFileDblClick(n.id);
-                  },
-                },
-                  h("rect", { width: w, height: hgt, rx: 8, ry: 8 }),
-                  h(
-                    "text",
-                    {
+                    h("rect", { width: w, height: hgt, rx: 8, ry: 8 }),
+                    n.kind === "file" && contextText
+                      ? h("text", { class: "ig-node-context", x: 12, y: 18 }, contextText)
+                      : null,
+                    h("text", {
                       class: "ig-node-label",
                       x: 12,
-                      y: hgt / 2,
-                      "dominant-baseline": "middle",
-                    },
-                    labelText,
-                  ),
-                );
-              }),
+                      y: n.kind === "file" && contextText ? 37 : hgt / 2,
+                      "dominant-baseline": n.kind === "file" && contextText ? undefined : "middle",
+                    }, labelText),
+                  );
+                }),
+              ),
             ),
           ),
           packageSubgraph && packageSubgraph.files.length > 48
@@ -731,26 +1545,47 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
               )
             : null,
         ),
+        streetViewMode === "dialog" && mode === "file" && focusFile
+          ? h("div", { class: "ig-street-detail", key: "detail" },
+              h("span", null, focusZoneName ?? "Unzoned"),
+              h("strong", { title: focusFile }, focusFile),
+              h("span", null, `${inDegree.get(focusFile) ?? 0} importing · ${outDegree.get(focusFile) ?? 0} outgoing`),
+              focusInv
+                ? h("span", null, `${focusInv.language} · ${formatSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
+                : null,
+            )
+          : null,
+          ],
       ),
 
       h("div", { class: "ig-side" },
-        mode === "file"
-          ? h("div", { class: "ig-side-section" },
-              h("h3", { class: "ig-panel-title" }, "Files"),
-              h("p", { class: "ig-panel-desc" }, "Search, then click a path to refocus the graph."),
-              h("div", { class: "ig-list" },
-                ...filteredFileList.slice(0, 80).map((p) =>
-                  h("button", {
-                    key: p,
-                    type: "button",
-                    class: "ig-list-row",
-                    title: p,
-                    onClick: () => handleFileClick(p),
-                  }, p),
-                ),
+        h("div", { class: "ig-side-section ig-focus-detail" },
+          h("h3", { class: "ig-panel-title" }, "Current selection"),
+          h("p", { class: "ig-focus-reason" }, focusReason),
+          mode === "file" && focusFile
+            ? h("div", { class: "ig-focus-detail-grid" },
+                h("span", null, "Path"),
+                h("strong", { title: focusFile }, focusFile),
+                h("span", null, "Zone"),
+                h("strong", null, focusZoneName ?? "Unzoned"),
+                h("span", null, "Imports"),
+                h("strong", null, `${inDegree.get(focusFile) ?? 0} in · ${outDegree.get(focusFile) ?? 0} out`),
+                focusInv
+                  ? h("span", null, "File")
+                  : null,
+                focusInv
+                  ? h("strong", null, `${focusInv.language} · ${formatSize(focusInv.size)} · ${focusInv.lines.toLocaleString()} lines`)
+                  : null,
+              )
+            : h("div", { class: "ig-focus-detail-grid" },
+                h("span", null, "Package"),
+                h("strong", null, focusPackage ?? "No package selected"),
+                h("span", null, "Importers"),
+                h("strong", null, focusPackageImporters.toLocaleString()),
               ),
-            )
-          : h("div", { class: "ig-side-section" },
+        ),
+        mode === "package"
+          ? h("div", { class: "ig-side-section" },
               h("h3", { class: "ig-panel-title" }, "External packages"),
               h("p", { class: "ig-panel-desc" }, "Open a package to see who imports it."),
               h("div", { class: "ig-list" },
@@ -763,12 +1598,7 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
                     onClick: () => {
                       setMode("package");
                       setFocusPackage(ex.package);
-                      onSelect({
-                        type: "generic",
-                        title: ex.package,
-                        package: ex.package,
-                        importers: ex.importedBy.length,
-                      });
+                      setFocusSource({ kind: "package", packageName: ex.package });
                     },
                   },
                     h("span", { class: "ig-list-primary" }, ex.package),
@@ -776,56 +1606,18 @@ export function Graph({ data, onSelect, selectedFile, selectedZone, navigateTo }
                   ),
                 ),
               ),
-            ),
-
-        h("div", { class: "ig-side-section" },
-          h("h3", { class: "ig-panel-title" }, "Most imported"),
-          h("p", { class: "ig-panel-desc" }, "Hot spots in your module graph."),
-          h("div", { class: "ig-list" },
-            ...hubList.map((hub) =>
-              h("button", {
-                key: hub.path,
-                type: "button",
-                class: "ig-list-row ig-list-row-split",
-                title: hub.path,
-                onClick: () => handleFileClick(hub.path),
-              },
-                h("span", { class: "ig-list-primary" }, hub.path),
-                h("span", { class: "ig-list-badge" }, String(hub.count)),
-              ),
-            ),
-          ),
-        ),
-
-        h("div", { class: "ig-side-section" },
-          h("h3", { class: "ig-panel-title" }, "Circular dependencies"),
-          h("p", { class: "ig-panel-desc" }, "Jump into a cycle to inspect its files."),
-          h("div", { class: "ig-list" },
-            ...cycleList.map((c, i) =>
-              h("button", {
-                key: `c${i}`,
-                type: "button",
-                class: "ig-list-row",
-                onClick: () => {
-                  const first = c.cycle[0];
-                  if (first) handleFileClick(first);
-                },
-              }, c.cycle.slice(0, 5).map(basename).join(" → ")),
-            ),
-          ),
-        ),
-
+            )
+          : null,
         h("div", { class: "ig-callout" },
           h("div", { class: "ig-callout-title" }, "Shortcuts"),
           h("p", { class: "ig-callout-body" },
             "Double-click a file node to open it in ",
             h("strong", null, "Files"),
-            ". Adjust depth and filters to widen or narrow what you see.",
+            ". Drag nodes to rearrange the map, scroll to pan, and pinch to zoom.",
           ),
         ),
       ),
     ),
-    )
-      : null,
+    ),
   );
 }

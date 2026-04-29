@@ -68,7 +68,7 @@ describe("favicon", () => {
   describe("VIEW_TO_PRODUCT", () => {
     it("maps sourcevision views correctly", () => {
       const svViews: ViewId[] = [
-        "overview", "graph", "zones", "files", "routes",
+        "overview", "graph", "files", "routes",
         "architecture", "problems", "suggestions", "pr-markdown",
       ];
       for (const view of svViews) {
@@ -119,9 +119,6 @@ describe("favicon", () => {
       expect(getFaviconHref()).toContain(FAVICON_PNGS.sourcevision);
 
       updateFavicon("graph");
-      expect(getFaviconHref()).toContain(FAVICON_PNGS.sourcevision);
-
-      updateFavicon("zones");
       expect(getFaviconHref()).toContain(FAVICON_PNGS.sourcevision);
     });
 

@@ -2177,7 +2177,7 @@ function promoteSubAnalyses(
     promotedZones.push(...promoteZones(sub));
     promotedCrossings.push(...promoteCrossings(sub));
   }
-  const allZones = [...pinnedFinalZones, ...promotedZones];
+  const allZones = dedupeZonesById([...pinnedFinalZones, ...promotedZones]);
 
   if (subAnalyses.length > 0) {
     const packageMap = buildPackageMap(subAnalyses);
@@ -2188,6 +2188,17 @@ function promoteSubAnalyses(
   }
 
   return { allZones, promotedCrossings };
+}
+
+function dedupeZonesById(zones: Zone[]): Zone[] {
+  const seen = new Set<string>();
+  const out: Zone[] = [];
+  for (const zone of zones) {
+    if (seen.has(zone.id)) continue;
+    seen.add(zone.id);
+    out.push(zone);
+  }
+  return out;
 }
 
 // ── Helper: move recommendations ─────────────────────────────────────────────

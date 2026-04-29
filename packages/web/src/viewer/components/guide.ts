@@ -14,16 +14,10 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     actions: "Check module status table to see which analysis phases have completed. Run additional 'sourcevision analyze' passes for deeper AI-generated insights.",
   },
   graph: {
-    title: "Import Graph",
-    description: "Force-directed visualization of the import graph. Nodes are colored by zone. Cross-zone edges are highlighted in orange.",
-    lookFor: "Dense clusters suggest tightly-coupled modules. Orange cross-zone edges indicate zone boundary violations. Isolated nodes may be dead code.",
-    actions: "Click nodes to inspect. Look for hub files that could be split. Consider if cross-zone imports suggest zones should be merged or boundaries clarified.",
-  },
-  zones: {
-    title: "Zones",
-    description: "Architectural zones detected by Louvain community detection. Each zone groups files with strong internal import connections.",
-    lookFor: "Cohesion < 0.4 means files in a zone aren't well-related — consider splitting. Coupling > 0.6 means heavy cross-zone dependencies. Large zones (>50 files) may need decomposition.",
-    actions: "Click a zone to see its files and entry points. Review AI-generated insights. Check if zone boundaries match your intended architecture.",
+    title: "Map",
+    description: "Explorable map of zones, files, imports, and cross-boundary relationships.",
+    lookFor: "Hub files, unexpected cross-zone imports, and external zones that cluster around many files.",
+    actions: "Select a zone, hover files to preview routes, and click files to open the dependency street view.",
   },
   files: {
     title: "Files",

@@ -1,11 +1,24 @@
 /* Import Graph — uses only viewer tokens (no --bg-elevated: undefined in viewer theme). */
 
 .ig-page {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  --ig-ink: var(--text);
+  --ig-subtle: var(--text-dim);
+  --ig-muted: var(--text-muted, var(--text-dim));
+  --ig-panel: var(--bg-surface);
+  --ig-veil: color-mix(in srgb, var(--bg-hover) 42%, var(--bg-surface));
+  --ig-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  display: grid;
+  grid-template-columns: minmax(360px, 0.95fr) minmax(520px, 1.05fr);
+  gap: 14px;
+  align-items: start;
   padding-bottom: 20px;
   min-height: 0;
+}
+
+.ig-page > .view-header,
+.ig-page > .ig-explore,
+.ig-page > .ig-atlas-hero {
+  grid-column: 1 / -1;
 }
 
 .ig-page--empty {
@@ -282,12 +295,55 @@
   gap: 8px 12px;
 }
 
+.ig-graph-title-block {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
 .ig-graph-head-label {
   font-size: 0.75rem;
   font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted, var(--text-dim));
+}
+
+.ig-graph-scope {
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.ig-preview-history {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-hover) 30%, transparent);
+}
+
+.ig-preview-history-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.ig-preview-history-btn:not(:disabled):hover {
+  background: var(--bg-surface);
+  color: var(--text);
+}
+
+.ig-preview-history-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .ig-focus-chip {
@@ -378,6 +434,15 @@
   pointer-events: none;
 }
 
+.ig-node-context {
+  fill: var(--text-muted, var(--text-dim));
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.02em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
 .ig-node-package .ig-node-label {
   font-weight: 650;
 }
@@ -390,9 +455,20 @@
 }
 
 .ig-edge.ig-edge-cross {
-  stroke: var(--accent);
+  stroke: var(--orange);
   stroke-opacity: 0.75;
   stroke-width: 2;
+}
+
+.ig-edge-labels text {
+  fill: var(--orange);
+  paint-order: stroke;
+  stroke: var(--bg-surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  font-size: 10px;
+  font-weight: 760;
+  pointer-events: none;
 }
 
 .ig-footnote {
@@ -403,6 +479,276 @@
   color: var(--text-dim);
   border-top: 1px solid var(--border);
   background: var(--bg-surface);
+}
+
+.ig-zone-overview {
+  grid-column: 1;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+}
+
+.ig-zone-minimap {
+  position: relative;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.ig-zone-minimap .ig-zone-network svg {
+  min-height: clamp(500px, 62vh, 760px);
+}
+
+.ig-zone-overview-empty {
+  min-height: 300px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 6px;
+}
+
+.ig-zone-overview-empty h3,
+.ig-zone-overview-empty p {
+  margin: 0;
+}
+
+.ig-zone-overview-empty p {
+  max-width: 44ch;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.ig-zone-overview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ig-zone-overview-kicker {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--accent);
+  font-size: 0.64rem;
+  font-weight: 820;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ig-zone-overview h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.ig-zone-overview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ig-zone-overview-stats span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-hover) 38%, var(--bg-surface));
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ig-zone-network {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 46%),
+    color-mix(in srgb, var(--border) 8%, var(--bg));
+}
+
+.ig-zone-network svg {
+  display: block;
+  width: 100%;
+  min-width: 520px;
+  min-height: 220px;
+}
+
+.ig-zone-network-bg {
+  fill: transparent;
+  cursor: default;
+}
+
+.ig-zone-network-edges path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text-dim) 76%, var(--border));
+  stroke-width: 1.25;
+  stroke-opacity: 0.38;
+}
+
+.ig-zone-network-edge-external path {
+  stroke: var(--orange);
+  stroke-width: 1.45;
+  stroke-opacity: 0.58;
+  stroke-dasharray: 7 7;
+}
+
+.ig-zone-network-edge-active path {
+  stroke-opacity: 0.82;
+  stroke-width: 1.8;
+}
+
+.ig-zone-network-edge-muted path {
+  stroke-opacity: 0.1;
+}
+
+.ig-zone-network-node {
+  cursor: grab;
+}
+
+.ig-zone-network-file-box {
+  fill: color-mix(in srgb, var(--bg-surface) 92%, var(--bg-hover));
+  stroke: color-mix(in srgb, var(--text-muted, var(--text-dim)) 26%, var(--border));
+  stroke-width: 1.4;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.10));
+}
+
+.ig-zone-network-node:hover .ig-zone-network-file-box,
+.ig-zone-network-node-preview .ig-zone-network-file-box,
+.ig-zone-network-node-active .ig-zone-network-file-box {
+  fill: color-mix(in srgb, var(--purple, var(--accent)) 7%, var(--bg-surface));
+  stroke: color-mix(in srgb, var(--purple, var(--accent)) 54%, var(--border));
+  stroke-width: 2;
+}
+
+.ig-zone-network-node-muted {
+  opacity: 0.42;
+}
+
+.ig-zone-network-boundary-pin {
+  fill: var(--orange);
+  opacity: 0.74;
+  pointer-events: none;
+}
+
+.ig-zone-network-dir {
+  fill: var(--text-muted, var(--text-dim));
+  font-size: 9px;
+  font-weight: 720;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
+.ig-zone-network-label {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 750;
+  pointer-events: none;
+  text-anchor: start;
+}
+
+.ig-zone-external-node {
+  cursor: grab;
+}
+
+.ig-zone-external-node rect {
+  fill: color-mix(in srgb, var(--orange) 20%, var(--bg-surface));
+  stroke: color-mix(in srgb, var(--orange) 58%, var(--border));
+  stroke-width: 1.5;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.14));
+}
+
+.ig-zone-external-node:hover rect {
+  fill: color-mix(in srgb, var(--orange) 28%, var(--bg-surface));
+  stroke: var(--orange);
+}
+
+.ig-zone-external-node-preview rect {
+  fill: color-mix(in srgb, var(--orange) 30%, var(--bg-surface));
+  stroke: var(--orange);
+  stroke-width: 2;
+}
+
+.ig-zone-external-label {
+  fill: var(--text);
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.ig-zone-external-meta {
+  fill: var(--text-dim);
+  font-size: 8px;
+  font-weight: 750;
+  pointer-events: none;
+}
+
+.ig-zone-dir-node {
+  cursor: grab;
+  opacity: 0.78;
+}
+
+.ig-zone-dir-node rect {
+  fill: color-mix(in srgb, var(--bg-hover) 48%, var(--bg-surface));
+  stroke: color-mix(in srgb, var(--text-muted, var(--text-dim)) 20%, var(--border));
+  stroke-width: 1.2;
+  stroke-dasharray: 4 4;
+}
+
+.ig-zone-dir-label {
+  fill: var(--text);
+  font-size: 9px;
+  font-weight: 760;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
+.ig-zone-dir-meta {
+  fill: var(--text-dim);
+  font-size: 8px;
+  font-weight: 720;
+  pointer-events: none;
+}
+
+.ig-external-zone-preview {
+  display: grid;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.ig-external-zone-preview h3,
+.ig-external-zone-preview p {
+  margin: 0;
+}
+
+.ig-external-zone-preview h3 {
+  color: var(--text);
+  font-size: 0.98rem;
+}
+
+.ig-external-zone-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ig-external-zone-files span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-hover) 58%, var(--bg-surface));
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.ig-zone-network-note {
+  margin: 0;
+  padding: 0 10px 10px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
 }
 
 /* ── Side lists ────────────────────────────────────────────────────────────── */
@@ -427,6 +773,40 @@
   font-size: 0.8125rem;
   line-height: 1.4;
   color: var(--text-dim);
+}
+
+.ig-focus-detail {
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+}
+
+.ig-focus-detail-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 9px;
+  font-size: 0.78rem;
+}
+
+.ig-focus-reason {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.ig-focus-detail-grid span {
+  color: var(--text-muted, var(--text-dim));
+}
+
+.ig-focus-detail-grid strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 650;
 }
 
 .ig-list {
@@ -517,59 +897,146 @@
   color: var(--text-dim);
 }
 
-/* ── Top bar & Explore / Graph tabs ───────────────────────────────────────── */
-.ig-topbar {
-  margin-bottom: 14px;
-  padding: 12px 14px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
+/* ── Atlas hero & unified workspace ──────────────────────────────────────── */
+.ig-atlas-hero {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(340px, 520px);
+  gap: 10px;
+  margin-bottom: 0;
+  padding: 4px 0 2px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
 }
 
-.ig-topbar-row {
+[data-theme="light"] .ig-atlas-hero {
+  background: transparent;
+}
+
+.ig-atlas-copy {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+}
+
+.ig-kicker {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+.ig-atlas-metrics {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ig-metric-tile {
+  min-height: 46px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: color-mix(in srgb, var(--ig-panel) 78%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.ig-metric-value {
+  display: block;
+  font-size: clamp(1rem, 1.4vw, 1.35rem);
+  font-weight: 780;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ig-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ig-metric-label {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ig-muted);
+}
+
+.ig-atlas-footer {
+  position: relative;
+  z-index: 1;
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px 16px;
-}
-
-.ig-topbar-lead {
-  flex: 1;
-  min-width: min(100%, 220px);
+  gap: 10px 16px;
+  padding-top: 6px;
+  border-top: none;
 }
 
 .ig-page-title {
   margin: 0 0 4px;
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  max-width: none;
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+  font-weight: 760;
+  line-height: 1.1;
   color: var(--text);
 }
 
-.ig-topbar-metrics {
+.ig-atlas-summary {
   margin: 0;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--text-muted, var(--text-dim));
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ig-muted);
+}
+
+.ig-atlas-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg-surface));
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 780;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ig-atlas-mode::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 18px var(--ig-glow);
 }
 
 .ig-segments {
   display: inline-flex;
-  padding: 3px;
-  border-radius: 10px;
-  background: var(--bg-hover, var(--bg-active));
-  border: 1px solid var(--border);
-  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-hover) 58%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  gap: 3px;
   flex-shrink: 0;
 }
 
 .ig-segment {
   border: none;
-  border-radius: 8px;
-  padding: 7px 14px;
+  border-radius: 999px;
+  padding: 8px 16px;
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 720;
   color: var(--text-dim);
   background: transparent;
   cursor: pointer;
@@ -584,29 +1051,594 @@
 .ig-segment-active {
   color: var(--text);
   background: var(--bg-surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
 }
 
 .ig-topbar-hint {
-  margin: 10px 0 0;
-  font-size: 0.8rem;
+  max-width: 72ch;
+  margin: 8px 0 0;
+  font-size: 0.88rem;
   line-height: 1.45;
   color: var(--text-dim);
 }
 
 .ig-graph-shell {
+  grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 10px;
+  margin-top: 0;
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 36%),
+    var(--bg-surface);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.07);
   min-height: 0;
 }
 
-/* ── Explore codebase ───────────────────────────────────────────────────── */
+.ig-graph-shell-zone::before {
+  content: "Showing key routes for the focused file; hover or click a file to inspect its connections";
+  display: block;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--bg-hover) 32%, var(--bg-surface));
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.ig-graph-shell .ig-controls,
+.ig-graph-shell .ig-search-wrap {
+  margin-bottom: 0;
+}
+
+.ig-graph-shell .ig-controls {
+  padding: 10px;
+}
+
+.ig-graph-shell .ig-main {
+  position: relative;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  min-height: clamp(460px, 62vh, 760px);
+}
+
+.ig-graph-shell .ig-side {
+  grid-column: 1 / -1;
+}
+
+.ig-graph-shell .ig-side {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.ig-graph-shell .ig-panel-desc,
+.ig-graph-shell .ig-callout {
+  display: none;
+}
+
+.ig-graph-shell .ig-list {
+  max-height: 150px;
+}
+
+.ig-graph-shell .ig-svg-wrap {
+  min-height: 320px;
+  max-height: min(50vh, 520px);
+  cursor: grab;
+}
+
+.ig-graph-shell .ig-graph-column {
+  position: absolute;
+  top: 14px;
+  width: min(340px, 34%);
+  max-height: min(360px, 46vh);
+  z-index: 5;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-surface) 92%, transparent), var(--bg-surface)),
+    var(--bg-surface);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.98);
+  overflow: hidden;
+  transition: opacity 0.16s ease, transform 0.16s ease, width 0.18s ease, max-height 0.18s ease;
+}
+
+.ig-graph-shell .ig-graph-column-right {
+  right: 14px;
+}
+
+.ig-graph-shell .ig-graph-column-left {
+  left: 14px;
+}
+
+.ig-street-view-preview .ig-graph-column {
+  opacity: 1;
+  pointer-events: none;
+  transform: translateY(0) scale(1);
+}
+
+.ig-street-view-dialog .ig-graph-column,
+.ig-graph-shell .ig-graph-column:hover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.ig-street-view-dialog .ig-graph-column {
+  width: min(880px, 78%);
+  max-height: min(78vh, 760px);
+}
+
+.ig-street-view-preview .ig-controls,
+.ig-street-view-preview .ig-type-toggles,
+.ig-street-view-preview .ig-side,
+.ig-street-view-preview .ig-street-detail,
+.ig-street-view-preview .ig-edge-labels {
+  display: none;
+}
+
+.ig-street-view-preview .ig-graph-head {
+  margin-bottom: 6px;
+}
+
+.ig-street-view-preview .ig-svg-wrap {
+  min-height: 190px;
+  max-height: 260px;
+}
+
+.ig-street-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-hover) 26%, var(--bg-surface));
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.ig-street-detail strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.ig-node {
+  cursor: move;
+}
+
+/* ── Atlas, signals, and drill-down panels ───────────────────────────────── */
 .ig-explore {
+  grid-column: 1;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 0;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.ig-explore-selected {
+  position: sticky;
+  top: 8px;
+  z-index: 8;
+}
+
+.ig-codebase-morph {
+  display: grid;
+  gap: 8px;
+}
+
+.ig-codebase-morph .ig-codebase-mini,
+.ig-codebase-morph .ig-scope-card {
+  overflow: hidden;
+  transition:
+    max-height 0.28s ease,
+    opacity 0.22s ease,
+    transform 0.28s ease,
+    padding 0.28s ease,
+    border-width 0.28s ease,
+    margin 0.28s ease;
+}
+
+.ig-codebase-morph-full .ig-codebase-mini {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+  margin: 0;
+  transform: translateY(-12px) scale(0.96);
+  pointer-events: none;
+}
+
+.ig-codebase-morph-full .ig-scope-card {
+  max-height: 760px;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.ig-codebase-morph-mini .ig-codebase-mini {
+  max-height: 64px;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.ig-codebase-morph-mini .ig-scope-card {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+  margin: 0;
+  transform: translateY(-18px) scale(0.965);
+  pointer-events: none;
+}
+
+.ig-codebase-mini {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  background: color-mix(in srgb, var(--bg-surface) 94%, transparent);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(12px);
+  transform-origin: 50% 0;
+}
+
+.ig-mini-reset,
+.ig-mini-zone {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 760;
+  line-height: 1;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.ig-mini-zones {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.ig-mini-zone {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.ig-mini-zone-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
+}
+
+.ig-mini-current {
+  padding: 0 8px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.ig-atlas-stage {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.ig-scope-card {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  background:
+    radial-gradient(circle at 0 0, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%),
+    var(--bg-surface);
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.05);
+}
+
+.ig-zone-selector-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.34fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.ig-zone-map {
+  min-width: 0;
+}
+
+.ig-zone-map svg {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 46%),
+    color-mix(in srgb, var(--bg-hover) 22%, var(--bg-surface));
+}
+
+.ig-zone-map-flows path {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 2;
+  stroke-opacity: 0.62;
+}
+
+.ig-zone-map-flows text {
+  fill: var(--orange);
+  paint-order: stroke;
+  stroke: var(--bg-surface);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  font-size: 11px;
+  font-weight: 800;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.ig-zone-map-flows g:hover text {
+  opacity: 1;
+}
+
+.ig-zone-map-flows .ig-zone-map-flow-count {
+  fill: var(--text-dim);
+  font-size: 9px;
+  font-weight: 720;
+}
+
+.ig-zone-map-node {
+  cursor: grab;
+}
+
+.ig-zone-map-node rect {
+  fill: color-mix(in srgb, var(--bg-surface) 92%, var(--bg-hover));
+  stroke: color-mix(in srgb, var(--text-muted, var(--text-dim)) 24%, var(--border));
+  stroke-width: 1.5;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.10));
+}
+
+.ig-zone-map-node:hover rect,
+.ig-zone-map-node-active rect {
+  fill: color-mix(in srgb, var(--purple, var(--accent)) 7%, var(--bg-surface));
+  stroke: color-mix(in srgb, var(--purple, var(--accent)) 54%, var(--border));
+  stroke-width: 2.4;
+}
+
+.ig-zone-map-name {
+  fill: var(--text);
+  font-size: 10.5px;
+  font-weight: 820;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.ig-zone-map-meta {
+  fill: var(--text-dim);
+  font-size: 8.5px;
+  font-weight: 720;
+  pointer-events: none;
+}
+
+.ig-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ig-boundary-strip {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-hover) 22%, var(--bg-surface));
+}
+
+.ig-boundary-strip h4 {
+  margin: 0 0 8px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 760;
+}
+
+.ig-boundary-list {
+  display: grid;
+  gap: 6px;
+}
+
+.ig-boundary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 9px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+}
+
+.ig-boundary-route {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.ig-boundary-count {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 14%, var(--bg-surface));
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.ig-boundary-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.ig-atlas-map {
+  position: relative;
+  min-height: 260px;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 34%),
+    radial-gradient(circle at 25% 78%, color-mix(in srgb, var(--purple) 10%, transparent), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-hover) 34%, var(--ig-panel)), var(--ig-panel));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.ig-atlas-map::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.34;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--border) 54%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 54%, transparent) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(circle at 50% 50%, #000 20%, transparent 78%);
+  pointer-events: none;
+}
+
+.ig-atlas-map svg {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+}
+
+.ig-atlas-link {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 60%, var(--purple));
+  stroke-linecap: round;
+  stroke-opacity: 0.24;
+}
+
+.ig-atlas-node {
+  cursor: pointer;
+}
+
+.ig-atlas-node-aura {
+  fill: var(--accent);
+  opacity: 0.07;
+}
+
+.ig-atlas-node-core {
+  fill: url(#ig-zone-glow);
+  stroke: color-mix(in srgb, var(--accent) 42%, var(--border));
+  stroke-width: 1.5;
+}
+
+.ig-atlas-node-active .ig-atlas-node-core {
+  stroke: var(--orange);
+  stroke-width: 3;
+}
+
+.ig-atlas-node-name {
+  fill: var(--text);
+  font-size: 13px;
+  font-weight: 780;
+  pointer-events: none;
+}
+
+.ig-atlas-node-count {
+  fill: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.ig-atlas-empty {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  color: var(--text-dim);
+}
+
+.ig-signal-deck {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.ig-signal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 11px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.ig-signal-card-primary {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 42%),
+    var(--bg-surface);
+}
+
+.ig-signal-eyebrow {
+  font-size: 0.66rem;
+  font-weight: 820;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.ig-signal-card strong {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.ig-signal-card p {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--text-dim);
 }
 
 .ig-explore-toolbar {
@@ -702,53 +1734,19 @@
   max-width: 70ch;
 }
 
-.ig-zone-cards {
-  display: flex;
-  flex-wrap: wrap;
+.ig-drill-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
+  align-items: start;
 }
 
-.ig-zone-card {
-  min-width: 200px;
-  max-width: 280px;
-  flex: 1 1 200px;
-  padding: 12px 14px;
-  border-radius: 12px;
+.ig-panel-card {
+  padding: 14px;
+  border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--bg-surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-
-.ig-zone-card-active {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
-}
-
-.ig-zone-card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.ig-zone-card-name {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.ig-zone-card-count {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted, var(--text-dim));
-  white-space: nowrap;
-}
-
-.ig-zone-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.05);
 }
 
 .ig-table-scroll {
@@ -756,11 +1754,11 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-surface);
-  max-height: 280px;
+  max-height: 180px;
 }
 
 .ig-table-scroll--tall {
-  max-height: min(52vh, 560px);
+  max-height: min(32vh, 300px);
 }
 
 .ig-table {
@@ -830,4 +1828,77 @@
 
 .ig-table-row-click:hover td {
   background: var(--bg-hover, var(--bg-active));
+}
+
+@media (max-width: 980px) {
+  .ig-page {
+    grid-template-columns: 1fr;
+  }
+
+  .ig-explore,
+  .ig-zone-overview,
+  .ig-graph-shell {
+    grid-column: 1;
+  }
+
+  .ig-atlas-hero,
+  .ig-atlas-stage,
+  .ig-drill-grid,
+  .ig-zone-selector-grid,
+  .ig-graph-shell .ig-main {
+    grid-template-columns: 1fr;
+  }
+
+  .ig-atlas-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ig-signal-deck,
+  .ig-graph-shell .ig-side {
+    grid-template-columns: 1fr;
+  }
+
+  .ig-graph-shell .ig-graph-column {
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
+
+  .ig-street-view-preview .ig-graph-column {
+    left: auto;
+    right: 8px;
+    top: 8px;
+    width: min(280px, 48vw);
+    max-height: min(250px, 38vh);
+    padding: 8px;
+  }
+
+  .ig-street-view-preview .ig-graph-scope {
+    display: none;
+  }
+
+  .ig-street-view-preview .ig-svg-wrap {
+    min-height: 120px;
+    max-height: 160px;
+  }
+
+  .ig-street-view-preview .ig-svg-wrap svg {
+    min-height: 120px;
+  }
+}
+
+@media (max-width: 640px) {
+  .ig-street-view-preview .ig-graph-column {
+    width: min(230px, 58vw);
+    max-height: 210px;
+  }
+
+  .ig-street-view-preview .ig-svg-wrap {
+    min-height: 96px;
+    max-height: 130px;
+  }
+
+  .ig-street-view-preview .ig-svg-wrap svg {
+    min-height: 96px;
+  }
 }

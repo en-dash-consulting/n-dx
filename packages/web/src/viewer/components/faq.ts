@@ -41,7 +41,7 @@ const FAQ_SECTIONS: FAQSection[] = [
         question: "What are zones and how are they detected?",
         answer:
           "Zones are architectural areas detected by Louvain community detection on the import graph. Files with strong internal connections cluster into zones. Low cohesion (<0.4) suggests a zone should be split; high coupling (>0.6) suggests merging.",
-        docLink: { label: "Zones view", hash: "zones" },
+        docLink: { label: "Map view", hash: "graph" },
       },
       {
         question: "What are enrichment passes?",
@@ -52,7 +52,7 @@ const FAQ_SECTIONS: FAQSection[] = [
         question: "What does the import graph show?",
         answer:
           "A force-directed visualization where nodes are files colored by zone. Orange cross-zone edges highlight potential boundary violations. Dense clusters suggest tight coupling; isolated nodes may be dead code.",
-        docLink: { label: "Import Graph", hash: "graph" },
+        docLink: { label: "Map", hash: "graph" },
       },
     ],
   },

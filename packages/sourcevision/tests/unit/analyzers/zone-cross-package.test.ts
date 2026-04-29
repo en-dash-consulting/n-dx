@@ -173,6 +173,58 @@ describe("analyzeZones cross-package crossings", () => {
     vi.restoreAllMocks();
   });
 
+  it("does not duplicate promoted sub-analysis zones across reuseStructure passes", async () => {
+    const subZone = makeZone("core", [
+      "src/client.ts",
+      "src/types.ts",
+    ]);
+    const sub: SubAnalysis = makeSubAnalysis({
+      id: "packages-foundation",
+      prefix: "packages/foundation",
+      svDir: "/test/packages/foundation/.sourcevision",
+      zones: {
+        zones: [subZone],
+        crossings: [],
+        unzoned: [],
+      },
+      imports: {
+        edges: [
+          { from: "src/client.ts", to: "src/types.ts", type: "static", symbols: ["Config"] },
+        ],
+        external: [],
+        summary: {
+          totalEdges: 1, totalExternal: 0, circularCount: 0,
+          circulars: [], mostImported: [], avgImportsPerFile: 1,
+        },
+      },
+      inventory: {
+        files: [
+          makeFileEntry("src/client.ts"),
+          makeFileEntry("src/types.ts"),
+        ],
+        summary: { totalFiles: 2, totalLines: 20, byLanguage: {}, byRole: {}, byCategory: {} },
+      },
+    });
+
+    const rootInventory = makeInventory([]);
+    const rootImports = makeImports([]);
+
+    const first = await analyzeZones(rootInventory, rootImports, {
+      enrich: false,
+      subAnalyses: [sub],
+    });
+    const second = await analyzeZones(rootInventory, rootImports, {
+      enrich: false,
+      previousZones: first.zones,
+      reuseStructure: true,
+      subAnalyses: [sub],
+    });
+
+    const ids = second.zones.zones.map((z) => z.id);
+    expect(ids).toEqual([...new Set(ids)]);
+    expect(ids.filter((id) => id === "packages-foundation:core")).toHaveLength(1);
+  });
+
   it("produces no cross-package crossings when there are no sub-analyses", async () => {
     // Simple single-repo scenario with no sub-analyses
     const files = [

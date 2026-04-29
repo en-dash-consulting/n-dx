@@ -114,12 +114,14 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   // Feature-gated nav items: subscribe to toggle state
   const notionSyncEnabled = useFeatureToggle("rex.notionSync", false);
   const integrationsEnabled = useFeatureToggle("rex.integrations", false);
+  const prMarkdownEnabled = useFeatureToggle("sourcevision.prMarkdown", false);
   const enabledGates = useMemo(() => {
     const m = new Map<string, boolean>();
     m.set("rex.notionSync", notionSyncEnabled);
     m.set("rex.integrations", integrationsEnabled);
+    m.set("sourcevision.prMarkdown", prMarkdownEnabled);
     return m;
-  }, [notionSyncEnabled, integrationsEnabled]);
+  }, [notionSyncEnabled, integrationsEnabled, prMarkdownEnabled]);
 
   /** Sections filtered by scope and feature gates. */
   const visibleSections = useMemo(() => {

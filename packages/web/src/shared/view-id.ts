@@ -9,7 +9,6 @@
 export type ViewId =
   | "overview"
   | "graph"
-  | "zones"
   | "files"
   | "routes"
   | "architecture"

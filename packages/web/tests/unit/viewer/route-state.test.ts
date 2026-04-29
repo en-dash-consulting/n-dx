@@ -5,7 +5,6 @@ import { parseLegacyHashRoute, parsePathnameRoute, resolveLocationRoute } from "
 const VIEWS = new Set<ViewId>([
   "overview",
   "graph",
-  "zones",
   "files",
   "routes",
   "architecture",

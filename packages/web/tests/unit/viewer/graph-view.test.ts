@@ -54,26 +54,56 @@ function makeLoadedData(overrides: Partial<LoadedData> = {}): LoadedData {
 }
 
 describe("Graph (Import Graph view)", () => {
-  it("defaults to explore with sortable file table", () => {
+  it("renders a clear scope selector and graph panel", () => {
     const root = document.createElement("div");
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
-    expect(root.querySelector("#ig-tab-explore")?.getAttribute("aria-selected")).toBe("true");
-    expect(root.querySelector(".ig-table-row-click")).not.toBeNull();
-    expect(root.textContent).toContain("src/a.ts");
+    expect(root.querySelector(".ig-scope-card")).not.toBeNull();
+    expect(root.querySelector(".ig-zone-map")).not.toBeNull();
+    expect(root.querySelector(".ig-zone-row")).toBeNull();
+    expect(root.querySelector(".ig-controls")).toBeNull();
+    expect(root.querySelector(".ig-type-toggles")).toBeNull();
+    expect(root.querySelector("#ig-graph-panel")).not.toBeNull();
+    expect(root.textContent).toContain("Codebase map");
+    expect(root.querySelector(".ig-boundary-strip")?.textContent).toContain("Zone A -> Zone B");
+    expect(root.textContent).toContain("Zone A");
   });
 
-  it("explore row click switches to file graph and selects file", async () => {
+  it("zone network click refocuses the local graph without opening detail panel", async () => {
     const onSelect = vi.fn();
     const root = document.createElement("div");
     render(h(Graph, { data: makeLoadedData(), onSelect }), root);
-    const row = [...root.querySelectorAll(".ig-table-row-click")].find((r) => r.textContent?.includes("src/c.ts"));
-    expect(row).toBeTruthy();
-    (row as HTMLElement).click();
+    const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
+    expect(zoneBtn).toBeTruthy();
+    (zoneBtn as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await vi.waitFor(() => {
-      expect((root.querySelector("#ig-tab-graph") as HTMLButtonElement).getAttribute("aria-selected")).toBe("true");
+      expect(root.querySelector(".ig-zone-network-node")).not.toBeNull();
     });
-    expect(onSelect).toHaveBeenCalled();
-    expect(onSelect.mock.calls.some((c) => c[0]?.path === "src/c.ts")).toBe(true);
+    (root.querySelector(".ig-zone-network-node") as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("Driven by file: c.ts");
+      expect(root.querySelector("#ig-graph-panel")?.className).toContain("ig-street-view-dialog");
+      expect(root.querySelector(".ig-street-detail")?.textContent).toContain("src/c.ts");
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("closes file street view when clicking the zone map background", async () => {
+    const root = document.createElement("div");
+    render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
+    expect(zoneBtn).toBeTruthy();
+    (zoneBtn as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-zone-network-node")).not.toBeNull();
+    });
+    (root.querySelector(".ig-zone-network-node") as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector("#ig-graph-panel")?.className).toContain("ig-street-view-dialog");
+    });
+    (root.querySelector(".ig-zone-network-bg") as SVGRectElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector("#ig-graph-panel")?.className).toContain("ig-street-view-closed");
+    });
   });
 
   it("shows loading when imports are missing", () => {
@@ -87,39 +117,125 @@ describe("Graph (Import Graph view)", () => {
     const root = document.createElement("div");
     const data = makeLoadedData();
     render(h(Graph, { data, onSelect: vi.fn() }), root);
-    expect(root.textContent).toContain("Import Graph");
-    expect(root.textContent).toContain("2 edges");
-    expect(root.textContent).toContain("1 package");
-    const graphTab = root.querySelector("#ig-tab-graph") as HTMLButtonElement | null;
-    expect(graphTab).not.toBeNull();
-    graphTab!.click();
+    expect(root.textContent).toContain("Map");
+    expect(root.textContent).toContain("2 imports");
+    expect(root.textContent).toContain("1packages");
     await vi.waitFor(() => {
-      expect(root.querySelector("svg")).not.toBeNull();
+      expect(root.querySelector(".ig-node-file")).not.toBeNull();
     });
-    expect(root.textContent).toContain("src/b.ts");
+    expect(root.querySelector("#ig-graph-panel")?.textContent).toContain("src");
   });
 
-  it("calls onSelect when a hub list entry is clicked", async () => {
+  it("zone selection updates visible candidates without opening detail panel", async () => {
     const onSelect = vi.fn();
     const root = document.createElement("div");
     render(h(Graph, { data: makeLoadedData(), onSelect }), root);
-    (root.querySelector("#ig-tab-graph") as HTMLButtonElement).click();
-    await vi.waitFor(() => root.querySelector(".ig-list button"));
-    const buttons = root.querySelectorAll(".ig-list button");
-    const hubBtn = [...buttons].find((b) => b.textContent?.includes("src/b.ts"));
-    expect(hubBtn).toBeTruthy();
-    (hubBtn as HTMLButtonElement).click();
-    expect(onSelect).toHaveBeenCalled();
-    const arg = onSelect.mock.calls[0][0];
-    expect(arg.type).toBe("file");
-    expect(arg.path).toBe("src/b.ts");
+    const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
+    expect(zoneBtn).toBeTruthy();
+    (zoneBtn as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("Driven by zone: Zone B");
+    });
+    expect(root.querySelector(".ig-codebase-mini")?.textContent).toContain("Zone B");
+    expect(root.querySelector(".ig-zone-overview")?.textContent).toContain("Zone B");
+    expect(root.querySelector(".ig-zone-overview-kicker")?.textContent).toContain("Zone map");
+    expect(root.textContent).toContain("Map of Zone:");
+    expect(root.textContent).not.toContain("Filtered to Zone B");
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("expands the codebase map only on upward wheel intent at the top", async () => {
+    const root = document.createElement("div");
+    root.className = "main";
+    render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone A"));
+    expect(zoneBtn).toBeTruthy();
+    (zoneBtn as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-codebase-morph")?.className).toContain("ig-codebase-morph-mini");
+    });
+    root.scrollTop = 200;
+    root.dispatchEvent(new Event("scroll"));
+    root.scrollTop = 100;
+    root.dispatchEvent(new Event("scroll"));
+    expect(root.querySelector(".ig-codebase-morph")?.className).toContain("ig-codebase-morph-mini");
+    root.scrollTop = 0;
+    root.querySelector(".ig-page")?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -20 }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-codebase-morph")?.className).toContain("ig-codebase-morph-full");
+      expect(root.querySelector(".ig-zone-overview")?.textContent).toContain("Zone A");
+    });
+    root.querySelector(".ig-page")?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 20 }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-codebase-morph")?.className).toContain("ig-codebase-morph-mini");
+    });
+  });
+
+  it("recenters the file street view when the focused graph changes", async () => {
+    const root = document.createElement("div");
+    render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    const svg = root.querySelector(".ig-graph-column .ig-svg-wrap svg") as SVGSVGElement;
+    expect(svg).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-focus-chip")?.textContent).toBeTruthy();
+    });
+    svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 40 }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-graph-column .ig-svg-wrap svg > g[transform]")?.getAttribute("transform")).toContain("translate(0 -40)");
+    });
+    const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
+    expect(zoneBtn).toBeTruthy();
+    (zoneBtn as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-graph-column .ig-svg-wrap svg > g[transform]")?.getAttribute("transform")).toBe("translate(0 0) scale(1)");
+    });
+  });
+
+  it("supports back and forward through clicked dependency preview nodes", async () => {
+    const root = document.createElement("div");
+    render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-node-file[title='src/a.ts']")).not.toBeNull();
+    });
+    (root.querySelector(".ig-node-file[title='src/a.ts']") as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/a.ts");
+    });
+    const buttons = [...root.querySelectorAll(".ig-preview-history-btn")] as HTMLButtonElement[];
+    buttons[0].click();
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/b.ts");
+    });
+    buttons[1].click();
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/a.ts");
+    });
+  });
+
+  it("shows external zones that touch cross-boundary imports", async () => {
+    const root = document.createElement("div");
+    render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone A"));
+    expect(zoneBtn).toBeTruthy();
+    (zoneBtn as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-zone-external-node rect")).not.toBeNull();
+      expect(root.querySelector(".ig-zone-network-file-box")).not.toBeNull();
+      expect(root.querySelector(".ig-zone-network-boundary-pin")).not.toBeNull();
+    });
+    (root.querySelector(".ig-zone-network-node") as SVGGElement).dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-zone-network-edge-external path")).not.toBeNull();
+      expect(root.querySelector(".ig-zone-overview")?.textContent).toContain("Zone B");
+      expect(root.querySelector(".ig-graph-scope")?.textContent).toContain("cross-boundary");
+      expect(root.querySelector(".ig-edge-labels")?.textContent).toContain("Zone A -> Zone B");
+    });
   });
 
   it("navigates to files view on double-click of a node", async () => {
     const navigateTo = vi.fn();
     const root = document.createElement("div");
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn(), navigateTo }), root);
-    (root.querySelector("#ig-tab-graph") as HTMLButtonElement).click();
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-node-file")).not.toBeNull();
     });

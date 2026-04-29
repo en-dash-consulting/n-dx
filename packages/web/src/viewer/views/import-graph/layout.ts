@@ -14,7 +14,7 @@ export interface LayoutNode {
 }
 
 /** SVG node box sizes — keep in sync with `import-graph.css` (.ig-node-* rect). */
-export const FILE_NODE_BOX = { w: 152, h: 40 } as const;
+export const FILE_NODE_BOX = { w: 168, h: 52 } as const;
 export const PKG_NODE_BOX = { w: 180, h: 42 } as const;
 
 export function nodeBox(kind: NodeKind): { readonly w: number; readonly h: number } {
@@ -25,12 +25,12 @@ export function nodeHalfWidth(kind: NodeKind): number {
   return nodeBox(kind).w / 2;
 }
 
-const ROW_H = 48;
+const ROW_H = 64;
 /** Keep node centers ≥ half box width + margin so SVG nodes are not clipped (see FILE_NODE_BOX). */
 const PAD_X = 28;
 const COL_LEFT = PAD_X + FILE_NODE_BOX.w / 2;
-const COL_CENTER = 360;
-const COL_RIGHT = 612;
+const COL_CENTER = 382;
+const COL_RIGHT = 666;
 const COL_PKG = 472;
 const TOP = 88;
 
@@ -93,7 +93,7 @@ export function layoutFocusedGraph(opts: {
     });
   }
 
-  const height = Math.max(460, TOP + maxCol * ROW_H + (packageName ? 160 : 64));
+  const height = Math.max(460, TOP + maxCol * ROW_H + (packageName ? 160 : 72));
   const width = Math.max(760, COL_RIGHT + FILE_NODE_BOX.w / 2 + PAD_X);
   return { nodes, width, height };
 }

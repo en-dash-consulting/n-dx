@@ -22,7 +22,6 @@ import type { DegradableFeature } from "../performance/index.js";
 import {
   Overview,
   Graph,
-  ZonesView,
   FilesView,
   ArchitectureView,
   ProblemsView,
@@ -83,9 +82,6 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
     h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),
-
-  "zones": ({ data, setDetail, navigateTo }) =>
-    h(ZonesView, { data, onSelect: setDetail, navigateTo }),
 
   "files": ({ data, setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }) =>
     h(FilesView, { data, onSelect: setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }),

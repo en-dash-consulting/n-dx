@@ -122,6 +122,22 @@ function createMockApi(options: MockApiOptions = {}): typeof fetch {
     const url = String(input);
 
     if (url === "/api/config") return jsonResponse({ scope });
+    if (url === "/api/features") {
+      return jsonResponse({
+        toggles: [
+          {
+            key: "sourcevision.prMarkdown",
+            label: "PR Markdown Page",
+            description: "Show the SourceVision PR Markdown page in navigation.",
+            impact: "",
+            package: "sourcevision",
+            stability: "experimental",
+            defaultValue: false,
+            enabled: true,
+          },
+        ],
+      });
+    }
     if (url === "/api/project") return jsonResponse({ name: "n-dx", description: null, version: null, git: null, nameSource: "directory" });
     if (url === "/api/status") {
       return jsonResponse({
@@ -158,14 +174,15 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
   it("shows PR Markdown as a SourceVision tab and selects it like existing tabs", async () => {
     await bootViewer("/overview", createMockApi());
 
-    const zonesItem = findNavItem("Zones");
+    await waitFor(() => findNavItem("PR Markdown") !== null);
+    const mapItem = findNavItem("Map");
     const prMarkdownItem = findNavItem("PR Markdown");
-    expect(zonesItem).not.toBeNull();
+    expect(mapItem).not.toBeNull();
     expect(prMarkdownItem).not.toBeNull();
 
-    zonesItem?.click();
-    await waitFor(() => window.location.pathname === "/zones");
-    await waitFor(() => document.querySelector(".nav-item.active")?.textContent?.includes("Zones") ?? false);
+    mapItem?.click();
+    await waitFor(() => window.location.pathname === "/graph");
+    await waitFor(() => document.querySelector(".nav-item.active")?.textContent?.includes("Map") ?? false);
 
     prMarkdownItem?.click();
     await waitFor(() => window.location.pathname === "/pr-markdown");
@@ -209,6 +226,7 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
     const failingFetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/api/config") return jsonResponse({ scope: "sourcevision" });
+      if (url === "/api/features") return jsonResponse({ toggles: [] });
       if (url === "/api/project") return jsonResponse({ name: "n-dx", description: null, version: null, git: null, nameSource: "directory" });
       if (url === "/api/status") {
         return jsonResponse({

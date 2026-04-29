@@ -505,7 +505,7 @@ describe("Sidebar", () => {
     });
 
     it("navigates to overview when progress indicator is clicked", () => {
-      renderSidebar({ manifest: mockManifest, view: "zones" as const });
+      renderSidebar({ manifest: mockManifest, view: "graph" as const });
       const progress = root.querySelector<HTMLElement>(".sidebar-progress");
       progress?.click();
       expect(onNavigate).toHaveBeenCalledWith("overview");
@@ -587,9 +587,10 @@ describe("Sidebar", () => {
     it("shows sourcevision nav items + token usage + settings when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 9 sourcevision items (including Import Graph) + 1 token usage item + 6 settings items (General, ndx analyze/plan, ndx work, ndx export, Feature Flags, CLI Timeouts)
-      // ndx sync (notion-config) is feature-gated (rex.notionSync=false by default) so not counted
-      expect(navItems.length).toBe(16);
+      // 7 sourcevision items (PR Markdown is feature-gated off by default) + 1 token usage item
+      // + 6 settings items (General, ndx analyze/plan, ndx work, ndx export, Feature Flags, CLI Timeouts).
+      // ndx sync (notion-config) is feature-gated (rex.notionSync=false by default) so not counted.
+      expect(navItems.length).toBe(14);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

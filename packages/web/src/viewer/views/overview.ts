@@ -293,8 +293,8 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
               navigateTo
                 ? h("button", {
                     class: "link-btn",
-                    onClick: () => navigateTo("zones"),
-                  }, "View all \u2192")
+                    onClick: () => navigateTo("graph"),
+                  }, "Open map \u2192")
                 : null
             ),
             h("div", { class: "top-zones-list" },
@@ -308,7 +308,7 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
                 return h("div", {
                   key: zone.id,
                   class: "top-zone-item",
-                  onClick: navigateTo ? () => navigateTo("zones", { zone: zone.id }) : undefined,
+                  onClick: navigateTo ? () => navigateTo("graph", { zone: zone.id }) : undefined,
                 },
                   h("span", { class: "zone-dot", style: `background: ${color}` }),
                   h("span", { class: "zone-name" }, zone.name),

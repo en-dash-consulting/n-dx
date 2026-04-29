@@ -8,8 +8,8 @@ import {
 } from "../../../src/viewer/views/index.js";
 
 describe("SOURCEVISION_TABS", () => {
-  it("defines exactly 9 tabs", () => {
-    expect(SOURCEVISION_TABS).toHaveLength(9);
+  it("defines exactly 8 tabs", () => {
+    expect(SOURCEVISION_TABS).toHaveLength(8);
   });
 
   it("every tab has required fields", () => {
@@ -31,7 +31,8 @@ describe("SOURCEVISION_TABS", () => {
     const ids = SOURCEVISION_TABS.map((t) => t.id);
     expect(ids).toContain("overview");
     expect(ids).toContain("graph");
-    expect(ids).toContain("zones");
+    expect(SOURCEVISION_TABS.find((t) => t.id === "graph")?.label).toBe("Map");
+    expect(ids).not.toContain("zones");
     expect(ids).toContain("files");
     expect(ids).toContain("routes");
     expect(ids).toContain("architecture");
@@ -57,6 +58,10 @@ describe("SOURCEVISION_TABS", () => {
     for (const tab of ungated) {
       expect(tab.minPass).toBe(0);
     }
+  });
+
+  it("gates PR Markdown behind a default-off feature flag", () => {
+    expect(SOURCEVISION_TABS.find((t) => t.id === "pr-markdown")?.featureGate).toBe("sourcevision.prMarkdown");
   });
 });
 

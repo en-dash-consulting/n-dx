@@ -69,6 +69,15 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     stability: "stable",
     defaultValue: true,
   },
+  {
+    key: "sourcevision.prMarkdown",
+    label: "PR Markdown Page",
+    description: "Show the SourceVision PR Markdown page in navigation.",
+    impact: "When disabled, PR Markdown remains hidden from the SourceVision sidebar.",
+    package: "sourcevision",
+    stability: "experimental",
+    defaultValue: false,
+  },
   // ── Rex ────────────────────────────────────────────────────────────
   {
     key: "rex.autoComplete",
