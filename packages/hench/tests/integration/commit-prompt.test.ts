@@ -233,3 +233,193 @@ describe("performCommitPromptIfNeeded (commit approval bypass)", () => {
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
 });
+
+describe("performCommitPromptIfNeeded (PRD status integration)", () => {
+  let projectDir: string;
+  let henchDir: string;
+  let rexDir: string;
+  let originalIsTTY: boolean | undefined;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-prd-status-"));
+    henchDir = join(projectDir, ".hench");
+    rexDir = join(projectDir, ".rex");
+    await initConfig(henchDir);
+    await mkdir(join(henchDir, "runs"), { recursive: true });
+    await mkdir(join(rexDir, "tree", "task-slug-1"), { recursive: true });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await setupGitRepo(projectDir);
+
+    originalIsTTY = process.stdin.isTTY;
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: originalIsTTY,
+      configurable: true,
+    });
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("stages PRD status file alongside code changes in the same commit", async () => {
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Create initial PRD task file with status "in_progress"
+    const taskIndexPath = join(rexDir, "tree", "task-slug-1", "index.md");
+    const initialTaskContent = `# Task
+status: in_progress
+`;
+    await mkdir(join(rexDir, "tree", "task-slug-1"), { recursive: true });
+    await writeFile(taskIndexPath, initialTaskContent, "utf-8");
+
+    // Create initial code file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+
+    // Create initial commit with both files
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+    // Modify code file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+
+    // Write proposed commit message
+    await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: update x", "utf-8");
+
+    // Create a mock store that updates the task file's status
+    const mockStore = {
+      updateItem: vi.fn(async (taskId: string) => {
+        if (taskId === "task-1") {
+          const content = readFileSync(taskIndexPath, "utf-8");
+          const updated = content.replace("status: in_progress", "status: completed");
+          await writeFile(taskIndexPath, updated, "utf-8");
+        }
+      }),
+      appendLog: vi.fn(async () => {}),
+    };
+
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false, // non-interactive so it auto-commits
+      configurable: true,
+    });
+
+    const run = buildCompletedRun();
+
+    await performCommitPromptIfNeeded(
+      run,
+      projectDir,
+      /* autoCommit */ false,
+      /* yes */ false,
+      /* autonomous */ true,
+      mockStore as any,
+      "task-1",
+    );
+
+    // Verify the commit was created
+    expect(await getHeadSubject(projectDir)).toBe("feat: update x");
+
+    // Verify both the code file and PRD status file are in the commit
+    const { stdout: commitFiles } = await execAsync(
+      "git diff-tree --no-commit-id --name-only -r HEAD",
+      { cwd: projectDir },
+    );
+    const files = commitFiles.trim().split("\n");
+    expect(files).toContain("src.ts");
+    expect(files.some((f) => f.includes(".rex/tree"))).toBe(true);
+
+    // Verify the PRD file content shows status: completed
+    const committedTask = readFileSync(taskIndexPath, "utf-8");
+    expect(committedTask).toContain("status: completed");
+
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+  });
+
+  it("does not update PRD status if commit is declined", async () => {
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    vi.doMock("node:readline", () => ({
+      createInterface: () => ({
+        question: (q: string, cb: (answer: string) => void) => {
+          cb("n"); // decline
+        },
+        close: () => {},
+        on: () => {},
+        removeListener: () => {},
+      }),
+    }));
+    vi.resetModules();
+
+    try {
+      const { performCommitPromptIfNeeded: updated } = await import(
+        "../../src/agent/lifecycle/shared.js"
+      );
+
+      const taskIndexPath = join(rexDir, "tree", "task-slug-1", "index.md");
+      const initialTaskContent = `# Task
+status: in_progress
+`;
+      await writeFile(taskIndexPath, initialTaskContent, "utf-8");
+      await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+
+      await execAsync("git add .", { cwd: projectDir });
+      await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+      await writeFile(join(projectDir, "src.ts"), "export const x = 3;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      await writeFile(
+        join(projectDir, ".hench-commit-msg.txt"),
+        "feat: update to 3",
+        "utf-8",
+      );
+
+      let statusWasUpdated = false;
+      const mockStore = {
+        updateItem: vi.fn(async () => {
+          statusWasUpdated = true;
+          // Normally this would update the file, but we're testing that it's NOT called
+          throw new Error("updateItem should not be called when commit is declined");
+        }),
+        appendLog: vi.fn(async () => {}),
+      };
+
+      Object.defineProperty(process.stdin, "isTTY", {
+        value: true,
+        configurable: true,
+      });
+
+      const run = buildCompletedRun();
+
+      // This should decline the commit
+      await updated(
+        run,
+        projectDir,
+        /* autoCommit */ false,
+        /* yes */ false,
+        /* autonomous */ false,
+        mockStore as any,
+        "task-1",
+      );
+
+      // Verify updateItem was not called (status not updated)
+      expect(statusWasUpdated).toBe(false);
+      expect(mockStore.updateItem).not.toHaveBeenCalled();
+
+      // Verify HEAD is still the initial commit
+      expect(await getHeadSubject(projectDir)).toBe("initial");
+
+      // Verify the file still has status: in_progress
+      const taskContent = readFileSync(taskIndexPath, "utf-8");
+      expect(taskContent).toContain("status: in_progress");
+    } finally {
+      vi.resetModules();
+    }
+  });
+});

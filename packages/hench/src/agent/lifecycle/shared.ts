@@ -827,6 +827,8 @@ export async function performCommitPromptIfNeeded(
   autoCommit: boolean,
   yes?: boolean,
   autonomous?: boolean,
+  store?: PRDStore,
+  taskId?: string,
 ): Promise<void> {
   if (autoCommit || run.status !== "completed") return;
 
@@ -872,6 +874,52 @@ export async function performCommitPromptIfNeeded(
     info(`Commit declined — ${stagedCount} file(s) left staged.`);
     try { unlinkSync(msgPath); } catch { /* ignore */ }
     return;
+  }
+
+  // Update PRD status and stage the change before committing.
+  // This ensures the status transition and code changes are in the same commit.
+  if (store && taskId && run.status === "completed") {
+    try {
+      // Update PRD status to "completed"
+      await toolRexUpdateStatus(store, taskId, { status: "completed" });
+      // Log the completion event
+      await toolRexAppendLog(store, taskId, {
+        event: "task_completed",
+        detail: run.summary,
+      });
+
+      // Find and stage the modified PRD file(s) in .rex/tree/
+      // After toolRexUpdateStatus modifies the tree, stage the changed files.
+      try {
+        // Use git status to find modified files in .rex/tree/
+        const { stdout } = await execStdout("git", ["status", "--porcelain"], {
+          cwd: projectDir,
+          timeout: 10_000,
+        });
+        const statusLines = stdout.trim().split("\n").filter(Boolean);
+        const rexTreeFiles = statusLines
+          .filter((line) => line.includes(".rex/tree"))
+          .map((line) => line.slice(3).trim()); // Remove status prefix (e.g., " M ")
+
+        if (rexTreeFiles.length > 0) {
+          for (const file of rexTreeFiles) {
+            await execStdout("git", ["add", file], {
+              cwd: projectDir,
+              timeout: 10_000,
+            });
+          }
+          detail(`Staged ${rexTreeFiles.length} PRD file(s)`);
+        }
+      } catch (err) {
+        // Best-effort: if staging fails, proceed with commit anyway
+        // The status update has already been persisted to disk
+        detail(`Warning: could not stage PRD files: ${(err as Error).message}`);
+      }
+    } catch (err) {
+      // Best-effort: if PRD update fails, proceed with commit anyway
+      // This prevents a failed PRD update from blocking the entire commit flow
+      detail(`Warning: PRD status update failed: ${(err as Error).message}`);
+    }
   }
 
   try {
@@ -1082,12 +1130,16 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // No-op when autoCommit is true (agent committed itself) or on failure paths.
   // The approval prompt is bypassed in autonomous mode (--auto, --loop) so
   // unattended runs do not stall waiting for user input.
+  // The store and taskId are passed so that the PRD status transition can be
+  // staged alongside code changes and included in the same commit.
   await performCommitPromptIfNeeded(
     run,
     projectDir,
     opts.autoCommit === true,
     opts.yes,
     opts.autonomous,
+    opts.store,
+    run.taskId,
   );
 
   // Rollback uncommitted changes when the run failed (unless suppressed).

@@ -990,11 +990,8 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     // Success
     run.status = "completed";
     run.summary = result.summary;
-    await toolRexUpdateStatus(store, taskId, { status: "completed" });
-    await toolRexAppendLog(store, taskId, {
-      event: "task_completed",
-      detail: run.summary,
-    });
+    // Note: PRD status update deferred to performCommitPromptIfNeeded
+    // so it's staged alongside code changes in the same commit.
   } else {
     // Completion rejected — no meaningful changes
     run.status = "failed";
