@@ -8,24 +8,3 @@ completedAt: "2026-03-03T06:55:31.871Z"
 acceptanceCriteria: []
 description: "Phase 3 (future): sourcevision workspace [dirs...] command. Each repo's analysis becomes a top-level zone. Cross-repo crossings from external import resolution. The fractal property from Phase 1/2 makes this a data assembly problem."
 ---
-
-## Subtask: Design workspace command and config format
-
-**ID:** `task-workspace-design`
-**Status:** completed
-
----
-
-## Subtask: Implement workspace zone builder
-
-**ID:** `task-workspace-zone-builder`
-**Status:** completed
-
----
-
-## Subtask: Implement cross-repo crossing computation
-
-**ID:** `task-cross-repo-crossings`
-**Status:** completed
-
----
