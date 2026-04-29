@@ -55,28 +55,59 @@ export function writePRD(dir: string, doc: PRDDocument): void {
 
 /**
  * Create a minimal markdown representation of a PRDItem for folder tree tests.
+ * Uses YAML frontmatter format expected by the folder-tree-parser.
  */
 function createMinimalMarkdown(item: any): string {
-  const lines: string[] = [
-    "---",
-    `id: "${item.id}"`,
-    `title: "${item.title}"`,
-    `level: "${item.level}"`,
-    `status: "${item.status}"`,
-    `priority: "${item.priority || 'medium'}"`,
-  ];
+  const lines: string[] = ["---"];
 
+  // Core fields in order (matching real serializer)
+  lines.push(`id: "${item.id}"`);
+  lines.push(`level: "${item.level}"`);
+  lines.push(`title: "${item.title}"`);
+  lines.push(`status: "${item.status}"`);
+  lines.push(`priority: "${item.priority || "medium"}"`);
+
+  // Optional fields
   if (item.description) {
-    lines.push(`description: |`);
-    lines.push(`  ${item.description}`);
+    lines.push(`description: "${item.description}"`);
+  }
+  if (item.startedAt) {
+    lines.push(`startedAt: "${item.startedAt}"`);
+  }
+  if (item.completedAt) {
+    lines.push(`completedAt: "${item.completedAt}"`);
   }
 
-  if (item.startedAt) lines.push(`startedAt: "${item.startedAt}"`);
-  if (item.completedAt) lines.push(`completedAt: "${item.completedAt}"`);
+  // Add any other item fields not explicitly handled
+  for (const [key, value] of Object.entries(item)) {
+    if (
+      !["id", "title", "level", "status", "priority", "description", "startedAt", "completedAt", "children"].includes(
+        key,
+      )
+    ) {
+      if (value !== null && value !== undefined) {
+        lines.push(`${key}: "${String(value)}"`);
+      }
+    }
+  }
 
   lines.push("---");
   lines.push("");
   lines.push(`# ${item.title}`);
+
+  // Add children table if present
+  if (item.children && item.children.length > 0) {
+    lines.push("");
+    lines.push("## Children");
+    lines.push("");
+    lines.push("| Title | Status |");
+    lines.push("|-------|--------|");
+    for (const child of item.children) {
+      const childPath = `${child.id}/index.md`;
+      lines.push(`| [${child.title}](./${childPath}) | ${child.status} |`);
+    }
+    lines.push("");
+  }
 
   return lines.join("\n");
 }
