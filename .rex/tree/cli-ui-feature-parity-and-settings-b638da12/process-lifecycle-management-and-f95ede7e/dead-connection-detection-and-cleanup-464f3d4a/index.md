@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T03:49:41.994Z"
 completedAt: "2026-02-27T03:49:41.994Z"
+acceptanceCriteria: []
 description: "Implement immediate detection and removal of disconnected WebSocket clients to prevent resource waste"
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-06T15:17:39.610Z"
 completedAt: "2026-02-06T15:17:39.610Z"
+acceptanceCriteria: []
 description: "Robust configuration loading, validation, and project-level overrides"
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-08T02:28:41.182Z"
 completedAt: "2026-02-08T02:28:41.182Z"
+acceptanceCriteria: []
 description: "Improve prioritization and grouping of architectural findings and recommendations"
 ---
 

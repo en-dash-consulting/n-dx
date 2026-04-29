@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-15T15:21:21.845Z"
 completedAt: "2026-04-15T15:21:21.845Z"
+acceptanceCriteria: []
 description: "Add Claude and Codex configuration validation tests to the gauntlet test suite. These tests verify config presence, format, authentication, and vendor-specific behavior before allowing pipeline progression."
 ---
 

@@ -6,14 +6,15 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T21:18:12.472Z"
 completedAt: "2026-02-22T21:18:12.472Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Duplicate Detection and Reason Classification](./duplicate-detection-and-reason-3fdee105/index.md) | completed |
-| [Interactive Duplicate Override Decision Flow](./interactive-duplicate-override-decision-e28b4532/index.md) | completed |
-| [Force-create Auditability and Visibility](./force-create-auditability-and-visibility-0926d1fd/index.md) | completed |
 | [Documentation and Test Coverage for Duplicate Overrides](./documentation-and-test-coverage-for-4355a9e7/index.md) | completed |
+| [Duplicate Detection and Reason Classification](./duplicate-detection-and-reason-3fdee105/index.md) | completed |
+| [Force-create Auditability and Visibility](./force-create-auditability-and-visibility-0926d1fd/index.md) | completed |
+| [Interactive Duplicate Override Decision Flow](./interactive-duplicate-override-decision-e28b4532/index.md) | completed |
 | [Orphaned Parent Cleanup After Smart-Add Merge](./orphaned-parent-cleanup-after-smart-add-8e04e63b/index.md) | completed |

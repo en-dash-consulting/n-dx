@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T04:08:43.389Z"
 completedAt: "2026-02-11T04:08:43.389Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Interactive Graph Controls](./interactive-graph-controls-9e57dd9f/index.md) | completed |
 | [Graph Organization and Layout](./graph-organization-and-layout-fe904ed1/index.md) | completed |
+| [Interactive Graph Controls](./interactive-graph-controls-9e57dd9f/index.md) | completed |

@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-16T20:02:43.943Z"
 completedAt: "2026-04-16T20:02:43.943Z"
+acceptanceCriteria: []
 description: "- Generic zone name \"Sourcevision 4\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose"
 recommendationMeta: "[object Object]"
 ---

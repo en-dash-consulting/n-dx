@@ -12,5 +12,5 @@ completedAt: "2026-04-24T20:41:18.643Z"
 
 | Title | Status |
 |-------|--------|
-| [Branch Attribution Metadata on PRD Items](./branch-attribution-metadata-on-prd-items-578686b2/index.md) | completed |
 | [Branch Attribution Display in PRD Dashboard](./branch-attribution-display-in-prd-9f96a45d/index.md) | completed |
+| [Branch Attribution Metadata on PRD Items](./branch-attribution-metadata-on-prd-items-578686b2/index.md) | completed |

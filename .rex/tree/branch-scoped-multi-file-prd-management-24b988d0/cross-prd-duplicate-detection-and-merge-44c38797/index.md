@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-22T19:12:07.716Z"
 completedAt: "2026-04-22T19:12:07.716Z"
+acceptanceCriteria: []
 description: "Extend the ndx add duplicate detection pipeline to operate across multiple PRD files, merging newer duplicate proposals into the older PRD's existing item rather than creating duplicates across branch-scoped files."
 ---
 

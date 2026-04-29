@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T21:30:18.392Z"
 completedAt: "2026-02-22T21:30:18.392Z"
+acceptanceCriteria: []
 description: "Keep old Rex Token Usage links functional while enforcing the new global canonical route through deterministic redirects and tests."
 ---
 

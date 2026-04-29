@@ -5,10 +5,11 @@
  * index.md, and reconstructs the full PRD item tree in memory.
  *
  * Contract (see docs/architecture/prd-folder-tree-schema.md):
- *   - Depth 1 dirs → epics
- *   - Depth 2 dirs → features
- *   - Depth 3 dirs → tasks
- *   - Subtasks are `## Subtask:` sections inside the parent task's index.md
+ *   - Depth 1 dirs -> epics
+ *   - Depth 2 dirs -> features
+ *   - Depth 3 dirs -> tasks
+ *   - Depth 4 dirs -> subtasks
+ *   - Legacy `## Subtask:` sections are still parsed for backward compatibility
  *   - `## Children` table is informational only; directory nesting is authoritative
  *   - Parse order: alphabetical by directory name within each level
  *   - Never throws; emits structured warnings for missing or malformed files
@@ -76,7 +77,24 @@ export async function parseFolderTree(treeRoot: string): Promise<FolderParseResu
       for (const taskDir of await listSubdirs(featurePath)) {
         const taskPath = join(featurePath, taskDir);
         const task = await parseTaskFile(join(taskPath, "index.md"), warnings);
-        if (task) taskItems.push(task);
+        if (task) {
+          const legacySubtasks = task.children ?? [];
+          const subtaskItems: PRDItem[] = [];
+
+          for (const subtaskDir of await listSubdirs(taskPath)) {
+            const subtaskPath = join(taskPath, subtaskDir);
+            const subtask = await parseItemFile(join(subtaskPath, "index.md"), "subtask", warnings);
+            if (subtask) subtaskItems.push(subtask);
+          }
+
+          const seenSubtaskIds = new Set(subtaskItems.map(subtask => subtask.id));
+          for (const legacySubtask of legacySubtasks) {
+            if (!seenSubtaskIds.has(legacySubtask.id)) subtaskItems.push(legacySubtask);
+          }
+
+          if (subtaskItems.length > 0) task.children = subtaskItems;
+          taskItems.push(task);
+        }
       }
 
       if (taskItems.length > 0) feature.children = taskItems;
@@ -123,7 +141,7 @@ async function listSubdirs(dir: string): Promise<string[]> {
  */
 async function parseItemFile(
   filePath: string,
-  expectedLevel: "epic" | "feature",
+  expectedLevel: "epic" | "feature" | "subtask",
   warnings: ParseWarning[],
 ): Promise<PRDItem | null> {
   const text = await readIndexFile(filePath, warnings);
@@ -172,7 +190,7 @@ async function readIndexFile(filePath: string, warnings: ParseWarning[]): Promis
 function buildItem(
   fm: Record<string, unknown>,
   filePath: string,
-  expectedLevel: "epic" | "feature" | "task",
+  expectedLevel: "epic" | "feature" | "task" | "subtask",
   warnings: ParseWarning[],
 ): PRDItem | null {
   const id = asString(fm["id"]);
@@ -237,7 +255,8 @@ function buildItem(
   if (failureReason !== null) item.failureReason = failureReason;
 
   // acceptanceCriteria: preserve whenever present in frontmatter (any level).
-  // Feature and task items default to [] when the field is absent; epics do not.
+  // Feature and task items default to [] when the field is absent; epics and
+  // subtasks do not.
   const ac = asStringList(fm["acceptanceCriteria"]);
   if (ac !== null) {
     item.acceptanceCriteria = ac;

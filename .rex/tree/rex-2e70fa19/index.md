@@ -18,6 +18,6 @@ completedAt: "2026-04-16T16:55:59.938Z"
 | [Fix observation in rex-recommend (1 finding)](./fix-observation-in-rex-recommend-1-ba206df9/index.md) | completed |
 | [Fix suggestion in rex (1 finding)](./fix-suggestion-in-rex-1-finding-6d9a909f/index.md) | completed |
 | [Rex Smart Operations UI Integration](./rex-smart-operations-ui-integration-aab3e41d/index.md) | completed |
-| [Rex UI Task Management Enhancement](./rex-ui-task-management-enhancement-2171d478/index.md) | completed |
-| [Rex UI Consistency and Polish](./rex-ui-consistency-and-polish-b73ae2ff/index.md) | completed |
 | [Rex Token Usage & LLM Utilization UX Overhaul](./rex-token-usage-llm-utilization-ux-fdc6c3d4/index.md) | completed |
+| [Rex UI Consistency and Polish](./rex-ui-consistency-and-polish-b73ae2ff/index.md) | completed |
+| [Rex UI Task Management Enhancement](./rex-ui-task-management-enhancement-2171d478/index.md) | completed |

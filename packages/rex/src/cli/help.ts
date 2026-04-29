@@ -545,14 +545,19 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     tool: "rex",
     command: "migrate-to-folder-tree",
     summary: "migrate prd.md to the .rex/tree/ folder-tree format",
-    usage: "rex migrate-to-folder-tree [dir]",
+    usage: "rex migrate-to-folder-tree [dir] [--yes]",
     description:
-      "Reads the current PRD from .rex/prd.md (or prd.json) and writes the full\n" +
-      "folder tree to .rex/tree/. Idempotent: re-running updates changed items\n" +
-      "without duplicating folders. Prints a summary of folders created and\n" +
-      "index.md files written.",
+      "Reads the current PRD from .rex/prd.md (or branch-scoped prd_*_*.md files,\n" +
+      "or prd.json as a fallback) and writes the full folder tree to .rex/tree/\n" +
+      "using slug-based directory names at all four hierarchy levels.\n\n" +
+      "After a successful migration, prompts to delete prd.md and any branch-scoped\n" +
+      "prd_{branch}_{date}.md files. Pass --yes to auto-confirm deletion.\n\n" +
+      "Idempotent: re-running on an already-migrated project (even after prd.md has\n" +
+      "been deleted) is a no-op. Prints a summary of item counts per PRD level and\n" +
+      "folders/files created.",
     examples: [
-      { command: "rex migrate-to-folder-tree", description: "Migrate current project" },
+      { command: "rex migrate-to-folder-tree", description: "Migrate and prompt to delete prd.md" },
+      { command: "rex migrate-to-folder-tree --yes", description: "Migrate and auto-delete prd.md" },
       { command: "rex migrate-to-folder-tree ./my-project", description: "Migrate a specific project" },
     ],
     related: ["init", "status", "validate"],

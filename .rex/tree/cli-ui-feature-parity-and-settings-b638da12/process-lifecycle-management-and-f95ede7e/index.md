@@ -6,13 +6,14 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T07:53:24.088Z"
 completedAt: "2026-02-24T07:53:24.088Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Lingering Process Investigation and Root Cause Analysis](./lingering-process-investigation-and-d60d8d39/index.md) | completed |
-| [Graceful Shutdown Implementation](./graceful-shutdown-implementation-a766ff1d/index.md) | completed |
-| [Refresh Command Process Management](./refresh-command-process-management-9ac4a684/index.md) | completed |
 | [Dead Connection Detection and Cleanup](./dead-connection-detection-and-cleanup-464f3d4a/index.md) | completed |
+| [Graceful Shutdown Implementation](./graceful-shutdown-implementation-a766ff1d/index.md) | completed |
+| [Lingering Process Investigation and Root Cause Analysis](./lingering-process-investigation-and-d60d8d39/index.md) | completed |
+| [Refresh Command Process Management](./refresh-command-process-management-9ac4a684/index.md) | completed |

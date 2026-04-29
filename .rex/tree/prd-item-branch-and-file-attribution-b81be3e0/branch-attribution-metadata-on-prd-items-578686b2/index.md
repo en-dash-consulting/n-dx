@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T16:57:13.842Z"
 completedAt: "2026-04-24T16:57:13.842Z"
+acceptanceCriteria: []
 description: "Extend the PRD item schema and write paths so each item records the git branch and source file it was created or last modified on, enabling provenance tracking across the tool chain."
 ---
 

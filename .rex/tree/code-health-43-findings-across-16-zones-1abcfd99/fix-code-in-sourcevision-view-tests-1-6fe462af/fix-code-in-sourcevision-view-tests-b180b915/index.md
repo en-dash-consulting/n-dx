@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:21:36.154Z"
 completedAt: "2026-04-14T01:27:08.447Z"
+acceptanceCriteria: []
 description: "- Coupling score 0.75 is produced entirely by false-positive string-literal edges, while the real architectural risk (white-box leaf-path imports into web-viewer internals) is unrepresented in the metric. Zone tooling that gates on coupling score will raise a false alarm for the wrong reason while the true refactor trap goes undetected."
 recommendationMeta: "[object Object]"
 ---

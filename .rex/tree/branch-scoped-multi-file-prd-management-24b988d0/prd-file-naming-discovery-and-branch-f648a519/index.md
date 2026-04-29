@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-22T16:30:27.569Z"
 completedAt: "2026-04-22T16:30:27.569Z"
+acceptanceCriteria: []
 description: "Introduce a branch-aware PRD file naming convention (prd_{branch}_{date}.json) with git-based branch detection, first-commit date lookup, and file discovery logic that finds or creates the correct PRD file for the current branch."
 ---
 

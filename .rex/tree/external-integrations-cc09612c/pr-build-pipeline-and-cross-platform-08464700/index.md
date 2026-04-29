@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-07T14:28:53.235Z"
 completedAt: "2026-04-07T14:28:53.235Z"
+acceptanceCriteria: []
 description: "Extend the existing PR validation pipeline with additive cross-platform execution stages that run the same n-dx install and smoke-command flow in MacOS and Windows containerized environments, then verify parity against each other and against the repository's existing static expected responses and exit codes."
 ---
 

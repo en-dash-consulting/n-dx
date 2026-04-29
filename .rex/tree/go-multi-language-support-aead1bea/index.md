@@ -12,6 +12,6 @@ completedAt: "2026-03-26T04:05:46.164Z"
 
 | Title | Status |
 |-------|--------|
-| [Phase 1: Language Registry & Inventory Foundation](./phase-1-language-registry-inventory-956b7119/index.md) | completed |
 | [Landing page for n-dx](./landing-page-for-n-dx-4aa53ba2/index.md) | completed |
+| [Phase 1: Language Registry & Inventory Foundation](./phase-1-language-registry-inventory-956b7119/index.md) | completed |
 | [Web Server Port Management](./web-server-port-management-8ea82222/index.md) | completed |

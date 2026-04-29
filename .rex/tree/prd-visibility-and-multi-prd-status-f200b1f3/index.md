@@ -12,5 +12,5 @@ completedAt: "2026-04-27T13:13:51.820Z"
 
 | Title | Status |
 |-------|--------|
-| [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-e430a1e2/index.md) | completed |
 | [Per-PRD Status Breakdown via --show-individual](./per-prd-status-breakdown-via-show-73fc1ee2/index.md) | completed |
+| [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-e430a1e2/index.md) | completed |

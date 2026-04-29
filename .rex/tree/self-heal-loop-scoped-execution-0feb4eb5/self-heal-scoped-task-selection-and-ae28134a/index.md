@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T15:25:12.963Z"
 completedAt: "2026-04-24T15:25:12.963Z"
+acceptanceCriteria: []
 description: "Restrict hench task selection during self-heal runs to only pick up items tagged 'self-heal', and automatically stop the loop once all such items are resolved — without spilling into unrelated PRD work."
 ---
 

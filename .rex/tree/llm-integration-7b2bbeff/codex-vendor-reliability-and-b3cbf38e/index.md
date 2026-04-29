@@ -6,13 +6,14 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-20T23:12:36.086Z"
 completedAt: "2026-02-20T23:12:36.086Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Hench Codex Output Parsing Hardening](./hench-codex-output-parsing-hardening-373c6363/index.md) | completed |
 | [Codex Token Accounting Accuracy](./codex-token-accounting-accuracy-05ea54b7/index.md) | completed |
-| [Rex and Hench Vendor Behavior Documentation](./rex-and-hench-vendor-behavior-26c7a348/index.md) | completed |
 | [Fix Run Count in Sidebar](./fix-run-count-in-sidebar-351e9c1a/index.md) | completed |
+| [Hench Codex Output Parsing Hardening](./hench-codex-output-parsing-hardening-373c6363/index.md) | completed |
+| [Rex and Hench Vendor Behavior Documentation](./rex-and-hench-vendor-behavior-26c7a348/index.md) | completed |

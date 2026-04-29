@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:53:18.531Z"
 completedAt: "2026-04-13T21:53:18.531Z"
+acceptanceCriteria: []
 description: "- Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.75) — 3 imports target \"web\""
 parentId: "0de5be78-d295-4f71-be5d-38594a355240"
 recommendationMeta: "[object Object]"

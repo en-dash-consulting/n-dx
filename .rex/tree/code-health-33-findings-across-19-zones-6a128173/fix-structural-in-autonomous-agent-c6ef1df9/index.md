@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T15:04:20.413Z"
 completedAt: "2026-04-18T15:04:20.413Z"
+acceptanceCriteria: []
 description: "- No automated intra-zone boundary assertions exist yet; at 208 files the zone is approaching the scale where sub-zone drift becomes difficult to detect without test-enforced checks."
 recommendationMeta: "[object Object]"
 ---

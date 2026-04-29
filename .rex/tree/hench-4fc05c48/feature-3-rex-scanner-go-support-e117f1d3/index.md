@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T15:22:13.888Z"
 completedAt: "2026-03-26T15:22:13.888Z"
+acceptanceCriteria: []
 description: "Update Rex's analyze scanners to understand Go project structure: parse `go.mod` for dependency information, detect Go test files, and skip Go-specific directories."
 ---
 

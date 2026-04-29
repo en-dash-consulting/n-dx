@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T00:51:29.431Z"
 completedAt: "2026-02-23T00:51:29.431Z"
+acceptanceCriteria: []
 description: "Validate git prerequisites before PR markdown generation so refresh failures are detected early and reported with precise root causes."
 ---
 

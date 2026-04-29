@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T02:16:59.280Z"
 completedAt: "2026-02-11T02:29:18.230Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Smart Pruning UI Integration](./smart-pruning-ui-integration-07c19b0f/index.md) | completed |
 | [Smart Add UI Integration](./smart-add-ui-integration-6efaf2cb/index.md) | completed |
+| [Smart Pruning UI Integration](./smart-pruning-ui-integration-07c19b0f/index.md) | completed |

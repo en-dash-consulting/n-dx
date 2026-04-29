@@ -10,6 +10,7 @@ tags:
   - "design"
 startedAt: "2026-02-13T18:28:14.448Z"
 completedAt: "2026-02-13T18:28:14.448Z"
+acceptanceCriteria: []
 description: "Build a beautiful, informative, and interactive landing page for n-dx. Should showcase the three-package toolkit (sourcevision, rex, hench), demonstrate the analyze → plan → execute workflow, and convey the value proposition of AI-powered development tooling. Needs strong visual design, smooth interactions, and clear messaging."
 ---
 
@@ -17,6 +18,6 @@ description: "Build a beautiful, informative, and interactive landing page for n
 
 | Title | Status |
 |-------|--------|
-| [Build landing page with hero and package showcase](./build-landing-page-with-hero-and-5afe5ef6/index.md) | completed |
-| [Add interactive workflow demo and animations](./add-interactive-workflow-demo-and-7ff4f6b5/index.md) | completed |
 | [Add getting started section and wire up routing](./add-getting-started-section-and-wire-up-28610126/index.md) | completed |
+| [Add interactive workflow demo and animations](./add-interactive-workflow-demo-and-7ff4f6b5/index.md) | completed |
+| [Build landing page with hero and package showcase](./build-landing-page-with-hero-and-5afe5ef6/index.md) | completed |

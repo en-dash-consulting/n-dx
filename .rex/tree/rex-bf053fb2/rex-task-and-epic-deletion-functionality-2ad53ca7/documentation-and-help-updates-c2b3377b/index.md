@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T17:27:43.063Z"
 completedAt: "2026-02-24T17:27:43.063Z"
+acceptanceCriteria: []
 description: "Update project documentation to reflect the new deletion capabilities in both CLI and UI"
 ---
 

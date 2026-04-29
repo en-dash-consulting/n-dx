@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-06T02:29:26.369Z"
 completedAt: "2026-03-06T02:33:34.964Z"
+acceptanceCriteria: []
 description: "- God function: GraphRenderer.constructor in packages/web/src/viewer/graph/renderer.ts calls 49 unique functions — consider decomposing into smaller, focused functions"
 recommendationMeta: "[object Object]"
 ---

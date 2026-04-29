@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-09T19:11:15.938Z"
 completedAt: "2026-02-09T19:11:15.938Z"
+acceptanceCriteria: []
 description: "Add filtering controls to the Rex web dashboard tree view that allow users to show/hide items based on their status (pending, in_progress, completed, blocked, deferred, deleted)"
 ---
 

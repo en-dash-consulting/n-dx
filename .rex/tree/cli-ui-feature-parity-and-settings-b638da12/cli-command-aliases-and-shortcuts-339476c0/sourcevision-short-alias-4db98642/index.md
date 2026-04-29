@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-05T17:06:14.761Z"
 completedAt: "2026-02-05T17:06:14.761Z"
+acceptanceCriteria: []
 description: "Provide 'sv' as a short alias for sourcevision in all contexts"
 ---
 

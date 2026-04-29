@@ -67,20 +67,3 @@ Parse JSON and YAML files with flexible schemas
 In callgraph-findings.ts:199-300, detectDeadExports() only checks the call graph for usage, missing exports consumed via dynamic imports, static imports without call edges (JSX components, validators), and import chains. Fix: after building the calledFunctions set from call edges, also mark an export as used if its name appears in any import edge's symbols array (static, dynamic, or require types). This covers dynamic imports (await import()), JSX element usage, and inline calls that don't produce CallExpression nodes. Add unit tests covering: dynamic-import-only usage, static-import-only usage (no call edge), genuinely dead exports, re-exported symbols, and class instance methods.
 
 ---
-
-packages/hench/src/store/suggestions.ts exports loadSuggestionHistoryAsync and saveSuggestionHistoryAsync which have no callers. The synchronous versions (loadSuggestionHistory, saveSuggestionHistory) are used. Remove the async exports, or if they exist for a planned feature, document that intent.
-
-**Acceptance Criteria**
-
-- detectDeadExports consults import graph edges with type 'dynamic' and 'require' in addition to call graph edges
-- cmdConfig (imported via dynamic import in hench CLI router) is no longer flagged as unused
-- pnpm test passes for sourcevision package
-- Exports that appear in import edge symbols (static, dynamic, or require) are not flagged as dead
-- validate.ts validators, health-gauge.ts components, and logos.ts exports are no longer flagged
-- Genuinely dead exports (not imported anywhere) are still detected
-- Test file exists covering all 5 edge cases
-- All tests pass
-- loadSuggestionHistoryAsync and saveSuggestionHistoryAsync are either removed or documented with a tracking reference
-- pnpm typecheck and pnpm test pass
-
----

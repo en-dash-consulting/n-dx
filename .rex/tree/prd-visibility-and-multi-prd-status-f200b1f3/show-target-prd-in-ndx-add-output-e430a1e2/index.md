@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-27T03:46:02.112Z"
 completedAt: "2026-04-27T03:46:02.112Z"
+acceptanceCriteria: []
 description: "Surface which PRD file (canonical or branch-scoped) receives newly added items so users have clear feedback about where their work landed."
 ---
 

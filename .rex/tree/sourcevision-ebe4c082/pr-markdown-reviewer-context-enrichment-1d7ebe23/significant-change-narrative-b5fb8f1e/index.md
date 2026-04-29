@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T22:15:55.948Z"
 completedAt: "2026-02-22T22:15:55.948Z"
+acceptanceCriteria: []
 description: "Shift PR markdown toward human-readable explanation of important functional and feature-level changes, minimizing noisy implementation detail."
 ---
 

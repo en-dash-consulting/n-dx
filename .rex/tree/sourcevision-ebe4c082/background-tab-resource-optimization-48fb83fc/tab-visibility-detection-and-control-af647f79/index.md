@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T01:57:56.497Z"
 completedAt: "2026-02-26T01:57:56.497Z"
+acceptanceCriteria: []
 description: "Implement browser tab visibility detection to enable resource-aware polling management"
 ---
 

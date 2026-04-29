@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-06T06:06:12.706Z"
 completedAt: "2026-02-06T06:06:12.706Z"
+acceptanceCriteria: []
 description: "Build comprehensive web interface for viewing and managing Rex PRD hierarchy, tasks, and workflow"
 ---
 

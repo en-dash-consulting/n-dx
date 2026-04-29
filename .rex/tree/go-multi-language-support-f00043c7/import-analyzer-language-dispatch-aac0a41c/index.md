@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T05:34:37.680Z"
 completedAt: "2026-03-26T05:34:37.680Z"
+acceptanceCriteria: []
 description: "Modify the SourceVision import analyzer (imports.ts) to dispatch to the Go import parser when processing .go files, reading go.mod once per invocation and producing file-to-package edges for internal imports. Integration tests validate the full import graph against the Go fixture."
 ---
 

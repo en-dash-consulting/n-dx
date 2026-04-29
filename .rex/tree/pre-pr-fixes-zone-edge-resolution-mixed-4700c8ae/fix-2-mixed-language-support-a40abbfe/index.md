@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T21:19:10.766Z"
 completedAt: "2026-03-26T21:19:10.766Z"
+acceptanceCriteria: []
 description: "Projects containing both Go and TypeScript files (e.g., a Go CLI with a Next.js docs site) detect only a single primary language. The non-primary language's files are inventoried but produce sparse import edges and orphan zones with 0 cohesion because `manifest.language` is a single string, archetype signal filtering scopes to one language, and only the primary language's skip directories, config file names, and test patterns are applied. Applying Fix 1 (zone edge resolution) first is recommended, but this fix is independent — together they make mixed Go+TS projects produce fully meaningful analysis."
 ---
 
@@ -13,5 +14,5 @@ description: "Projects containing both Go and TypeScript files (e.g., a Go CLI w
 
 | Title | Status |
 |-------|--------|
-| [Implement multi-language detection and extend Manifest schema](./implement-multi-language-detection-and-d567173b/index.md) | completed |
 | [Add test coverage for mixed-language detection](./add-test-coverage-for-mixed-language-44a1fcf3/index.md) | completed |
+| [Implement multi-language detection and extend Manifest schema](./implement-multi-language-detection-and-d567173b/index.md) | completed |

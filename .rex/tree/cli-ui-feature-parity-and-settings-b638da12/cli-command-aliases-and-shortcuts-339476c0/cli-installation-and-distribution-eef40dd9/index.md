@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-05T17:11:30.001Z"
 completedAt: "2026-02-05T17:11:30.001Z"
+acceptanceCriteria: []
 description: "Ensure all command aliases are properly installed and available in user PATH"
 ---
 

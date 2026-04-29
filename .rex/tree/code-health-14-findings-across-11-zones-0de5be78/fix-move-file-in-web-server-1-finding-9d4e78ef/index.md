@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T20:09:29.458Z"
 completedAt: "2026-04-13T20:09:29.458Z"
+acceptanceCriteria: []
 description: "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone"
 parentId: "0de5be78-d295-4f71-be5d-38594a355240"
 recommendationMeta: "[object Object]"

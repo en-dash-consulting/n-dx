@@ -9,6 +9,7 @@ tags:
   - "dx"
 startedAt: "2026-02-10T05:31:42.546Z"
 completedAt: "2026-02-10T05:31:42.546Z"
+acceptanceCriteria: []
 description: "Introduce `ndx start` as the unified entrypoint that starts both the web dashboard and MCP HTTP endpoints on a single port. Supports `--background`, `stop`, `status` (extending the existing `ndx web` pattern). `ndx web` becomes an alias or is deprecated in favor of `ndx start`."
 ---
 

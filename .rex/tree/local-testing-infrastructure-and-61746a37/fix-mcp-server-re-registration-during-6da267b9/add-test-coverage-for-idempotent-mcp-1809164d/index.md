@@ -6,4 +6,5 @@ status: "completed"
 priority: "medium"
 startedAt: "2026-04-09T20:44:05.570Z"
 completedAt: "2026-04-09T20:50:08.538Z"
+acceptanceCriteria: []
 ---

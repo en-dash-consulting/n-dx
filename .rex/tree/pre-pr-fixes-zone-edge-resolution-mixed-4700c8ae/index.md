@@ -14,6 +14,6 @@ completedAt: "2026-03-26T21:19:10.882Z"
 |-------|--------|
 | [Fix 1: Go Zone Edge Resolution](./fix-1-go-zone-edge-resolution-d373f51a/index.md) | completed |
 | [Fix 2: Mixed-Language Support](./fix-2-mixed-language-support-a40abbfe/index.md) | completed |
-| [ndx work Model Resolution, Display, and Vendor-Change Reset](./ndx-work-model-resolution-display-and-3d1dfc17/index.md) | completed |
 | [Fix suggestion in polling (1 finding)](./fix-suggestion-in-polling-1-finding-1fd3f6e9/index.md) | completed |
+| [ndx work Model Resolution, Display, and Vendor-Change Reset](./ndx-work-model-resolution-display-and-3d1dfc17/index.md) | completed |
 | [Web UI Memory Management and Crash Resolution](./web-ui-memory-management-and-crash-0344cef0/index.md) | completed |

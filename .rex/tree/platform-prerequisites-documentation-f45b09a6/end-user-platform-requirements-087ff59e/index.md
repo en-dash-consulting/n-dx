@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T04:42:32.885Z"
 completedAt: "2026-04-19T04:42:32.885Z"
+acceptanceCriteria: []
 description: "Surface clear, accurate OS and runtime version requirements so users know before installing whether their environment is supported."
 ---
 

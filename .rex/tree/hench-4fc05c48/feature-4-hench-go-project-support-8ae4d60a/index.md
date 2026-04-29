@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T15:14:41.533Z"
 completedAt: "2026-03-26T15:14:41.533Z"
+acceptanceCriteria: []
 description: "Make Hench capable of executing tasks in Go projects: update guard defaults to allow Go toolchain commands, add Go test runner support, and make agent prompts language-aware."
 ---
 

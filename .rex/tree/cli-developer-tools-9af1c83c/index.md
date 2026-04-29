@@ -12,7 +12,7 @@ description: "Command-line interface: error handling, validation, formatting, he
 
 | Title | Status |
 |-------|--------|
-| [Shared Unit Test Utilities](./shared-unit-test-utilities-f9b208b6/index.md) | completed |
-| [Full-Suite Red-to-Green Verification](./full-suite-red-to-green-verification-982f45e5/index.md) | completed |
-| [CLI User Experience and Developer Tools](./cli-user-experience-and-developer-tools-4ca9aac4/index.md) | completed |
 | [CLI Robustness](./cli-robustness-f69ce6c6/index.md) | completed |
+| [CLI User Experience and Developer Tools](./cli-user-experience-and-developer-tools-4ca9aac4/index.md) | completed |
+| [Full-Suite Red-to-Green Verification](./full-suite-red-to-green-verification-982f45e5/index.md) | completed |
+| [Shared Unit Test Utilities](./shared-unit-test-utilities-f9b208b6/index.md) | completed |

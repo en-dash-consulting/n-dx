@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T03:28:21.925Z"
 completedAt: "2026-02-27T03:28:21.925Z"
+acceptanceCriteria: []
 description: "Prevent memory waste from DOM updates and response buffering when tab is not visible"
 ---
 

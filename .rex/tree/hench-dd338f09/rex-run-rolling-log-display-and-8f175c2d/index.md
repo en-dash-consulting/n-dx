@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T23:44:31.021Z"
 completedAt: "2026-04-08T23:44:31.021Z"
+acceptanceCriteria: []
 description: "Limit live console output during rex runs to a rolling 10-line grey window while capturing the full run output to a timestamped file in .run-logs/, which is excluded from git."
 ---
 

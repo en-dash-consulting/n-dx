@@ -15,10 +15,10 @@ const execAsync = promisify(execCb);
  * and commit-approval prompts.
  *
  * The run-loop in `packages/hench/src/cli/commands/run.ts` registers a
- * SIGINT handler that calls `process.exit(1)` on a second Ctrl-C. Before
- * opening an interactive readline prompt the lifecycle layer must
- * temporarily detach that handler so a second Ctrl-C does not terminate
- * the process mid-question.
+ * SIGINT handler that calls `process.exit(1)` on a second Ctrl-C. The
+ * rollback prompt holds the first Ctrl-C so the user can still answer,
+ * then exits cleanly only if Ctrl-C is pressed again while the prompt is
+ * still open.
  */
 
 async function setupGitRepo(dir: string): Promise<void> {
@@ -222,7 +222,7 @@ describe("prompt SIGINT suspension", () => {
     }
   });
 
-  it("cancels the rollback prompt cleanly on Ctrl-C without invoking the outer handler", async () => {
+  it("holds the first Ctrl-C during the rollback prompt and keeps the prompt answerable", async () => {
     const { fakes } = installFakeReadline();
     vi.resetModules();
 
@@ -250,24 +250,34 @@ describe("prompt SIGINT suspension", () => {
       expect(fakes).toHaveLength(1);
 
       // Emit a process-level SIGINT while the prompt is visible. The
-      // outer handler has been detached, so only the prompt's internal
-      // onInterrupt fires — cancelling the readline and resolving the
-      // prompt as a decline.
+      // outer handler has been detached, so only the rollback prompt's
+      // internal handler fires. The first interrupt is held: it prints a
+      // hint, does not close the prompt, and does not answer for the user.
       process.emit("SIGINT");
+
+      expect(outerHandler).not.toHaveBeenCalled();
+      expect(fakes[0].closed).toBe(false);
+      const output = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(output).toContain("Press Ctrl+C again to abort the rollback prompt and exit.");
+
+      // The user can still deliberately accept the rollback after the
+      // first Ctrl-C. This proves the first signal was not treated as a
+      // decline.
+      fakes[0].answer("y");
       await finalizePromise;
 
       expect(outerHandler).not.toHaveBeenCalled();
       expect(fakes[0].closed).toBe(true);
 
-      // Decline path leaves the working tree unchanged.
+      // Accept path still reverts the modified file.
       const content = await readFile(join(projectDir, "src.ts"), "utf-8");
-      expect(content).toBe("export const x = 999;\n");
+      expect(content).toBe("export const x = 1;\n");
     } finally {
       restoreSigintListeners(priorListeners);
     }
   });
 
-  it("does not call process.exit(1) when a second SIGINT arrives during the rollback prompt", async () => {
+  it("exits cleanly without rollback when a second Ctrl-C arrives during the rollback prompt", async () => {
     // Reproduces the original bug scenario as closely as possible: the
     // run-loop in `run.ts` registers a handler that calls
     // `process.exit(1)` on a second Ctrl-C. The first Ctrl-C is assumed
@@ -321,15 +331,22 @@ describe("prompt SIGINT suspension", () => {
       // Deliver the "second" Ctrl-C. The first one is the signal that
       // ended the run and opened the prompt in the first place.
       process.emit("SIGINT");
+      expect(fakes[0].closed).toBe(false);
+
+      await Promise.resolve();
+      process.emit("SIGINT");
       await finalizePromise;
 
-      // Core criterion: process.exit(1) must not have been invoked.
-      expect(exitSpy).not.toHaveBeenCalled();
+      // Core criterion: only the prompt's second Ctrl-C branch exits; the
+      // detached outer force-exit handler is never invoked.
+      expect(exitSpy).toHaveBeenCalledWith(1);
       expect(outerForceExit).not.toHaveBeenCalled();
       // The readline interface completed cleanly — it was closed by the
-      // shim's onInterrupt handler, and the finalizeRun promise resolved
-      // without rejection (implicit in the awaited promise above).
+      // prompt's second-interrupt branch, and the finalizeRun promise
+      // resolved without rejection when process.exit was mocked.
       expect(fakes[0].closed).toBe(true);
+      const content = await readFile(join(projectDir, "src.ts"), "utf-8");
+      expect(content).toBe("export const x = 999;\n");
       // And the outer handler is reinstalled exactly once so subsequent
       // Ctrl-C handling is uninterrupted.
       const restored = (process.listeners("SIGINT") as Array<(...a: unknown[]) => void>).filter(
@@ -342,10 +359,11 @@ describe("prompt SIGINT suspension", () => {
     }
   });
 
-  it("also cancels cleanly when SIGINT is delivered via readline's own event", async () => {
+  it("also holds the first Ctrl-C when SIGINT is delivered via readline's own event", async () => {
     // Some terminals deliver Ctrl-C through the readline surface instead
     // of (or in addition to) the process-level signal. The prompt
-    // listens on both so either delivery channel unblocks the question.
+    // listens on both so either delivery channel uses the same hold
+    // behavior.
     const { fakes } = installFakeReadline();
     vi.resetModules();
 
@@ -373,6 +391,13 @@ describe("prompt SIGINT suspension", () => {
       expect(fakes).toHaveLength(1);
 
       fakes[0].emitRlSigint();
+
+      expect(outerHandler).not.toHaveBeenCalled();
+      expect(fakes[0].closed).toBe(false);
+      const output = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(output).toContain("Press Ctrl+C again to abort the rollback prompt and exit.");
+
+      fakes[0].answer("n");
       await finalizePromise;
 
       expect(outerHandler).not.toHaveBeenCalled();

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-25T04:38:48.030Z"
 completedAt: "2026-02-25T04:38:48.030Z"
+acceptanceCriteria: []
 description: "Generate PR markdown content from rex completion data rather than git differences, focusing on completed work items and their significance"
 ---
 

@@ -12,6 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-14T16:22:08.354Z"
 completedAt: "2026-04-14T16:28:37.118Z"
+acceptanceCriteria: []
 description: "- Bidirectional coupling: \"web\" ↔ \"web-server\" (85+5 crossings) — consider extracting shared interface"
 recommendationMeta: "[object Object]"
 ---

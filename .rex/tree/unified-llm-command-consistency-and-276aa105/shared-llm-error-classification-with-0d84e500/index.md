@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-21T17:39:34.103Z"
 completedAt: "2026-04-21T17:39:34.103Z"
+acceptanceCriteria: []
 description: "Only smart-add.ts has sophisticated LLM error classification (classifySmartAddError, lines 634-720) that detects rate limits (429), auth failures (401), network errors, malformed responses, and server errors. All other LLM-calling commands (reshape, reorganize, prune, sourcevision analyze) either silently swallow errors or throw generic messages. The ERROR_HINTS array in errors.ts has no LLM-specific patterns. Users hitting token exhaustion, rate limits, or bad responses in these commands get unhelpful stack traces instead of actionable guidance."
 ---
 
@@ -13,6 +14,6 @@ description: "Only smart-add.ts has sophisticated LLM error classification (clas
 
 | Title | Status |
 |-------|--------|
+| [Add rate-limit cooldown detection with retry-after countdown and timeout state messaging](./add-rate-limit-cooldown-detection-with-f61ca69b/index.md) | completed |
 | [Extract smart-add error classifier into shared LLM error utility and extend ERROR_HINTS](./extract-smart-add-error-classifier-into-d8036b40/index.md) | completed |
 | [Wire shared error classifier and budget preflight into reshape, reorganize, prune, and sourcevision analyze](./wire-shared-error-classifier-and-budget-0454e5d5/index.md) | completed |
-| [Add rate-limit cooldown detection with retry-after countdown and timeout state messaging](./add-rate-limit-cooldown-detection-with-f61ca69b/index.md) | completed |

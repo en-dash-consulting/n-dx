@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-10T20:32:59.824Z"
 completedAt: "2026-02-10T20:32:59.824Z"
+acceptanceCriteria: []
 description: "Improve user feedback when SourceVision detects changes and resets to lower analysis passes\n\n---\n\nCreate a centralized configuration panel for managing experimental or problematic features across the n-dx toolkit"
 ---
 
@@ -48,20 +49,5 @@ Ensure the pass status output reflects the actual current pass immediately after
 **Priority:** low
 
 Build a dedicated configuration area within the unified config system that allows users to enable/disable experimental or problematic features across all n-dx packages
-
----
-
-Create a user-friendly web interface for managing feature toggles, providing easy access to experimental or problematic feature controls
-
-**Acceptance Criteria**
-
-- Feature toggle section exists in unified config interface
-- Toggles are organized by package (sourcevision, rex, hench)
-- Configuration changes apply immediately without restart
-- Feature flags are documented with descriptions and impact warnings
-- Control panel is accessible from main navigation or settings
-- Each toggle has clear description and current status
-- Changes are saved automatically and reflected immediately
-- Panel shows which features are experimental vs stable
 
 ---

@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T19:41:05.319Z"
 completedAt: "2026-02-22T19:41:05.319Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Vendor/Model Budget Resolution Rules](./vendormodel-budget-resolution-rules-998b6797/index.md) | completed |
 | [Task-Level Utilization Chips and Details Fallback UX](./task-level-utilization-chips-and-2e6e214b/index.md) | completed |
+| [Vendor/Model Budget Resolution Rules](./vendormodel-budget-resolution-rules-998b6797/index.md) | completed |

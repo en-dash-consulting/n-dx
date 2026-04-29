@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-06T15:39:26.006Z"
 completedAt: "2026-02-06T15:39:26.006Z"
+acceptanceCriteria: []
 description: "Improve command input validation and safety\n\n---\n\nConsistent JSON output formats across commands"
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T19:36:19.014Z"
 completedAt: "2026-02-21T19:36:19.014Z"
+acceptanceCriteria: []
 description: "Introduce a first-class `ndx refresh` command that turns user intent into a deterministic refresh plan across build and data steps."
 ---
 

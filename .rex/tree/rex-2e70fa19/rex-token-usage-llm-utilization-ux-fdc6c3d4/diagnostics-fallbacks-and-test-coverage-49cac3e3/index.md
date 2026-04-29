@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T08:27:41.683Z"
 completedAt: "2026-02-21T08:27:41.683Z"
+acceptanceCriteria: []
 description: "Provide explicit diagnostics for missing usage metadata and add comprehensive tests for parsing and utilization math."
 ---
 

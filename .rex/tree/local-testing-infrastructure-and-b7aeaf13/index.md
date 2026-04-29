@@ -12,5 +12,5 @@ completedAt: "2026-04-20T19:44:11.415Z"
 
 | Title | Status |
 |-------|--------|
-| [macOS Local Docker Test Suite](./macos-local-docker-test-suite-9dbecc75/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main-5a24a938/index.md) | completed |
+| [macOS Local Docker Test Suite](./macos-local-docker-test-suite-9dbecc75/index.md) | completed |

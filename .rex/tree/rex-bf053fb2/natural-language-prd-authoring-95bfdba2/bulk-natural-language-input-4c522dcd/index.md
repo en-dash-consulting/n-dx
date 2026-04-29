@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"
+acceptanceCriteria: []
 description: "Support multiple descriptions and file-based input for batch PRD creation"
 ---
 

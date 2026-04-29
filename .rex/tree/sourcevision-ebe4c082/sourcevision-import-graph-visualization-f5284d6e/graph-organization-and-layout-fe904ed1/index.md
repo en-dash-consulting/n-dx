@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T04:03:13.848Z"
 completedAt: "2026-02-11T04:03:13.848Z"
+acceptanceCriteria: []
 description: "Group related files and apply intelligent layout algorithms to make complex import relationships easier to understand\n\n---\n\nFix overlapping filename labels and implement smart visibility management to make the graph readable at all scales"
 ---
 
@@ -51,21 +52,5 @@ Apply force-directed or hierarchical layout algorithms that respect grouping con
 **Priority:** medium
 
 Prevent label overlaps through dynamic positioning and manage label visibility based on zoom level and density
-
----
-
-Truncate long filenames with ellipsis and show full names on hover to balance readability with information access
-
-**Acceptance Criteria**
-
-- Labels never overlap with other labels or nodes
-- Labels remain clearly associated with their corresponding nodes
-- Algorithm performs efficiently on graphs with 100+ nodes
-- Labels fade out when zoom level makes them unreadable
-- High-density areas show only key file labels
-- User can toggle label visibility on demand
-- Long filenames are truncated with ellipsis after reasonable length
-- Hover shows full filename in tooltip
-- Truncation preserves important parts of filename (extension, meaningful segments)
 
 ---

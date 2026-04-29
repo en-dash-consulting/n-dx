@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T04:56:26.463Z"
 completedAt: "2026-04-19T04:56:26.463Z"
+acceptanceCriteria: []
 description: "Document what contributors need beyond the end-user prerequisites — build toolchain, pnpm workspace setup, and any platform-specific gotchas — so new contributors can get a working dev environment without trial and error."
 ---
 

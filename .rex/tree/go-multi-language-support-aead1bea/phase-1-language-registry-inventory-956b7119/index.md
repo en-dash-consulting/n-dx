@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T04:05:46.055Z"
 completedAt: "2026-03-26T04:05:46.055Z"
+acceptanceCriteria: []
 description: "Establish a language registry abstraction in SourceVision so that Go projects can be inventoried correctly alongside JS/TS. All existing JS/TS behavior is preserved as the default path; Go support is purely additive."
 ---
 
@@ -13,7 +14,7 @@ description: "Establish a language registry abstraction in SourceVision so that 
 
 | Title | Status |
 |-------|--------|
-| [Implement language registry module in sourcevision](./implement-language-registry-module-in-67760efe/index.md) | completed |
-| [Refactor inventory.ts to consume language registry](./refactor-inventoryts-to-consume-e27102cc/index.md) | completed |
 | [Add language field to .n-dx.json schema and wire config support](./add-language-field-to-n-dxjson-schema-a070e70d/index.md) | completed |
 | [Create Go fixture project and language registry test suite](./create-go-fixture-project-and-language-fa93b525/index.md) | completed |
+| [Implement language registry module in sourcevision](./implement-language-registry-module-in-67760efe/index.md) | completed |
+| [Refactor inventory.ts to consume language registry](./refactor-inventoryts-to-consume-e27102cc/index.md) | completed |

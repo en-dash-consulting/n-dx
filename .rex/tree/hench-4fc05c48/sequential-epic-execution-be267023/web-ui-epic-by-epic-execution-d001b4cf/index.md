@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-10T19:22:25.616Z"
 completedAt: "2026-02-10T19:22:25.616Z"
+acceptanceCriteria: []
 description: "Enable epic-by-epic execution mode from the web dashboard with visual progress tracking and control interfaces\n\n---\n\nEnable sequential epic processing through CLI commands with automatic progression and completion detection"
 ---
 

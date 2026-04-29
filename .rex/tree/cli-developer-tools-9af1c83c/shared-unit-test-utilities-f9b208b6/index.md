@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-02T17:55:31.910Z"
 completedAt: "2026-04-02T17:55:31.910Z"
+acceptanceCriteria: []
 description: "Reduce duplication across unit tests by consolidating repeated constants and helper functions into test-only shared utilities without changing production code or altering test coverage."
 ---
 

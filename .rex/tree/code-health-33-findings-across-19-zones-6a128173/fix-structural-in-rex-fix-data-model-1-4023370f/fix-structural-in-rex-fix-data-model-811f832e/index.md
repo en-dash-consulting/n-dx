@@ -9,6 +9,7 @@ startedAt: "2026-04-19T02:45:02.865Z"
 completedAt: "2026-04-19T02:47:47.437Z"
 resolutionType: "code-change"
 resolutionDetail: "Finding acknowledged; structural fix was already applied by prior session (test file relocation improved cohesion from 0.4→0.5)."
+acceptanceCriteria: []
 description: "- Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6); per rex-satellite zone policy, any addition that lowers cohesion requires explicit justification"
 recommendationMeta: "[object Object]"
 ---

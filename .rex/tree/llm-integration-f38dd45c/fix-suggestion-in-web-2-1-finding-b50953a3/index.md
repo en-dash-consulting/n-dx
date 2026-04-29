@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:59:43.128Z"
 completedAt: "2026-04-13T21:59:43.128Z"
+acceptanceCriteria: []
 description: "- Zone \"web-2\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID"
 recommendationMeta: "[object Object]"
 ---

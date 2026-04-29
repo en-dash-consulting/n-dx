@@ -455,7 +455,7 @@ async function dispatchCommand(
     }
     case "migrate-to-folder-tree": {
       const { cmdMigrateToFolderTree } = await import("./commands/migrate-to-folder-tree.js");
-      await cmdMigrateToFolderTree(resolveDir(positional));
+      await cmdMigrateToFolderTree(resolveDir(positional), flags);
       break;
     }
     case "parse-md": {

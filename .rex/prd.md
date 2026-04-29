@@ -3257,7 +3257,7 @@ items:
       - id: "9bb8cd7a-c478-4008-acb1-be7b6168c13e"
         level: task
         title: Add cross-vendor regression tests for PRD authoring CLI commands
-        status: pending
+        status: completed
         priority: high
         acceptanceCriteria:
           - Integration tests cover rex add proposal generation with mocked Claude and Codex responses
@@ -3268,7 +3268,12 @@ items:
           - Test suite asserts no prd_{branch}_{date}.md file is created by any CLI or MCP write operation
           - Tests are added to the existing regression test file used for JSON/markdown write validation
           - All new regression tests pass in CI on a clean clone with no pre-existing prd.md
+        activeIntervals:
+          - start: "2026-04-29T14:22:42.427Z"
+            end: "2026-04-29T14:36:57.145Z"
         branch: feature/new-PRD-design
+        completedAt: "2026-04-29T14:36:57.145Z"
+        endedAt: "2026-04-29T14:36:57.145Z"
         mergedProposals:
           - mergedAt: "2026-04-29T13:47:25.935Z"
             proposalKind: task
@@ -3286,6 +3291,8 @@ items:
           reason: content_overlap
           reasonRef: content_overlap:0270df79-5844-45ea-8bd9-da2df2ae8a26
           type: duplicate_guard_override
+        resolutionDetail: Completed prd.md → folder-tree write-side migration and added comprehensive cross-vendor regression tests. FileStore now writes exclusively to folder-tree backend. Tests verify prd.md and branch-scoped files are never created/modified by CLI commands, MCP tools, or FileStore operations.
+        resolutionType: code-change
         source: smart-add
         sourceFile: .rex/prd.md
         startedAt: "2026-04-16T16:45:28.240Z"
@@ -29087,7 +29094,7 @@ items:
           - id: "3effa16b-1466-4b82-a963-c1f21afaedeb"
             level: task
             title: Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
-            status: pending
+            status: in_progress
             priority: high
             acceptanceCriteria:
               - All existing PRDStore unit tests pass with the folder-tree backend without modification to test assertions
@@ -29104,8 +29111,8 @@ items:
                 end: "2026-04-28T10:43:59.377Z"
               - start: "2026-04-28T13:41:10.111Z"
                 end: "2026-04-28T13:49:34.833Z"
+              - start: "2026-04-29T14:37:40.407Z"
             branch: feature/new-PRD-design
-            endedAt: "2026-04-28T13:49:34.833Z"
             mergedProposals:
               - mergedAt: "2026-04-29T13:47:25.935Z"
                 proposalKind: task
@@ -30481,7 +30488,7 @@ Each Rex view currently places primary actions (Add, Prune, Filter, Refresh) in 
 Investigate why rex add fails to produce a proposal when Codex is the active vendor. Likely causes include prompt formatting incompatibilities, Codex response shape differences, or JSON extraction failure on non-standard completions. Identify the root cause across the proposal pipeline and implement targeted fixes so proposals are generated and presented for review end-to-end with Codex.
 
 #### Add cross-vendor regression tests for PRD authoring CLI commands
-*task · pending · priority: high · started 2026-04-16 · tags: codex, claude, testing, rex, regression, prd*
+*task · completed · priority: high · started 2026-04-16 · completed 2026-04-29 · tags: codex, claude, testing, rex, regression, prd*
 
 Extend the existing no-JSON-write regression test suite to also assert that no prd.md or branch-scoped prd_{branch}_{date}.md file is created or modified by any PRD mutation. Cover rex CLI add/edit/remove/move/merge, all MCP write tools, and PRDStore.saveDocument directly. Wire the tests into CI to block any future regression.
 
@@ -39032,7 +39039,7 @@ Build a one-shot CLI command (rex migrate-to-folder-tree) that reads the existin
 Update all existing PRD-related unit, integration, and e2e tests to exercise the folder-tree storage backend, and add new tests covering the serializer, parser, round-trip fidelity, and full CLI pipeline correctness.
 
 #### Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
-*task · pending · priority: high · started 2026-04-28 · ended 2026-04-28 · tags: prd, tests, unit, storage, serializer, parser*
+*task · in_progress · priority: high · started 2026-04-28 · tags: prd, tests, unit, storage, serializer, parser*
 
 Integrate the slug function into the existing folder-tree serializer so created directories follow the <epic-slug>/<feature-slug>/<task-slug>/<subtask-slug> naming hierarchy. Update the parser to reconstruct PRD items from slug-named directories without relying on ID-based path conventions. Verify that serialize → parse produces an identical PRD tree to confirm no data is lost under the new convention.
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T08:28:31.947Z"
 completedAt: "2026-02-21T08:28:31.947Z"
+acceptanceCriteria: []
 description: "Support configurable weekly token budgets by vendor/model and compute utilization percentages for tasks and project rollups."
 ---
 

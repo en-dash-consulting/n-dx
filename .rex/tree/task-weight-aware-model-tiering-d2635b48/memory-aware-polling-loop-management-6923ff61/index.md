@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T04:11:56.344Z"
 completedAt: "2026-02-27T04:11:56.344Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Memory Pressure Polling Suspension](./memory-pressure-polling-suspension-e385d455/index.md) | completed |
 | [Memory-Aware Polling Validation](./memory-aware-polling-validation-2351e3d1/index.md) | completed |
+| [Memory Pressure Polling Suspension](./memory-pressure-polling-suspension-e385d455/index.md) | completed |

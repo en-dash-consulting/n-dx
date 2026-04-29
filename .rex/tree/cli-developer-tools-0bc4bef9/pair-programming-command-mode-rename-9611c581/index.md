@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-16T16:19:56.284Z"
 completedAt: "2026-04-16T16:19:56.284Z"
+acceptanceCriteria: []
 description: "Rename the ndx single-command/sc CLI entrypoints to ndx pair-programming/bicker, and augment the mode with cross-vendor validation so whichever vendor is not doing the primary work automatically runs tests and reviews the completed command output."
 ---
 
@@ -13,5 +14,5 @@ description: "Rename the ndx single-command/sc CLI entrypoints to ndx pair-progr
 
 | Title | Status |
 |-------|--------|
-| [Rename single-command and sc CLI entrypoints to pair-programming and bicker](./rename-single-command-and-sc-cli-0150c623/index.md) | completed |
 | [Implement cross-vendor validation pass in pair-programming mode](./implement-cross-vendor-validation-pass-661f8e0c/index.md) | completed |
+| [Rename single-command and sc CLI entrypoints to pair-programming and bicker](./rename-single-command-and-sc-cli-0150c623/index.md) | completed |

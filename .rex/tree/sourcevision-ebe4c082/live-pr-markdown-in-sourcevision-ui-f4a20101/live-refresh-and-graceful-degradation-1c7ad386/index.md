@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T05:40:54.335Z"
 completedAt: "2026-02-21T05:40:54.335Z"
+acceptanceCriteria: []
 description: "Keep PR markdown current as repository state changes, while failing safely when git context is unavailable."
 ---
 

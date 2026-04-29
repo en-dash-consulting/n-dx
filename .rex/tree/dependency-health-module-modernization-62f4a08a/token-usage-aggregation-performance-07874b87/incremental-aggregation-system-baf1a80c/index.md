@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T16:38:30.297Z"
 completedAt: "2026-02-26T16:38:30.297Z"
+acceptanceCriteria: []
 description: "Replace full aggregation rebuilds with efficient incremental updates to handle large run histories"
 ---
 

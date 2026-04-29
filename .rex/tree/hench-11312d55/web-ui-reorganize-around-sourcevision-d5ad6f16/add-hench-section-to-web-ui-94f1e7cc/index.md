@@ -9,6 +9,7 @@ tags:
   - "hench"
 startedAt: "2026-02-09T18:30:32.410Z"
 completedAt: "2026-02-09T18:30:32.410Z"
+acceptanceCriteria: []
 description: "Add a Hench section to the sidebar as the execution arm of Rex. Relatively minor compared to SourceVision and Rex — focused on showing run history, run status, and linking runs back to the Rex tasks they executed. Hench data lives in .hench/runs/."
 ---
 

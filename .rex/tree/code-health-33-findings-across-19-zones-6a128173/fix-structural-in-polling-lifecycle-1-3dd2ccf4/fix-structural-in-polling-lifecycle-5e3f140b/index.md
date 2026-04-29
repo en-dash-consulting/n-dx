@@ -9,6 +9,7 @@ startedAt: "2026-04-19T02:36:59.916Z"
 completedAt: "2026-04-19T02:37:42.176Z"
 resolutionType: "code-change"
 resolutionDetail: "Duplicate hooks/use-polling-suspension.ts was already removed in commit 9a7a3978. Only polling/use-polling-suspension.ts remains as the canonical location. Typecheck passes clean."
+acceptanceCriteria: []
 description: "- Duplicate use-polling-suspension.ts exists in both hooks/ and polling/ directories; one is likely a forwarding re-export creating an invisible seam that can drift out of sync."
 recommendationMeta: "[object Object]"
 ---

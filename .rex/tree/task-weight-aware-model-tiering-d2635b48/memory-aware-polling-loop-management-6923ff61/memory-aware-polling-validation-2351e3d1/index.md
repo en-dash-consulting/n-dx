@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T04:11:56.269Z"
 completedAt: "2026-02-27T04:11:56.269Z"
+acceptanceCriteria: []
 description: "Add testing and monitoring to ensure polling suspension works correctly under memory pressure scenarios"
 ---
 

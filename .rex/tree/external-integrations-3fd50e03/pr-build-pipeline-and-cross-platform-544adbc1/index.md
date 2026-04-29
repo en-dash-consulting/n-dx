@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-07T22:50:03.910Z"
 completedAt: "2026-04-07T22:50:03.910Z"
+acceptanceCriteria: []
 ---
 
 ## Children

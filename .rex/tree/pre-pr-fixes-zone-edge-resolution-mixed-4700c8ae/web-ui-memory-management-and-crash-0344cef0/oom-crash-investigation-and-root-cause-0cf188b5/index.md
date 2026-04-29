@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T19:29:13.108Z"
 completedAt: "2026-02-24T19:29:13.108Z"
+acceptanceCriteria: []
 description: "Investigate and diagnose the recurring out-of-memory crashes that cause 'aw snap error code 5' in the web UI"
 ---
 

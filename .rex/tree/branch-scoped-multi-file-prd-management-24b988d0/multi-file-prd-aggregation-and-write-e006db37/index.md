@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-22T17:05:50.268Z"
 completedAt: "2026-04-22T17:05:50.268Z"
+acceptanceCriteria: []
 description: "Refactor the PRDStore to aggregate items from all PRD files for read operations and route write operations to the correct branch-scoped file, preserving all existing command behavior while operating transparently on multiple underlying storage files."
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T07:12:18.010Z"
 completedAt: "2026-02-26T07:12:18.010Z"
+acceptanceCriteria: []
 description: "Suspend all polling intervals when browser tab is backgrounded to reduce resource consumption"
 ---
 

@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:58:34.277Z"
 completedAt: "2026-04-20T15:58:34.277Z"
+acceptanceCriteria: []
 description: "- 9 entry points — wide API surface, consider consolidating exports"
 recommendationMeta: "[object Object]"
 ---

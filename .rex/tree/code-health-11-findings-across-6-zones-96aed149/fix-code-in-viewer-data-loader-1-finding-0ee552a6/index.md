@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:25:21.043Z"
 completedAt: "2026-04-20T15:25:21.043Z"
+acceptanceCriteria: []
 description: "- Only one test file (loader-onchange.test.ts) is present for four production files; the core loader.ts load path appears untested."
 recommendationMeta: "[object Object]"
 ---

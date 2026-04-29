@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-03T11:45:11.430Z"
 completedAt: "2026-03-03T11:45:11.430Z"
+acceptanceCriteria: []
 description: "Normalize spacing, padding, border, and color usage across all Rex views to eliminate the patchwork appearance caused by independently styled page sections"
 ---
 

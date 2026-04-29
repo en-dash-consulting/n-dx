@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:44:25.224Z"
 completedAt: "2026-04-13T21:44:25.224Z"
+acceptanceCriteria: []
 description: "- High coupling (0.65) — 8 imports target \"web\"\n- Low cohesion (0.35) — files are loosely related, consider splitting this zone"
 parentId: "0de5be78-d295-4f71-be5d-38594a355240"
 recommendationMeta: "[object Object]"

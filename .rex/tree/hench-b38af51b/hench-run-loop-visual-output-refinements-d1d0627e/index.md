@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T14:32:47.496Z"
 completedAt: "2026-04-09T14:36:24.994Z"
+acceptanceCriteria: []
 description: "Apply consistent semantic color conventions and styled separators to hench's run-loop console output, making task completion states, inter-task pause intervals, and loop-iteration boundaries immediately legible when scanning long run transcripts."
 ---
 
@@ -13,5 +14,5 @@ description: "Apply consistent semantic color conventions and styled separators 
 
 | Title | Status |
 |-------|--------|
-| [Apply semantic success and pause colors to hench run-loop status messages](./apply-semantic-success-and-pause-colors-c5ba3c69/index.md) | completed |
 | [Add pink loop-iteration separator line to hench run output](./add-pink-loop-iteration-separator-line-62f1d0e6/index.md) | completed |
+| [Apply semantic success and pause colors to hench run-loop status messages](./apply-semantic-success-and-pause-colors-c5ba3c69/index.md) | completed |

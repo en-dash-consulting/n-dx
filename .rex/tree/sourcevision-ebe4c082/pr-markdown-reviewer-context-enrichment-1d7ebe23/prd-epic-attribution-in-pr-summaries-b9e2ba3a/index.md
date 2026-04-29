@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T22:20:05.323Z"
 completedAt: "2026-02-22T22:20:05.323Z"
+acceptanceCriteria: []
 description: "Connect branch work to PRD context so reviewers can quickly understand which planned initiatives the changes implement."
 ---
 

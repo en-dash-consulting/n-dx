@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T01:11:08.148Z"
 completedAt: "2026-02-23T01:11:08.148Z"
+acceptanceCriteria: []
 description: "Ensure PR markdown generation still succeeds when git-based fetch or diff operations fail by switching to a deterministic artifact-based fallback path."
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T07:30:33.185Z"
 completedAt: "2026-02-24T07:30:33.185Z"
+acceptanceCriteria: []
 description: "Systematically investigate and diagnose the root causes of lingering processes that remain active after dashboard termination or refresh commands"
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T06:47:01.266Z"
 completedAt: "2026-02-18T06:47:01.266Z"
+acceptanceCriteria: []
 description: "Create a prominent display for currently running tasks in the Hench UI"
 ---
 

@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T06:25:50.699Z"
 completedAt: "2026-02-21T06:25:50.699Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Navigation and Routing Parity](./navigation-and-routing-parity-2188d6f2/index.md) | completed |
 | [Endpoint Integration and Diagnostic States](./endpoint-integration-and-diagnostic-db4a5c69/index.md) | completed |
+| [Navigation and Routing Parity](./navigation-and-routing-parity-2188d6f2/index.md) | completed |

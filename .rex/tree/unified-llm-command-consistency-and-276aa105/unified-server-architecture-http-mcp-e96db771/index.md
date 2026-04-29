@@ -10,6 +10,7 @@ tags:
   - "server"
 startedAt: "2026-02-10T05:31:42.596Z"
 completedAt: "2026-02-10T05:31:42.596Z"
+acceptanceCriteria: []
 description: "Replace the current stdio-only MCP setup with HTTP-served MCP endpoints, and introduce a single `ndx start` command that spins up both the web dashboard and MCP servers. Currently MCP requires manual `claude mcp add` per-server (stdio transport), and the web dashboard runs independently via `ndx web`. Goal: one command, one port, everything running — browser dashboard + MCP endpoints for any MCP client."
 ---
 
@@ -19,7 +20,7 @@ description: "Replace the current stdio-only MCP setup with HTTP-served MCP endp
 |-------|--------|
 | [MCP over HTTP transport](./mcp-over-http-transport-36e132ef/index.md) | completed |
 | [`ndx start` orchestration command](./ndx-start-orchestration-command-64fcec7c/index.md) | completed |
-| [Unified web viewer architecture](./unified-web-viewer-architecture-29a51b12/index.md) | completed |
 | [Rex PRD management UI](./rex-prd-management-ui-bb97c680/index.md) | completed |
-| [Web server and API integration](./web-server-and-api-integration-8a65d7cd/index.md) | completed |
 | [rex_edit_item MCP tool](./rexedititem-mcp-tool-653cb773/index.md) | completed |
+| [Unified web viewer architecture](./unified-web-viewer-architecture-29a51b12/index.md) | completed |
+| [Web server and API integration](./web-server-and-api-integration-8a65d7cd/index.md) | completed |

@@ -15,6 +15,6 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
+| [Fix observation in polling (2 findings)](./fix-observation-in-polling-2-findings-c662581c/index.md) | completed |
 | [Fix suggestion in token (1 finding)](./fix-suggestion-in-token-1-finding-3fb82f2e/index.md) | completed |
 | [Fix suggestion in web-2 (1 finding)](./fix-suggestion-in-web-2-1-finding-b50953a3/index.md) | completed |
-| [Fix observation in polling (2 findings)](./fix-observation-in-polling-2-findings-c662581c/index.md) | completed |

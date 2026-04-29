@@ -2,13 +2,16 @@
 id: "c9c4ea2f-cfc6-4ff3-946e-3021df15d4e8"
 level: "task"
 title: "Define and implement slug generation rules for PRD folder names at all hierarchy levels"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "prd"
   - "storage"
   - "naming"
 source: "smart-add"
+startedAt: "2026-04-29T15:42:13.527Z"
+completedAt: "2026-04-29T15:58:54.534Z"
+endedAt: "2026-04-29T15:58:54.534Z"
 acceptanceCriteria:
   - "Slug function produces lowercase, hyphen-separated names with no special characters or path separators"
   - "Slug is deterministic: the same title always produces the same slug"

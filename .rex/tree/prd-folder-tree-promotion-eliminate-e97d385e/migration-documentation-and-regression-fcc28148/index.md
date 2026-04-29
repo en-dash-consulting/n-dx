@@ -4,6 +4,7 @@ level: "feature"
 title: "Migration, Documentation, and Regression Coverage for Folder-Tree-Only Storage"
 status: "pending"
 source: "smart-add"
+acceptanceCriteria: []
 description: "Update the existing migration command to produce slug-named folders and offer prd.md removal, revise all documentation to reflect the folder tree as the sole storage format, and add regression tests that prevent any future re-introduction of prd.md write paths."
 ---
 
@@ -11,5 +12,5 @@ description: "Update the existing migration command to produce slug-named folder
 
 | Title | Status |
 |-------|--------|
-| [Update rex migrate-to-folder-tree to produce slug-named directories and offer prd.md removal](./update-rex-migrate-to-folder-tree-to-3907de2e/index.md) | pending |
 | [Update CLAUDE.md, README, and Key Files documentation to reflect folder-tree as sole PRD storage](./update-claudemd-readme-and-key-files-60a8e23e/index.md) | pending |
+| [Update rex migrate-to-folder-tree to produce slug-named directories and offer prd.md removal](./update-rex-migrate-to-folder-tree-to-3907de2e/index.md) | in_progress |

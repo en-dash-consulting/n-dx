@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T21:18:12.426Z"
 completedAt: "2026-02-22T21:18:12.426Z"
+acceptanceCriteria: []
 description: "Document the new behavior and lock it in with regression tests across detection, prompt decisions, and persistence."
 ---
 

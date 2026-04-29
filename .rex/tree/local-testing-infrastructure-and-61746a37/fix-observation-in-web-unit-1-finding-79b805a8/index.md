@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-16T20:18:38.726Z"
 completedAt: "2026-04-16T20:18:38.726Z"
+acceptanceCriteria: []
 description: "- High coupling (0.6) — 5 imports target \"web-server\""
 recommendationMeta: "[object Object]"
 ---

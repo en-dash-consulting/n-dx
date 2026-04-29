@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-09T13:45:09.477Z"
 completedAt: "2026-02-09T13:45:09.477Z"
+acceptanceCriteria: []
 description: "Improve PRD tree manipulation and navigation"
 ---
 

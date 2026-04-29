@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T18:08:30.754Z"
 completedAt: "2026-02-24T18:08:30.754Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Package.json PR Build Script](./packagejson-pr-build-script-47e2c9a4/index.md) | completed |
 | [Bitbucket Pipeline Integration](./bitbucket-pipeline-integration-2ac7ce3e/index.md) | completed |
+| [Package.json PR Build Script](./packagejson-pr-build-script-47e2c9a4/index.md) | completed |

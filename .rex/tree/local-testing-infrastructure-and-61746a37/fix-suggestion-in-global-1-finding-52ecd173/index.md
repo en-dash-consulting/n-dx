@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-16T20:25:18.971Z"
 completedAt: "2026-04-16T20:25:18.971Z"
+acceptanceCriteria: []
 description: "- Hub function: jsonResponse in packages/web/src/server/response-utils.ts is called from 22 files — changes here have wide impact, consider if responsibilities can be narrowed"
 recommendationMeta: "[object Object]"
 ---

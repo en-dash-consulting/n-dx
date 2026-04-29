@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T02:47:47.477Z"
 completedAt: "2026-04-19T02:47:47.477Z"
+acceptanceCriteria: []
 description: "- Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6); per rex-satellite zone policy, any addition that lowers cohesion requires explicit justification"
 recommendationMeta: "[object Object]"
 ---

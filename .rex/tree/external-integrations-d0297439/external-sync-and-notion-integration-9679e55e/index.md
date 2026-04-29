@@ -6,11 +6,12 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Store adapter architecture](./store-adapter-architecture-3a5378b3/index.md) | completed |
 | [Notion adapter implementation](./notion-adapter-implementation-1aca6c86/index.md) | completed |
+| [Store adapter architecture](./store-adapter-architecture-3a5378b3/index.md) | completed |

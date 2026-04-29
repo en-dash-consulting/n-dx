@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T03:25:03.715Z"
 completedAt: "2026-04-23T03:25:03.715Z"
+acceptanceCriteria: []
 description: "Allow ndx work invocations running in non-interactive autonomous modes (--auto, --loop) to skip the interactive commit message approval gate, so unattended runs don't stall waiting for user input."
 ---
 

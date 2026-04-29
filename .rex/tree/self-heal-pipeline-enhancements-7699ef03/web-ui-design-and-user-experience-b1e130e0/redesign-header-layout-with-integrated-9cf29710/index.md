@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-10T20:40:13.472Z"
 completedAt: "2026-02-10T20:40:13.472Z"
+acceptanceCriteria: []
 description: "Consolidate all header controls into a unified navigation experience and reposition branding elements for improved visual hierarchy"
 ---
 

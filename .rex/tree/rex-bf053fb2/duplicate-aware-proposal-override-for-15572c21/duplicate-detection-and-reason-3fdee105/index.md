@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T20:56:35.331Z"
 completedAt: "2026-02-22T20:56:35.331Z"
+acceptanceCriteria: []
 description: "Identify when generated add proposals overlap with existing or completed PRD items and produce clear, user-facing duplicate reasons before any write occurs."
 ---
 

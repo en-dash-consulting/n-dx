@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-16T17:33:49.851Z"
 completedAt: "2026-04-16T17:33:49.851Z"
+acceptanceCriteria: []
 description: "- Bidirectional coupling: \"web-server\" ↔ \"web-viewer\" (31+72 crossings) — consider extracting shared interface"
 ---
 

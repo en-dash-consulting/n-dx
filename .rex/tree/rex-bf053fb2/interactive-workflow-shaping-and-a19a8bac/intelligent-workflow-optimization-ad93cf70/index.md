@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-10T23:01:55.120Z"
 completedAt: "2026-02-10T23:01:55.120Z"
+acceptanceCriteria: []
 description: "Analyze workflow execution patterns and automatically optimize configurations based on project characteristics, historical performance, and adaptive learning"
 ---
 

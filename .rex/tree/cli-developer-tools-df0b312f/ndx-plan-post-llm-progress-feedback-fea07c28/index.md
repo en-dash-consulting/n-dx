@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T17:58:55.309Z"
 completedAt: "2026-04-09T17:58:55.309Z"
+acceptanceCriteria: []
 description: "After `ndx plan` prints 'Done.' and 'Vendor: ...' (which marks the end of the LLM response stream), the process appears to stall with no visible output while it processes the response and builds proposals. Users cannot distinguish a working pipeline from a hung process."
 ---
 
@@ -13,5 +14,5 @@ description: "After `ndx plan` prints 'Done.' and 'Vendor: ...' (which marks the
 
 | Title | Status |
 |-------|--------|
-| [Trace ndx plan output flow and identify the silent gap after 'Done.'](./trace-ndx-plan-output-flow-and-identify-b3bdcdb5/index.md) | completed |
 | [Add spinner and stage labels to ndx plan output between LLM response and proposal display](./add-spinner-and-stage-labels-to-ndx-8f3ffe22/index.md) | completed |
+| [Trace ndx plan output flow and identify the silent gap after 'Done.'](./trace-ndx-plan-output-flow-and-identify-b3bdcdb5/index.md) | completed |

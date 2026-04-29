@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T17:48:19.524Z"
 completedAt: "2026-04-09T17:48:19.524Z"
+acceptanceCriteria: []
 description: "The ndx init dinosaur animation sequence is incorrect. Rex-F.png must be the canonical first frame, and each subsequent animation frame must be derived from the closest available reference image to Rex-F.png rather than being independently invented."
 ---
 

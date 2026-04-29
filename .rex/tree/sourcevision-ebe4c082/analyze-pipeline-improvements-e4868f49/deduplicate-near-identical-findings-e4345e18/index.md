@@ -6,5 +6,6 @@ status: "completed"
 priority: "medium"
 startedAt: "2026-02-09T18:39:30.216Z"
 completedAt: "2026-02-09T18:45:26.263Z"
+acceptanceCriteria: []
 description: "Add finding deduplication to zones scanner: detect and merge findings with similar text across different passes, keeping the highest-severity version"
 ---

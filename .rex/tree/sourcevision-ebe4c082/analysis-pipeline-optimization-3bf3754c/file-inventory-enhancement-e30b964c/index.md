@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-09T15:55:13.442Z"
 completedAt: "2026-02-09T15:55:13.442Z"
+acceptanceCriteria: []
 description: "Comprehensive file classification and metadata extraction"
 ---
 

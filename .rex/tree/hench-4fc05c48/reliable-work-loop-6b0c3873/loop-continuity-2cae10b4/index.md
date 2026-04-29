@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-04T17:40:56.130Z"
 completedAt: "2026-02-04T17:40:56.130Z"
+acceptanceCriteria: []
 description: "Enable continuous autonomous execution with proper error handling"
 ---
 

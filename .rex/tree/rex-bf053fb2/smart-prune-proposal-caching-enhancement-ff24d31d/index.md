@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-06T05:59:33.851Z"
 completedAt: "2026-03-11T02:19:13.174Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [LLM Proposal Caching for Prune Operations](./llm-proposal-caching-for-prune-3691e747/index.md) | completed |
 | [Integration tests for smart prune caching workflow](./integration-tests-for-smart-prune-c79dec6c/index.md) | completed |
+| [LLM Proposal Caching for Prune Operations](./llm-proposal-caching-for-prune-3691e747/index.md) | completed |

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-02T08:01:56.527Z"
 completedAt: "2026-03-02T08:01:56.527Z"
+acceptanceCriteria: []
 description: "Enable rex add command to accept and process markdown and text files containing product requirements and descriptions"
 ---
 

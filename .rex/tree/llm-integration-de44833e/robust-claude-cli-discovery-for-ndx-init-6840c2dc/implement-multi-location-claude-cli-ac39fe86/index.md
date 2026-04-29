@@ -17,5 +17,5 @@ acceptanceCriteria:
   - "cli.claudePath key in .n-dx.json overrides discovery and is documented in ndx config --help"
   - "Resolved path is written to .hench/config.json on successful discovery"
   - "Discovery logic is exercised by a unit test that stubs PATH and file-existence checks for each platform"
-description: "Replace the current single PATH lookup for the claude binary with an ordered discovery chain that checks: (1) a user-configured path from .n-dx.json or CLAUDE_CLI_PATH env var, (2) the shell PATH, (3) well-known install locations (~/.claude/local/claude, ~/.nvm/versions/node/*/bin/claude, /usr/local/bin, /opt/homebrew/bin, %APPDATA%\\npm\\claude.cmd on Windows). The resolved path should be persisted in .hench/config.json so subsequent commands reuse it without re-discovering each time."
+description: "Replace the current single PATH lookup for the claude binary with an ordered discovery chain that checks: (1) a user-configured path from .n-dx.json or CLAUDE_CLI_PATH env var, (2) the shell PATH, (3) well-known install locations (~/.claude/local/claude, ~/.nvm/versions/node/*/bin/claude, /usr/local/bin, /opt/homebrew/bin, %APPDATA%\npm\\claude.cmd on Windows). The resolved path should be persisted in .hench/config.json so subsequent commands reuse it without re-discovering each time."
 ---

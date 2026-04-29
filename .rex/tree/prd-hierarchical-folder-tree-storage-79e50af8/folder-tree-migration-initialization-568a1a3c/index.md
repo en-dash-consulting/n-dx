@@ -7,6 +7,7 @@ source: "smart-add"
 startedAt: "2026-04-28T10:06:18.341Z"
 completedAt: "2026-04-28T10:06:18.341Z"
 endedAt: "2026-04-28T10:06:18.341Z"
+acceptanceCriteria: []
 description: "Provide a first-run migration path from prd.md to the folder-tree format, integrate folder scaffolding into ndx init, and implement automatic migration detection so existing projects upgrade transparently."
 ---
 

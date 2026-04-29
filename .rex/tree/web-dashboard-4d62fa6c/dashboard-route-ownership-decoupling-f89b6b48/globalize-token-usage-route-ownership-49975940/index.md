@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T21:40:06.085Z"
 completedAt: "2026-02-22T21:40:06.085Z"
+acceptanceCriteria: []
 description: "Make Token Usage a first-class global dashboard destination instead of a Rex-scoped view so routing and UI metadata remain consistent across sections."
 ---
 

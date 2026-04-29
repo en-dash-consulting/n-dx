@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T18:14:34.818Z"
 completedAt: "2026-02-26T18:14:34.818Z"
+acceptanceCriteria: []
 description: "Prevent duplicate in-flight requests by tracking active API calls and returning shared promises for identical requests"
 ---
 

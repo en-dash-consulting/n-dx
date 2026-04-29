@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-25T15:28:31.160Z"
 completedAt: "2026-02-25T15:28:31.160Z"
+acceptanceCriteria: []
 description: "Extend the existing equals-prefixed index selector to support comma-separated lists and period wildcard for all items"
 ---
 

@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T02:56:32.761Z"
 completedAt: "2026-04-19T02:56:32.761Z"
+acceptanceCriteria: []
 description: "- Single-file micro-zone with cohesion 0 and coupling 1 — an algorithmic artifact. theme-toggle.ts should be classified within viewer-ui-hub to eliminate a spurious zone boundary with no governance value."
 recommendationMeta: "[object Object]"
 ---

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T04:22:21.385Z"
 completedAt: "2026-02-27T04:22:21.385Z"
+acceptanceCriteria: []
 description: "Remove obsolete entries from usage aggregation to prevent memory bloat and improve accuracy"
 ---
 

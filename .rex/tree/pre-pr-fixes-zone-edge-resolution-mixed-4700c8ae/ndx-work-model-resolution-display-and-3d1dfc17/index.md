@@ -7,6 +7,7 @@ priority: "high"
 source: "smart-add"
 startedAt: "2026-04-14T16:33:04.573Z"
 completedAt: "2026-04-14T16:33:04.573Z"
+acceptanceCriteria: []
 description: "The ndx work command does not surface the LLM model configured in .n-dx.json to the user at run time, and may not propagate it to the underlying hench LLM call sites. Additionally, when the vendor is changed, a stale model value from the previous vendor can persist in config, causing silent misconfiguration."
 recommendationMeta: "[object Object]"
 ---

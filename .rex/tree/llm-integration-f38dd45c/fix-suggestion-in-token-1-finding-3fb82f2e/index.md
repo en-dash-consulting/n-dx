@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:59:36.959Z"
 completedAt: "2026-04-13T21:59:36.959Z"
+acceptanceCriteria: []
 description: "- Zone \"Token\" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0.65) — requires refactoring before new feature development"
 recommendationMeta: "[object Object]"
 ---

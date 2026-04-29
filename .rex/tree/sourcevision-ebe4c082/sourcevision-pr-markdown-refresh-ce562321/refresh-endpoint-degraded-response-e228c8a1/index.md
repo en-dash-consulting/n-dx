@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T23:14:32.541Z"
 completedAt: "2026-02-22T23:14:32.541Z"
+acceptanceCriteria: []
 description: "Make `/api/sv/pr-markdown/refresh` behave consistently with read/state endpoints by returning structured degraded responses when refresh prerequisites fail but cached markdown is available."
 ---
 

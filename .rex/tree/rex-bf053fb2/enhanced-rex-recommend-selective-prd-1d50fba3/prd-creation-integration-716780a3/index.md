@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-25T15:45:38.461Z"
 completedAt: "2026-02-25T15:45:38.461Z"
+acceptanceCriteria: []
 description: "Implement the actual PRD creation workflow for selected recommendations, going beyond the existing acknowledge functionality"
 ---
 

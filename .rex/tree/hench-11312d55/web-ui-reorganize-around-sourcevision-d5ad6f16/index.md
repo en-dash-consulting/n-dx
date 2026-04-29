@@ -10,6 +10,7 @@ tags:
   - "navigation"
 startedAt: "2026-02-09T18:30:32.446Z"
 completedAt: "2026-02-09T18:30:32.446Z"
+acceptanceCriteria: []
 description: "Restructure the web dashboard sidebar and navigation so the three tools have clear, distinct sections rather than the current flat \"Analysis\" + \"Enrichment\" grouping. SourceVision and Rex are the two major sections; Hench is a smaller section focused on execution history. This replaces the current layout where Rex is just one \"Tasks\" tab buried among SourceVision views."
 ---
 
@@ -17,6 +18,6 @@ description: "Restructure the web dashboard sidebar and navigation so the three 
 
 | Title | Status |
 |-------|--------|
-| [Restructure sidebar into SourceVision / Rex / Hench sections](./restructure-sidebar-into-sourcevision-abbf736c/index.md) | completed |
-| [Expand Rex into a full multi-view section](./expand-rex-into-a-full-multi-view-12e7cfc8/index.md) | completed |
 | [Add Hench section to web UI](./add-hench-section-to-web-ui-94f1e7cc/index.md) | completed |
+| [Expand Rex into a full multi-view section](./expand-rex-into-a-full-multi-view-12e7cfc8/index.md) | completed |
+| [Restructure sidebar into SourceVision / Rex / Hench sections](./restructure-sidebar-into-sourcevision-abbf736c/index.md) | completed |

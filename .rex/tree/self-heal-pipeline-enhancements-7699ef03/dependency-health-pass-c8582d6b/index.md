@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T19:48:08.783Z"
 completedAt: "2026-04-14T19:48:08.783Z"
+acceptanceCriteria: []
 description: "Extend the self-heal loop with an automated dependency audit and cleanup step that inspects all monorepo package.json files, identifies unused, outdated, or duplicate dependencies, and applies safe remediation before proceeding with the analysis–recommend–execute cycle."
 ---
 
@@ -13,5 +14,5 @@ description: "Extend the self-heal loop with an automated dependency audit and c
 
 | Title | Status |
 |-------|--------|
-| [Implement dependency audit step in self-heal pipeline](./implement-dependency-audit-step-in-self-8af32cae/index.md) | completed |
 | [Implement automated dependency cleanup executor](./implement-automated-dependency-cleanup-5052d7d9/index.md) | completed |
+| [Implement dependency audit step in self-heal pipeline](./implement-dependency-audit-step-in-self-8af32cae/index.md) | completed |

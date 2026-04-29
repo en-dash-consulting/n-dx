@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T15:06:38.369Z"
 completedAt: "2026-04-09T15:06:38.369Z"
+acceptanceCriteria: []
 description: "The dinosaur rendered in the `ndx init` banner does not accurately represent the Rex-F.png mascot image used in marketing and branding. This feature corrects the ASCII art to match the proportions and silhouette of the reference image."
 ---
 
@@ -13,5 +14,5 @@ description: "The dinosaur rendered in the `ndx init` banner does not accurately
 
 | Title | Status |
 |-------|--------|
-| [Redesign ndx init ASCII dinosaur to match Rex-F.png proportions](./redesign-ndx-init-ascii-dinosaur-to-ef198516/index.md) | completed |
 | [Add visual regression snapshot for ndx init dinosaur output](./add-visual-regression-snapshot-for-ndx-7a7249e7/index.md) | completed |
+| [Redesign ndx init ASCII dinosaur to match Rex-F.png proportions](./redesign-ndx-init-ascii-dinosaur-to-ef198516/index.md) | completed |

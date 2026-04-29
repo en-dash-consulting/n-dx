@@ -12,6 +12,6 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 
 | Title | Status |
 |-------|--------|
-| [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http-5dd63e4e/index.md) | completed |
 | [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-decoupling-f89b6b48/index.md) | completed |
+| [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http-5dd63e4e/index.md) | completed |
 | [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-orchestration-f82b4f30/index.md) | completed |

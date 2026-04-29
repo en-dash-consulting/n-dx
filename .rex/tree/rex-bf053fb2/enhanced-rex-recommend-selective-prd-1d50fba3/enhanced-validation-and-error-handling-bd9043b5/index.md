@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-25T16:15:09.286Z"
 completedAt: "2026-02-25T16:15:09.286Z"
+acceptanceCriteria: []
 description: "Robust validation for the extended selector syntax and PRD creation workflow"
 ---
 

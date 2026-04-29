@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T20:10:12.593Z"
 completedAt: "2026-04-14T20:10:12.593Z"
+acceptanceCriteria: []
 description: "Codex CLI prints token usage statistics to stdout after each invocation. This feature captures those printed counts and feeds them into hench's token tracking system so Codex runs appear in usage analytics alongside Claude runs."
 ---
 

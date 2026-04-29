@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-03T14:35:01.471Z"
 completedAt: "2026-04-03T14:35:01.471Z"
+acceptanceCriteria: []
 description: "- File \"packages/web/src/viewer/components/progressive-loader.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/components/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone"
 recommendationMeta: "[object Object]"
 ---

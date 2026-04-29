@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-07T02:56:01.916Z"
 completedAt: "2026-03-07T02:59:00.524Z"
+acceptanceCriteria: []
 description: "- God function: agentLoop in packages/hench/src/agent/lifecycle/loop.ts calls 38 unique functions — consider decomposing into smaller, focused functions"
 recommendationMeta: "[object Object]"
 ---

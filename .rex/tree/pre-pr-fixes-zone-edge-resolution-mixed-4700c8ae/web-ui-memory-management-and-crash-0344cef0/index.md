@@ -6,12 +6,13 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T20:25:23.092Z"
 completedAt: "2026-02-24T20:25:23.092Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [OOM Crash Investigation and Root Cause Analysis](./oom-crash-investigation-and-root-cause-0cf188b5/index.md) | completed |
-| [Memory Optimization and Leak Prevention](./memory-optimization-and-leak-prevention-3eda1cdc/index.md) | completed |
 | [Crash Recovery and User Experience](./crash-recovery-and-user-experience-8786c4b2/index.md) | completed |
+| [Memory Optimization and Leak Prevention](./memory-optimization-and-leak-prevention-3eda1cdc/index.md) | completed |
+| [OOM Crash Investigation and Root Cause Analysis](./oom-crash-investigation-and-root-cause-0cf188b5/index.md) | completed |

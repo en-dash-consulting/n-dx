@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-02T17:19:13.841Z"
 completedAt: "2026-04-02T17:19:13.841Z"
+acceptanceCriteria: []
 description: "Restore full test pass status across the project while preserving the integrity of the test refactor and avoiding test edits that merely mask real failures."
 ---
 

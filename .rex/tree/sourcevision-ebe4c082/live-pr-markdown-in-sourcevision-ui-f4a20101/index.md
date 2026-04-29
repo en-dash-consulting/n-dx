@@ -6,12 +6,13 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T05:40:54.374Z"
 completedAt: "2026-02-21T05:40:54.374Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
+| [Live Refresh and Graceful Degradation](./live-refresh-and-graceful-degradation-1c7ad386/index.md) | completed |
 | [PR Summary Generation Pipeline](./pr-summary-generation-pipeline-37518442/index.md) | completed |
 | [SourceVision PR Markdown Tab Experience](./sourcevision-pr-markdown-tab-experience-6674ca7d/index.md) | completed |
-| [Live Refresh and Graceful Degradation](./live-refresh-and-graceful-degradation-1c7ad386/index.md) | completed |

@@ -6,5 +6,6 @@ status: "completed"
 priority: "medium"
 startedAt: "2026-02-13T17:07:10.264Z"
 completedAt: "2026-02-13T18:28:14.367Z"
+acceptanceCriteria: []
 description: "Add interactive elements: animated terminal showing the CLI workflow (ndx init → plan → work), hover/scroll animations on package cards, smooth section transitions. Make the page feel alive."
 ---

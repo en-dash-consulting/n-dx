@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-20T22:31:32.197Z"
 completedAt: "2026-02-20T22:31:32.197Z"
+acceptanceCriteria: []
 description: "Make Hench resilient to Codex-mode response variations so task execution state is derived consistently even when tool output shape changes."
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-09T14:09:06.145Z"
 completedAt: "2026-02-09T14:27:04.154Z"
+acceptanceCriteria: []
 description: "Optimize prompts for better LLM responses"
 ---
 

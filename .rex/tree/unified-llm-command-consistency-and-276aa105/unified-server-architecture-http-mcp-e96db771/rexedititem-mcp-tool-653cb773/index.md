@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-09T01:23:07.809Z"
 completedAt: "2026-03-09T01:23:07.809Z"
+acceptanceCriteria: []
 description: "Expose a dedicated edit_item action on the rex MCP server so AI agents and Claude Code can modify PRD item content (title, description, acceptance criteria, priority, tags, LoE fields) in a single structured call — distinct from rex_update which handles status/lifecycle transitions."
 ---
 

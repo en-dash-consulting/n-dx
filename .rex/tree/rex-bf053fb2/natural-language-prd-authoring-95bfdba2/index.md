@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-09T12:56:47.925Z"
 completedAt: "2026-02-09T12:56:47.925Z"
+acceptanceCriteria: []
 description: "Enable natural language input for PRD creation, allowing users to describe features in plain English and have them automatically structured into proper epic/feature/task hierarchies with AI assistance"
 ---
 
@@ -13,5 +14,5 @@ description: "Enable natural language input for PRD creation, allowing users to 
 
 | Title | Status |
 |-------|--------|
-| [Smart add functionality](./smart-add-functionality-5b558cbb/index.md) | completed |
 | [Bulk natural language input](./bulk-natural-language-input-4c522dcd/index.md) | completed |
+| [Smart add functionality](./smart-add-functionality-5b558cbb/index.md) | completed |

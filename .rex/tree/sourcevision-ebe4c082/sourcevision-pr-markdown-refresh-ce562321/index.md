@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T23:34:13.201Z"
 completedAt: "2026-02-22T23:34:13.201Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Refresh endpoint degraded response parity](./refresh-endpoint-degraded-response-e228c8a1/index.md) | completed |
 | [PR Markdown UI messaging and regression coverage](./pr-markdown-ui-messaging-and-regression-39cfec87/index.md) | completed |
+| [Refresh endpoint degraded response parity](./refresh-endpoint-degraded-response-e228c8a1/index.md) | completed |

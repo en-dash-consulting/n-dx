@@ -9,6 +9,7 @@ startedAt: "2026-03-11T05:52:38.428Z"
 completedAt: "2026-03-11T05:54:43.458Z"
 resolutionType: "code-change"
 resolutionDetail: "Fixed detectPinDivergence to skip move suggestions when the target directory is a subdirectory of the file's current directory, preventing false positives for zone-root gateway files like external.ts"
+acceptanceCriteria: []
 description: "- File \"packages/web/src/viewer/external.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/ — consider moving to packages/web/src/viewer/styles/ to align physical location with architectural zone"
 recommendationMeta: "[object Object]"
 ---

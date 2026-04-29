@@ -14,6 +14,7 @@ description: "Automated recommendations from SourceVision analysis. 14 zone+cate
 
 | Title | Status |
 |-------|--------|
+| [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-finding-9d4e78ef/index.md) | completed |
 | [Fix observation in domain-gateway-routes-mcp (1 finding)](./fix-observation-in-domain-gateway-31008a00/index.md) | completed |
 | [Fix observation in global (1 finding)](./fix-observation-in-global-1-finding-1e94a947/index.md) | completed |
 | [Fix observation in health (1 finding)](./fix-observation-in-health-1-finding-ce8e81d4/index.md) | completed |
@@ -22,4 +23,3 @@ description: "Automated recommendations from SourceVision analysis. 14 zone+cate
 | [Fix observation in use (1 finding)](./fix-observation-in-use-1-finding-afe3615b/index.md) | completed |
 | [Fix observation in web-2 (2 findings)](./fix-observation-in-web-2-2-findings-2de3bf8b/index.md) | completed |
 | [Fix observation in web-unit (1 finding)](./fix-observation-in-web-unit-1-finding-1f995e5a/index.md) | completed |
-| [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-finding-9d4e78ef/index.md) | completed |

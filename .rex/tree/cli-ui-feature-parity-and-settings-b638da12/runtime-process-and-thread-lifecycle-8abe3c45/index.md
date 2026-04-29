@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-03T18:50:24.588Z"
 completedAt: "2026-04-03T18:50:24.588Z"
+acceptanceCriteria: []
 description: "Ensure that no worker threads or child processes are left behind during normal n-dx operation — not just at exit. Covers the full command lifecycle: spawn, execution, and teardown for all CLI entry points."
 ---
 

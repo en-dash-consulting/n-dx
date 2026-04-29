@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T08:42:14.151Z"
 completedAt: "2026-02-18T08:42:14.151Z"
+acceptanceCriteria: []
 description: "Allow users to provide natural language feedback to modify LLM-generated proposals instead of only accepting/rejecting them"
 ---
 

@@ -6,12 +6,13 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T09:31:53.840Z"
 completedAt: "2026-02-18T09:31:53.840Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Notion Integration Configuration Interface](./notion-integration-configuration-d7e6c7a6/index.md) | completed |
 | [Claude API Configuration](./claude-api-configuration-e47412ba/index.md) | completed |
 | [Natural language proposal modification](./natural-language-proposal-modification-a5b424c6/index.md) | completed |
+| [Notion Integration Configuration Interface](./notion-integration-configuration-d7e6c7a6/index.md) | completed |

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T05:46:12.440Z"
 completedAt: "2026-03-26T05:46:12.440Z"
+acceptanceCriteria: []
 description: "Extend the Go fixture project to cover import syntax edge cases required by the parser (aliased, blank, dot imports, test files), update go.mod to match new dependencies, and produce a coverage map documenting which fixture file exercises which syntax variant."
 ---
 

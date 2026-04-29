@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T00:35:58.630Z"
 completedAt: "2026-02-23T00:35:58.630Z"
+acceptanceCriteria: []
 description: "Integrate credential helper guidance into failure handling while preserving default non-interactive behavior for automated and scripted refresh runs."
 ---
 

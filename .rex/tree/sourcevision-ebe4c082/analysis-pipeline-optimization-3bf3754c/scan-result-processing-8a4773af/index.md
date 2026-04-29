@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-09T15:29:11.123Z"
 completedAt: "2026-02-09T15:29:11.123Z"
+acceptanceCriteria: []
 description: "Improve the quality and accuracy of code analysis"
 ---
 

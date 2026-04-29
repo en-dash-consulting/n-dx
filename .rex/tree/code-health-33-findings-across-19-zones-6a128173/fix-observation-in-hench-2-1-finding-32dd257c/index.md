@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-17T18:32:36.322Z"
 completedAt: "2026-04-17T18:32:36.322Z"
+acceptanceCriteria: []
 description: "- Generic zone name \"Hench 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose"
 recommendationMeta: "[object Object]"
 ---

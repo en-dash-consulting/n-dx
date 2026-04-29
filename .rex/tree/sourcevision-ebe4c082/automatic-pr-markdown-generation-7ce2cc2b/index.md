@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-25T05:14:47.909Z"
 completedAt: "2026-02-25T05:14:47.909Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Sourcevision analyze integration](./sourcevision-analyze-integration-1d377d59/index.md) | completed |
 | [Rex-based content generation](./rex-based-content-generation-31100b02/index.md) | completed |
+| [Sourcevision analyze integration](./sourcevision-analyze-integration-1d377d59/index.md) | completed |

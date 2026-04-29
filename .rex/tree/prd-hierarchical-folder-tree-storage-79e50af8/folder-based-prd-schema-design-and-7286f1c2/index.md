@@ -7,6 +7,7 @@ source: "smart-add"
 startedAt: "2026-04-27T19:20:57.818Z"
 completedAt: "2026-04-27T19:20:57.818Z"
 endedAt: "2026-04-27T19:20:57.818Z"
+acceptanceCriteria: []
 description: "Define and implement a folder-tree layout where each PRD level (epic → feature → task) maps to a directory containing an index.md. Parent directories recursively summarize everything below them. Tasks are leaf folders — their index.md contains subtasks as sections rather than nested directories."
 ---
 
@@ -15,5 +16,5 @@ description: "Define and implement a folder-tree layout where each PRD level (ep
 | Title | Status |
 |-------|--------|
 | [Design folder naming conventions, index.md content schema, and recursive summary contract for each PRD level](./design-folder-naming-conventions-69ff9538/index.md) | completed |
-| [Implement PRD-to-folder-tree serializer that writes nested directories with index.md files](./implement-prd-to-folder-tree-serializer-3b80109b/index.md) | completed |
 | [Implement folder-tree-to-PRD parser that aggregates index.md files into the PRD item tree](./implement-folder-tree-to-prd-parser-21053225/index.md) | completed |
+| [Implement PRD-to-folder-tree serializer that writes nested directories with index.md files](./implement-prd-to-folder-tree-serializer-3b80109b/index.md) | completed |

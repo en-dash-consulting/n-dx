@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T07:53:24.020Z"
 completedAt: "2026-02-24T07:53:24.020Z"
+acceptanceCriteria: []
 description: "Enhance the ndx refresh command to properly detect and clean up existing dashboard processes before starting refresh operations"
 ---
 

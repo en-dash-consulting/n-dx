@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T06:53:49.640Z"
 completedAt: "2026-02-26T06:53:49.640Z"
+acceptanceCriteria: []
 description: "Replace individual per-component timers with a shared timer service to reduce CPU overhead and coordinate updates"
 ---
 

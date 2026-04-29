@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T19:41:05.267Z"
 completedAt: "2026-02-22T19:41:05.267Z"
+acceptanceCriteria: []
 description: "Define a deterministic resolution path for weekly token budgets so task-level utilization always computes from a known source or a consistent fallback state."
 ---
 

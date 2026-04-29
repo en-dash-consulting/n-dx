@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T14:38:18.439Z"
 completedAt: "2026-04-18T14:38:18.439Z"
+acceptanceCriteria: []
 description: "- High coupling (0.6) — 1 imports target \"rex\""
 recommendationMeta: "[object Object]"
 ---

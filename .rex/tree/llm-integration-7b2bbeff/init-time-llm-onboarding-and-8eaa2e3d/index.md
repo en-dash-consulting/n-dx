@@ -6,12 +6,13 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T05:23:23.067Z"
 completedAt: "2026-02-21T05:23:23.067Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
+| [Direct Claude API Integration](./direct-claude-api-integration-66f9d899/index.md) | completed |
 | [Interactive init banner and provider selection](./interactive-init-banner-and-provider-cdfde982/index.md) | completed |
 | [Provider authentication preflight during init](./provider-authentication-preflight-83e1555b/index.md) | completed |
-| [Direct Claude API Integration](./direct-claude-api-integration-66f9d899/index.md) | completed |

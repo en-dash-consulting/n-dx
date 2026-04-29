@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-03T08:57:59.556Z"
 completedAt: "2026-03-03T08:57:59.556Z"
+acceptanceCriteria: []
 description: "Address small, broken, and inconsistently sized text across all Rex pages — including task cards, detail panels, status badges, and section headers"
 ---
 

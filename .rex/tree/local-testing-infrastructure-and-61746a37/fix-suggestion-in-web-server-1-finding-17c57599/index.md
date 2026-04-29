@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-16T21:08:47.234Z"
 completedAt: "2026-04-16T21:08:47.234Z"
+acceptanceCriteria: []
 description: "- Zone \"Web Server\" (web-server) has critical risk (score: 0.67, cohesion: 0.33, coupling: 0.67) — requires refactoring before new feature development"
 recommendationMeta: "[object Object]"
 ---

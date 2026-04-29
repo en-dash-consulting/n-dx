@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T08:45:23.981Z"
 completedAt: "2026-02-21T08:45:23.981Z"
+acceptanceCriteria: []
 description: "Promote token usage to a first-class Rex section and add a dedicated vendor/model utilization dashboard."
 ---
 

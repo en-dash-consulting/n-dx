@@ -89,7 +89,7 @@ export async function cmdValidate(
     });
   }
 
-  // Override with folder-tree items for structural checks (auto-migrates if tree absent).
+  // Override with folder-tree items for structural checks.
   // Falls back to the Markdown-loaded items on any error so existing checks still run.
   if (doc && store) {
     try {

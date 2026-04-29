@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-16T16:55:58.881Z"
 completedAt: "2026-04-16T16:55:58.881Z"
+acceptanceCriteria: []
 description: "Fix Codex compatibility failures in the rex add and related PRD authoring CLI commands. Codex currently cannot complete proposals due to rate limiting errors and response parsing failures that Claude does not trigger."
 ---
 

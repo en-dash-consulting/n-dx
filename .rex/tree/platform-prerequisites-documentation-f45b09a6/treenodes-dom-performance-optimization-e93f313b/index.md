@@ -6,12 +6,13 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T21:33:29.008Z"
 completedAt: "2026-02-26T21:33:29.008Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Lazy Rendering and Node Culling](./lazy-rendering-and-node-culling-f8b985a1/index.md) | completed |
 | [Event Listener Optimization](./event-listener-optimization-9b281847/index.md) | completed |
+| [Lazy Rendering and Node Culling](./lazy-rendering-and-node-culling-f8b985a1/index.md) | completed |
 | [Performance Monitoring and Metrics](./performance-monitoring-and-metrics-e07521ef/index.md) | completed |

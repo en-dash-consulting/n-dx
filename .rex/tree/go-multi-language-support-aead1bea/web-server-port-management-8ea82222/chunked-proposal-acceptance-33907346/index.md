@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-06T04:00:51.629Z"
 completedAt: "2026-02-06T04:43:01.162Z"
+acceptanceCriteria: []
 description: "Allow users to accept proposals in smaller or larger batches instead of all-or-nothing"
 ---
 

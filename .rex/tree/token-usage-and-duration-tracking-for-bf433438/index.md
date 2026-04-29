@@ -12,6 +12,6 @@ completedAt: "2026-04-23T17:11:13.169Z"
 
 | Title | Status |
 |-------|--------|
-| [Token Usage Attribution per PRD Item](./token-usage-attribution-per-prd-item-aa92ccd9/index.md) | completed |
-| [Task Duration Tracking](./task-duration-tracking-db3f2b10/index.md) | completed |
 | [Dashboard UI for Usage and Duration](./dashboard-ui-for-usage-and-duration-ab5ab1c8/index.md) | completed |
+| [Task Duration Tracking](./task-duration-tracking-db3f2b10/index.md) | completed |
+| [Token Usage Attribution per PRD Item](./token-usage-attribution-per-prd-item-aa92ccd9/index.md) | completed |

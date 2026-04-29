@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T01:39:38.087Z"
 completedAt: "2026-02-23T01:39:38.087Z"
+acceptanceCriteria: []
 description: "Improve operator recovery by surfacing exact failure context and tailored next actions based on failure category."
 ---
 

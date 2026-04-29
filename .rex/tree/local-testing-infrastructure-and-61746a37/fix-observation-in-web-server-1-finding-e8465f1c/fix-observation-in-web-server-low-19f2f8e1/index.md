@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-16T20:02:46.148Z"
 completedAt: "2026-04-16T20:10:52.670Z"
+acceptanceCriteria: []
 description: "- Low cohesion (0.33) — files are loosely related, consider splitting this zone"
 recommendationMeta: "[object Object]"
 ---

@@ -7,6 +7,7 @@ priority: "critical"
 source: "sourcevision"
 startedAt: "2026-04-13T18:49:22.288Z"
 completedAt: "2026-04-13T20:05:34.822Z"
+acceptanceCriteria: []
 description: "- Zone \"Rex\" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0.79) — requires immediate architectural intervention"
 recommendationMeta: "[object Object]"
 ---

@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:11:52.157Z"
 completedAt: "2026-04-14T02:15:49.669Z"
+acceptanceCriteria: []
 description: "- Zone \"hench-4\" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID"
 recommendationMeta: "[object Object]"
 ---

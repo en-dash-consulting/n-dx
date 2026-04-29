@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-17T15:22:09.583Z"
 completedAt: "2026-04-17T15:22:09.583Z"
+acceptanceCriteria: []
 description: "- God function: handleInit in packages/core/cli.js calls 40 unique functions — consider decomposing into smaller, focused functions"
 recommendationMeta: "[object Object]"
 ---

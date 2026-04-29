@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-06T14:57:18.614Z"
 completedAt: "2026-02-06T14:57:18.614Z"
+acceptanceCriteria: []
 description: "Improve CI integration and reporting capabilities"
 ---
 

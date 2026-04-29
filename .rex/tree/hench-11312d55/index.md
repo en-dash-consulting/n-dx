@@ -12,6 +12,6 @@ completedAt: "2026-04-16T15:21:00.810Z"
 
 | Title | Status |
 |-------|--------|
+| [Hench UI Real-time Task Monitoring](./hench-ui-real-time-task-monitoring-79851c84/index.md) | completed |
 | [Run Failure Recovery and Rollback](./run-failure-recovery-and-rollback-3415b5f0/index.md) | completed |
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-sourcevision-d5ad6f16/index.md) | completed |
-| [Hench UI Real-time Task Monitoring](./hench-ui-real-time-task-monitoring-79851c84/index.md) | completed |

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T06:25:50.658Z"
 completedAt: "2026-02-21T06:25:50.658Z"
+acceptanceCriteria: []
 description: "Ensure PR Markdown data and availability state come from the dedicated APIs with clear, actionable UI feedback for unavailable scenarios."
 ---
 

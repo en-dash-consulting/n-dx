@@ -13,7 +13,7 @@ completedAt: "2026-04-08T23:50:07.453Z"
 | Title | Status |
 |-------|--------|
 | [Deprecated npm Dependency Audit and Remediation](./deprecated-npm-dependency-audit-and-f6c36dec/index.md) | completed |
-| [Stale Import Path and Deprecated Node.js API Cleanup](./stale-import-path-and-deprecated-nodejs-5117fd5f/index.md) | completed |
 | [Immersive Init Experience with Dinosaur Theme & Branding](./immersive-init-experience-with-dinosaur-ccbcaf61/index.md) | completed |
+| [Stale Import Path and Deprecated Node.js API Cleanup](./stale-import-path-and-deprecated-nodejs-5117fd5f/index.md) | completed |
 | [Timer Performance Optimization and Re-render Reduction](./timer-performance-optimization-and-re-10c4bdde/index.md) | completed |
 | [Token Usage Aggregation Performance Optimization](./token-usage-aggregation-performance-07874b87/index.md) | completed |

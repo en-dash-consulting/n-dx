@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:26:11.821Z"
 completedAt: "2026-04-20T15:33:00.951Z"
+acceptanceCriteria: []
 description: "- File \"assistant-assets/index.js\" is pinned to zone \"Core\" but lives in assistant-assets/ — consider moving to packages/core/ to align physical location with architectural zone"
 recommendationMeta: "[object Object]"
 ---

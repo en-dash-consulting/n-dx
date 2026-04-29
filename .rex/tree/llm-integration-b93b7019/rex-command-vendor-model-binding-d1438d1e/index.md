@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T15:52:18.334Z"
 completedAt: "2026-04-08T15:52:18.334Z"
+acceptanceCriteria: []
 description: "When `ndx config llm.vendor codex` is set, rex CLI commands (analyze, recommend, add, etc.) should resolve and use GPT-family models rather than falling back to Claude defaults. The centralized resolver exists but rex call sites may not be reading vendor config correctly or may be bypassing the resolver."
 ---
 
@@ -13,6 +14,6 @@ description: "When `ndx config llm.vendor codex` is set, rex CLI commands (analy
 
 | Title | Status |
 |-------|--------|
+| [Add regression tests for vendor-scoped model selection in rex commands](./add-regression-tests-for-vendor-scoped-0270df79/index.md) | completed |
 | [Audit rex LLM call sites for vendor/model resolver gaps](./audit-rex-llm-call-sites-for-633f588d/index.md) | completed |
 | [Fix rex commands to use resolved GPT model when vendor is codex](./fix-rex-commands-to-use-resolved-gpt-f0c313d6/index.md) | completed |
-| [Add regression tests for vendor-scoped model selection in rex commands](./add-regression-tests-for-vendor-scoped-0270df79/index.md) | completed |

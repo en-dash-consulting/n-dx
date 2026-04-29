@@ -6,5 +6,6 @@ status: "completed"
 priority: "medium"
 startedAt: "2026-02-09T18:59:04.383Z"
 completedAt: "2026-02-09T19:05:28.783Z"
+acceptanceCriteria: []
 description: "Improve deriveNextSteps priority scoring by incorporating zone cohesion and coupling metrics alongside the existing related-count threshold"
 ---

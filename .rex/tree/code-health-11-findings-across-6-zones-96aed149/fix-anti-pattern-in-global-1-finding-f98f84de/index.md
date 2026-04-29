@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:22:19.105Z"
 completedAt: "2026-04-20T15:22:19.105Z"
+acceptanceCriteria: []
 description: "- God function: runCommand in packages/core/cli.js calls 38 unique functions — consider decomposing into smaller, focused functions"
 recommendationMeta: "[object Object]"
 ---

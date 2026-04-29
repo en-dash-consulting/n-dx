@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T02:07:03.655Z"
 completedAt: "2026-02-23T02:07:03.655Z"
+acceptanceCriteria: []
 description: "Make fallback output explicit, reviewable, and trustworthy by labeling mode and attaching measurable coverage and confidence signals."
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T07:47:26.043Z"
 completedAt: "2026-03-26T07:47:26.043Z"
+acceptanceCriteria: []
 description: "Create a regex-based Go HTTP route detector that identifies route registrations from popular Go HTTP frameworks (net/http, chi, gin, echo, fiber, gorilla/mux). Output uses the existing `ServerRoute` and `ServerRouteGroup` types from the schema."
 ---
 

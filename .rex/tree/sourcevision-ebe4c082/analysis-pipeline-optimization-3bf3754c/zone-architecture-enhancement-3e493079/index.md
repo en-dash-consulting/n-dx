@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-09T15:12:52.695Z"
 completedAt: "2026-02-09T15:12:52.695Z"
+acceptanceCriteria: []
 description: "Improve zone-based code organization and reduce coupling"
 ---
 

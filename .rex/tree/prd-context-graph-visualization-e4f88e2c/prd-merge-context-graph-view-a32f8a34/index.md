@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T19:59:27.566Z"
 completedAt: "2026-04-24T19:59:27.566Z"
+acceptanceCriteria: []
 description: "Interactive visual graph in the dashboard that shows the PRD tree as a context graph overlaid with git merge history, so users can see which PRD items correspond to which merges and what code changes were introduced in each merge."
 ---
 

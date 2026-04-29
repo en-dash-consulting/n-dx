@@ -2,13 +2,11 @@
  * PRD-to-folder-tree serializer.
  *
  * Converts an in-memory PRD item tree to a nested directory structure under
- * a configurable tree root (default: `.rex/tree/`). Each epic, feature, and
- * task maps to one directory containing one `index.md`. Subtasks are encoded
- * as `## Subtask:` sections inside their parent task's `index.md`.
+ * a configurable tree root (default: `.rex/tree/`). Each epic, feature, task,
+ * and subtask maps to one directory containing one `index.md`.
  *
  * Contract (see docs/architecture/prd-folder-tree-schema.md):
- *   - Depth 1 dirs → epics, depth 2 → features, depth 3 → tasks
- *   - Subtasks appear as sections, not directories
+ *   - Depth 1 dirs -> epics, depth 2 -> features, depth 3 -> tasks, depth 4 -> subtasks
  *   - Non-leaf index.md files include a `## Children` table
  *   - Serialization is incremental: files with unchanged content are not rewritten
  *   - Stale directories (items removed from the PRD) are deleted
@@ -22,6 +20,10 @@ import { mkdir, readFile, writeFile, readdir, rm, rename, stat } from "node:fs/p
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { PRDItem } from "../schema/index.js";
+
+const MAX_SLUG_LENGTH = 60;
+const SHORT_ID_LENGTH = 6;
+const EMPTY_TITLE_SLUG = "untitled";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -61,38 +63,55 @@ export async function serializeFolderTree(
 
   await ensureDir(treeRoot, result);
 
-  // Compute expected epic slugs and write each epic subtree.
+  const rootSlugs = resolveSiblingSlugs(items);
   const expectedEpicSlugs = new Set<string>();
   for (const epic of items) {
-    const epicSlug = slugify(epic.title, epic.id);
+    const epicSlug = requireSlug(rootSlugs, epic);
     expectedEpicSlugs.add(epicSlug);
     const epicDir = join(treeRoot, epicSlug);
     await ensureDir(epicDir, result);
 
     const features = (epic.children ?? []).filter(c => c.level === "feature");
-    const content = renderEpicOrFeatureIndexMd(epic, features);
+    const featureSlugs = resolveSiblingSlugs(features);
+    const content = renderItemIndexMd(epic, features, featureSlugs);
     await writeIfChanged(join(epicDir, "index.md"), content, result);
 
     const expectedFeatureSlugs = new Set<string>();
     for (const feature of features) {
-      const featureSlug = slugify(feature.title, feature.id);
+      const featureSlug = requireSlug(featureSlugs, feature);
       expectedFeatureSlugs.add(featureSlug);
       const featureDir = join(epicDir, featureSlug);
       await ensureDir(featureDir, result);
 
       const tasks = (feature.children ?? []).filter(c => c.level === "task");
-      const featureContent = renderEpicOrFeatureIndexMd(feature, tasks);
+      const taskSlugs = resolveSiblingSlugs(tasks);
+      const featureContent = renderItemIndexMd(feature, tasks, taskSlugs);
       await writeIfChanged(join(featureDir, "index.md"), featureContent, result);
 
       const expectedTaskSlugs = new Set<string>();
       for (const task of tasks) {
-        const taskSlug = slugify(task.title, task.id);
+        const taskSlug = requireSlug(taskSlugs, task);
         expectedTaskSlugs.add(taskSlug);
         const taskDir = join(featureDir, taskSlug);
         await ensureDir(taskDir, result);
 
-        const taskContent = renderTaskIndexMd(task);
+        const subtasks = (task.children ?? []).filter(c => c.level === "subtask");
+        const subtaskSlugs = resolveSiblingSlugs(subtasks);
+        const taskContent = renderItemIndexMd(task, subtasks, subtaskSlugs);
         await writeIfChanged(join(taskDir, "index.md"), taskContent, result);
+
+        const expectedSubtaskSlugs = new Set<string>();
+        for (const subtask of subtasks) {
+          const subtaskSlug = requireSlug(subtaskSlugs, subtask);
+          expectedSubtaskSlugs.add(subtaskSlug);
+          const subtaskDir = join(taskDir, subtaskSlug);
+          await ensureDir(subtaskDir, result);
+
+          const subtaskContent = renderItemIndexMd(subtask, [], new Map());
+          await writeIfChanged(join(subtaskDir, "index.md"), subtaskContent, result);
+        }
+
+        await removeStaleSubdirs(taskDir, expectedSubtaskSlugs, result);
       }
 
       await removeStaleSubdirs(featureDir, expectedTaskSlugs, result);
@@ -107,50 +126,118 @@ export async function serializeFolderTree(
 }
 
 /**
- * Derive a deterministic directory slug from an item's title and ID.
+ * Derive a deterministic, title-first directory slug for one item.
  *
- * Algorithm (10 steps, see docs/architecture/prd-folder-tree-schema.md):
- *   1. NFKD normalize
- *   2. Strip combining characters
- *   3. Remove non-ASCII
- *   4. Lowercase
- *   5. Replace whitespace runs with a single hyphen
- *   6. Remove characters outside [a-z0-9-]
- *   7. Collapse consecutive hyphens
- *   8. Strip leading/trailing hyphens
- *   9. Truncate to ≤40 chars at a segment boundary
- *  10. Append `-{id8}` (first 8 hex chars of the UUID, hyphens removed)
+ * Normal titles produce the same slug regardless of ID. Titles whose normalized
+ * slug exceeds 60 characters reserve room for `-{id6}` and append the first
+ * six safe ID characters. Sibling collision suffixes are applied by
+ * `resolveSiblingSlugs`, because collision detection requires parent context.
  */
 export function slugify(title: string, id: string): string {
-  let body = title
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")   // step 2: combining chars
-    .replace(/[^\x00-\x7F]/g, "")      // step 3: non-ASCII
-    .toLowerCase()                      // step 4
-    .replace(/\s+/g, "-")              // step 5
-    .replace(/[^a-z0-9-]/g, "")        // step 6
-    .replace(/-+/g, "-")               // step 7
-    .replace(/^-|-$/g, "");            // step 8
+  const body = normalizeTitleSlug(title);
+  if (!requiresLongSuffix(title, body)) return body;
+  return appendShortIdSuffix(body, id);
+}
 
-  // Step 9: truncate to ≤40 chars at segment boundary
-  if (body.length > 40) {
-    const candidate = body.slice(0, 40);
-    const lastHyphen = candidate.lastIndexOf("-");
-    body = lastHyphen > 0 ? candidate.slice(0, lastHyphen) : candidate;
+/**
+ * Convert a title into the slug it would use before ID-based uniqueness rules.
+ * This is deterministic for a title alone and never returns an empty string.
+ */
+export function slugifyTitle(title: string): string {
+  return truncateAtWordBoundary(normalizeTitleSlug(title), MAX_SLUG_LENGTH);
+}
+
+/**
+ * Resolve final directory slugs for sibling items.
+ *
+ * If two siblings normalize to the same unsuffixed slug, every colliding item
+ * gets a short ID suffix. This keeps results deterministic regardless of item
+ * order and avoids giving the first item a privileged unsuffixed path.
+ */
+export function resolveSiblingSlugs(items: PRDItem[]): Map<string, string> {
+  const unsuffixedById = new Map<string, string>();
+  const counts = new Map<string, number>();
+
+  for (const item of items) {
+    const unsuffixed = slugifyTitle(item.title);
+    unsuffixedById.set(item.id, unsuffixed);
+    counts.set(unsuffixed, (counts.get(unsuffixed) ?? 0) + 1);
   }
 
-  // Step 10: append id8
-  const id8 = id.replace(/-/g, "").slice(0, 8);
-  return body ? `${body}-${id8}` : id8;
+  const resolved = new Map<string, string>();
+  for (const item of items) {
+    const normalized = normalizeTitleSlug(item.title);
+    const unsuffixed = requireMapValue(unsuffixedById, item.id);
+    const collides = (counts.get(unsuffixed) ?? 0) > 1;
+    resolved.set(item.id, requiresLongSuffix(item.title, normalized) || collides
+      ? appendShortIdSuffix(normalized, item.id)
+      : unsuffixed);
+  }
+
+  return resolved;
+}
+
+function normalizeTitleSlug(title: string): string {
+  const body = title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x00-\x7F]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return body || EMPTY_TITLE_SLUG;
+}
+
+function requiresLongSuffix(title: string, normalizedSlug: string): boolean {
+  return Array.from(title).length > MAX_SLUG_LENGTH || normalizedSlug.length > MAX_SLUG_LENGTH;
+}
+
+function appendShortIdSuffix(slug: string, id: string): string {
+  const suffix = shortId(id);
+  const prefixLimit = MAX_SLUG_LENGTH - suffix.length - 1;
+  const prefix = truncateAtWordBoundary(slug, prefixLimit);
+  return prefix ? `${prefix}-${suffix}` : suffix;
+}
+
+function shortId(id: string): string {
+  const safe = id.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, SHORT_ID_LENGTH);
+  return safe || "item";
+}
+
+function truncateAtWordBoundary(slug: string, maxLength: number): string {
+  if (slug.length <= maxLength) return slug;
+
+  const candidate = slug.slice(0, maxLength).replace(/-+$/g, "");
+  const lastHyphen = candidate.lastIndexOf("-");
+  if (lastHyphen > 0) return candidate.slice(0, lastHyphen);
+  return candidate;
+}
+
+function requireSlug(slugs: Map<string, string>, item: PRDItem): string {
+  return requireMapValue(slugs, item.id);
+}
+
+function requireMapValue(map: Map<string, string>, key: string): string {
+  const value = map.get(key);
+  if (value === undefined) {
+    throw new Error(`Missing slug for item "${key}"`);
+  }
+  return value;
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 /**
- * Render the index.md for an epic or feature item.
+ * Render the index.md for any item.
  * Includes a `## Children` section if `children` is non-empty.
  */
-function renderEpicOrFeatureIndexMd(item: PRDItem, children: PRDItem[]): string {
+function renderItemIndexMd(
+  item: PRDItem,
+  children: PRDItem[],
+  childSlugs: Map<string, string>,
+): string {
   const lines: string[] = [];
 
   lines.push("---");
@@ -164,48 +251,9 @@ function renderEpicOrFeatureIndexMd(item: PRDItem, children: PRDItem[]): string 
     lines.push("| Title | Status |");
     lines.push("|-------|--------|");
     for (const child of children) {
-      const slug = slugify(child.title, child.id);
+      const slug = requireSlug(childSlugs, child);
       lines.push(`| [${child.title}](./${slug}/index.md) | ${child.status} |`);
     }
-    lines.push("");
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Render the index.md for a task item.
- * Subtasks are encoded as `## Subtask:` sections; no `## Children` table.
- */
-function renderTaskIndexMd(task: PRDItem): string {
-  const lines: string[] = [];
-
-  lines.push("---");
-  emitFrontmatter(lines, task);
-  lines.push("---");
-  lines.push("");
-
-  const subtasks = (task.children ?? []).filter(c => c.level === "subtask");
-  for (const subtask of subtasks) {
-    lines.push(`## Subtask: ${subtask.title}`);
-    lines.push("");
-    lines.push(`**ID:** \`${subtask.id}\``);
-    lines.push(`**Status:** ${subtask.status}`);
-    if (subtask.priority) lines.push(`**Priority:** ${subtask.priority}`);
-    lines.push("");
-    if (subtask.description) {
-      lines.push(subtask.description);
-      lines.push("");
-    }
-    if (subtask.acceptanceCriteria && subtask.acceptanceCriteria.length > 0) {
-      lines.push("**Acceptance Criteria**");
-      lines.push("");
-      for (const ac of subtask.acceptanceCriteria) {
-        lines.push(`- ${ac}`);
-      }
-      lines.push("");
-    }
-    lines.push("---");
     lines.push("");
   }
 

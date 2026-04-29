@@ -7,6 +7,7 @@ source: "smart-add"
 startedAt: "2026-04-28T00:06:30.996Z"
 completedAt: "2026-04-28T00:06:30.996Z"
 endedAt: "2026-04-28T00:06:30.996Z"
+acceptanceCriteria: []
 description: "Update every rex CLI command and MCP tool that modifies PRD state to persist changes through the folder-tree serializer, keeping the folder tree consistent with the in-memory store after every mutation."
 ---
 
@@ -14,6 +15,6 @@ description: "Update every rex CLI command and MCP tool that modifies PRD state 
 
 | Title | Status |
 |-------|--------|
-| [Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation](./update-rex-write-commands-add-edit-a90cf2ff/index.md) | completed |
-| [Update rex read commands (status, next, validate) to read PRD from folder tree](./update-rex-read-commands-status-next-1e04af28/index.md) | completed |
 | [Update ndx plan, ndx recommend, and all MCP write tools to propagate writes to the folder tree](./update-ndx-plan-ndx-recommend-and-all-f16ab364/index.md) | completed |
+| [Update rex read commands (status, next, validate) to read PRD from folder tree](./update-rex-read-commands-status-next-1e04af28/index.md) | completed |
+| [Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation](./update-rex-write-commands-add-edit-a90cf2ff/index.md) | completed |

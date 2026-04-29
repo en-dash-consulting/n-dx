@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T20:41:18.632Z"
 completedAt: "2026-04-24T20:41:18.632Z"
+acceptanceCriteria: []
 description: "Surface branch and file attribution visually in the dashboard PRD tree view so users can immediately see which items are actively being worked on and on which branch, without leaving the dashboard."
 ---
 

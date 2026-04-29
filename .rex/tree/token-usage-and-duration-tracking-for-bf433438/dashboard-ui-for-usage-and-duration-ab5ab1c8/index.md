@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T16:54:04.708Z"
 completedAt: "2026-04-23T16:54:04.708Z"
+acceptanceCriteria: []
 description: "Surface per-item token usage and duration in the web dashboard so users can see, at a glance, how much LLM spend and wall-clock time each task, feature, and epic has consumed."
 ---
 

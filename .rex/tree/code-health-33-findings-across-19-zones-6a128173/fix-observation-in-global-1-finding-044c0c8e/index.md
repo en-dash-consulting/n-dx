@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-17T15:47:26.842Z"
 completedAt: "2026-04-17T15:47:26.842Z"
+acceptanceCriteria: []
 description: "- Bidirectional coupling: \"viewer-ui-hub\" ↔ \"web-viewer\" (5+5 crossings) — consider extracting shared interface"
 recommendationMeta: "[object Object]"
 ---

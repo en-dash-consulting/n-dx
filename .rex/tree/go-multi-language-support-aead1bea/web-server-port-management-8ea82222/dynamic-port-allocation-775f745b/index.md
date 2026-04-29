@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T02:16:16.768Z"
 completedAt: "2026-02-18T02:16:16.768Z"
+acceptanceCriteria: []
 description: "Automatically find and use an available port when the default port 3117 is already in use"
 ---
 

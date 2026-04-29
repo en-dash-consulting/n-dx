@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-07T22:58:12.823Z"
 completedAt: "2026-04-07T22:58:12.823Z"
+acceptanceCriteria: []
 description: "Refocus smoke parity validation on standardized error semantics so failures remain easy to compare, diagnose, and fix regardless of operating system."
 ---
 
@@ -13,5 +14,5 @@ description: "Refocus smoke parity validation on standardized error semantics so
 
 | Title | Status |
 |-------|--------|
-| [Refactor smoke parity checks to compare normalized error codes](./refactor-smoke-parity-checks-to-compare-0886fe61/index.md) | completed |
 | [Document error code meanings and remediation expectations](./document-error-code-meanings-and-47b55bf8/index.md) | completed |
+| [Refactor smoke parity checks to compare normalized error codes](./refactor-smoke-parity-checks-to-compare-0886fe61/index.md) | completed |

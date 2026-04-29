@@ -9,6 +9,7 @@ startedAt: "2026-03-09T19:35:17.229Z"
 completedAt: "2026-03-09T19:37:43.886Z"
 resolutionType: "code-change"
 resolutionDetail: "Extracted 4 helper functions from analyzeZones: prepareScopeAndEdges, promoteSubAnalyses, computeMoveFindings, buildAnalyzeZonesResult. Reduces the god function from ~190 lines of inline logic to a clean orchestrator that delegates each phase to a named function."
+acceptanceCriteria: []
 description: "- God function: analyzeZones in packages/sourcevision/src/analyzers/zones.ts calls 32 unique functions — consider decomposing into smaller, focused functions"
 recommendationMeta: "[object Object]"
 ---

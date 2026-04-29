@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T07:05:02.195Z"
 completedAt: "2026-02-21T07:05:02.195Z"
+acceptanceCriteria: []
 description: "Refocus generated PR summaries on reviewer-friendly signal instead of exhaustive file-by-file noise."
 ---
 

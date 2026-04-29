@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-06T15:45:56.704Z"
 completedAt: "2026-02-06T15:45:56.704Z"
+acceptanceCriteria: []
 description: "Enhanced user interface for proposal approval and management"
 ---
 

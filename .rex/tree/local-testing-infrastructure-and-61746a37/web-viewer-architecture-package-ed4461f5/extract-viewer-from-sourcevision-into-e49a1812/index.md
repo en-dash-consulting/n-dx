@@ -9,6 +9,7 @@ tags:
   - "viewer"
 startedAt: "2026-02-10T04:30:37.010Z"
 completedAt: "2026-02-10T04:30:37.010Z"
+acceptanceCriteria: []
 description: "Move the web server code (start.ts, routes-*.ts, websocket.ts, viewer HTML/CSS/JS) out of `packages/sourcevision/` into a proper home — either a new `packages/web` package or the monorepo root. The server already imports from rex, hench, and sourcevision; it should live at the orchestration layer, not inside one package. Includes updating build pipeline, package.json, and all import paths."
 ---
 

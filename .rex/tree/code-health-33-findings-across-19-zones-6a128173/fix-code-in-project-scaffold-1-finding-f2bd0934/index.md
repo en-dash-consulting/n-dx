@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-17T15:30:03.343Z"
 completedAt: "2026-04-17T15:30:03.343Z"
+acceptanceCriteria: []
 description: "- cli-brand.js exists at both the repo root and inside packages/core, creating a duplication risk if one copy diverges silently during future edits."
 recommendationMeta: "[object Object]"
 ---

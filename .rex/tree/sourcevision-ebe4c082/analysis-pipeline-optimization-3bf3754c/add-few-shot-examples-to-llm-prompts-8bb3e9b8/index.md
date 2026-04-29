@@ -5,4 +5,5 @@ title: "Add few-shot examples to LLM prompts"
 status: "completed"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"
+acceptanceCriteria: []
 ---

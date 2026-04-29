@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T18:55:40.239Z"
 completedAt: "2026-04-24T18:55:40.239Z"
+acceptanceCriteria: []
 description: "Ensure that every PRD item created or added during a self-heal run is automatically tagged with 'self-heal', making it easy to distinguish autonomously-created remediation work from manually-authored PRD items."
 ---
 

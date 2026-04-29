@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-20T19:44:11.364Z"
 completedAt: "2026-04-20T19:44:11.364Z"
+acceptanceCriteria: []
 description: "The main README references .local_testing/ in passing but has no dedicated section explaining how to run the Docker-based local test suite, what prerequisites are needed, or what commands to use. Users need a self-contained guide in README.md so they can find and run local platform tests without digging into .local_testing/README.md."
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-17T23:53:56.209Z"
 completedAt: "2026-02-17T23:53:56.209Z"
+acceptanceCriteria: []
 ---
 
 ## Children
@@ -13,7 +14,7 @@ completedAt: "2026-02-17T23:53:56.209Z"
 | Title | Status |
 |-------|--------|
 | [Enhanced Navigation Interface](./enhanced-navigation-interface-45553d8b/index.md) | completed |
+| [Hench Run Deep-linking](./hench-run-deep-linking-a62d284c/index.md) | completed |
+| [Project-centric Page Title and Branding](./project-centric-page-title-and-branding-dee97c9f/index.md) | completed |
 | [Project Configuration and Switching](./project-configuration-and-switching-986cc829/index.md) | completed |
 | [Top-level Token Usage Navigation](./top-level-token-usage-navigation-3178b0f6/index.md) | completed |
-| [Project-centric Page Title and Branding](./project-centric-page-title-and-branding-dee97c9f/index.md) | completed |
-| [Hench Run Deep-linking](./hench-run-deep-linking-a62d284c/index.md) | completed |

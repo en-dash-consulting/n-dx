@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T02:30:34.820Z"
 completedAt: "2026-04-23T02:30:34.820Z"
+acceptanceCriteria: []
 description: "Unify the branch-scoped multi-file PRD storage back into a single canonical file named 'prd' for both newly generated and existing PRDs, including migration of any existing split files."
 ---
 

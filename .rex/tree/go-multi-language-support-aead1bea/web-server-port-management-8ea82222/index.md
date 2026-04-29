@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T02:16:16.823Z"
 completedAt: "2026-02-18T02:16:16.823Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Dynamic port allocation](./dynamic-port-allocation-775f745b/index.md) | completed |
 | [Chunked proposal acceptance](./chunked-proposal-acceptance-33907346/index.md) | completed |
+| [Dynamic port allocation](./dynamic-port-allocation-775f745b/index.md) | completed |

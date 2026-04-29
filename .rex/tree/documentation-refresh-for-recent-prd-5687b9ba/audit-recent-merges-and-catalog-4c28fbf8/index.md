@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T02:50:03.489Z"
 completedAt: "2026-04-23T02:50:03.489Z"
+acceptanceCriteria: []
 description: "Review merges from the past week to identify all user-facing behavior changes, then map each change to the documentation files that need updating. Produces a working list that drives the rest of the documentation work."
 ---
 

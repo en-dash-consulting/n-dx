@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:45:20.089Z"
 completedAt: "2026-04-20T15:45:20.089Z"
+acceptanceCriteria: []
 description: "- Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-shared\" ↔ \"web-viewer\" (1+11 crossings) — consider extracting shared interface"
 recommendationMeta: "[object Object]"
 ---

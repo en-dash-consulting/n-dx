@@ -2,7 +2,7 @@
 id: "3effa16b-1466-4b82-a963-c1f21afaedeb"
 level: "task"
 title: "Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures"
-status: "pending"
+status: "deferred"
 priority: "high"
 tags:
   - "prd"
@@ -13,7 +13,6 @@ tags:
   - "parser"
 source: "smart-add"
 startedAt: "2026-04-28T10:19:31.855Z"
-endedAt: "2026-04-28T13:49:34.833Z"
 acceptanceCriteria:
   - "All existing PRDStore unit tests pass with the folder-tree backend without modification to test assertions"
   - "Serializer unit tests: create item → correct folder and index.md, edit item → updated index.md and parent summary, delete item → folder removed and parent summary cleaned, move item → folder relocated and both parents updated"

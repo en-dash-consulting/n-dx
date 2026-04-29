@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-06T17:05:15.123Z"
 completedAt: "2026-03-06T17:05:15.123Z"
+acceptanceCriteria: []
 description: "Add search functionality to the Rex tasks web UI so users can quickly locate tasks, epics, and features by title, description, tags, or status without manually scanning the full PRD tree."
 ---
 

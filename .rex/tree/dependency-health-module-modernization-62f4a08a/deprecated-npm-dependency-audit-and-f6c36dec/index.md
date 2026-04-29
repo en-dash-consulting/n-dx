@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T22:59:36.242Z"
 completedAt: "2026-04-08T22:59:36.242Z"
+acceptanceCriteria: []
 description: "Identify and replace deprecated or end-of-life npm packages across all monorepo package.json files. Covers direct and transitive dependencies flagged by pnpm audit, npm deprecation notices, and packages with published successors."
 ---
 

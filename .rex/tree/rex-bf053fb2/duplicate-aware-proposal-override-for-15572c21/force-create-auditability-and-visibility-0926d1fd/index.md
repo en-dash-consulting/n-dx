@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T20:59:56.613Z"
 completedAt: "2026-02-22T20:59:56.613Z"
+acceptanceCriteria: []
 description: "Persist and expose override markers so intentionally duplicated items can be traced later in CLI output and downstream tools."
 ---
 

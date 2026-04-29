@@ -5,8 +5,8 @@
  *   - Serializer produces the expected folder tree with correct nesting depth
  *   - Each index.md contains full metadata (title, status, description, AC, tags, loe)
  *   - Non-leaf index.md includes a ## Children section listing direct children
- *   - Task index.md encodes subtasks as ## Subtask: sections
- *   - Slug collisions are resolved deterministically via id8 suffix
+ *   - Task index.md links subtask child directories
+ *   - Slug collisions are resolved deterministically via id6 suffix
  *   - Re-running on unchanged tree produces no file writes (idempotent)
  *   - Stale directories (removed items) are cleaned up
  *   - Round-trip with parser: serialize then parse yields the original items
@@ -16,7 +16,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { serializeFolderTree, slugify } from "../../../src/store/folder-tree-serializer.js";
+import {
+  resolveSiblingSlugs,
+  serializeFolderTree,
+  slugify,
+  slugifyTitle,
+} from "../../../src/store/folder-tree-serializer.js";
 import { parseFolderTree } from "../../../src/store/folder-tree-parser.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
@@ -57,42 +62,55 @@ function makeSubtask(id: string, title: string, extra: Partial<PRDItem> = {}): P
 // ── Slug algorithm ────────────────────────────────────────────────────────────
 
 describe("slugify", () => {
-  it("produces basic hyphenated slug with id8 suffix", () => {
+  it("produces lowercase hyphenated ASCII slugs without special characters", () => {
     expect(slugify("Web Dashboard", "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7")).toBe(
-      "web-dashboard-4d62fa6c",
+      "web-dashboard",
+    );
+    expect(slugify("Path / Separator \\ Safe!", "11111111-0000-0000-0000-000000000000")).toBe(
+      "path-separator-safe",
     );
   });
 
-  it("strips non-ASCII and unicode combining chars", () => {
+  it("normalizes Unicode accents and strips unsupported Unicode characters", () => {
     // Héros → heros after NFKD + combining strip + non-ASCII strip
     expect(slugify("Héros & Légendes", "a1b2c3d4-0000-0000-0000-000000000000")).toBe(
-      "heros-legendes-a1b2c3d4",
+      "heros-legendes",
     );
+    expect(slugify("日本語タイトル", "f0e1d2c3-0000-0000-0000-000000000000")).toBe("untitled");
   });
 
-  it("falls back to bare id8 when title produces empty body", () => {
-    expect(slugify("日本語タイトル", "f0e1d2c3-0000-0000-0000-000000000000")).toBe("f0e1d2c3");
-    expect(slugify("--- !!!", "11223344-0000-0000-0000-000000000000")).toBe("11223344");
+  it("falls back to a safe slug when title contains only special characters", () => {
+    expect(slugify("--- !!!", "11223344-0000-0000-0000-000000000000")).toBe("untitled");
   });
 
-  it("truncates at ≤40 chars on segment boundary", () => {
-    // "hot-reload-mcp-tool-schemas-on-http-transport-without-server-restart"
-    // first 40 chars: "hot-reload-mcp-tool-schemas-on-http-tran"
-    // last hyphen before 40: position 36 ("…-http")
-    // body: "hot-reload-mcp-tool-schemas-on-http"
+  it("is deterministic for the same normal title regardless of ID", () => {
+    const s1 = slugify("Auth Feature", "aaaaaaaa-0000-0000-0000-000000000000");
+    const s2 = slugify("Auth Feature", "bbbbbbbb-0000-0000-0000-000000000000");
+    expect(s1).toBe("auth-feature");
+    expect(s2).toBe("auth-feature");
+  });
+
+  it("truncates long titles at a word boundary and appends id6", () => {
     const slug = slugify(
       "Hot-reload MCP tool schemas on HTTP transport without server restart",
       "5dd63e4e-0000-0000-0000-000000000000",
     );
-    expect(slug).toBe("hot-reload-mcp-tool-schemas-on-http-5dd63e4e");
+    expect(slug).toBe("hot-reload-mcp-tool-schemas-on-http-transport-5dd63e");
+    expect(slug.length).toBeLessThanOrEqual(60);
+    expect(slug).not.toContain("server");
   });
 
-  it("two items with the same title but different IDs get different slugs", () => {
-    const s1 = slugify("Auth Feature", "aaaaaaaa-0000-0000-0000-000000000000");
-    const s2 = slugify("Auth Feature", "bbbbbbbb-0000-0000-0000-000000000000");
-    expect(s1).not.toBe(s2);
-    expect(s1).toMatch(/aaaaaaaa$/);
-    expect(s2).toMatch(/bbbbbbbb$/);
+  it("exposes the unsuffixed title slug for collision checks", () => {
+    expect(slugifyTitle("Auth Feature")).toBe("auth-feature");
+  });
+
+  it("adds id6 suffixes when sibling items collide without the ID", () => {
+    const first = makeFeature("aaaaaaaa-0000-0000-0000-000000000000", "Auth Feature");
+    const second = makeFeature("bbbbbbbb-0000-0000-0000-000000000000", "Auth Feature!");
+    const slugs = resolveSiblingSlugs([first, second]);
+
+    expect(slugs.get(first.id)).toBe("auth-feature-aaaaaa");
+    expect(slugs.get(second.id)).toBe("auth-feature-bbbbbb");
   });
 });
 
@@ -319,7 +337,7 @@ describe("serializeFolderTree: task index.md", () => {
     expect(content).toContain('description: "Task description."');
   });
 
-  it("does NOT include ## Children section for tasks", async () => {
+  it("includes ## Children section for task subtasks", async () => {
     const subtask = makeSubtask("44444444-0000-0000-0000-000000000000", "Subtask");
     const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", {
       children: [subtask],
@@ -330,14 +348,15 @@ describe("serializeFolderTree: task index.md", () => {
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
     await serializeFolderTree([epic], testDir);
     const content = await readTaskContent(epic, feature, task);
-    expect(content).not.toContain("## Children");
+    expect(content).toContain("## Children");
+    expect(content).toContain(`| [Subtask](./${slugify(subtask.title, subtask.id)}/index.md) | pending |`);
   });
 });
 
-// ── Subtask sections ──────────────────────────────────────────────────────────
+// ── Subtask directories ───────────────────────────────────────────────────────
 
-describe("serializeFolderTree: subtask sections", () => {
-  it("encodes subtasks as ## Subtask: sections with ID, Status, Priority", async () => {
+describe("serializeFolderTree: subtask directories", () => {
+  it("creates subtask directories with frontmatter at depth 4", async () => {
     const st = makeSubtask("44444444-0000-0000-0000-000000000000", "First Subtask", {
       status: "completed",
       priority: "high",
@@ -354,17 +373,19 @@ describe("serializeFolderTree: subtask sections", () => {
         slugify(epic.title, epic.id),
         slugify(feature.title, feature.id),
         slugify(task.title, task.id),
+        slugify(st.title, st.id),
         "index.md",
       ),
       "utf8",
     );
-    expect(content).toContain("## Subtask: First Subtask");
-    expect(content).toContain("**ID:** `44444444-0000-0000-0000-000000000000`");
-    expect(content).toContain("**Status:** completed");
-    expect(content).toContain("**Priority:** high");
+    expect(content).toContain('id: "44444444-0000-0000-0000-000000000000"');
+    expect(content).toContain('level: "subtask"');
+    expect(content).toContain('title: "First Subtask"');
+    expect(content).toContain('status: "completed"');
+    expect(content).toContain('priority: "high"');
   });
 
-  it("encodes subtask description and acceptanceCriteria", async () => {
+  it("writes subtask description and acceptanceCriteria", async () => {
     const st = makeSubtask("44444444-0000-0000-0000-000000000000", "Detailed Subtask", {
       description: "Do the thing.",
       acceptanceCriteria: ["AC one", "AC two"],
@@ -381,17 +402,18 @@ describe("serializeFolderTree: subtask sections", () => {
         slugify(epic.title, epic.id),
         slugify(feature.title, feature.id),
         slugify(task.title, task.id),
+        slugify(st.title, st.id),
         "index.md",
       ),
       "utf8",
     );
     expect(content).toContain("Do the thing.");
-    expect(content).toContain("**Acceptance Criteria**");
-    expect(content).toContain("- AC one");
-    expect(content).toContain("- AC two");
+    expect(content).toContain("acceptanceCriteria:");
+    expect(content).toContain('"AC one"');
+    expect(content).toContain('"AC two"');
   });
 
-  it("omits Priority line when subtask has no priority", async () => {
+  it("omits priority frontmatter when subtask has no priority", async () => {
     const st = makeSubtask("44444444-0000-0000-0000-000000000000", "No-Priority Subtask");
     const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st] });
     const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
@@ -405,12 +427,13 @@ describe("serializeFolderTree: subtask sections", () => {
         slugify(epic.title, epic.id),
         slugify(feature.title, feature.id),
         slugify(task.title, task.id),
+        slugify(st.title, st.id),
         "index.md",
       ),
       "utf8",
     );
-    expect(content).toContain("## Subtask: No-Priority Subtask");
-    expect(content).not.toContain("**Priority:**");
+    expect(content).toContain('title: "No-Priority Subtask"');
+    expect(content).not.toContain("priority:");
   });
 });
 

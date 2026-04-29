@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-20T23:12:36.052Z"
 completedAt: "2026-02-20T23:12:36.052Z"
+acceptanceCriteria: []
 description: "Clarify how Rex and Hench behave across vendors, with explicit notes for Codex mode, to reduce operator confusion and support issues."
 ---
 

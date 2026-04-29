@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T14:47:55.036Z"
 completedAt: "2026-04-08T14:47:55.036Z"
+acceptanceCriteria: []
 description: "Ensure a single, authoritative vendor/model resolution path is used across all ndx commands — including reasoning/thinking calls and standard API calls — so that no command silently diverges from the configured or defaulted model. Default resolution should produce the newest available model for the active vendor when no explicit model is configured."
 ---
 

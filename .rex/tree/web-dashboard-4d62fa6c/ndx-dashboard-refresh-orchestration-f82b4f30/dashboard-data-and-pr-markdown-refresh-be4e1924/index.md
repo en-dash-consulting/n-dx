@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T19:40:48.516Z"
 completedAt: "2026-02-21T19:40:48.516Z"
+acceptanceCriteria: []
 description: "Refresh SourceVision-derived dashboard data and explicitly support PR markdown cache regeneration within the same orchestration command."
 ---
 

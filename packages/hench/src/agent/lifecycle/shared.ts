@@ -647,17 +647,27 @@ async function listDirtyPaths(projectDir: string): Promise<string[]> {
  * commit prompt. This helper snapshots the existing SIGINT listeners,
  * removes them while the readline is open, and restores them on exit.
  *
- * A Ctrl-C received during the prompt is treated as "cancel cleanly —
- * decline": the readline closes and the promise resolves with `false`.
- * This matches the decline path (skip rollback / skip commit) so the
- * agent loop shuts down without bypassing the question.
+ * By default, a Ctrl-C received during the prompt is treated as "cancel
+ * cleanly — decline": the readline closes and the promise resolves with
+ * `false`. Rollback confirmation uses a stricter policy: the first
+ * Ctrl-C is absorbed with a visible hint, and a second Ctrl-C exits.
  *
  * @param question  The question to display (with trailing space).
  * @returns         true on accept (empty input, 'y', 'yes');
  *                  false on explicit decline or Ctrl-C cancellation.
  */
-async function askYesNoWithSuspendedSigint(question: string): Promise<boolean> {
+interface AskYesNoOptions {
+  interruptMode?: "decline" | "hold-then-exit";
+}
+
+const ROLLBACK_INTERRUPT_HINT = "Press Ctrl+C again to abort the rollback prompt and exit.";
+
+async function askYesNoWithSuspendedSigint(
+  question: string,
+  options: AskYesNoOptions = {},
+): Promise<boolean> {
   const { createInterface } = await import("node:readline");
+  const interruptMode = options.interruptMode ?? "decline";
 
   // Snapshot any existing SIGINT listeners — typically the run-loop's
   // force-exit handler from run.ts — and remove them before opening the
@@ -671,7 +681,29 @@ async function askYesNoWithSuspendedSigint(question: string): Promise<boolean> {
 
   return new Promise<boolean>((resolve) => {
     let settled = false;
-    const onInterrupt = (): void => finish(false);
+    let interruptCount = 0;
+    let secondInterruptArmed = false;
+    const onInterrupt = (): void => {
+      if (interruptMode === "hold-then-exit") {
+        interruptCount++;
+        if (interruptCount === 1) {
+          info(`\n${ROLLBACK_INTERRUPT_HINT}`);
+          queueMicrotask(() => {
+            secondInterruptArmed = true;
+          });
+          return;
+        }
+        if (!secondInterruptArmed) {
+          return;
+        }
+
+        info("\nAborting rollback prompt.");
+        const exitProcess = process.exit as (code?: number) => void;
+        exitProcess(1);
+      }
+
+      finish(false);
+    };
 
     const finish = (value: boolean): void => {
       if (settled) return;
@@ -703,11 +735,13 @@ async function askYesNoWithSuspendedSigint(question: string): Promise<boolean> {
 /**
  * Ask the user to confirm rollback via stdin (TTY only).
  * Returns true when the user accepts (empty input or 'y'/'yes').
- * A Ctrl-C during the prompt cancels cleanly and returns false.
+ * The first Ctrl-C prints a hint and keeps the prompt open; a second
+ * Ctrl-C aborts the prompt and exits.
  */
 async function promptRollbackConfirm(count: number): Promise<boolean> {
   return askYesNoWithSuspendedSigint(
     `\nRoll back ${count} uncommitted file(s)? [Y/n] `,
+    { interruptMode: "hold-then-exit" },
   );
 }
 

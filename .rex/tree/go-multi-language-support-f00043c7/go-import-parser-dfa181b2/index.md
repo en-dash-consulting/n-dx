@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T05:10:44.727Z"
 completedAt: "2026-03-26T05:10:44.727Z"
+acceptanceCriteria: []
 description: "Create a regex-based Go import parser in sourcevision that handles all Go import syntax variants and classifies imports as stdlib, third-party, or internal using go.mod module path resolution."
 ---
 

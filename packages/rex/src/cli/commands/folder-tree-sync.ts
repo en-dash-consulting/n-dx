@@ -5,8 +5,8 @@
  * in-memory store to the `.rex/tree/` folder structure.
  *
  * `loadItemsPreferFolderTree` — canonical read path for status, next, and
- * validate. Reads items from `.rex/tree/` when it exists; auto-migrates from
- * `prd.md`/`prd.json` when it does not.
+ * validate. Reads items from the required `.rex/tree/` folder tree; throws if
+ * the tree is absent (directing the user to run `rex migrate-to-folder-tree`).
  */
 
 import { join } from "node:path";

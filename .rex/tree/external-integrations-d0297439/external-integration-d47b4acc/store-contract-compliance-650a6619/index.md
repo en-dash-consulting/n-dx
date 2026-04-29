@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-08T15:28:49.613Z"
 completedAt: "2026-02-08T15:28:49.613Z"
+acceptanceCriteria: []
 description: "Ensure all store implementations meet the required contract"
 ---
 

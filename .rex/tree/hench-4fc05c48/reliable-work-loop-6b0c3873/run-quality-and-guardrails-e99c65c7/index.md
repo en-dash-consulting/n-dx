@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-04T18:11:41.993Z"
 completedAt: "2026-02-04T18:11:41.993Z"
+acceptanceCriteria: []
 description: "Validate work quality and provide safety mechanisms for autonomous execution"
 ---
 

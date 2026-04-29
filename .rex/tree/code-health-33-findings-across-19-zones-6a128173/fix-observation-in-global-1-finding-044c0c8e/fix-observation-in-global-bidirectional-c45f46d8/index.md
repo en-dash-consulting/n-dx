@@ -9,6 +9,7 @@ startedAt: "2026-04-17T15:33:07.453Z"
 completedAt: "2026-04-17T15:47:26.536Z"
 resolutionType: "code-change"
 resolutionDetail: "Extended api.ts with hooks/component/nav re-exports; sidebar.ts now imports through api.ts instead of 4 direct web-viewer leaf files, reducing outbound zone crossings from 5 targets to 2 (external.ts + api.ts)"
+acceptanceCriteria: []
 description: "- Bidirectional coupling: \"viewer-ui-hub\" ↔ \"web-viewer\" (5+5 crossings) — consider extracting shared interface"
 recommendationMeta: "[object Object]"
 ---

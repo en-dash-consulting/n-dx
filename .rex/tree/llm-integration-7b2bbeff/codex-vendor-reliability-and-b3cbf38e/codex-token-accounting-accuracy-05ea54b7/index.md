@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-20T22:35:55.356Z"
 completedAt: "2026-02-20T22:35:55.356Z"
+acceptanceCriteria: []
 description: "Ensure Hench records token usage correctly in Codex mode so usage reporting and budget enforcement remain trustworthy."
 ---
 

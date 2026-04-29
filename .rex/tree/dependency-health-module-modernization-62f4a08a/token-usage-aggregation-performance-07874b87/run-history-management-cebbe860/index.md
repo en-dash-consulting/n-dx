@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T04:40:54.985Z"
 completedAt: "2026-02-27T04:40:54.985Z"
+acceptanceCriteria: []
 description: "Implement efficient storage and retention policies for historical run data to control growth"
 ---
 

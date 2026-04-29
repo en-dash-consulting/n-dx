@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-10T16:27:02.649Z"
 completedAt: "2026-04-10T16:27:02.649Z"
+acceptanceCriteria: []
 description: "ndx init fails to locate the claude CLI on machines where it is installed outside the shell's default PATH — common when users install via npm, Homebrew, or the Claude desktop app, or when ndx is invoked from a non-interactive shell (CI, IDE terminals) that does not source the user's profile. The discovery mechanism must work across macOS, Linux, and Windows regardless of how or where claude was installed."
 ---
 
@@ -13,5 +14,5 @@ description: "ndx init fails to locate the claude CLI on machines where it is in
 
 | Title | Status |
 |-------|--------|
-| [Implement multi-location Claude CLI discovery chain with configurable override](./implement-multi-location-claude-cli-ac39fe86/index.md) | completed |
 | [Emit actionable diagnostics when Claude CLI cannot be located](./emit-actionable-diagnostics-when-claude-caadeba9/index.md) | completed |
+| [Implement multi-location Claude CLI discovery chain with configurable override](./implement-multi-location-claude-cli-ac39fe86/index.md) | completed |

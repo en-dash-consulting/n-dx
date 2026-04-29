@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-27T13:13:51.806Z"
 completedAt: "2026-04-27T13:13:51.806Z"
+acceptanceCriteria: []
 description: "Add a --show-individual flag to ndx status so users can see status broken down per PRD file when multiple branch-scoped PRD files exist alongside the canonical prd.md."
 ---
 

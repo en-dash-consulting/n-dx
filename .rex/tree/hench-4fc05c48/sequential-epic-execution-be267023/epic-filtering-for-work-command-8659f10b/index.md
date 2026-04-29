@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-05T16:26:43.089Z"
 completedAt: "2026-02-05T16:26:43.089Z"
+acceptanceCriteria: []
 description: "Allow users to constrain hench work loop to execute only tasks within a specified epic"
 ---
 

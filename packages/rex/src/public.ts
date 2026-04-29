@@ -64,7 +64,12 @@ export type { ParseWarning, FolderParseResult } from "./store/folder-tree-parser
 
 // ---- Folder-tree serializer -------------------------------------------------
 
-export { serializeFolderTree, slugify } from "./store/folder-tree-serializer.js";
+export {
+  serializeFolderTree,
+  slugify,
+  slugifyTitle,
+  resolveSiblingSlugs,
+} from "./store/folder-tree-serializer.js";
 export type { SerializeResult } from "./store/folder-tree-serializer.js";
 
 // ---- Store: git branch helpers and PRD filename composers ------------------

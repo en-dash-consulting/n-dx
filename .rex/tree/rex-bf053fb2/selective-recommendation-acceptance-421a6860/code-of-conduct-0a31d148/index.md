@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-07T02:42:10.041Z"
 completedAt: "2026-03-07T02:42:10.041Z"
+acceptanceCriteria: []
 description: "Establish a code of conduct document for the repository to set community and contributor expectations."
 ---
 

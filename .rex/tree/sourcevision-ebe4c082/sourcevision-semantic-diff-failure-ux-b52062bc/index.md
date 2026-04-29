@@ -6,12 +6,13 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T01:39:38.148Z"
 completedAt: "2026-02-23T01:39:38.148Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Diff-stage cache safety and API diagnostics](./diff-stage-cache-safety-and-api-8fd7d8cf/index.md) | completed |
 | [Actionable UI diagnostics and retry guidance](./actionable-ui-diagnostics-and-retry-20bbdb7b/index.md) | completed |
 | [Deterministic Semantic Diff Command Execution](./deterministic-semantic-diff-command-71e5ae15/index.md) | completed |
+| [Diff-stage cache safety and API diagnostics](./diff-stage-cache-safety-and-api-8fd7d8cf/index.md) | completed |

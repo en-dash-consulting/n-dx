@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T15:15:50.152Z"
 completedAt: "2026-04-18T15:15:50.152Z"
+acceptanceCriteria: []
 description: "- Production entry points (assistant-assets/index.js, packages/core/assistant-integration.js) are grouped into the same zone as test files, suggesting community detection is coupling asset-generation scripts to the test suite via shared import paths."
 recommendationMeta: "[object Object]"
 ---

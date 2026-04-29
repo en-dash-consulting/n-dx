@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-06T18:14:50.750Z"
 completedAt: "2026-03-06T18:21:32.613Z"
+acceptanceCriteria: []
 description: "- God function: main in packages/rex/src/cli/index.ts calls 48 unique functions — consider decomposing into smaller, focused functions\n- God function: usePRDActions in packages/web/src/viewer/hooks/use-prd-actions.ts calls 39 unique functions — consider decomposing into smaller, focused functions"
 recommendationMeta: "[object Object]"
 ---

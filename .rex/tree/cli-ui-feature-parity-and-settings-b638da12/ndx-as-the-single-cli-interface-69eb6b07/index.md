@@ -6,6 +6,7 @@ status: "completed"
 priority: "high"
 startedAt: "2026-04-13T18:35:49.604Z"
 completedAt: "2026-03-24T13:06:25.502Z"
+acceptanceCriteria: []
 description: "Every user-facing command accessible through ndx. Users never need to know which package owns what."
 ---
 

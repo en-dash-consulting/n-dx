@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-25T04:30:49.301Z"
 completedAt: "2026-02-25T04:30:49.301Z"
+acceptanceCriteria: []
 description: "Create a persistent JSON-based system within sourcevision to track completed epics, features, and tasks on the current branch"
 ---
 

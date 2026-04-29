@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T19:27:42.952Z"
 completedAt: "2026-02-22T19:27:42.952Z"
+acceptanceCriteria: []
 description: "Ensure task-level utilization displays remain deterministic and understandable when weekly budgets are missing or only partially configured."
 ---
 

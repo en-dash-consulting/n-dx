@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T14:54:09.198Z"
 completedAt: "2026-04-18T14:54:09.198Z"
+acceptanceCriteria: []
 description: "- Generic zone name \"Web 3\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.67) — 3 imports target \"web-viewer\""
 recommendationMeta: "[object Object]"
 ---

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-09T21:19:46.867Z"
 completedAt: "2026-02-10T05:37:05.168Z"
+acceptanceCriteria: []
 description: "Generate comprehensive PDF reports from sourcevision analysis data for sharing and documentation purposes"
 ---
 

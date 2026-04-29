@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T19:54:35.554Z"
 completedAt: "2026-02-21T19:54:35.554Z"
+acceptanceCriteria: []
 description: "Make refresh behavior compatible with active `ndx start` sessions by attempting live reload signaling and clearly documenting restart requirements when hot update is not possible."
 ---
 

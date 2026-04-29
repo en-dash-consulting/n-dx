@@ -15,7 +15,7 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
+| [Fix anti-pattern in global (2 findings)](./fix-anti-pattern-in-global-2-findings-c4e93fb7/index.md) | completed |
+| [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-finding-f190d1c3/index.md) | completed |
 | [Fix suggestion in sourcevision-2 (1 finding)](./fix-suggestion-in-sourcevision-2-1-ff6c5a83/index.md) | completed |
 | [Fix suggestion in sourcevision-3 (1 finding)](./fix-suggestion-in-sourcevision-3-1-4e6c049d/index.md) | completed |
-| [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-finding-f190d1c3/index.md) | completed |
-| [Fix anti-pattern in global (2 findings)](./fix-anti-pattern-in-global-2-findings-c4e93fb7/index.md) | completed |

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T00:51:43.680Z"
 completedAt: "2026-02-23T00:51:43.680Z"
+acceptanceCriteria: []
 description: "Add automated tests validating fallback activation, output structure, and metadata correctness across key failure modes."
 ---
 

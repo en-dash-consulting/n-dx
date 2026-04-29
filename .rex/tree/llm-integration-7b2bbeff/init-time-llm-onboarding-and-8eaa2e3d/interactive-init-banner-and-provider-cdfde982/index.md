@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T05:23:23.023Z"
 completedAt: "2026-02-21T05:23:23.023Z"
+acceptanceCriteria: []
 description: "Make `n-dx init`/`ndx init` guide first-time setup with a prominent terminal banner and a clear LLM provider picker so users can configure execution without manual config edits."
 ---
 

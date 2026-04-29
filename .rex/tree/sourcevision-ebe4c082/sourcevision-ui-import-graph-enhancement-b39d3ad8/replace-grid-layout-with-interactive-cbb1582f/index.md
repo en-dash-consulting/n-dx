@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-02T07:16:24.344Z"
 completedAt: "2026-03-02T07:16:24.344Z"
+acceptanceCriteria: []
 description: "Transform the SourceVision zones page from a grid-based layout to an interactive slideout-based interface for better user experience"
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-06T14:35:05.946Z"
 completedAt: "2026-02-06T14:35:05.946Z"
+acceptanceCriteria: []
 description: "Better error messages and graceful degradation"
 ---
 

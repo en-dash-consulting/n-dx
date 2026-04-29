@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T16:06:02.365Z"
 completedAt: "2026-02-26T16:06:02.365Z"
+acceptanceCriteria: []
 description: "Restore polling and synchronize data when tab becomes active again"
 ---
 

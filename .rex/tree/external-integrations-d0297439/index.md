@@ -12,8 +12,8 @@ description: "Store adapters, bidirectional sync (Notion, future backends), CI/C
 
 | Title | Status |
 |-------|--------|
-| [External sync and Notion integration](./external-sync-and-notion-integration-9679e55e/index.md) | completed |
-| [External Integration](./external-integration-d47b4acc/index.md) | completed |
-| [PR Build Pipeline and Code Quality Automation](./pr-build-pipeline-and-code-quality-84562611/index.md) | completed |
-| [Fix observation in panel (1 finding)](./fix-observation-in-panel-1-finding-d97894ab/index.md) | completed |
 | [External Integration Configuration UI](./external-integration-configuration-ui-5fd0de0b/index.md) | completed |
+| [External Integration](./external-integration-d47b4acc/index.md) | completed |
+| [External sync and Notion integration](./external-sync-and-notion-integration-9679e55e/index.md) | completed |
+| [Fix observation in panel (1 finding)](./fix-observation-in-panel-1-finding-d97894ab/index.md) | completed |
+| [PR Build Pipeline and Code Quality Automation](./pr-build-pipeline-and-code-quality-84562611/index.md) | completed |

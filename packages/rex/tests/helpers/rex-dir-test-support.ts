@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 import { parseDocument } from "../../src/store/markdown-parser.js";
@@ -40,6 +40,13 @@ export function writePRD(dir: string, doc: PRDDocument): void {
         const taskDir = join(featureDir, task.id);
         mkdirSync(taskDir, { recursive: true });
         writeFileSync(join(taskDir, "index.md"), createMinimalMarkdown(task));
+
+        for (const subtask of task.children || []) {
+          if (subtask.level !== "subtask") continue;
+          const subtaskDir = join(taskDir, subtask.id);
+          mkdirSync(subtaskDir, { recursive: true });
+          writeFileSync(join(subtaskDir, "index.md"), createMinimalMarkdown(subtask));
+        }
       }
     }
 
@@ -49,6 +56,13 @@ export function writePRD(dir: string, doc: PRDDocument): void {
       const taskDir = join(epicDir, task.id);
       mkdirSync(taskDir, { recursive: true });
       writeFileSync(join(taskDir, "index.md"), createMinimalMarkdown(task));
+
+      for (const subtask of task.children || []) {
+        if (subtask.level !== "subtask") continue;
+        const subtaskDir = join(taskDir, subtask.id);
+        mkdirSync(subtaskDir, { recursive: true });
+        writeFileSync(join(subtaskDir, "index.md"), createMinimalMarkdown(subtask));
+      }
     }
   }
 }
@@ -144,43 +158,43 @@ function readFolderTreeSync(treeRoot: string): PRDItem[] {
   const items: PRDItem[] = [];
 
   // List epics (depth 1)
-  const epicDirs = readdirSync(treeRoot).sort();
+  const epicDirs = listSubdirNames(treeRoot);
 
-  for (const epicId of epicDirs) {
-    const epicDir = join(treeRoot, epicId);
+  for (const epicDirName of epicDirs) {
+    const epicDir = join(treeRoot, epicDirName);
     const indexPath = join(epicDir, "index.md");
 
     const epicItem = parseItemFromMarkdown(readFileSync(indexPath, "utf-8"));
     if (!epicItem) continue;
 
-    epicItem.id = epicId;
     epicItem.children = [];
 
     // List features and tasks (depth 2)
-    const childDirs = readdirSync(epicDir).filter((d) => d !== "index.md").sort();
+    const childDirs = listSubdirNames(epicDir);
 
-    for (const childId of childDirs) {
-      const childPath = join(epicDir, childId, "index.md");
+    for (const childDirName of childDirs) {
+      const childDir = join(epicDir, childDirName);
+      const childPath = join(childDir, "index.md");
       const childItem = parseItemFromMarkdown(readFileSync(childPath, "utf-8"));
       if (!childItem) continue;
 
-      childItem.id = childId;
       childItem.children = [];
 
       // List tasks under features (depth 3)
       if (childItem.level === "feature") {
-        const taskDirs = readdirSync(join(epicDir, childId))
-          .filter((d) => d !== "index.md")
-          .sort();
+        const taskDirs = listSubdirNames(childDir);
 
-        for (const taskId of taskDirs) {
-          const taskPath = join(epicDir, childId, taskId, "index.md");
+        for (const taskDirName of taskDirs) {
+          const taskDir = join(childDir, taskDirName);
+          const taskPath = join(taskDir, "index.md");
           const taskItem = parseItemFromMarkdown(readFileSync(taskPath, "utf-8"));
           if (!taskItem) continue;
 
-          taskItem.id = taskId;
+          taskItem.children = readSubtasksSync(taskDir);
           childItem.children!.push(taskItem);
         }
+      } else if (childItem.level === "task") {
+        childItem.children = readSubtasksSync(childDir);
       }
 
       epicItem.children!.push(childItem);
@@ -190,6 +204,28 @@ function readFolderTreeSync(treeRoot: string): PRDItem[] {
   }
 
   return items;
+}
+
+function listSubdirNames(dir: string): string[] {
+  return readdirSync(dir)
+    .filter((entry) => {
+      try {
+        return statSync(join(dir, entry)).isDirectory();
+      } catch {
+        return false;
+      }
+    })
+    .sort();
+}
+
+function readSubtasksSync(taskDir: string): PRDItem[] {
+  const subtasks: PRDItem[] = [];
+  for (const subtaskDirName of listSubdirNames(taskDir)) {
+    const subtaskPath = join(taskDir, subtaskDirName, "index.md");
+    const subtaskItem = parseItemFromMarkdown(readFileSync(subtaskPath, "utf-8"));
+    if (subtaskItem) subtasks.push(subtaskItem as PRDItem);
+  }
+  return subtasks;
 }
 
 /**

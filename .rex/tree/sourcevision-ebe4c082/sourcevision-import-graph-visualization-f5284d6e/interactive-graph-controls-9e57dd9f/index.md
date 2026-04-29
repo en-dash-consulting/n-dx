@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T04:08:43.326Z"
 completedAt: "2026-02-11T04:08:43.326Z"
+acceptanceCriteria: []
 description: "Make the import graph interactive with draggable nodes, clickable elements, and navigation controls for better user exploration"
 ---
 

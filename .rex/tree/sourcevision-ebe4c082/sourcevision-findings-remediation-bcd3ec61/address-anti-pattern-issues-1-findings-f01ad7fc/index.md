@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-07T17:27:04.810Z"
 completedAt: "2026-03-07T17:30:13.582Z"
+acceptanceCriteria: []
 description: "- God function: cliLoop in packages/hench/src/agent/lifecycle/cli-loop.ts calls 36 unique functions — consider decomposing into smaller, focused functions"
 recommendationMeta: "[object Object]"
 ---

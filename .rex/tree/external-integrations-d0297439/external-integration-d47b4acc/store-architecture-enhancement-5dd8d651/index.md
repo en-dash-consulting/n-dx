@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-09T13:50:56.013Z"
 completedAt: "2026-02-09T13:50:56.013Z"
+acceptanceCriteria: []
 description: "Comprehensive store architecture with adapter support\n\n---\n\nRobust Notion API client with comprehensive operations"
 ---
 
@@ -19,7 +20,7 @@ Complete adapter registration, store creation with configuration validation, sec
 
 **Acceptance Criteria**
 
-- creates a FileStore for the 
+- creates a FileStore for the
 - registers a new adapter
 - rejects duplicate adapter names
 - rejects empty adapter name

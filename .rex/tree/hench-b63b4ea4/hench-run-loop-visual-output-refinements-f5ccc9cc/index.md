@@ -6,11 +6,12 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T14:32:25.306Z"
 completedAt: "2026-04-09T14:32:25.306Z"
+acceptanceCriteria: []
 ---
 
 ## Children
 
 | Title | Status |
 |-------|--------|
-| [Fix rolling window to count visual lines instead of message entries](./fix-rolling-window-to-count-visual-0b9042e1/index.md) | completed |
 | [Add regression tests for multi-line scroll window behavior](./add-regression-tests-for-multi-line-cd39ee5e/index.md) | completed |
+| [Fix rolling window to count visual lines instead of message entries](./fix-rolling-window-to-count-visual-0b9042e1/index.md) | completed |

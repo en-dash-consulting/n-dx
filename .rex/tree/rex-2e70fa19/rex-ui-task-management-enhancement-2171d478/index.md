@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T09:43:24.958Z"
 completedAt: "2026-02-18T09:43:24.958Z"
+acceptanceCriteria: []
 ---
 
 ## Children
@@ -13,7 +14,7 @@ completedAt: "2026-02-18T09:43:24.958Z"
 | Title | Status |
 |-------|--------|
 | [Detail Panel Task Creation](./detail-panel-task-creation-5b719370/index.md) | completed |
-| [Status-based Tree Filtering](./status-based-tree-filtering-0a8093cf/index.md) | completed |
 | [Rex Task Search](./rex-task-search-7834908d/index.md) | completed |
-| [Smart Add Command Regression Fix](./smart-add-command-regression-fix-598d6fd3/index.md) | completed |
 | [Smart Add Command Construction and Submission UX Fix](./smart-add-command-construction-and-7de88f8c/index.md) | completed |
+| [Smart Add Command Regression Fix](./smart-add-command-regression-fix-598d6fd3/index.md) | completed |
+| [Status-based Tree Filtering](./status-based-tree-filtering-0a8093cf/index.md) | completed |

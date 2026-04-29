@@ -7,6 +7,7 @@ priority: "critical"
 source: "sourcevision"
 startedAt: "2026-04-13T18:44:49.350Z"
 completedAt: "2026-04-13T18:49:18.867Z"
+acceptanceCriteria: []
 description: "- Zone \"Polling\" (polling) has catastrophic risk (score: 0.75, cohesion: 0.25, coupling: 0.75) — requires immediate architectural intervention"
 recommendationMeta: "[object Object]"
 ---

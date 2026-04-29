@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T04:50:23.216Z"
 completedAt: "2026-02-23T04:50:23.216Z"
+acceptanceCriteria: []
 ---
 
 ## Children
@@ -13,5 +14,5 @@ completedAt: "2026-02-23T04:50:23.216Z"
 | Title | Status |
 |-------|--------|
 | [Branch-Scoped Work Evidence Pipeline](./branch-scoped-work-evidence-pipeline-29180c95/index.md) | completed |
-| [Work-History Narrative Synthesis](./work-history-narrative-synthesis-1311822b/index.md) | completed |
 | [PDF Export Functionality](./pdf-export-functionality-7474c596/index.md) | completed |
+| [Work-History Narrative Synthesis](./work-history-narrative-synthesis-1311822b/index.md) | completed |

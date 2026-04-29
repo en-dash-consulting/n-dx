@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T17:27:43.138Z"
 completedAt: "2026-02-24T17:27:43.138Z"
+acceptanceCriteria: []
 ---
 
 ## Children
@@ -13,6 +14,6 @@ completedAt: "2026-02-24T17:27:43.138Z"
 | Title | Status |
 |-------|--------|
 | [Backend Deletion API Implementation](./backend-deletion-api-implementation-d5f21901/index.md) | completed |
-| [Rex UI Deletion Interface](./rex-ui-deletion-interface-e7080a46/index.md) | completed |
 | [Documentation and Help Updates](./documentation-and-help-updates-c2b3377b/index.md) | completed |
 | [Request deduplication infrastructure](./request-deduplication-infrastructure-66d94a74/index.md) | completed |
+| [Rex UI Deletion Interface](./rex-ui-deletion-interface-e7080a46/index.md) | completed |

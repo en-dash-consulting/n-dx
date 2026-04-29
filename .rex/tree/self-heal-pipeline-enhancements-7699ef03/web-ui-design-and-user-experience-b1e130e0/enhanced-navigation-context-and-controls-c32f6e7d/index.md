@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-09T20:41:37.051Z"
 completedAt: "2026-02-09T20:41:37.051Z"
+acceptanceCriteria: []
 description: "Improve sidebar navigation with active page indication and centralized global controls\n\n---\n\nMove the analysis progress indicator to proper SourceVision section"
 ---
 

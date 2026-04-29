@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T17:18:27.341Z"
 completedAt: "2026-02-24T17:18:27.341Z"
+acceptanceCriteria: []
 description: "Add interactive deletion capabilities to the Rex web UI task tab with proper user confirmation flows"
 ---
 

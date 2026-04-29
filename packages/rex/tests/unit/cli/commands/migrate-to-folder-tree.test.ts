@@ -52,6 +52,33 @@ const SAMPLE_PRD: PRDDocument = {
   ],
 };
 
+/** Write a minimal prd.md from a PRDDocument (enough for the markdown parser). */
+function writePrdMd(rexDir: string, doc: PRDDocument): void {
+  const lines: string[] = [`# ${doc.title}`, ""];
+  function writeItem(item: PRDDocument["items"][number], depth: number): void {
+    const heading = "#".repeat(depth + 1);
+    lines.push(`${heading} ${item.title}`);
+    lines.push("");
+    lines.push(`id: ${item.id}`);
+    lines.push(`level: ${item.level}`);
+    lines.push(`status: ${item.status}`);
+    if (item.description) lines.push(`description: ${item.description}`);
+    lines.push("");
+    for (const child of item.children ?? []) {
+      writeItem(child, depth + 1);
+    }
+  }
+  for (const item of doc.items) writeItem(item, 1);
+  writeFileSync(join(rexDir, "prd.md"), lines.join("\n"), "utf-8");
+}
+
+/** Simple prd.md builder using rex markdown serializer format. */
+function writePrdMdSerialized(rexDir: string, doc: PRDDocument): void {
+  // Use JSON-source prd.json as fallback to avoid needing the full markdown serializer
+  // The migration command tries prd.md first, then prd.json
+  writeFileSync(join(rexDir, "prd.json"), JSON.stringify(doc));
+}
+
 function subdirs(dir: string): string[] {
   return readdirSync(dir).filter((e) => statSync(join(dir, e)).isDirectory());
 }
@@ -78,7 +105,7 @@ describe("cmdMigrateToFolderTree", () => {
   it("creates folder tree from prd.json with zero data loss", async () => {
     writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
 
-    await cmdMigrateToFolderTree(tmp);
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
 
     const treeDir = join(tmp, ".rex", "tree");
     expect(existsSync(treeDir)).toBe(true);
@@ -105,7 +132,7 @@ describe("cmdMigrateToFolderTree", () => {
   it("prints creation summary on first run", async () => {
     writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
 
-    await cmdMigrateToFolderTree(tmp);
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
 
     const out = output();
     expect(out).toContain("Migrated .rex/prd.md → .rex/tree/");
@@ -116,10 +143,10 @@ describe("cmdMigrateToFolderTree", () => {
   it("is idempotent: re-running prints 'already up to date'", async () => {
     writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
 
-    await cmdMigrateToFolderTree(tmp);
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
     logSpy.mockClear();
 
-    await cmdMigrateToFolderTree(tmp);
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
 
     expect(output()).toContain("already up to date");
   });
@@ -127,10 +154,114 @@ describe("cmdMigrateToFolderTree", () => {
   it("is idempotent: re-running does not duplicate directories", async () => {
     writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
 
-    await cmdMigrateToFolderTree(tmp);
-    await cmdMigrateToFolderTree(tmp);
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
 
     const treeDir = join(tmp, ".rex", "tree");
     expect(subdirs(treeDir)).toHaveLength(1);
+  });
+
+  it("emits item count summary per PRD level", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
+
+    const out = output();
+    expect(out).toMatch(/1 epic/);
+    expect(out).toMatch(/1 feature/);
+    expect(out).toMatch(/1 task/);
+  });
+
+  it("does not emit levels with zero count", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
+
+    // SAMPLE_PRD has no subtasks
+    expect(output()).not.toMatch(/subtask/);
+  });
+
+  it("prompts to delete prd.md after successful migration", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+    writeFileSync(join(tmp, ".rex", "prd.md"), "# Test Project\n");
+
+    const questions: string[] = [];
+    const prompt = (q: string) => { questions.push(q); return Promise.resolve("n"); };
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt });
+
+    expect(questions.length).toBeGreaterThan(0);
+    expect(questions[0]).toMatch(/[Dd]elete.*prd\.md/);
+  });
+
+  it("deletes prd.md when user confirms with y", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+    writeFileSync(join(tmp, ".rex", "prd.md"), "# Test Project\n");
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("y") });
+
+    expect(existsSync(join(tmp, ".rex", "prd.md"))).toBe(false);
+  });
+
+  it("does not delete prd.md when user declines", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+    writeFileSync(join(tmp, ".rex", "prd.md"), "# Test Project\n");
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
+
+    expect(existsSync(join(tmp, ".rex", "prd.md"))).toBe(true);
+  });
+
+  it("deletes branch-scoped prd files when user confirms", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+    writeFileSync(join(tmp, ".rex", "prd.md"), "# Test Project\n");
+    writeFileSync(join(tmp, ".rex", "prd_feature-x_2026-04-01.md"), "# branch prd\n");
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("y") });
+
+    expect(existsSync(join(tmp, ".rex", "prd.md"))).toBe(false);
+    expect(existsSync(join(tmp, ".rex", "prd_feature-x_2026-04-01.md"))).toBe(false);
+  });
+
+  it("skips delete prompt when no prd.md files exist", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+    // No prd.md present
+
+    const questions: string[] = [];
+    const prompt = (q: string) => { questions.push(q); return Promise.resolve("n"); };
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt });
+
+    expect(questions).toHaveLength(0);
+  });
+
+  it("--yes flag auto-confirms deletion without prompting", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+    writeFileSync(join(tmp, ".rex", "prd.md"), "# Test Project\n");
+
+    const questions: string[] = [];
+    const prompt = (q: string) => { questions.push(q); return Promise.resolve("n"); };
+
+    await cmdMigrateToFolderTree(tmp, { yes: "true" }, { prompt });
+
+    // --yes bypasses the prompt fn entirely
+    expect(questions).toHaveLength(0);
+    expect(existsSync(join(tmp, ".rex", "prd.md"))).toBe(false);
+  });
+
+  it("re-run after prd.md deletion reads from tree and stays idempotent", async () => {
+    writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(SAMPLE_PRD));
+    writeFileSync(join(tmp, ".rex", "prd.md"), "# Test Project\n");
+
+    // First run: migrate and delete prd.md
+    await cmdMigrateToFolderTree(tmp, { yes: "true" });
+
+    expect(existsSync(join(tmp, ".rex", "prd.md"))).toBe(false);
+
+    // Second run: prd.md gone, tree exists → should be a no-op
+    logSpy.mockClear();
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
+
+    expect(output()).toContain("already up to date");
   });
 });

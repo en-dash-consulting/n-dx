@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:38:47.231Z"
 completedAt: "2026-04-20T15:38:47.231Z"
+acceptanceCriteria: []
 description: "- File \"packages/web/src/viewer/hooks/use-polling.ts\" is pinned to zone \"Web Viewer\" but lives in packages/web/src/viewer/hooks/ — consider moving to packages/web/src/viewer/views/ to align physical location with architectural zone"
 recommendationMeta: "[object Object]"
 ---

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-06T05:59:33.646Z"
 completedAt: "2026-03-06T05:59:33.646Z"
+acceptanceCriteria: []
 description: "Implement caching system for smart prune proposals to enable reuse between dry-run and accept operations without redundant LLM calls"
 ---
 

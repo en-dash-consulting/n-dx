@@ -9,6 +9,7 @@ startedAt: "2026-04-18T14:35:35.365Z"
 completedAt: "2026-04-18T14:38:18.402Z"
 resolutionType: "code-change"
 resolutionDetail: "Inlined FixItemStatus union in fix/types.ts, removing the import from ../schema/index.js. The rex-fix zone is now self-contained."
+acceptanceCriteria: []
 description: "- High coupling (0.6) — 1 imports target \"rex\""
 recommendationMeta: "[object Object]"
 ---

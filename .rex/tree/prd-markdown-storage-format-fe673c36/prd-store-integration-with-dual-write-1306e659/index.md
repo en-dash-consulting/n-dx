@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T16:20:10.156Z"
 completedAt: "2026-04-24T16:20:10.156Z"
+acceptanceCriteria: []
 description: "Integrate the markdown format as the primary read/write target in the PRD store while keeping prd.json synchronized for backward compatibility, and automate migration from existing JSON files on first use."
 ---
 
@@ -13,6 +14,6 @@ description: "Integrate the markdown format as the primary read/write target in 
 
 | Title | Status |
 |-------|--------|
-| [Integrate markdown as primary read/write format in PRDStore with JSON dual-write](./integrate-markdown-as-primary-readwrite-97b24996/index.md) | completed |
 | [Build automatic first-run migration and explicit rex migrate-to-md CLI command](./build-automatic-first-run-migration-and-7143e2a0/index.md) | completed |
+| [Integrate markdown as primary read/write format in PRDStore with JSON dual-write](./integrate-markdown-as-primary-readwrite-97b24996/index.md) | completed |
 | [Write end-to-end and concurrency tests for markdown-primary PRD storage](./write-end-to-end-and-concurrency-tests-3b442642/index.md) | completed |

@@ -7,6 +7,7 @@ priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T16:25:47.126Z"
 completedAt: "2026-04-20T16:25:47.126Z"
+acceptanceCriteria: []
 description: "- Cohesion (0.4) and coupling (0.6) both sit at warning thresholds; the zone mixes a hook, a service, a utility, and a schema validator — consider whether schema-compat and validate belong in a dedicated schema sub-module to raise cohesion."
 recommendationMeta: "[object Object]"
 ---

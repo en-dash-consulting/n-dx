@@ -7,6 +7,7 @@ source: "smart-add"
 startedAt: "2026-04-29T14:13:04.054Z"
 completedAt: "2026-04-29T14:13:04.054Z"
 endedAt: "2026-04-29T14:13:04.054Z"
+acceptanceCriteria: []
 description: "Flip the PRDStore read/write layer so the epic → feature → task → subtask folder tree is the sole authoritative storage. Remove all remaining paths that read from or write to prd.md so that file is never created, consulted, or maintained by any part of the system."
 ---
 

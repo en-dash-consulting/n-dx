@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T14:24:27.208Z"
 completedAt: "2026-04-24T14:24:27.208Z"
+acceptanceCriteria: []
 description: "Define a human-readable markdown format that encodes all PRD fields with full fidelity, and implement serializers/parsers for converting between the in-memory PRD tree and markdown representations."
 ---
 

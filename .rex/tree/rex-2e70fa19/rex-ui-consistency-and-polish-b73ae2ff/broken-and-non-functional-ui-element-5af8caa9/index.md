@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-03-03T08:09:04.401Z"
 completedAt: "2026-03-03T08:09:04.401Z"
+acceptanceCriteria: []
 description: "Identify and fix buttons, toggles, inputs, and other interactive controls across Rex pages that are visually present but non-functional, incorrectly wired, or produce no feedback"
 ---
 

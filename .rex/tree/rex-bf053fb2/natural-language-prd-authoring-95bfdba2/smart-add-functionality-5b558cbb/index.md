@@ -6,6 +6,7 @@ status: "completed"
 source: "llm"
 startedAt: "2026-02-09T12:56:47.907Z"
 completedAt: "2026-02-09T12:56:47.907Z"
+acceptanceCriteria: []
 description: "Allow natural language input that gets structured by LLM into proper PRD hierarchy"
 ---
 

@@ -6,6 +6,7 @@ status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T04:40:55.059Z"
 completedAt: "2026-02-27T04:40:55.059Z"
+acceptanceCriteria: []
 ---
 
 ## Children
@@ -13,6 +14,6 @@ completedAt: "2026-02-27T04:40:55.059Z"
 | Title | Status |
 |-------|--------|
 | [Incremental Aggregation System](./incremental-aggregation-system-baf1a80c/index.md) | completed |
-| [Stale Data Cleanup](./stale-data-cleanup-8d286eb2/index.md) | completed |
-| [Run History Management](./run-history-management-cebbe860/index.md) | completed |
 | [Message Throttling and Coalescing](./message-throttling-and-coalescing-4a39248e/index.md) | completed |
+| [Run History Management](./run-history-management-cebbe860/index.md) | completed |
+| [Stale Data Cleanup](./stale-data-cleanup-8d286eb2/index.md) | completed |
