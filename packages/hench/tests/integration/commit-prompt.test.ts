@@ -294,11 +294,24 @@ status: in_progress
 
     // Create a mock store that updates the task file's status
     const mockStore = {
-      updateItem: vi.fn(async (taskId: string) => {
+      getItem: vi.fn(async (taskId: string) => {
         if (taskId === "task-1") {
-          const content = readFileSync(taskIndexPath, "utf-8");
-          const updated = content.replace("status: in_progress", "status: completed");
-          await writeFile(taskIndexPath, updated, "utf-8");
+          return { status: "in_progress", id: "task-1", title: "Test Task", level: "task" };
+        }
+        return null;
+      }),
+      loadDocument: vi.fn(async () => ({
+        items: [
+          { id: "task-1", status: "in_progress", title: "Test Task", level: "task", children: [] },
+        ],
+      })),
+      updateItem: vi.fn(async (taskId: string, updates: any) => {
+        if (taskId === "task-1") {
+          let content = readFileSync(taskIndexPath, "utf-8");
+          if (updates.status) {
+            content = content.replace("status: in_progress", `status: ${updates.status}`);
+          }
+          await writeFile(taskIndexPath, content, "utf-8");
         }
       }),
       appendLog: vi.fn(async () => {}),
@@ -421,5 +434,75 @@ status: in_progress
     } finally {
       vi.resetModules();
     }
+  });
+
+  it("adds N-DX-Status trailer to commit message when status changes from in_progress to completed", async () => {
+    // This test verifies that the N-DX-Status trailer is correctly appended
+    // to the commit message when a task status changes.
+
+    // We'll test this at a lower level by directly testing the message file modification,
+    // since the full toolRexUpdateStatus function is complex to mock.
+
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Setup: Create initial code file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+    // Modify and stage a file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+
+    // Write proposed commit message
+    await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: update x", "utf-8");
+
+    // Create a minimal mock store that only needs to support getItem
+    // (performCommitPromptIfNeeded only calls toolRexUpdateStatus which requires more,
+    // but our implementation catches any errors and continues)
+    const mockStore = {
+      getItem: vi.fn(async (taskId: string) => {
+        if (taskId === "task-1") {
+          return { status: "in_progress" };
+        }
+        return null;
+      }),
+      updateItem: vi.fn(async () => { /* no-op */ }),
+      appendLog: vi.fn(async () => { /* no-op */ }),
+      loadDocument: vi.fn(async () => ({
+        items: [{ id: "task-1", status: "in_progress" }],
+      })),
+    };
+
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false, // non-interactive so it auto-commits
+      configurable: true,
+    });
+
+    const run = buildCompletedRun();
+
+    await performCommitPromptIfNeeded(
+      run,
+      projectDir,
+      /* autoCommit */ false,
+      /* yes */ false,
+      /* autonomous */ true,
+      mockStore as any,
+      "task-1",
+    );
+
+    // Verify the commit was created
+    expect(await getHeadSubject(projectDir)).toBe("feat: update x");
+
+    // Verify the commit message includes the N-DX-Status trailer
+    const { stdout: trailers } = await execAsync("git log -1 --format='%(trailers)'", { cwd: projectDir });
+    expect(trailers.trim()).toContain("N-DX-Status:");
+    expect(trailers).toContain("task-1");
+    expect(trailers).toContain("in_progress");
+    expect(trailers).toContain("completed");
+
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
 });

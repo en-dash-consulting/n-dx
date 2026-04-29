@@ -878,10 +878,18 @@ export async function performCommitPromptIfNeeded(
 
   // Update PRD status and stage the change before committing.
   // This ensures the status transition and code changes are in the same commit.
+  let oldStatus: string | undefined;
+  let newStatus: string | undefined;
   if (store && taskId && run.status === "completed") {
     try {
+      // Capture old status before updating
+      const existingItem = await store.getItem(taskId);
+      oldStatus = existingItem?.status;
+
       // Update PRD status to "completed"
       await toolRexUpdateStatus(store, taskId, { status: "completed" });
+      newStatus = "completed";
+
       // Log the completion event
       await toolRexAppendLog(store, taskId, {
         event: "task_completed",
@@ -892,14 +900,14 @@ export async function performCommitPromptIfNeeded(
       // After toolRexUpdateStatus modifies the tree, stage the changed files.
       try {
         // Use git status to find modified files in .rex/tree/
-        const { stdout } = await execStdout("git", ["status", "--porcelain"], {
+        const output = await execStdout("git", ["status", "--porcelain"], {
           cwd: projectDir,
           timeout: 10_000,
         });
-        const statusLines = stdout.trim().split("\n").filter(Boolean);
+        const statusLines = output.trim().split("\n").filter(Boolean);
         const rexTreeFiles = statusLines
-          .filter((line) => line.includes(".rex/tree"))
-          .map((line) => line.slice(3).trim()); // Remove status prefix (e.g., " M ")
+          .filter((line: string) => line.includes(".rex/tree"))
+          .map((line: string) => line.slice(3).trim()); // Remove status prefix (e.g., " M ")
 
         if (rexTreeFiles.length > 0) {
           for (const file of rexTreeFiles) {
@@ -919,6 +927,21 @@ export async function performCommitPromptIfNeeded(
       // Best-effort: if PRD update fails, proceed with commit anyway
       // This prevents a failed PRD update from blocking the entire commit flow
       detail(`Warning: PRD status update failed: ${(err as Error).message}`);
+    }
+  }
+
+  // Append N-DX-Status trailer if status changed
+  if (oldStatus && newStatus && oldStatus !== newStatus && taskId) {
+    try {
+      const { writeFileSync } = await import("node:fs");
+      const currentMessage = readFileSync(msgPath, "utf-8");
+      // Git trailers are separated from the body by a blank line
+      const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
+      const trailer = `${separator}N-DX-Status: ${taskId} ${oldStatus} → ${newStatus}`;
+      writeFileSync(msgPath, currentMessage + trailer, "utf-8");
+    } catch (err) {
+      // Best-effort: if trailer append fails, proceed with commit anyway
+      detail(`Warning: could not add status trailer: ${(err as Error).message}`);
     }
   }
 
