@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { FileStore } from "../../../src/store/file-adapter.js";
 import { parseDocument } from "../../../src/store/markdown-parser.js";
 import { PRD_MARKDOWN_FILENAME } from "../../../src/store/prd-md-migration.js";
-import { SCHEMA_VERSION, type PRDDocument } from "../../../src/schema/index.js";
+import { serializeDocument } from "../../../src/store/markdown-serializer.js";
+import { SCHEMA_VERSION, type PRDDocument, type PRDItem } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 
 describe("FileStore markdown auto-migration", () => {
@@ -59,6 +60,45 @@ describe("FileStore markdown auto-migration", () => {
 
     const jsonAfter = await readFile(jsonPath, "utf-8");
     expect(jsonAfter).toBe(jsonBefore);
+  });
+
+  it("saveDocument does not create prd.json when only prd.md exists", async () => {
+    const doc: PRDDocument = { schema: SCHEMA_VERSION, title: "MD Only", items: [] };
+    await writeFile(join(rexDir, PRD_MARKDOWN_FILENAME), serializeDocument(doc), "utf-8");
+
+    const store = new FileStore(rexDir);
+    const loaded = await store.loadDocument();
+    loaded.items.push({ id: "e1", title: "Epic", status: "pending", level: "epic" } as PRDItem);
+    await store.saveDocument(loaded);
+
+    await expect(access(join(rexDir, "prd.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("addItem does not create prd.json when only prd.md exists", async () => {
+    const doc: PRDDocument = { schema: SCHEMA_VERSION, title: "MD Only", items: [] };
+    await writeFile(join(rexDir, PRD_MARKDOWN_FILENAME), serializeDocument(doc), "utf-8");
+
+    const store = new FileStore(rexDir);
+    await store.addItem({ id: "e1", title: "Epic", status: "pending", level: "epic" });
+
+    await expect(access(join(rexDir, "prd.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("saveDocument does not modify a pre-existing prd.json", async () => {
+    const doc: PRDDocument = { schema: SCHEMA_VERSION, title: "MD Primary", items: [] };
+    await writeFile(join(rexDir, PRD_MARKDOWN_FILENAME), serializeDocument(doc), "utf-8");
+
+    const legacyJson = toCanonicalJSON({ schema: SCHEMA_VERSION, title: "Legacy JSON", items: [] });
+    const jsonPath = join(rexDir, "prd.json");
+    await writeFile(jsonPath, legacyJson, "utf-8");
+
+    const store = new FileStore(rexDir);
+    const loaded = await store.loadDocument();
+    loaded.items.push({ id: "e1", title: "Epic", status: "pending", level: "epic" } as PRDItem);
+    await store.saveDocument(loaded);
+
+    const jsonAfter = await readFile(jsonPath, "utf-8");
+    expect(jsonAfter).toBe(legacyJson);
   });
 
   it("prefers prd.md on subsequent loads after migration", async () => {

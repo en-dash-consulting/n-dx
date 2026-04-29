@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { FileStore, ensureRexDir } from "../../../src/store/file-adapter.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import type { PRDDocument, PRDItem } from "../../../src/schema/index.js";
+import { serializeDocument } from "../../../src/store/markdown-serializer.js";
+import { PRD_MARKDOWN_FILENAME } from "../../../src/store/prd-md-migration.js";
 
 describe("FileStore", () => {
   let rexDir: string;
@@ -17,13 +19,13 @@ describe("FileStore", () => {
     await ensureRexDir(rexDir);
     store = new FileStore(rexDir);
 
-    // Seed minimal files
+    // Seed minimal files — prd.md is the primary storage
     const doc: PRDDocument = {
       schema: SCHEMA_VERSION,
       title: "Test",
       items: [],
     };
-    await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
+    await writeFile(join(rexDir, PRD_MARKDOWN_FILENAME), serializeDocument(doc), "utf-8");
     await writeFile(
       join(rexDir, "config.json"),
       toCanonicalJSON({ schema: SCHEMA_VERSION, project: "test", adapter: "file" }),
@@ -59,33 +61,6 @@ describe("FileStore", () => {
       expect(reloaded.items[0].title).toBe("Epic");
     });
 
-    it("throws on malformed JSON in prd.json", async () => {
-      await writeFile(join(rexDir, "prd.json"), "{not valid json", "utf-8");
-      await expect(store.loadDocument()).rejects.toThrow();
-    });
-
-    it("throws on schema-invalid prd.json", async () => {
-      await writeFile(
-        join(rexDir, "prd.json"),
-        JSON.stringify({ title: "No schema", items: [] }),
-        "utf-8",
-      );
-      await expect(store.loadDocument()).rejects.toThrow("Invalid prd.json");
-    });
-
-    it("throws on prd.json with invalid item fields", async () => {
-      await writeFile(
-        join(rexDir, "prd.json"),
-        JSON.stringify({
-          schema: SCHEMA_VERSION,
-          title: "Bad Items",
-          items: [{ id: "x", title: "X", status: "bogus", level: "epic" }],
-        }),
-        "utf-8",
-      );
-      await expect(store.loadDocument()).rejects.toThrow("Invalid prd.json");
-    });
-
     it("saveDocument validates before writing", async () => {
       const invalid = { schema: SCHEMA_VERSION, title: "Missing items" } as unknown as PRDDocument;
       await expect(store.saveDocument(invalid)).rejects.toThrow();
@@ -93,6 +68,71 @@ describe("FileStore", () => {
       // Verify the original document is untouched
       const doc = await store.loadDocument();
       expect(doc.title).toBe("Test");
+    });
+
+    it("saveDocument does not create prd.json when absent", async () => {
+      const doc = await store.loadDocument();
+      doc.items.push({ id: "e1", title: "Epic", status: "pending", level: "epic" });
+      await store.saveDocument(doc);
+      await expect(access(join(rexDir, "prd.json"))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("saveDocument does not modify a pre-existing prd.json", async () => {
+      const legacyContent = toCanonicalJSON({ schema: SCHEMA_VERSION, title: "Legacy", items: [] });
+      await writeFile(join(rexDir, "prd.json"), legacyContent, "utf-8");
+
+      const doc = await store.loadDocument();
+      doc.items.push({ id: "e1", title: "Epic", status: "pending", level: "epic" });
+      await store.saveDocument(doc);
+
+      const after = await readFile(join(rexDir, "prd.json"), "utf-8");
+      expect(after).toBe(legacyContent);
+    });
+  });
+
+  describe("loadDocument — JSON fallback (migration path)", () => {
+    // These tests exercise the legacy migration path where prd.md is absent
+    // and loadDocument falls back to prd.json. No prd.md is seeded here.
+
+    let jsonRexDir: string;
+    let jsonStore: FileStore;
+
+    beforeEach(async () => {
+      const tmpDir = await mkdtemp(join(tmpdir(), "rex-json-fallback-"));
+      jsonRexDir = join(tmpDir, ".rex");
+      await ensureRexDir(jsonRexDir);
+      jsonStore = new FileStore(jsonRexDir);
+    });
+
+    afterEach(async () => {
+      await rm(jsonRexDir, { recursive: true, force: true });
+    });
+
+    it("throws on malformed JSON in prd.json", async () => {
+      await writeFile(join(jsonRexDir, "prd.json"), "{not valid json", "utf-8");
+      await expect(jsonStore.loadDocument()).rejects.toThrow();
+    });
+
+    it("throws on schema-invalid prd.json", async () => {
+      await writeFile(
+        join(jsonRexDir, "prd.json"),
+        JSON.stringify({ title: "No schema", items: [] }),
+        "utf-8",
+      );
+      await expect(jsonStore.loadDocument()).rejects.toThrow("Invalid prd.json");
+    });
+
+    it("throws on prd.json with invalid item fields", async () => {
+      await writeFile(
+        join(jsonRexDir, "prd.json"),
+        JSON.stringify({
+          schema: SCHEMA_VERSION,
+          title: "Bad Items",
+          items: [{ id: "x", title: "X", status: "bogus", level: "epic" }],
+        }),
+        "utf-8",
+      );
+      await expect(jsonStore.loadDocument()).rejects.toThrow("Invalid prd.json");
     });
   });
 

@@ -21,6 +21,8 @@ import { FileStore, ensureRexDir } from "../../../src/store/file-adapter.js";
 import { FolderTreeStore, ensureFolderTreeRexDir } from "../../../src/store/folder-tree-store.js";
 import { NotionStore, ensureNotionRexDir } from "../../../src/store/notion-adapter.js";
 import type { NotionClient, NotionAdapterConfig } from "../../../src/store/notion-client.js";
+import { serializeDocument } from "../../../src/store/markdown-serializer.js";
+import { PRD_MARKDOWN_FILENAME } from "../../../src/store/prd-md-migration.js";
 
 // ---------------------------------------------------------------------------
 // Reusable contract test suite
@@ -503,13 +505,13 @@ describeStoreContract("FileStore", () => ({
     const rexDir = join(tmpDir, ".rex");
     await ensureRexDir(rexDir);
 
-    // Seed the minimal files FileStore expects
+    // Seed the minimal files FileStore expects — prd.md is the primary storage
     const doc: PRDDocument = {
       schema: SCHEMA_VERSION,
       title: "Contract Test",
       items: [],
     };
-    await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
+    await writeFile(join(rexDir, PRD_MARKDOWN_FILENAME), serializeDocument(doc), "utf-8");
     await writeFile(
       join(rexDir, "config.json"),
       toCanonicalJSON({
