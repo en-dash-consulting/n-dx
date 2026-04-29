@@ -2,7 +2,7 @@
 id: "97b24996-6ca7-46de-a2bf-1355ebc12e9f"
 level: "task"
 title: "Integrate markdown as primary read/write format in PRDStore with JSON dual-write"
-status: "pending"
+status: "completed"
 priority: "critical"
 tags:
   - "rex"
@@ -10,6 +10,8 @@ tags:
   - "refactor"
 source: "smart-add"
 startedAt: "2026-04-24T15:54:10.082Z"
+completedAt: "2026-04-28T15:08:27.304Z"
+endedAt: "2026-04-28T15:08:27.304Z"
 acceptanceCriteria:
   - "PRDStore.load() reads from .rex/prd.md when the file exists; falls back to .rex/prd.json when prd.md is absent"
   - "PRDStore.save() writes .rex/prd.md first, then syncs .rex/prd.json; a write error on the json sync is logged but does not throw"

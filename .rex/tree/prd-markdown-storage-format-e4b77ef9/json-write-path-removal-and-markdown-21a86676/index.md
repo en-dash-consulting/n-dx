@@ -1,0 +1,16 @@
+---
+id: "21a86676-166a-4af7-bc57-39af1f47d2ba"
+level: "feature"
+title: "JSON Write Path Removal and Markdown-Only Enforcement"
+status: "pending"
+source: "smart-add"
+description: "Remove all code that writes to .rex/prd.json (and any branch-scoped .rex/prd_*.json files) from PRD mutation paths. After the dual-write migration phase, only Markdown files should be written by ndx add, rex CLI commands, and MCP write tools. The only permitted JSON write is the ephemeral .rex/.cache/prd.json produced by ndx start."
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Remove JSON dual-write from PRDStore save operations](./remove-json-dual-write-from-prdstore-72581f11/index.md) | completed |
+| [Audit and remove residual JSON write calls from rex CLI and MCP handlers](./audit-and-remove-residual-json-write-eb208a9e/index.md) | completed |
+| [Add regression tests asserting no JSON writes occur outside ndx start](./add-regression-tests-asserting-no-json-67246c10/index.md) | pending |
