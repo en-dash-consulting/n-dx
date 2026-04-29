@@ -12,5 +12,5 @@ description: "When hench produces a commit, append a structured trailer block id
 
 | Title | Status |
 |-------|--------|
-| [Append n-dx authorship and vendor/model audit trailer to hench-generated commit messages](./append-n-dx-authorship-and-vendormodel-30bd6623/index.md) | pending |
+| [Append n-dx authorship and vendor/model audit trailer to hench-generated commit messages](./append-n-dx-authorship-and-vendormodel-30bd6623/index.md) | in_progress |
 | [Embed n-dx dashboard permalink for the PRD item in the commit message footer](./embed-n-dx-dashboard-permalink-for-the-25c1d40b/index.md) | pending |

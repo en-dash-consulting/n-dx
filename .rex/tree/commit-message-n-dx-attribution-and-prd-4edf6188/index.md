@@ -10,5 +10,5 @@ source: "smart-add"
 
 | Title | Status |
 |-------|--------|
-| [Commit-Time PRD Status Transition Embedding](./commit-time-prd-status-transition-e22db08b/index.md) | pending |
+| [Commit-Time PRD Status Transition Embedding](./commit-time-prd-status-transition-e22db08b/index.md) | completed |
 | [N-DX Authorship and Model Audit Trailer in Commit Messages](./n-dx-authorship-and-model-audit-trailer-44afa388/index.md) | pending |

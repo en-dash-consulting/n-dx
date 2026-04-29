@@ -303,7 +303,7 @@ export interface InitRunOptions {
   taskTitle: string;
   model: string;
   henchDir: string;
-  /** LLM vendor for this run (e.g. "claude", "codex"). Captured in diagnostics. */
+  /** LLM vendor for this run (e.g. "claude", "codex"). Captured in diagnostics and run.vendor. */
   vendor?: string;
   /** Sandbox mode in effect (e.g. "workspace-write"). Captured in diagnostics. */
   sandbox?: string;
@@ -313,6 +313,8 @@ export interface InitRunOptions {
   parseMode?: string;
   /** Invocation context: "cli" for CLI invocation, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
+  /** Task weight / tier ("light" | "standard"). Used for task-weight-aware model selection. */
+  weight?: string;
 }
 
 /**
@@ -342,6 +344,8 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     toolCalls: [],
     model: opts.model,
     invocationContext: opts.invocationContext,
+    vendor: opts.vendor,
+    weight: opts.weight ?? "standard",
   };
 
   // Emit invocation context to the output stream for CLI and dashboard visibility
@@ -943,6 +947,24 @@ export async function performCommitPromptIfNeeded(
       // Best-effort: if trailer append fails, proceed with commit anyway
       detail(`Warning: could not add status trailer: ${(err as Error).message}`);
     }
+  }
+
+  // Append N-DX authorship trailer with vendor, model, and run ID
+  try {
+    const { writeFileSync } = await import("node:fs");
+    const vendor = run.vendor ?? run.diagnostics?.vendor ?? "unknown";
+    const model = run.model ?? "unknown";
+    const runId = run.id;
+    const weight = run.weight && run.weight !== "standard" ? ` (${run.weight})` : "";
+
+    const currentMessage = readFileSync(msgPath, "utf-8");
+    // Git trailers are separated from the body by a blank line
+    const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
+    const authTrailer = `${separator}N-DX: ${vendor}/${model}${weight} · run ${runId}`;
+    writeFileSync(msgPath, currentMessage + authTrailer, "utf-8");
+  } catch (err) {
+    // Best-effort: if trailer append fails, proceed with commit anyway
+    detail(`Warning: could not add authorship trailer: ${(err as Error).message}`);
   }
 
   try {

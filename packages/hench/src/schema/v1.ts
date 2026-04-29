@@ -606,6 +606,19 @@ export interface RunRecord {
   turnTokenUsage?: TurnTokenUsage[];
   toolCalls: ToolCallRecord[];
   model: string;
+  /**
+   * LLM vendor used for this run ("claude" | "codex").
+   * Also available via `diagnostics.vendor` but captured here for easy commit-time access.
+   * v1 additive field — old records without this field load normally.
+   */
+  vendor?: string;
+  /**
+   * Task weight / tier selected for this run ("light" | "standard").
+   * Used for task-weight tiering to select cheaper models for simple tasks.
+   * Defaults to "standard" if not specified.
+   * v1 additive field — old records without this field load normally.
+   */
+  weight?: string;
   retryAttempts?: number;
   /** Structured metadata derived from tool calls at run finalization. */
   structuredSummary?: RunSummaryData;

@@ -2,13 +2,14 @@
 id: "30bd6623-4c94-461d-a4f3-42614114db05"
 level: "task"
 title: "Append n-dx authorship and vendor/model audit trailer to hench-generated commit messages"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "hench"
   - "commit"
   - "attribution"
 source: "smart-add"
+startedAt: "2026-04-29T19:03:10.292Z"
 acceptanceCriteria:
   - "Every commit produced by `ndx work` (interactive, --auto, and --loop modes) ends with an `N-DX:` trailer line that names the vendor and the resolved model id"
   - "When task-weight tiering selects a non-default tier, the trailer records the tier alongside the model (e.g. `claude/claude-opus-4-7 (heavy)`)"

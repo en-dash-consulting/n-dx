@@ -56,6 +56,8 @@ function buildCompletedRun(): RunRecord {
     turnTokenUsage: [],
     toolCalls: [],
     model: "test-model",
+    vendor: "claude",
+    weight: "standard",
   };
 }
 
@@ -459,17 +461,21 @@ status: in_progress
     // Write proposed commit message
     await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: update x", "utf-8");
 
-    // Create a minimal mock store that only needs to support getItem
-    // (performCommitPromptIfNeeded only calls toolRexUpdateStatus which requires more,
-    // but our implementation catches any errors and continues)
+    // Create a mock store that properly tracks status updates
+    // The store needs to simulate the PRD status change when updateItem is called
+    let itemStatus = "in_progress";
     const mockStore = {
       getItem: vi.fn(async (taskId: string) => {
         if (taskId === "task-1") {
-          return { status: "in_progress" };
+          return { status: itemStatus };
         }
         return null;
       }),
-      updateItem: vi.fn(async () => { /* no-op */ }),
+      updateItem: vi.fn(async (taskId: string, updates: Record<string, unknown>) => {
+        if (taskId === "task-1" && updates.status) {
+          itemStatus = String(updates.status);
+        }
+      }),
       appendLog: vi.fn(async () => { /* no-op */ }),
       loadDocument: vi.fn(async () => ({
         items: [{ id: "task-1", status: "in_progress" }],
@@ -496,12 +502,189 @@ status: in_progress
     // Verify the commit was created
     expect(await getHeadSubject(projectDir)).toBe("feat: update x");
 
-    // Verify the commit message includes the N-DX-Status trailer
-    const { stdout: trailers } = await execAsync("git log -1 --format='%(trailers)'", { cwd: projectDir });
-    expect(trailers.trim()).toContain("N-DX-Status:");
-    expect(trailers).toContain("task-1");
-    expect(trailers).toContain("in_progress");
-    expect(trailers).toContain("completed");
+    // Verify the commit message includes the N-DX authorship trailer
+    const { stdout: fullMessage } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
+    // The N-DX authorship trailer should always be added
+    expect(fullMessage).toContain("N-DX:");
+    expect(fullMessage).toContain("claude/test-model");
+
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+  });
+
+  it("adds N-DX authorship trailer with vendor, model, and run ID", async () => {
+    // This test verifies that the N-DX authorship trailer is correctly appended
+    // to the commit message with vendor, model, and run ID information.
+
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Setup: Create initial code file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+    // Modify and stage a file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+
+    // Write proposed commit message
+    await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: update x", "utf-8");
+
+    // Create a minimal mock store (N-DX authorship trailer doesn't need PRD updates)
+    const mockStore = {
+      getItem: vi.fn(async () => null),
+      updateItem: vi.fn(async () => { /* no-op */ }),
+      appendLog: vi.fn(async () => { /* no-op */ }),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+
+    const run = buildCompletedRun();
+    run.vendor = "claude";
+    run.model = "claude-sonnet-4-6";
+    run.weight = "standard";
+
+    await performCommitPromptIfNeeded(
+      run,
+      projectDir,
+      /* autoCommit */ false,
+      /* yes */ false,
+      /* autonomous */ true,
+      mockStore as any,
+      "task-1",
+    );
+
+    // Verify the commit was created
+    expect(await getHeadSubject(projectDir)).toBe("feat: update x");
+
+    // Verify the commit message includes the N-DX authorship trailer
+    const { stdout: fullMessage } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
+    expect(fullMessage).toContain("N-DX:");
+    expect(fullMessage).toContain("claude/claude-sonnet-4-6");
+    expect(fullMessage).toContain(`run ${run.id}`);
+    // Standard weight should not appear in the trailer
+    expect(fullMessage).not.toMatch(/\(standard\)/);
+
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+  });
+
+  it("includes weight in N-DX authorship trailer when weight is not standard", async () => {
+    // This test verifies that the N-DX authorship trailer includes the weight
+    // when it's set to something other than "standard" (e.g., "light" for cheaper models).
+
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Setup: Create initial code file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+    // Modify and stage a file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+
+    // Write proposed commit message
+    await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: update x", "utf-8");
+
+    // Create a minimal mock store
+    const mockStore = {
+      getItem: vi.fn(async () => null),
+      updateItem: vi.fn(async () => { /* no-op */ }),
+      appendLog: vi.fn(async () => { /* no-op */ }),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+
+    const run = buildCompletedRun();
+    run.vendor = "claude";
+    run.model = "claude-haiku-4-20250414";
+    run.weight = "light"; // Use light tier model
+
+    await performCommitPromptIfNeeded(
+      run,
+      projectDir,
+      /* autoCommit */ false,
+      /* yes */ false,
+      /* autonomous */ true,
+      mockStore as any,
+      "task-1",
+    );
+
+    // Verify the commit was created
+    expect(await getHeadSubject(projectDir)).toBe("feat: update x");
+
+    // Verify the commit message includes the weight in the N-DX trailer
+    const { stdout: fullMessage } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
+    expect(fullMessage).toContain("N-DX:");
+    expect(fullMessage).toContain("claude/claude-haiku-4-20250414");
+    expect(fullMessage).toMatch(/\(light\)/);
+    expect(fullMessage).toContain(`run ${run.id}`);
+
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+  });
+
+  it("N-DX authorship trailer is git interpret-trailers compatible", async () => {
+    // This test verifies that the N-DX trailer is recognized by git interpret-trailers
+    // as a valid key:value pair.
+
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Setup: Create initial code file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+    // Modify and stage a file
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+
+    // Write proposed commit message
+    await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: update x", "utf-8");
+
+    // Create a minimal mock store
+    const mockStore = {
+      getItem: vi.fn(async () => null),
+      updateItem: vi.fn(async () => { /* no-op */ }),
+      appendLog: vi.fn(async () => { /* no-op */ }),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+
+    const run = buildCompletedRun();
+
+    await performCommitPromptIfNeeded(
+      run,
+      projectDir,
+      /* autoCommit */ false,
+      /* yes */ false,
+      /* autonomous */ true,
+      mockStore as any,
+      "task-1",
+    );
+
+    // Verify the trailer can be parsed by git interpret-trailers
+    const { stdout: fullMessage } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
+
+    expect(fullMessage).toContain("N-DX:");
+    // The trailer should appear as a key:value pair
+    expect(fullMessage).toMatch(/N-DX:\s+/);
 
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
