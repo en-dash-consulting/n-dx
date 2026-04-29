@@ -6,6 +6,14 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
+import { parseDocument, serializeDocument } from "@n-dx/rex";
+
+function readPRDFromMd(rexDir: string) {
+  const raw = readFileSync(join(rexDir, "prd.md"), "utf-8");
+  const result = parseDocument(raw);
+  if (!result.ok) throw result.error;
+  return result.data;
+}
 
 /** PRD fixture with requirements. */
 function makePRD() {
@@ -95,7 +103,7 @@ describe("Requirements API routes", () => {
     rexDir = join(tmpDir, ".rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
-    await writeFile(join(rexDir, "prd.json"), JSON.stringify(makePRD(), null, 2));
+    await writeFile(join(rexDir, "prd.md"), serializeDocument(makePRD() as never));
 
     ctx = { projectDir: tmpDir, svDir, rexDir, dev: false };
     const started = await startTestServer(ctx);
@@ -163,7 +171,7 @@ describe("Requirements API routes", () => {
     expect(data.requirement.category).toBe("accessibility");
 
     // Verify persisted
-    const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+    const prd = readPRDFromMd(rexDir);
     const task2 = prd.items[0].children[1];
     expect(task2.requirements).toHaveLength(1);
     expect(task2.requirements[0].title).toBe("Accessibility compliance");
@@ -229,7 +237,7 @@ describe("Requirements API routes", () => {
     expect(data.requirement.id).toBe("req-2"); // ID preserved
 
     // Verify persisted
-    const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+    const prd = readPRDFromMd(rexDir);
     const task1 = prd.items[0].children[0];
     expect(task1.requirements[0].title).toBe("Updated coverage requirement");
   });
@@ -263,7 +271,7 @@ describe("Requirements API routes", () => {
     expect(data.ok).toBe(true);
 
     // Verify removed from disk
-    const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+    const prd = readPRDFromMd(rexDir);
     const task1 = prd.items[0].children[0];
     expect(task1.requirements).toBeUndefined();
   });

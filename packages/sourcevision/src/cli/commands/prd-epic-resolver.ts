@@ -63,6 +63,36 @@ function readJSONFile<T>(path: string): T | null {
   }
 }
 
+/**
+ * Read the PRD document, preferring `.rex/prd.md` (current source of truth)
+ * and falling back to `.rex/prd.json` for legacy projects. Markdown is parsed
+ * by spawning `rex parse-md --stdin` so we never import rex at the code level.
+ */
+function readPRDDocument(projectDir: string): PRDDocumentLike | null {
+  const mdPath = join(projectDir, REX_DIR, "prd.md");
+  const jsonPath = join(projectDir, REX_DIR, "prd.json");
+
+  try {
+    const md = readFileSync(mdPath, "utf-8");
+    if (md.trim().startsWith("---")) {
+      try {
+        const out = execFileSync("rex", ["parse-md", "--stdin"], {
+          input: md,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+        return JSON.parse(out) as PRDDocumentLike;
+      } catch {
+        // fall through to JSON
+      }
+    }
+  } catch {
+    // prd.md not readable — fall back to JSON
+  }
+
+  return readJSONFile<PRDDocumentLike>(jsonPath);
+}
+
 function readJSONLFile<T>(path: string): T[] {
   try {
     const raw = readFileSync(path, "utf-8");
@@ -274,9 +304,8 @@ function resolveWorkedEpicTitlesForRange(projectDir: string, comparisonRange: st
     };
   }
 
-  const prdPath = join(projectDir, REX_DIR, "prd.json");
   const logPath = join(projectDir, REX_DIR, "execution-log.jsonl");
-  const prd = readJSONFile<PRDDocumentLike>(prdPath);
+  const prd = readPRDDocument(projectDir);
   if (!prd?.items) {
     return {
       status: "empty",

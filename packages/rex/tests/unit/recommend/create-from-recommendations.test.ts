@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { PRDDocument, PRDItem } from "../../../src/schema/index.js";
+import { readPRD, writePRD } from "../../helpers/rex-dir-test-support.js";
 
 /**
  * Create a minimal fixture project with .rex/ and empty PRD.
@@ -23,20 +24,15 @@ async function writeFixtureProject(
     "utf-8",
   );
 
-  await writeFile(
-    join(dir, ".rex", "prd.json"),
-    JSON.stringify({
-      schema: "rex/v1",
-      title: "test-project",
-      items,
-    }),
-    "utf-8",
-  );
+  writePRD(dir, {
+    schema: "rex/v1",
+    title: "test-project",
+    items,
+  } as PRDDocument);
 }
 
 async function readPrd(dir: string): Promise<PRDDocument> {
-  const raw = await readFile(join(dir, ".rex", "prd.json"), "utf-8");
-  return JSON.parse(raw) as PRDDocument;
+  return readPRD(dir);
 }
 
 async function readLog(dir: string): Promise<string[]> {

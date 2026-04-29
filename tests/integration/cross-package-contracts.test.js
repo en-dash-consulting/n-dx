@@ -635,6 +635,7 @@ describe("gateway export auto-detection", () => {
         "reasonForReshape", "isPriority", "isItemLevel",
         "isRequirementCategory", "isValidationType", "isRootLevel", "isWorkItem",
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
+        "serializeDocument", "parseDocument",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "CHILD_LEVEL"],
       ...["SCHEMA_VERSION"],

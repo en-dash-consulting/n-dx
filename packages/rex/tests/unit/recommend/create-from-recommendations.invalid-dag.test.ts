@@ -1,28 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveStore } from "../../../src/store/index.js";
 import { createItemsFromRecommendations } from "../../../src/recommend/create-from-recommendations.js";
+import { readPRD, writePRD } from "../../helpers/rex-dir-test-support.js";
+import type { PRDDocument, PRDItem } from "../../../src/schema/index.js";
 
 async function writeFixtureProject(
   dir: string,
-  items: unknown[] = [],
+  items: PRDItem[] = [],
 ): Promise<void> {
-  await writeFile(
-    join(dir, ".rex", "prd.json"),
-    JSON.stringify({
-      schema: "rex/v1",
-      title: "test-project",
-      items,
-    }, null, 2) + "\n",
-  );
+  writePRD(dir, {
+    schema: "rex/v1",
+    title: "test-project",
+    items,
+  } as PRDDocument);
   await writeFile(join(dir, ".rex", "log.ndjson"), "");
 }
 
-async function readPrd(dir: string): Promise<{ items: unknown[] }> {
-  const raw = await readFile(join(dir, ".rex", "prd.json"), "utf-8");
-  return JSON.parse(raw) as { items: unknown[] };
+async function readPrd(dir: string): Promise<{ items: PRDItem[] }> {
+  return readPRD(dir);
 }
 
 describe("createItemsFromRecommendations invalid existing DAG handling", () => {

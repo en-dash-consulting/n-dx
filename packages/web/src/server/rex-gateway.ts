@@ -101,3 +101,6 @@ export { handleEditItem } from "@n-dx/rex";
 
 // ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
 export type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";
+
+// ---- Rex Markdown serializer / parser (used by prd-io cache) ----------------
+export { serializeDocument, parseDocument } from "@n-dx/rex";

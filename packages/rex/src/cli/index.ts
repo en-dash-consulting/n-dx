@@ -316,6 +316,7 @@ async function dispatchCommand(
   // their own dir resolution and requireRexDir check inside the case block.
   const SKIP_DIR_CHECK = new Set([
     "init", "analyze", "import", "update", "move", "add", "reshape", "remove",
+    "parse-md",
   ]);
   if (!SKIP_DIR_CHECK.has(command)) {
     requireRexDir(resolveDir(positional));
@@ -457,6 +458,12 @@ async function dispatchCommand(
       await cmdMigrateToFolderTree(resolveDir(positional));
       break;
     }
+    case "parse-md": {
+      const { cmdParseMd } = await import("./commands/parse-md.js");
+      const stdinInput = flags.stdin === "true" ? await readStdin() : "";
+      await cmdParseMd(resolveDir(positional), flags, stdinInput);
+      break;
+    }
     default: {
       // Check if the user tried an ndx-only orchestration command
       const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -480,7 +487,7 @@ async function dispatchCommand(
         "init", "status", "next", "add", "update", "move", "remove", "reshape",
         "prune", "validate", "fix", "sync", "usage", "report", "verify",
         "recommend", "analyze", "import", "adapter", "reorganize", "health", "mcp",
-        "migrate-to-md", "migrate-to-folder-tree",
+        "migrate-to-md", "migrate-to-folder-tree", "parse-md",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
       throw new CLIError(

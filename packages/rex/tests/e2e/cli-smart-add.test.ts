@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { readPRD } from "../helpers/rex-dir-test-support.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -73,9 +74,7 @@ describe("rex add (smart mode routing)", () => {
     expect(output).toContain("ID:");
 
     // Verify in prd.json
-    const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const prd = readPRD(tmpDir);
     expect(prd.items.some((i: { title: string }) => i.title === "Test Epic")).toBe(true);
   });
 
@@ -97,9 +96,7 @@ describe("rex add (smart mode routing)", () => {
     expect(output).toContain("Created epic: Flag Epic");
     expect(output).toContain("ID:");
 
-    const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const prd = readPRD(tmpDir);
     expect(prd.items.some((i: { title: string }) => i.title === "Flag Epic")).toBe(true);
   });
 
@@ -190,9 +187,7 @@ describe("rex add (smart mode routing)", () => {
     run(["add", "subtask", "--title=S", `--parent=${taskId}`, tmpDir]);
 
     // Read back to find the subtask id
-    const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const prd = readPRD(tmpDir);
     const subtaskId = prd.items[0].children[0].children[0].children[0].id;
 
     const { stderr } = runExpectFail([

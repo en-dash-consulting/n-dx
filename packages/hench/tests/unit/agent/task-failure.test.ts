@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Anthropic from "@anthropic-ai/sdk";
 import { initConfig } from "../../../src/store/config.js";
+import { parseDocument, serializeDocument } from "@n-dx/rex";
 
 /**
  * Tests that the API agentLoop properly handles task failures:
@@ -35,8 +36,8 @@ async function setupProjectDir(): Promise<{
   );
 
   await writeFile(
-    join(rexDir, "prd.json"),
-    JSON.stringify({
+    join(rexDir, "prd.md"),
+    serializeDocument({
       schema: "rex/v1",
       title: "Test",
       items: [
@@ -48,7 +49,7 @@ async function setupProjectDir(): Promise<{
           priority: "high",
         },
       ],
-    }),
+    } as never),
     "utf-8",
   );
 
@@ -58,9 +59,10 @@ async function setupProjectDir(): Promise<{
 }
 
 function readPrdTask(rexDir: string) {
-  return readFile(join(rexDir, "prd.json"), "utf-8").then((raw) => {
-    const prd = JSON.parse(raw);
-    return prd.items.find((i: { id: string }) => i.id === "task-1");
+  return readFile(join(rexDir, "prd.md"), "utf-8").then((raw) => {
+    const result = parseDocument(raw);
+    if (!result.ok) throw result.error;
+    return result.data.items.find((i: { id: string }) => i.id === "task-1");
   });
 }
 

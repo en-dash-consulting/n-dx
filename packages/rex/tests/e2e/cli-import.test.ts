@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { readPRD } from "../helpers/rex-dir-test-support.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -87,9 +88,7 @@ describe("Billing", () => {
     expect(output).toContain("Accepted");
     expect(output).toContain("items added to PRD");
 
-    const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const prd = readPRD(tmpDir);
     expect(prd.items.length).toBeGreaterThan(0);
   });
 

@@ -5,7 +5,15 @@ import { tmpdir } from "node:os";
 import { FileStore, ensureRexDir } from "../../../src/store/file-adapter.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
+import { parseDocument } from "../../../src/store/markdown-parser.js";
 import type { PRDDocument, PRDItem } from "../../../src/schema/index.js";
+
+async function readMarkdown(path: string): Promise<PRDDocument> {
+  const raw = await readFile(path, "utf-8");
+  const parsed = parseDocument(raw);
+  if (!parsed.ok) throw parsed.error;
+  return parsed.data;
+}
 
 function makeDoc(title: string, items: PRDItem[]): PRDDocument {
   return { schema: SCHEMA_VERSION, title, items };
@@ -398,7 +406,7 @@ describe("PRDStore aggregation", () => {
       });
     });
 
-    it("decomposes items back to their owning files on save", async () => {
+    it("collapses legacy JSON sources into a single prd.md on save", async () => {
       await writeFile(
         join(rexDir, "prd.json"),
         toCanonicalJSON(
@@ -414,26 +422,15 @@ describe("PRDStore aggregation", () => {
         "utf-8",
       );
 
-      // Run a no-op transaction
       await store.withTransaction(async () => {});
 
-      // Verify prd.json still has only its original item
-      const raw = await readFile(join(rexDir, "prd.json"), "utf-8");
-      const primary = JSON.parse(raw) as PRDDocument;
-      expect(primary.items).toHaveLength(1);
-      expect(primary.items[0].id).toBe("e0");
-
-      // Verify branch file still has only its original item
-      const branchRaw = await readFile(
-        join(rexDir, "prd_branch_2025-01-01.json"),
-        "utf-8",
-      );
-      const branch = JSON.parse(branchRaw) as PRDDocument;
-      expect(branch.items).toHaveLength(1);
-      expect(branch.items[0].id).toBe("e1");
+      // All items end up merged into the single prd.md.
+      const merged = await readMarkdown(join(rexDir, "prd.md"));
+      const ids = merged.items.map((i) => i.id).sort();
+      expect(ids).toEqual(["e0", "e1"]);
     });
 
-    it("addItem without parentId writes to currentBranchFile (defaults to prd.json)", async () => {
+    it("addItem without parentId merges into prd.md alongside legacy items", async () => {
       await writeFile(
         join(rexDir, "prd.json"),
         toCanonicalJSON(makeDoc("Primary", [])),
@@ -449,22 +446,12 @@ describe("PRDStore aggregation", () => {
 
       await store.addItem(makeItem("e2", "New Epic"));
 
-      // Verify new item is in prd.json (the default currentBranchFile)
-      const raw = await readFile(join(rexDir, "prd.json"), "utf-8");
-      const primary = JSON.parse(raw) as PRDDocument;
-      expect(primary.items).toHaveLength(1);
-      expect(primary.items[0].id).toBe("e2");
+      // Single-file Markdown mode: every item lives in prd.md after the
+      // first load (legacy branch JSON sources are merged in, then unused).
+      const merged = await readMarkdown(join(rexDir, "prd.md"));
+      const ids = merged.items.map((i) => i.id).sort();
+      expect(ids).toEqual(["e1", "e2"]);
 
-      // Verify branch file is untouched
-      const branchRaw = await readFile(
-        join(rexDir, "prd_branch_2025-01-01.json"),
-        "utf-8",
-      );
-      const branch = JSON.parse(branchRaw) as PRDDocument;
-      expect(branch.items).toHaveLength(1);
-      expect(branch.items[0].id).toBe("e1");
-
-      // But loadDocument sees all items aggregated
       const doc = await store.loadDocument();
       expect(doc.items).toHaveLength(2);
     });

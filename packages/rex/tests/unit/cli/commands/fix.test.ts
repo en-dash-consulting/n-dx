@@ -3,12 +3,7 @@ import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdFix } from "../../../../src/cli/commands/fix.js";
-import type { PRDDocument } from "../../../../src/schema/index.js";
-import { writeConfig, writePRD } from "../../../helpers/rex-dir-test-support.js";
-
-function readPRD(dir: string): PRDDocument {
-  return JSON.parse(readFileSync(join(dir, ".rex", "prd.json"), "utf-8"));
-}
+import { readPRD, writeConfig, writePRD } from "../../../helpers/rex-dir-test-support.js";
 
 const VALID_CONFIG = {
   schema: "rex/v1",

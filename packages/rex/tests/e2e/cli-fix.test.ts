@@ -13,6 +13,8 @@ import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { serializeDocument } from "../../src/store/markdown-serializer.js";
+import { readPRD } from "../helpers/rex-dir-test-support.js";
+import type { PRDDocument } from "../../src/schema/index.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -41,11 +43,7 @@ function run(args: string[], expectFail = false): string {
 
 /** Write a PRD with specific items for testing fix scenarios. */
 async function writePrd(dir: string, items: unknown[]): Promise<void> {
-  const doc = { schema: "rex/v1", title: "Fix Test", items };
-  await writeFile(
-    join(dir, ".rex", "prd.json"),
-    JSON.stringify(doc, null, 2) + "\n",
-  );
+  const doc = { schema: "rex/v1", title: "Fix Test", items } as PRDDocument;
   await writeFile(join(dir, ".rex", "prd.md"), serializeDocument(doc));
 }
 
@@ -82,7 +80,7 @@ describe("rex fix", () => {
     expect(output).toContain("Fixed");
 
     // Verify the fix was persisted
-    const prd = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
+    const prd = readPRD(tmpDir);
     expect(prd.items[0].completedAt).toBeTruthy();
   });
 
@@ -101,7 +99,7 @@ describe("rex fix", () => {
     const output = run(["fix", tmpDir]);
     expect(output).toContain("Fixed");
 
-    const prd = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
+    const prd = readPRD(tmpDir);
     // Orphan reference should be removed
     expect(prd.items[0].blockedBy ?? []).not.toContain("nonexistent-id");
   });
@@ -117,9 +115,9 @@ describe("rex fix", () => {
       },
     ]);
 
-    const before = await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8");
+    const before = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
     const output = run(["fix", "--dry-run", tmpDir]);
-    const after = await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8");
+    const after = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
 
     expect(output).toContain("Would fix");
     expect(before).toEqual(after);

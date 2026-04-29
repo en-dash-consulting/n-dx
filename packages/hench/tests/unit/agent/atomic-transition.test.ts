@@ -5,6 +5,18 @@ import { tmpdir } from "node:os";
 import Anthropic from "@anthropic-ai/sdk";
 import { initConfig } from "../../../src/store/config.js";
 import { toolRexUpdateStatus } from "../../../src/tools/rex.js";
+import { parseDocument, serializeDocument } from "@n-dx/rex";
+
+async function readPRDFromMarkdown(rexDir: string): Promise<{ items: Array<{ id: string; status: string; children?: unknown[] }> }> {
+  const raw = await readFile(join(rexDir, "prd.md"), "utf-8");
+  const parsed = parseDocument(raw);
+  if (!parsed.ok) throw parsed.error;
+  return parsed.data as { items: Array<{ id: string; status: string; children?: unknown[] }> };
+}
+
+async function writePRDToMarkdown(rexDir: string, doc: unknown): Promise<void> {
+  await writeFile(join(rexDir, "prd.md"), serializeDocument(doc as never), "utf-8");
+}
 
 // Get the Messages prototype for mocking
 const messagesProto = Object.getPrototypeOf(
@@ -80,9 +92,7 @@ describe("atomic task state transitions", () => {
       const authError = Object.assign(new Error("Authentication error"), { status: 401 });
       vi.spyOn(messagesProto, "create").mockRejectedValue(authError);
 
-      await writeFile(
-        join(rexDir, "prd.json"),
-        JSON.stringify({
+      await writePRDToMarkdown(rexDir, {
           schema: "rex/v1",
           title: "Test",
           items: [
@@ -94,9 +104,7 @@ describe("atomic task state transitions", () => {
               priority: "high",
             },
           ],
-        }),
-        "utf-8",
-      );
+        });
 
       const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
@@ -116,7 +124,7 @@ describe("atomic task state transitions", () => {
         expect(result.run.status).toBe("failed");
 
         // Read the PRD back — task should be deferred after failure handling
-        const prd = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8"));
+        const prd = await readPRDFromMarkdown(rexDir);
         const task = prd.items.find((i: { id: string }) => i.id === "task-1");
         expect(task.status).toBe("deferred");
         expect(task.startedAt).toBeDefined();
@@ -135,9 +143,7 @@ describe("atomic task state transitions", () => {
       vi.spyOn(messagesProto, "create").mockRejectedValue(authError);
 
       const existingStartedAt = "2025-06-01T00:00:00.000Z";
-      await writeFile(
-        join(rexDir, "prd.json"),
-        JSON.stringify({
+      await writePRDToMarkdown(rexDir, {
           schema: "rex/v1",
           title: "Test",
           items: [
@@ -150,9 +156,7 @@ describe("atomic task state transitions", () => {
               startedAt: existingStartedAt,
             },
           ],
-        }),
-        "utf-8",
-      );
+        });
 
       const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
@@ -171,7 +175,7 @@ describe("atomic task state transitions", () => {
 
         expect(result.run.status).toBe("failed");
 
-        const prd = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8"));
+        const prd = await readPRDFromMarkdown(rexDir);
         const task = prd.items.find((i: { id: string }) => i.id === "task-1");
         expect(task.status).toBe("deferred");
         expect(task.startedAt).toBe(existingStartedAt);
@@ -185,9 +189,7 @@ describe("atomic task state transitions", () => {
     });
 
     it("does not transition status on dry run", async () => {
-      await writeFile(
-        join(rexDir, "prd.json"),
-        JSON.stringify({
+      await writePRDToMarkdown(rexDir, {
           schema: "rex/v1",
           title: "Test",
           items: [
@@ -199,9 +201,7 @@ describe("atomic task state transitions", () => {
               priority: "high",
             },
           ],
-        }),
-        "utf-8",
-      );
+        });
 
       const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
@@ -215,7 +215,7 @@ describe("atomic task state transitions", () => {
       await agentLoop({ config, store, projectDir, henchDir, dryRun: true });
 
       // Task should still be pending — dry run must not mutate state
-      const prd = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8"));
+      const prd = await readPRDFromMarkdown(rexDir);
       const task = prd.items.find((i: { id: string }) => i.id === "task-1");
       expect(task.status).toBe("pending");
 
@@ -237,9 +237,7 @@ describe("atomic task state transitions", () => {
     });
 
     it("does not transition status on dry run", async () => {
-      await writeFile(
-        join(rexDir, "prd.json"),
-        JSON.stringify({
+      await writePRDToMarkdown(rexDir, {
           schema: "rex/v1",
           title: "Test",
           items: [
@@ -251,9 +249,7 @@ describe("atomic task state transitions", () => {
               priority: "high",
             },
           ],
-        }),
-        "utf-8",
-      );
+        });
 
       const { cliLoop } = await import("../../../src/agent/lifecycle/cli-loop.js");
       const { createStore } = await import("@n-dx/rex/dist/store/index.js");
@@ -267,7 +263,7 @@ describe("atomic task state transitions", () => {
       await cliLoop({ config, store, projectDir, henchDir, dryRun: true });
 
       // Task should still be pending — dry run must not mutate state
-      const prd = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8"));
+      const prd = await readPRDFromMarkdown(rexDir);
       const task = prd.items.find((i: { id: string }) => i.id === "task-1");
       expect(task.status).toBe("pending");
 

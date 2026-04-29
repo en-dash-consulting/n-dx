@@ -11,6 +11,7 @@ package-lock.json
 .n-dx2.json
 .n-dx-web.pid
 .n-dx-web.port
+.rex/.cache/
 .rex/n-dx_workflow.md
 .rex/prd.json.lock
 .rex/adapters.json

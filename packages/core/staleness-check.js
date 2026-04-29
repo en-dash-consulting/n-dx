@@ -66,6 +66,35 @@ function safeReadJSON(filePath) {
 }
 
 /**
+ * Safely read the PRD schema field. Prefers `.rex/prd.md` (current source of
+ * truth) and falls back to `.rex/prd.json` for legacy projects. The Markdown
+ * front-matter is scanned with a tiny regex — staleness only needs the schema
+ * field, so spawning the rex parser would be overkill.
+ *
+ * @param {string} rexDir
+ * @returns {{ schema?: string } | null}
+ */
+function safeReadPRDForSchemaCheck(rexDir) {
+  const mdPath = join(rexDir, "prd.md");
+  if (existsSync(mdPath)) {
+    try {
+      const md = readFileSync(mdPath, "utf-8");
+      // Front-matter ends at the second `---` line.
+      const fmEnd = md.indexOf("\n---", 3);
+      const fm = fmEnd > 0 ? md.slice(0, fmEnd) : md;
+      const m = /^schema:\s*"?([^"\n]+?)"?\s*$/m.exec(fm);
+      if (m) {
+        return { schema: m[1] };
+      }
+      return {};
+    } catch {
+      // fall through to JSON
+    }
+  }
+  return safeReadJSON(join(rexDir, "prd.json"));
+}
+
+/**
  * Check whether a schema string is compatible with a known prefix.
  * Matches exact prefix or prefix followed by "." (forward-compatible minor).
  * E.g. "rex/v1" and "rex/v1.2" both match prefix "rex/v1".
@@ -153,11 +182,11 @@ export function checkProjectStaleness(dir) {
   // ── 2. Schema version mismatches ────────────────────────────────────────
 
   // Rex PRD
-  const prd = safeReadJSON(join(dir, ".rex", "prd.json"));
+  const prd = safeReadPRDForSchemaCheck(join(dir, ".rex"));
   if (prd !== null && !isCompatibleSchemaPrefix(prd.schema, REX_SCHEMA_PREFIX)) {
     issues.push({
       type: "schema-mismatch",
-      detail: `prd.json schema "${prd.schema ?? "missing"}" — expected "${REX_SCHEMA_PREFIX}"`,
+      detail: `PRD schema "${prd.schema ?? "missing"}" — expected "${REX_SCHEMA_PREFIX}"`,
     });
   }
 

@@ -64,36 +64,35 @@ export async function cmdValidate(
     });
   }
 
-  // Check prd.json schema
+  // Check PRD schema (Markdown is authoritative; FileStore performs legacy migration if needed)
   let doc: PRDDocument | null = null;
   let store: PRDStore | null = null;
   try {
-    const raw = await readFile(join(rexDir, "prd.json"), "utf-8");
-    const parsed = JSON.parse(raw);
-    const result = validateDocument(parsed);
+    store = await resolveStore(rexDir);
+    const loaded = await store.loadDocument();
+    const result = validateDocument(loaded);
     if (result.ok) {
       doc = result.data as PRDDocument;
-      checks.push({ name: "prd.json schema", pass: true, errors: [] });
+      checks.push({ name: "PRD schema", pass: true, errors: [] });
     } else {
       checks.push({
-        name: "prd.json schema",
+        name: "PRD schema",
         pass: false,
         errors: result.errors.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
       });
     }
   } catch (err) {
     checks.push({
-      name: "prd.json schema",
+      name: "PRD schema",
       pass: false,
       errors: [(err as Error).message],
     });
   }
 
   // Override with folder-tree items for structural checks (auto-migrates if tree absent).
-  // Falls back to prd.json items on any error so existing checks still run.
-  if (doc) {
+  // Falls back to the Markdown-loaded items on any error so existing checks still run.
+  if (doc && store) {
     try {
-      store = await resolveStore(rexDir);
       doc.items = await loadItemsPreferFolderTree(rexDir, store);
     } catch {
       // Tree load failed: structural checks will use items already in doc.

@@ -268,15 +268,17 @@ describe("cmdValidate", () => {
   describe("error reporting", () => {
     it("reports validation errors clearly in text mode", async () => {
       writeConfig(tmpDir, VALID_CONFIG);
+      // Schema field is required by the parser; omitting it makes the PRD
+      // unparseable, which validate surfaces as a "PRD schema" failure.
       writeFileSync(
-        join(tmpDir, ".rex", "prd.json"),
-        JSON.stringify({ invalid: true }),
+        join(tmpDir, ".rex", "prd.md"),
+        "---\ntitle: x\n---\n",
       );
 
       await expect(cmdValidate(tmpDir, {})).rejects.toThrow("process.exit");
 
       const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
-      expect(output).toContain("✗ prd.json schema");
+      expect(output).toContain("✗ PRD schema");
       expect(output).toContain("Validation failed.");
     });
 

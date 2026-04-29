@@ -23,7 +23,7 @@ describe("FileStore markdown auto-migration", () => {
   });
 
   it("creates prd.md on load when only prd.json exists", async () => {
-    const doc: PRDDocument = {
+    const docBefore: PRDDocument = {
       schema: SCHEMA_VERSION,
       title: "Auto Migration",
       items: [
@@ -37,8 +37,13 @@ describe("FileStore markdown auto-migration", () => {
         },
       ],
     };
+    // Migration stamps sourceFile on items; the returned document reflects that.
+    const doc: PRDDocument = {
+      ...docBefore,
+      items: docBefore.items.map((i) => ({ ...i, sourceFile: ".rex/prd.md" })),
+    };
     const jsonPath = join(rexDir, "prd.json");
-    const jsonBefore = toCanonicalJSON(doc);
+    const jsonBefore = toCanonicalJSON(docBefore);
     await writeFile(jsonPath, jsonBefore, "utf-8");
 
     const store = new FileStore(rexDir);
@@ -57,7 +62,7 @@ describe("FileStore markdown auto-migration", () => {
   });
 
   it("prefers prd.md on subsequent loads after migration", async () => {
-    const doc: PRDDocument = {
+    const docBefore: PRDDocument = {
       schema: SCHEMA_VERSION,
       title: "Markdown Primary",
       items: [
@@ -69,7 +74,12 @@ describe("FileStore markdown auto-migration", () => {
         },
       ],
     };
-    await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
+    // Migration stamps sourceFile; subsequent loads read it from prd.md.
+    const doc: PRDDocument = {
+      ...docBefore,
+      items: docBefore.items.map((i) => ({ ...i, sourceFile: ".rex/prd.md" })),
+    };
+    await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(docBefore), "utf-8");
 
     const store = new FileStore(rexDir);
     const firstLoad = await store.loadDocument();

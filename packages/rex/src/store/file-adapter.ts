@@ -5,7 +5,7 @@ import { validateDocument, validateConfig, validateLogEntry } from "../schema/va
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
-import { atomicWrite, atomicWriteJSON } from "./atomic-write.js";
+import { atomicWrite } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import {
@@ -52,6 +52,10 @@ export class FileStore implements PRDStore {
 
   private get prdLockPath(): string {
     return this.path(`${PRD_FILENAME}.lock`);
+  }
+
+  private get markdownLockPath(): string {
+    return this.path(`${PRD_MARKDOWN_FILENAME}.lock`);
   }
 
   setCurrentBranchFile(filename: string): void {
@@ -162,7 +166,7 @@ export class FileStore implements PRDStore {
 
   private async ensureOwnershipMap(): Promise<void> {
     if (this.ownershipLoaded) return;
-    await this.loadDocumentFromJsonSources();
+    await this.loadDocument();
   }
 
   private async resolveOwnerFile(itemId: string): Promise<string> {
@@ -175,93 +179,77 @@ export class FileStore implements PRDStore {
   }
 
   /**
-   * Sync the derived `prd.json` artifact from an in-memory document.
-   *
-   * A write error is logged to stderr but never propagated — prd.md is already
-   * consistent, and `prd.json` is a backward-compat artifact.
+   * Map an item back to its logical "owner file" key for the in-memory
+   * itemToFile map. The actual on-disk write target is always prd.md, but the
+   * map is preserved so backwards-compatible APIs (getKnownFiles, ownership
+   * inspection) continue to work. The key is derived from the item's
+   * `sourceFile` attribution, normalized to a bare legacy `.json` filename
+   * (no `.rex/` prefix) so that callers like `toMarkdownSourcePath` can apply
+   * the prefix idempotently.
    */
-  private async syncJsonSilent(doc: PRDDocument): Promise<void> {
-    try {
-      await atomicWriteJSON(this.prdPath, doc, toCanonicalJSON);
-    } catch (err) {
-      process.stderr.write(
-        `[rex] Warning: failed to sync prd.json: ${(err as Error).message}\n`,
-      );
+  private deriveOwnerFile(item: PRDItem): string {
+    const md = (item as unknown as { sourceFile?: string }).sourceFile;
+    if (typeof md === "string" && md.length > 0) {
+      const stripped = md.startsWith(".rex/") ? md.slice(".rex/".length) : md;
+      return stripped.endsWith(".md") ? stripped.slice(0, -3) + ".json" : stripped;
     }
+    return this.currentBranchFile;
   }
 
   /**
-   * Build a merged PRD snapshot from all source files, substituting the
-   * in-memory `mutatedDoc` for `mutatedFilename` instead of reading it from
-   * disk. Used to generate the prd.md content *before* writing the JSON file.
+   * Rebuild the itemToFile / fileMetadata view from a freshly-loaded merged
+   * PRDDocument. After this call `ownershipLoaded` is true and subsequent
+   * write routing (which now collapses onto prd.md) has consistent metadata.
    */
-  private async buildMergedSnapshotPreWrite(
-    mutatedFilename: string,
-    mutatedDoc: PRDDocument,
-  ): Promise<PRDDocument> {
-    const branchFiles = await discoverPRDFiles(this.rexDir);
+  private rebuildOwnershipFromItems(doc: PRDDocument): void {
+    this.itemToFile.clear();
+    this.fileMetadata.clear();
 
-    // Determine sources in merge order (prd.json first, then branch files)
-    type Source = { filename: string; doc: PRDDocument };
-    const sources: Source[] = [];
-
-    if (mutatedFilename === PRD_FILENAME) {
-      sources.push({ filename: PRD_FILENAME, doc: mutatedDoc });
-    } else {
-      try {
-        const primary = await this.loadSingleFile(PRD_FILENAME);
-        sources.push({ filename: PRD_FILENAME, doc: primary });
-      } catch (err) {
-        const code = (err as NodeJS.ErrnoException | undefined)?.code;
-        if (code !== "ENOENT") throw err;
+    for (const entry of walkTree(doc.items)) {
+      const owner = this.deriveOwnerFile(entry.item);
+      this.itemToFile.set(entry.item.id, owner);
+      if (!this.fileMetadata.has(owner)) {
+        this.fileMetadata.set(owner, { schema: doc.schema, title: doc.title });
       }
     }
 
-    for (const branchFile of branchFiles) {
-      if (branchFile === mutatedFilename) {
-        sources.push({ filename: branchFile, doc: mutatedDoc });
-      } else {
-        const bd = await this.loadSingleFile(branchFile);
-        sources.push({ filename: branchFile, doc: bd });
-      }
+    if (this.fileMetadata.size === 0) {
+      this.fileMetadata.set(this.currentBranchFile, {
+        schema: doc.schema,
+        title: doc.title,
+      });
     }
 
-    if (sources.length === 0) return mutatedDoc;
-    if (sources.length === 1) return sources[0].doc;
-
-    const allItems = sources.flatMap((s) => s.doc.items);
-    const primary = sources[0].doc;
-    return { schema: primary.schema, title: primary.title, items: allItems };
+    this.primaryFile = this.fileMetadata.has(PRD_FILENAME)
+      ? PRD_FILENAME
+      : [...this.fileMetadata.keys()][0] ?? PRD_FILENAME;
+    this.ownershipLoaded = true;
   }
 
+  /**
+   * Mutate the PRD document and persist it to `prd.md`.
+   *
+   * Markdown is the sole writable surface. The `_filename` argument is
+   * accepted for callsite-compat with the historical multi-file layout but
+   * is no longer used to route writes — every mutation lands in `prd.md`.
+   * Per-item attribution (`branch`, `sourceFile`) still travels with each
+   * item via {@link applyWriteAttribution}.
+   */
   private async withFileTransaction<T>(
-    filename: string,
+    _filename: string,
     fn: (doc: PRDDocument) => Promise<T>,
   ): Promise<T> {
-    return withLock(this.lockPathForFile(filename), async () => {
-      const doc = await this.loadSingleFile(filename);
+    return withLock(this.markdownLockPath, async () => {
+      const doc = await this.loadDocument();
       const result = await fn(doc);
       const valid = validateDocument(doc);
       if (!valid.ok) {
         throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
       }
-      // Build merged snapshot in-memory (before writing the JSON file)
-      const snapshot = await this.buildMergedSnapshotPreWrite(filename, doc);
-      // Write prd.md FIRST (primary storage)
-      await atomicWrite(this.markdownPath, serializeDocument(snapshot));
-      // Write the specific JSON file SECOND
-      await atomicWriteJSON(this.path(filename), doc, toCanonicalJSON);
+      await atomicWrite(this.markdownPath, serializeDocument(doc));
+      this.rebuildOwnershipFromItems(doc);
       return result;
     });
-  }
-
-  private async withNestedLocks<T>(
-    filenames: string[],
-    fn: () => Promise<T>,
-  ): Promise<T> {
-    if (filenames.length === 0) return fn();
-    const [next, ...rest] = filenames;
-    return withLock(this.lockPathForFile(next), () => this.withNestedLocks(rest, fn));
   }
 
   private async loadDocumentFromJsonSources(): Promise<PRDDocument> {
@@ -320,9 +308,10 @@ export class FileStore implements PRDStore {
   /**
    * Load and validate the consolidated PRD document.
    *
-   * `prd.md` is the primary read surface when present. If only `prd.json`
-   * exists, the first read migrates it to markdown and subsequent reads use
-   * the markdown file.
+   * `prd.md` is the sole writable storage. If `prd.md` is absent and legacy
+   * `prd.json` / branch-scoped JSON files exist, this performs a one-shot
+   * migration: read the JSON sources, write `prd.md`, and from that point on
+   * `prd.md` is authoritative.
    *
    * @throws If the backing files are missing, invalid, or fail validation.
    */
@@ -333,9 +322,7 @@ export class FileStore implements PRDStore {
       if (!parsed.ok) {
         throw new Error(`Invalid ${PRD_MARKDOWN_FILENAME}: ${parsed.error.message}`);
       }
-      // Markdown is a merged view — ownership lives in the JSON sources.
-      // Populate the ownership map so subsequent writes route per-file.
-      await this.ensureOwnershipMap();
+      this.rebuildOwnershipFromItems(parsed.data);
       return parsed.data;
     } catch (error) {
       const code = (error as NodeJS.ErrnoException | undefined)?.code;
@@ -344,7 +331,23 @@ export class FileStore implements PRDStore {
       }
     }
 
+    // Legacy migration path: prd.md is missing, so fall back to JSON sources
+    // (loadDocumentFromJsonSources sets ownershipLoaded internally) and write
+    // prd.md once. After this returns, every subsequent loadDocument hits the
+    // markdown branch above. Stamp `sourceFile` onto items lacking it so the
+    // ownership map survives the migration into single-file Markdown — without
+    // this, `rebuildOwnershipFromItems` on the next read collapses every item
+    // onto `currentBranchFile` and `--show-individual` loses its grouping.
     const doc = await this.loadDocumentFromJsonSources();
+    for (const [id, filename] of this.itemToFile) {
+      const expected = this.toAttributedSourceFile(filename);
+      const entry = findItem(doc.items, id);
+      if (!entry) continue;
+      const item = entry.item as PRDItem & { sourceFile?: string };
+      if (!item.sourceFile) {
+        item.sourceFile = expected;
+      }
+    }
     await this.saveMarkdownDocument(doc);
     return doc;
   }
@@ -354,14 +357,10 @@ export class FileStore implements PRDStore {
   }
 
   /**
-   * Persist a PRD document.
+   * Persist a PRD document to `prd.md`. No JSON files are written.
    *
-   * `prd.md` is written first (primary storage). `prd.json` is then synced as
-   * a derived backward-compat artifact — a write error there is logged but does
-   * not propagate so that the primary write is never rolled back.
-   *
-   * When not inside a {@link withTransaction}, acquires a per-file lock
-   * so concurrent writers serialize safely.
+   * When not already inside {@link withTransaction}, acquires the markdown
+   * file lock so concurrent writers serialize safely.
    */
   async saveDocument(doc: PRDDocument): Promise<void> {
     const result = validateDocument(doc);
@@ -369,68 +368,21 @@ export class FileStore implements PRDStore {
       throw new Error(`Invalid document: ${result.errors.message}`);
     }
 
-    if (!this.ownershipLoaded) {
-      if (this.inTransaction) {
-        // Write prd.md FIRST (primary), then sync prd.json (non-fatal)
-        await atomicWrite(this.markdownPath, serializeDocument(doc));
-        await this.syncJsonSilent(doc);
-        return;
-      }
-
-      await withLock(this.prdLockPath, async () => {
-        await atomicWrite(this.markdownPath, serializeDocument(doc));
-        await this.syncJsonSilent(doc);
-      });
-      return;
-    }
-
-    // Multi-file ownership mode: route items to their owning files
-    const fileItems = new Map<string, PRDItem[]>();
-    for (const filename of this.fileMetadata.keys()) {
-      fileItems.set(filename, []);
-    }
-
-    for (const item of doc.items) {
-      const file = this.itemToFile.get(item.id) ?? this.currentBranchFile;
-      if (!fileItems.has(file)) fileItems.set(file, []);
-      fileItems.get(file)!.push(item);
-    }
-
-    const filenames = [...fileItems.keys()].sort();
-    const writeAll = async () => {
-      // Write prd.md FIRST (primary — merged view of all items)
+    const writeMarkdown = async () => {
       await atomicWrite(this.markdownPath, serializeDocument(doc));
-
-      // Write per-file JSON SECOND; prd.json write is non-fatal
-      for (const filename of filenames) {
-        const items = fileItems.get(filename)!;
-        const meta =
-          filename === this.primaryFile
-            ? { schema: doc.schema, title: doc.title }
-            : this.fileMetadata.get(filename) ?? { schema: doc.schema, title: doc.title };
-        const fileDoc = { schema: meta.schema, title: meta.title, items };
-        if (filename === PRD_FILENAME) {
-          await this.syncJsonSilent(fileDoc);
-        } else {
-          await atomicWriteJSON(this.path(filename), fileDoc, toCanonicalJSON);
-        }
-      }
+      this.rebuildOwnershipFromItems(doc);
     };
 
     if (this.inTransaction) {
-      await writeAll();
+      await writeMarkdown();
       return;
     }
 
-    await this.withNestedLocks(filenames, writeAll);
+    await withLock(this.markdownLockPath, writeMarkdown);
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-    await this.ensureOwnershipMap();
-    const filenames =
-      this.fileMetadata.size > 0 ? [...this.fileMetadata.keys()].sort() : [PRD_FILENAME];
-
-    return this.withNestedLocks(filenames, async () => {
+    return withLock(this.markdownLockPath, async () => {
       this.inTransaction = true;
       try {
         const doc = await this.loadDocument();

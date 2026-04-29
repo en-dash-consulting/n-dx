@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, existsSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { CLIError } from "../../../../src/cli/errors.js";
 import { cmdUpdate } from "../../../../src/cli/commands/update.js";
+import { readPRD, writePRD } from "../../../helpers/rex-dir-test-support.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 describe("cmdUpdate", () => {
@@ -13,21 +14,18 @@ describe("cmdUpdate", () => {
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), "rex-update-test-"));
     mkdirSync(join(tmp, ".rex"));
-    writeFileSync(
-      join(tmp, ".rex", "prd.json"),
-      JSON.stringify({
-        schema: "rex/v1",
-        title: "test",
-        items: [
-          {
-            id: itemId,
-            title: "Test item",
-            level: "epic",
-            status: "pending",
-          },
-        ],
-      }),
-    );
+    writePRD(tmp, {
+      schema: "rex/v1",
+      title: "test",
+      items: [
+        {
+          id: itemId,
+          title: "Test item",
+          level: "epic",
+          status: "pending",
+        },
+      ],
+    } as PRDDocument);
   });
 
   afterEach(() => {
@@ -241,9 +239,7 @@ describe("cmdUpdate", () => {
 
   describe("blockedBy updates", () => {
     it("sets blockedBy from comma-separated string", async () => {
-      writeFileSync(
-        join(tmp, ".rex", "prd.json"),
-        JSON.stringify({
+      writePRD(tmp, {
           schema: "rex/v1",
           title: "test",
           items: [
@@ -251,33 +247,27 @@ describe("cmdUpdate", () => {
             { id: "dep-1", title: "Dep 1", level: "task", status: "pending" },
             { id: "dep-2", title: "Dep 2", level: "task", status: "pending" },
           ],
-        }),
-      );
+        } as PRDDocument);
 
       await cmdUpdate(tmp, itemId, { blockedBy: "dep-1,dep-2" });
 
-      const raw = readFileSync(join(tmp, ".rex", "prd.json"), "utf-8");
-      const doc = JSON.parse(raw) as PRDDocument;
+      const doc = readPRD(tmp);
       expect(doc.items[0].blockedBy).toEqual(["dep-1", "dep-2"]);
     });
 
     it("clears blockedBy with empty string", async () => {
-      writeFileSync(
-        join(tmp, ".rex", "prd.json"),
-        JSON.stringify({
+      writePRD(tmp, {
           schema: "rex/v1",
           title: "test",
           items: [
             { id: itemId, title: "Test item", level: "epic", status: "pending", blockedBy: ["dep-1"] },
             { id: "dep-1", title: "Dep 1", level: "task", status: "pending" },
           ],
-        }),
-      );
+        } as PRDDocument);
 
       await cmdUpdate(tmp, itemId, { blockedBy: "" });
 
-      const raw = readFileSync(join(tmp, ".rex", "prd.json"), "utf-8");
-      const doc = JSON.parse(raw) as PRDDocument;
+      const doc = readPRD(tmp);
       expect(doc.items[0].blockedBy).toBeUndefined();
     });
 
@@ -300,17 +290,14 @@ describe("cmdUpdate", () => {
     });
 
     it("rejects blockedBy that creates a cycle", async () => {
-      writeFileSync(
-        join(tmp, ".rex", "prd.json"),
-        JSON.stringify({
+      writePRD(tmp, {
           schema: "rex/v1",
           title: "test",
           items: [
             { id: "a", title: "A", level: "task", status: "pending", blockedBy: ["b"] },
             { id: "b", title: "B", level: "task", status: "pending" },
           ],
-        }),
-      );
+        } as PRDDocument);
 
       // b blocked by a → a blocked by b → cycle
       await expect(
@@ -326,8 +313,7 @@ describe("cmdUpdate", () => {
 
   describe("automatic timestamps", () => {
     function readItem(): PRDDocument["items"][number] {
-      const raw = readFileSync(join(tmp, ".rex", "prd.json"), "utf-8");
-      const doc = JSON.parse(raw) as PRDDocument;
+      const doc = readPRD(tmp);
       return doc.items[0];
     }
 

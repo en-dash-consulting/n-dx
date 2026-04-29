@@ -4,14 +4,17 @@
  * ## Architecture
  *
  * Sourcevision and rex are peer domain packages that **never import each other
- * at runtime**. This module reads `.rex/prd.json` directly from the filesystem
- * (and from git history) using lightweight local type definitions that mirror
- * the rex PRDItem shape. No `import from "rex"` exists here.
+ * at runtime**. This module reads `.rex/prd.md` (the authoritative Markdown
+ * source) by spawning `rex parse-md`, which converts the document to
+ * canonical JSON on stdout. For legacy projects that still have `.rex/prd.json`,
+ * we fall back to direct JSON.parse — no `import from "rex"` exists here.
  *
  * ## Algorithm
  *
- * 1. Read the current PRD from `.rex/prd.json` on disk.
- * 2. Detect the base branch (main or master) and read its PRD via `git show`.
+ * 1. Read the current PRD from `.rex/prd.md` (via `rex parse-md`) or
+ *    `.rex/prd.json` (legacy) on disk.
+ * 2. Detect the base branch (main or master) and read its PRD via `git show`,
+ *    preferring `prd.md` and piping it through `rex parse-md --stdin`.
  * 3. Diff: completed IDs on current branch minus completed IDs on base branch.
  * 4. Build enriched work items with parent chain and epic summaries.
  *
@@ -112,13 +115,44 @@ export interface CollectorOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a JSON string into a PRD document shape.
+ * Parse a PRD document from raw text. Accepts both Markdown (rex/v1
+ * front-matter form, the current source-of-truth format) and legacy JSON.
+ * Markdown is dispatched to `rex parse-md --stdin` so we never need to
+ * depend on the rex parser at the code level.
+ *
  * Returns null if the input is empty, malformed, or lacks an `items` array.
  */
 export function parsePRDDocument(raw: string): PRDDocumentShape | null {
   if (!raw || !raw.trim()) return null;
+
+  // Markdown: front-matter starts with "---" on the first non-empty line.
+  const trimmedStart = raw.replace(/^\s+/, "");
+  if (trimmedStart.startsWith("---")) {
+    return parseMarkdownViaRex(raw);
+  }
+
+  // Legacy JSON path
   try {
     const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.items)) return null;
+    return parsed as PRDDocumentShape;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert a rex/v1 markdown PRD to the local document shape by spawning
+ * `rex parse-md --stdin`. Returns null on any spawn / parse failure.
+ */
+function parseMarkdownViaRex(markdown: string): PRDDocumentShape | null {
+  try {
+    const out = execFileSync("rex", ["parse-md", "--stdin"], {
+      input: markdown,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const parsed = JSON.parse(out);
     if (!parsed || !Array.isArray(parsed.items)) return null;
     return parsed as PRDDocumentShape;
   } catch {
@@ -345,16 +379,19 @@ export async function collectBranchWork(
   const baseBranch = options.baseBranch ?? (gitAvailable ? detectBaseBranch(dir) : "main");
 
   // ── 2. Read current PRD from disk ────────────────────────────
+  // Prefer prd.md (current source of truth); fall back to legacy prd.json.
 
-  const prdPath = join(dir, PROJECT_DIRS.REX, "prd.json");
+  const mdPath = join(dir, PROJECT_DIRS.REX, "prd.md");
+  const jsonPath = join(dir, PROJECT_DIRS.REX, "prd.json");
+  const sourcePath = existsSync(mdPath) ? mdPath : existsSync(jsonPath) ? jsonPath : null;
+
   let currentDoc: PRDDocumentShape | null = null;
-
-  if (existsSync(prdPath)) {
+  if (sourcePath) {
     try {
-      const raw = readFileSync(prdPath, "utf-8");
+      const raw = readFileSync(sourcePath, "utf-8");
       currentDoc = parsePRDDocument(raw);
       if (!currentDoc) {
-        errors.push("Current PRD file exists but could not be parsed");
+        errors.push(`Current PRD file exists but could not be parsed: ${sourcePath}`);
       }
     } catch (err) {
       errors.push(`Failed to read current PRD: ${err instanceof Error ? err.message : String(err)}`);
@@ -372,12 +409,13 @@ export async function collectBranchWork(
   }
 
   // ── 3. Read base branch PRD from git history ─────────────────
+  // Prefer prd.md from the base branch; fall back to legacy prd.json.
 
   let baseDoc: PRDDocumentShape | null = null;
 
   if (gitAvailable && branch !== baseBranch) {
-    const rexRelPath = `${PROJECT_DIRS.REX}/prd.json`;
-    const baseRaw = gitShowFile(dir, baseBranch, rexRelPath);
+    const baseMdRaw = gitShowFile(dir, baseBranch, `${PROJECT_DIRS.REX}/prd.md`);
+    const baseRaw = baseMdRaw ?? gitShowFile(dir, baseBranch, `${PROJECT_DIRS.REX}/prd.json`);
 
     if (baseRaw) {
       baseDoc = parsePRDDocument(baseRaw);

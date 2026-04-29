@@ -1,21 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdValidate } from "../../../../src/cli/commands/validate.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
-
-function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
-}
-
-function writeConfig(dir: string, config: Record<string, unknown>): void {
-  writeFileSync(join(dir, ".rex", "config.json"), JSON.stringify(config));
-}
-
-function readPRD(dir: string): PRDDocument {
-  return JSON.parse(readFileSync(join(dir, ".rex", "prd.json"), "utf-8"));
-}
+import { readPRD, writeConfig, writePRD } from "../../../helpers/rex-dir-test-support.js";
 
 const VALID_CONFIG = {
   schema: "rex/v1",

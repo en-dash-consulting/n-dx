@@ -10,6 +10,7 @@ import { ensureRexDir, resolveStore } from "../../../src/store/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import { SCHEMA_VERSION } from "../../../src/schema/v1.js";
 import { parseDocument } from "../../../src/store/markdown-parser.js";
+import { readPRD } from "../../helpers/rex-dir-test-support.js";
 import type { PRDDocument } from "../../../src/schema/v1.js";
 
 const EXPECTED_TOOLS = [
@@ -45,30 +46,12 @@ function initRepo(dir: string): void {
 }
 
 async function expectCanonicalFilesInSync(rexDir: string): Promise<PRDDocument> {
-  const jsonDoc = JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8")) as PRDDocument;
   const parsed = parseDocument(await readFile(join(rexDir, "prd.md"), "utf-8"));
   expect(parsed.ok).toBe(true);
   if (!parsed.ok) {
     throw parsed.error;
   }
-  expect(normalizeForMarkdown(parsed.data)).toEqual(normalizeForMarkdown(jsonDoc));
-  return jsonDoc;
-}
-
-function normalizeForMarkdown<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeForMarkdown(entry)) as T;
-  }
-  if (value === null || typeof value !== "object") {
-    return value;
-  }
-  const normalized: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (entry === undefined) continue;
-    if (Array.isArray(entry) && entry.length === 0 && key !== "items") continue;
-    normalized[key] = normalizeForMarkdown(entry);
-  }
-  return normalized as T;
+  return parsed.data;
 }
 
 describe("Rex MCP server factory", () => {
@@ -80,12 +63,6 @@ describe("Rex MCP server factory", () => {
     rexDir = join(tmpDir, ".rex");
     await ensureRexDir(rexDir);
 
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "MCP Test",
-      items: [],
-    };
-    await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
     await writeFile(
       join(rexDir, "prd.md"),
       `---\nschema: ${SCHEMA_VERSION}\ntitle: MCP Test\nitems: []\n---\n\n# MCP Test\n`,

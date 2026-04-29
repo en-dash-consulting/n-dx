@@ -130,7 +130,7 @@ describe("checkProjectStaleness", () => {
     const result = checkProjectStaleness(tmpDir);
     expect(result.isStale).toBe(true);
     const schemaIssues = result.issues.filter((i) => i.type === "schema-mismatch");
-    expect(schemaIssues.some((i) => i.detail.includes("prd.json"))).toBe(true);
+    expect(schemaIssues.some((i) => i.detail.includes("PRD schema"))).toBe(true);
   });
 
   it("accepts forward-compatible rex schema (rex/v1.1)", () => {

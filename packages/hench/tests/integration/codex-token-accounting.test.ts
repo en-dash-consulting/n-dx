@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import type { RunRecord } from "../../src/schema/v1.js";
 import { initConfig } from "../../src/store/config.js";
 import { saveRun, listRuns } from "../../src/store/runs.js";
+import { parseDocument, serializeDocument } from "@n-dx/rex";
 
 function mockCliProcess(opts: { stdout?: string; stderr?: string; code: number }) {
   const proc = new EventEmitter() as EventEmitter & {
@@ -57,8 +58,8 @@ async function setupProjectDir(): Promise<{
   );
 
   await writeFile(
-    join(rexDir, "prd.json"),
-    JSON.stringify({
+    join(rexDir, "prd.md"),
+    serializeDocument({
       schema: "rex/v1",
       title: "Test",
       items: [
@@ -70,7 +71,7 @@ async function setupProjectDir(): Promise<{
           priority: "high",
         },
       ],
-    }),
+    } as never),
     "utf-8",
   );
   await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
@@ -173,8 +174,10 @@ describe("codex token accounting integration", () => {
     const afterTotal = totalTokens(afterRuns);
     expect(afterTotal).toBe(beforeTotal + 150);
 
-    const prdRaw = await readFile(join(rexDir, "prd.json"), "utf-8");
-    const prd = JSON.parse(prdRaw) as {
+    const prdRaw = await readFile(join(rexDir, "prd.md"), "utf-8");
+    const prdParsed = parseDocument(prdRaw);
+    if (!prdParsed.ok) throw prdParsed.error;
+    const prd = prdParsed.data as {
       items: Array<{ id: string; status: string }>;
     };
     const task = prd.items.find((item) => item.id === "task-1");

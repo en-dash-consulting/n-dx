@@ -929,8 +929,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",
-    maxExports: 52,
-    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants)",
+    maxExports: 54,
+    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser)",
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",

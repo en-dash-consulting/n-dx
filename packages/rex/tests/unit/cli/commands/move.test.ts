@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { CLIError } from "../../../../src/cli/errors.js";
 import { cmdMove } from "../../../../src/cli/commands/move.js";
+import { readPRD, writePRD } from "../../../helpers/rex-dir-test-support.js";
+import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
 
-function makePrd(items: unknown[] = []) {
-  return JSON.stringify({ schema: "rex/v1", title: "test", items });
+function makePrd(items: PRDItem[] = []): PRDDocument {
+  return { schema: "rex/v1", title: "test", items } as PRDDocument;
 }
 
 function fullTree() {
@@ -51,11 +53,11 @@ describe("cmdMove", () => {
   });
 
   it("moves feature to different epic", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     await cmdMove(tmp, "f1", { parent: "e2" });
 
-    const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+    const prd = readPRD(tmp);
     // f1 should be under e2 now
     const e2 = prd.items.find((i: { id: string }) => i.id === "e2");
     expect(e2.children.length).toBe(2);
@@ -68,11 +70,11 @@ describe("cmdMove", () => {
   });
 
   it("preserves children when moving", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     await cmdMove(tmp, "f1", { parent: "e2" });
 
-    const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+    const prd = readPRD(tmp);
     const e2 = prd.items.find((i: { id: string }) => i.id === "e2");
     const movedFeature = e2.children.find((c: { id: string }) => c.id === "f1");
     expect(movedFeature.children.length).toBe(2);
@@ -81,22 +83,22 @@ describe("cmdMove", () => {
   });
 
   it("moves task directly under epic", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     await cmdMove(tmp, "t2", { parent: "e2" });
 
-    const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+    const prd = readPRD(tmp);
     const e2 = prd.items.find((i: { id: string }) => i.id === "e2");
     expect(e2.children.length).toBe(2);
     expect(e2.children[1].id).toBe("t2");
   });
 
   it("moves subtask to different task", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     await cmdMove(tmp, "s1", { parent: "t2" });
 
-    const prd = JSON.parse(readFileSync(join(tmp, ".rex", "prd.json"), "utf-8"));
+    const prd = readPRD(tmp);
     // s1 should be under t2 now
     const e1 = prd.items.find((i: { id: string }) => i.id === "e1");
     const f1 = e1.children.find((c: { id: string }) => c.id === "f1");
@@ -108,7 +110,7 @@ describe("cmdMove", () => {
   });
 
   it("throws CLIError when item not found", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     await expect(
       cmdMove(tmp, "nonexistent", { parent: "e1" }),
@@ -119,7 +121,7 @@ describe("cmdMove", () => {
   });
 
   it("throws CLIError when parent not found", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     await expect(
       cmdMove(tmp, "f1", { parent: "nonexistent" }),
@@ -130,7 +132,7 @@ describe("cmdMove", () => {
   });
 
   it("throws CLIError for invalid hierarchy", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     // Subtask under feature is invalid
     await expect(
@@ -142,7 +144,7 @@ describe("cmdMove", () => {
   });
 
   it("throws CLIError for circular move", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     // Moving e1 under its own descendant t1
     await expect(
@@ -154,7 +156,7 @@ describe("cmdMove", () => {
   });
 
   it("throws CLIError for no-op move", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     await expect(
       cmdMove(tmp, "f1", { parent: "e1" }),
@@ -165,7 +167,7 @@ describe("cmdMove", () => {
   });
 
   it("throws CLIError when feature moved to root", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     // Features can't be root items
     await expect(
@@ -177,7 +179,7 @@ describe("cmdMove", () => {
   });
 
   it("logs the move event", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     await cmdMove(tmp, "f1", { parent: "e2" });
 
@@ -190,7 +192,7 @@ describe("cmdMove", () => {
   });
 
   it("outputs JSON when --format=json", async () => {
-    writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+    writePRD(tmp, makePrd(fullTree()));
 
     const logs: string[] = [];
     const origLog = console.log;
@@ -212,7 +214,7 @@ describe("cmdMove", () => {
 
   describe("folder tree persistence", () => {
     it("writes folder tree after a move", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writePRD(tmp, makePrd(fullTree()));
 
       await cmdMove(tmp, "f1", { parent: "e2" });
 
@@ -240,7 +242,7 @@ describe("cmdMove", () => {
     });
 
     it("updates parent index.md Children section after move", async () => {
-      writeFileSync(join(tmp, ".rex", "prd.json"), makePrd(fullTree()));
+      writePRD(tmp, makePrd(fullTree()));
 
       await cmdMove(tmp, "f1", { parent: "e2" });
 

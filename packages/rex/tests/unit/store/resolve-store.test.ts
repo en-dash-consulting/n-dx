@@ -19,6 +19,7 @@ import {
   resetDefaultRegistry,
 } from "../../../src/store/adapter-registry.js";
 import { FileStore } from "../../../src/store/file-adapter.js";
+import { parseDocument } from "../../../src/store/markdown-parser.js";
 import type { PRDStore } from "../../../src/store/contracts.js";
 
 // ---------------------------------------------------------------------------
@@ -31,8 +32,8 @@ async function seedRexDir(
 ): Promise<void> {
   await mkdir(rexDir, { recursive: true });
   await writeFile(
-    join(rexDir, "prd.json"),
-    toCanonicalJSON({ schema: SCHEMA_VERSION, title: "Test", items: [] }),
+    join(rexDir, "prd.md"),
+    `---\nschema: ${SCHEMA_VERSION}\ntitle: Test\n---\n\n# Test\n`,
     "utf-8",
   );
   await writeFile(
@@ -76,8 +77,8 @@ describe("resolveStore", () => {
     // Create rexDir but no config.json
     await mkdir(rexDir, { recursive: true });
     await writeFile(
-      join(rexDir, "prd.json"),
-      toCanonicalJSON({ schema: SCHEMA_VERSION, title: "Test", items: [] }),
+      join(rexDir, "prd.md"),
+      `---\nschema: ${SCHEMA_VERSION}\ntitle: Test\n---\n\n# Test\n`,
       "utf-8",
     );
     await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
@@ -238,7 +239,7 @@ describe("resolveStore", () => {
     expect(doc1).toEqual(doc2);
   });
 
-  it("routes new root items to the current branch's matching PRD file when one exists", async () => {
+  it("writes new root items to prd.md regardless of the current branch (single-file mode)", async () => {
     await mkdir(tmpDir, { recursive: true });
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, encoding: "utf-8" });
     execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, encoding: "utf-8" });
@@ -250,11 +251,6 @@ describe("resolveStore", () => {
     execFileSync("git", ["checkout", "-b", "feature/test"], { cwd: tmpDir, encoding: "utf-8" });
 
     await seedRexDir(rexDir, "file");
-    await writeFile(
-      join(rexDir, "prd_feature-test_2025-04-01.json"),
-      toCanonicalJSON({ schema: SCHEMA_VERSION, title: "feature/test", items: [] }),
-      "utf-8",
-    );
 
     const store = await resolveStore(rexDir);
     await store.addItem({
@@ -264,14 +260,12 @@ describe("resolveStore", () => {
       level: "epic",
     });
 
-    const branchDoc = JSON.parse(
-      await readFile(join(rexDir, "prd_feature-test_2025-04-01.json"), "utf-8"),
-    ) as { items: Array<{ id: string }> };
-    expect(branchDoc.items.map((item) => item.id)).toEqual(["branch-epic"]);
-
-    const primaryDoc = JSON.parse(
-      await readFile(join(rexDir, "prd.json"), "utf-8"),
-    ) as { items: Array<{ id: string }> };
-    expect(primaryDoc.items).toEqual([]);
+    // All writes land in prd.md; the in-memory currentBranchFile only
+    // influences attribution metadata, not the on-disk write target.
+    const primaryParsed = parseDocument(
+      await readFile(join(rexDir, "prd.md"), "utf-8"),
+    );
+    if (!primaryParsed.ok) throw primaryParsed.error;
+    expect(primaryParsed.data.items.map((item) => item.id)).toEqual(["branch-epic"]);
   });
 });

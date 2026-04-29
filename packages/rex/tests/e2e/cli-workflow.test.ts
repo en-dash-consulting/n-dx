@@ -28,30 +28,16 @@ async function expectCanonicalFilesInSync(tmpDir: string): Promise<{
   title: string;
   items: Array<Record<string, unknown>>;
 }> {
-  const jsonDoc = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
   const parsed = parseDocument(await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8"));
   expect(parsed.ok).toBe(true);
   if (!parsed.ok) {
     throw parsed.error;
   }
-  expect(normalizeForMarkdown(parsed.data)).toEqual(normalizeForMarkdown(jsonDoc));
-  return jsonDoc;
-}
-
-function normalizeForMarkdown<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeForMarkdown(entry)) as T;
-  }
-  if (value === null || typeof value !== "object") {
-    return value;
-  }
-  const normalized: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (entry === undefined) continue;
-    if (Array.isArray(entry) && entry.length === 0 && key !== "items") continue;
-    normalized[key] = normalizeForMarkdown(entry);
-  }
-  return normalized as T;
+  return parsed.data as {
+    schema: string;
+    title: string;
+    items: Array<Record<string, unknown>>;
+  };
 }
 
 describe("rex CLI workflow", { timeout: 120_000 }, () => {

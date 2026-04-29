@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { readPRD } from "../helpers/rex-dir-test-support.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -126,9 +127,7 @@ describe("Billing", () => {
     expect(output).toContain("items added to PRD");
 
     // Verify items in prd.json
-    const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const prd = readPRD(tmpDir);
     expect(prd.items.length).toBeGreaterThan(0);
   });
 
@@ -157,7 +156,7 @@ describe("Billing", () => {
     run(["analyze", "--file=spec.json", "--accept", tmpDir]);
 
     // Count non-subtask items in prd.json
-    const prd = JSON.parse(await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"));
+    const prd = readPRD(tmpDir);
     function countNonSubtasks(items: { level: string; children?: unknown[] }[]): number {
       let count = 0;
       for (const item of items) {
@@ -538,9 +537,7 @@ describe("Cache", () => {
     expect(output).toContain("items added to PRD");
 
     // Verify items in prd.json (items are nested: epics → features → tasks)
-    const prd = JSON.parse(
-      await readFile(join(tmpDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const prd = readPRD(tmpDir);
     function collectTitles(items: { title: string; children?: unknown[] }[]): string[] {
       const result: string[] = [];
       for (const item of items) {

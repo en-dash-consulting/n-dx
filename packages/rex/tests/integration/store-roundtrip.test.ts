@@ -10,23 +10,10 @@ import { PRD_MARKDOWN_FILENAME } from "../../src/store/prd-md-migration.js";
 import type { PRDStore } from "../../src/store/index.js";
 import type { PRDItem, PRDDocument } from "../../src/schema/index.js";
 
-async function readJsonDoc(rexDir: string): Promise<PRDDocument> {
-  return JSON.parse(await readFile(join(rexDir, "prd.json"), "utf-8")) as PRDDocument;
-}
-
 async function readMarkdownDoc(rexDir: string): Promise<PRDDocument> {
   const parsed = parseDocument(await readFile(join(rexDir, PRD_MARKDOWN_FILENAME), "utf-8"));
   if (!parsed.ok) throw parsed.error;
   return parsed.data;
-}
-
-async function expectCanonicalFilesInSync(rexDir: string): Promise<PRDDocument> {
-  const [jsonDoc, markdownDoc] = await Promise.all([
-    readJsonDoc(rexDir),
-    readMarkdownDoc(rexDir),
-  ]);
-  expect(markdownDoc).toEqual(jsonDoc);
-  return markdownDoc;
 }
 
 describe("Store roundtrip integration", () => {
@@ -40,13 +27,11 @@ describe("Store roundtrip integration", () => {
     await ensureRexDir(rexDir);
     store = createStore("file", rexDir);
 
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Integration Test",
-      items: [],
-    };
-    await writeFile(join(rexDir, "prd.json"), toCanonicalJSON(doc), "utf-8");
-    await writeFile(join(rexDir, "prd.md"), `---\nschema: ${SCHEMA_VERSION}\n---\n\n# Integration Test\n`, "utf-8");
+    await writeFile(
+      join(rexDir, "prd.md"),
+      `---\nschema: ${SCHEMA_VERSION}\ntitle: Integration Test\n---\n\n# Integration Test\n`,
+      "utf-8",
+    );
     await writeFile(
       join(rexDir, "config.json"),
       toCanonicalJSON({ schema: SCHEMA_VERSION, project: "test", adapter: "file" }),
@@ -60,7 +45,7 @@ describe("Store roundtrip integration", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("full lifecycle keeps prd.md primary and prd.json synchronized", async () => {
+  it("full lifecycle persists state to prd.md", async () => {
     // Add an epic
     const epic: PRDItem = {
       id: "epic-1",
@@ -70,7 +55,7 @@ describe("Store roundtrip integration", () => {
       priority: "high",
     };
     await store.addItem(epic);
-    await expectCanonicalFilesInSync(rexDir);
+    await readMarkdownDoc(rexDir);
 
     // Add a feature under the epic
     const feature: PRDItem = {
@@ -80,7 +65,7 @@ describe("Store roundtrip integration", () => {
       level: "feature",
     };
     await store.addItem(feature, "epic-1");
-    await expectCanonicalFilesInSync(rexDir);
+    await readMarkdownDoc(rexDir);
 
     // Add tasks under the feature
     const task1: PRDItem = {
@@ -100,7 +85,7 @@ describe("Store roundtrip integration", () => {
     };
     await store.addItem(task1, "feat-1");
     await store.addItem(task2, "feat-1");
-    const afterAdd = await expectCanonicalFilesInSync(rexDir);
+    const afterAdd = await readMarkdownDoc(rexDir);
 
     // Read back the full document
     const doc = await store.loadDocument();
@@ -119,13 +104,13 @@ describe("Store roundtrip integration", () => {
 
     // Update status
     await store.updateItem("task-1", { status: "completed" });
-    await expectCanonicalFilesInSync(rexDir);
+    await readMarkdownDoc(rexDir);
     const updated = await store.getItem("task-1");
     expect(updated!.status).toBe("completed");
 
     // Remove an item
     await store.removeItem("task-2");
-    await expectCanonicalFilesInSync(rexDir);
+    await readMarkdownDoc(rexDir);
     const afterRemove = await store.loadDocument();
     expect(afterRemove.items[0].children![0].children!.length).toBe(1);
   });
@@ -140,7 +125,7 @@ describe("Store roundtrip integration", () => {
       sourceFile: ".rex/prd_feature-prd-attribution_2026-04-24.md",
     });
 
-    await expectCanonicalFilesInSync(rexDir);
+    await readMarkdownDoc(rexDir);
 
     const reloaded = await store.loadDocument();
     expect(reloaded.items[0].branch).toBe("feature/prd-attribution");
@@ -164,7 +149,7 @@ describe("Store roundtrip integration", () => {
       projectMeta: "preserved",
     } as PRDDocument;
     await store.saveDocument(docWithExtras);
-    await expectCanonicalFilesInSync(rexDir);
+    await readMarkdownDoc(rexDir);
 
     const reloaded = await store.loadDocument();
     expect((reloaded as Record<string, unknown>).projectMeta).toBe("preserved");
@@ -180,7 +165,7 @@ describe("Store roundtrip integration", () => {
       status: "pending",
       level: "epic",
     });
-    await expectCanonicalFilesInSync(rexDir);
+    await readMarkdownDoc(rexDir);
 
     await store.addItem({
       id: "epic-force",
@@ -280,13 +265,23 @@ describe("Store roundtrip integration", () => {
   });
 
   it("migrates from prd.json and continues reading from prd.md", async () => {
+    // Set up legacy prd.json fixture and remove prd.md to trigger migration
     await unlink(join(rexDir, "prd.md"));
+    await writeFile(
+      join(rexDir, "prd.json"),
+      toCanonicalJSON({
+        schema: SCHEMA_VERSION,
+        title: "Integration Test",
+        items: [],
+      }),
+      "utf-8",
+    );
 
     const doc = await store.loadDocument();
     expect(doc.title).toBe("Integration Test");
 
     const migrated = await readMarkdownDoc(rexDir);
-    expect(migrated).toEqual(await readJsonDoc(rexDir));
+    expect(migrated.title).toBe("Integration Test");
 
     await writeFile(
       join(rexDir, "prd.json"),
@@ -321,7 +316,7 @@ describe("Store roundtrip integration", () => {
       }),
     ]);
 
-    const synced = await expectCanonicalFilesInSync(rexDir);
+    const synced = await readMarkdownDoc(rexDir);
     expect(synced.items).toHaveLength(2);
     expect(synced.items.map((item) => item.id).sort()).toEqual(["epic-1", "epic-2"]);
     expect(synced.items.find((item) => item.id === "epic-1")?.title).toBe("Concurrent Epic Updated");
@@ -373,11 +368,11 @@ describe("Store roundtrip integration", () => {
     await ensureRexDir(rexDir2);
     const store2 = createStore("file", rexDir2);
 
-    await writeFile(join(rexDir2, "prd.json"), toCanonicalJSON({
-      schema: SCHEMA_VERSION,
-      title: "Test",
-      items: [],
-    }), "utf-8");
+    await writeFile(
+      join(rexDir2, "prd.md"),
+      `---\nschema: ${SCHEMA_VERSION}\ntitle: Test\n---\n\n# Test\n`,
+      "utf-8",
+    );
 
     const entries = await store2.readLog();
     expect(entries).toEqual([]);

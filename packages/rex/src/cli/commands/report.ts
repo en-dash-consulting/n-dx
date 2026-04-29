@@ -6,6 +6,7 @@ import { validateDAG } from "../../core/dag.js";
 import { validateStructure } from "../../core/structural.js";
 import { walkTree } from "../../core/tree.js";
 import { computeStats } from "../../core/stats.js";
+import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { result } from "../output.js";
 import type { PRDDocument, PRDItem, ItemLevel } from "../../schema/index.js";
@@ -81,24 +82,24 @@ async function runChecks(dir: string): Promise<{
     });
   }
 
-  // Check prd.json schema
+  // Check PRD schema (Markdown is authoritative; FileStore performs legacy migration if needed)
   try {
-    const raw = await readFile(join(rexDir, "prd.json"), "utf-8");
-    const parsed = JSON.parse(raw);
-    const res = validateDocument(parsed);
+    const store = await resolveStore(rexDir);
+    const loaded = await store.loadDocument();
+    const res = validateDocument(loaded);
     if (res.ok) {
       doc = res.data as PRDDocument;
-      checks.push({ name: "prd.json schema", pass: true, errors: [] });
+      checks.push({ name: "PRD schema", pass: true, errors: [] });
     } else {
       checks.push({
-        name: "prd.json schema",
+        name: "PRD schema",
         pass: false,
         errors: res.errors.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
       });
     }
   } catch (err) {
     checks.push({
-      name: "prd.json schema",
+      name: "PRD schema",
       pass: false,
       errors: [(err as Error).message],
     });

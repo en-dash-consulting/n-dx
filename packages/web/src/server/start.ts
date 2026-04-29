@@ -3,7 +3,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
@@ -15,8 +15,8 @@ import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
-import { loadPRDSync } from "./prd-io.js";
-import { collectAllIds, createRexMcpServer } from "./rex-gateway.js";
+import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
+import { collectAllIds, createRexMcpServer, parseDocument } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
@@ -234,6 +234,34 @@ function isInScope(scope: ViewerScope | undefined, pkg: ViewerScope): boolean {
   return !scope || scope === pkg;
 }
 
+/**
+ * Regenerate `.rex/.cache/prd.json` from `prd.md`.
+ * Called at server boot and whenever the `prd.md` watcher fires.
+ * Failures are logged but not thrown — a missing or corrupt cache degrades
+ * gracefully (loadPRDSync falls back to parsing prd.md directly).
+ * @internal exported for integration testing only
+ */
+export function refreshPRDCache(rexDir: string): void {
+  const prdMdPath = join(rexDir, "prd.md");
+  if (!existsSync(prdMdPath)) return;
+  try {
+    const parsed = parseDocument(readFileSync(prdMdPath, "utf-8"));
+    if (!parsed.ok) {
+      console.warn(`[prd-cache] prd.md parse error: ${parsed.error.message}`);
+      return;
+    }
+    const cacheDir = join(rexDir, PRD_CACHE_DIR);
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(
+      join(cacheDir, PRD_CACHE_JSON),
+      JSON.stringify(parsed.data, null, 2) + "\n",
+      "utf-8",
+    );
+  } catch (err) {
+    console.warn(`[prd-cache] failed to refresh cache: ${(err as Error).message}`);
+  }
+}
+
 function resolveRouteResult(result: RouteResult): Promise<boolean> | boolean {
   return result instanceof Promise ? result : result;
 }
@@ -272,6 +300,7 @@ function registerRexWatcher(
 ): FSWatcher | null {
   if (!isInScope(scope, "rex") || !existsSync(rexDir)) return null;
   const debouncedRefresh = debounce(() => {
+    refreshPRDCache(rexDir);
     watcher.refresh();
     ws.broadcast({
       type: "rex:prd-changed",
@@ -280,7 +309,7 @@ function registerRexWatcher(
   }, WATCHER_DEBOUNCE_MS);
   try {
     return watch(rexDir, (_eventType, filename) => {
-      if (filename === "prd.json") {
+      if (filename === "prd.md" || (typeof filename === "string" && /^prd_.*\.md$/.test(filename))) {
         debouncedRefresh();
       }
     });
@@ -347,6 +376,8 @@ interface WatcherHandles {
   henchRunsDir: string;
   /** Monitor intervals to clear on shutdown. */
   monitorIntervals: ReturnType<typeof setInterval>[];
+  /** Ephemeral PRD JSON cache directory to delete on shutdown (if set). */
+  prdCacheDir?: string;
 }
 
 function registerWatchers(
@@ -365,10 +396,13 @@ function registerWatchers(
   if (hench) watchers.push(hench);
   const dev = registerDevViewerWatcher(ctx.dev, viewerPath, watcher, ws);
   if (dev) watchers.push(dev);
-  return { watchers, henchRunsDir, monitorIntervals: [] };
+  const prdCacheDir = isInScope(ctx.scope, "rex") && existsSync(ctx.rexDir)
+    ? join(ctx.rexDir, PRD_CACHE_DIR)
+    : undefined;
+  return { watchers, henchRunsDir, monitorIntervals: [], prdCacheDir };
 }
 
-/** Close all file system watchers and monitor intervals to release resources. */
+/** Close all file system watchers, monitor intervals, and ephemeral cache on shutdown. */
 function closeWatchers(handles: WatcherHandles): void {
   for (const w of handles.watchers) {
     try { w.close(); } catch { /* ignore */ }
@@ -378,6 +412,14 @@ function closeWatchers(handles: WatcherHandles): void {
     try { clearInterval(interval); } catch { /* ignore */ }
   }
   handles.monitorIntervals.length = 0;
+  if (handles.prdCacheDir) {
+    try {
+      rmSync(handles.prdCacheDir, { recursive: true, force: true });
+      console.log("[shutdown] PRD cache removed");
+    } catch {
+      // Non-fatal
+    }
+  }
 }
 
 function setCorsHeaders(res: ServerResponse): void {
@@ -691,17 +733,31 @@ export async function startServer(
         // Non-fatal: port file is a convenience, not a requirement
       }
 
+      // ── Generate ephemeral PRD JSON cache ──────────────────────────────
+      // `.rex/.cache/prd.json` is the fast-path read target for all web
+      // route handlers while the server is running. It is regenerated here
+      // at boot and refreshed by the prd.md file watcher on every change.
+      // The `.cache/` directory is removed on shutdown.
+      if (isInScope(scope, "rex") && existsSync(rexDir)) {
+        refreshPRDCache(rexDir);
+      }
+
       logStartup(actualPort, ctx, watcherHandles.henchRunsDir);
 
       // ── Graceful shutdown ───────────────────────────────────────────────
       // Single handler coordinates cleanup in dependency order:
-      //   0. File watchers          (release OS file descriptors)
-      //   1. Hench child processes  (avoid orphaned agents)
-      //   2. WebSocket connections  (clean close frames)
-      //   3. HTTP server            (drain in-flight requests)
-      //   4. Port file              (orchestrator discovery)
+      //   0. File watchers + PRD cache  (release OS resources)
+      //   1. Hench child processes      (avoid orphaned agents)
+      //   2. WebSocket connections      (clean close frames)
+      //   3. HTTP server                (drain in-flight requests)
+      //   4. Port file                  (orchestrator discovery)
       // A second signal forces immediate exit; overall timeout prevents hangs.
       registerShutdownHandlers(server, ws, portFilePath, actualPort, undefined, {}, watcherHandles);
+      // Last-resort safety net: remove PRD cache even if graceful shutdown never runs.
+      if (watcherHandles.prdCacheDir) {
+        const cacheToRemove = watcherHandles.prdCacheDir;
+        process.once("exit", () => { try { rmSync(cacheToRemove, { recursive: true, force: true }); } catch { /* ignore */ } });
+      }
 
       resolvePromise({
         port: actualPort,

@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { PRDDocument } from "../../../../src/schema/index.js";
+import { readPRD, writePRD } from "../../../helpers/rex-dir-test-support.js";
 
 async function writeFixtureProject(dir: string): Promise<void> {
   await mkdir(join(dir, ".rex"), { recursive: true });
@@ -18,15 +19,11 @@ async function writeFixtureProject(dir: string): Promise<void> {
     "utf-8",
   );
 
-  await writeFile(
-    join(dir, ".rex", "prd.json"),
-    JSON.stringify({
-      schema: "rex/v1",
-      title: "test-project",
-      items: [],
-    }),
-    "utf-8",
-  );
+  writePRD(dir, {
+    schema: "rex/v1",
+    title: "test-project",
+    items: [],
+  } as PRDDocument);
 
   await writeFile(
     join(dir, ".sourcevision", "zones.json"),
@@ -43,9 +40,7 @@ async function writeFixtureProject(dir: string): Promise<void> {
 }
 
 async function readPrdItems(dir: string): Promise<PRDDocument["items"]> {
-  const raw = await readFile(join(dir, ".rex", "prd.json"), "utf-8");
-  const doc = JSON.parse(raw) as PRDDocument;
-  return doc.items;
+  return readPRD(dir).items;
 }
 
 type AnyItem = PRDDocument["items"][0];
@@ -195,13 +190,8 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=all" });
     const itemsAll = flattenItems(await readPrdItems(tmpDir));
 
-    // Reset PRD (both prd.json and prd.md — prd.md is the primary read surface)
-    await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
-      JSON.stringify({ schema: "rex/v1", title: "test-project", items: [] }),
-      "utf-8",
-    );
-    await rm(join(tmpDir, ".rex", "prd.md"), { force: true });
+    // Reset PRD
+    writePRD(tmpDir, { schema: "rex/v1", title: "test-project", items: [] } as PRDDocument);
 
     // Accept with true (legacy)
     await cmdRecommend(tmpDir, { accept: "true" });
@@ -233,13 +223,8 @@ describe("cmdRecommend --accept indexed selection", () => {
     await cmdRecommend(tmpDir, { accept: "=." });
     const itemsDot = flattenItems(await readPrdItems(tmpDir));
 
-    // Reset PRD (both prd.json and prd.md — prd.md is the primary read surface)
-    await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
-      JSON.stringify({ schema: "rex/v1", title: "test-project", items: [] }),
-      "utf-8",
-    );
-    await rm(join(tmpDir, ".rex", "prd.md"), { force: true });
+    // Reset PRD
+    writePRD(tmpDir, { schema: "rex/v1", title: "test-project", items: [] } as PRDDocument);
 
     // Accept with =all
     await cmdRecommend(tmpDir, { accept: "=all" });
@@ -930,9 +915,7 @@ describe("cmdRecommend --accept conflict detection", () => {
 
   it("creates all items including when existing items have similar titles (force for hierarchy)", async () => {
     // Pre-populate PRD with an item that has a similar title to a task recommendation
-    await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
-      JSON.stringify({
+    writePRD(tmpDir, {
         schema: "rex/v1",
         title: "test-project",
         items: [
@@ -943,9 +926,7 @@ describe("cmdRecommend --accept conflict detection", () => {
             level: "task",
           },
         ],
-      }),
-      "utf-8",
-    );
+      } as PRDDocument);
 
     // Hierarchical recommendations always use "force" strategy, so all items
     // are created even when existing items have similar titles. Dedup is handled
@@ -961,9 +942,7 @@ describe("cmdRecommend --accept conflict detection", () => {
   });
 
   it("creates all items with --force flag explicitly", async () => {
-    await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
-      JSON.stringify({
+    writePRD(tmpDir, {
         schema: "rex/v1",
         title: "test-project",
         items: [
@@ -974,9 +953,7 @@ describe("cmdRecommend --accept conflict detection", () => {
             level: "task",
           },
         ],
-      }),
-      "utf-8",
-    );
+      } as PRDDocument);
 
     await cmdRecommend(tmpDir, { accept: "=all", force: "" });
 
@@ -1038,11 +1015,7 @@ describe("cmdRecommend --actionable-only", () => {
       JSON.stringify({ schema: "rex/v1", project: "test", adapter: "file" }),
       "utf-8",
     );
-    await writeFile(
-      join(tmpDir, ".rex", "prd.json"),
-      JSON.stringify({ schema: "rex/v1", title: "test", items: [] }),
-      "utf-8",
-    );
+    writePRD(tmpDir, { schema: "rex/v1", title: "test", items: [] } as PRDDocument);
   });
 
   afterEach(async () => {

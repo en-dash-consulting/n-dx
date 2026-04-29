@@ -1,11 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, rm, unlink } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
+import { parseDocument, serializeDocument } from "@n-dx/rex";
+
+function readPRDFromMd(rexDir: string) {
+  const raw = readFileSync(join(rexDir, "prd.md"), "utf-8");
+  const result = parseDocument(raw);
+  if (!result.ok) throw result.error;
+  return result.data;
+}
 
 /** Minimal PRD document fixture. */
 function makePRD() {
@@ -84,7 +92,7 @@ describe("Rex API routes", () => {
     rexDir = join(tmpDir, ".rex");
     await mkdir(svDir, { recursive: true });
     await mkdir(rexDir, { recursive: true });
-    await writeFile(join(rexDir, "prd.json"), JSON.stringify(makePRD(), null, 2));
+    await writeFile(join(rexDir, "prd.md"), serializeDocument(makePRD() as never));
 
     ctx = { projectDir: tmpDir, svDir, rexDir, dev: false };
     const started = await startTestServer(ctx);
@@ -156,7 +164,7 @@ describe("Rex API routes", () => {
     expect(data.ok).toBe(true);
 
     // Verify the change was persisted
-    const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+    const prd = readPRDFromMd(rexDir);
     const task2 = prd.items[0].children[1];
     expect(task2.status).toBe("in_progress");
     expect(task2.startedAt).toBeDefined();
@@ -170,7 +178,7 @@ describe("Rex API routes", () => {
     });
     expect(res.status).toBe(200);
 
-    const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+    const prd = readPRDFromMd(rexDir);
     const task1 = prd.items[0].children[0];
     expect(task1.status).toBe("completed");
     expect(task1.completedAt).toBeDefined();
@@ -215,7 +223,7 @@ describe("Rex API routes", () => {
   it("returns 404 when no PRD exists", async () => {
     // Remove prd.json
     const { unlink } = await import("node:fs/promises");
-    await unlink(join(rexDir, "prd.json"));
+    await unlink(join(rexDir, "prd.md"));
 
     const prdRes = await fetch(`http://localhost:${port}/api/rex/prd`);
     expect(prdRes.status).toBe(404);
@@ -287,7 +295,7 @@ describe("Rex API routes", () => {
       expect(data.preview.absorbed[0].id).toBe("task-2");
 
       // Verify data was NOT modified
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       const taskIds = prd.items[0].children.map((t: { id: string }) => t.id);
       expect(taskIds).toContain("task-1");
       expect(taskIds).toContain("task-2");
@@ -309,7 +317,7 @@ describe("Rex API routes", () => {
       expect(data.absorbedIds).toEqual(["task-2"]);
 
       // Verify task-2 is gone from disk
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       const taskIds = prd.items[0].children.map((t: { id: string }) => t.id);
       expect(taskIds).toContain("task-1");
       expect(taskIds).not.toContain("task-2");
@@ -327,7 +335,7 @@ describe("Rex API routes", () => {
       });
       expect(res.status).toBe(200);
 
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       const task1 = prd.items[0].children.find((t: { id: string }) => t.id === "task-1");
       expect(task1.title).toBe("Merged Task");
     });
@@ -356,11 +364,11 @@ describe("Rex API routes", () => {
   describe("GET /api/rex/prune/preview", () => {
     it("returns empty items when nothing is prunable", async () => {
       // Rewrite PRD with no completed items
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       for (const child of prd.items[0].children) {
         if (child.status === "completed") child.status = "pending";
       }
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+      await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
       const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(200);
@@ -373,12 +381,12 @@ describe("Rex API routes", () => {
 
     it("identifies a completed leaf task as prunable", async () => {
       // Set all children of epic-1 to completed, then the epic itself
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       for (const child of prd.items[0].children) {
         child.status = "completed";
       }
       prd.items[0].status = "completed";
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+      await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
       const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(200);
@@ -407,7 +415,7 @@ describe("Rex API routes", () => {
 
     it("returns 404 when no PRD exists", async () => {
       const { unlink } = await import("node:fs/promises");
-      await unlink(join(rexDir, "prd.json"));
+      await unlink(join(rexDir, "prd.md"));
 
       const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(404);
@@ -478,14 +486,14 @@ describe("Rex API routes", () => {
 
     it("returns prunableIds with all subtree descendants", async () => {
       // Make the entire epic fully completed so the whole subtree is prunable
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       for (const child of prd.items[0].children) {
         child.status = "completed";
         child.completedAt = "2026-01-01T00:00:00.000Z";
       }
       prd.items[0].status = "completed";
       prd.items[0].completedAt = "2026-01-01T00:00:00.000Z";
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+      await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
       const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
       const data = await res.json();
@@ -519,11 +527,11 @@ describe("Rex API routes", () => {
     });
 
     it("returns empty epicImpact when nothing is prunable", async () => {
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       for (const child of prd.items[0].children) {
         if (child.status === "completed") child.status = "pending";
       }
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+      await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
       const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
       const data = await res.json();
@@ -549,7 +557,7 @@ describe("Rex API routes", () => {
       expect(data.archivedTo).toBe("archive.json");
 
       // Verify task-3 is gone from PRD
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       const taskIds = prd.items[0].children.map((t: { id: string }) => t.id);
       expect(taskIds).not.toContain("task-3");
       expect(taskIds).toContain("task-1");
@@ -582,11 +590,11 @@ describe("Rex API routes", () => {
 
     it("returns nothing to prune when all items are active", async () => {
       // Remove the completed task-3
-      const prd = JSON.parse(readFileSync(join(rexDir, "prd.json"), "utf-8"));
+      const prd = readPRDFromMd(rexDir);
       prd.items[0].children = prd.items[0].children.filter(
         (t: { id: string }) => t.id !== "task-3",
       );
-      await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd, null, 2));
+      await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
       const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
         method: "POST",
@@ -628,7 +636,7 @@ describe("Rex API routes", () => {
 
     it("returns 404 when no PRD exists", async () => {
       const { unlink } = await import("node:fs/promises");
-      await unlink(join(rexDir, "prd.json"));
+      await unlink(join(rexDir, "prd.md"));
 
       const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
         method: "POST",

@@ -6,6 +6,7 @@ import { cmdSync } from "../../../../src/cli/commands/sync.js";
 import { getDefaultRegistry, resetDefaultRegistry } from "../../../../src/store/adapter-registry.js";
 import { FileStore } from "../../../../src/store/file-adapter.js";
 import { toCanonicalJSON } from "../../../../src/core/canonical.js";
+import { readPRD, writePRD } from "../../../helpers/rex-dir-test-support.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 const VALID_CONFIG = {
@@ -33,17 +34,13 @@ const POPULATED_PRD: PRDDocument = {
   ],
 };
 
-function writeConfig(dir: string, config: Record<string, unknown>): void {
+function writeRexConfig(dir: string, config: Record<string, unknown>): void {
   writeFileSync(join(dir, ".rex", "config.json"), toCanonicalJSON(config));
-}
-
-function writePRD(dir: string, doc: PRDDocument): void {
-  writeFileSync(join(dir, ".rex", "prd.json"), toCanonicalJSON(doc));
 }
 
 function seedDir(dir: string, prd: PRDDocument = EMPTY_PRD): void {
   mkdirSync(join(dir, ".rex"), { recursive: true });
-  writeConfig(dir, VALID_CONFIG);
+  writeRexConfig(dir, VALID_CONFIG);
   writePRD(dir, prd);
   writeFileSync(join(dir, ".rex", "execution-log.jsonl"), "", "utf-8");
   writeFileSync(join(dir, ".rex", "workflow.md"), "# Workflow", "utf-8");
@@ -108,9 +105,7 @@ describe("cmdSync", () => {
     await cmdSync(tmpDir, { push: "true", adapter: "test-remote" });
 
     // Verify push happened — remote should now have the item
-    const remoteDoc = JSON.parse(
-      readFileSync(join(remoteDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const remoteDoc = readPRD(remoteDir);
     expect(remoteDoc.items.length).toBeGreaterThan(0);
     expect(remoteDoc.items[0].id).toBe("e1");
 
@@ -139,9 +134,7 @@ describe("cmdSync", () => {
     await cmdSync(tmpDir, { pull: "true", adapter: "test-remote" });
 
     // Verify pull happened — local should now have the item
-    const localDoc = JSON.parse(
-      readFileSync(join(tmpDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const localDoc = readPRD(tmpDir);
     expect(localDoc.items.length).toBeGreaterThan(0);
     expect(localDoc.items[0].id).toBe("e1");
 
@@ -177,12 +170,8 @@ describe("cmdSync", () => {
     await cmdSync(tmpDir, { adapter: "test-remote" });
 
     // Both should now have both items
-    const localDoc = JSON.parse(
-      readFileSync(join(tmpDir, ".rex", "prd.json"), "utf-8"),
-    );
-    const remoteDoc = JSON.parse(
-      readFileSync(join(remoteDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const localDoc = readPRD(tmpDir);
+    const remoteDoc = readPRD(remoteDir);
 
     const localIds = localDoc.items.map((i: { id: string }) => i.id).sort();
     const remoteIds = remoteDoc.items.map((i: { id: string }) => i.id).sort();
@@ -284,9 +273,7 @@ describe("cmdSync", () => {
     await cmdSync(tmpDir, { "dry-run": "true", adapter: "test-remote" });
 
     // Remote should still be empty
-    const remoteDoc = JSON.parse(
-      readFileSync(join(remoteDir, ".rex", "prd.json"), "utf-8"),
-    );
+    const remoteDoc = readPRD(remoteDir);
     expect(remoteDoc.items).toEqual([]);
 
     rmSync(remoteDir, { recursive: true, force: true });
