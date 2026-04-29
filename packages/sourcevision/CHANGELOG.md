@@ -1,5 +1,20 @@
 # @n-dx/sourcevision
 
+## 0.4.0
+
+### Minor Changes
+
+- [#170](https://github.com/en-dash-consulting/n-dx/pull/170) [`0269cf7`](https://github.com/en-dash-consulting/n-dx/commit/0269cf75bddcbd50c352b9cf11365103a3a40c71) Thanks [@endash-shal](https://github.com/endash-shal)! - This adds a new commands, bug fixes, and a suprise for devs
+
+### Patch Changes
+
+- [#189](https://github.com/en-dash-consulting/n-dx/pull/189) [`907c5fe`](https://github.com/en-dash-consulting/n-dx/commit/907c5fe8ace0139ab44f323f6a411ed35abb1363) Thanks [@dnaniel](https://github.com/dnaniel)! - Refresh the SourceVision Map experience with cohesive zone/import exploration, remove obsolete Zones navigation, gate PR Markdown behind a feature flag, and dedupe promoted sub-analysis zones.
+
+- [#174](https://github.com/en-dash-consulting/n-dx/pull/174) [`9237f50`](https://github.com/en-dash-consulting/n-dx/commit/9237f509d505659f134f52a9effa6a4f9666fe48) Thanks [@dnaniel](https://github.com/dnaniel)! - Add sourcevision LLM eval harness under `tests/gauntlet/sourcevision-evals/` with fixture projects, golden recording pipeline (`pnpm gauntlet:evals:record`), and gated scoring tests (`pnpm gauntlet:evals`). Enables measured eval-score deltas on future optimization PRs (model swaps, payload reduction, heuristic-first classification).
+
+- Updated dependencies [[`76bfdd7`](https://github.com/en-dash-consulting/n-dx/commit/76bfdd76b90c37bd79b08833072322704f24eb3c), [`0269cf7`](https://github.com/en-dash-consulting/n-dx/commit/0269cf75bddcbd50c352b9cf11365103a3a40c71)]:
+  - @n-dx/llm-client@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes
