@@ -29291,10 +29291,16 @@ items:
       - id: "7145d6bc-5c6c-46bb-af89-cc65da8337f2"
         level: feature
         title: Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend
-        status: pending
+        status: completed
+        activeIntervals:
+          - start: "2026-04-29T14:13:04.054Z"
+            end: "2026-04-29T14:13:04.054Z"
         branch: feature/new-PRD-design
+        completedAt: "2026-04-29T14:13:04.054Z"
+        endedAt: "2026-04-29T14:13:04.054Z"
         source: smart-add
         sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
+        startedAt: "2026-04-29T14:13:04.054Z"
         description: Flip the PRDStore read/write layer so the epic → feature → task → subtask folder tree is the sole authoritative storage. Remove all remaining paths that read from or write to prd.md so that file is never created, consulted, or maintained by any part of the system.
         children:
           - id: "6fa1218b-b843-429c-886e-154b93c16145"
@@ -29326,7 +29332,7 @@ items:
           - id: "1e7c95da-5153-4634-8c19-f137a1195ebf"
             level: task
             title: Remove prd.md read fallback from PRDStore and all CLI, MCP, and web consumers
-            status: in_progress
+            status: completed
             priority: critical
             acceptanceCriteria:
               - PRDStore.loadDocument reads only from the folder tree; no prd.md read path exists
@@ -29336,7 +29342,12 @@ items:
               - Integration tests confirm correct behavior with a folder-tree-only backend (no prd.md present)
             activeIntervals:
               - start: "2026-04-29T13:59:33.665Z"
+                end: "2026-04-29T14:13:03.841Z"
             branch: feature/new-PRD-design
+            completedAt: "2026-04-29T14:13:03.841Z"
+            endedAt: "2026-04-29T14:13:03.841Z"
+            resolutionDetail: Implemented folder-tree-only PRD backend. Removed prd.md read fallback from FileStore.loadDocument(). Updated all CLI read paths and error handling to require folder tree. Parse-md now requires --stdin or --file flags.
+            resolutionType: code-change
             source: smart-add
             sourceFile: .rex/prd_feature-new-prd-design_2026-04-22.md
             startedAt: "2026-04-29T13:59:33.665Z"
@@ -39057,7 +39068,7 @@ Add integration tests that run key PRD-mutating commands and assert that .rex/pr
 *epic · pending*
 
 ### Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend
-*feature · pending*
+*feature · completed · started 2026-04-29 · completed 2026-04-29*
 
 Flip the PRDStore read/write layer so the epic → feature → task → subtask folder tree is the sole authoritative storage. Remove all remaining paths that read from or write to prd.md so that file is never created, consulted, or maintained by any part of the system.
 
@@ -39067,7 +39078,7 @@ Flip the PRDStore read/write layer so the epic → feature → task → subtask 
 Trace every code path in PRDStore, rex CLI commands, MCP handlers, ndx orchestration scripts, and the web server that reads from or writes to prd.md (including branch-scoped variants). Produce a prioritized change list mapping each path to its folder-tree replacement before any implementation begins.
 
 #### Remove prd.md read fallback from PRDStore and all CLI, MCP, and web consumers
-*task · in_progress · priority: critical · started 2026-04-29 · tags: prd, storage, rex, mcp, web*
+*task · completed · priority: critical · started 2026-04-29 · completed 2026-04-29 · tags: prd, storage, rex, mcp, web*
 
 Update PRDStore.loadDocument and every caller (rex CLI commands, MCP tools, web server PRD aggregator, ndx status) to read exclusively from the folder tree. Remove fallback logic that reads prd.md when a folder tree is absent. When no folder tree is found, emit a clear error directing the user to run the migration command rather than silently falling back.
 

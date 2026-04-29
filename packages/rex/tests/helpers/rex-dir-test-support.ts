@@ -1,6 +1,6 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { PRDDocument } from "../../src/schema/index.js";
+import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 import { parseDocument } from "../../src/store/markdown-parser.js";
 
 /**
@@ -113,16 +113,135 @@ function createMinimalMarkdown(item: any): string {
 }
 
 /**
- * Read the PRD document from `prd.md`. Mirrors the legacy `JSON.parse(readFileSync(prd.json))`
- * pattern used pervasively in tests prior to the markdown-only-writes migration.
+ * Read the PRD document from the folder-tree backend at `.rex/tree/`.
+ * Simple sync implementation for test support (mirrors writePRD structure).
  */
 export function readPRD(dir: string): PRDDocument {
-  const raw = readFileSync(join(dir, ".rex", "prd.md"), "utf-8");
-  const result = parseDocument(raw);
-  if (!result.ok) {
-    throw new Error(`readPRD: failed to parse prd.md: ${result.error.message}`);
+  let title = "PRD";
+  try {
+    const metaPath = join(dir, ".rex", "tree-meta.json");
+    const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
+    if (typeof meta["title"] === "string") title = meta["title"];
+  } catch {
+    // No tree-meta.json; use default title
   }
-  return result.data;
+
+  const treeRoot = join(dir, ".rex", "tree");
+  const items = readFolderTreeSync(treeRoot);
+
+  return {
+    schema: "rex/v1",
+    title,
+    items,
+  };
+}
+
+/**
+ * Synchronous folder-tree parser for test support.
+ * Mirrors the async parseFolderTree but uses readdirSync and readFileSync.
+ */
+function readFolderTreeSync(treeRoot: string): PRDItem[] {
+  const items: PRDItem[] = [];
+
+  // List epics (depth 1)
+  const epicDirs = readdirSync(treeRoot).sort();
+
+  for (const epicId of epicDirs) {
+    const epicDir = join(treeRoot, epicId);
+    const indexPath = join(epicDir, "index.md");
+
+    const epicItem = parseItemFromMarkdown(readFileSync(indexPath, "utf-8"));
+    if (!epicItem) continue;
+
+    epicItem.id = epicId;
+    epicItem.children = [];
+
+    // List features and tasks (depth 2)
+    const childDirs = readdirSync(epicDir).filter((d) => d !== "index.md").sort();
+
+    for (const childId of childDirs) {
+      const childPath = join(epicDir, childId, "index.md");
+      const childItem = parseItemFromMarkdown(readFileSync(childPath, "utf-8"));
+      if (!childItem) continue;
+
+      childItem.id = childId;
+      childItem.children = [];
+
+      // List tasks under features (depth 3)
+      if (childItem.level === "feature") {
+        const taskDirs = readdirSync(join(epicDir, childId))
+          .filter((d) => d !== "index.md")
+          .sort();
+
+        for (const taskId of taskDirs) {
+          const taskPath = join(epicDir, childId, taskId, "index.md");
+          const taskItem = parseItemFromMarkdown(readFileSync(taskPath, "utf-8"));
+          if (!taskItem) continue;
+
+          taskItem.id = taskId;
+          childItem.children!.push(taskItem);
+        }
+      }
+
+      epicItem.children!.push(childItem);
+    }
+
+    items.push(epicItem);
+  }
+
+  return items;
+}
+
+/**
+ * Parse a single item from its markdown frontmatter.
+ * Extracts YAML fields and returns a PRDItem.
+ */
+function parseItemFromMarkdown(content: string): Partial<PRDItem> | null {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return null;
+
+  const frontmatter = match[1];
+  const item: Partial<PRDItem> = {};
+
+  // Parse YAML-like frontmatter (simple line-based parsing)
+  for (const line of frontmatter.split("\n")) {
+    const [key, ...valueParts] = line.split(":").map((s) => s.trim());
+    const value = valueParts.join(":").trim();
+
+    if (!key || !value) continue;
+
+    // Remove quotes if present
+    const cleanValue = value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value;
+
+    switch (key) {
+      case "id":
+        item.id = cleanValue;
+        break;
+      case "title":
+        item.title = cleanValue;
+        break;
+      case "level":
+        item.level = cleanValue as any;
+        break;
+      case "status":
+        item.status = cleanValue as any;
+        break;
+      case "priority":
+        item.priority = cleanValue as any;
+        break;
+      case "description":
+        item.description = cleanValue;
+        break;
+      case "startedAt":
+        item.startedAt = cleanValue;
+        break;
+      case "completedAt":
+        item.completedAt = cleanValue;
+        break;
+    }
+  }
+
+  return item.title ? item : null;
 }
 
 export function writeConfig<T extends Record<string, unknown>>(dir: string, config: T): void {

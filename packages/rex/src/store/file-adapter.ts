@@ -16,6 +16,7 @@ import {
 import { parseDocument } from "./markdown-parser.js";
 import { serializeDocument } from "./markdown-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
+import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
@@ -186,8 +187,8 @@ export class FileStore implements PRDStore {
 
   /**
    * Map an item back to its logical "owner file" key for the in-memory
-   * itemToFile map. The actual on-disk write target is always prd.md, but the
-   * map is preserved so backwards-compatible APIs (getKnownFiles, ownership
+   * itemToFile map. The actual on-disk write target is the folder-tree at `.rex/tree/`,
+   * but the map is preserved so backwards-compatible APIs (getKnownFiles, ownership
    * inspection) continue to work. The key is derived from the item's
    * `sourceFile` attribution, normalized to a bare legacy `.json` filename
    * (no `.rex/` prefix) so that callers like `toMarkdownSourcePath` can apply
@@ -205,7 +206,7 @@ export class FileStore implements PRDStore {
   /**
    * Rebuild the itemToFile / fileMetadata view from a freshly-loaded merged
    * PRDDocument. After this call `ownershipLoaded` is true and subsequent
-   * write routing (which now collapses onto prd.md) has consistent metadata.
+   * write routing (which now uses the folder-tree backend) has consistent metadata.
    */
   private rebuildOwnershipFromItems(doc: PRDDocument): void {
     this.itemToFile.clear();
@@ -233,11 +234,11 @@ export class FileStore implements PRDStore {
   }
 
   /**
-   * Mutate the PRD document and persist it to `prd.md`.
+   * Mutate the PRD document and persist it to the folder-tree backend.
    *
-   * Markdown is the sole writable surface. The `_filename` argument is
+   * Folder-tree is the sole writable surface. The `_filename` argument is
    * accepted for callsite-compat with the historical multi-file layout but
-   * is no longer used to route writes — every mutation lands in `prd.md`.
+   * is no longer used to route writes — every mutation lands in `.rex/tree/`.
    * Per-item attribution (`branch`, `sourceFile`) still travels with each
    * item via {@link applyWriteAttribution}.
    */
@@ -245,14 +246,20 @@ export class FileStore implements PRDStore {
     _filename: string,
     fn: (doc: PRDDocument) => Promise<T>,
   ): Promise<T> {
-    return withLock(this.markdownLockPath, async () => {
+    const folderTreeLockPath = this.path("tree.lock");
+    return withLock(folderTreeLockPath, async () => {
       const doc = await this.loadDocument();
       const result = await fn(doc);
       const valid = validateDocument(doc);
       if (!valid.ok) {
         throw new Error(`Invalid document after mutation: ${valid.errors.message}`);
       }
-      await atomicWrite(this.markdownPath, serializeDocument(doc));
+      await mkdir(this.treeRoot, { recursive: true });
+      await atomicWrite(
+        this.path("tree-meta.json"),
+        JSON.stringify({ title: doc.title }),
+      );
+      await serializeFolderTree(doc.items, this.treeRoot);
       this.rebuildOwnershipFromItems(doc);
       return result;
     });
@@ -360,15 +367,12 @@ export class FileStore implements PRDStore {
     return (err as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
   }
 
-  private async saveMarkdownDocument(doc: PRDDocument): Promise<void> {
-    await atomicWrite(this.markdownPath, serializeDocument(doc));
-  }
-
   /**
-   * Persist a PRD document to `prd.md`. No JSON files are written.
+   * Persist a PRD document to the folder-tree backend at `.rex/tree/`.
+   * No prd.md or branch-scoped files are written.
    *
-   * When not already inside {@link withTransaction}, acquires the markdown
-   * file lock so concurrent writers serialize safely.
+   * When not already inside {@link withTransaction}, acquires the folder-tree
+   * lock so concurrent writers serialize safely.
    */
   async saveDocument(doc: PRDDocument): Promise<void> {
     const result = validateDocument(doc);
@@ -376,21 +380,29 @@ export class FileStore implements PRDStore {
       throw new Error(`Invalid document: ${result.errors.message}`);
     }
 
-    const writeMarkdown = async () => {
-      await atomicWrite(this.markdownPath, serializeDocument(doc));
+    const writeFolderTree = async () => {
+      await mkdir(this.treeRoot, { recursive: true });
+      await atomicWrite(
+        this.path("tree-meta.json"),
+        JSON.stringify({ title: doc.title }),
+      );
+      await serializeFolderTree(doc.items, this.treeRoot);
       this.rebuildOwnershipFromItems(doc);
     };
 
     if (this.inTransaction) {
-      await writeMarkdown();
+      await writeFolderTree();
       return;
     }
 
-    await withLock(this.markdownLockPath, writeMarkdown);
+    // Use folder-tree lock path (not markdown lock)
+    const folderTreeLockPath = this.path("tree.lock");
+    await withLock(folderTreeLockPath, writeFolderTree);
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-    return withLock(this.markdownLockPath, async () => {
+    const folderTreeLockPath = this.path("tree.lock");
+    return withLock(folderTreeLockPath, async () => {
       this.inTransaction = true;
       try {
         const doc = await this.loadDocument();

@@ -2,7 +2,7 @@
 id: "1e7c95da-5153-4634-8c19-f137a1195ebf"
 level: "task"
 title: "Remove prd.md read fallback from PRDStore and all CLI, MCP, and web consumers"
-status: "pending"
+status: "completed"
 priority: "critical"
 tags:
   - "prd"
@@ -11,6 +11,11 @@ tags:
   - "mcp"
   - "web"
 source: "smart-add"
+startedAt: "2026-04-29T13:59:33.665Z"
+completedAt: "2026-04-29T14:13:03.841Z"
+endedAt: "2026-04-29T14:13:03.841Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented folder-tree-only PRD backend. Removed prd.md read fallback from FileStore.loadDocument(). Updated all CLI read paths and error handling to require folder tree. Parse-md now requires --stdin or --file flags."
 acceptanceCriteria:
   - "PRDStore.loadDocument reads only from the folder tree; no prd.md read path exists"
   - "All rex CLI commands and MCP tools obtain PRD data through the folder-tree backend"
