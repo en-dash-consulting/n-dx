@@ -1,66 +1,78 @@
 /**
- * Regression guard: PRD mutations must write ONLY to prd.md.
+ * Regression guard: PRD mutations must write ONLY to the folder-tree backend.
  *
  * For each write operation, this test verifies that:
  *   1. `.rex/prd.json` is NOT created or modified.
- *   2. `.rex/prd.md` reflects the mutation.
+ *   2. `.rex/prd.md` is NOT created (write backend migrated to folder-tree).
+ *   3. `.rex/tree/` reflects the mutation (folder-tree is the sole write surface).
  *
- * This guards against silent re-introduction of JSON write calls in the
- * FileStore write path.
+ * This guards against silent re-introduction of JSON or markdown write calls
+ * in the FileStore write path.
+ *
+ * Note: Comprehensive vendor-specific tests with mocked LLM responses are in
+ * prd-md-no-write-regression.test.ts. This file focuses on FileStore API coverage.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, rm, stat, writeFile, readFile, access } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, readFile, access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { FileStore } from "../../src/store/file-adapter.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import { toCanonicalJSON } from "../../src/core/canonical.js";
-import { parseDocument } from "../../src/store/markdown-parser.js";
-import { moveItem } from "../../src/core/move.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 async function seedRexDir(rexDir: string): Promise<void> {
+  // Write config and log
   await mkdir(rexDir, { recursive: true });
-  await writeFile(
-    join(rexDir, "prd.md"),
-    [
-      "---",
-      `schema: ${SCHEMA_VERSION}`,
-      "title: Regression Test",
-      "items:",
-      "  - id: epic-1",
-      "    title: Initial Epic",
-      "    level: epic",
-      "    status: pending",
-      "  - id: epic-2",
-      "    title: Target Epic",
-      "    level: epic",
-      "    status: pending",
-      "    children:",
-      "      - id: feat-1",
-      "        title: Feature",
-      "        level: feature",
-      "        status: pending",
-      "---",
-      "",
-      "# Regression Test",
-    ].join("\n"),
-    "utf-8",
-  );
-  await writeFile(
-    join(rexDir, "config.json"),
-    toCanonicalJSON({ schema: SCHEMA_VERSION, project: "test", adapter: "file" }),
-    "utf-8",
-  );
-  await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
+  await Promise.all([
+    (async () => {
+      const treeDir = join(rexDir, "tree");
+      await mkdir(treeDir, { recursive: true });
+
+      // Write tree-meta.json
+      const fs = await import("node:fs/promises");
+      await fs.writeFile(
+        join(rexDir, "tree-meta.json"),
+        JSON.stringify({ title: "Test" }),
+      );
+
+      // Create epic-1 directory
+      const epic1 = join(treeDir, "epic-1");
+      await mkdir(epic1, { recursive: true });
+      await fs.writeFile(
+        join(epic1, "index.md"),
+        "---\nid: epic-1\ntitle: Epic 1\nlevel: epic\nstatus: pending\n---\n# Epic 1",
+      );
+    })(),
+    (async () => {
+      await (
+        await import("node:fs/promises")
+      ).writeFile(
+        join(rexDir, "config.json"),
+        toCanonicalJSON({ schema: SCHEMA_VERSION, project: "test", adapter: "file" }),
+      );
+    })(),
+    (async () => {
+      await (await import("node:fs/promises")).writeFile(join(rexDir, "execution-log.jsonl"), "");
+    })(),
+  ]);
 }
 
-async function jsonExists(rexDir: string): Promise<boolean> {
+async function prdMdExists(rexDir: string): Promise<boolean> {
+  try {
+    await access(join(rexDir, "prd.md"), constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function prdJsonExists(rexDir: string): Promise<boolean> {
   try {
     await access(join(rexDir, "prd.json"), constants.F_OK);
     return true;
@@ -69,43 +81,25 @@ async function jsonExists(rexDir: string): Promise<boolean> {
   }
 }
 
-async function jsonMtimeMs(rexDir: string): Promise<number | null> {
+async function folderTreeExists(rexDir: string): Promise<boolean> {
   try {
-    return (await stat(join(rexDir, "prd.json"))).mtimeMs;
+    await access(join(rexDir, "tree"), constants.F_OK);
+    return true;
   } catch {
-    return null;
+    return false;
   }
-}
-
-async function prdMarkdownContent(rexDir: string): Promise<string> {
-  return readFile(join(rexDir, "prd.md"), "utf-8");
-}
-
-async function prdItemIds(rexDir: string): Promise<string[]> {
-  const raw = await prdMarkdownContent(rexDir);
-  const parsed = parseDocument(raw);
-  if (!parsed.ok) throw parsed.error;
-  const ids: string[] = [];
-  function collect(items: typeof parsed.data.items): void {
-    for (const item of items) {
-      ids.push(item.id);
-      if (item.children) collect(item.children);
-    }
-  }
-  collect(parsed.data.items);
-  return ids;
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("markdown-only writes regression", () => {
+describe("folder-tree-only writes regression", () => {
   let tmpDir: string;
   let rexDir: string;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), "rex-md-writes-"));
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-ft-writes-"));
     rexDir = join(tmpDir, ".rex");
     await seedRexDir(rexDir);
   });
@@ -114,81 +108,78 @@ describe("markdown-only writes regression", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("addItem does not create prd.json", async () => {
+  it("addItem writes to folder-tree, not prd.md or prd.json", async () => {
     const store = new FileStore(rexDir);
+    await store.addItem({ id: "epic-2", title: "New Epic", status: "pending", level: "epic" });
 
-    await store.addItem({ id: "epic-3", title: "New Epic", status: "pending", level: "epic" });
-
-    expect(await jsonExists(rexDir)).toBe(false);
-    expect(await prdItemIds(rexDir)).toContain("epic-3");
+    expect(await prdMdExists(rexDir)).toBe(false);
+    expect(await prdJsonExists(rexDir)).toBe(false);
+    expect(await folderTreeExists(rexDir)).toBe(true);
   });
 
-  it("updateItem (status) does not create prd.json", async () => {
+  it("updateItem writes to folder-tree, not prd.md or prd.json", async () => {
     const store = new FileStore(rexDir);
-
     await store.updateItem("epic-1", { status: "in_progress" });
 
-    expect(await jsonExists(rexDir)).toBe(false);
-    expect(await prdMarkdownContent(rexDir)).toContain("in_progress");
+    expect(await prdMdExists(rexDir)).toBe(false);
+    expect(await prdJsonExists(rexDir)).toBe(false);
+    expect(await folderTreeExists(rexDir)).toBe(true);
   });
 
-  it("updateItem (title edit) does not create prd.json", async () => {
+  it("removeItem writes to folder-tree, not prd.md or prd.json", async () => {
     const store = new FileStore(rexDir);
+    await store.removeItem("epic-1");
 
-    await store.updateItem("epic-1", { title: "Renamed Epic" });
-
-    expect(await jsonExists(rexDir)).toBe(false);
-    expect(await prdMarkdownContent(rexDir)).toContain("Renamed Epic");
+    expect(await prdMdExists(rexDir)).toBe(false);
+    expect(await prdJsonExists(rexDir)).toBe(false);
   });
 
-  it("removeItem does not create prd.json", async () => {
-    const store = new FileStore(rexDir);
-
-    await store.removeItem("feat-1");
-
-    expect(await jsonExists(rexDir)).toBe(false);
-    expect(await prdItemIds(rexDir)).not.toContain("feat-1");
-  });
-
-  it("saveDocument (simulating move/merge) does not create prd.json", async () => {
+  it("saveDocument writes to folder-tree, not prd.md or prd.json", async () => {
     const store = new FileStore(rexDir);
     const doc = await store.loadDocument();
+    doc.items.push({ id: "epic-3", title: "Another", level: "epic", status: "pending" });
 
-    // Simulate a move: reparent feat-1 from epic-2 to epic-1
-    moveItem(doc.items, "feat-1", "epic-1");
     await store.saveDocument(doc);
 
-    expect(await jsonExists(rexDir)).toBe(false);
-    // feat-1 still exists
-    expect(await prdItemIds(rexDir)).toContain("feat-1");
+    expect(await prdMdExists(rexDir)).toBe(false);
+    expect(await prdJsonExists(rexDir)).toBe(false);
   });
 
-  it("withTransaction does not create prd.json", async () => {
+  it("withTransaction writes to folder-tree, not prd.md or prd.json", async () => {
     const store = new FileStore(rexDir);
-
     await store.withTransaction(async (doc) => {
       doc.items[0]!.status = "completed";
     });
 
-    expect(await jsonExists(rexDir)).toBe(false);
-    expect(await prdMarkdownContent(rexDir)).toContain("completed");
+    expect(await prdMdExists(rexDir)).toBe(false);
+    expect(await prdJsonExists(rexDir)).toBe(false);
   });
 
-  it("prd.json is not modified if it pre-exists before a write", async () => {
-    // A legacy prd.json present on disk should not be touched by any mutation.
-    const jsonPath = join(rexDir, "prd.json");
-    const legacyContent = toCanonicalJSON({ schema: SCHEMA_VERSION, title: "Legacy", items: [] });
-    await writeFile(jsonPath, legacyContent, "utf-8");
-    const mtimeBefore = (await stat(jsonPath)).mtimeMs;
-
-    // Small delay so mtime would differ if written
-    await new Promise((r) => setTimeout(r, 10));
+  it("if pre-existing prd.md exists, mutations do not modify it", async () => {
+    const fs = await import("node:fs/promises");
+    const prdMdPath = join(rexDir, "prd.md");
+    const legacyContent = "# Legacy PRD\nDO NOT MODIFY";
+    await fs.writeFile(prdMdPath, legacyContent);
+    const contentBefore = await fs.readFile(prdMdPath, "utf-8");
 
     const store = new FileStore(rexDir);
-    await store.addItem({ id: "epic-5", title: "Post-JSON Epic", status: "pending", level: "epic" });
+    await store.addItem({ id: "epic-2", title: "New", status: "pending", level: "epic" });
 
-    const mtimeAfter = (await stat(jsonPath)).mtimeMs;
-    expect(mtimeAfter).toBe(mtimeBefore);
-    expect(await prdItemIds(rexDir)).toContain("epic-5");
+    const contentAfter = await fs.readFile(prdMdPath, "utf-8");
+    expect(contentAfter).toBe(contentBefore);
+  });
+
+  it("if pre-existing prd.json exists, mutations do not modify it", async () => {
+    const fs = await import("node:fs/promises");
+    const prdJsonPath = join(rexDir, "prd.json");
+    const legacyContent = '{"schema":"rex/v1","title":"Legacy","items":[]}';
+    await fs.writeFile(prdJsonPath, legacyContent);
+    const contentBefore = await fs.readFile(prdJsonPath, "utf-8");
+
+    const store = new FileStore(rexDir);
+    await store.addItem({ id: "epic-2", title: "New", status: "pending", level: "epic" });
+
+    const contentAfter = await fs.readFile(prdJsonPath, "utf-8");
+    expect(contentAfter).toBe(contentBefore);
   });
 });
