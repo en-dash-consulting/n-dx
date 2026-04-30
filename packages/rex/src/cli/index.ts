@@ -469,6 +469,11 @@ async function dispatchCommand(
       await cmdParseMd(resolveDir(positional), flags, stdinInput);
       break;
     }
+    case "backfill-commit-attribution": {
+      const { cmdBackfillCommitAttribution } = await import("./commands/backfill-commit-attribution.js");
+      await cmdBackfillCommitAttribution(resolveDir(positional), flags);
+      break;
+    }
     default: {
       // Check if the user tried an ndx-only orchestration command
       const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -493,6 +498,7 @@ async function dispatchCommand(
         "prune", "validate", "fix", "sync", "usage", "report", "verify",
         "recommend", "analyze", "import", "adapter", "reorganize", "health", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "parse-md",
+        "backfill-commit-attribution",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
       throw new CLIError(

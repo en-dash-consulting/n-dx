@@ -2,13 +2,14 @@
 id: "8956fb2a-6e3a-40f2-bc49-19fd641b4523"
 level: "task"
 title: "Populate commit attribution on hench-driven status transitions and from commit-message trailers"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "hench"
   - "rex"
   - "git"
 source: "smart-add"
+startedAt: "2026-04-30T13:26:59.195Z"
 acceptanceCriteria:
   - "Hench post-commit hook updates the PRD item's `commits` array with the new commit's SHA, author, email, and timestamp"
   - "Update is appended (not overwritten) so multi-commit items accumulate attribution entries"

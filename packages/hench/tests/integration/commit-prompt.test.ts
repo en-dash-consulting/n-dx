@@ -688,4 +688,94 @@ status: in_progress
 
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
+
+  it("populates commits array with commit hash, author, email, timestamp", async () => {
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Create initial commit
+    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
+
+    // Modify and stage file
+    await stageChangeWithPendingMessage(
+      projectDir,
+      "src.ts",
+      "export const x = 2;\n",
+      "feat: update x",
+    );
+
+    // Mock PRDStore to capture updateItem calls
+    let capturedUpdates: { id: string; updates: any } | null = null;
+    const mockStore = {
+      getItem: vi.fn(async (taskId: string) => {
+        if (taskId === "task-1") {
+          return {
+            status: "in_progress",
+            id: "task-1",
+            title: "Test Task",
+            level: "task",
+            commits: [],
+          };
+        }
+        return null;
+      }),
+      loadDocument: vi.fn(async () => ({
+        items: [
+          { id: "task-1", status: "in_progress", title: "Test Task", level: "task", children: [] },
+        ],
+      })),
+      updateItem: vi.fn(async (taskId: string, updates: any) => {
+        if (taskId === "task-1") {
+          capturedUpdates = { id: taskId, updates };
+        }
+      }),
+      appendLog: vi.fn(async () => {}),
+    };
+
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+
+    const run = buildCompletedRun();
+
+    await performCommitPromptIfNeeded(
+      run,
+      projectDir,
+      /* autoCommit */ false,
+      /* yes */ false,
+      /* autonomous */ true,
+      mockStore as any,
+      "task-1",
+    );
+
+    // Get the commit info we're expecting
+    const { stdout: sha } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
+    const expectedSha = sha.trim();
+    const { stdout: fullLog } = await execAsync(
+      "git log -1 --format='%an%n%ae%n%cI'",
+      { cwd: projectDir },
+    );
+    const [author, email, timestamp] = fullLog.trim().split("\n");
+
+    // Verify updateItem was called with commits array
+    expect(mockStore.updateItem).toHaveBeenCalled();
+
+    // Verify the commits array was updated
+    expect(capturedUpdates).not.toBeNull();
+    expect(capturedUpdates!.updates).toHaveProperty("commits");
+    const commits = capturedUpdates!.updates.commits;
+    expect(commits).toHaveLength(1);
+    expect(commits[0]).toEqual(
+      expect.objectContaining({
+        hash: expectedSha,
+        author: "Test",
+        authorEmail: "test@test.com",
+        timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}/), // ISO 8601 date
+      }),
+    );
+
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+  });
 });

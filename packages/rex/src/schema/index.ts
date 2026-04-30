@@ -49,6 +49,7 @@ export type {
   Requirement,
   DuplicateOverrideMarker,
   MergedProposalRecord,
+  CommitAttribution,
   PRDItem,
   PRDDocument,
   ActiveInterval,

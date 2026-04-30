@@ -969,6 +969,50 @@ export async function performCommitPromptIfNeeded(
       timeout: 30_000,
     });
     info(`Commit created — ${stagedCount} file(s).`);
+
+    // Capture commit attribution after successful commit
+    if (store && taskId && run.status === "completed") {
+      try {
+        // Get the commit SHA
+        const shaOutput = await execStdout("git", ["rev-parse", "HEAD"], {
+          cwd: projectDir,
+          timeout: 10_000,
+        });
+        const sha = shaOutput.trim();
+
+        // Get commit metadata: hash, timestamp, author, email
+        const format = "%H%n%cI%n%an%n%ae";
+        const metaOutput = await execStdout("git", ["log", "-1", `--format=${format}`, sha], {
+          cwd: projectDir,
+          timeout: 10_000,
+        });
+        const lines = metaOutput.trim().split("\n");
+        if (lines.length >= 4) {
+          const hash = lines[0];
+          const timestamp = lines[1];
+          const author = lines[2];
+          const authorEmail = lines[3];
+
+          // Update PRD item with commit attribution (append to commits array)
+          const item = await store.getItem(taskId);
+          if (item) {
+            const existing = item.commits ?? [];
+            // Check if this commit is already recorded (idempotent)
+            if (!existing.some((c) => c.hash === hash)) {
+              const updatedCommits = [
+                ...existing,
+                { hash, author, authorEmail, timestamp },
+              ];
+              await store.updateItem(taskId, { commits: updatedCommits });
+              detail(`Attribution: recorded commit ${hash.slice(0, 7)}`);
+            }
+          }
+        }
+      } catch (err) {
+        // Best-effort: commit attribution failure doesn't block commit flow
+        detail(`Warning: could not record commit attribution: ${(err as Error).message}`);
+      }
+    }
   } catch (err) {
     info(`Commit failed: ${(err as Error).message}`);
   } finally {

@@ -36,6 +36,7 @@ export function usage(): void {
           { name: "sync [dir]", description: "Sync local PRD with remote adapter" },
           { name: "migrate-to-md [dir]", description: "Create .rex/prd.md from .rex/prd.json without modifying JSON" },
           { name: "migrate-folder-tree-filenames [dir]", description: "Rename legacy index.md files to title-based filenames" },
+          { name: "backfill-commit-attribution [dir]", description: "Populate commits array from git history N-DX-Status trailers" },
           { name: "adapter <sub> [name]", description: "Manage store adapters (list|add|remove|show)" },
           { name: "mcp [dir]", description: "Start MCP server" },
         ],
