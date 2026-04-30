@@ -626,7 +626,7 @@ describe("gateway export auto-detection", () => {
     const sourceExports = parseRuntimeExports(gwPath);
 
     const testedSymbols = new Set([
-      ...["createRexMcpServer", "isCompatibleSchema", "findItem", "walkTree",
+      ...["createRexMcpServer", "ensureLegacyPrdMigrated", "isCompatibleSchema", "findItem", "walkTree",
         "insertChild", "updateInTree", "removeFromTree", "computeStats",
         "collectAllIds", "findNextTask", "collectCompletedIds",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
