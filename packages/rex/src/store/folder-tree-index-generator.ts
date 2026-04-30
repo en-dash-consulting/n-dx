@@ -252,17 +252,8 @@ function emitYamlField(lines: string[], key: string, value: unknown): void {
         lines.push(`  - ${JSON.stringify(String(item))}`);
       }
     }
-  } else if (
-    typeof value === "string" &&
-    (key === "level" ||
-      key === "status" ||
-      key === "priority" ||
-      key === "loe" ||
-      key === "resolutionType")
-  ) {
-    // Enum-like fields: don't quote
-    lines.push(`${key}: ${value}`);
   } else {
+    // Quote all scalar values consistently with folder-tree-serializer.ts
     lines.push(`${key}: ${JSON.stringify(String(value))}`);
   }
 }

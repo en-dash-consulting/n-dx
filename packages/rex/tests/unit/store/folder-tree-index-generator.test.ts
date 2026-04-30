@@ -20,9 +20,9 @@ describe("generateIndexMd", () => {
     const output = generateIndexMd(item, [], []);
     expect(output).toContain("---");
     expect(output).toContain('id: "epic-1"');
-    expect(output).toContain("level: epic");
-    expect(output).toContain("title: \"Web Dashboard\"");
-    expect(output).toContain("status: in_progress");
+    expect(output).toContain('level: "epic"');
+    expect(output).toContain('title: "Web Dashboard"');
+    expect(output).toContain('status: "in_progress"');
     expect(output).toContain("# Web Dashboard");
     expect(output).toContain("[in_progress]");
     expect(output).toContain("## Summary");

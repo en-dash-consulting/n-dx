@@ -174,7 +174,8 @@ describe("Billing", () => {
     // Count per-item markdown files in item directories. The serializer writes
     // a title-named .md file per item (e.g. `epic_alpha.md`); legacy `index.md`
     // is also accepted by the parser. Skip the tree root's own index.md stub
-    // (depth 0) which `rex init` creates as a human-readable scaffold.
+    // (depth 0) which `rex init` creates as a human-readable scaffold. Count
+    // only title-named files, not index.md (which is a fallback for parser).
     async function countItemFiles(dir: string, depth = 0): Promise<number> {
       let count = 0;
       try {
@@ -184,7 +185,7 @@ describe("Billing", () => {
           const s = await stat(entryPath);
           if (s.isDirectory()) {
             count += await countItemFiles(entryPath, depth + 1);
-          } else if (entry.endsWith(".md") && depth > 0) {
+          } else if (entry.endsWith(".md") && entry !== "index.md" && depth > 0) {
             count++;
           }
         }
