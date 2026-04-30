@@ -72,6 +72,10 @@ export {
 } from "./store/folder-tree-serializer.js";
 export type { SerializeResult } from "./store/folder-tree-serializer.js";
 
+// ---- Title-to-filename normalization ----------------------------------------
+
+export { titleToFilename } from "./store/title-to-filename.js";
+
 // ---- Store: git branch helpers and PRD filename composers ------------------
 
 export {

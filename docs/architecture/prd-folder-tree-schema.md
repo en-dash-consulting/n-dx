@@ -70,6 +70,54 @@ The `{id8}` suffix is derived from 32 hex characters of a UUID v4. The probabili
 
 ---
 
+## Title-to-Filename Normalization
+
+As PRD item storage evolves from directory-based slug indexing to title-based markdown files, a separate normalization function converts item titles to filesystem-safe filenames. This is distinct from the directory slug algorithm: filenames use underscores for word boundaries (not hyphens) and apply idempotent round-trip normalization.
+
+### Rules
+
+1. Remove `.md` extension if already present (ensures round-trip idempotence)
+2. Unicode-normalize using NFKD decomposition (decomposes accented characters)
+3. Strip combining diacritical marks (U+0300–U+036F)
+4. Lowercase
+5. Remove filesystem-reserved and punctuation characters: `\ / : * ? " < > | ' ( ) & ! @ # $ % ^ = + [ ] { } ; , . ~ ` `
+6. Replace whitespace runs with single underscore
+7. Strip leading/trailing underscores
+8. If the result is empty (all characters removed), use "unnamed"
+9. Append `.md` extension
+
+### Properties
+
+- **Deterministic:** Same title always produces the same filename
+- **Round-trip safe:** `f(f(x)) = f(x)` — applying the function twice yields the same result as applying once
+- **Idempotent:** Already-normalized filenames are not changed
+- **Collision-prone inputs merge:** Titles differing only in punctuation normalize to the same filename
+- **No length limit:** Unlike directory slugs, filenames are not truncated
+
+### Examples
+
+| Title | Normalized Filename |
+|-------|---------------------|
+| `Web Dashboard` | `web_dashboard.md` |
+| `My: Title? (test)` | `my_title_test.md` |
+| `web_dashboard.md` | `web_dashboard.md` |
+| `  spaces  ` | `spaces.md` |
+| `!!!???` | `unnamed.md` |
+| `Héros & Légendes` | `heros_legendes.md` |
+| `Hello World` | `hello_world.md` |
+| `Hello: World` | `hello_world.md` |
+| `Hello (World)` | `hello_world.md` |
+
+### Public API
+
+```typescript
+export function titleToFilename(title: string): string
+```
+
+Exported from `rex` package at `rex.titleToFilename()`. Used by the folder-tree serializer to generate markdown filenames from item titles, and by migration commands to rename legacy `index.md` files.
+
+---
+
 ## index.md Schema
 
 Every `index.md` begins with a YAML frontmatter block, followed by Markdown body content. **Bold** = required.

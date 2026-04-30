@@ -2,7 +2,9 @@
   "llm": {
     "vendor": "claude",
     "model": "claude-haiku-4-5",
-    "claude": {},
+    "claude": {
+      "model": "claude-sonnet-4-6"
+    },
     "codex": {}
   },
   "sourcevision": {

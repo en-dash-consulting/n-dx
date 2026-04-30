@@ -396,7 +396,6 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `.rex/tree/` | PRD storage root — slug-based folder tree; one directory per item (epic/feature/task) containing `index.md` |
 | `.rex/prd.md` | (Legacy) flat Markdown PRD; migration source for `rex migrate-to-folder-tree`. Absent after migration. |
 | `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
-| `.rex/.cache/prd.json` | Ephemeral JSON cache written by `ndx start` for the web dashboard. Removed on server shutdown. Do not edit; do not read from other code paths. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
 | `.rex/workflow.md` | Human-readable workflow state |
 | `.rex/config.json` | Rex project configuration |
