@@ -15,6 +15,8 @@ import { findItemById } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { isWorkItem, getLevelLabel, getChildLevel } from "./levels.js";
+import { useIndexMd } from "../../hooks/use-index-md.js";
+import { IndexMdSectionsPanel } from "./index-md-sections.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1420,6 +1422,33 @@ function HenchRunsList({
   );
 }
 
+// ── Index.md Sections Renderer ───────────────────────────────────────────────
+
+/** Wrapper component that fetches and renders index.md schema sections. */
+function IndexMdSectionsRenderer({ itemId }: { itemId: string }) {
+  const { sections, loading, error } = useIndexMd(itemId);
+
+  // No sections available yet (index.md not generated or 404)
+  if (!loading && (!sections || Object.keys(sections).length === 0)) {
+    return null;
+  }
+
+  // Show error if parsing failed
+  if (error) {
+    return h(
+      "div",
+      { class: "task-section task-index-md-error" },
+      h("div", { class: "task-section-label" }, "Schema Error"),
+      h("p", { class: "error-message" }, error),
+    );
+  }
+
+  // Render sections
+  return h("div", { class: "task-index-md-sections" },
+    h(IndexMdSectionsPanel, { sections: sections || {}, gitRemoteUrl: undefined }),
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────
 
 export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, allItems, onUpdate, onNavigateToItem, onExecuteTask, onPrdChanged, onAddChild, onRemove, navigateTo }: TaskDetailProps) {
@@ -1749,6 +1778,9 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
             : null,
         )
       : null,
+
+    // Index.md schema sections (Progress table, Commits, Changes, Info)
+    h(IndexMdSectionsRenderer, { itemId: item.id }),
 
     // Timestamps
     (item.startedAt || item.completedAt)

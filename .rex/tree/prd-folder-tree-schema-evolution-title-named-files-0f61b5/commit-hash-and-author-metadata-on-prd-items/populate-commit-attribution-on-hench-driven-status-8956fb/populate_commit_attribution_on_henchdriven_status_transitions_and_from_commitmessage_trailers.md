@@ -2,7 +2,7 @@
 id: "8956fb2a-6e3a-40f2-bc49-19fd641b4523"
 level: "task"
 title: "Populate commit attribution on hench-driven status transitions and from commit-message trailers"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "hench"
@@ -10,6 +10,10 @@ tags:
   - "git"
 source: "smart-add"
 startedAt: "2026-04-30T13:26:59.195Z"
+completedAt: "2026-04-30T13:45:47.378Z"
+endedAt: "2026-04-30T13:45:47.378Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented commit attribution for hench-driven status transitions. Hench post-commit hook now captures commit SHA, author, email, timestamp and updates PRD item's commits array. Implemented rex backfill-commit-attribution command to populate commits from git history N-DX-Status trailers. Both features are idempotent and handle edge cases. Added comprehensive integration and unit tests. Commit: 98c5d48a"
 acceptanceCriteria:
   - "Hench post-commit hook updates the PRD item's `commits` array with the new commit's SHA, author, email, and timestamp"
   - "Update is appended (not overwritten) so multi-commit items accumulate attribution entries"

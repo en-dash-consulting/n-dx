@@ -132,3 +132,237 @@
   color: var(--text-dim);
   padding-top: var(--space-1);
 }
+
+/* Index.md schema sections styling */
+
+.task-index-md-sections {
+  margin-top: var(--space-4);
+}
+
+/* Progress table styling */
+.detail-progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: var(--space-2);
+}
+
+.detail-progress-table th {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  background-color: var(--bg-hover);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.detail-progress-table th.sortable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.detail-progress-table th.sortable:hover {
+  background-color: var(--accent-dim);
+}
+
+.detail-progress-table th.sortable.active {
+  background-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.detail-progress-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.detail-progress-table tr:hover td {
+  background-color: var(--bg-hover);
+}
+
+/* Commits section */
+.detail-commits-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0 0;
+}
+
+.detail-commit-item {
+  font-size: 12px;
+  padding: var(--space-1) 0;
+  margin: 0;
+  font-family: monospace;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.commit-hash-link {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.commit-hash-link:hover {
+  color: var(--accent-bright);
+  text-decoration: underline;
+}
+
+.commit-hash {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.commit-date {
+  color: var(--text-dim-2);
+  font-size: 11px;
+}
+
+/* Changes section */
+.detail-changes-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0 0;
+}
+
+.detail-change-item {
+  font-size: 12px;
+  padding: var(--space-1) 0;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.change-timestamp {
+  color: var(--text-dim-2);
+  font-size: 11px;
+}
+
+/* Info section */
+.detail-info-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0 0;
+}
+
+.detail-info-item {
+  font-size: 12px;
+  padding: var(--space-1) 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.detail-info-item strong {
+  color: var(--text);
+}
+
+/* Summary section */
+.detail-summary-section {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--bg-hover);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.detail-summary-section p {
+  margin: var(--space-1) 0;
+}
+
+.detail-summary-section h1,
+.detail-summary-section h2 {
+  margin: var(--space-2) 0 var(--space-1) 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detail-summary-section li {
+  margin-left: var(--space-4);
+  margin-bottom: var(--space-1);
+}
+
+/* Subtasks section */
+.detail-subtasks-section {
+  margin-top: var(--space-2);
+}
+
+.detail-subtasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.detail-subtask-item {
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--bg-hover);
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.subtask-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.subtask-id {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.subtask-title {
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+  color: var(--text);
+}
+
+.subtask-description {
+  margin: var(--space-1) 0;
+  color: var(--text-dim);
+}
+
+.subtask-criteria {
+  list-style-position: inside;
+  margin: var(--space-1) 0 0 var(--space-2);
+  padding: 0;
+  color: var(--text-dim);
+}
+
+.subtask-criteria li {
+  margin: var(--space-1) 0;
+}
+
+/* Raw markdown fallback */
+.detail-raw-markdown {
+  background-color: var(--bg);
+  padding: var(--space-2);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+  overflow-x: auto;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Error state */
+.task-index-md-error {
+  background-color: #fff3cd;
+  padding: var(--space-3);
+  border-radius: 4px;
+  margin-top: var(--space-2);
+}
+
+.error-message {
+  color: #856404;
+  font-size: 12px;
+  margin: 0;
+}

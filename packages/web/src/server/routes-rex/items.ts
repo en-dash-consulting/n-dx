@@ -13,6 +13,7 @@ import {
   findItemById, insertChild, updateInTree, loadPRD, savePRD,
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
+import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
   type PRDItem,
@@ -61,6 +62,11 @@ export function routeItems(
   const itemsMatch = path.match(/^items\/([^/?]+)/);
   if (itemsMatch) {
     const itemId = itemsMatch[1];
+
+    // GET /api/rex/items/:id/index-md — index.md content (new schema sections)
+    if (path === `items/${itemId}/index-md` && method === "GET") {
+      return getIndexMarkdown(res, ctx, itemId);
+    }
 
     // Requirements sub-routes: /api/rex/items/:id/requirements[/:reqId]
     if (routeItemRequirements) {

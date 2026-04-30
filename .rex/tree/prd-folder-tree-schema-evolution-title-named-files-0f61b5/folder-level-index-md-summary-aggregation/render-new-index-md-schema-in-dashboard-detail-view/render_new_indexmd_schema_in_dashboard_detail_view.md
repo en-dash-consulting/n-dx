@@ -2,13 +2,14 @@
 id: "80cfba3f-f672-43c3-8fcf-00d416757319"
 level: "task"
 title: "Render new index.md schema in dashboard detail view"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "web"
   - "ui"
   - "prd"
 source: "smart-add"
+startedAt: "2026-04-30T13:47:03.546Z"
 acceptanceCriteria:
   - "Detail panel renders all schema sections (completion table, commits, summary, change list, basic info)"
   - "Completion table is sortable by title, status, and last-updated"
