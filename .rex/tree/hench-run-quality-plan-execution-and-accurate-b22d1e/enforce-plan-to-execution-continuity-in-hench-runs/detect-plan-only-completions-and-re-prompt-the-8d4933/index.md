@@ -2,7 +2,7 @@
 id: "8d493315-ede5-4370-bae3-901630c5ec02"
 level: "task"
 title: "Detect plan-only completions and re-prompt the agent to execute before allowing run completion"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "hench"
@@ -10,6 +10,10 @@ tags:
   - "reliability"
 source: "smart-add"
 startedAt: "2026-04-30T19:34:47.206Z"
+completedAt: "2026-04-30T19:53:26.442Z"
+endedAt: "2026-04-30T19:53:26.442Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented plan-only completion detection in the hench agent loop. Added detectPlanOnlyIteration() to classify iterations, integrated re-prompting logic into the API loop with configurable max retries (default 2), and created comprehensive unit and integration tests (29+ test cases covering detection scenarios, config options, and re-prompt behavior)."
 acceptanceCriteria:
   - "Run loop classifies each iteration as 'planned-only' vs 'executed' based on whether code-modifying tool calls were issued"
   - "A planned-only terminal iteration triggers an automatic re-prompt requiring execution before the run can be marked complete"
@@ -21,7 +25,7 @@ description: "Add a guard in the hench run loop that classifies the agent's outp
 
 # Detect plan-only completions and re-prompt the agent to execute before allowing run completion
 
-🟠 [in_progress]
+🟠 [completed]
 
 ## Summary
 
@@ -29,8 +33,10 @@ Add a guard in the hench run loop that classifies the agent's output: if the run
 
 ## Info
 
-- **Status:** in_progress
+- **Status:** completed
 - **Priority:** high
 - **Tags:** hench, agent-loop, reliability
 - **Level:** task
 - **Started:** 2026-04-30T19:34:47.206Z
+- **Completed:** 2026-04-30T19:53:26.442Z
+- **Duration:** 18m

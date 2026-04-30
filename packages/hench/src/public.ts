@@ -274,3 +274,10 @@ export type { AgentLoopOptions, AgentLoopResult } from "./agent/lifecycle/loop.j
 export type { CliLoopOptions, CliLoopResult } from "./agent/lifecycle/cli-loop.js";
 export type { TokenBudgetResult } from "./agent/lifecycle/token-budget.js";
 export type { CompletionValidationResult, CompletionValidationOptions } from "./validation/completion.js";
+export type { TaskCompletionGateResult } from "./validation/task-completion-gate.js";
+
+// ---- File classification (for change detection and validation) ---------
+
+export { classifyFile, classifyChangedFiles, getCodeFiles, hasCodeFiles } from "./store/file-classifier.js";
+
+export type { FileCategory } from "./store/file-classifier.js";

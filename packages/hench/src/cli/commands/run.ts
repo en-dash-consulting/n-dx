@@ -4,6 +4,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { RunRecord, ToolCallRecord } from "../../schema/index.js";
+import { classifyChangedFiles } from "../../store/file-classifier.js";
+import type { FileCategory } from "../../store/file-classifier.js";
 import { loadConfig } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
@@ -509,60 +511,6 @@ async function selectTask(
 // ---------------------------------------------------------------------------
 // Change classification
 // ---------------------------------------------------------------------------
-
-type FileCategory = "code" | "test" | "docs" | "config" | "metadata";
-
-/**
- * Classify a file path into a category based on its extension and name.
- */
-function classifyFile(filePath: string): FileCategory {
-  // PRD metadata files
-  if (filePath.endsWith("prd.json") || filePath.includes(".rex/")) return "metadata";
-
-  // Test files
-  if (/\.test\.[jt]sx?$/.test(filePath) || /\.spec\.[jt]sx?$/.test(filePath) ||
-      filePath.includes("__tests__/") || filePath.includes("/tests/")) return "test";
-
-  // Docs
-  if (/\.md$/i.test(filePath) || /\.mdx$/i.test(filePath) ||
-      /\.txt$/i.test(filePath) || /\.rst$/i.test(filePath)) return "docs";
-
-  // Config files
-  if (/\.json$/i.test(filePath) || /\.ya?ml$/i.test(filePath) ||
-      /\.toml$/i.test(filePath) || /\.ini$/i.test(filePath) ||
-      /\.env/i.test(filePath) || /\.config\.[jt]s$/i.test(filePath)) return "config";
-
-  // Code (everything else — .ts, .js, .tsx, .jsx, .py, .go, etc.)
-  return "code";
-}
-
-/**
- * Extract modified file paths from tool call records and classify them.
- */
-function classifyChangedFiles(toolCalls: ToolCallRecord[]): Map<FileCategory, string[]> {
-  const changedFiles = new Set<string>();
-
-  for (const call of toolCalls) {
-    if (call.tool === "write_file") {
-      const path = call.input.path as string | undefined;
-      if (path) changedFiles.add(path);
-    }
-    // Also detect rex status updates as metadata changes
-    if (call.tool === "rex_update" || call.tool === "rex_add") {
-      changedFiles.add("prd.json");
-    }
-  }
-
-  const classified = new Map<FileCategory, string[]>();
-  for (const file of changedFiles) {
-    const category = classifyFile(file);
-    const existing = classified.get(category) ?? [];
-    existing.push(file);
-    classified.set(category, existing);
-  }
-
-  return classified;
-}
 
 /**
  * Detect whether any tool calls include PRD status updates (rex_update).

@@ -2,13 +2,14 @@
 id: "bad1ef80-40ca-44b1-8d8b-eff1b4b0ecd5"
 level: "task"
 title: "Strengthen task-completion criteria to require evidence of code changes for code-classified tasks"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "hench"
   - "prd"
   - "completion-gate"
 source: "smart-add"
+startedAt: "2026-04-30T19:53:45.630Z"
 acceptanceCriteria:
   - "Status transition to completed for code-classified tasks is rejected when the run produced zero code file changes"
   - "Rejection emits a structured run failure with actionable message naming the task and the missing-change reason"
@@ -19,7 +20,7 @@ description: "Tighten the existing 'transparent task selection and completion re
 
 # Strengthen task-completion criteria to require evidence of code changes for code-classified tasks
 
-🟠 [pending]
+🟠 [in_progress]
 
 ## Summary
 
@@ -27,7 +28,8 @@ Tighten the existing 'transparent task selection and completion reasoning' class
 
 ## Info
 
-- **Status:** pending
+- **Status:** in_progress
 - **Priority:** high
 - **Tags:** hench, prd, completion-gate
 - **Level:** task
+- **Started:** 2026-04-30T19:53:45.630Z

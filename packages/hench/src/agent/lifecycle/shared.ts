@@ -37,6 +37,7 @@ import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig } from "../../store/project-config.js";
+import { validateTaskCompletion } from "../../validation/task-completion-gate.js";
 
 // ---------------------------------------------------------------------------
 // Display helpers
@@ -976,6 +977,21 @@ export async function performCommitPromptIfNeeded(
     info(`Commit declined — ${stagedCount} file(s) left staged.`);
     try { unlinkSync(msgPath); } catch { /* ignore */ }
     return;
+  }
+
+  // Task completion criteria gate: verify code-classified tasks have code file changes.
+  // This prevents false completions where the agent claims code work but only
+  // produced documentation or configuration changes.
+  if (run.status === "completed") {
+    const gateResult = validateTaskCompletion(run);
+    if (!gateResult.valid) {
+      // Reject completion: code-modifying tool calls made but no code file changes
+      run.status = "failing";
+      run.error = gateResult.reason;
+      info(`\n${gateResult.reason}`);
+      try { unlinkSync(msgPath); } catch { /* ignore */ }
+      return;
+    }
   }
 
   // Update PRD status and stage the change before committing.

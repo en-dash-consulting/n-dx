@@ -20,8 +20,8 @@ When the agent produces a plan during a task, hench must execute that plan withi
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Detect plan-only completions and re-prompt the agent to execute before allowing run completion | task | in_progress | 2026-04-30 |
-| Strengthen task-completion criteria to require evidence of code changes for code-classified tasks | task | pending | 1970-01-01 |
+| Detect plan-only completions and re-prompt the agent to execute before allowing run completion | task | completed | 2026-04-30 |
+| Strengthen task-completion criteria to require evidence of code changes for code-classified tasks | task | in_progress | 2026-04-30 |
 
 ## Info
 
