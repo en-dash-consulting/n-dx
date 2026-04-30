@@ -35,6 +35,7 @@ export function usage(): void {
           { name: "health [dir]", description: "Show structure health score (depth, balance, completeness)" },
           { name: "sync [dir]", description: "Sync local PRD with remote adapter" },
           { name: "migrate-to-md [dir]", description: "Create .rex/prd.md from .rex/prd.json without modifying JSON" },
+          { name: "migrate-folder-tree-filenames [dir]", description: "Rename legacy index.md files to title-based filenames" },
           { name: "adapter <sub> [name]", description: "Manage store adapters (list|add|remove|show)" },
           { name: "mcp [dir]", description: "Start MCP server" },
         ],

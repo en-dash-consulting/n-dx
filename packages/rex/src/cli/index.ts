@@ -458,6 +458,11 @@ async function dispatchCommand(
       await cmdMigrateToFolderTree(resolveDir(positional), flags);
       break;
     }
+    case "migrate-folder-tree-filenames": {
+      const { cmdMigrateFolderTreeFilenames } = await import("./commands/migrate-folder-tree-filenames.js");
+      await cmdMigrateFolderTreeFilenames(resolveDir(positional), flags);
+      break;
+    }
     case "parse-md": {
       const { cmdParseMd } = await import("./commands/parse-md.js");
       const stdinInput = flags.stdin === "true" ? await readStdin() : "";
@@ -487,7 +492,7 @@ async function dispatchCommand(
         "init", "status", "next", "add", "update", "move", "remove", "reshape",
         "prune", "validate", "fix", "sync", "usage", "report", "verify",
         "recommend", "analyze", "import", "adapter", "reorganize", "health", "mcp",
-        "migrate-to-md", "migrate-to-folder-tree", "parse-md",
+        "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "parse-md",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
       throw new CLIError(
