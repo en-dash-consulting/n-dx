@@ -33,6 +33,10 @@ import {
   formatModelLabel,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
+import {
+  detectPlanOnlyIteration,
+  createExecutionReminder,
+} from "../analysis/plan-only-detection.js";
 
 export interface AgentLoopOptions extends SharedLoopOptions {
   maxTurns?: number;
@@ -363,6 +367,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   // API-specific: turn-based execution loop
   let consecutiveEmptyTurns = 0;
+  let planOnlyRetryCount = 0;
+  const planOnlyMaxRetries = config.planOnlyMaxRetries ?? 2;
 
   // Register SIGINT handler for graceful cancellation
   let cancelled = false;
@@ -414,8 +420,32 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       streamAssistantText(assistantContent, formatModelLabel(model));
 
+      // Detect plan-only iterations before handling completion
+      const planDetection = detectPlanOnlyIteration(assistantContent);
+
       // Handle stop reasons
       if (response.stop_reason === "end_turn") {
+        // Check for plan-only completion at end_turn
+        if (planDetection.isPlanOnly && planOnlyMaxRetries > 0) {
+          if (planOnlyRetryCount < planOnlyMaxRetries) {
+            planOnlyRetryCount++;
+            const summary = extractEndTurnSummary(assistantContent);
+            const reminder = createExecutionReminder(summary, planOnlyRetryCount);
+            stream("Warning", `Plan without execution detected. Re-prompting to execute (attempt ${planOnlyRetryCount}/${planOnlyMaxRetries})...`);
+            messages.push({
+              role: "user",
+              content: reminder,
+            });
+            continue;
+          } else {
+            run.status = "failed";
+            run.error = `Plan-only completion: Agent produced a plan but did not execute it after ${planOnlyMaxRetries} re-prompts.`;
+            stream("Warning", run.error);
+            await handleRunFailure(store, taskId, "deferred", "plan_only_completion", run.error);
+            break;
+          }
+        }
+
         run.status = "completed";
         run.summary = extractEndTurnSummary(assistantContent);
         break;
@@ -443,6 +473,27 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       }
 
       if (response.stop_reason !== "tool_use") {
+        // Check for plan-only completion at non-tool_use stop reasons
+        if (planDetection.isPlanOnly && planOnlyMaxRetries > 0) {
+          if (planOnlyRetryCount < planOnlyMaxRetries) {
+            planOnlyRetryCount++;
+            const summary = extractEndTurnSummary(assistantContent);
+            const reminder = createExecutionReminder(summary, planOnlyRetryCount);
+            stream("Warning", `Plan without execution detected. Re-prompting to execute (attempt ${planOnlyRetryCount}/${planOnlyMaxRetries})...`);
+            messages.push({
+              role: "user",
+              content: reminder,
+            });
+            continue;
+          } else {
+            run.status = "failed";
+            run.error = `Plan-only completion: Agent produced a plan but did not execute it after ${planOnlyMaxRetries} re-prompts.`;
+            stream("Warning", run.error);
+            await handleRunFailure(store, taskId, "deferred", "plan_only_completion", run.error);
+            break;
+          }
+        }
+
         run.status = "completed";
         break;
       }

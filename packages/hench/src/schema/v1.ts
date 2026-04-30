@@ -140,6 +140,13 @@ export interface HenchConfig {
    * Example: "pnpm test" or "npm run test:all"
    */
   fullTestCommand?: string;
+  /**
+   * Maximum number of times to re-prompt the agent when it produces a plan
+   * without executing code modifications (default: 2).
+   * Set to 0 to disable plan-only detection and allow completion with plans only.
+   * Applies to autonomous and pair-programming modes.
+   */
+  planOnlyMaxRetries?: number;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────
@@ -205,6 +212,7 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
     loopPauseMs: 2000,
     maxFailedAttempts: 3,
     autoCommit: false,
+    planOnlyMaxRetries: 2,
     ...(language ? { language } : {}),
   };
 }
