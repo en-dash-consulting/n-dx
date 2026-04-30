@@ -1,4 +1,4 @@
-# n-dx
+# n-dx 
 
 AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks autonomously.
 

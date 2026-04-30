@@ -169,7 +169,9 @@ loe:                  # string  optional — xs | s | m | l | xl
 
 ## Full index.md Examples
 
-### Epic
+The following examples illustrate the complete schema including all summary sections.
+
+### Epic: Web Dashboard
 
 ```markdown
 ---
@@ -178,11 +180,38 @@ level: epic
 title: "Web Dashboard"
 status: completed
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-03-24T20:36:04.012Z"
+completedAt: "2026-04-29T18:36:04.012Z"
 description: >-
   Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision,
-  Rex, and Hench views.
+  Rex, and Hench views. Provides real-time PRD status, autonomous agent monitoring,
+  and integrated analysis tools.
 ---
+
+# Web Dashboard
+
+⚪ [completed]
+
+## Summary
+
+Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision,
+Rex, and Hench views. Provides real-time PRD status, autonomous agent monitoring,
+and integrated analysis tools.
+
+## Progress
+
+| Child | Level | Status | Last Updated |
+|-------|-------|--------|--------------|
+| [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http-5dd63e4e/index.md) | feature | completed | 2026-04-17 |
+| [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-decoupling-f89b6b48/index.md) | feature | completed | 2026-04-22 |
+| [WebSocket Real-Time Updates](./websocket-real-time-updates-c3d4e5f6/index.md) | feature | completed | 2026-04-29 |
+
+## Info
+
+- **Status:** completed
+- **Level:** epic
+- **Started:** 2026-03-24T05:27:03.754Z
+- **Completed:** 2026-04-29T18:36:04.012Z
+- **Duration:** 36d 13h 8m
 
 ## Children
 
@@ -190,9 +219,16 @@ description: >-
 |-------|--------|
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http-5dd63e4e/index.md) | completed |
 | [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-decoupling-f89b6b48/index.md) | completed |
+| [WebSocket Real-Time Updates](./websocket-real-time-updates-c3d4e5f6/index.md) | completed |
 ```
 
-### Feature
+**Annotations:**
+- Epic has no `## Commits` or `## Changes` sections (only features and tasks accumulate these).
+- `## Summary` sourced from `description` field; preserved across regeneration if human-edited.
+- `## Progress` shows all direct children with their completion status and last-update dates.
+- `## Info` displays high-level metadata (status, level, dates, duration).
+
+### Feature: Hot-reload MCP Tool Schemas
 
 ```markdown
 ---
@@ -215,17 +251,65 @@ loe: m
 description: >-
   The HTTP MCP server holds tool schemas in memory from startup. When rex or
   sourcevision are rebuilt, the running server still serves old schemas. Users
-  must restart the server to pick up changes.
+  must restart the server to pick up changes. This feature implements automatic
+  schema reloading via file watchers so the server stays current without restarts.
 ---
+
+# Hot-reload MCP Tool Schemas on HTTP Transport Without Server Restart
+
+⚪ [completed]
+
+## Summary
+
+The HTTP MCP server holds tool schemas in memory from startup. When rex or
+sourcevision are rebuilt, the running server still serves old schemas. Users
+must restart the server to pick up changes. This feature implements automatic
+schema reloading via file watchers so the server stays current without restarts.
+
+## Progress
+
+| Child | Level | Status | Last Updated |
+|-------|-------|--------|--------------|
+| [Implement file-watch reload trigger](./implement-file-watch-reload-trigger-a1b2c3d4/index.md) | task | completed | 2026-04-17 |
+| [Update MCP subprocess proxy](./update-mcp-subprocess-proxy-b2c3d4e5/index.md) | task | completed | 2026-04-17 |
+
+## Commits
+
+- `a3b4c5d6` — Implement file-watch reload trigger for MCP schemas (2026-04-17)
+- `b4c5d6e7` — Add subprocess proxy hot-reload handler (2026-04-17)
+- `c5d6e7f8` — Update MCP tool schema tests (2026-04-17)
+
+## Changes
+
+- **Status changed:** in_progress → completed (2026-04-17T05:02:17.402Z)
+
+## Info
+
+- **Status:** completed
+- **Priority:** low
+- **Tags:** web, mcp, dx
+- **Level:** feature
+- **Started:** 2026-04-17T04:37:35.878Z
+- **Completed:** 2026-04-17T05:02:17.402Z
+- **Duration:** 24m
 
 ## Children
 
 | Title | Status |
 |-------|--------|
 | [Implement file-watch reload trigger](./implement-file-watch-reload-trigger-a1b2c3d4/index.md) | completed |
+| [Update MCP subprocess proxy](./update-mcp-subprocess-proxy-b2c3d4e5/index.md) | completed |
 ```
 
-### Task
+**Annotations:**
+- Feature is a container but also a work item, so it can have `## Commits` and `## Changes` sections.
+- `## Progress` shows the two task children with their completion status.
+- `## Commits` lists the 3 most recent commits associated with this feature (discovered via git commit trailers).
+- `## Changes` shows the status transition to completed.
+- `## Info` includes priority, tags, and duration in addition to basic status/level/dates.
+- `## Children` remains for directory structure documentation (same as before).
+
+### Task: Globalize Token Usage Route Ownership
 
 ```markdown
 ---
@@ -237,6 +321,9 @@ priority: high
 startedAt: "2026-02-22T21:40:06.085Z"
 completedAt: "2026-02-22T21:40:06.085Z"
 resolutionType: code-change
+resolutionDetail: >-
+  Moved token-usage endpoint from Rex-scoped routes to global dashboard routes.
+  Updated route configuration and sidebar metadata. All tests passing.
 acceptanceCriteria:
   - "Token Usage is reachable from global nav without being scoped to Rex"
   - "Routing and UI metadata are consistent with other global dashboard sections"
@@ -244,7 +331,37 @@ loe: s
 description: >-
   Make Token Usage a first-class global dashboard destination instead of a
   Rex-scoped view so routing and UI metadata remain consistent across sections.
+  This involves updating the route registry and removing Rex-specific bindings.
 ---
+
+# Globalize Token Usage Route Ownership
+
+⚪ [completed]
+
+## Summary
+
+Make Token Usage a first-class global dashboard destination instead of a
+Rex-scoped view so routing and UI metadata remain consistent across sections.
+This involves updating the route registry and removing Rex-specific bindings.
+
+## Commits
+
+- `a7b8c9d0` — Remove token-usage from Rex view scope registry (2026-02-22)
+- `b8c9d0e1` — Register token-usage as global route (2026-02-22)
+- `c9d0e1f2` — Update breadcrumb and sidebar metadata (2026-02-22)
+
+## Changes
+
+- **Status changed:** in_progress → completed (2026-02-22T21:40:06.085Z)
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Level:** task
+- **Started:** 2026-02-22T21:40:06.085Z
+- **Completed:** 2026-02-22T21:40:06.085Z
+- **Duration:** < 1m
 
 ## Subtask: Remove token-usage from Rex view scope registry
 
@@ -277,6 +394,210 @@ resolve it correctly.
 - `token-usage` appears in the global route table
 - Breadcrumb renders "Token Usage" without a Rex prefix
 ```
+
+**Annotations:**
+- Task includes `## Summary`, `## Commits`, `## Changes`, and `## Info` sections like features.
+- Task has NO `## Children` section (children are encoded as `## Subtask:` sections instead).
+- `## Commits` shows the three commits associated with task completion.
+- `## Changes` shows the status transition event.
+- `## Info` includes all applicable metadata (status, priority, level, dates, duration).
+- Subtask sections follow immediately after `## Info`, before any child structural sections.
+
+---
+
+## index.md Summary Schema
+
+Every `index.md` file serves as both a data container (via frontmatter) and an auto-generated summary of its folder's contents. Beyond the required frontmatter and children/subtask sections, the `index.md` body includes extended metadata sections that are regenerated on every PRD write to remain in sync with the underlying PRD state.
+
+### Semantic Contracts
+
+Each body section is classified as either **regenerated** or **preserved**:
+
+- **Regenerated**: Overwritten on every PRD write. The serializer computes these from PRD state (frontmatter, execution log, tree structure).
+- **Preserved**: Round-trip safe for human edits. When a human or external process modifies these sections, the serializer respects the changes on the next write.
+
+### Structure
+
+Every `index.md` follows this structure (in order):
+
+```
+1. YAML frontmatter        ← required; always regenerated
+2. Item display heading    ← required; regenerated
+3. Summary section         ← required; preserved (human-editable)
+4. Progress section        ← for containers; regenerated
+5. Commits section         ← for completed/in-progress items; regenerated
+6. Changes section         ← if recent mutations exist; regenerated
+7. Info section            ← regenerated
+8. Children section        ← for non-leaf items; regenerated (or omit if empty)
+9. Subtask sections        ← for tasks; regenerated
+```
+
+### Section Details
+
+#### 1. Item Display Heading
+
+**Regenerated**. Provides a prominent display of the item title and key metadata.
+
+```markdown
+# {title}
+
+{priority-indicator} {status-badge}
+```
+
+**Rules:**
+- Heading level 1 (single `#`).
+- Priority indicator (only if priority is set): `🔴` (critical), `🟠` (high), `🟡` (medium), `⚪` (low).
+- Status badge: `[pending]`, `[in_progress]`, `[completed]`, `[failing]`, `[deferred]`, `[blocked]`, `[deleted]` (markdown code formatting).
+
+**Example:**
+```markdown
+# Web Dashboard Rewrite
+
+🔴 [in_progress]
+```
+
+#### 2. Summary Section
+
+**Preserved**. Contains a prose summary of the item. The serializer initializes this from the `description` field in frontmatter but does NOT overwrite it on regeneration if the section has been edited.
+
+**Heading:** `## Summary`
+
+**Content:**
+- First write: value from `description` frontmatter field
+- If human-edited: changes survive regeneration
+- If `description` is empty: "No summary provided."
+
+**Rules:**
+- Plain Markdown prose (no special formatting required).
+- If the item has no description and the section is empty, it stays empty on subsequent writes.
+- Edits to this section are not reflected back into the frontmatter `description` field (one-way initialization).
+
+**Example:**
+```markdown
+## Summary
+
+The Web Dashboard is the central hub for PRD management, analysis, and autonomous execution. It aggregates SourceVision analysis, Rex task status, and Hench run history into a unified browser-based interface.
+```
+
+#### 3. Progress Section
+
+**Regenerated**. Appears only on non-leaf items (epics and features). Shows completion status of direct children.
+
+**Heading:** `## Progress`
+
+**Format:**
+
+```markdown
+## Progress
+
+| Child | Level | Status | Last Updated |
+|-------|-------|--------|--------------|
+| [Implement hot-reload](./implement-hot-reload-a1b2c3d4/index.md) | task | completed | 2026-04-29 |
+| [Add metrics endpoint](./add-metrics-endpoint-b2c3d4e5/index.md) | task | in_progress | 2026-04-30 |
+```
+
+**Columns:**
+- **Child:** Linked title (relative path to child folder + `/index.md`)
+- **Level:** Child item level (`task`, `feature`)
+- **Status:** Current status badge (`pending`, `in_progress`, `completed`, etc.)
+- **Last Updated:** ISO date of the most recent status change for this child (from execution log or `completedAt`/`endedAt`)
+
+**Rules:**
+- Children listed in PRD insertion order.
+- If a non-leaf item has no children, omit this section entirely.
+- "Last Updated" is derived from: `completedAt` (if completed), `endedAt` (if status changed), or `startedAt` (if in_progress).
+- Fallback to the date portion of the item's `id` timestamp if no status timestamps exist (internal consistency).
+
+#### 4. Commits Section
+
+**Regenerated**. Appears on completed or in-progress tasks. Lists commits attributed to this task via commit trailers or execution log records.
+
+**Heading:** `## Commits`
+
+**Format:**
+
+```markdown
+## Commits
+
+- `a3b4c5d6` — Implement hot-reload MCP tool schemas without server restart (2026-04-17)
+- `b4c5d6e7` — Add file-watch reload trigger (2026-04-18)
+- `c5d6e7f8` — Update hot-reload tests and integration (2026-04-19)
+```
+
+**Commit Attribution Rules:**
+- Commits are discovered via `N-DX-Status:` trailers in git commit messages (format: `N-DX-Status: {itemId} {fromStatus} → {toStatus}`).
+- A commit is attributed to a task if its trailer references the task's ID.
+- If no trailers exist, commits are inferred from execution log entries of type `task_completed` or `status_updated` that reference the task. In this case, no specific commit hash is available — the section is omitted.
+- Commits listed in reverse chronological order (most recent first).
+
+**Rules:**
+- Include up to the 10 most recent commits.
+- Fallback to "Commits not yet attributed" if no commits are discovered.
+- If the item is not completed or in_progress, omit this section entirely.
+
+#### 5. Changes Section
+
+**Regenerated**. Appears only if the item has recent mutations (within the last 10 changes). Lists the most recent mutations from the execution log.
+
+**Heading:** `## Changes`
+
+**Format:**
+
+```markdown
+## Changes
+
+- **Status changed:** in_progress → completed (2026-04-29T19:03:08.925Z)
+- **Execution logged:** run completed with 150 tokens (2026-04-29T19:02:50.000Z)
+- **Priority updated:** high → critical (2026-04-29T18:00:00.000Z)
+```
+
+**Mutation Discovery:**
+- Query the execution log (`.rex/execution-log.jsonl`) for entries with `itemId` matching this item's ID.
+- Include entries of type: `status_updated`, `status_changed`, `task_completed`, `task_failed`.
+- For `status_changed` entries, parse the `detail` field to extract the transition (`{fromStatus} → {toStatus}`).
+- For other types, format the detail from the `detail` field (truncated to 100 chars if necessary).
+
+**Rules:**
+- Show the 10 most recent mutations.
+- Timestamps in ISO 8601 format.
+- If no mutations exist, omit this section entirely.
+- Format mutation types as bold labels (e.g., `**Status changed:**`).
+
+#### 6. Info Section
+
+**Regenerated**. Displays detailed item metadata.
+
+**Heading:** `## Info`
+
+**Format:**
+
+```markdown
+## Info
+
+- **Status:** in_progress
+- **Priority:** high
+- **Tags:** web, mcp, dx
+- **Level:** feature
+- **Branch:** main
+- **Started:** 2026-04-17T04:37:35.878Z
+- **Last Updated:** 2026-04-29T19:03:08.925Z
+- **Duration:** 12d 14h 25m
+```
+
+**Fields:**
+- **Status:** Current status
+- **Priority:** If set; otherwise omit
+- **Tags:** If set, comma-separated; otherwise omit
+- **Level:** Always included
+- **Branch:** If set in frontmatter; otherwise omit
+- **Started:** If `startedAt` is set; formatted as ISO date or relative time
+- **Last Updated:** Most recent timestamp from `completedAt`, `endedAt`, or `startedAt`
+- **Duration:** Human-readable interval from `startedAt` to `completedAt` (if both exist); otherwise omit
+
+**Rules:**
+- Omit fields that are not set or not applicable.
+- Duration calculation: `completedAt - startedAt` (rounded to nearest hour/day).
+- Use ISO 8601 timestamps, or human-readable relative times if the UI prefers (e.g., "2 weeks ago").
 
 ---
 
@@ -333,17 +654,78 @@ Subtasks are encoded as `## Subtask: {title}` sections within the parent task's 
 
 ---
 
+## Regeneration Semantics Matrix
+
+This table documents the regeneration behavior for each section:
+
+| Section | Regenerated | Source of Truth | Preservation Policy |
+|---------|-------------|-----------------|---------------------|
+| Frontmatter | Yes | PRDItem fields | Always overwritten; contains canonical item data |
+| Item Display | Yes | title, priority, status | Computed from frontmatter on each write |
+| Summary | **No** (preserved) | `description` field (initial value) | First-write from description; human edits survive |
+| Progress | Yes | Tree structure + child status | Recomputed from tree on each write |
+| Commits | Yes | Execution log + git trailers | Discovered from git history on each write |
+| Changes | Yes | Execution log | Last 10 mutations recomputed on each write |
+| Info | Yes | Frontmatter + computed dates | Derived from item state on each write |
+| Children | Yes | Tree structure | Recomputed from directory nesting on each write |
+| Subtasks | Yes | PRDItem.children (task level) | Serialized from child items on each write |
+
+### Decision Rationale
+
+**Why is `## Summary` preserved?**
+- The `description` field is often written by humans as prose.
+- If the serializer overwrites the summary on every write, humans cannot add elaborative detail beyond the original description (e.g., links, examples, context).
+- By preserving the summary, the serializer allows humans to enhance and maintain the section while still initializing it from description on first write.
+- The summary is not synced back to the frontmatter description field (one-way initialization).
+
+**Why are other sections regenerated?**
+- They derive from PRD state (execution log, tree structure, item fields) that changes frequently.
+- Manually editing these sections would be lost on the next write, so preservation would be misleading.
+- The serializer makes these sections read-only by design: they are informational, not authoritative.
+
+### Serializer Behavior
+
+When writing an `index.md` file:
+
+1. **Frontmatter:** Always overwritten with current PRDItem state.
+2. **Summary:** 
+   - If the item is being created or the file does not exist, initialize from `description`.
+   - If the file exists and the summary section is present, preserve the existing section (do not overwrite).
+   - If the file exists but the summary section is missing, add it from `description`.
+3. **All other sections:** Recompute and overwrite with current state.
+
+### Parser Behavior
+
+When reading an `index.md` file:
+
+1. Parse frontmatter as the canonical source of item data.
+2. Ignore all body sections except:
+   - `## Subtask:` sections (for task-level items) — parse these to reconstruct subtask children.
+   - `## Children` — ignored for tree reconstruction (directory structure is authoritative).
+3. Ignore Summary, Progress, Commits, Changes, and Info sections — these are informational only.
+
+---
+
 ## Serializer Contract
 
 The serializer (PRD → folder tree) must:
 
 1. Compute each item's slug using the algorithm in [Naming Convention](#naming-convention).
 2. Create directories at the correct nesting depth under the tree root.
-3. Write `index.md` with all required frontmatter fields and the correct body.
-4. For task items, append `## Subtask:` sections for each subtask child.
-5. For non-leaf items with at least one child, append a `## Children` section listing direct children in insertion order.
-6. Write atomically: build the entire tree into a temp directory, then rename it into place to prevent partial states.
-7. Preserve unknown frontmatter fields (round-trip fidelity for future extensions).
+3. Write `index.md` with all required frontmatter fields and a complete body.
+4. **Item Display:** Generate the heading and status badge from title and status.
+5. **Summary:** 
+   - For new files: initialize from `description` field.
+   - For existing files: preserve the existing summary section if present; do not overwrite.
+   - If summary is missing and description exists, add it.
+6. **Progress:** For non-leaf items with at least one child, generate a table with child title, level, status, and last-updated date.
+7. **Commits:** For completed or in-progress items, query git history for commits with `N-DX-Status:` trailers matching this item's ID, and list the 10 most recent. If no commits found, omit this section.
+8. **Changes:** Query the execution log for recent mutations (itemId matches this item), and list the 10 most recent. Omit if no mutations exist.
+9. **Info:** Generate metadata section with status, priority (if set), tags (if set), level, branch (if set), started/completed dates (if set), and computed duration.
+10. **Children:** For non-leaf items with at least one child, append a `## Children` section listing direct children in insertion order. Omit if the item has no children.
+11. **Subtasks:** For task items, append `## Subtask:` sections for each subtask child.
+12. Write atomically: build the entire tree into a temp directory, then rename it into place to prevent partial states.
+13. Preserve unknown frontmatter fields (round-trip fidelity for future extensions).
 
 ---
 
@@ -352,10 +734,15 @@ The serializer (PRD → folder tree) must:
 The parser (folder tree → PRD) must:
 
 1. Discover all `index.md` files under the tree root using depth-first traversal.
-2. Parse the YAML frontmatter from each file to extract structured fields.
-3. Infer parent-child relationships from directory nesting depth — a file at `tree/{a}/{b}/{c}/index.md` is a task `{c}` whose parent is feature `{b}` whose parent is epic `{a}`.
-4. For task-level files, parse `## Subtask:` sections to reconstruct subtask items.
-5. Ignore the `## Children` summary table (informational only; directory structure is authoritative).
+2. Parse the YAML frontmatter from each file to extract structured fields — this is the canonical source of item data.
+3. Ignore all Markdown body sections except `## Subtask:` sections:
+   - The `## Summary`, `## Progress`, `## Commits`, `## Changes`, and `## Info` sections are informational only and must not be parsed into item fields.
+   - The `## Children` section is informational only; directory structure is authoritative for parent-child relationships.
+4. Infer parent-child relationships from directory nesting depth — a file at `tree/{a}/{b}/{c}/index.md` is a task `{c}` whose parent is feature `{b}` whose parent is epic `{a}`.
+5. For task-level files, parse `## Subtask:` sections to reconstruct subtask items:
+   - Each `## Subtask: {title}` section defines one subtask child.
+   - Extract ID, status, priority (if present), description, and acceptance criteria from the section.
+   - Omit fields that are not present in the section.
 6. Reject files with missing required frontmatter fields with a descriptive error identifying the file path and the missing field.
 7. Reconstruct items in directory-entry order (alphabetical by slug) within each level, which preserves insertion order because slugs are stable.
 
@@ -383,3 +770,25 @@ The parser (folder tree → PRD) must:
 | `failureReason` | optional | optional | optional | — |
 | `## Children` body block | when children exist | when children exist | — | — |
 | `## Subtask:` body sections | — | — | when subtasks exist | — |
+
+---
+
+## Related Documentation
+
+This schema is the normative storage contract for the PRD folder-tree format. For broader context:
+
+- **CLAUDE.md** ([Key Files](../../CLAUDE.md#key-files) section): Describes `.rex/tree/` as the sole writable PRD surface and references this schema document.
+- **AGENTS.md** (Public guidance): Links to this schema for agents implementing PRD operations.
+- **Implementation**: The `rex` package implements serialization and parsing according to this schema:
+  - `packages/rex/src/store/folder-tree-serializer.ts` — writes files to disk
+  - `packages/rex/src/store/folder-tree-parser.ts` — reads files from disk
+
+## Versioning and Future Extensions
+
+This is schema version `v1` of the folder-tree format. Future versions may introduce:
+
+- Additional body sections (e.g., `## Metrics`, `## Risks`)
+- Commit-attribution metadata fields in frontmatter
+- Execution-log-derived analytics sections
+
+The serializer preserves unknown frontmatter fields for forward compatibility. Any new fields added to the schema should be added to frontmatter (not body sections) to keep them in the canonical item data.
