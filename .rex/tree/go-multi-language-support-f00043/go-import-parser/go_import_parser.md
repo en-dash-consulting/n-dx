@@ -14,5 +14,5 @@ description: "Create a regex-based Go import parser in sourcevision that handles
 
 | Title | Status |
 |-------|--------|
-| [Implement extractGoImports function with full Go import syntax coverage](./implement-extractgoimports-function-with-full-go-32f70f/index.md) | completed |
-| [Write comprehensive unit tests for go-imports.ts covering all syntax variants and edge cases](./write-comprehensive-unit-tests-for-go-imports-ts-afab2a/index.md) | completed |
+| [Implement extractGoImports function with full Go import syntax coverage](./implement-extractgoimports-32f70f/index.md) | completed |
+| [Write comprehensive unit tests for go-imports.ts covering all syntax variants and edge cases](./write-comprehensive-unit-tests-afab2a/index.md) | completed |

@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix code in global: Establish a satellite zone testing policy requiring every production file in a s (+3 more)](./fix-code-in-global-establish-a-satellite-zone-715755/index.md) | completed |
+| [Fix code in global: Establish a satellite zone testing policy requiring every production file in a s (+3 more)](./fix-code-in-global-establish-a-715755/index.md) | completed |

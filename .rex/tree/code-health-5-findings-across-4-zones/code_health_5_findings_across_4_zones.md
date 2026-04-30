@@ -17,5 +17,5 @@ recommendationMeta: "[object Object]"
 |-------|--------|
 | [Fix anti-pattern in global (2 findings)](./fix-anti-pattern-in-global-2-findings/index.md) | completed |
 | [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-finding/index.md) | completed |
-| [Fix suggestion in sourcevision-2 (1 finding)](./fix-suggestion-in-sourcevision-2-1-finding/index.md) | completed |
-| [Fix suggestion in sourcevision-3 (1 finding)](./fix-suggestion-in-sourcevision-3-1-finding/index.md) | completed |
+| [Fix suggestion in sourcevision-2 (1 finding)](./fix-suggestion-in-sourcevision-ff6c5a/index.md) | completed |
+| [Fix suggestion in sourcevision-3 (1 finding)](./fix-suggestion-in-sourcevision-4e6c04/index.md) | completed |

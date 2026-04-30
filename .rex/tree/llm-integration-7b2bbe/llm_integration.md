@@ -12,10 +12,10 @@ description: "AI client infrastructure: vendor-neutral LLM foundation, token usa
 
 | Title | Status |
 |-------|--------|
-| [Codex CLI Token Usage Extraction from Run Output](./codex-cli-token-usage-extraction-from-run-output/index.md) | completed |
-| [Codex Vendor Reliability and Documentation](./codex-vendor-reliability-and-documentation/index.md) | completed |
-| [Deterministic Task Utilization Budget Fallback](./deterministic-task-utilization-budget-fallback/index.md) | completed |
-| [Init-time LLM Onboarding and Authentication](./init-time-llm-onboarding-and-authentication/index.md) | completed |
-| [LLM Client Circular Dependency Resolution](./llm-client-circular-dependency-resolution/index.md) | completed |
+| [Codex CLI Token Usage Extraction from Run Output](./codex-cli-token-usage-508bf0/index.md) | completed |
+| [Codex Vendor Reliability and Documentation](./codex-vendor-reliability-and-b3cbf3/index.md) | completed |
+| [Deterministic Task Utilization Budget Fallback](./deterministic-task-utilization-7fefed/index.md) | completed |
+| [Init-time LLM Onboarding and Authentication](./init-time-llm-onboarding-and-8eaa2e/index.md) | completed |
+| [LLM Client Circular Dependency Resolution](./llm-client-circular-dependency-9dc205/index.md) | completed |
 | [Token Event Attribution Accuracy](./token-event-attribution-accuracy/index.md) | completed |
 | [Token usage tracking and analytics](./token-usage-tracking-and-analytics/index.md) | completed |

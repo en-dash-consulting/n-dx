@@ -14,5 +14,5 @@ description: "After `ndx plan` prints 'Done.' and 'Vendor: ...' (which marks the
 
 | Title | Status |
 |-------|--------|
-| [Add spinner and stage labels to ndx plan output between LLM response and proposal display](./add-spinner-and-stage-labels-to-ndx-plan-output-8f3ffe/index.md) | completed |
-| [Trace ndx plan output flow and identify the silent gap after 'Done.'](./trace-ndx-plan-output-flow-and-identify-the-silent-b3bdcd/index.md) | completed |
+| [Add spinner and stage labels to ndx plan output between LLM response and proposal display](./add-spinner-and-stage-labels-to-8f3ffe/index.md) | completed |
+| [Trace ndx plan output flow and identify the silent gap after 'Done.'](./trace-ndx-plan-output-flow-and-b3bdcd/index.md) | completed |

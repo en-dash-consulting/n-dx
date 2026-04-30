@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix move-file in web-viewer: File "packages/web/src/viewer/hooks/use-polling.ts" is pinned to zone "Web Viewe](./fix-move-file-in-web-viewer-file-packages-web-src-26cb28/index.md) | completed |
+| [Fix move-file in web-viewer: File "packages/web/src/viewer/hooks/use-polling.ts" is pinned to zone "Web Viewe](./fix-move-file-in-web-viewer-26cb28/index.md) | completed |

@@ -12,4 +12,4 @@ completedAt: "2026-04-08T15:36:35.368Z"
 
 | Title | Status |
 |-------|--------|
-| [Suppress DEP0040 punycode Deprecation Warning in CLI Output](./suppress-dep0040-punycode-deprecation-warning-in-cli-output/index.md) | completed |
+| [Suppress DEP0040 punycode Deprecation Warning in CLI Output](./suppress-dep0040-punycode-9aaa6f/index.md) | completed |

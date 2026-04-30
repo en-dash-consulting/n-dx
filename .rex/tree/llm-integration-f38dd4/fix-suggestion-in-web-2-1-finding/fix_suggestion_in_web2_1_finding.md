@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in web-2: Zone "web-2" has a numeric suffix indicating an overflow community — pin its fil](./fix-suggestion-in-web-2-zone-web-2-has-a-numeric-77111a/index.md) | completed |
+| [Fix suggestion in web-2: Zone "web-2" has a numeric suffix indicating an overflow community — pin its fil](./fix-suggestion-in-web-2-zone-77111a/index.md) | completed |

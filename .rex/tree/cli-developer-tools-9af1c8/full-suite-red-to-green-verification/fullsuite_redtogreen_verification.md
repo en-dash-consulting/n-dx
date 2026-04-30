@@ -14,4 +14,4 @@ description: "Restore full test pass status across the project while preserving 
 
 | Title | Status |
 |-------|--------|
-| [Run project-wide test commands and compare against baseline coverage](./run-project-wide-test-commands-and-compare-against-ece5c7/index.md) | completed |
+| [Run project-wide test commands and compare against baseline coverage](./run-project-wide-test-commands-ece5c7/index.md) | completed |

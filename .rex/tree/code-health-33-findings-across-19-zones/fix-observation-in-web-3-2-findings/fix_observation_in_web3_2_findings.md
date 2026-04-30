@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in web-3: Generic zone name "Web 3" — enrichment did not assign a meaningful name reflecti (+1 more)](./fix-observation-in-web-3-generic-zone-name-web-3-aa55a6/index.md) | completed |
+| [Fix observation in web-3: Generic zone name "Web 3" — enrichment did not assign a meaningful name reflecti (+1 more)](./fix-observation-in-web-3-aa55a6/index.md) | completed |

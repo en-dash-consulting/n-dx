@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in token: Zone "Token" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0](./fix-suggestion-in-token-zone-token-token-has-db8cf9/index.md) | completed |
+| [Fix suggestion in token: Zone "Token" (token) has critical risk (score: 0.65, cohesion: 0.35, coupling: 0](./fix-suggestion-in-token-zone-db8cf9/index.md) | completed |

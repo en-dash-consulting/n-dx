@@ -14,5 +14,5 @@ description: "Add Go-specific signals to the existing archetype definitions in `
 
 | Title | Status |
 |-------|--------|
-| [Implement language-scoped ArchetypeSignal schema and add Go signals to archetypes](./implement-language-scoped-archetypesignal-schema-7cbffe/index.md) | completed |
-| [Write archetype classification tests for Go projects](./write-archetype-classification-tests-for-go-projects/index.md) | completed |
+| [Implement language-scoped ArchetypeSignal schema and add Go signals to archetypes](./implement-language-scoped-7cbffe/index.md) | completed |
+| [Write archetype classification tests for Go projects](./write-archetype-classification-4cba12/index.md) | completed |

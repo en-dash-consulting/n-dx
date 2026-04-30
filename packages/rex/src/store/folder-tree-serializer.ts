@@ -23,7 +23,7 @@ import type { PRDItem } from "../schema/index.js";
 import { titleToFilename } from "./title-to-filename.js";
 import { generateIndexMd } from "./folder-tree-index-generator.js";
 
-const MAX_SLUG_LENGTH = 60;
+const MAX_SLUG_LENGTH = 40;
 const SHORT_ID_LENGTH = 6;
 const EMPTY_TITLE_SLUG = "untitled";
 
@@ -133,7 +133,7 @@ async function serializeChildren(
  * Derive a deterministic, title-first directory slug for one item.
  *
  * Normal titles produce the same slug regardless of ID. Titles whose normalized
- * slug exceeds 60 characters reserve room for `-{id6}` and append the first
+ * slug exceeds 40 characters reserve room for `-{id6}` and append the first
  * six safe ID characters. Sibling collision suffixes are applied by
  * `resolveSiblingSlugs`, because collision detection requires parent context.
  */

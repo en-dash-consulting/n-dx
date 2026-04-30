@@ -14,5 +14,5 @@ acceptanceCriteria: []
 | Title | Status |
 |-------|--------|
 | [Claude API token tracking](./claude-api-token-tracking/index.md) | completed |
-| [Implement token usage tracking, reporting, and budget checking](./implement-token-usage-tracking-reporting-and-budget-1ae1ab/index.md) | completed |
+| [Implement token usage tracking, reporting, and budget checking](./implement-token-usage-tracking-1ae1ab/index.md) | completed |
 | [Usage reporting and visualization](./usage-reporting-and-visualization/index.md) | completed |

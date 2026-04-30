@@ -15,4 +15,4 @@ acceptanceCriteria: []
 |-------|--------|
 | [Claude API Configuration](./claude-api-configuration/index.md) | completed |
 | [Natural language proposal modification](./natural-language-proposal-modification/index.md) | completed |
-| [Notion Integration Configuration Interface](./notion-integration-configuration-interface/index.md) | completed |
+| [Notion Integration Configuration Interface](./notion-integration-d7e6c7/index.md) | completed |

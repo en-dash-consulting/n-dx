@@ -13,8 +13,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { join, relative, sep } from "node:path";
 import { tmpdir } from "node:os";
 import {
   resolveSiblingSlugs,
@@ -60,6 +60,23 @@ function makeSubtask(id: string, title: string, extra: Partial<PRDItem> = {}): P
   return { id, title, status: "pending", level: "subtask", ...extra };
 }
 
+async function collectFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const entryPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const childFiles = await collectFiles(entryPath);
+      files.push(...childFiles);
+    } else if (entry.isFile()) {
+      files.push(entryPath);
+    }
+  }
+
+  return files;
+}
+
 // ── Slug algorithm ────────────────────────────────────────────────────────────
 
 describe("slugify", () => {
@@ -96,8 +113,8 @@ describe("slugify", () => {
       "Hot-reload MCP tool schemas on HTTP transport without server restart",
       "5dd63e4e-0000-0000-0000-000000000000",
     );
-    expect(slug).toBe("hot-reload-mcp-tool-schemas-on-http-transport-5dd63e");
-    expect(slug.length).toBeLessThanOrEqual(60);
+    expect(slug).toBe("hot-reload-mcp-tool-schemas-on-5dd63e");
+    expect(slug.length).toBeLessThanOrEqual(40);
     expect(slug).not.toContain("server");
   });
 
@@ -165,6 +182,37 @@ describe("serializeFolderTree: directory structure", () => {
     );
     const s = await stat(taskDir);
     expect(s.isDirectory()).toBe(true);
+  });
+
+  it("keeps generated nested markdown paths within the Windows checkout budget", async () => {
+    const subtask = makeSubtask(
+      "44444444-0000-0000-0000-000000000000",
+      "Subtask with a deliberately verbose title that would otherwise make paths too long",
+    );
+    const task = makeTask(
+      "33333333-0000-0000-0000-000000000000",
+      "Task with a deliberately verbose title that would otherwise make paths too long",
+      { children: [subtask] },
+    );
+    const feature = makeFeature(
+      "22222222-0000-0000-0000-000000000000",
+      "Feature with a deliberately verbose title that would otherwise make paths too long",
+      { children: [task] },
+    );
+    const epic = makeEpic(
+      "11111111-0000-0000-0000-000000000000",
+      "Epic with a deliberately verbose title that would otherwise make paths too long",
+      { children: [feature] },
+    );
+
+    await serializeFolderTree([epic], testDir);
+
+    const files = await collectFiles(testDir);
+    const repoRelativePaths = files.map((file) =>
+      `.rex/tree/${relative(testDir, file).split(sep).join("/")}`,
+    );
+    const maxLength = Math.max(...repoRelativePaths.map((path) => path.length));
+    expect(maxLength).toBeLessThanOrEqual(220);
   });
 });
 

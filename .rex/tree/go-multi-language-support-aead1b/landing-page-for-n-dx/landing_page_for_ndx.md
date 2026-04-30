@@ -18,6 +18,6 @@ description: "Build a beautiful, informative, and interactive landing page for n
 
 | Title | Status |
 |-------|--------|
-| [Add getting started section and wire up routing](./add-getting-started-section-and-wire-up-routing/index.md) | completed |
-| [Add interactive workflow demo and animations](./add-interactive-workflow-demo-and-animations/index.md) | completed |
-| [Build landing page with hero and package showcase](./build-landing-page-with-hero-and-package-showcase/index.md) | completed |
+| [Add getting started section and wire up routing](./add-getting-started-section-and-286101/index.md) | completed |
+| [Add interactive workflow demo and animations](./add-interactive-workflow-demo-7ff4f6/index.md) | completed |
+| [Build landing page with hero and package showcase](./build-landing-page-with-hero-5afe5e/index.md) | completed |

@@ -17,4 +17,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in web-2: Generic zone name "Web 2" — enrichment did not assign a meaningful name reflecti (+1 more)](./fix-observation-in-web-2-generic-zone-name-web-2-0fe2a0/index.md) | completed |
+| [Fix observation in web-2: Generic zone name "Web 2" — enrichment did not assign a meaningful name reflecti (+1 more)](./fix-observation-in-web-2-0fe2a0/index.md) | completed |

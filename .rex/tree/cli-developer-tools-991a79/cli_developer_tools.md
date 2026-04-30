@@ -12,4 +12,4 @@ completedAt: "2026-04-08T21:08:10.991Z"
 
 | Title | Status |
 |-------|--------|
-| [ANSI Color Output Across Rex, SourceVision, and Hench](./ansi-color-output-across-rex-sourcevision-and-hench/index.md) | completed |
+| [ANSI Color Output Across Rex, SourceVision, and Hench](./ansi-color-output-across-rex-e73702/index.md) | completed |

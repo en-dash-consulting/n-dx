@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix move-file in core: File "assistant-assets/index.js" is pinned to zone "Core" but lives in assistant](./fix-move-file-in-core-file-assistant-assets-index-245593/index.md) | completed |
+| [Fix move-file in core: File "assistant-assets/index.js" is pinned to zone "Core" but lives in assistant](./fix-move-file-in-core-file-245593/index.md) | completed |

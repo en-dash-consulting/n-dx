@@ -12,5 +12,5 @@ completedAt: "2026-04-24T18:55:40.254Z"
 
 | Title | Status |
 |-------|--------|
-| [Self-Heal Scoped Task Selection and Auto-Termination](./self-heal-scoped-task-selection-and-auto-termination/index.md) | completed |
-| [Self-Heal Tag Attribution on Created PRD Items](./self-heal-tag-attribution-on-created-prd-items/index.md) | completed |
+| [Self-Heal Scoped Task Selection and Auto-Termination](./self-heal-scoped-task-selection-ae2813/index.md) | completed |
+| [Self-Heal Tag Attribution on Created PRD Items](./self-heal-tag-attribution-on-2e184c/index.md) | completed |

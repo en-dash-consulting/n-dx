@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix code in project-scaffold: cli-brand.js exists at both the repo root and inside packages/core, creating a d](./fix-code-in-project-scaffold-cli-brand-js-exists-at-787fdf/index.md) | completed |
+| [Fix code in project-scaffold: cli-brand.js exists at both the repo root and inside packages/core, creating a d](./fix-code-in-project-scaffold-787fdf/index.md) | completed |

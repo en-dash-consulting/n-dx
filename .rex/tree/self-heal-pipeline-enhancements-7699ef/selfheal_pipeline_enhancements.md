@@ -13,6 +13,6 @@ completedAt: "2026-04-14T20:16:38.921Z"
 | Title | Status |
 |-------|--------|
 | [Dependency Health Pass](./dependency-health-pass/index.md) | completed |
-| [Non-Test Codebase Cleanup and Condensation Pass](./non-test-codebase-cleanup-and-condensation-pass/index.md) | completed |
-| [Test Suite Validation Gate and Remediation Loop](./test-suite-validation-gate-and-remediation-loop/index.md) | completed |
-| [Web UI Design and User Experience Enhancement](./web-ui-design-and-user-experience-enhancement/index.md) | completed |
+| [Non-Test Codebase Cleanup and Condensation Pass](./non-test-codebase-cleanup-and-b7327b/index.md) | completed |
+| [Test Suite Validation Gate and Remediation Loop](./test-suite-validation-gate-and-0cae57/index.md) | completed |
+| [Web UI Design and User Experience Enhancement](./web-ui-design-and-user-b1e130/index.md) | completed |

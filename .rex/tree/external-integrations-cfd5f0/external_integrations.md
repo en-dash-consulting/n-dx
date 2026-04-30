@@ -12,4 +12,4 @@ completedAt: "2026-04-07T20:06:32.040Z"
 
 | Title | Status |
 |-------|--------|
-| [PR Build Pipeline and Cross-Platform CLI Validation Hardening](./pr-build-pipeline-and-cross-platform-cli-validation-1dc428/index.md) | completed |
+| [PR Build Pipeline and Cross-Platform CLI Validation Hardening](./pr-build-pipeline-and-cross-1dc428/index.md) | completed |

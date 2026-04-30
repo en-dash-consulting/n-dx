@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix anti-pattern in global: God function: handleInit in packages/core/cli.js calls 40 unique functions — con](./fix-anti-pattern-in-global-god-function-handleinit-f65315/index.md) | completed |
+| [Fix anti-pattern in global: God function: handleInit in packages/core/cli.js calls 40 unique functions — con](./fix-anti-pattern-in-global-god-f65315/index.md) | completed |

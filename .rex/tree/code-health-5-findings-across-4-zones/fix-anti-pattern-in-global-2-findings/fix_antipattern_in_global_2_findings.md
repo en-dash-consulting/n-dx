@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix anti-pattern in global: God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts c (+1 more)](./fix-anti-pattern-in-global-god-function-c43444/index.md) | completed |
+| [Fix anti-pattern in global: God function: analyzeImports in packages/sourcevision/src/analyzers/imports.ts c (+1 more)](./fix-anti-pattern-in-global-god-c43444/index.md) | completed |

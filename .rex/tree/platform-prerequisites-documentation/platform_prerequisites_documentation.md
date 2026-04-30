@@ -12,8 +12,8 @@ completedAt: "2026-04-19T04:56:26.493Z"
 
 | Title | Status |
 |-------|--------|
-| [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale-projects/index.md) | completed |
-| [Developer Environment Prerequisites Documentation](./developer-environment-prerequisites-documentation/index.md) | completed |
+| [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-013bc1/index.md) | completed |
+| [Developer Environment Prerequisites Documentation](./developer-environment-af74f8/index.md) | completed |
 | [Documentation improvements](./documentation-improvements/index.md) | completed |
 | [End-User Platform Requirements](./end-user-platform-requirements/index.md) | completed |
 | [TreeNodes DOM Performance Optimization](./treenodes-dom-performance-optimization/index.md) | completed |

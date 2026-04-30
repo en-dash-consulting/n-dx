@@ -12,4 +12,4 @@ completedAt: "2026-04-19T04:55:01.751Z"
 
 | Title | Status |
 |-------|--------|
-| [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-dino-takeover/index.md) | completed |
+| [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-331928/index.md) | completed |

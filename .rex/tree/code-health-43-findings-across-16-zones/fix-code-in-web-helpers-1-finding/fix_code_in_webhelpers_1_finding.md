@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix code in web-helpers: getLevelEmoji is imported as a runtime function from web-viewer's prd-tree/level](./fix-code-in-web-helpers-getlevelemoji-is-imported-d51939/index.md) | completed |
+| [Fix code in web-helpers: getLevelEmoji is imported as a runtime function from web-viewer's prd-tree/level](./fix-code-in-web-helpers-d51939/index.md) | completed |

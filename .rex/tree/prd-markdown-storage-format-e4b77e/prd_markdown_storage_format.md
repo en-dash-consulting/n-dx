@@ -13,4 +13,4 @@ endedAt: "2026-04-29T03:45:50.222Z"
 
 | Title | Status |
 |-------|--------|
-| [JSON Write Path Removal and Markdown-Only Enforcement](./json-write-path-removal-and-markdown-only-enforcement/index.md) | completed |
+| [JSON Write Path Removal and Markdown-Only Enforcement](./json-write-path-removal-and-21a866/index.md) | completed |

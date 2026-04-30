@@ -14,4 +14,4 @@ description: "Update Rex's analyze scanners to understand Go project structure: 
 
 | Title | Status |
 |-------|--------|
-| [Add go.mod scanner, Go skip patterns, and test coverage to Rex](./add-go-mod-scanner-go-skip-patterns-and-test-2ba0de/index.md) | completed |
+| [Add go.mod scanner, Go skip patterns, and test coverage to Rex](./add-go-mod-scanner-go-skip-2ba0de/index.md) | completed |

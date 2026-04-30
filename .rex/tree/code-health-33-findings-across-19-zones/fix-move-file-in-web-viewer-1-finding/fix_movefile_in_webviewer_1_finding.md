@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix move-file in web-viewer: File "packages/web/src/viewer/external.ts" is pinned to zone "Web Viewer" but li](./fix-move-file-in-web-viewer-file-packages-web-src-f85abf/index.md) | completed |
+| [Fix move-file in web-viewer: File "packages/web/src/viewer/external.ts" is pinned to zone "Web Viewer" but li](./fix-move-file-in-web-viewer-f85abf/index.md) | completed |

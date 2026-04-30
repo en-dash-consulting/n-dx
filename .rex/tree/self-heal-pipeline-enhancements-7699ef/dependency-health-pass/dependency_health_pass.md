@@ -14,5 +14,5 @@ description: "Extend the self-heal loop with an automated dependency audit and c
 
 | Title | Status |
 |-------|--------|
-| [Implement automated dependency cleanup executor](./implement-automated-dependency-cleanup-executor/index.md) | completed |
-| [Implement dependency audit step in self-heal pipeline](./implement-dependency-audit-step-in-self-heal-pipeline/index.md) | completed |
+| [Implement automated dependency cleanup executor](./implement-automated-dependency-5052d7/index.md) | completed |
+| [Implement dependency audit step in self-heal pipeline](./implement-dependency-audit-step-8af32c/index.md) | completed |

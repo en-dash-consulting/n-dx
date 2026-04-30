@@ -13,7 +13,7 @@ endedAt: "2026-04-28T10:43:59.641Z"
 
 | Title | Status |
 |-------|--------|
-| [CLI and MCP Write Command Integration with Folder Tree](./cli-and-mcp-write-command-integration-with-folder-tree/index.md) | completed |
-| [Folder-Based PRD Schema Design and Serialization](./folder-based-prd-schema-design-and-serialization/index.md) | completed |
-| [Folder Tree Migration, Initialization, and Auto-Trigger](./folder-tree-migration-initialization-and-auto-trigger/index.md) | completed |
-| [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-tree-prd-storage/index.md) | completed |
+| [CLI and MCP Write Command Integration with Folder Tree](./cli-and-mcp-write-command-ce2ecf/index.md) | completed |
+| [Folder-Based PRD Schema Design and Serialization](./folder-based-prd-schema-design-7286f1/index.md) | completed |
+| [Folder Tree Migration, Initialization, and Auto-Trigger](./folder-tree-migration-568a1a/index.md) | completed |
+| [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-db58ca/index.md) | completed |

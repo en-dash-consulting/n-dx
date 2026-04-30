@@ -23,7 +23,7 @@ description: "The PRD grew to 70 top-level epics before anyone noticed the struc
 
 | Title | Status |
 |-------|--------|
-| [Add structure health gate to rex ci / ndx ci](./add-structure-health-gate-to-rex-ci-ndx-ci/index.md) | completed |
-| [Define structure health thresholds and add to rex config schema](./define-structure-health-thresholds-and-add-to-rex-6ce9b7/index.md) | completed |
-| [Implement structure health check function](./implement-structure-health-check-function/index.md) | completed |
-| [Wire health warnings into rex add, analyze, and plan write paths](./wire-health-warnings-into-rex-add-analyze-and-plan-3befc0/index.md) | completed |
+| [Add structure health gate to rex ci / ndx ci](./add-structure-health-gate-to-d587ad/index.md) | completed |
+| [Define structure health thresholds and add to rex config schema](./define-structure-health-6ce9b7/index.md) | completed |
+| [Implement structure health check function](./implement-structure-health-bf1fd0/index.md) | completed |
+| [Wire health warnings into rex add, analyze, and plan write paths](./wire-health-warnings-into-rex-3befc0/index.md) | completed |

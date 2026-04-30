@@ -12,4 +12,4 @@ completedAt: "2026-04-13T16:48:29.051Z"
 
 | Title | Status |
 |-------|--------|
-| [CLI Hint Correctness, Test Coverage, and Documentation Sync](./cli-hint-correctness-test-coverage-and-documentation-sync/index.md) | completed |
+| [CLI Hint Correctness, Test Coverage, and Documentation Sync](./cli-hint-correctness-test-77b9a8/index.md) | completed |

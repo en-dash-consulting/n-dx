@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in hench-2: Generic zone name "Hench 2" — enrichment did not assign a meaningful name reflec](./fix-observation-in-hench-2-generic-zone-name-hench-cb13bd/index.md) | completed |
+| [Fix observation in hench-2: Generic zone name "Hench 2" — enrichment did not assign a meaningful name reflec](./fix-observation-in-hench-2-cb13bd/index.md) | completed |

@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in rex-2: Generic zone name "Rex 2" — enrichment did not assign a meaningful name reflecti](./fix-observation-in-rex-2-generic-zone-name-rex-2-9dbf4f/index.md) | completed |
+| [Fix observation in rex-2: Generic zone name "Rex 2" — enrichment did not assign a meaningful name reflecti](./fix-observation-in-rex-2-9dbf4f/index.md) | completed |

@@ -12,4 +12,4 @@ completedAt: "2026-04-20T19:32:34.107Z"
 
 | Title | Status |
 |-------|--------|
-| [Graceful Cancellation with Rollback Prompt on Ctrl+C](./graceful-cancellation-with-rollback-prompt-on-ctrl-c/index.md) | completed |
+| [Graceful Cancellation with Rollback Prompt on Ctrl+C](./graceful-cancellation-with-626d40/index.md) | completed |

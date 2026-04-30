@@ -14,5 +14,5 @@ description: "Modify the SourceVision import analyzer (imports.ts) to dispatch t
 
 | Title | Status |
 |-------|--------|
-| [Modify imports.ts to route .go files to the Go import parser](./modify-imports-ts-to-route-go-files-to-the-go-import-parser/index.md) | completed |
-| [Write integration tests validating the Go import graph against the fixture project](./write-integration-tests-validating-the-go-import-c42858/index.md) | completed |
+| [Modify imports.ts to route .go files to the Go import parser](./modify-imports-ts-to-route-go-195091/index.md) | completed |
+| [Write integration tests validating the Go import graph against the fixture project](./write-integration-tests-c42858/index.md) | completed |

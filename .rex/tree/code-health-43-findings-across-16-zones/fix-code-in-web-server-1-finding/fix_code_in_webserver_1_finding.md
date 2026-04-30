@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix code in web-server: server/types.ts exports runtime functions jsonResponse(), errorResponse(), and r](./fix-code-in-web-server-server-types-ts-exports-f6c7a6/index.md) | completed |
+| [Fix code in web-server: server/types.ts exports runtime functions jsonResponse(), errorResponse(), and r](./fix-code-in-web-server-server-f6c7a6/index.md) | completed |

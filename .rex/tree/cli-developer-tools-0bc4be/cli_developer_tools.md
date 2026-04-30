@@ -12,4 +12,4 @@ completedAt: "2026-04-16T16:19:57.286Z"
 
 | Title | Status |
 |-------|--------|
-| [Pair-Programming Command Mode (rename from single-command)](./pair-programming-command-mode-rename-from-single-command/index.md) | completed |
+| [Pair-Programming Command Mode (rename from single-command)](./pair-programming-command-mode-9611c5/index.md) | completed |

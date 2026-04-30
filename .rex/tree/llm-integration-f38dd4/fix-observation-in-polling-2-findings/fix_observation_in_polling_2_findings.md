@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in polling: High coupling (0.75) — 3 imports target "web" (+1 more)](./fix-observation-in-polling-high-coupling-0-75-3-be039c/index.md) | completed |
+| [Fix observation in polling: High coupling (0.75) — 3 imports target "web" (+1 more)](./fix-observation-in-polling-high-be039c/index.md) | completed |

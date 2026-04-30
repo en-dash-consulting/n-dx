@@ -14,5 +14,5 @@ description: "Introduce a per-command timeout system with a long, safe default s
 
 | Title | Status |
 |-------|--------|
-| [Add timeout configuration panel to web settings UI](./add-timeout-configuration-panel-to-web-settings-ui/index.md) | completed |
-| [Expose timeout configuration in .n-dx.json schema and ndx config command](./expose-timeout-configuration-in-n-dx-json-schema-4b5594/index.md) | completed |
+| [Add timeout configuration panel to web settings UI](./add-timeout-configuration-panel-1160eb/index.md) | completed |
+| [Expose timeout configuration in .n-dx.json schema and ndx config command](./expose-timeout-configuration-in-4b5594/index.md) | completed |

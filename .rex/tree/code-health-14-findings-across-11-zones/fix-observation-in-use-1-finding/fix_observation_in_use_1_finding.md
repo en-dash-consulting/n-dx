@@ -17,4 +17,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in use: High coupling (0.75) — 3 imports target "web"](./fix-observation-in-use-high-coupling-0-75-3-imports-024c8e/index.md) | completed |
+| [Fix observation in use: High coupling (0.75) — 3 imports target "web"](./fix-observation-in-use-high-024c8e/index.md) | completed |

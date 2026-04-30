@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix structural in global: Both rex fix zones fall at or below the dual-fragility threshold simultaneously; (+3 more)](./fix-structural-in-global-both-rex-fix-zones-fall-at-211f95/index.md) | completed |
+| [Fix structural in global: Both rex fix zones fall at or below the dual-fragility threshold simultaneously; (+3 more)](./fix-structural-in-global-both-211f95/index.md) | completed |

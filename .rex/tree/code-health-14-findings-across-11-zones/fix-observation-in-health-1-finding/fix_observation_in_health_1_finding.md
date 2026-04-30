@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in health: High coupling (0.67) — 4 imports target "web"](./fix-observation-in-health-high-coupling-0-67-4-47ea74/index.md) | completed |
+| [Fix observation in health: High coupling (0.67) — 4 imports target "web"](./fix-observation-in-health-high-47ea74/index.md) | completed |

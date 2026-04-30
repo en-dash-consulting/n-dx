@@ -15,4 +15,4 @@ completedAt: "2026-03-26T05:57:25.506Z"
 | [Go Fixture Enhancement](./go-fixture-enhancement/index.md) | completed |
 | [Go Import Parser](./go-import-parser/index.md) | completed |
 | [Import Analyzer Language Dispatch](./import-analyzer-language-dispatch/index.md) | completed |
-| [Zone Detection Validation for Go Projects](./zone-detection-validation-for-go-projects/index.md) | completed |
+| [Zone Detection Validation for Go Projects](./zone-detection-validation-for-fe5bf3/index.md) | completed |

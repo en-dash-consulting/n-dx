@@ -3,16 +3,20 @@
  *
  * Converts item titles to deterministic, filesystem-safe markdown filenames.
  * Separates concerns from directory slugification: filenames use underscores
- * for word boundaries (not hyphens) and are round-trip safe.
+ * for word boundaries (not hyphens), are round-trip safe, and are capped
+ * so checked-in folder trees remain compatible with Windows checkout limits.
  *
  * Normalization rules:
  *   1. Remove `.md` extension if already present (round-trip safety)
- *   2. Lowercase the title
- *   3. Remove filesystem-reserved characters: \ / : * ? " < > |
- *   4. Replace whitespace runs with single underscore
- *   5. Strip leading/trailing underscores
- *   6. If result is empty, use "unnamed"
- *   7. Append `.md` extension
+ *   2. Normalize Unicode with NFKD and strip combining marks
+ *   3. Lowercase the title
+ *   4. Remove non-ASCII characters that remain after accent normalization
+ *   5. Remove filesystem-reserved and punctuation characters
+ *   6. Replace whitespace runs with single underscore
+ *   7. Strip leading/trailing underscores
+ *   8. If result is empty, use "unnamed"
+ *   9. Truncate the filename body at a word boundary
+ *   10. Append `.md` extension
  *
  * Round-trip safety: titleToFilename(titleToFilename(x)) == titleToFilename(x)
  *
@@ -33,26 +37,62 @@
  * titleToFilename("!!!???")                  // "unnamed.md" (empty after normalization)
  * titleToFilename("Héros & Légendes")       // "heros_legendes.md"
  */
+
+const MARKDOWN_EXTENSION = ".md";
+const MAX_FILENAME_LENGTH = 40;
+const MAX_FILENAME_BODY_LENGTH = MAX_FILENAME_LENGTH - MARKDOWN_EXTENSION.length;
+
 export function titleToFilename(title: string): string {
   // Step 1: Remove .md extension if present (round-trip safety)
-  const withoutExtension = title.endsWith(".md") ? title.slice(0, -3) : title;
+  const withoutExtension = stripMarkdownExtension(title);
 
-  // Step 2-6: Normalize to filesystem-safe form
-  const normalized = withoutExtension
-    // Normalize Unicode using NFKD (decompose accented characters)
+  // Step 2-7: Normalize to filesystem-safe form.
+  const normalized = normalizeFilenameBody(withoutExtension);
+
+  // Step 8-10: Fallback, truncate, and append .md extension.
+  return truncateFilenameBody(normalized || "unnamed") + MARKDOWN_EXTENSION;
+}
+
+/**
+ * Append a deterministic suffix while preserving the global filename length cap.
+ */
+export function appendFilenameSuffix(filename: string, suffix: string): string {
+  const base = stripMarkdownExtension(filename);
+  const normalizedSuffix = normalizeFilenameBody(suffix) || "item";
+  const suffixBody = truncateFilenameBody(normalizedSuffix, MAX_FILENAME_BODY_LENGTH - 2);
+  const suffixPart = `_${suffixBody}`;
+  const baseLimit = Math.max(1, MAX_FILENAME_BODY_LENGTH - suffixPart.length);
+  return `${truncateFilenameBody(base, baseLimit)}${suffixPart}${MARKDOWN_EXTENSION}`;
+}
+
+function stripMarkdownExtension(value: string): string {
+  return value.toLowerCase().endsWith(MARKDOWN_EXTENSION)
+    ? value.slice(0, -MARKDOWN_EXTENSION.length)
+    : value;
+}
+
+function normalizeFilenameBody(value: string): string {
+  return value
+    // Normalize Unicode using NFKD (decompose accented characters).
     .normalize("NFKD")
-    // Remove combining diacritical marks (U+0300–U+036F)
-    .replace(/[̀-ͯ]/g, "")
-    // Lowercase
+    // Remove combining diacritical marks (U+0300-U+036F).
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    // Remove filesystem-reserved and punctuation characters:
-    // \ / : * ? " < > | ' ( ) & ! @ # $ % ^ = + [ ] { } ; , . ~ - `
-    .replace(/[\\/:*?"<>'()&!@#$%^=+\[\]{};,.~\-`|]/g, "")
-    // Replace whitespace runs with single underscore
+    // Keep filenames ASCII-only for predictable cross-platform checkout.
+    .replace(/[^\x00-\x7F]/g, "")
+    // Remove filesystem-reserved and punctuation characters.
+    .replace(/[^a-z0-9_\s]+/g, "")
+    // Replace whitespace runs with single underscore.
     .replace(/\s+/g, "_")
-    // Strip leading/trailing underscores
+    // Strip leading/trailing underscores.
     .replace(/^_+|_+$/g, "");
+}
 
-  // Step 7: Append .md extension (use "unnamed" if result is empty)
-  return (normalized || "unnamed") + ".md";
+function truncateFilenameBody(body: string, maxLength = MAX_FILENAME_BODY_LENGTH): string {
+  if (body.length <= maxLength) return body;
+
+  const candidate = body.slice(0, maxLength).replace(/_+$/g, "");
+  const lastUnderscore = candidate.lastIndexOf("_");
+  if (lastUnderscore > 0) return candidate.slice(0, lastUnderscore);
+  return candidate || body.slice(0, maxLength);
 }

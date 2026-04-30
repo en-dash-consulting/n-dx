@@ -12,4 +12,4 @@ completedAt: "2026-04-08T15:52:18.555Z"
 
 | Title | Status |
 |-------|--------|
-| [Rex Command Vendor-Model Binding Regression Fix](./rex-command-vendor-model-binding-regression-fix/index.md) | completed |
+| [Rex Command Vendor-Model Binding Regression Fix](./rex-command-vendor-model-d1438d/index.md) | completed |

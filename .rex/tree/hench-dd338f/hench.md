@@ -12,4 +12,4 @@ completedAt: "2026-04-08T23:44:31.225Z"
 
 | Title | Status |
 |-------|--------|
-| [Rex Run Rolling Log Display and Persistent Log Files](./rex-run-rolling-log-display-and-persistent-log-files/index.md) | completed |
+| [Rex Run Rolling Log Display and Persistent Log Files](./rex-run-rolling-log-display-and-8f175c/index.md) | completed |

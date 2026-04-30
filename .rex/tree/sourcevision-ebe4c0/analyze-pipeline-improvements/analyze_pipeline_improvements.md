@@ -19,10 +19,10 @@ description: "Two related UX improvements: (1) prune should reconsolidate remain
 
 | Title | Status |
 |-------|--------|
-| [Deduplicate near-identical findings across enrichment passes](./deduplicate-near-identical-findings-across-enrichment-passes/index.md) | completed |
-| [Enhance next-steps impact scoring with zone metrics](./enhance-next-steps-impact-scoring-with-zone-metrics/index.md) | completed |
+| [Deduplicate near-identical findings across enrichment passes](./deduplicate-near-identical-e4345e/index.md) | completed |
+| [Enhance next-steps impact scoring with zone metrics](./enhance-next-steps-impact-ed9582/index.md) | completed |
 | [Enhance scanSourceVision output](./enhance-scansourcevision-output/index.md) | completed |
 | [File import enhancements](./file-import-enhancements/index.md) | completed |
-| [Filter low-signal items from scanner output](./filter-low-signal-items-from-scanner-output/index.md) | completed |
-| [Hide completed items by default in status views](./hide-completed-items-by-default-in-status-views/index.md) | completed |
+| [Filter low-signal items from scanner output](./filter-low-signal-items-from-8c6b13/index.md) | completed |
+| [Hide completed items by default in status views](./hide-completed-items-by-default-41f5c0/index.md) | completed |
 | [Scanner improvements](./scanner-improvements/index.md) | completed |

@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix code in rex-recommend: Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, ](./fix-code-in-rex-recommend-add-unit-tests-for-8d046a/index.md) | completed |
+| [Fix code in rex-recommend: Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, ](./fix-code-in-rex-recommend-add-8d046a/index.md) | completed |

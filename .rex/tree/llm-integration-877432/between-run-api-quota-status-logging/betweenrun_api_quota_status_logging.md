@@ -13,4 +13,4 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Implement Codex API quota fetch and normalize response to QuotaRemaining](./implement-codex-api-quota-fetch-and-normalize-208d64/index.md) | completed |
+| [Implement Codex API quota fetch and normalize response to QuotaRemaining](./implement-codex-api-quota-fetch-208d64/index.md) | completed |

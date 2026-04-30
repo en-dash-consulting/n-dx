@@ -17,4 +17,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in tick: High coupling (0.56) — 3 imports target "web"](./fix-observation-in-tick-high-coupling-0-56-3-793e07/index.md) | completed |
+| [Fix observation in tick: High coupling (0.56) — 3 imports target "web"](./fix-observation-in-tick-high-793e07/index.md) | completed |

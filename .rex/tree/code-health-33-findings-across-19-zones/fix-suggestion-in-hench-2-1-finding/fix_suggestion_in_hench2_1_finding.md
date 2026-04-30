@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in hench-2: Zone "hench-2" has a numeric suffix indicating an overflow community — pin its f](./fix-suggestion-in-hench-2-zone-hench-2-has-a-0638f6/index.md) | completed |
+| [Fix suggestion in hench-2: Zone "hench-2" has a numeric suffix indicating an overflow community — pin its f](./fix-suggestion-in-hench-2-zone-0638f6/index.md) | completed |

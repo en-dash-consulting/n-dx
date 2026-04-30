@@ -13,5 +13,5 @@ completedAt: "2026-04-15T17:52:01.299Z"
 | Title | Status |
 |-------|--------|
 | [Memory-Aware Polling Loop Management](./memory-aware-polling-loop-management/index.md) | completed |
-| [Model Tier Registry and Weight-Aware Resolution](./model-tier-registry-and-weight-aware-resolution/index.md) | completed |
-| [Per-Command Task Weight Classification and Integration](./per-command-task-weight-classification-and-integration/index.md) | completed |
+| [Model Tier Registry and Weight-Aware Resolution](./model-tier-registry-and-weight-405c9f/index.md) | completed |
+| [Per-Command Task Weight Classification and Integration](./per-command-task-weight-effae9/index.md) | completed |

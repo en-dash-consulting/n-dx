@@ -13,4 +13,4 @@ completedAt: "2026-04-07T22:58:12.976Z"
 | Title | Status |
 |-------|--------|
 | [Cross-Platform Failure Diagnostics](./cross-platform-failure-diagnostics/index.md) | completed |
-| [PR Build Pipeline and Cross-Platform CLI Validation Hardening](./pr-build-pipeline-and-cross-platform-cli-validation-544adb/index.md) | completed |
+| [PR Build Pipeline and Cross-Platform CLI Validation Hardening](./pr-build-pipeline-and-cross-544adb/index.md) | completed |

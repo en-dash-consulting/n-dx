@@ -31,7 +31,7 @@ Tree root: `.rex/tree/` (configurable). Within it, the PRD hierarchy maps to nes
 
 ### Slug Algorithm
 
-Every directory name is derived deterministically from the item's **title** and **ID**.
+Every directory name is derived deterministically from the item's **title** and, when needed, **ID**.
 
 | Step | Operation |
 |------|-----------|
@@ -43,31 +43,32 @@ Every directory name is derived deterministically from the item's **title** and 
 | 6 | Remove all characters outside `[a-z0-9-]` |
 | 7 | Collapse consecutive hyphens to one |
 | 8 | Strip leading and trailing hyphens |
-| 9 | Truncate to ≤ 40 characters: if the 40th character falls mid-segment, search backward for the last hyphen and truncate there, then strip the trailing hyphen |
-| 10 | Append `-{id8}` where `id8 = id.replace(/-/g, "").slice(0, 8)` |
+| 9 | If the result is empty, use `untitled` |
+| 10 | Truncate to <= 40 characters at a hyphen boundary |
+| 11 | For long titles or sibling slug collisions, reserve room for `-{id6}` and append `id6 = id.replace(/[^a-z0-9]/g, "").slice(0, 6)` |
 
-If steps 1–8 produce an empty string (all characters stripped), the slug is the bare `{id8}` with no leading hyphen.
+For normal non-colliding titles, the slug remains title-only. Long titles and colliding sibling titles receive the ID suffix. If a malformed PRD contains duplicate title/ID pairs under the same parent, the serializer appends a final positional suffix to keep the migration lossless.
 
 ### Examples
 
 | Title | ID prefix | Slug |
 |-------|-----------|------|
-| `Web Dashboard` | `4d62fa6c` | `web-dashboard-4d62fa6c` |
-| `Hot-reload MCP tool schemas on HTTP transport without server restart` | `5dd63e4e` | `hot-reload-mcp-tool-schemas-on-http-5dd63e4e` |
-| `Héros & Légendes` | `a1b2c3d4` | `heros-legendes-a1b2c3d4` |
-| `日本語タイトル` | `f0e1d2c3` | `f0e1d2c3` |
-| `--- !!!` | `11223344` | `11223344` |
+| `Web Dashboard` | `4d62fa6c` | `web-dashboard` |
+| `Hot-reload MCP tool schemas on HTTP transport without server restart` | `5dd63e4e` | `hot-reload-mcp-tool-schemas-on-5dd63e` |
+| `Héros & Légendes` | `a1b2c3d4` | `heros-legendes` |
+| `日本語タイトル` | `f0e1d2c3` | `untitled` |
+| `--- !!!` | `11223344` | `untitled` |
 
 **Long-title trace** (`Hot-reload MCP…`):
-- After steps 1–8: `hot-reload-mcp-tool-schemas-on-http-transport-without-server-restart`
-- First 40 chars: `hot-reload-mcp-tool-schemas-on-http-tran` — truncation point falls inside `transport`
-- Last hyphen before position 40: position 36 (`…-http-`)
-- Body after truncation: `hot-reload-mcp-tool-schemas-on-http`
-- Final slug: `hot-reload-mcp-tool-schemas-on-http-5dd63e4e`
+- After title normalization: `hot-reload-mcp-tool-schemas-on-http-transport-without-server-restart`
+- The title exceeds the slug limit, so the serializer reserves room for `-5dd63e`
+- Prefix limit before suffix: 33 characters
+- Body after boundary truncation: `hot-reload-mcp-tool-schemas-on`
+- Final slug: `hot-reload-mcp-tool-schemas-on-5dd63e`
 
 ### Collision Resistance
 
-The `{id8}` suffix is derived from 32 hex characters of a UUID v4. The probability of two siblings sharing the same 8-character prefix is < 1 in 4 billion. No sequential counter or retry loop is needed.
+The `{id6}` suffix is derived from sanitized PRD IDs. It is applied only for long titles and sibling title collisions, which keeps common paths readable while preserving deterministic uniqueness where the title alone is insufficient.
 
 ---
 
@@ -81,11 +82,13 @@ As PRD item storage evolves from directory-based slug indexing to title-based ma
 2. Unicode-normalize using NFKD decomposition (decomposes accented characters)
 3. Strip combining diacritical marks (U+0300–U+036F)
 4. Lowercase
-5. Remove filesystem-reserved and punctuation characters: `\ / : * ? " < > | ' ( ) & ! @ # $ % ^ = + [ ] { } ; , . ~ ` `
-6. Replace whitespace runs with single underscore
-7. Strip leading/trailing underscores
-8. If the result is empty (all characters removed), use "unnamed"
-9. Append `.md` extension
+5. Remove remaining non-ASCII characters for predictable cross-platform checkout
+6. Remove filesystem-reserved and punctuation characters
+7. Replace whitespace runs with single underscore
+8. Strip leading/trailing underscores
+9. If the result is empty (all characters removed), use "unnamed"
+10. Truncate the filename body at a word boundary so the full filename is <= 40 characters including `.md`
+11. Append `.md` extension
 
 ### Properties
 
@@ -93,7 +96,7 @@ As PRD item storage evolves from directory-based slug indexing to title-based ma
 - **Round-trip safe:** `f(f(x)) = f(x)` — applying the function twice yields the same result as applying once
 - **Idempotent:** Already-normalized filenames are not changed
 - **Collision-prone inputs merge:** Titles differing only in punctuation normalize to the same filename
-- **No length limit:** Unlike directory slugs, filenames are not truncated
+- **Length capped:** Filenames are capped at 40 characters including `.md` to keep nested `.rex/tree` paths below Windows checkout limits
 
 ### Examples
 
@@ -108,6 +111,7 @@ As PRD item storage evolves from directory-based slug indexing to title-based ma
 | `Hello World` | `hello_world.md` |
 | `Hello: World` | `hello_world.md` |
 | `Hello (World)` | `hello_world.md` |
+| `This is a very long title with many words that should all be preserved` | `this_is_a_very_long_title_with_many.md` |
 
 ### Public API
 

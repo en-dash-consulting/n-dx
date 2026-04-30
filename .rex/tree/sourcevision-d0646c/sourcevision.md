@@ -12,4 +12,4 @@ completedAt: "2026-04-14T15:56:50.296Z"
 
 | Title | Status |
 |-------|--------|
-| [SourceVision Token Efficiency and Prompt Compaction](./sourcevision-token-efficiency-and-prompt-compaction/index.md) | completed |
+| [SourceVision Token Efficiency and Prompt Compaction](./sourcevision-token-efficiency-ede8a6/index.md) | completed |

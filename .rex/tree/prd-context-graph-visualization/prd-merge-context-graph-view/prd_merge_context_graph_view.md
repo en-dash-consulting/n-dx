@@ -14,5 +14,5 @@ description: "Interactive visual graph in the dashboard that shows the PRD tree 
 
 | Title | Status |
 |-------|--------|
-| [Build merge history data pipeline linking git merges to PRD items](./build-merge-history-data-pipeline-linking-git-3b7bdd/index.md) | completed |
-| [Render interactive PRD-and-merge context graph in the dashboard](./render-interactive-prd-and-merge-context-graph-in-72855b/index.md) | completed |
+| [Build merge history data pipeline linking git merges to PRD items](./build-merge-history-data-3b7bdd/index.md) | completed |
+| [Render interactive PRD-and-merge context graph in the dashboard](./render-interactive-prd-and-72855b/index.md) | completed |

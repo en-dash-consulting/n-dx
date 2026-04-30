@@ -14,6 +14,6 @@ description: "When an ndx work run fails, automatically revert uncommitted file 
 
 | Title | Status |
 |-------|--------|
-| [Add regression tests for Codex multi-line 'tokens used' output format](./add-regression-tests-for-codex-multi-line-tokens-c57e4a/index.md) | completed |
-| [Add rollback configuration, confirmation UX, and regression tests](./add-rollback-configuration-confirmation-ux-and-03d9f5/index.md) | completed |
-| [Implement git change rollback on failed hench runs](./implement-git-change-rollback-on-failed-hench-runs/index.md) | completed |
+| [Add regression tests for Codex multi-line 'tokens used' output format](./add-regression-tests-for-codex-c57e4a/index.md) | completed |
+| [Add rollback configuration, confirmation UX, and regression tests](./add-rollback-configuration-03d9f5/index.md) | completed |
+| [Implement git change rollback on failed hench runs](./implement-git-change-rollback-a6199e/index.md) | completed |

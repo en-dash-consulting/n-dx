@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in rex: Zone "Rex" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0](./fix-suggestion-in-rex-zone-rex-rex-has-catastrophic-362e10/index.md) | completed |
+| [Fix suggestion in rex: Zone "Rex" (rex) has catastrophic risk (score: 0.79, cohesion: 0.21, coupling: 0](./fix-suggestion-in-rex-zone-rex-362e10/index.md) | completed |

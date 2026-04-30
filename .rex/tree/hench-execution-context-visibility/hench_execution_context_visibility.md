@@ -12,4 +12,4 @@ completedAt: "2026-04-20T18:43:09.875Z"
 
 | Title | Status |
 |-------|--------|
-| [API vs CLI Invocation Context Detection and Display](./api-vs-cli-invocation-context-detection-and-display/index.md) | completed |
+| [API vs CLI Invocation Context Detection and Display](./api-vs-cli-invocation-context-28bd8b/index.md) | completed |

@@ -12,4 +12,4 @@ completedAt: "2026-04-14T21:36:07.688Z"
 
 | Title | Status |
 |-------|--------|
-| [Vendor-Agnostic Batch Execution in Self-Heal Loop](./vendor-agnostic-batch-execution-in-self-heal-loop/index.md) | completed |
+| [Vendor-Agnostic Batch Execution in Self-Heal Loop](./vendor-agnostic-batch-execution-e0d222/index.md) | completed |

@@ -15,4 +15,4 @@ description: "- Bidirectional coupling: \"web-server\" ↔ \"web-viewer\" (31+72
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in global: Bidirectional coupling: "web-server" ↔ "web-viewer" (31+72 crossings) — consider](./fix-observation-in-global-bidirectional-coupling-038323/index.md) | completed |
+| [Fix observation in global: Bidirectional coupling: "web-server" ↔ "web-viewer" (31+72 crossings) — consider](./fix-observation-in-global-038323/index.md) | completed |

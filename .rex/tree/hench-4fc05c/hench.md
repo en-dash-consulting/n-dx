@@ -18,6 +18,6 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Feature 3: Rex Scanner Go Support](./feature-3-rex-scanner-go-support/index.md) | completed |
 | [Feature 4: Hench Go Project Support](./feature-4-hench-go-project-support/index.md) | completed |
 | [Hench Process Concurrency Management](./hench-process-concurrency-management/index.md) | completed |
-| [Hench Resource Monitoring and User Feedback](./hench-resource-monitoring-and-user-feedback/index.md) | completed |
+| [Hench Resource Monitoring and User Feedback](./hench-resource-monitoring-and-a5f844/index.md) | completed |
 | [Reliable work loop](./reliable-work-loop/index.md) | completed |
 | [Sequential Epic Execution](./sequential-epic-execution/index.md) | completed |

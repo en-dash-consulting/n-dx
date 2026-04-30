@@ -17,4 +17,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in token: High coupling (0.65) — 8 imports target "web" (+1 more)](./fix-observation-in-token-high-coupling-0-65-8-df28f8/index.md) | completed |
+| [Fix observation in token: High coupling (0.65) — 8 imports target "web" (+1 more)](./fix-observation-in-token-high-df28f8/index.md) | completed |

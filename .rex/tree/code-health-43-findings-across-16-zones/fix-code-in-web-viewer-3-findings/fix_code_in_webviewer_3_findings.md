@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix code in web-viewer: boundary-check.test.ts does not assert that viewer→server imports are type-only. (+2 more)](./fix-code-in-web-viewer-boundary-check-test-ts-does-eca99b/index.md) | completed |
+| [Fix code in web-viewer: boundary-check.test.ts does not assert that viewer→server imports are type-only. (+2 more)](./fix-code-in-web-viewer-boundary-eca99b/index.md) | completed |

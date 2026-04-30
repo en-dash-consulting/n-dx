@@ -12,4 +12,4 @@ completedAt: "2026-04-23T02:30:34.826Z"
 
 | Title | Status |
 |-------|--------|
-| [Consolidate PRD Files into Single 'prd' File](./consolidate-prd-files-into-single-prd-file/index.md) | completed |
+| [Consolidate PRD Files into Single 'prd' File](./consolidate-prd-files-into-be363d/index.md) | completed |

@@ -14,5 +14,5 @@ description: "Extend the Go fixture project to cover import syntax edge cases re
 
 | Title | Status |
 |-------|--------|
-| [Add aliased, blank, and dot import files to the Go fixture and update go.mod](./add-aliased-blank-and-dot-import-files-to-the-go-3a247c/index.md) | completed |
-| [Create syntax variant coverage map for the Go fixture](./create-syntax-variant-coverage-map-for-the-go-fixture/index.md) | completed |
+| [Add aliased, blank, and dot import files to the Go fixture and update go.mod](./add-aliased-blank-and-dot-3a247c/index.md) | completed |
+| [Create syntax variant coverage map for the Go fixture](./create-syntax-variant-coverage-7e41ce/index.md) | completed |

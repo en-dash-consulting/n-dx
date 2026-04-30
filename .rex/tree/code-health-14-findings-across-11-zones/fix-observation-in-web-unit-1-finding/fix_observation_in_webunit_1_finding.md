@@ -17,4 +17,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in web-unit: High coupling (0.71) — 3 imports target "web"](./fix-observation-in-web-unit-high-coupling-0-71-3-41d979/index.md) | completed |
+| [Fix observation in web-unit: High coupling (0.71) — 3 imports target "web"](./fix-observation-in-web-unit-41d979/index.md) | completed |

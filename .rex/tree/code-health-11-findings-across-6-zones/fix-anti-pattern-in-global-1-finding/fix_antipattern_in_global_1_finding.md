@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix anti-pattern in global: God function: runCommand in packages/core/cli.js calls 38 unique functions — con](./fix-anti-pattern-in-global-god-function-runcommand-a2d6ca/index.md) | completed |
+| [Fix anti-pattern in global: God function: runCommand in packages/core/cli.js calls 38 unique functions — con](./fix-anti-pattern-in-global-god-a2d6ca/index.md) | completed |

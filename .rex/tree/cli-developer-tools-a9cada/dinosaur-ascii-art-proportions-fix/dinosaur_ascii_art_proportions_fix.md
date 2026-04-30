@@ -14,5 +14,5 @@ description: "The dinosaur rendered in the `ndx init` banner does not accurately
 
 | Title | Status |
 |-------|--------|
-| [Add visual regression snapshot for ndx init dinosaur output](./add-visual-regression-snapshot-for-ndx-init-dinosaur-output/index.md) | completed |
-| [Redesign ndx init ASCII dinosaur to match Rex-F.png proportions](./redesign-ndx-init-ascii-dinosaur-to-match-rex-f-png-ef1985/index.md) | completed |
+| [Add visual regression snapshot for ndx init dinosaur output](./add-visual-regression-snapshot-7a7249/index.md) | completed |
+| [Redesign ndx init ASCII dinosaur to match Rex-F.png proportions](./redesign-ndx-init-ascii-ef1985/index.md) | completed |

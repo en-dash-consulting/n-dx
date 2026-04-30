@@ -16,7 +16,7 @@
 import { join } from "node:path";
 import { readdir, readFile, rename, stat, appendFile } from "node:fs/promises";
 import { info } from "../output.js";
-import { titleToFilename } from "../../store/title-to-filename.js";
+import { appendFilenameSuffix, titleToFilename } from "../../store/title-to-filename.js";
 import { REX_DIR } from "./constants.js";
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 
@@ -147,7 +147,7 @@ async function walkAndMigrate(
 
     const baseFilename = titleToFilename(info.title);
     const suffix = siblingSuffixes.get(subdir) ?? "";
-    const finalFilename = suffix ? baseFilename.replace(/\.md$/, `_${suffix}.md`) : baseFilename;
+    const finalFilename = suffix ? appendFilenameSuffix(baseFilename, suffix) : baseFilename;
 
     // Only rename if target filename differs from index.md
     if (finalFilename === "index.md") {

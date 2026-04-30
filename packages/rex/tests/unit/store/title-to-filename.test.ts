@@ -10,7 +10,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { titleToFilename } from "../../../src/store/title-to-filename.js";
+import {
+  appendFilenameSuffix,
+  titleToFilename,
+} from "../../../src/store/title-to-filename.js";
 
 describe("titleToFilename", () => {
   // ── Basic ASCII cases ─────────────────────────────────────────────────────────
@@ -105,15 +108,13 @@ describe("titleToFilename", () => {
     expect(titleToFilename("Naïve Approach")).toBe("naive_approach.md");
   });
 
-  it("preserves Unicode letters (non-combining)", () => {
-    // Greek letters, Cyrillic, etc. are preserved as lowercase
-    expect(titleToFilename("Α Greek Letter")).toContain(".md");
+  it("strips unsupported Unicode letters after preserving ASCII words", () => {
+    expect(titleToFilename("Α Greek Letter")).toBe("greek_letter.md");
     expect(titleToFilename("Russian Text")).toBe("russian_text.md");
   });
 
-  it("converts non-ASCII to lowercase where applicable", () => {
-    // German Ä becomes ä after lowercase
-    expect(titleToFilename("Äpfel")).toContain(".md");
+  it("converts decomposable accents to ASCII where applicable", () => {
+    expect(titleToFilename("Äpfel")).toBe("apfel.md");
   });
 
   // ── Existing .md extension ───────────────────────────────────────────────────
@@ -200,10 +201,20 @@ describe("titleToFilename", () => {
 
   // ── Long titles ───────────────────────────────────────────────────────────────
 
-  it("preserves long titles without truncation", () => {
+  it("truncates long titles at a word boundary", () => {
     const longTitle = "This is a very long title with many words that should all be preserved";
     const result = titleToFilename(longTitle);
-    expect(result).toBe("this_is_a_very_long_title_with_many_words_that_should_all_be_preserved.md");
+    expect(result).toBe("this_is_a_very_long_title_with_many.md");
+    expect(result.length).toBeLessThanOrEqual(40);
+  });
+
+  it("appends suffixes without exceeding the filename length cap", () => {
+    const result = appendFilenameSuffix(
+      "this_is_a_very_long_title_with_many.md",
+      "abcdef",
+    );
+    expect(result).toBe("this_is_a_very_long_title_abcdef.md");
+    expect(result.length).toBeLessThanOrEqual(40);
   });
 
   // ── Edge cases ────────────────────────────────────────────────────────────────

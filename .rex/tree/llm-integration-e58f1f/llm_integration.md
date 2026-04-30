@@ -12,4 +12,4 @@ completedAt: "2026-04-08T14:47:55.155Z"
 
 | Title | Status |
 |-------|--------|
-| [Consistent Vendor and Model Resolution Across Commands](./consistent-vendor-and-model-resolution-across-commands/index.md) | completed |
+| [Consistent Vendor and Model Resolution Across Commands](./consistent-vendor-and-model-e4b6ed/index.md) | completed |

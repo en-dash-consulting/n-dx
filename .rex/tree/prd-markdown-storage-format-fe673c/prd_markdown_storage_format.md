@@ -12,5 +12,5 @@ completedAt: "2026-04-24T16:20:10.167Z"
 
 | Title | Status |
 |-------|--------|
-| [Markdown Schema Design and Bidirectional Serialization](./markdown-schema-design-and-bidirectional-serialization/index.md) | completed |
-| [PRD Store Integration with Dual-Write and First-Run Migration](./prd-store-integration-with-dual-write-and-first-run-1306e6/index.md) | completed |
+| [Markdown Schema Design and Bidirectional Serialization](./markdown-schema-design-and-6687ab/index.md) | completed |
+| [PRD Store Integration with Dual-Write and First-Run Migration](./prd-store-integration-with-dual-1306e6/index.md) | completed |

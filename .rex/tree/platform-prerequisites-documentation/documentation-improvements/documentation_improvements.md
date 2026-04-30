@@ -14,6 +14,6 @@ description: "Docs match the product vision: ndx is the interface, no package in
 
 | Title | Status |
 |-------|--------|
-| [Add troubleshooting guide for common issues](./add-troubleshooting-guide-for-common-issues/index.md) | completed |
+| [Add troubleshooting guide for common issues](./add-troubleshooting-guide-for-c9f50a/index.md) | completed |
 | [Rewrite commands.md to be user-centric](./rewrite-commands-md-to-be-user-centric/index.md) | completed |
 | [Write a 5-minute quickstart tutorial](./write-a-5-minute-quickstart-tutorial/index.md) | completed |

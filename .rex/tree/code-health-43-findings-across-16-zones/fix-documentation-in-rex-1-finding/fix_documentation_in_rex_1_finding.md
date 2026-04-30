@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix documentation in rex: Document the CLI two-tier API pattern in CLAUDE.md with an explicit allowlist of](./fix-documentation-in-rex-document-the-cli-two-tier-272c4b/index.md) | completed |
+| [Fix documentation in rex: Document the CLI two-tier API pattern in CLAUDE.md with an explicit allowlist of](./fix-documentation-in-rex-272c4b/index.md) | completed |

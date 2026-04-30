@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix structural in global: Three of five zones sit at or below cohesion 0.4; all three (web-3, polling, web](./fix-structural-in-global-three-of-five-zones-sit-at-5831bf/index.md) | completed |
+| [Fix structural in global: Three of five zones sit at or below cohesion 0.4; all three (web-3, polling, web](./fix-structural-in-global-three-5831bf/index.md) | completed |

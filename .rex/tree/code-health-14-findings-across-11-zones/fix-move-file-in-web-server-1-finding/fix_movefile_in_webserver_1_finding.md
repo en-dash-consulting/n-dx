@@ -17,4 +17,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix move-file in web-server: File "packages/web/src/server/routes-rex/analysis.ts" is pinned to zone "Web Ser](./fix-move-file-in-web-server-file-packages-web-src-900666/index.md) | completed |
+| [Fix move-file in web-server: File "packages/web/src/server/routes-rex/analysis.ts" is pinned to zone "Web Ser](./fix-move-file-in-web-server-900666/index.md) | completed |

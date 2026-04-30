@@ -12,4 +12,4 @@ completedAt: "2026-04-09T18:32:06.608Z"
 
 | Title | Status |
 |-------|--------|
-| [ANSI Color Reset Consistency in Tool Output](./ansi-color-reset-consistency-in-tool-output/index.md) | completed |
+| [ANSI Color Reset Consistency in Tool Output](./ansi-color-reset-consistency-in-eb21a9/index.md) | completed |

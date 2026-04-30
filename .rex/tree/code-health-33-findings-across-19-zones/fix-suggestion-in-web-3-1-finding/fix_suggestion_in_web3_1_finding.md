@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in web-3: Zone "web-3" has a numeric suffix indicating an overflow community — pin its fil](./fix-suggestion-in-web-3-zone-web-3-has-a-numeric-96f491/index.md) | completed |
+| [Fix suggestion in web-3: Zone "web-3" has a numeric suffix indicating an overflow community — pin its fil](./fix-suggestion-in-web-3-zone-96f491/index.md) | completed |

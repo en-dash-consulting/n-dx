@@ -13,7 +13,7 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Broken and Non-Functional UI Element Repair](./broken-and-non-functional-ui-element-repair/index.md) | completed |
-| [Interactive Element Placement Standardization](./interactive-element-placement-standardization/index.md) | completed |
+| [Broken and Non-Functional UI Element Repair](./broken-and-non-functional-ui-5af8ca/index.md) | completed |
+| [Interactive Element Placement Standardization](./interactive-element-placement-3c630e/index.md) | completed |
 | [Typography and Text Rendering Fixes](./typography-and-text-rendering-fixes/index.md) | completed |
 | [Visual and Spacing Consistency](./visual-and-spacing-consistency/index.md) | completed |
