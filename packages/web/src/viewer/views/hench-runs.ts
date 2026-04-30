@@ -22,6 +22,7 @@ import {
   WsHealthPanel,
   ThrottleControlsPanel,
 } from "../components/index.js";
+import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
 import type { ActiveRun } from "../components/index.js";
 import { usePolling } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
@@ -86,6 +87,8 @@ interface RunDetail extends RunSummary {
   diagnostics?: RunDiagnosticsData;
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
+  /** Files changed with git status codes (A/M/D/R/C/T). Format: "STATUS\tPATH". */
+  fileChangesWithStatus?: string[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -167,6 +170,106 @@ function isStaleRun(run: RunSummary): boolean {
   if (run.status !== "running") return false;
   if (!run.lastActivityAt) return true; // Legacy run without timestamp
   return Date.now() - new Date(run.lastActivityAt).getTime() > STALE_THRESHOLD_MS;
+}
+
+// ── File change classification ───────────────────────────────────────
+
+type FileCategory = "code" | "docs" | "config" | "metadata" | "test" | "other";
+
+interface FileChangeEntry {
+  status: string;
+  path: string;
+  category: FileCategory;
+}
+
+function classifyFilePath(filePath: string): FileCategory {
+  // Metadata (PRD-related)
+  if (filePath.includes(".rex/") || filePath === "prd.json") return "metadata";
+
+  // Tests (path or extension)
+  if (filePath.includes(".test.") || filePath.includes(".spec.") ||
+      filePath.includes("/__tests__/") || filePath.includes("/tests/")) {
+    return "test";
+  }
+
+  // Documentation
+  if (/\.(md|mdx|txt|rst)$/.test(filePath)) return "docs";
+
+  // Config files
+  if (/\.(json|yaml|yml|toml|ini|env)$/.test(filePath) ||
+      filePath.endsWith(".config.js") || filePath.endsWith(".config.ts")) {
+    return "config";
+  }
+
+  // Everything else is code
+  if (/\.(ts|tsx|js|jsx|py|go|rs|java|c|cpp|h|java|rb|php|swift|kt)$/.test(filePath)) {
+    return "code";
+  }
+
+  return "other";
+}
+
+function parseFileChanges(fileChangesWithStatus?: string[]): FileChangeEntry[] {
+  if (!fileChangesWithStatus || !Array.isArray(fileChangesWithStatus)) return [];
+
+  return fileChangesWithStatus
+    .map((entry) => {
+      const [status, ...pathParts] = entry.split("\t");
+      const path = pathParts.join("\t");
+      return {
+        status: status || "?",
+        path: path || "(unknown)",
+        category: classifyFilePath(path),
+      };
+    });
+}
+
+function getChangeClassification(changes: FileChangeEntry[]): { label: string; color: string } {
+  if (changes.length === 0) return { label: "no changes", color: "var(--text-dim)" };
+
+  const categories = new Set(changes.map((c) => c.category));
+  const hasCode = categories.has("code");
+  const hasDocs = categories.has("docs");
+  const hasConfig = categories.has("config");
+  const hasMetadata = categories.has("metadata");
+  const hasTest = categories.has("test");
+
+  // If only one non-test category, use that
+  const nonTestCategories = Array.from(categories).filter((c) => c !== "test");
+  if (nonTestCategories.length === 1) {
+    const cat = nonTestCategories[0];
+    if (cat === "code") return { label: "code", color: "var(--brand-teal)" };
+    if (cat === "docs") return { label: "docs", color: "var(--brand-purple)" };
+    if (cat === "config") return { label: "config", color: "var(--orange)" };
+    if (cat === "metadata") return { label: "metadata", color: "var(--text-dim)" };
+  }
+
+  // Multiple categories = mixed
+  return { label: "mixed", color: "var(--orange)" };
+}
+
+function getStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    A: "Added",
+    M: "Modified",
+    D: "Deleted",
+    R: "Renamed",
+    C: "Copied",
+    T: "Type Changed",
+  };
+  return labels[status] || status;
+}
+
+function getStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    A: "var(--green)",
+    M: "var(--orange)",
+    D: "var(--red)",
+    R: "var(--text-dim)",
+    C: "var(--text-dim)",
+    T: "var(--orange)",
+  };
+  return colors[status] || "var(--text-secondary)";
 }
 
 // ── Sub-components ───────────────────────────────────────────────────
@@ -298,6 +401,40 @@ function RunCard({ run, isSelected, isHighlighted, onClick, navigateTo, cardRef 
   );
 }
 
+/** File changes list with collapsible details. */
+function FileChangesList({ fileChangesWithStatus }: { fileChangesWithStatus?: string[] }) {
+  const changes = parseFileChanges(fileChangesWithStatus);
+  if (changes.length === 0) {
+    return h("div", { class: "hench-no-changes-message" }, "No changes");
+  }
+
+  const classification = getChangeClassification(changes);
+
+  return h("div", { class: "hench-detail-section" },
+    h("div", { class: "hench-file-changes-header" },
+      h("h3", null, "Files Changed"),
+      h("span", { class: `hench-change-classification hench-change-classification-${classification.label.replace(" ", "-")}`, style: `color: ${classification.color}` },
+        `${classification.label}`,
+      ),
+    ),
+    h(CollapsibleSection, {
+      title: `${changes.length} file${changes.length === 1 ? "" : "s"}`,
+      count: changes.length,
+      threshold: 8,
+      storageKey: "hench-file-changes-expanded",
+      children: changes.map((change) =>
+        h("div", { class: "hench-file-change-item", key: change.path },
+          h("span", { class: "hench-file-status", style: `color: ${getStatusColor(change.status)}`, title: getStatusLabel(change.status) },
+            change.status,
+          ),
+          h("span", { class: "hench-file-path" }, change.path),
+          h("span", { class: "hench-file-action" }, getStatusLabel(change.status)),
+        ),
+      ),
+    }),
+  );
+}
+
 /** Detail panel for the selected run. */
 function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: () => void; navigateTo?: NavigateTo }) {
   const status = getStatusConfig(run.status);
@@ -426,6 +563,11 @@ function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: ()
               : null,
           ),
         )
+      : null,
+
+    // File changes details
+    run.fileChangesWithStatus || (counts && counts.filesChanged === 0)
+      ? h(FileChangesList, { fileChangesWithStatus: run.fileChangesWithStatus })
       : null,
 
     // Token breakdown

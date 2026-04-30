@@ -586,6 +586,81 @@
   margin-top: 2px;
 }
 
+/* File changes section */
+.hench-file-changes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.hench-file-changes-header h3 {
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+}
+
+.hench-change-classification {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  background: color-mix(in srgb, currentColor 10%, var(--bg-surface));
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hench-no-changes-message {
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.hench-file-change-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, var(--bg-surface));
+}
+
+.hench-file-change-item:last-child {
+  border-bottom: none;
+}
+
+.hench-file-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  background: color-mix(in srgb, currentColor 8%, var(--bg-surface));
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.hench-file-path {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.hench-file-action {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-secondary) 8%, var(--bg-surface));
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Token breakdown grid */
 .hench-token-grid {
   display: grid;
