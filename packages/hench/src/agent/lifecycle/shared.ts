@@ -963,6 +963,43 @@ export async function performCommitPromptIfNeeded(
     detail(`Warning: could not add authorship trailer: ${(err as Error).message}`);
   }
 
+  // Append N-DX-Item trailer with dashboard permalink
+  if (taskId) {
+    try {
+      const { writeFileSync } = await import("node:fs");
+      const { readFileSync: readConfigFile, existsSync: pathExists } = await import("node:fs");
+      const { join } = await import("node:path");
+
+      // Load project config to get public URL
+      let publicUrl = "http://localhost:3117"; // default fallback
+      try {
+        const configPath = join(projectDir, ".n-dx.json");
+        if (pathExists(configPath)) {
+          const configContent = readConfigFile(configPath, "utf-8");
+          const config = JSON.parse(configContent) as Record<string, unknown>;
+          const web = config["web"] as Record<string, unknown> | undefined;
+          if (web && typeof web.publicUrl === "string" && web.publicUrl) {
+            publicUrl = web.publicUrl;
+          }
+        }
+      } catch {
+        // Use default fallback if config read fails
+        detail("Warning: could not read project config for public URL, using default");
+      }
+
+      // Build the N-DX-Item trailer URL
+      const itemUrl = `${publicUrl.replace(/\/$/, "")}/#/rex/item/${taskId}`;
+      const currentMessage = readFileSync(msgPath, "utf-8");
+      // Git trailers are separated from the body by a blank line
+      const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
+      const itemTrailer = `${separator}N-DX-Item: ${itemUrl}`;
+      writeFileSync(msgPath, currentMessage + itemTrailer, "utf-8");
+    } catch (err) {
+      // Best-effort: if trailer append fails, proceed with commit anyway
+      detail(`Warning: could not add item permalink trailer: ${(err as Error).message}`);
+    }
+  }
+
   try {
     await execStdout("git", ["commit", "-F", PENDING_COMMIT_FILE], {
       cwd: projectDir,

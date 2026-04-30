@@ -778,4 +778,120 @@ status: in_progress
 
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
+
+  it("adds N-DX-Item trailer with dashboard permalink to the commit message", async () => {
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Setup: Create initial commit
+    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
+
+    // Create .n-dx.json with a public URL
+    const ndxConfig = {
+      web: {
+        publicUrl: "https://dashboard.example.com",
+      },
+    };
+    await writeFile(
+      join(projectDir, ".n-dx.json"),
+      JSON.stringify(ndxConfig, null, 2) + "\n",
+      "utf-8",
+    );
+
+    // Modify and stage file
+    await stageChangeWithPendingMessage(
+      projectDir,
+      "src.ts",
+      "export const x = 2;\n",
+      "feat: update x",
+    );
+
+    // Create a minimal mock store
+    const mockStore = {
+      getItem: vi.fn(async () => null),
+      updateItem: vi.fn(async () => {}),
+      appendLog: vi.fn(async () => {}),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+
+    const run = buildCompletedRun();
+
+    await performCommitPromptIfNeeded(
+      run,
+      projectDir,
+      /* autoCommit */ false,
+      /* yes */ false,
+      /* autonomous */ true,
+      mockStore as any,
+      "task-1",
+    );
+
+    // Verify the commit was created
+    expect(await getHeadSubject(projectDir)).toBe("feat: update x");
+
+    // Verify the commit message includes the N-DX-Item trailer with the configured public URL
+    const { stdout: fullMessage } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
+    expect(fullMessage).toContain("N-DX-Item:");
+    expect(fullMessage).toContain("https://dashboard.example.com/#/rex/item/task-1");
+
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+  });
+
+  it("falls back to localhost URL when web.publicUrl is not configured", async () => {
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Setup: Create initial commit
+    await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
+
+    // Modify and stage file
+    await stageChangeWithPendingMessage(
+      projectDir,
+      "src.ts",
+      "export const x = 2;\n",
+      "feat: update x",
+    );
+
+    // Create a minimal mock store
+    const mockStore = {
+      getItem: vi.fn(async () => null),
+      updateItem: vi.fn(async () => {}),
+      appendLog: vi.fn(async () => {}),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+
+    const run = buildCompletedRun();
+
+    await performCommitPromptIfNeeded(
+      run,
+      projectDir,
+      /* autoCommit */ false,
+      /* yes */ false,
+      /* autonomous */ true,
+      mockStore as any,
+      "task-1",
+    );
+
+    // Verify the commit was created
+    expect(await getHeadSubject(projectDir)).toBe("feat: update x");
+
+    // Verify the commit message includes the N-DX-Item trailer with fallback localhost URL
+    const { stdout: fullMessage } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
+    expect(fullMessage).toContain("N-DX-Item:");
+    expect(fullMessage).toContain("http://localhost:3117/#/rex/item/task-1");
+
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+  });
 });

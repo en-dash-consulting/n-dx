@@ -2,7 +2,7 @@
 id: "fa572435-b461-4086-b370-97cfb9edd2b6"
 level: "task"
 title: "Surface commit attribution in dashboard PRD detail view and folder index summaries"
-status: "in_progress"
+status: "completed"
 priority: "medium"
 tags:
   - "web"
@@ -10,6 +10,10 @@ tags:
   - "prd"
 source: "smart-add"
 startedAt: "2026-04-30T14:02:14.454Z"
+completedAt: "2026-04-30T14:27:55.473Z"
+endedAt: "2026-04-30T14:27:55.473Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented commit attribution surfacing with table rendering in detail panel and index.md summaries, comprehensive tests, and CSS styling."
 acceptanceCriteria:
   - "Detail panel shows a commits table with author, short hash (linked to remote when configured), full hash on hover, and timestamp"
   - "`index.md` summary's per-task commit section consumes the same data source"

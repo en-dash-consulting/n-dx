@@ -21,7 +21,7 @@ When hench produces a commit, append a structured trailer block identifying that
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
 | Append n-dx authorship and vendor/model audit trailer to hench-generated commit messages | task | completed | 2026-04-29 |
-| Embed n-dx dashboard permalink for the PRD item in the commit message footer | task | pending | 1970-01-01 |
+| Embed n-dx dashboard permalink for the PRD item in the commit message footer | task | in_progress | 2026-04-30 |
 
 ## Info
 

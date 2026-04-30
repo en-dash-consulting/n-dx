@@ -2,13 +2,14 @@
 id: "25c1d40b-17d3-4dc7-8b23-e07fa789425b"
 level: task
 title: "Embed n-dx dashboard permalink for the PRD item in the commit message footer"
-status: pending
+status: in_progress
 priority: medium
 tags:
   - "hench"
   - "commit"
   - "dashboard"
 source: "smart-add"
+startedAt: "2026-04-30T14:37:19.862Z"
 acceptanceCriteria:
   - "Each hench commit message contains an `N-DX-Item:` trailer with a fully-qualified URL pointing to the PRD item view"
   - "URL base is configurable via `.n-dx.json` (`web.publicUrl`) and falls back to the local `ndx start` URL when unset"
@@ -19,7 +20,7 @@ description: "Add a permalink trailer (e.g. `N-DX-Item: http://localhost:3117/#/
 
 # Embed n-dx dashboard permalink for the PRD item in the commit message footer
 
-🟡 [pending]
+🟡 [in_progress]
 
 ## Summary
 
@@ -27,7 +28,8 @@ Add a permalink trailer (e.g. `N-DX-Item: http://localhost:3117/#/rex/item/<id>`
 
 ## Info
 
-- **Status:** pending
+- **Status:** in_progress
 - **Priority:** medium
 - **Tags:** hench, commit, dashboard
 - **Level:** task
+- **Started:** 2026-04-30T14:37:19.862Z
