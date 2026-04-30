@@ -1218,6 +1218,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   // Hench agent — deferred node: builtins for lock file and cleanup operations
   ["packages/hench/src/agent/lifecycle/shared.ts", "Lazy-loads node:fs and node:path for lock file cleanup — deferred to avoid import overhead on code paths that never touch the filesystem"],
   ["packages/hench/src/tools/cleanup-transformations.ts", "Lazy-loads node:fs/promises for file deletion — async filesystem access isolated to the tool cleanup path"],
+  ["packages/hench/src/tools/test-command-resolver.ts", "Lazy-loads node:readline only when interactive prompts are needed for test command resolution — avoids import cost in automated/config-resolved paths"],
 ]);
 
 describe("architecture policy: dynamic import audit", () => {

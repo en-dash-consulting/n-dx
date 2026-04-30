@@ -22,7 +22,7 @@ Integrate the markdown format as the primary read/write target in the PRD store 
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Build automatic first-run migration and explicit rex migrate-to-md CLI command | task | in_progress | 2026-04-24 |
+| Build automatic first-run migration and explicit rex migrate-to-md CLI command | task | completed | 2026-04-30 |
 | Integrate markdown as primary read/write format in PRDStore with JSON dual-write | task | completed | 2026-04-28 |
 | Write end-to-end and concurrency tests for markdown-primary PRD storage | task | completed | 2026-04-24 |
 

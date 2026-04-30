@@ -402,6 +402,8 @@ export interface TestGateOptions {
   projectDir: string;
   /** Files changed during the task. */
   filesChanged: string[];
+  /** Test command to execute. If not provided, defaults to "pnpm test --reporter=json". */
+  testCommand?: string;
   /** Timeout for the test command in ms. Default: 300_000. */
   timeout?: number;
 }
@@ -529,7 +531,7 @@ function parseVitestOutput(stdout: string, stderr: string): TestPackageResult[] 
  *
  * Behavior:
  * - Skips if filesChanged is empty (no modifications to test)
- * - Runs `pnpm test --reporter=json` to capture structured output
+ * - Runs the configured test command (or "pnpm test --reporter=json" by default)
  * - Aggregates results by package (packages/xyz/...)
  * - Returns per-package pass/fail status and failure counts
  * - Never throws — always returns a structured result
@@ -537,7 +539,7 @@ function parseVitestOutput(stdout: string, stderr: string): TestPackageResult[] 
 export async function runTestGate(
   options: TestGateOptions,
 ): Promise<TestGateResult> {
-  const { projectDir, filesChanged, timeout = TEST_GATE_TIMEOUT } = options;
+  const { projectDir, filesChanged, testCommand, timeout = TEST_GATE_TIMEOUT } = options;
 
   // Skip if no files were modified
   if (filesChanged.length === 0) {
@@ -549,7 +551,8 @@ export async function runTestGate(
     };
   }
 
-  const command = "pnpm test --reporter=json";
+  // Use provided command or default to pnpm test with JSON reporter
+  const command = testCommand || "pnpm test --reporter=json";
   const startMs = Date.now();
 
   const { stdout, stderr, exitCode } = await execShellCmd(command, {

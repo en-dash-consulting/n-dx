@@ -29,6 +29,7 @@ import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
+import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
 import { displayTaskInfo } from "./task-display.js";
@@ -519,7 +520,7 @@ async function promptTestGateFailure(
       process.on("SIGINT", onInterrupt);
       rl.on("SIGINT", onInterrupt);
 
-      rl.question(`\n${question}`, (input) => {
+      rl.question(`\n${question}`, (input: string) => {
         finish(input.trim().toLowerCase() || "a");
       });
     });
@@ -672,6 +673,7 @@ export interface FinalizeRunOptions {
   run: RunRecord;
   henchDir: string;
   projectDir: string;
+  config: HenchConfig;
   testCommand?: string;
   heartbeat?: Heartbeat;
   memoryCtx?: MemoryContext;
@@ -1213,7 +1215,7 @@ export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete"
  * and persist. Called at the end of both loops.
  */
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
-  const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
+  const { run, henchDir, projectDir, config, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
 
@@ -1299,18 +1301,46 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Runs whenever the run completed successfully and gate is not explicitly skipped.
   // On failure, prompts for rerun/abort/skip actions with interactive feedback.
   let testGateSkipped = false;
+  let resolvedTestCommand: string | undefined;
+
   if (run.status === "completed" && !skipFullTestGate && run.structuredSummary) {
+    // Resolve test command first (before attempting gate)
+    // This will prompt the user if no command is configured
+    try {
+      const resolution = await resolveTestCommand(
+        {
+          projectDir,
+          henchDir,
+          config,
+        },
+        autonomous,
+      );
+      resolvedTestCommand = resolution.command;
+
+      if (resolution.persisted) {
+        detail(`Test command persisted to config: ${resolution.command}`);
+      } else if (resolution.source !== "config") {
+        detail(`Using test command from ${resolution.source}: ${resolution.command}`);
+      }
+    } catch (err) {
+      // Test command resolution failed — mark run as failed and skip gate
+      run.status = "failed";
+      run.error = `Test command resolution failed: ${(err as Error).message}`;
+      info(`\n${run.error}`);
+    }
+
     // Rerun loop: gate can fail and be retried multiple times
     let testGateAttempt = 0;
     let gateComplete = false;
 
-    while (!gateComplete && testGateAttempt < 5) {
+    while (!gateComplete && testGateAttempt < 5 && run.status === "completed") {
       testGateAttempt++;
       subsection(`Full Test Suite Gate${testGateAttempt > 1 ? ` (attempt ${testGateAttempt})` : ""}`);
 
       const testGate = await runTestGate({
         projectDir,
         filesChanged: run.structuredSummary.filesChanged,
+        testCommand: resolvedTestCommand,
       });
 
       run.testGate = testGate;

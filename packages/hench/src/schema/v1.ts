@@ -130,6 +130,16 @@ export interface HenchConfig {
    * Test gate failure blocks commit unless this flag is set or user selects skip.
    */
   skipFullTestGate?: boolean;
+  /**
+   * Full test suite command for mandatory pre-commit gate.
+   * Resolution precedence:
+   * 1. .hench/config.json fullTestCommand field
+   * 2. .n-dx.json hench.fullTestCommand field
+   * 3. Auto-detect from package.json (test, test:all scripts)
+   * 4. Interactive prompt (when none of above are available)
+   * Example: "pnpm test" or "npm run test:all"
+   */
+  fullTestCommand?: string;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────

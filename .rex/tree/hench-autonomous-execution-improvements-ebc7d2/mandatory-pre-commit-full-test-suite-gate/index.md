@@ -21,7 +21,7 @@ Introduce a distinct, mandatory step in the hench run lifecycle that executes th
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
 | Add distinct full-test-suite gate step to hench run lifecycle before commit | task | completed | 2026-04-30 |
-| Resolve test command via project config with interactive prompt fallback for unknown or inaccessible suites | task | pending | 1970-01-01 |
+| Resolve test command via project config with interactive prompt fallback for unknown or inaccessible suites | task | in_progress | 2026-04-30 |
 
 ## Info
 

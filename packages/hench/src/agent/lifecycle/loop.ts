@@ -486,6 +486,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     run,
     henchDir,
     projectDir,
+    config,
     testCommand: brief.project.testCommand,
     heartbeat,
     memoryCtx,

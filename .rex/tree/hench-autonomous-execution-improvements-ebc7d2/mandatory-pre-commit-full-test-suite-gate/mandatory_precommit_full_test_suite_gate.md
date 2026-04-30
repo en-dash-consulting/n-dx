@@ -13,4 +13,4 @@ description: "Introduce a distinct, mandatory step in the hench run lifecycle th
 | Title | Status |
 |-------|--------|
 | [Add distinct full-test-suite gate step to hench run lifecycle before commit](./add-distinct-full-test-suite-gate-step-to-hench-run-3b422b/index.md) | completed |
-| [Resolve test command via project config with interactive prompt fallback for unknown or inaccessible suites](./resolve-test-command-via-project-config-with-fd409d/index.md) | pending |
+| [Resolve test command via project config with interactive prompt fallback for unknown or inaccessible suites](./resolve-test-command-via-project-config-with-fd409d/index.md) | in_progress |

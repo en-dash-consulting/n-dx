@@ -1285,6 +1285,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     run,
     henchDir,
     projectDir,
+    config,
     testCommand: brief.project.testCommand,
     heartbeat,
     memoryCtx,

@@ -2,13 +2,14 @@
 id: "fd409d4d-381c-4f55-afaa-220d4bc74f11"
 level: "task"
 title: "Resolve test command via project config with interactive prompt fallback for unknown or inaccessible suites"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "hench"
   - "config"
   - "ux"
 source: "smart-add"
+startedAt: "2026-04-30T15:52:10.503Z"
 acceptanceCriteria:
   - "Config schema supports a fullTestCommand field in .hench/config.json with documented precedence rules"
   - "Auto-detection falls back to package.json test scripts when the config field is absent"
