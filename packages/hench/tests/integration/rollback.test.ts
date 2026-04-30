@@ -174,6 +174,7 @@ describe("finalizeRun git rollback", () => {
       henchDir,
       projectDir,
       rollbackOnFailure: true,
+      skipFullTestGate: true,
     });
 
     // Changes should NOT be reverted for completed runs

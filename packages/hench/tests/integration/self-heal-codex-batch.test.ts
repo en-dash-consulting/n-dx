@@ -23,6 +23,33 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../src/store/config.js";
 
+// The temp project dirs created below have no git repo, so the real
+// `validateCompletion` would fail (`git diff --stat HEAD` exits non-zero,
+// stdout is empty, hasChanges=false → run.status flips to "failed" before
+// finalizeRun's test gate runs). Stub it so these tests can assert on
+// testGate behaviour. Hoisted so it applies to all dynamic imports of
+// cli-loop in every test in this file.
+vi.mock("../../src/validation/completion.js", () => ({
+  validateCompletion: vi.fn().mockResolvedValue({
+    valid: true,
+    hasChanges: true,
+    diffSummary: "stub: validation bypassed for test environment",
+  }),
+  formatValidationResult: () => "",
+}));
+
+// CODEX_VERBOSE_SUCCESS is parsed into one turn per line (15+ turns) with
+// zero tool calls — the real spin detector flags that as a runaway agent
+// and marks the run failed, short-circuiting finalizeRun's gate. Disable
+// it for this fixture-driven suite; spin behaviour is covered elsewhere.
+vi.mock("../../src/agent/analysis/spin.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/agent/analysis/spin.js")>();
+  return {
+    ...actual,
+    isSpinningRun: () => false,
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Codex output fixtures
 // ---------------------------------------------------------------------------
@@ -101,10 +128,17 @@ async function setupProjectDir(): Promise<{
   await initConfig(henchDir);
   await mkdir(rexDir, { recursive: true });
 
-  // Set Codex as the active vendor.
+  // Set Codex as the active vendor and provide a stub fullTestCommand so
+  // resolveTestCommand finds it via project config and does not throw on
+  // "no command configured" in the non-TTY test env. The command itself is
+  // never executed because runTestGate skips when filesChanged is empty
+  // (which it always is for these mocked Codex runs).
   await writeFile(
     join(projectDir, ".n-dx.json"),
-    JSON.stringify({ llm: { vendor: "codex" } }),
+    JSON.stringify({
+      llm: { vendor: "codex" },
+      hench: { fullTestCommand: "true" },
+    }),
     "utf-8",
   );
 

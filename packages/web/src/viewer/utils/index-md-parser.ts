@@ -62,33 +62,42 @@ export function parseIndexMd(markdown: string): IndexMdSections {
 
   try {
     // Extract Summary section
-    const summaryMatch = markdown.match(/## Summary\s*\n([\s\S]*?)(?=\n## |\n# |\Z)/);
+    const summaryMatch = markdown.match(/## Summary\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
     if (summaryMatch) {
       sections.summary = summaryMatch[1].trim();
     }
 
     // Extract Progress table
-    const progressMatch = markdown.match(/## Progress\s*\n([\s\S]*?)(?=\n## |\n# |\Z)/);
+    const progressMatch = markdown.match(/## Progress\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
     if (progressMatch) {
       sections.progress = parseProgressTable(progressMatch[1]);
     }
 
     // Extract Commits section
-    const commitsMatch = markdown.match(/## Commits\s*\n([\s\S]*?)(?=\n## |\n# |\Z)/);
+    const commitsMatch = markdown.match(/## Commits\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
     if (commitsMatch) {
-      sections.commits = parseCommitsList(commitsMatch[1]);
+      const parsed = parseCommitsList(commitsMatch[1]);
+      if (parsed.length > 0) {
+        sections.commits = parsed;
+      }
     }
 
     // Extract Changes section
-    const changesMatch = markdown.match(/## Changes\s*\n([\s\S]*?)(?=\n## |\n# |\Z)/);
+    const changesMatch = markdown.match(/## Changes\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
     if (changesMatch) {
-      sections.changes = parseChangesList(changesMatch[1]);
+      const parsed = parseChangesList(changesMatch[1]);
+      if (parsed.length > 0) {
+        sections.changes = parsed;
+      }
     }
 
     // Extract Info section
-    const infoMatch = markdown.match(/## Info\s*\n([\s\S]*?)(?=\n## |\n# |\Z)/);
+    const infoMatch = markdown.match(/## Info\s*\n([\s\S]*?)(?=\n## |\n# |\s*$)/);
     if (infoMatch) {
-      sections.info = parseInfoSection(infoMatch[1]);
+      const parsed = parseInfoSection(infoMatch[1]);
+      if (parsed.length > 0) {
+        sections.info = parsed;
+      }
     }
 
     // Extract Subtasks sections
@@ -101,8 +110,14 @@ export function parseIndexMd(markdown: string): IndexMdSections {
     if (subtasks.length > 0) {
       sections.subtasks = subtasks;
     }
-  } catch (err) {
-    // Graceful fallback: include raw markdown if parsing fails
+  } catch {
+    // Graceful fallback: include raw markdown if parsing throws
+    sections.rawMarkdown = markdown;
+    return sections;
+  }
+
+  // Fallback for non-empty markdown with no recognized sections
+  if (Object.keys(sections).length === 0 && markdown.trim().length > 0) {
     sections.rawMarkdown = markdown;
   }
 
@@ -227,10 +242,12 @@ function parseChangesList(content: string): ChangeEntry[] {
     if (!trimmed || !trimmed.startsWith("-")) continue;
 
     // Format: - **Label:** description (timestamp)
-    const match = trimmed.match(/\*\*(.+?)\*\*:\s*(.+?)\s*\(([^)]+)\)/);
+    // Accept both `**Label:**` (generator format, colon inside) and
+    // `**Label**:` (colon outside) for resilience.
+    const match = trimmed.match(/\*\*([^*]+?):?\*\*:?\s*(.+?)\s*\(([^)]+)\)/);
     if (match) {
       changes.push({
-        label: match[1].trim(),
+        label: match[1].trim().replace(/:$/, ""),
         description: match[2].trim(),
         timestamp: match[3].trim(),
       });
@@ -253,10 +270,12 @@ function parseInfoSection(content: string): InfoField[] {
     if (!trimmed || !trimmed.startsWith("-")) continue;
 
     // Format: - **Label:** value
-    const match = trimmed.match(/\*\*(.+?)\*\*:\s*(.+)/);
+    // Accept both `**Label:**` (generator format, colon inside) and
+    // `**Label**:` (colon outside) for resilience.
+    const match = trimmed.match(/\*\*([^*]+?):?\*\*:?\s*(.+)/);
     if (match) {
       fields.push({
-        label: match[1].trim(),
+        label: match[1].trim().replace(/:$/, ""),
         value: match[2].trim(),
       });
     }

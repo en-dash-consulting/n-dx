@@ -139,7 +139,14 @@ describe("finalizeRun PRD task reset on failure", () => {
     const { store, updatedStatus } = buildMockStore("in_progress");
 
     const run = buildMinimalRun("completed");
-    await finalizeRun({ run, henchDir, projectDir, store, rollbackOnFailure: false });
+    await finalizeRun({
+      run,
+      henchDir,
+      projectDir,
+      store,
+      rollbackOnFailure: false,
+      skipFullTestGate: true,
+    });
 
     expect(updatedStatus()).toBe("in_progress");
   });

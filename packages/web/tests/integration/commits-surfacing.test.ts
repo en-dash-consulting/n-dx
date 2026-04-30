@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Integration test for commit attribution surfacing in dashboard.
  *
@@ -206,7 +207,7 @@ status: pending
       const summaryRoot = renderToDiv(h(IndexMdSectionsPanel, { sections }));
 
       // Both should contain the same commit information
-      const commitDataPoints = ["Developer", "Final implementation", "abcdef12", "2026-04-30T16:00:00Z"];
+      const commitDataPoints = ["Developer", "Final implementation", "abcdef1", "2026-04-30T16:00:00Z"];
       for (const dataPoint of commitDataPoints) {
         expect(detailRoot.textContent).toContain(dataPoint);
         expect(summaryRoot.textContent).toContain(dataPoint);

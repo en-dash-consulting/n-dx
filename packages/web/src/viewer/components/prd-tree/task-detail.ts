@@ -15,7 +15,7 @@ import { findItemById } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { isWorkItem, getLevelLabel, getChildLevel } from "./levels.js";
-import { useIndexMd } from "../../hooks/use-index-md.js";
+import { useIndexMd } from "../../hooks/index.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
 
 // ── Types ────────────────────────────────────────────────────────────

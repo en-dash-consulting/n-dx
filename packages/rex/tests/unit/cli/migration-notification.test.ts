@@ -11,15 +11,21 @@ import {
   emitMigrationNotification,
 } from "../../../src/cli/migration-notification.js";
 import type { LegacyPrdMigrationResult } from "../../../src/store/ensure-legacy-prd-migrated.js";
-import { setQuiet, isQuiet } from "@n-dx/llm-client";
+import { setQuiet, isQuiet, resetColorCache } from "@n-dx/llm-client";
 
 describe("Migration Notification", () => {
   beforeEach(() => {
     setQuiet(false);
+    process.env.FORCE_COLOR = "1";
+    delete process.env.NO_COLOR;
+    resetColorCache();
   });
 
   afterEach(() => {
     setQuiet(false);
+    delete process.env.FORCE_COLOR;
+    delete process.env.NO_COLOR;
+    resetColorCache();
   });
 
   describe("formatMigrationBanner", () => {

@@ -6,6 +6,7 @@ export * from "./use-facet-state.js";
 export * from "./use-feature-toggle.js";
 export * from "./use-file-edges.js";
 export * from "./use-graceful-degradation.js";
+export * from "./use-index-md.js";
 export * from "./use-item-selection.js";
 export * from "./use-memory-monitor.js";
 export * from "./use-pan-zoom.js";
