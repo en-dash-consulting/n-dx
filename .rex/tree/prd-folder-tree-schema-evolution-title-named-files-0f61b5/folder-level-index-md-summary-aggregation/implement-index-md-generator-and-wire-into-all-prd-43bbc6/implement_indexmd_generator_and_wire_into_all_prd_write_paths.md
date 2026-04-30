@@ -2,13 +2,14 @@
 id: "43bbc65d-fcd9-4709-b024-6ab1b1f13131"
 level: "task"
 title: "Implement index.md generator and wire into all PRD write paths"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "rex"
   - "prd"
   - "storage"
 source: "smart-add"
+startedAt: "2026-04-30T12:59:49.957Z"
 acceptanceCriteria:
   - "Generator produces deterministic output given the same input subtree (no timestamps that vary across regenerations)"
   - "Every PRDStore write triggers regeneration of `index.md` for the changed folder and all ancestor folders up to the tree root"

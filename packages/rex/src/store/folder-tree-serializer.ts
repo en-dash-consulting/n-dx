@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { PRDItem } from "../schema/index.js";
 import { titleToFilename } from "./title-to-filename.js";
+import { generateIndexMd } from "./folder-tree-index-generator.js";
 
 const MAX_SLUG_LENGTH = 60;
 const SHORT_ID_LENGTH = 6;
@@ -80,6 +81,10 @@ export async function serializeFolderTree(
     await writeIfChanged(epicPath, content, result);
     // Clean up any orphaned markdown files in this directory (title renames)
     await removeOrphanedMarkdownFiles(epicDir, epicFilename);
+    // Generate and write index.md for the epic
+    const epicIndexContent = generateIndexMd(epic, features, []);
+    const epicIndexPath = join(epicDir, "index.md");
+    await writeIfChanged(epicIndexPath, epicIndexContent, result);
 
     const expectedFeatureSlugs = new Set<string>();
     for (const feature of features) {
@@ -96,6 +101,10 @@ export async function serializeFolderTree(
       await writeIfChanged(featurePath, featureContent, result);
       // Clean up any orphaned markdown files in this directory (title renames)
       await removeOrphanedMarkdownFiles(featureDir, featureFilename);
+      // Generate and write index.md for the feature
+      const featureIndexContent = generateIndexMd(feature, tasks, []);
+      const featureIndexPath = join(featureDir, "index.md");
+      await writeIfChanged(featureIndexPath, featureIndexContent, result);
 
       const expectedTaskSlugs = new Set<string>();
       for (const task of tasks) {
@@ -112,6 +121,10 @@ export async function serializeFolderTree(
         await writeIfChanged(taskPath, taskContent, result);
         // Clean up any orphaned markdown files in this directory (title renames)
         await removeOrphanedMarkdownFiles(taskDir, taskFilename);
+        // Generate and write index.md for the task
+        const taskIndexContent = generateIndexMd(task, subtasks, []);
+        const taskIndexPath = join(taskDir, "index.md");
+        await writeIfChanged(taskIndexPath, taskIndexContent, result);
 
         const expectedSubtaskSlugs = new Set<string>();
         for (const subtask of subtasks) {
@@ -126,6 +139,10 @@ export async function serializeFolderTree(
           await writeIfChanged(subtaskPath, subtaskContent, result);
           // Clean up any orphaned markdown files in this directory (title renames)
           await removeOrphanedMarkdownFiles(subtaskDir, subtaskFilename);
+          // Generate and write index.md for the subtask
+          const subtaskIndexContent = generateIndexMd(subtask, [], []);
+          const subtaskIndexPath = join(subtaskDir, "index.md");
+          await writeIfChanged(subtaskIndexPath, subtaskIndexContent, result);
         }
 
         await removeStaleSubdirs(taskDir, expectedSubtaskSlugs, result);
