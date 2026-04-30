@@ -45,7 +45,16 @@ export async function cmdMigrateToFolderTree(
   const rexDir = join(dir, REX_DIR);
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
-  const doc = await loadSourceDocument(rexDir, treeRoot);
+  const { doc, fromTree } = await loadSourceDocument(rexDir, treeRoot);
+
+  // If we loaded from tree and it's a re-run, be idempotent
+  if (fromTree) {
+    info(
+      `Folder tree already up to date at .rex/${FOLDER_TREE_SUBDIR}/`,
+    );
+    return;
+  }
+
   const levelCounts = countItemsByLevel(doc.items);
   const result = await serializeFolderTree(doc.items, treeRoot);
 
@@ -97,7 +106,7 @@ export async function cmdMigrateToFolderTree(
  * 2. Existing .rex/tree/ folder tree (idempotent re-run after prd.md deletion)
  * 3. prd.json (legacy JSON fallback)
  */
-async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<PRDDocument> {
+async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<{ doc: PRDDocument; fromTree: boolean }> {
   const primaryDoc = await tryReadMarkdown(join(rexDir, PRD_MARKDOWN_FILENAME));
 
   if (primaryDoc !== null) {
@@ -107,14 +116,14 @@ async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<PRD
       const branchDoc = await tryReadMarkdown(join(rexDir, file));
       if (branchDoc) allItems.push(...branchDoc.items);
     }
-    return { ...primaryDoc, items: allItems };
+    return { doc: { ...primaryDoc, items: allItems }, fromTree: false };
   }
 
   // Tree exists → idempotent re-run after prd.md was deleted
   if (await directoryExists(treeRoot)) {
     const { items } = await parseFolderTree(treeRoot);
     const title = await readTreeTitle(rexDir);
-    return { schema: SCHEMA_VERSION, title, items };
+    return { doc: { schema: SCHEMA_VERSION, title, items }, fromTree: true };
   }
 
   // Legacy prd.json fallback
@@ -122,7 +131,7 @@ async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<PRD
     const raw = await readFile(join(rexDir, "prd.json"), "utf-8");
     const parsed: unknown = JSON.parse(raw);
     const validated = validateDocument(parsed);
-    if (validated.ok) return validated.data as PRDDocument;
+    if (validated.ok) return { doc: validated.data as PRDDocument, fromTree: false };
   } catch {
     // Not found or invalid
   }

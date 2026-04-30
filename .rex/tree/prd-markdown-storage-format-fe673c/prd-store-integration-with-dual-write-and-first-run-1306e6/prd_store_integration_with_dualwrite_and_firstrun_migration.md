@@ -14,6 +14,6 @@ description: "Integrate the markdown format as the primary read/write target in 
 
 | Title | Status |
 |-------|--------|
-| [Build automatic first-run migration and explicit rex migrate-to-md CLI command](./build-automatic-first-run-migration-and-explicit-7143e2/index.md) | completed |
+| [Build automatic first-run migration and explicit rex migrate-to-md CLI command](./build-automatic-first-run-migration-and-explicit-7143e2/index.md) | in_progress |
 | [Integrate markdown as primary read/write format in PRDStore with JSON dual-write](./integrate-markdown-as-primary-read-write-format-in-97b249/index.md) | completed |
 | [Write end-to-end and concurrency tests for markdown-primary PRD storage](./write-end-to-end-and-concurrency-tests-for-markdown-3b4426/index.md) | completed |
