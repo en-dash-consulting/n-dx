@@ -2,7 +2,7 @@
 id: "015a9f0b-46fc-4b8a-96e4-eeb04fc1a7f0"
 level: task
 title: "Implement shared legacy-PRD detection, backup, and migration helper"
-status: in_progress
+status: completed
 priority: high
 tags:
   - "rex"
@@ -10,6 +10,10 @@ tags:
   - "prd"
 source: "smart-add"
 startedAt: "2026-04-30T16:08:53.868Z"
+completedAt: "2026-04-30T16:30:57.868Z"
+endedAt: "2026-04-30T16:30:57.868Z"
+resolutionType: code-change
+resolutionDetail: "Implemented ensureLegacyPrdMigrated() helper in rex/store that detects, backs up, and migrates legacy .rex/prd.json to folder-tree format. Idempotent via marker file, thread-safe via file locking. Exports from public API for CLI/MCP/web use. 12 unit tests cover idempotency, backup creation, error recovery, concurrency."
 acceptanceCriteria:
   - "Helper detects .rex/prd.json presence and short-circuits when absent or when a folder-tree already reflects its content"
   - "Backup file is written to .rex/ with a timestamped suffix before any destructive action and is preserved on success and failure"
@@ -22,7 +26,7 @@ description: "Add a single helper (e.g. ensureLegacyPrdMigrated) in the rex pack
 
 # Implement shared legacy-PRD detection, backup, and migration helper
 
-🟠 [in_progress]
+🟠 [completed]
 
 ## Summary
 
@@ -30,8 +34,10 @@ Add a single helper (e.g. ensureLegacyPrdMigrated) in the rex package that check
 
 ## Info
 
-- **Status:** in_progress
+- **Status:** completed
 - **Priority:** high
 - **Tags:** rex, migration, prd
 - **Level:** task
 - **Started:** 2026-04-30T16:08:53.868Z
+- **Completed:** 2026-04-30T16:30:57.868Z
+- **Duration:** 22m

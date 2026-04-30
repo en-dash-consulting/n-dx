@@ -2,7 +2,7 @@
 id: "3effa16b-1466-4b82-a963-c1f21afaedeb"
 level: task
 title: "Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures"
-status: deferred
+status: in_progress
 priority: high
 tags:
   - "prd"
@@ -28,7 +28,7 @@ description: "Integrate the slug function into the existing folder-tree serializ
 
 # Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures
 
-🟠 [deferred]
+🟠 [in_progress]
 
 ## Summary
 
@@ -36,7 +36,7 @@ Integrate the slug function into the existing folder-tree serializer so created 
 
 ## Info
 
-- **Status:** deferred
+- **Status:** in_progress
 - **Priority:** high
 - **Tags:** prd, tests, unit, storage, serializer, parser
 - **Level:** task

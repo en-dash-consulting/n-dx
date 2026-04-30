@@ -2,7 +2,7 @@
 id: "3effa16b-1466-4b82-a963-c1f21afaedeb"
 level: "task"
 title: "Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "prd"

@@ -1,0 +1,16 @@
+---
+id: "e08fe050-bded-4ff2-9e4f-46d55cbfc93f"
+level: "feature"
+title: "Enforce Plan-to-Execution Continuity in Hench Runs"
+status: "pending"
+source: "smart-add"
+acceptanceCriteria: []
+description: "When the agent produces a plan during a task, hench must execute that plan within the same run instead of emitting the plan in the summary and terminating without code changes. Several recent runs have completed tasks by describing what they would do rather than doing it, leaving the PRD item marked complete with no corresponding implementation."
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Detect plan-only completions and re-prompt the agent to execute before allowing run completion](./detect-plan-only-completions-and-re-prompt-the-8d4933/index.md) | pending |
+| [Strengthen task-completion criteria to require evidence of code changes for code-classified tasks](./strengthen-task-completion-criteria-to-require-bad1ef/index.md) | pending |

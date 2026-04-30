@@ -24,7 +24,7 @@ Update all existing PRD-related unit, integration, and e2e tests to exercise the
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
 | Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands | task | completed | 2026-04-28 |
-| Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures | task | deferred | 2026-04-28 |
+| Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures | task | in_progress | 2026-04-28 |
 
 ## Info
 
