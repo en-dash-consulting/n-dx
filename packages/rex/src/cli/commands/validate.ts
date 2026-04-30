@@ -8,7 +8,7 @@ import {
   resolveEpiclessFeatures,
   applyEpiclessResolutions,
 } from "./validate-interactive.js";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
@@ -39,6 +39,9 @@ export async function cmdValidate(
   flags: Record<string, string>,
   options?: ValidateOptions,
 ): Promise<void> {
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
+  await ensureLegacyPrdMigrated(dir);
+
   const rexDir = join(dir, REX_DIR);
   const checks: CheckResult[] = [];
 

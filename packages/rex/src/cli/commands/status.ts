@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { computeStats } from "../../core/stats.js";
 import { verify } from "../../core/verify.js";
@@ -78,6 +78,9 @@ export async function cmdStatus(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
+  await ensureLegacyPrdMigrated(dir);
+
   const format = flags.format;
   const showCoverage = flags.coverage === "true";
   const showTokens = flags.tokens !== "false";

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, requireRexDir } from "../errors.js";
@@ -24,6 +24,9 @@ export async function cmdUpdate(
       "Usage: rex update <id> --status=<s> --priority=<p> --title=<t>",
     );
   }
+
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before writing PRD
+  await ensureLegacyPrdMigrated(dir);
 
   requireRexDir(dir);
   const rexDir = join(dir, REX_DIR);

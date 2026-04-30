@@ -2,7 +2,7 @@
 id: "3effa16b-1466-4b82-a963-c1f21afaedeb"
 level: "task"
 title: "Update PRDStore unit tests and add serializer/parser unit tests with folder-tree fixtures"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "prd"
@@ -13,6 +13,10 @@ tags:
   - "parser"
 source: "smart-add"
 startedAt: "2026-04-28T10:19:31.855Z"
+completedAt: "2026-04-30T16:47:43.201Z"
+endedAt: "2026-04-30T16:47:43.201Z"
+resolutionType: "code-change"
+resolutionDetail: "Completed PRDStore unit tests and serializer/parser tests with folder-tree fixtures. Fixed YAML quoting in index generator for consistency. Enabled round-trip integration tests (previously skipped) - all 15 tests passing. Validated serialize→parse round-trip produces identical PRD trees. All 595 storage-related tests passing (39 serializer, 24 parser, 79 store contract, 15 roundtrip)."
 acceptanceCriteria:
   - "All existing PRDStore unit tests pass with the folder-tree backend without modification to test assertions"
   - "Serializer unit tests: create item → correct folder and index.md, edit item → updated index.md and parent summary, delete item → folder removed and parent summary cleaned, move item → folder relocated and both parents updated"

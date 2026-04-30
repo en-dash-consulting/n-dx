@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
 import { verify } from "../../core/verify.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
@@ -9,6 +9,9 @@ export async function cmdVerify(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
+  await ensureLegacyPrdMigrated(dir);
+
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();

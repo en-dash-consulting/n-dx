@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
 import { REX_DIR } from "./constants.js";
@@ -19,6 +19,9 @@ export async function cmdNext(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
+  await ensureLegacyPrdMigrated(dir);
+
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();

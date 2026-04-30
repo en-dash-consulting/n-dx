@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { join } from "node:path";
-import { resolveStore, resolveRemoteStore, SyncEngine } from "../store/index.js";
+import { resolveStore, resolveRemoteStore, SyncEngine, ensureLegacyPrdMigrated } from "../store/index.js";
 import { REX_DIR, TOOL_VERSION } from "./commands/constants.js";
 import { getAllLevels } from "../schema/index.js";
 import {
@@ -44,6 +44,19 @@ import {
  */
 export async function createRexMcpServer(dir: string): Promise<McpServer> {
   const rexDir = join(dir, REX_DIR);
+
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before any PRD operations
+  const migrationResult = await ensureLegacyPrdMigrated(dir);
+  if (migrationResult.migrated) {
+    const itemCount = migrationResult.itemCount ?? 0;
+    const backupPath = migrationResult.backupPath ?? "(unknown)";
+    console.error(
+      `✓ Migrated ${itemCount} item(s) from legacy prd.json to folder-tree format.\n` +
+      `  Backup saved to: ${backupPath}\n` +
+      `  Original file renamed to: .rex/prd.json.migrated`
+    );
+  }
+
   const store = await resolveStore(rexDir);
 
   const server = new McpServer({

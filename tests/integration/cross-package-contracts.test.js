@@ -328,6 +328,7 @@ describe("web → rex gateway contract", () => {
 
   const GATEWAY_FUNCTIONS = [
     "createRexMcpServer",
+    "ensureLegacyPrdMigrated",
     "isCompatibleSchema",
     "findItem",
     "walkTree",

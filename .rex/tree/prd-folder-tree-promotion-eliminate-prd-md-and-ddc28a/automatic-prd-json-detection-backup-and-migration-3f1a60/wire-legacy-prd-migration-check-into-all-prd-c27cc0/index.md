@@ -2,7 +2,7 @@
 id: "c27cc067-a7f4-4cff-a087-aeedc1b161ba"
 level: task
 title: "Wire legacy-PRD migration check into all PRD-touching command entry points"
-status: pending
+status: in_progress
 priority: high
 tags:
   - "rex"
@@ -11,6 +11,7 @@ tags:
   - "web"
   - "migration"
 source: "smart-add"
+startedAt: "2026-04-30T16:47:58.275Z"
 acceptanceCriteria:
   - "Audit list of all PRD-touching entry points is captured (rex CLI, ndx CLI, MCP tools, web server) with a checkbox per integration site"
   - "Every listed entry point calls the shared migration helper before its first PRD read or write"
@@ -22,7 +23,7 @@ description: "Invoke the shared migration helper at the entry point of every com
 
 # Wire legacy-PRD migration check into all PRD-touching command entry points
 
-🟠 [pending]
+🟠 [in_progress]
 
 ## Summary
 
@@ -30,7 +31,8 @@ Invoke the shared migration helper at the entry point of every command, MCP hand
 
 ## Info
 
-- **Status:** pending
+- **Status:** in_progress
 - **Priority:** high
 - **Tags:** rex, ndx, mcp, web, migration
 - **Level:** task
+- **Started:** 2026-04-30T16:47:58.275Z

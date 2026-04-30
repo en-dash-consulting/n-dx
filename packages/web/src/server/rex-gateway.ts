@@ -23,6 +23,10 @@
 // ---- Rex MCP server factory -------------------------------------------------
 export { createRexMcpServer } from "@n-dx/rex";
 
+// ---- Rex legacy PRD migration -----------------------------------------------
+export { ensureLegacyPrdMigrated } from "@n-dx/rex";
+export type { LegacyPrdMigrationResult } from "@n-dx/rex";
+
 // ---- Rex schema version contract --------------------------------------------
 export { SCHEMA_VERSION, isCompatibleSchema } from "@n-dx/rex";
 

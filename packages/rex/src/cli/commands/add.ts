@@ -6,6 +6,7 @@ import {
   resolvePRDFile,
   resolveGitBranch,
   toMarkdownSourcePath,
+  ensureLegacyPrdMigrated,
 } from "../../store/index.js";
 import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js";
 import { findItem } from "../../core/tree.js";
@@ -22,6 +23,9 @@ export async function cmdAdd(
   level: string | undefined,
   flags: Record<string, string>,
 ): Promise<void> {
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before writing PRD
+  await ensureLegacyPrdMigrated(dir);
+
   const title = flags.title;
   if (!title) {
     throw new CLIError(

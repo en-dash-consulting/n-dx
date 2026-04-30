@@ -7,6 +7,7 @@ import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
 import type { ServerContext, ViewerScope } from "./types.js";
+import { ensureLegacyPrdMigrated } from "./rex-gateway.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
 import { handleRexRoute, shutdownRexExecution } from "./routes-rex/index.js";
@@ -656,6 +657,18 @@ export async function startServer(
   if (!assets) {
     console.error("Viewer HTML not found. Run 'npm run build:viewer' first.");
     process.exit(1);
+  }
+
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before serving any PRD-backed routes
+  if (isInScope(scope, "rex")) {
+    const migrationResult = await ensureLegacyPrdMigrated(absDir);
+    if (migrationResult.migrated) {
+      const itemCount = migrationResult.itemCount ?? 0;
+      console.log(
+        `✓ Migrated ${itemCount} item(s) from legacy prd.json to folder-tree format.\n` +
+        `  Backup saved to: ${migrationResult.backupPath}`
+      );
+    }
   }
 
   // Create server context
