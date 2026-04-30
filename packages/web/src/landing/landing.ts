@@ -27,7 +27,11 @@ function initThemeToggle(): void {
     const current = document.documentElement.getAttribute("data-theme") || "dark";
     const next = current === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("sv-theme", next);
+    try {
+      localStorage.setItem("sv-theme", next);
+    } catch {
+      // Storage can be unavailable in hardened browser contexts.
+    }
     themeBtn.setAttribute(
       "aria-label",
       next === "dark" ? "Switch to light mode" : "Switch to dark mode",

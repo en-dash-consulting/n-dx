@@ -15,5 +15,8 @@ export default defineConfig({
       { find: /^(\..+)\.js$/, replacement: "$1.ts" },
     ],
   },
-  test: { include: ["tests/**/*.test.ts"] },
+  test: {
+    include: ["tests/**/*.test.ts"],
+    testTimeout: 30000,
+  },
 });

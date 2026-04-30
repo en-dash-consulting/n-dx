@@ -900,27 +900,23 @@ export async function performCommitPromptIfNeeded(
         detail: run.summary,
       });
 
-      // Find and stage the modified PRD file(s) in .rex/tree/
-      // After toolRexUpdateStatus modifies the tree, stage the changed files.
+      // Stage the PRD store after the status update so code and task state
+      // land in the same commit. Prefer the current folder-tree store, with a
+      // legacy markdown fallback for older projects.
       try {
-        // Use git status to find modified files in .rex/tree/
-        const output = await execStdout("git", ["status", "--porcelain"], {
-          cwd: projectDir,
-          timeout: 10_000,
-        });
-        const statusLines = output.trim().split("\n").filter(Boolean);
-        const rexTreeFiles = statusLines
-          .filter((line: string) => line.includes(".rex/tree"))
-          .map((line: string) => line.slice(3).trim()); // Remove status prefix (e.g., " M ")
+        const prdPaths = [
+          existsSync(join(projectDir, ".rex", "tree")) ? ".rex/tree" : undefined,
+          existsSync(join(projectDir, ".rex", "prd.md")) ? ".rex/prd.md" : undefined,
+        ].filter((p): p is string => Boolean(p));
 
-        if (rexTreeFiles.length > 0) {
-          for (const file of rexTreeFiles) {
-            await execStdout("git", ["add", file], {
-              cwd: projectDir,
-              timeout: 10_000,
-            });
-          }
-          detail(`Staged ${rexTreeFiles.length} PRD file(s)`);
+        for (const prdPath of prdPaths) {
+          await execStdout("git", ["add", prdPath], {
+            cwd: projectDir,
+            timeout: 10_000,
+          });
+        }
+        if (prdPaths.length > 0) {
+          detail(`Staged ${prdPaths.length} PRD path(s)`);
         }
       } catch (err) {
         // Best-effort: if staging fails, proceed with commit anyway

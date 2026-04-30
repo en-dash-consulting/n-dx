@@ -115,29 +115,36 @@ describe("rex prune", { timeout: 120_000 }, () => {
   });
 
   it("does not prune partially completed subtrees", () => {
-    // Create epic with two tasks — only one completed
+    // Create epic > feature > two tasks — only one completed.
+    // Tasks live under a feature because the folder-tree serializer only
+    // emits depth-2 directories for items whose level is "feature".
     const epicOut = run(["add", "epic", "--title=Mixed Epic", tmpDir]);
     const epicId = epicOut.match(/ID: (.+)/)?.[1]?.trim();
 
-    const taskOut = run(["add", "task", "--title=Done Task", `--parent=${epicId}`, tmpDir]);
+    const featureOut = run(["add", "feature", "--title=Mixed Feature", `--parent=${epicId}`, tmpDir]);
+    const featureId = featureOut.match(/ID: (.+)/)?.[1]?.trim();
+
+    const taskOut = run(["add", "task", "--title=Done Task", `--parent=${featureId}`, tmpDir]);
     const taskId = taskOut.match(/ID: (.+)/)?.[1]?.trim();
-    run(["add", "task", "--title=Active Task", `--parent=${epicId}`, tmpDir]);
+    run(["add", "task", "--title=Active Task", `--parent=${featureId}`, tmpDir]);
 
     run(["update", taskId!, "--status=in_progress", "--force", tmpDir]);
     run(["update", taskId!, "--status=completed", "--force", tmpDir]);
 
     const output = run(["prune", "--no-consolidate", tmpDir]);
-    // The completed task should be pruned from under the epic
+    // The completed task should be pruned from under the feature
     expect(output).toContain("Pruned 1 completed item");
     expect(output).toContain("Done Task");
 
-    // The epic and active task should remain
+    // The epic, feature, and active task should remain
     const status = run(["status", "--format=json", tmpDir]);
     const doc = JSON.parse(status);
     expect(doc.items).toHaveLength(1);
     expect(doc.items[0].title).toBe("Mixed Epic");
     expect(doc.items[0].children).toHaveLength(1);
-    expect(doc.items[0].children[0].title).toBe("Active Task");
+    expect(doc.items[0].children[0].title).toBe("Mixed Feature");
+    expect(doc.items[0].children[0].children).toHaveLength(1);
+    expect(doc.items[0].children[0].children[0].title).toBe("Active Task");
   });
 
   it("--yes flag skips confirmation and prunes", () => {
@@ -163,42 +170,55 @@ describe("rex prune", { timeout: 120_000 }, () => {
   });
 
   it("dry-run shows impact counts with subtree details", () => {
-    // Create an epic with a task (2-item subtree)
+    // Create epic > feature > task (3-item subtree). Tasks must live under a
+    // feature because the folder-tree serializer only emits depth-2 dirs for
+    // items whose level is "feature".
     const epicOut = run(["add", "epic", "--title=Impact Epic", tmpDir]);
     const epicId = epicOut.match(/ID: (.+)/)?.[1]?.trim();
 
-    const taskOut = run(["add", "task", "--title=Impact Task", `--parent=${epicId}`, tmpDir]);
+    const featureOut = run(["add", "feature", "--title=Impact Feature", `--parent=${epicId}`, tmpDir]);
+    const featureId = featureOut.match(/ID: (.+)/)?.[1]?.trim();
+
+    const taskOut = run(["add", "task", "--title=Impact Task", `--parent=${featureId}`, tmpDir]);
     const taskId = taskOut.match(/ID: (.+)/)?.[1]?.trim();
 
     run(["update", epicId!, "--status=in_progress", "--force", tmpDir]);
+    run(["update", featureId!, "--status=in_progress", "--force", tmpDir]);
     run(["update", taskId!, "--status=in_progress", "--force", tmpDir]);
     run(["update", taskId!, "--status=completed", "--force", tmpDir]);
+    run(["update", featureId!, "--status=completed", "--force", tmpDir]);
     run(["update", epicId!, "--status=completed", "--force", tmpDir]);
 
     const dryOutput = run(["prune", "--dry-run", "--no-consolidate", tmpDir]);
     expect(dryOutput).toContain("Would prune:");
     expect(dryOutput).toContain("Impact Epic");
-    expect(dryOutput).toContain("2 items including children");
-    expect(dryOutput).toContain("Impact: 2 total items");
+    expect(dryOutput).toContain("3 items including children");
+    expect(dryOutput).toContain("Impact: 3 total items");
     expect(dryOutput).toContain("1 epic");
   });
 
   it("dry-run JSON output includes totalItems count", () => {
+    // Same epic > feature > task structure as the test above.
     const epicOut = run(["add", "epic", "--title=Total Epic", tmpDir]);
     const epicId = epicOut.match(/ID: (.+)/)?.[1]?.trim();
 
-    const taskOut = run(["add", "task", "--title=Total Task", `--parent=${epicId}`, tmpDir]);
+    const featureOut = run(["add", "feature", "--title=Total Feature", `--parent=${epicId}`, tmpDir]);
+    const featureId = featureOut.match(/ID: (.+)/)?.[1]?.trim();
+
+    const taskOut = run(["add", "task", "--title=Total Task", `--parent=${featureId}`, tmpDir]);
     const taskId = taskOut.match(/ID: (.+)/)?.[1]?.trim();
 
     run(["update", epicId!, "--status=in_progress", "--force", tmpDir]);
+    run(["update", featureId!, "--status=in_progress", "--force", tmpDir]);
     run(["update", taskId!, "--status=in_progress", "--force", tmpDir]);
     run(["update", taskId!, "--status=completed", "--force", tmpDir]);
+    run(["update", featureId!, "--status=completed", "--force", tmpDir]);
     run(["update", epicId!, "--status=completed", "--force", tmpDir]);
 
     const output = run(["prune", "--dry-run", "--format=json", "--no-consolidate", tmpDir]);
     const parsed = JSON.parse(output);
     expect(parsed.dryRun).toBe(true);
-    expect(parsed.totalItems).toBe(2);
+    expect(parsed.totalItems).toBe(3);
     expect(parsed.items).toHaveLength(1);
     expect(parsed.items[0].title).toBe("Total Epic");
   });

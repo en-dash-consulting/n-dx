@@ -74,7 +74,7 @@ export async function cmdMigrateToFolderTree(
     parts.push(`${directoriesCreated} folder${directoriesCreated === 1 ? "" : "s"} created`);
   }
   if (filesWritten > 0) {
-    parts.push(`${filesWritten} index.md file${filesWritten === 1 ? "" : "s"} written`);
+    parts.push(`${filesWritten} item file${filesWritten === 1 ? "" : "s"} written`);
   }
   if (directoriesRemoved > 0) {
     parts.push(`${directoriesRemoved} stale folder${directoriesRemoved === 1 ? "" : "s"} removed`);

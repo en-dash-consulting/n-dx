@@ -16,6 +16,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdMigrateToFolderTree } from "../../../../src/cli/commands/migrate-to-folder-tree.js";
+import { titleToFilename } from "../../../../src/store/title-to-filename.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 const SAMPLE_PRD: PRDDocument = {
@@ -124,7 +125,7 @@ describe("cmdMigrateToFolderTree", () => {
     expect(taskDirs).toHaveLength(1);
     expect(taskDirs[0]).toMatch(/task-apple/);
 
-    const epicIndex = readFileSync(join(epicDir, "index.md"), "utf-8");
+    const epicIndex = readFileSync(join(epicDir, titleToFilename("Epic Alpha")), "utf-8");
     expect(epicIndex).toContain("Epic Alpha");
     expect(epicIndex).toContain("e1111111");
   });
@@ -137,7 +138,7 @@ describe("cmdMigrateToFolderTree", () => {
     const out = output();
     expect(out).toContain("Migrated .rex/prd.md → .rex/tree/");
     expect(out).toMatch(/folder.*created/);
-    expect(out).toMatch(/index\.md file.*written/);
+    expect(out).toMatch(/item file.*written/);
   });
 
   it("is idempotent: re-running prints 'already up to date'", async () => {

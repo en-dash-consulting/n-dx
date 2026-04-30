@@ -178,6 +178,7 @@ describe("rex cli/commands import surface", () => {
     "../../store/index.js",
     "../../store/markdown-parser.js",
     "../../store/project-config.js",
+    "../../store/title-to-filename.js",
     "../../workflow/default.js",
   ]);
 

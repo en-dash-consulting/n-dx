@@ -281,8 +281,8 @@ describe("parseFolderTree: folder-tree fixtures", () => {
     expect(result.items.map(item => item.title)).toEqual(["Good Epic"]);
     expect(result.warnings).toEqual([
       expect.objectContaining({
-        path: expect.stringContaining("missing-epic-bbbbbbbb/index.md"),
-        message: "index.md not found or unreadable",
+        path: expect.stringContaining("missing-epic-bbbbbbbb"),
+        message: "No item markdown file found (expected index.md or title-named .md file)",
       }),
     ]);
   });
@@ -450,7 +450,7 @@ describe("parseFolderTree: warnings for malformed/missing files", () => {
 
     const result = await parseFolderTree(testDir);
     expect(result.items).toHaveLength(0);
-    const w = result.warnings.find(w => w.message.includes("not found"));
+    const w = result.warnings.find(w => w.message.includes("No item markdown file found"));
     expect(w).toBeDefined();
   });
 

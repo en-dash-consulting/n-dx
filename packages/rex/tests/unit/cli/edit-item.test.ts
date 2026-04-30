@@ -43,11 +43,20 @@ describe("handleEditItem", () => {
       title: "Second item",
       level: "task",
     });
+    // Tasks must live under a feature so the folder-tree serializer can
+    // represent them; without an intermediate feature `syncFolderTree`
+    // silently drops the tasks and subsequent `getItem` calls return null.
+    const feature = makeItem({
+      id: "feature-1",
+      title: "Test Feature",
+      level: "feature",
+      children: [item1, item2],
+    });
     const epic = makeItem({
       id: "epic-1",
       title: "Test Epic",
       level: "epic",
-      children: [item1, item2],
+      children: [feature],
     });
 
     const doc: PRDDocument = {

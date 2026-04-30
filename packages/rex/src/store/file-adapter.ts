@@ -322,24 +322,94 @@ export class FileStore implements PRDStore {
     return this.mergeDocuments(sources);
   }
 
+  private async directoryExists(path: string): Promise<boolean> {
+    try {
+      return (await stat(path)).isDirectory();
+    } catch (err) {
+      if (this.isMissingFileError(err)) return false;
+      throw err;
+    }
+  }
+
+  private async fileExists(filename: string): Promise<boolean> {
+    try {
+      return (await stat(this.path(filename))).isFile();
+    } catch (err) {
+      if (this.isMissingFileError(err)) return false;
+      throw err;
+    }
+  }
+
+  private async loadDocumentFromMarkdownSource(): Promise<PRDDocument> {
+    const raw = await readFile(this.markdownPath, "utf-8");
+    const parsed = parseDocument(raw);
+    if (!parsed.ok) {
+      throw new Error(`Invalid ${PRD_MARKDOWN_FILENAME}: ${parsed.error.message}`);
+    }
+    const result = validateDocument(parsed.data);
+    if (!result.ok) {
+      throw new Error(`Invalid ${PRD_MARKDOWN_FILENAME}: ${result.errors.message}`);
+    }
+    const doc = result.data as PRDDocument;
+    this.rebuildOwnershipFromItems(doc);
+    return doc;
+  }
+
+  private async loadLegacyDocument(): Promise<PRDDocument> {
+    if (await this.fileExists(PRD_MARKDOWN_FILENAME)) {
+      return this.loadDocumentFromMarkdownSource();
+    }
+    const doc = await this.loadDocumentFromJsonSources();
+    const attributed = this.withMarkdownSourceAttribution(doc);
+    await writeFile(this.markdownPath, serializeDocument(attributed), "utf-8");
+    this.rebuildOwnershipFromItems(attributed);
+    return attributed;
+  }
+
+  private withMarkdownSourceAttribution(doc: PRDDocument): PRDDocument {
+    const attributeItem = (item: PRDItem): PRDItem => {
+      const owner = this.itemToFile.get(item.id) ?? PRD_FILENAME;
+      const attributed: PRDItem = {
+        ...item,
+        sourceFile: toMarkdownSourcePath(owner),
+      };
+      if (item.children) {
+        attributed.children = item.children.map(attributeItem);
+      }
+      return attributed;
+    };
+
+    return {
+      ...doc,
+      items: doc.items.map(attributeItem),
+    };
+  }
+
   /**
    * Load and validate the consolidated PRD document.
    *
-   * Reads exclusively from the folder-tree format at `.rex/tree/`. The folder-tree
-   * is the sole authoritative PRD backend. No fallback to prd.md or prd.json.
+   * Reads from the folder-tree format at `.rex/tree/` when present. If the tree
+   * has not been created yet, falls back to legacy read-only sources
+   * (`prd.md`, then `prd.json`/branch JSON files) so pre-migration projects and
+   * tests can still be inspected. Mutations still persist only to `.rex/tree/`.
    *
    * Document title is read from `tree-meta.json` if present; defaults to "PRD".
-   *
-   * @throws If the folder tree is missing or invalid. Error message includes
-   *         migration command suggestion.
    */
   async loadDocument(): Promise<PRDDocument> {
-    // Read document title from tree-meta.json
+    if (!(await this.directoryExists(this.treeRoot))) {
+      return this.loadLegacyDocument();
+    }
+
+    // Read document title from tree-meta.json. Its presence also signals the
+    // folder tree has been initialised — if it's there we trust the tree as
+    // canonical and do not silently fall back to a legacy prd.md/prd.json.
     let title = "PRD";
+    let treeMetaPresent = false;
     try {
       const raw = await readFile(this.path("tree-meta.json"), "utf-8");
       const meta = JSON.parse(raw) as Record<string, unknown>;
       if (typeof meta["title"] === "string") title = meta["title"];
+      treeMetaPresent = true;
     } catch (err) {
       if (!this.isMissingFileError(err)) {
         throw err;
@@ -349,6 +419,9 @@ export class FileStore implements PRDStore {
     // Parse items from the folder tree
     try {
       const { items } = await parseFolderTree(this.treeRoot);
+      if (items.length === 0 && !treeMetaPresent && (await this.hasLegacySource())) {
+        return this.loadLegacyDocument();
+      }
       this.rebuildOwnershipFromItems({ schema: SCHEMA_VERSION, title, items });
       return { schema: SCHEMA_VERSION, title, items };
     } catch (error) {
@@ -369,6 +442,13 @@ export class FileStore implements PRDStore {
    */
   private isMissingFileError(err: unknown): boolean {
     return (err as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
+  }
+
+  private async hasLegacySource(): Promise<boolean> {
+    if (await this.fileExists(PRD_MARKDOWN_FILENAME)) return true;
+    if (await this.fileExists(PRD_FILENAME)) return true;
+    const branchFiles = await discoverPRDFiles(this.rexDir);
+    return branchFiles.length > 0;
   }
 
   /**

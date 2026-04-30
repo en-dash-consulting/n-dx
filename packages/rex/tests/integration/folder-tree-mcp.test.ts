@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createStore, ensureRexDir } from "../../src/store/index.js";
@@ -62,9 +62,17 @@ async function treeEpics(rexDir: string): Promise<PRDItem[]> {
   return items;
 }
 
-/** Read the index.md for an item given its title and ID (via slug). */
+/**
+ * Read the markdown file for an item given its directory path. Uses the same
+ * discovery rule as the production parser: prefer a single non-`index.md`
+ * markdown file, falling back to `index.md`.
+ */
 async function readIndexMd(rexDir: string, ...pathParts: string[]): Promise<string> {
-  return readFile(join(rexDir, "tree", ...pathParts, "index.md"), "utf-8");
+  const itemDir = join(rexDir, "tree", ...pathParts);
+  const entries = await readdir(itemDir);
+  const titleNamed = entries.filter((f) => f.endsWith(".md") && f !== "index.md");
+  if (titleNamed.length === 1) return readFile(join(itemDir, titleNamed[0]), "utf-8");
+  return readFile(join(itemDir, "index.md"), "utf-8");
 }
 
 /** Resolve the slug directory name for an item. */

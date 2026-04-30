@@ -179,7 +179,8 @@ describe("cmdFix", () => {
 
       await cmdFix(tmpDir, {});
       const doc = readPRD(tmpDir);
-      expect(doc.items[1].blockedBy).toEqual(["t1"]);
+      const t2 = doc.items.find(i => i.id === "t2");
+      expect(t2?.blockedBy).toEqual(["t1"]);
     });
 
     it("removes blockedBy array entirely when all refs are orphaned", async () => {

@@ -12,6 +12,6 @@ description: "Repurpose `index.md` inside each PRD item folder as an auto-genera
 
 | Title | Status |
 |-------|--------|
-| [Design and document the folder index.md summary schema](./design-and-document-the-folder-index-md-summary-schema/index.md) | pending |
+| [Design and document the folder index.md summary schema](./design-and-document-the-folder-index-md-summary-schema/index.md) | completed |
 | [Implement index.md generator and wire into all PRD write paths](./implement-index-md-generator-and-wire-into-all-prd-43bbc6/index.md) | pending |
 | [Render new index.md schema in dashboard detail view](./render-new-index-md-schema-in-dashboard-detail-view/index.md) | pending |

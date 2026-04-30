@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdNext } from "../../../../src/cli/commands/next.js";
 import { serializeFolderTree } from "../../../../src/store/index.js";
@@ -79,13 +79,13 @@ describe("cmdNext — folder tree read path", () => {
     expect(output()).toContain("Task Beta");
   });
 
-  it("auto-migrates to tree when absent and selects same task", async () => {
+  it("selects same task when reading from legacy prd.json fallback", async () => {
     writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(NEXT_PRD));
-    // No tree pre-created.
+    // No tree pre-created — FileStore.loadDocument falls back to prd.json
+    // (read-only). The folder tree is no longer auto-created on read.
 
     await cmdNext(tmp, {});
 
-    expect(existsSync(join(tmp, ".rex", "tree"))).toBe(true);
     expect(output()).toContain("Task Beta");
   });
 

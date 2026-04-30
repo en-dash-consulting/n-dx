@@ -30,6 +30,7 @@ export default defineConfig({
     include: [
       "tests/**/*.test.ts",
     ],
+    setupFiles: ["tests/setup/local-storage.ts"],
     exclude: sandboxBlocksNetwork
       ? [
           "tests/unit/server/**/*.test.ts",

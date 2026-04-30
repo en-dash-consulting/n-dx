@@ -105,6 +105,7 @@ const REX_COMMANDS = [
   "sync",
   "adapter",
   "migrate-to-md",
+  "migrate-folder-tree-filenames",
   "mcp",
 ];
 

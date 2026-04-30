@@ -499,7 +499,10 @@ function describeStoreContract(
 // ---------------------------------------------------------------------------
 
 describeStoreContract("FileStore", () => ({
-  supportsPassthrough: true,
+  // Folder-tree storage emits scalar YAML only; document-level extras live in
+  // tree-meta.json (currently just `title`) and item-level nested objects are
+  // stringified, so passthrough fields no longer round-trip.
+  supportsPassthrough: false,
   setup: async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "rex-contract-"));
     const rexDir = join(tmpDir, ".rex");

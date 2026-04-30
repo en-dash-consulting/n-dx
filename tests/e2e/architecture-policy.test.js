@@ -824,7 +824,10 @@ const COHESION_THRESHOLD = 0.5;
  * Each entry must explain why the zone cannot meet the threshold and
  * what structural condition would allow removing the exemption.
  */
-const COHESION_EXCEPTIONS = new Map();
+const COHESION_EXCEPTIONS = new Map([
+  ["graph-layout", "Small focused graph-rendering utility cluster; cohesion is depressed by one-way integration with the viewer hub. Remove when graph layout code is folded into a cohesive graph zone or gains enough internal edges."],
+  ["tick", "Small polling/tick utility cluster used by viewer components; cohesion is depressed by hub-facing timer imports. Remove when tick utilities move under the viewer-message pipeline or gain a dedicated gateway."],
+]);
 
 describe("architecture policy: zone cohesion gate", () => {
   it(`all production zones meet minimum cohesion threshold (${COHESION_THRESHOLD})`, () => {
@@ -1183,6 +1186,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   // Rex CLI — lazy-loads command handlers and heavy dependencies
   ["packages/rex/src/cli/index.ts", "CLI command dispatch — lazy-loads command handlers"],
   ["packages/rex/src/cli/commands/analyze.ts", "Chunked-review lazy import — loaded only during interactive proposal review"],
+  ["packages/rex/src/cli/commands/migrate-to-folder-tree.ts", "Lazy-loads node:readline only for the interactive legacy-file cleanup prompt"],
   ["packages/rex/src/cli/commands/prune.ts", "Lazy-loads LLM client for smart prune proposals"],
   ["packages/rex/src/cli/commands/remove.ts", "Lazy-loads LLM client for smart remove analysis"],
   ["packages/rex/src/cli/commands/reorganize.ts", "Lazy-loads LLM client for reorganization proposals"],

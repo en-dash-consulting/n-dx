@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:
 import { tmpdir } from "node:os";
 import { cmdValidate } from "../../../../src/cli/commands/validate.js";
 import { writePRD, writeConfig } from "../../../helpers/rex-dir-test-support.js";
+import { serializeFolderTree } from "../../../../src/store/folder-tree-serializer.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
 
 const VALID_CONFIG = {
@@ -647,15 +648,14 @@ describe("cmdValidate — folder tree read path", () => {
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
-  it("auto-migrates to tree when tree is absent, structural checks pass", async () => {
+  it("falls back to legacy prd.json when tree is absent, structural checks pass", async () => {
     writeFileSync(join(tmpDir, ".rex", "config.json"), JSON.stringify(VALID_CONFIG_FOR_TREE));
     writeFileSync(join(tmpDir, ".rex", "prd.json"), JSON.stringify(VALID_PRD_FOR_TREE));
-    // No tree pre-created.
+    // No tree pre-created — FileStore should read the legacy JSON source.
 
     await cmdValidate(tmpDir, {});
 
     expect(exitSpy).not.toHaveBeenCalled();
-    expect(existsSync(join(tmpDir, ".rex", "tree"))).toBe(true);
   });
 
   it("reports same issues from tree as from prd.json (empty-container warning)", async () => {

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Anthropic from "@anthropic-ai/sdk";
 import { initConfig } from "../../../src/store/config.js";
-import { parseDocument, serializeDocument } from "@n-dx/rex";
+import { serializeDocument } from "@n-dx/rex";
+import { createStore } from "@n-dx/rex/dist/store/index.js";
 
 /**
  * Tests that the API agentLoop properly handles task failures:
@@ -59,10 +60,8 @@ async function setupProjectDir(): Promise<{
 }
 
 function readPrdTask(rexDir: string) {
-  return readFile(join(rexDir, "prd.md"), "utf-8").then((raw) => {
-    const result = parseDocument(raw);
-    if (!result.ok) throw result.error;
-    return result.data.items.find((i: { id: string }) => i.id === "task-1");
+  return createStore("file", rexDir).loadDocument().then((doc) => {
+    return doc.items.find((i: { id: string }) => i.id === "task-1");
   });
 }
 

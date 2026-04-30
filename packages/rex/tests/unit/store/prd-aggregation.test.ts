@@ -430,7 +430,9 @@ describe("PRDStore aggregation", () => {
       expect(ids).toEqual(["e0", "e1"]);
     });
 
-    it("addItem without parentId merges into prd.md alongside legacy items", async () => {
+    // Mutations write only to .rex/tree/ now; prd.md is no longer regenerated,
+    // so the merge-into-prd.md path no longer exists.
+    it.skip("addItem without parentId merges into prd.md alongside legacy items", async () => {
       await writeFile(
         join(rexDir, "prd.json"),
         toCanonicalJSON(makeDoc("Primary", [])),

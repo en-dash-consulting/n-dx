@@ -48,17 +48,6 @@ function extractId(output: string): string {
   return match[1].trim();
 }
 
-/** Return the first 8 hex chars of a UUID (hyphens stripped) — the id8 suffix. */
-function id8(id: string): string {
-  return id.replace(/-/g, "").slice(0, 8);
-}
-
-/** Find a directory name that ends with `-{id8}` in `dirs`. */
-function findByIdSuffix(dirs: string[], id: string): string | undefined {
-  const suffix = id8(id);
-  return dirs.find((d) => d.endsWith(`-${suffix}`));
-}
-
 /** List direct subdirectory names of `dir`. Returns [] when dir is absent. */
 async function listSubdirs(dir: string): Promise<string[]> {
   try {
@@ -75,6 +64,50 @@ async function listSubdirs(dir: string): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Find the markdown file that holds an item's content inside `dir` using the
+ * same rule the production parser uses: prefer a single non-`index.md` markdown
+ * file, otherwise fall back to `index.md`.
+ */
+async function discoverItemFile(dir: string): Promise<string | undefined> {
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return undefined;
+  }
+  const titleNamed = entries.filter((f) => f.endsWith(".md") && f !== "index.md");
+  if (titleNamed.length === 1) return join(dir, titleNamed[0]);
+  const indexPath = join(dir, "index.md");
+  try {
+    await stat(indexPath);
+    return indexPath;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read the item markdown for the given directory. */
+async function readItemMd(dir: string): Promise<string> {
+  const path = await discoverItemFile(dir);
+  if (!path) throw new Error(`No item markdown file found in ${dir}`);
+  return readFile(path, "utf-8");
+}
+
+/**
+ * Find the immediate subdirectory of `parent` whose item has the given id,
+ * by reading the YAML frontmatter `id:` field.
+ */
+async function findItemDir(parent: string, id: string): Promise<string | undefined> {
+  for (const sub of await listSubdirs(parent)) {
+    const itemPath = await discoverItemFile(join(parent, sub));
+    if (!itemPath) continue;
+    const content = await readFile(itemPath, "utf-8");
+    if (new RegExp(`^id:\\s*"?${id}"?\\s*$`, "m").test(content)) return sub;
+  }
+  return undefined;
 }
 
 /** Recursively collect all item IDs from a PRD items tree. */
@@ -111,10 +144,10 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
 
     const epicDirs = await listSubdirs(treeRoot);
     expect(epicDirs.length).toBe(1);
-    const epicDir = findByIdSuffix(epicDirs, id);
+    const epicDir = await findItemDir(treeRoot, id);
     expect(epicDir).toBeDefined();
 
-    const indexMd = await readFile(join(treeRoot, epicDir!, "index.md"), "utf-8");
+    const indexMd = await readItemMd(join(treeRoot, epicDir!));
     expect(indexMd).toContain(`"Auth System"`);
     expect(indexMd).toContain(`"epic"`);
     expect(indexMd).toContain(`"high"`);
@@ -127,17 +160,15 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     const featOut = run(["add", "feature", tmpDir, "--title=Feature One", `--parent=${epicId}`]);
     const featId = extractId(featOut);
 
-    const epicDirs = await listSubdirs(treeRoot);
-    const epicDir = findByIdSuffix(epicDirs, epicId)!;
-    const featDirs = await listSubdirs(join(treeRoot, epicDir));
-    const featDir = findByIdSuffix(featDirs, featId);
+    const epicDir = (await findItemDir(treeRoot, epicId))!;
+    const featDir = await findItemDir(join(treeRoot, epicDir), featId);
     expect(featDir).toBeDefined();
 
-    const featIndexMd = await readFile(join(treeRoot, epicDir, featDir!, "index.md"), "utf-8");
+    const featIndexMd = await readItemMd(join(treeRoot, epicDir, featDir!));
     expect(featIndexMd).toContain(`"Feature One"`);
 
     // Parent epic index.md should list the feature in ## Children table
-    const epicIndexMd = await readFile(join(treeRoot, epicDir, "index.md"), "utf-8");
+    const epicIndexMd = await readItemMd(join(treeRoot, epicDir));
     expect(epicIndexMd).toContain("Feature One");
     expect(epicIndexMd).toContain("## Children");
   });
@@ -150,18 +181,12 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     const taskOut = run(["add", "task", tmpDir, "--title=Task Alpha", `--parent=${featId}`, "--priority=high"]);
     const taskId = extractId(taskOut);
 
-    const epicDirs = await listSubdirs(treeRoot);
-    const epicDir = findByIdSuffix(epicDirs, epicId)!;
-    const featDirs = await listSubdirs(join(treeRoot, epicDir));
-    const featDir = findByIdSuffix(featDirs, featId)!;
-    const taskDirs = await listSubdirs(join(treeRoot, epicDir, featDir));
-    const taskDir = findByIdSuffix(taskDirs, taskId);
+    const epicDir = (await findItemDir(treeRoot, epicId))!;
+    const featDir = (await findItemDir(join(treeRoot, epicDir), featId))!;
+    const taskDir = await findItemDir(join(treeRoot, epicDir, featDir), taskId);
     expect(taskDir).toBeDefined();
 
-    const taskIndexMd = await readFile(
-      join(treeRoot, epicDir, featDir, taskDir!, "index.md"),
-      "utf-8",
-    );
+    const taskIndexMd = await readItemMd(join(treeRoot, epicDir, featDir, taskDir!));
     expect(taskIndexMd).toContain(`"Task Alpha"`);
     expect(taskIndexMd).toContain(`"high"`);
     expect(taskIndexMd).toContain(`"pending"`);
@@ -173,9 +198,8 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
 
     run(["update", epicId, tmpDir, "--status=in_progress"]);
 
-    const epicDirs = await listSubdirs(treeRoot);
-    const epicDir = findByIdSuffix(epicDirs, epicId)!;
-    const indexMd = await readFile(join(treeRoot, epicDir, "index.md"), "utf-8");
+    const epicDir = (await findItemDir(treeRoot, epicId))!;
+    const indexMd = await readItemMd(join(treeRoot, epicDir));
     expect(indexMd).toContain(`"in_progress"`);
   });
 
@@ -185,11 +209,10 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
 
     run(["update", epicId, tmpDir, "--title=New Title"]);
 
-    // Directory slug changes to reflect new title but retains same id8 suffix
-    const epicDirs = await listSubdirs(treeRoot);
-    const epicDir = findByIdSuffix(epicDirs, epicId);
+    // Directory slug reflects the new title; the same item is still findable by id.
+    const epicDir = await findItemDir(treeRoot, epicId);
     expect(epicDir).toBeDefined();
-    const indexMd = await readFile(join(treeRoot, epicDir!, "index.md"), "utf-8");
+    const indexMd = await readItemMd(join(treeRoot, epicDir!));
     expect(indexMd).toContain(`"New Title"`);
     expect(indexMd).not.toContain(`"Old Title"`);
   });
@@ -198,11 +221,11 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     const epicOut = run(["add", "epic", tmpDir, "--title=To Remove"]);
     const epicId = extractId(epicOut);
 
-    expect(findByIdSuffix(await listSubdirs(treeRoot), epicId)).toBeDefined();
+    expect(await findItemDir(treeRoot, epicId)).toBeDefined();
 
     run(["remove", "epic", epicId, tmpDir, "--yes"]);
 
-    expect(findByIdSuffix(await listSubdirs(treeRoot), epicId)).toBeUndefined();
+    expect(await findItemDir(treeRoot, epicId)).toBeUndefined();
   });
 
   it("remove task deletes its directory from the feature subdirectory", async () => {
@@ -213,16 +236,16 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     const taskOut = run(["add", "task", tmpDir, "--title=Task", `--parent=${featId}`]);
     const taskId = extractId(taskOut);
 
-    const epicDir = findByIdSuffix(await listSubdirs(treeRoot), epicId)!;
-    const featDir = findByIdSuffix(await listSubdirs(join(treeRoot, epicDir)), featId)!;
+    const epicDir = (await findItemDir(treeRoot, epicId))!;
+    const featDir = (await findItemDir(join(treeRoot, epicDir), featId))!;
     expect(
-      findByIdSuffix(await listSubdirs(join(treeRoot, epicDir, featDir)), taskId),
+      await findItemDir(join(treeRoot, epicDir, featDir), taskId),
     ).toBeDefined();
 
     run(["remove", "task", taskId, tmpDir, "--yes"]);
 
     expect(
-      findByIdSuffix(await listSubdirs(join(treeRoot, epicDir, featDir)), taskId),
+      await findItemDir(join(treeRoot, epicDir, featDir), taskId),
     ).toBeUndefined();
   });
 
@@ -234,20 +257,18 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     const featOut = run(["add", "feature", tmpDir, "--title=Feature A", `--parent=${epic1Id}`]);
     const featId = extractId(featOut);
 
-    const epicDirsBefore = await listSubdirs(treeRoot);
-    const epic1DirBefore = findByIdSuffix(epicDirsBefore, epic1Id)!;
-    expect(findByIdSuffix(await listSubdirs(join(treeRoot, epic1DirBefore)), featId)).toBeDefined();
+    const epic1DirBefore = (await findItemDir(treeRoot, epic1Id))!;
+    expect(await findItemDir(join(treeRoot, epic1DirBefore), featId)).toBeDefined();
 
     run(["move", featId, tmpDir, `--parent=${epic2Id}`]);
 
-    const epicDirs = await listSubdirs(treeRoot);
-    const epic1Dir = findByIdSuffix(epicDirs, epic1Id)!;
-    const epic2Dir = findByIdSuffix(epicDirs, epic2Id)!;
+    const epic1Dir = (await findItemDir(treeRoot, epic1Id))!;
+    const epic2Dir = (await findItemDir(treeRoot, epic2Id))!;
 
     // Feature no longer under epic1
-    expect(findByIdSuffix(await listSubdirs(join(treeRoot, epic1Dir)), featId)).toBeUndefined();
+    expect(await findItemDir(join(treeRoot, epic1Dir), featId)).toBeUndefined();
     // Feature is now under epic2
-    expect(findByIdSuffix(await listSubdirs(join(treeRoot, epic2Dir)), featId)).toBeDefined();
+    expect(await findItemDir(join(treeRoot, epic2Dir), featId)).toBeDefined();
   });
 
   it("adding multiple epics creates one directory per epic", async () => {
@@ -260,7 +281,7 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     const epicDirs = await listSubdirs(treeRoot);
     expect(epicDirs.length).toBe(3);
     for (const id of ids) {
-      expect(findByIdSuffix(epicDirs, id)).toBeDefined();
+      expect(await findItemDir(treeRoot, id)).toBeDefined();
     }
   });
 });

@@ -127,20 +127,29 @@ describe("store → tree → task-selection pipeline", () => {
         priority: "high",
         children: [
           {
-            id: "task-a",
-            title: "First",
-            level: "task",
+            id: "feat-1",
+            title: "Feature",
+            level: "feature",
             status: "pending",
-            priority: "critical",
-            children: [],
-          },
-          {
-            id: "task-b",
-            title: "Second",
-            level: "task",
-            status: "pending",
-            priority: "medium",
-            children: [],
+            priority: "high",
+            children: [
+              {
+                id: "task-a",
+                title: "First",
+                level: "task",
+                status: "pending",
+                priority: "critical",
+                children: [],
+              },
+              {
+                id: "task-b",
+                title: "Second",
+                level: "task",
+                status: "pending",
+                priority: "medium",
+                children: [],
+              },
+            ],
           },
         ],
       },
@@ -171,19 +180,28 @@ describe("store → tree → task-selection pipeline", () => {
   it("findAutoCompletions cascades from completed leaf to parent", async () => {
     const items: PRDItem[] = [
       {
-        id: "feat-1",
-        title: "Feature",
-        level: "feature",
+        id: "epic-1",
+        title: "Epic",
+        level: "epic",
         status: "pending",
         priority: "high",
         children: [
           {
-            id: "task-1",
-            title: "Only task",
-            level: "task",
-            status: "completed",
+            id: "feat-1",
+            title: "Feature",
+            level: "feature",
+            status: "pending",
             priority: "high",
-            children: [],
+            children: [
+              {
+                id: "task-1",
+                title: "Only task",
+                level: "task",
+                status: "completed",
+                priority: "high",
+                children: [],
+              },
+            ],
           },
         ],
       },
@@ -206,28 +224,37 @@ describe("store → tree → task-selection pipeline", () => {
         priority: "high",
         children: [
           {
-            id: "task-done",
-            title: "Done",
-            level: "task",
-            status: "completed",
-            priority: "high",
-            children: [],
-          },
-          {
-            id: "task-pending",
-            title: "Pending",
-            level: "task",
+            id: "feat-1",
+            title: "Feature",
+            level: "feature",
             status: "pending",
-            priority: "medium",
-            children: [],
-          },
-          {
-            id: "task-failing",
-            title: "Failing",
-            level: "task",
-            status: "failing",
-            priority: "critical",
-            children: [],
+            priority: "high",
+            children: [
+              {
+                id: "task-done",
+                title: "Done",
+                level: "task",
+                status: "completed",
+                priority: "high",
+                children: [],
+              },
+              {
+                id: "task-pending",
+                title: "Pending",
+                level: "task",
+                status: "pending",
+                priority: "medium",
+                children: [],
+              },
+              {
+                id: "task-failing",
+                title: "Failing",
+                level: "task",
+                status: "failing",
+                priority: "critical",
+                children: [],
+              },
+            ],
           },
         ],
       },
@@ -288,17 +315,26 @@ describe("store → tree → task-selection pipeline", () => {
         level: "epic",
         status: "pending",
         priority: "high",
-        children: [],
+        children: [
+          {
+            id: "feat-1",
+            title: "Feature",
+            level: "feature",
+            status: "pending",
+            priority: "high",
+            children: [],
+          },
+        ],
       },
     ]);
 
-    // Initially the epic itself is actionable (leaf with no children)
+    // Initially the feature is actionable (leaf with no task children)
     let doc = await store.loadDocument();
     let actionable = findActionableTasks(doc.items, collectCompletedIds(doc.items));
     expect(actionable.length).toBe(1);
-    expect(actionable[0].item.id).toBe("epic-1");
+    expect(actionable[0].item.id).toBe("feat-1");
 
-    // Add a task under the epic
+    // Add a task under the feature
     await store.addItem({
       id: "task-new",
       title: "New Task",
@@ -306,9 +342,9 @@ describe("store → tree → task-selection pipeline", () => {
       status: "pending",
       priority: "critical",
       children: [],
-    }, "epic-1");
+    }, "feat-1");
 
-    // Now the new task is actionable; the epic is no longer a leaf
+    // Now the new task is actionable; the feature is no longer a leaf
     doc = await store.loadDocument();
     actionable = findActionableTasks(doc.items, collectCompletedIds(doc.items));
     expect(actionable.length).toBe(1);

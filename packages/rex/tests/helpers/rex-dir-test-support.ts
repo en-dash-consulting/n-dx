@@ -1,11 +1,20 @@
-import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 import { parseDocument } from "../../src/store/markdown-parser.js";
+import { titleToFilename } from "../../src/store/title-to-filename.js";
 
 /**
  * Write a test PRD by creating the folder tree structure synchronously.
  * This uses simple directory and file creation without going through the async serializer.
+ *
+ * The per-item markdown file is written to `<titleToFilename(title)>.md`, matching
+ * what the production serializer produces. The folder-tree parser also accepts an
+ * `index.md` fallback, so older fixtures that hand-wrote `index.md` still parse.
+ *
+ * The full document is also persisted to `.rex/prd.json` so that any test PRD the
+ * folder tree cannot represent (e.g., a non-epic item at the root, used to exercise
+ * orphan/structural validation) is still loadable via the FileStore legacy fallback.
  */
 export function writePRD(dir: string, doc: PRDDocument): void {
   mkdirSync(join(dir, ".rex"), { recursive: true });
@@ -16,36 +25,65 @@ export function writePRD(dir: string, doc: PRDDocument): void {
     JSON.stringify({ title: doc.title }),
   );
 
+  // Persist the full document for the legacy read fallback. This is the only
+  // surface that round-trips items the folder tree cannot express (non-epic
+  // root items, etc.) and keeps test setup decoupled from slug shape.
+  writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc, null, 2));
+
+  // Reset the tree so successive writePRD calls in the same temp dir do not
+  // leak items from a previous run.
+  const treePath = join(dir, ".rex", "tree");
+  if (existsSync(treePath)) rmSync(treePath, { recursive: true, force: true });
+  // prd.md is the legacy fallback's write target; clear it so the next CLI
+  // load re-materializes from the freshly written prd.json.
+  const prdMdPath = join(dir, ".rex", "prd.md");
+  if (existsSync(prdMdPath)) rmSync(prdMdPath, { force: true });
+
+  // Skip tree creation entirely if the document has any non-epic items at the
+  // root. Such PRDs are intentionally malformed (used to exercise structural
+  // validation) and would partially populate the tree, causing FileStore to
+  // pick tree-only items and silently drop the orphans.
+  const allRootItemsAreEpics = doc.items.every((i) => i.level === "epic");
+  if (!allRootItemsAreEpics) return;
+
+  // Skip tree creation when the document has duplicate IDs. The tree maps
+  // each id to a directory, so siblings with the same id collide and the
+  // duplicate signal is lost. validate.test.ts relies on this case via the
+  // legacy prd.json fallback to verify the duplicate-detection error path.
+  const collectAllIds = (items: PRDItem[]): string[] =>
+    items.flatMap((i) => [i.id, ...collectAllIds(i.children ?? [])]);
+  const allIds = collectAllIds(doc.items);
+  if (new Set(allIds).size !== allIds.length) return;
+
   // Create minimal folder tree structure for tests
-  // This is a simplified sync version that creates the basic directory structure
   mkdirSync(join(dir, ".rex", "tree"), { recursive: true });
 
-  // Write each epic as a directory with an index.md
+  const writeItem = (itemDir: string, item: PRDItem): void => {
+    mkdirSync(itemDir, { recursive: true });
+    writeFileSync(join(itemDir, titleToFilename(item.title)), createMinimalMarkdown(item));
+  };
+
+  // Write each epic as a directory with a title-named markdown file
   for (const epic of doc.items) {
     if (epic.level !== "epic") continue;
     const epicDir = join(dir, ".rex", "tree", epic.id);
-    mkdirSync(epicDir, { recursive: true });
-    writeFileSync(join(epicDir, "index.md"), createMinimalMarkdown(epic));
+    writeItem(epicDir, epic);
 
     // Write features
     for (const feature of epic.children || []) {
       if (feature.level !== "feature") continue;
       const featureDir = join(epicDir, feature.id);
-      mkdirSync(featureDir, { recursive: true });
-      writeFileSync(join(featureDir, "index.md"), createMinimalMarkdown(feature));
+      writeItem(featureDir, feature);
 
       // Write tasks
       for (const task of feature.children || []) {
         if (task.level !== "task") continue;
         const taskDir = join(featureDir, task.id);
-        mkdirSync(taskDir, { recursive: true });
-        writeFileSync(join(taskDir, "index.md"), createMinimalMarkdown(task));
+        writeItem(taskDir, task);
 
         for (const subtask of task.children || []) {
           if (subtask.level !== "subtask") continue;
-          const subtaskDir = join(taskDir, subtask.id);
-          mkdirSync(subtaskDir, { recursive: true });
-          writeFileSync(join(subtaskDir, "index.md"), createMinimalMarkdown(subtask));
+          writeItem(join(taskDir, subtask.id), subtask);
         }
       }
     }
@@ -54,14 +92,11 @@ export function writePRD(dir: string, doc: PRDDocument): void {
     for (const task of epic.children || []) {
       if (task.level !== "task") continue;
       const taskDir = join(epicDir, task.id);
-      mkdirSync(taskDir, { recursive: true });
-      writeFileSync(join(taskDir, "index.md"), createMinimalMarkdown(task));
+      writeItem(taskDir, task);
 
       for (const subtask of task.children || []) {
         if (subtask.level !== "subtask") continue;
-        const subtaskDir = join(taskDir, subtask.id);
-        mkdirSync(subtaskDir, { recursive: true });
-        writeFileSync(join(subtaskDir, "index.md"), createMinimalMarkdown(subtask));
+        writeItem(join(taskDir, subtask.id), subtask);
       }
     }
   }
@@ -127,8 +162,16 @@ function createMinimalMarkdown(item: any): string {
 }
 
 /**
- * Read the PRD document from the folder-tree backend at `.rex/tree/`.
- * Simple sync implementation for test support (mirrors writePRD structure).
+ * Read the PRD document from the folder tree, with a legacy fallback.
+ *
+ * The CLI only persists mutations to the folder tree, so the tree is the
+ * authoritative post-mutation source. This sync reader uses a permissive
+ * frontmatter parser that preserves every field (including `source`, `tags`,
+ * `acceptanceCriteria`, etc.) so tests can assert on the full item shape.
+ *
+ * If the tree directory does not exist (e.g., the test PRD was malformed and
+ * writePRD declined to create one), falls back to reading the legacy
+ * `.rex/prd.json` source.
  */
 export function readPRD(dir: string): PRDDocument {
   let title = "PRD";
@@ -141,8 +184,17 @@ export function readPRD(dir: string): PRDDocument {
   }
 
   const treeRoot = join(dir, ".rex", "tree");
-  const items = readFolderTreeSync(treeRoot);
+  if (!existsSync(treeRoot)) {
+    try {
+      const raw = readFileSync(join(dir, ".rex", "prd.json"), "utf-8");
+      const doc = JSON.parse(raw) as PRDDocument;
+      return { ...doc, title: doc.title ?? title };
+    } catch {
+      return { schema: "rex/v1", title, items: [] };
+    }
+  }
 
+  const items = readFolderTreeSync(treeRoot);
   return {
     schema: "rex/v1",
     title,
@@ -162,45 +214,44 @@ function readFolderTreeSync(treeRoot: string): PRDItem[] {
 
   for (const epicDirName of epicDirs) {
     const epicDir = join(treeRoot, epicDirName);
-    const indexPath = join(epicDir, "index.md");
-
-    const epicItem = parseItemFromMarkdown(readFileSync(indexPath, "utf-8"));
+    const epicItem = parseItemFromDir(epicDir);
     if (!epicItem) continue;
 
-    epicItem.children = [];
+    const epicChildren: PRDItem[] = [];
 
     // List features and tasks (depth 2)
     const childDirs = listSubdirNames(epicDir);
 
     for (const childDirName of childDirs) {
       const childDir = join(epicDir, childDirName);
-      const childPath = join(childDir, "index.md");
-      const childItem = parseItemFromMarkdown(readFileSync(childPath, "utf-8"));
+      const childItem = parseItemFromDir(childDir);
       if (!childItem) continue;
-
-      childItem.children = [];
 
       // List tasks under features (depth 3)
       if (childItem.level === "feature") {
+        const featureChildren: PRDItem[] = [];
         const taskDirs = listSubdirNames(childDir);
 
         for (const taskDirName of taskDirs) {
           const taskDir = join(childDir, taskDirName);
-          const taskPath = join(taskDir, "index.md");
-          const taskItem = parseItemFromMarkdown(readFileSync(taskPath, "utf-8"));
+          const taskItem = parseItemFromDir(taskDir);
           if (!taskItem) continue;
 
-          taskItem.children = readSubtasksSync(taskDir);
-          childItem.children!.push(taskItem);
+          const subtasks = readSubtasksSync(taskDir);
+          if (subtasks.length > 0) taskItem.children = subtasks;
+          featureChildren.push(taskItem as PRDItem);
         }
+        if (featureChildren.length > 0) childItem.children = featureChildren;
       } else if (childItem.level === "task") {
-        childItem.children = readSubtasksSync(childDir);
+        const subtasks = readSubtasksSync(childDir);
+        if (subtasks.length > 0) childItem.children = subtasks;
       }
 
-      epicItem.children!.push(childItem);
+      epicChildren.push(childItem as PRDItem);
     }
 
-    items.push(epicItem);
+    if (epicChildren.length > 0) epicItem.children = epicChildren;
+    items.push(epicItem as PRDItem);
   }
 
   return items;
@@ -208,7 +259,7 @@ function readFolderTreeSync(treeRoot: string): PRDItem[] {
 
 function listSubdirNames(dir: string): string[] {
   return readdirSync(dir)
-    .filter((entry) => {
+    .filter((entry: string) => {
       try {
         return statSync(join(dir, entry)).isDirectory();
       } catch {
@@ -218,11 +269,35 @@ function listSubdirNames(dir: string): string[] {
     .sort();
 }
 
+/**
+ * Find the item markdown file inside `dir` using the same discovery rule as the
+ * production parser: if exactly one non-`index.md` markdown file exists, use it;
+ * otherwise fall back to `index.md`. Returns null if neither exists.
+ */
+function discoverItemFile(dir: string): string | null {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return null;
+  }
+  const titleNamed = entries.filter((f) => f.endsWith(".md") && f !== "index.md");
+  if (titleNamed.length === 1) return join(dir, titleNamed[0]);
+  const indexPath = join(dir, "index.md");
+  if (existsSync(indexPath)) return indexPath;
+  return null;
+}
+
+function parseItemFromDir(dir: string): Partial<PRDItem> | null {
+  const path = discoverItemFile(dir);
+  if (!path) return null;
+  return parseItemFromMarkdown(readFileSync(path, "utf-8"));
+}
+
 function readSubtasksSync(taskDir: string): PRDItem[] {
   const subtasks: PRDItem[] = [];
   for (const subtaskDirName of listSubdirNames(taskDir)) {
-    const subtaskPath = join(taskDir, subtaskDirName, "index.md");
-    const subtaskItem = parseItemFromMarkdown(readFileSync(subtaskPath, "utf-8"));
+    const subtaskItem = parseItemFromDir(join(taskDir, subtaskDirName));
     if (subtaskItem) subtasks.push(subtaskItem as PRDItem);
   }
   return subtasks;
@@ -230,54 +305,73 @@ function readSubtasksSync(taskDir: string): PRDItem[] {
 
 /**
  * Parse a single item from its markdown frontmatter.
- * Extracts YAML fields and returns a PRDItem.
+ *
+ * Preserves every scalar and inline-array field so tests can assert on the
+ * full item shape without losing metadata like `source`, `tags`, `loe`, or
+ * `acceptanceCriteria`. Unknown fields are kept as-is on the returned object.
  */
 function parseItemFromMarkdown(content: string): Partial<PRDItem> | null {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (!match) return null;
 
   const frontmatter = match[1];
-  const item: Partial<PRDItem> = {};
+  const item: Record<string, unknown> = {};
+  const lines = frontmatter.split("\n");
 
-  // Parse YAML-like frontmatter (simple line-based parsing)
-  for (const line of frontmatter.split("\n")) {
-    const [key, ...valueParts] = line.split(":").map((s) => s.trim());
-    const value = valueParts.join(":").trim();
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const colon = line.indexOf(":");
+    if (colon < 0) continue;
+    const key = line.slice(0, colon).trim();
+    const rawValue = line.slice(colon + 1).trim();
+    if (!key) continue;
 
-    if (!key || !value) continue;
-
-    // Remove quotes if present
-    const cleanValue = value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value;
-
-    switch (key) {
-      case "id":
-        item.id = cleanValue;
-        break;
-      case "title":
-        item.title = cleanValue;
-        break;
-      case "level":
-        item.level = cleanValue as any;
-        break;
-      case "status":
-        item.status = cleanValue as any;
-        break;
-      case "priority":
-        item.priority = cleanValue as any;
-        break;
-      case "description":
-        item.description = cleanValue;
-        break;
-      case "startedAt":
-        item.startedAt = cleanValue;
-        break;
-      case "completedAt":
-        item.completedAt = cleanValue;
-        break;
+    // Block-style YAML list: `key:` followed by `  - "item"` lines.
+    if (!rawValue) {
+      const arr: string[] = [];
+      let j = i + 1;
+      while (j < lines.length && /^\s+-\s/.test(lines[j])) {
+        arr.push(parseScalar(lines[j].replace(/^\s+-\s+/, "")));
+        j++;
+      }
+      if (arr.length > 0) {
+        item[key] = arr;
+        i = j - 1;
+      }
+      continue;
     }
+
+    // Inline array: `key: ["a", "b"]`.
+    if (rawValue.startsWith("[") && rawValue.endsWith("]")) {
+      try {
+        item[key] = JSON.parse(rawValue);
+        continue;
+      } catch {
+        // fall through to scalar handling
+      }
+    }
+
+    item[key] = parseScalar(rawValue);
   }
 
-  return item.title ? item : null;
+  return item.title ? (item as Partial<PRDItem>) : null;
+}
+
+function parseScalar(raw: string): string {
+  const trimmed = raw.trim();
+  // The serializer emits values via JSON.stringify, so unescape via JSON.parse
+  // when the value is double-quoted. This recovers \n, \t, \", etc.
+  if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
+    try {
+      return JSON.parse(trimmed) as string;
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  if (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
 }
 
 export function writeConfig<T extends Record<string, unknown>>(dir: string, config: T): void {

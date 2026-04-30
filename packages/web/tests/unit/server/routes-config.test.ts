@@ -27,6 +27,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
 }
 
 describe("Config API routes", () => {
+  let parentDir: string;
   let tmpDir: string;
   let ctx: ServerContext;
   let server: Server;
@@ -34,7 +35,10 @@ describe("Config API routes", () => {
 
   beforeEach(async () => {
     clearConfigCaches();
-    tmpDir = await mkdtemp(join(tmpdir(), "config-api-"));
+    // Nest tmpDir inside a dedicated parent so detectProjects' parent-dir scan
+    // stays bounded — scanning the system tmpdir directly can have 30k+ entries.
+    parentDir = await mkdtemp(join(tmpdir(), "config-api-parent-"));
+    tmpDir = join(parentDir, "project");
     const svDir = join(tmpDir, ".sourcevision");
     const rexDir = join(tmpDir, ".rex");
     await mkdir(svDir, { recursive: true });
@@ -46,7 +50,7 @@ describe("Config API routes", () => {
 
   afterEach(async () => {
     server.close();
-    await rm(tmpDir, { recursive: true, force: true });
+    await rm(parentDir, { recursive: true, force: true });
   });
 
   // ── GET /api/ndx-config ──────────────────────────────────────────────

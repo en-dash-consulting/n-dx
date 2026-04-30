@@ -43,7 +43,3 @@ export * as V1 from "../schema/v1.js";
 // ── Shared types and constants (via barrel) ───────────────────────────────
 export type { FeatureToggle, FeaturesResponse, ViewId, ViewerScope, SourcevisionScopeViewId } from "../shared/index.js";
 export { DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES, buildValidViews } from "../shared/index.js";
-
-// ── Shared utilities ───────────────────────────────────────────────────────
-export { createRequestDedup } from "./messaging/request-dedup.js";
-export type { RequestDedup } from "./messaging/request-dedup.js";

@@ -171,9 +171,11 @@ describe("Billing", () => {
     }
     const prdNonSubtaskCount = countNonSubtasks(prd.items);
 
-    // Count index.md files in item directories (skip the tree root's own index.md stub).
-    // rex init creates .rex/tree/index.md as a human-readable stub; it is not a PRD item.
-    async function countIndexFiles(dir: string, depth = 0): Promise<number> {
+    // Count per-item markdown files in item directories. The serializer writes
+    // a title-named .md file per item (e.g. `epic_alpha.md`); legacy `index.md`
+    // is also accepted by the parser. Skip the tree root's own index.md stub
+    // (depth 0) which `rex init` creates as a human-readable scaffold.
+    async function countItemFiles(dir: string, depth = 0): Promise<number> {
       let count = 0;
       try {
         const entries = await readdir(dir);
@@ -181,9 +183,8 @@ describe("Billing", () => {
           const entryPath = join(dir, entry);
           const s = await stat(entryPath);
           if (s.isDirectory()) {
-            count += await countIndexFiles(entryPath, depth + 1);
-          } else if (entry === "index.md" && depth > 0) {
-            // depth 0 is the tree root stub — skip it
+            count += await countItemFiles(entryPath, depth + 1);
+          } else if (entry.endsWith(".md") && depth > 0) {
             count++;
           }
         }
@@ -193,7 +194,7 @@ describe("Billing", () => {
       return count;
     }
     const treeRoot = join(tmpDir, ".rex", "tree");
-    const treeIndexCount = await countIndexFiles(treeRoot);
+    const treeIndexCount = await countItemFiles(treeRoot);
 
     expect(treeIndexCount).toBe(prdNonSubtaskCount);
     expect(treeIndexCount).toBeGreaterThan(0);

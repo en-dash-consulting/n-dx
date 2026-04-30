@@ -11,17 +11,18 @@ Tree root: `.rex/tree/` (configurable). Within it, the PRD hierarchy maps to nes
 ```
 .rex/tree/
 ├── {epic-slug}/
-│   ├── index.md
+│   ├── {epic_title}.md
 │   └── {feature-slug}/
-│       ├── index.md
+│       ├── {feature_title}.md
 │       └── {task-slug}/
-│           └── index.md        ← subtasks as sections, not directories
+│           └── {task_title}.md   ← subtasks as sections, not directories
 └── …
 ```
 
 **Rules:**
-- Each epic, feature, or task maps to exactly one directory containing exactly one `index.md`.
-- Subtasks appear as `## Subtask:` sections inside the parent task's `index.md` — never as nested directories.
+- Each epic, feature, or task maps to exactly one directory containing exactly one **title-named** markdown file (`<titleToFilename(title)>.md`). Legacy fixtures that hand-wrote `index.md` are still accepted by the parser; the serializer always emits the title-named form.
+- A folder-level `index.md` aggregating each directory's contents is reserved for the upcoming summary feature (see [`## index.md Summary Schema`](#indexmd-summary-schema)) and is **not yet emitted** by the serializer.
+- Subtasks appear as `## Subtask:` sections inside the parent task's per-item file — never as nested directories.
 - Nesting depth encodes level: epics at depth 1, features at depth 2, tasks at depth 3.
 
 ---
@@ -118,9 +119,9 @@ Exported from `rex` package at `rex.titleToFilename()`. Used by the folder-tree 
 
 ---
 
-## index.md Schema
+## Per-Item Markdown File Schema
 
-Every `index.md` begins with a YAML frontmatter block, followed by Markdown body content. **Bold** = required.
+Every per-item markdown file (named `<titleToFilename(title)>.md`) begins with a YAML frontmatter block, followed by Markdown body content. **Bold** = required.
 
 ### Common Fields (All Levels)
 
@@ -167,9 +168,9 @@ loe:                  # string  optional — xs | s | m | l | xl
 
 ---
 
-## Full index.md Examples
+## Full Per-Item File Examples
 
-The following examples illustrate the complete schema including all summary sections.
+The following examples illustrate the complete schema including all summary sections. Inline `index.md` references inside the example children/links predate the title-named-file rename and should be read as `<child_title>.md`; they are kept verbatim so the example bodies remain valid Markdown.
 
 ### Epic: Web Dashboard
 
@@ -407,7 +408,13 @@ resolve it correctly.
 
 ## index.md Summary Schema
 
-Every `index.md` file serves as both a data container (via frontmatter) and an auto-generated summary of its folder's contents. Beyond the required frontmatter and children/subtask sections, the `index.md` body includes extended metadata sections that are regenerated on every PRD write to remain in sync with the underlying PRD state.
+> **Status: designed; not yet implemented by the serializer.** The serializer
+> currently writes only the title-named per-item file. Folder-level `index.md`
+> aggregation summaries are tracked in the PRD as "Folder-level index.md
+> summary aggregation" and will be emitted in addition to (not in place of)
+> the per-item file. The schema below is the target contract for that work.
+
+Every folder-level `index.md` file serves as an auto-generated summary of its directory's contents. The body includes extended metadata sections that are regenerated on every PRD write to remain in sync with the underlying PRD state.
 
 ### Semantic Contracts
 
@@ -603,7 +610,7 @@ The Web Dashboard is the central hub for PRD management, analysis, and autonomou
 
 ## Recursive Children Summary Block
 
-Every `index.md` whose item has direct children **must** include a `## Children` section at the end of the Markdown body. Tasks **never** include this section — their children are subtasks encoded as sections.
+Every per-item markdown file whose item has direct children **must** include a `## Children` section at the end of the Markdown body. Tasks **never** include this section — their children are subtasks encoded as sections.
 
 ### Format
 
@@ -612,12 +619,12 @@ Every `index.md` whose item has direct children **must** include a `## Children`
 
 | Title | Status |
 |-------|--------|
-| [{child title}](./{child-slug}/index.md) | {status} |
+| [{child title}](./{child-slug}/{child_title}.md) | {status} |
 ```
 
 **Rules:**
 - Children listed in PRD insertion order.
-- Relative link: `./` + child directory name + `/index.md`.
+- Relative link: `./` + child directory name + `/` + `<titleToFilename(child.title)>.md`. Legacy fixtures whose links still point at `/index.md` are accepted by the parser, but the serializer always emits the title-named form.
 - If a non-leaf item has no children (empty container), omit the `## Children` section entirely.
 - The parser **ignores** this section for tree reconstruction — it uses directory nesting as ground truth. The section is informational only.
 
@@ -625,7 +632,7 @@ Every `index.md` whose item has direct children **must** include a `## Children`
 
 ## Subtask Encoding
 
-Subtasks are encoded as `## Subtask: {title}` sections within the parent task's `index.md`.
+Subtasks are encoded as `## Subtask: {title}` sections within the parent task's per-item markdown file.
 
 ### Format
 
@@ -712,7 +719,7 @@ The serializer (PRD → folder tree) must:
 
 1. Compute each item's slug using the algorithm in [Naming Convention](#naming-convention).
 2. Create directories at the correct nesting depth under the tree root.
-3. Write `index.md` with all required frontmatter fields and a complete body.
+3. Write `<titleToFilename(title)>.md` with all required frontmatter fields and a complete body. Remove orphaned per-item `.md` files in the same directory (left over from prior titles).
 4. **Item Display:** Generate the heading and status badge from title and status.
 5. **Summary:** 
    - For new files: initialize from `description` field.
@@ -733,12 +740,12 @@ The serializer (PRD → folder tree) must:
 
 The parser (folder tree → PRD) must:
 
-1. Discover all `index.md` files under the tree root using depth-first traversal.
+1. Discover the per-item markdown file for each directory under the tree root, preferring the unique title-named `.md` file and accepting `index.md` as a legacy fallback. Traverse depth-first.
 2. Parse the YAML frontmatter from each file to extract structured fields — this is the canonical source of item data.
 3. Ignore all Markdown body sections except `## Subtask:` sections:
    - The `## Summary`, `## Progress`, `## Commits`, `## Changes`, and `## Info` sections are informational only and must not be parsed into item fields.
    - The `## Children` section is informational only; directory structure is authoritative for parent-child relationships.
-4. Infer parent-child relationships from directory nesting depth — a file at `tree/{a}/{b}/{c}/index.md` is a task `{c}` whose parent is feature `{b}` whose parent is epic `{a}`.
+4. Infer parent-child relationships from directory nesting depth — a file at `tree/{a}/{b}/{c}/<task_title>.md` is a task `{c}` whose parent is feature `{b}` whose parent is epic `{a}`.
 5. For task-level files, parse `## Subtask:` sections to reconstruct subtask items:
    - Each `## Subtask: {title}` section defines one subtask child.
    - Extract ID, status, priority (if present), description, and acceptance criteria from the section.
@@ -777,11 +784,12 @@ The parser (folder tree → PRD) must:
 
 This schema is the normative storage contract for the PRD folder-tree format. For broader context:
 
-- **CLAUDE.md** ([Key Files](../../CLAUDE.md#key-files) section): Describes `.rex/tree/` as the sole writable PRD surface and references this schema document.
+- **CLAUDE.md** (`Key Files` section): Describes `.rex/tree/` as the sole writable PRD surface and references this schema document.
 - **AGENTS.md** (Public guidance): Links to this schema for agents implementing PRD operations.
 - **Implementation**: The `rex` package implements serialization and parsing according to this schema:
-  - `packages/rex/src/store/folder-tree-serializer.ts` — writes files to disk
-  - `packages/rex/src/store/folder-tree-parser.ts` — reads files from disk
+  - `packages/rex/src/store/folder-tree-serializer.ts` — writes files to disk (title-named per-item `.md`, plus orphan cleanup for renamed titles)
+  - `packages/rex/src/store/folder-tree-parser.ts` — reads files from disk (title-named first, `index.md` legacy fallback)
+  - `packages/rex/src/store/title-to-filename.ts` — implements `titleToFilename` (also re-exported from `packages/rex/src/public.ts`)
 
 ## Versioning and Future Extensions
 

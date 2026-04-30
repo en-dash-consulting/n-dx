@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Anthropic from "@anthropic-ai/sdk";
 import { initConfig } from "../../../src/store/config.js";
 import { toolRexUpdateStatus } from "../../../src/tools/rex.js";
-import { parseDocument, serializeDocument } from "@n-dx/rex";
+import { serializeDocument } from "@n-dx/rex";
+import { createStore } from "@n-dx/rex/dist/store/index.js";
 
 async function readPRDFromMarkdown(rexDir: string): Promise<{ items: Array<{ id: string; status: string; children?: unknown[] }> }> {
-  const raw = await readFile(join(rexDir, "prd.md"), "utf-8");
-  const parsed = parseDocument(raw);
-  if (!parsed.ok) throw parsed.error;
-  return parsed.data as { items: Array<{ id: string; status: string; children?: unknown[] }> };
+  return await createStore("file", rexDir).loadDocument() as {
+    items: Array<{ id: string; status: string; children?: unknown[] }>;
+  };
 }
 
 async function writePRDToMarkdown(rexDir: string, doc: unknown): Promise<void> {
