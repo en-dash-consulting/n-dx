@@ -407,19 +407,19 @@ export const SMOKE_CASES = [
             priority: "medium",
             children: [
               {
-                id: "task-1",
-                level: "task",
-                title: "Test Task",
-                status: "completed",
-                priority: "medium",
-                children: [],
-              },
-              {
                 id: "task-2",
                 level: "task",
                 title: "Another Task",
                 status: "pending",
                 priority: "low",
+                children: [],
+              },
+              {
+                id: "task-1",
+                level: "task",
+                title: "Test Task",
+                status: "completed",
+                priority: "medium",
                 children: [],
               },
             ],
