@@ -495,6 +495,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     autonomous: opts.autonomous,
     store,
     autoCommit: config.autoCommit === true,
+    skipFullTestGate: config.skipFullTestGate,
   });
 
   return { run };

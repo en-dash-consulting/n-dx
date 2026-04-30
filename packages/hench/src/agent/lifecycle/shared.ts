@@ -17,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { getCurrentHead, execShellCmd, execStdout } from "../../process/exec.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
@@ -448,6 +448,97 @@ export async function runReviewGate(
 }
 
 // ---------------------------------------------------------------------------
+// Test suite gate failure handler (mandatory full test validation)
+// ---------------------------------------------------------------------------
+
+export type TestGateFailureAction = "rerun" | "abort" | "skip";
+
+/**
+ * Handle test gate failure: display summary and prompt for user action.
+ * Offers three options: rerun tests, abort (skip commit), or skip gate via flag.
+ *
+ * Returns the selected action. When called, the gate has already failed
+ * (run.status was set to "failed" by the caller).
+ *
+ * Only prompts in interactive TTY mode; in CI/autonomous mode defaults to abort.
+ */
+async function promptTestGateFailure(
+  testGate: TestGateResult,
+  yes?: boolean,
+  autonomous?: boolean,
+): Promise<TestGateFailureAction> {
+  // In non-interactive mode (CI, --yes, --auto), default to abort
+  if (!process.stdin.isTTY || yes || autonomous) {
+    return "abort";
+  }
+
+  const failedPackages = testGate.packages
+    .filter((p) => !p.passed)
+    .map((p) => p.name)
+    .join(", ");
+  const packageCount = testGate.packages.length;
+  const failCount = packageCount - testGate.packages.filter((p) => p.passed).length;
+
+  info(`\n${failCount}/${packageCount} package(s) failed testing`);
+  detail(`Command: ${testGate.command}`);
+  detail(`Failed packages: ${failedPackages}`);
+
+  const question =
+    "[r]erun tests, [a]bort (revert & skip commit), or [s]kip gate (continue to commit)? [a] ";
+
+  try {
+    const answer = await new Promise<string>((resolve) => {
+      // Dynamically import readline at runtime
+      const { createInterface } = require("node:readline");
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+      // Suspend outer SIGINT handlers while the prompt is open
+      const savedListeners = process.listeners("SIGINT") as Array<(...args: unknown[]) => void>;
+      for (const listener of savedListeners) {
+        process.removeListener("SIGINT", listener);
+      }
+
+      let settled = false;
+      const onInterrupt = (): void => {
+        finish("a"); // Default to abort on Ctrl-C
+      };
+
+      const finish = (value: string): void => {
+        if (settled) return;
+        settled = true;
+        process.removeListener("SIGINT", onInterrupt);
+        rl.removeListener("SIGINT", onInterrupt);
+        rl.close();
+        // Restore outer SIGINT listeners
+        for (const listener of savedListeners) {
+          process.on("SIGINT", listener);
+        }
+        resolve(value);
+      };
+
+      process.on("SIGINT", onInterrupt);
+      rl.on("SIGINT", onInterrupt);
+
+      rl.question(`\n${question}`, (input) => {
+        finish(input.trim().toLowerCase() || "a");
+      });
+    });
+
+    switch (answer) {
+      case "r":
+        return "rerun";
+      case "s":
+        return "skip";
+      default:
+        return "abort";
+    }
+  } catch {
+    // On any error, default to abort
+    return "abort";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Post-task testing (identical in both loops)
 // ---------------------------------------------------------------------------
 
@@ -615,6 +706,11 @@ export interface FinalizeRunOptions {
    * commit message written by the agent and prompts the user to commit.
    */
   autoCommit?: boolean;
+  /**
+   * Skip the mandatory full test suite gate before commit.
+   * Default: false (gate is mandatory). Set via --skip-test-gate flag.
+   */
+  skipFullTestGate?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1117,7 +1213,7 @@ export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete"
  * and persist. Called at the end of both loops.
  */
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
-  const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx, selfHeal } = opts;
+  const { run, henchDir, projectDir, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
 
@@ -1173,13 +1269,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
   }
 
+  // Discover changed files for the test gate.
   // When the agent loop produced no tool call records (e.g. Codex CLI, which
   // emits verbose text rather than structured tool events), fall back to
   // `git diff --name-only HEAD` to discover which files were actually changed.
-  // This ensures the self-heal test gate runs even for vendors that do not
-  // emit structured tool events.  The check is intentionally vendor-agnostic:
-  // it activates whenever toolCalls is empty, regardless of which vendor ran.
-  if (selfHeal && run.structuredSummary && run.toolCalls.length === 0) {
+  // This ensures the test gate runs even for vendors that do not emit
+  // structured tool events. The check is vendor-agnostic and runs for all modes.
+  if (run.structuredSummary && run.toolCalls.length === 0) {
     try {
       const { stdout } = await execShellCmd("git diff --name-only HEAD", {
         cwd: projectDir,
@@ -1199,40 +1295,75 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
   }
 
-  // Run test suite gate in self-heal mode (mandatory full test validation)
-  if (selfHeal && run.structuredSummary) {
-    subsection("Test Suite Gate");
-    const testGate = await runTestGate({
-      projectDir,
-      filesChanged: run.structuredSummary.filesChanged,
-    });
+  // Full test suite gate (mandatory before commit, unless skipped via flag).
+  // Runs whenever the run completed successfully and gate is not explicitly skipped.
+  // On failure, prompts for rerun/abort/skip actions with interactive feedback.
+  let testGateSkipped = false;
+  if (run.status === "completed" && !skipFullTestGate && run.structuredSummary) {
+    // Rerun loop: gate can fail and be retried multiple times
+    let testGateAttempt = 0;
+    let gateComplete = false;
 
-    run.testGate = testGate;
+    while (!gateComplete && testGateAttempt < 5) {
+      testGateAttempt++;
+      subsection(`Full Test Suite Gate${testGateAttempt > 1 ? ` (attempt ${testGateAttempt})` : ""}`);
 
-    if (testGate.ran) {
-      const packageCount = testGate.packages.length;
-      const passCount = testGate.packages.filter((p) => p.passed).length;
+      const testGate = await runTestGate({
+        projectDir,
+        filesChanged: run.structuredSummary.filesChanged,
+      });
 
-      if (testGate.passed) {
-        stream("Test Gate", `✓ All ${packageCount} package(s) passed`);
-        if (testGate.totalDurationMs != null) {
-          detail(`Elapsed: ${formatDurationMs(testGate.totalDurationMs)}`);
+      run.testGate = testGate;
+
+      if (testGate.ran) {
+        const packageCount = testGate.packages.length;
+        const passCount = testGate.packages.filter((p) => p.passed).length;
+
+        if (testGate.passed) {
+          stream("Test Gate", `✓ All ${packageCount} package(s) passed`);
+          if (testGate.totalDurationMs != null) {
+            detail(`Elapsed: ${formatDurationMs(testGate.totalDurationMs)}`);
+          }
+          gateComplete = true;
+        } else {
+          // Gate failed — prompt for action
+          const failedPackages = testGate.packages.filter((p) => !p.passed).map((p) => p.name);
+          stream("Test Gate", `✗ ${packageCount - passCount}/${packageCount} package(s) failed`);
+
+          // Show failure details from first failed package
+          const firstFailure = testGate.packages.find((p) => p.failureOutput);
+          if (firstFailure?.failureOutput) {
+            detail(firstFailure.failureOutput);
+          }
+
+          // Prompt for action
+          const action = await promptTestGateFailure(testGate, yes, autonomous);
+
+          if (action === "rerun") {
+            // Loop will retry
+            detail("Retrying test gate...");
+          } else if (action === "skip") {
+            // User chose to skip gate and continue to commit
+            testGateSkipped = true;
+            stream("Test Gate", "Skipped by user");
+            gateComplete = true;
+          } else {
+            // "abort" — mark run as failed and proceed to rollback
+            run.status = "failed";
+            run.error = `Test gate failed: ${failedPackages.join(", ")}`;
+            gateComplete = true;
+          }
         }
-      } else {
-        // Mark run as failed to trigger remediation loop
-        run.status = "failed";
-        const failedPackages = testGate.packages.filter((p) => !p.passed).map((p) => p.name);
-        run.error = `Test gate failed: ${failedPackages.join(", ")}`;
-        stream("Test Gate", `✗ ${packageCount - passCount}/${packageCount} package(s) failed`);
-
-        // Show failure details from first failed package
-        const firstFailure = testGate.packages.find((p) => p.failureOutput);
-        if (firstFailure?.failureOutput) {
-          detail(firstFailure.failureOutput);
-        }
+      } else if (testGate.skipReason) {
+        detail(`Skipped: ${testGate.skipReason}`);
+        gateComplete = true;
       }
-    } else if (testGate.skipReason) {
-      detail(`Skipped: ${testGate.skipReason}`);
+    }
+
+    if (testGateAttempt >= 5) {
+      info("\nTest gate max attempts reached");
+      run.status = "failed";
+      run.error = "Test gate max retry attempts exceeded";
     }
   }
 

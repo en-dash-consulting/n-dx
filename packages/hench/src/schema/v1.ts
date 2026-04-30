@@ -124,6 +124,12 @@ export interface HenchConfig {
    * the user to approve the commit before running `git commit -F <file>`.
    */
   autoCommit?: boolean;
+  /**
+   * When true, skip the mandatory full test suite gate before commit.
+   * Default: false (gate is mandatory). The --skip-test-gate CLI flag sets this.
+   * Test gate failure blocks commit unless this flag is set or user selects skip.
+   */
+  skipFullTestGate?: boolean;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────
