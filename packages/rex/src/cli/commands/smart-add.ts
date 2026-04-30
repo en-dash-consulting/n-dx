@@ -10,9 +10,10 @@ import {
   findPRDFileForBranch,
   resolveGitBranch,
   resolvePRDFilename,
-  toMarkdownSourcePath,
 } from "../../store/index.js";
 import { findItem } from "../../core/tree.js";
+import { getFolderTreePath } from "../folder-tree-path.js";
+import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
@@ -1073,24 +1074,27 @@ async function acceptProposals(
 
   await clearPending(dir);
 
-  // Resolve which PRD files received writes by inspecting the file ownership
-  // map (FileStore only). Items removed by the empty-container cleanup above
-  // are dropped from the map by removeItem(), so they're naturally excluded.
-  const prdPaths: string[] = [];
-  if (store instanceof FileStore) {
-    const map = store.getItemFileMap();
+  // Persist the updated tree to the folder structure.
+  await syncFolderTree(rexDir, store);
+
+  // Resolve folder-tree paths for newly added items. Items removed by the
+  // empty-container cleanup above are naturally excluded since they're no
+  // longer in addedItemIds.
+  const folderTreePaths: string[] = [];
+  {
+    const doc = await store.loadDocument();
     const seen = new Set<string>();
     for (const id of addedItemIds) {
-      const file = map.get(id);
-      if (file && !seen.has(file)) {
-        seen.add(file);
-        prdPaths.push(toMarkdownSourcePath(file));
+      const path = getFolderTreePath(doc.items, id);
+      if (path && !seen.has(path)) {
+        seen.add(path);
+        folderTreePaths.push(path);
       }
     }
-    prdPaths.sort();
+    folderTreePaths.sort();
   }
 
-  return { added: addedCount, prdPaths };
+  return { added: addedCount, prdPaths: folderTreePaths };
 }
 
 type SmartAddInput = {

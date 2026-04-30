@@ -5,7 +5,6 @@ import {
   FileStore,
   resolvePRDFile,
   resolveGitBranch,
-  toMarkdownSourcePath,
   ensureLegacyPrdMigrated,
 } from "../../store/index.js";
 import { LEVEL_HIERARCHY, CHILD_LEVEL, isItemLevel } from "../../schema/index.js";
@@ -17,6 +16,7 @@ import { cascadeParentReset } from "../../core/parent-reset.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import { emitMigrationNotification } from "../migration-notification.js";
+import { getFolderTreePath } from "../folder-tree-path.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../../schema/index.js";
 
 export async function cmdAdd(
@@ -170,26 +170,21 @@ export async function cmdAdd(
   // Persist the updated tree to the folder structure.
   await syncFolderTree(rexDir, store);
 
-  // Resolve the PRD file the item was actually written to.
-  // For FileStore, addItem populates the item-to-file map; non-FileStore
-  // adapters (e.g. Notion) leave prdPath undefined.
-  let prdPath: string | undefined;
-  if (store instanceof FileStore) {
-    const ownerFile = store.getItemFileMap().get(id) ?? store.getCurrentBranchFile();
-    prdPath = toMarkdownSourcePath(ownerFile);
-  }
+  // Compute the folder-tree path where the item was written.
+  const updatedDoc = await store.loadDocument();
+  const folderTreePath = getFolderTreePath(updatedDoc.items, id);
 
   if (flags.format === "json") {
     result(
       JSON.stringify(
-        { id, level: resolvedLevel, title, resetItems, ...(prdPath ? { prdPath } : {}) },
+        { id, level: resolvedLevel, title, resetItems, ...(folderTreePath ? { folderTreePath } : {}) },
         null,
         2,
       ),
     );
   } else {
-    if (prdPath) {
-      result(`Added to: ${prdPath}`);
+    if (folderTreePath) {
+      result(`Added to: ${folderTreePath}`);
     }
     result(`Created ${resolvedLevel}: ${title}`);
     result(`  ID: ${id}`);
