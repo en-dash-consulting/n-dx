@@ -1,9 +1,9 @@
 ---
 id: "d429d9e3-136a-464b-809a-6a51d974f02a"
-level: task
+level: "task"
 title: "Define title-to-filename normalization rules and implement pure helper"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "prd"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-30T00:56:37.385Z"
 completedAt: "2026-04-30T01:04:59.180Z"
 endedAt: "2026-04-30T01:04:59.180Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented titleToFilename() pure function with complete test coverage and documentation. Function handles Unicode normalization, punctuation removal, whitespace collapsing, and round-trip safety. Exported from rex public API. 28 unit tests all passing. Documentation added to prd-folder-tree-schema.md."
 acceptanceCriteria:
   - "Pure function exported from rex that maps any title string to a deterministic filename"

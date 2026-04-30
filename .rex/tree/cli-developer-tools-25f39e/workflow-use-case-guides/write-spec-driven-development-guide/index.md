@@ -1,9 +1,9 @@
 ---
 id: "41bc75d8-637e-4336-853c-7bfb9b41ddfa"
-level: task
+level: "task"
 title: "Write Spec-Driven Development Guide"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "docs"
   - "rex"

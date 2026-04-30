@@ -1,8 +1,8 @@
 ---
 id: "a32f8a34-2c34-4ea1-9652-d85d0ba4e8d2"
-level: feature
+level: "feature"
 title: "PRD Merge Context Graph View"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T19:59:27.566Z"
 completedAt: "2026-04-24T19:59:27.566Z"

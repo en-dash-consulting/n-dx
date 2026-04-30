@@ -1,9 +1,9 @@
 ---
 id: "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae"
-level: task
+level: "task"
 title: "Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "documentation"
   - "assistant-instructions"

@@ -1,8 +1,8 @@
 ---
 id: "b3cbf38e-4757-4c5b-9a49-663cc8536533"
-level: feature
+level: "feature"
 title: "Codex Vendor Reliability and Documentation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-20T23:12:36.086Z"
 completedAt: "2026-02-20T23:12:36.086Z"

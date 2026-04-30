@@ -1,9 +1,9 @@
 ---
 id: "67246c10-3996-4481-86c9-6e753b0cb52a"
-level: task
+level: "task"
 title: "Add regression tests asserting no JSON writes occur outside ndx start"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
   - "testing"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-29T03:39:51.660Z"
 completedAt: "2026-04-29T13:08:47.420Z"
 endedAt: "2026-04-29T13:08:47.420Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added cli-prd-no-json-writes.test.js with 7 tests across 3 suites (ndx add, rex update, rex prune) — each suite asserts prd.json is neither created nor modified. All pass."
 acceptanceCriteria:
   - "Integration test runs ndx add with a new item description and asserts .rex/prd.json is not created or modified"

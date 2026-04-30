@@ -1,9 +1,9 @@
 ---
 id: "46f6c6a0-f5c0-4e3c-bfe2-74b25ce959ec"
-level: task
+level: "task"
 title: "Handle large result sets with chunking"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"

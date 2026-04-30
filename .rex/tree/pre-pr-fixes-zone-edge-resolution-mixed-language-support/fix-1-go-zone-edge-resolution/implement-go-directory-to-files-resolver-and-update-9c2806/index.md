@@ -1,9 +1,9 @@
 ---
 id: "9c28061d-d830-4ebb-9389-fae26db29adf"
-level: task
+level: "task"
 title: "Implement Go directory-to-files resolver and update zone pipeline"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

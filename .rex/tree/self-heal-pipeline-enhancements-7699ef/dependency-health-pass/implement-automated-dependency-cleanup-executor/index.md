@@ -1,9 +1,9 @@
 ---
 id: "5052d7d9-c825-4644-93ab-d1c011976c60"
-level: task
+level: "task"
 title: "Implement automated dependency cleanup executor"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "self-heal"
   - "dependencies"

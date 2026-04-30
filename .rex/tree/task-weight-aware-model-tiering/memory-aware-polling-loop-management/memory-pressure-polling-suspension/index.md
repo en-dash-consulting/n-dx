@@ -1,8 +1,8 @@
 ---
 id: "e385d455-1c95-41d4-b468-b6102ed4477c"
-level: task
+level: "task"
 title: "Memory Pressure Polling Suspension"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T15:56:34.090Z"
 completedAt: "2026-02-26T15:56:34.090Z"

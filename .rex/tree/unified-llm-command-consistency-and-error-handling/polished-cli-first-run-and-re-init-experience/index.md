@@ -1,9 +1,9 @@
 ---
 id: "fa59f28a-e444-4451-b770-f965c8db1798"
-level: feature
+level: "feature"
 title: "Polished CLI first-run and re-init experience"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 startedAt: "2026-04-13T18:35:49.604Z"
 completedAt: "2026-03-24T13:06:25.502Z"
 acceptanceCriteria: []

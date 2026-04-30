@@ -1,8 +1,8 @@
 ---
 id: "642df761-d076-4309-bd5c-edba76604dfd"
-level: feature
+level: "feature"
 title: "Between-Run API Quota Status Logging"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T20:46:18.155Z"
 completedAt: "2026-04-08T20:46:18.155Z"

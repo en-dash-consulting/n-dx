@@ -1,8 +1,8 @@
 ---
 id: "d47b4acc-646f-4ef8-8d43-7387fc0bb5ed"
-level: feature
+level: "feature"
 title: "External Integration"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-09T15:47:21.698Z"
 completedAt: "2026-02-09T15:47:21.698Z"

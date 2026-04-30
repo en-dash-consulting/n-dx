@@ -1,8 +1,8 @@
 ---
 id: "8a65d7cd-40ea-4f87-bf10-23396c378a35"
-level: task
+level: "task"
 title: "Web server and API integration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-06T05:52:08.769Z"
 completedAt: "2026-02-06T05:52:08.769Z"

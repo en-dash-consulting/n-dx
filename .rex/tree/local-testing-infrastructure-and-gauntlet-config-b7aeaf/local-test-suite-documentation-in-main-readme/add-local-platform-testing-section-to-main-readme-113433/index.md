@@ -1,9 +1,9 @@
 ---
 id: "11343373-2400-483d-9736-04f42cbce488"
-level: task
+level: "task"
 title: "Add Local Platform Testing section to main README with prerequisites and run commands"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "docs"
   - "readme"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-20T19:33:37.471Z"
 completedAt: "2026-04-20T19:34:22.499Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added \"Local Platform Testing\" section to README.md with prerequisites, copy-pasteable commands for Windows/macOS gauntlets, exit codes, and link to .local_testing/README.md for advanced options."
 acceptanceCriteria:
   - "README.md contains a 'Local Platform Testing' section with Windows and macOS run commands"

@@ -1,9 +1,9 @@
 ---
 id: "d519390b-e500-4cff-a9ae-6cfb76c29b32"
-level: task
+level: "task"
 title: "Fix code in web-helpers: getLevelEmoji is imported as a runtime function from web-viewer's prd-tree/level"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 source: "sourcevision"
 startedAt: "2026-04-14T00:27:09.262Z"
 completedAt: "2026-04-14T00:31:35.592Z"

@@ -1,9 +1,9 @@
 ---
 id: "3fecf45d-371c-4772-969f-203383f29f7e"
-level: feature
+level: "feature"
 title: "Fix code in rex (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:20:10.658Z"
 completedAt: "2026-04-14T01:20:10.658Z"

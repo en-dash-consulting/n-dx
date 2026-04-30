@@ -1,8 +1,8 @@
 ---
 id: "f82b4f30-8f6a-40d9-95a7-57825dd321cb"
-level: feature
+level: "feature"
 title: "ndx Dashboard Refresh Orchestration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T19:54:35.598Z"
 completedAt: "2026-02-21T19:54:35.598Z"

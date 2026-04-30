@@ -1,9 +1,9 @@
 ---
 id: "3ad8f0c5-a022-401f-8771-3f800131970b"
-level: task
+level: "task"
 title: "Fix suggestion in hench-4: Zone \"hench-4\" has a numeric suffix indicating an overflow community — pin its f"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:11:52.157Z"
 completedAt: "2026-04-14T02:15:49.669Z"

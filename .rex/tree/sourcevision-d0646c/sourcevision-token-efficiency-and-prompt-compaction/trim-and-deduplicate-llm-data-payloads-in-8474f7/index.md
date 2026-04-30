@@ -1,9 +1,9 @@
 ---
 id: "8474f71e-41ac-4d6f-b963-77c8f7a91d85"
-level: task
+level: "task"
 title: "Trim and deduplicate LLM data payloads in sourcevision analysis"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "llm"

@@ -1,8 +1,8 @@
 ---
 id: "e7080a46-fedc-400c-86db-120e2d8ae2f2"
-level: task
+level: "task"
 title: "Rex UI Deletion Interface"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T17:18:27.341Z"
 completedAt: "2026-02-24T17:18:27.341Z"

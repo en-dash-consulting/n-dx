@@ -1,8 +1,8 @@
 ---
 id: "4a068181-10e1-45d7-978f-69dc97e77b17"
-level: task
+level: "task"
 title: "Indexed opt-in parsing for `recommend --accept`"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T02:57:21.360Z"
 completedAt: "2026-02-21T02:57:21.360Z"

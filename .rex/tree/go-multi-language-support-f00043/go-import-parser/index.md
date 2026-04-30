@@ -1,8 +1,8 @@
 ---
 id: "dfa181b2-9543-4b37-a04b-bdcf0af58da6"
-level: feature
+level: "feature"
 title: "Go Import Parser"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T05:10:44.727Z"
 completedAt: "2026-03-26T05:10:44.727Z"

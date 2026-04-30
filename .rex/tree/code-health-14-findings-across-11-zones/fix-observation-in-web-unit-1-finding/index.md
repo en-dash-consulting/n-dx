@@ -1,9 +1,9 @@
 ---
 id: "1f995e5a-c5af-4607-94dc-8b35e97220cc"
-level: feature
+level: "feature"
 title: "Fix observation in web-unit (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:57:29.987Z"
 completedAt: "2026-04-13T21:57:29.987Z"

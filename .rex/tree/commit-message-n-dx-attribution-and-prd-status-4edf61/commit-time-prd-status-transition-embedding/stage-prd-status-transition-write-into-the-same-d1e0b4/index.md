@@ -1,9 +1,9 @@
 ---
 id: "d1e0b463-dd22-4ffd-b0e6-b711afd8f4f2"
-level: task
+level: "task"
 title: "Stage PRD status transition write into the same commit that completes the task"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "hench"
   - "commit"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-29T18:48:34.716Z"
 completedAt: "2026-04-29T18:54:55.035Z"
 endedAt: "2026-04-29T18:54:55.035Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented deferred PRD status updates at commit time, staged PRD files alongside code changes, added regression tests"
 acceptanceCriteria:
   - "After a successful hench run, `.rex/tree/<slug>/index.md` shows status `completed` and the change is part of the same commit as the code changes"

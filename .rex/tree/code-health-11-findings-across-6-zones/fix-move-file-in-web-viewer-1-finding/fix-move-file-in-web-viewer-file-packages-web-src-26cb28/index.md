@@ -1,9 +1,9 @@
 ---
 id: "26cb2890-9483-4005-a6de-ef83ca613eed"
-level: task
+level: "task"
 title: "Fix move-file in web-viewer: File \"packages/web/src/viewer/hooks/use-polling.ts\" is pinned to zone \"Web Viewe"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:35:32.503Z"
 completedAt: "2026-04-20T15:38:47.177Z"

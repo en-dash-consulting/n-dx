@@ -1,8 +1,8 @@
 ---
 id: "d60d8d39-5e77-42c5-a4ea-b027e266befd"
-level: task
+level: "task"
 title: "Lingering Process Investigation and Root Cause Analysis"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T07:30:33.185Z"
 completedAt: "2026-02-24T07:30:33.185Z"

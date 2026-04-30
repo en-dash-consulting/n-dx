@@ -1,9 +1,9 @@
 ---
 id: "208d645e-27e5-47bb-a1bf-db3e69d80361"
-level: task
+level: "task"
 title: "Implement Codex API quota fetch and normalize response to QuotaRemaining"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "llm"
   - "codex"

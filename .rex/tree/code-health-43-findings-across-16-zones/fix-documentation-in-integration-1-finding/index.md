@@ -1,9 +1,9 @@
 ---
 id: "c172d6b1-8d8d-4a05-82cb-961def53c63d"
-level: feature
+level: "feature"
 title: "Fix documentation in integration (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:54:25.544Z"
 completedAt: "2026-04-14T01:54:25.544Z"

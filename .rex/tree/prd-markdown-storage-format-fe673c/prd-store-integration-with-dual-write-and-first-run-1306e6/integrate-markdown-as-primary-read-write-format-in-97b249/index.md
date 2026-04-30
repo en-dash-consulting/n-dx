@@ -1,9 +1,9 @@
 ---
 id: "97b24996-6ca7-46de-a2bf-1355ebc12e9f"
-level: task
+level: "task"
 title: "Integrate markdown as primary read/write format in PRDStore with JSON dual-write"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "storage"

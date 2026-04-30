@@ -1,9 +1,9 @@
 ---
 id: "b50953a3-1853-45b9-aaa6-2050033af692"
-level: feature
+level: "feature"
 title: "Fix suggestion in web-2 (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:59:43.128Z"
 completedAt: "2026-04-13T21:59:43.128Z"

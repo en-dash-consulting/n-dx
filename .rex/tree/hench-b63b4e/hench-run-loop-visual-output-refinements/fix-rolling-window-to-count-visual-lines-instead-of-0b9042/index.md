@@ -1,9 +1,9 @@
 ---
 id: "0b9042e1-523e-4fab-aca4-1d89bbb0c6f3"
-level: task
+level: "task"
 title: "Fix rolling window to count visual lines instead of message entries"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "cli"

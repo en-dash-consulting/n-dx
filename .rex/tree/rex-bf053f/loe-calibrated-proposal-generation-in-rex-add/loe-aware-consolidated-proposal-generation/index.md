@@ -1,8 +1,8 @@
 ---
 id: "b4127ae4-3f1c-4201-82ba-f648a7915037"
-level: task
+level: "task"
 title: "LoE-Aware Consolidated Proposal Generation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-03T07:50:01.464Z"
 completedAt: "2026-03-03T07:50:01.464Z"

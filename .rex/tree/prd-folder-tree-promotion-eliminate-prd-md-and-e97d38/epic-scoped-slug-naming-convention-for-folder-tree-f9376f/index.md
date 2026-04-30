@@ -1,8 +1,8 @@
 ---
 id: "f9376f14-b575-4878-bec0-097c24f26970"
-level: feature
+level: "feature"
 title: "Epic-Scoped Slug Naming Convention for Folder-Tree Directories"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-29T15:58:55.165Z"
 completedAt: "2026-04-29T15:58:55.165Z"

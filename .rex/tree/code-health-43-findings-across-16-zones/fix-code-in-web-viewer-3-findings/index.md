@@ -1,9 +1,9 @@
 ---
 id: "4a8cfe94-39a7-4c24-b10a-28376a222cd4"
-level: feature
+level: "feature"
 title: "Fix code in web-viewer (3 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:44:30.962Z"
 completedAt: "2026-04-14T01:44:30.962Z"

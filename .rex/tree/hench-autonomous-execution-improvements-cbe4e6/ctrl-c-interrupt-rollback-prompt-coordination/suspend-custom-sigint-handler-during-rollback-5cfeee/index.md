@@ -1,9 +1,9 @@
 ---
 id: "5cfeee22-c15d-40ec-aa66-0983959703f5"
-level: task
+level: "task"
 title: "Suspend custom SIGINT handler during rollback confirmation prompt"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "ux"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-24T20:42:30.170Z"
 completedAt: "2026-04-24T20:50:21.821Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added askYesNoWithSuspendedSigint helper in shared.ts that snapshots and detaches existing SIGINT listeners around the readline prompt, installs a temporary onInterrupt that cancels readline cleanly on Ctrl-C (resolving false = decline), and restores the original listeners in finally. Both promptRollbackConfirm and promptCommitConfirm now delegate to this helper. Added 5 integration tests in tests/integration/sigint-prompt.test.ts verifying: outer handler detached/restored around the prompt, SIGINT during prompt cancels cleanly without invoking the outer handler, readline-surface SIGINT works the same way, accept path still rolls back, and the same suspension applies to the commit-approval prompt."
 acceptanceCriteria:
   - "After a single Ctrl-C during a running task, the 'Roll back N uncommitted file(s)? [Y/n]' prompt appears and remains active"

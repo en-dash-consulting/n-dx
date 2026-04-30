@@ -1,9 +1,9 @@
 ---
 id: "b892e543-006f-402f-ae07-e359c1229a81"
-level: task
+level: "task"
 title: "Persist full rex run log to .run-logs/ and add directory to .gitignore"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "logging"

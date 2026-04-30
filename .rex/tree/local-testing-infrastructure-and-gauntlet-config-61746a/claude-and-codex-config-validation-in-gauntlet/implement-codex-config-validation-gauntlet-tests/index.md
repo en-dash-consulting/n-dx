@@ -1,9 +1,9 @@
 ---
 id: "a89dacb4-d825-4a95-989a-fa86155c32a6"
-level: task
+level: "task"
 title: "Implement Codex config validation gauntlet tests"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "testing"
   - "config"

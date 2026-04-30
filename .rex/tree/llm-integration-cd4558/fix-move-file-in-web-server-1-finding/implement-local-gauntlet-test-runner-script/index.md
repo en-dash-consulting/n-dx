@@ -1,9 +1,9 @@
 ---
 id: "718406b9-2826-4a8b-a6d7-94f76b846b00"
-level: task
+level: "task"
 title: "Implement local gauntlet test runner script"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "testing"
   - "docker"
@@ -13,7 +13,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-15T14:57:43.008Z"
 completedAt: "2026-04-20T19:13:21.724Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Fixed platform-specific shell command selection in run-gauntlet.sh. The script now correctly uses /bin/bash -c for macOS/Linux containers and powershell -Command for Windows containers, matching each platform's Dockerfile entrypoint configuration."
 acceptanceCriteria:
   - "Shell script (e.g., run-gauntlet.sh) in .local_testing/ starts container and runs tests"

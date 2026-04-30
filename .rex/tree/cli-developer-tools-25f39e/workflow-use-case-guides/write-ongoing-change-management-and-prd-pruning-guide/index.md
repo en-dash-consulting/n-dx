@@ -1,9 +1,9 @@
 ---
 id: "bd466646-bb0a-400a-a56d-2b67876a2f30"
-level: task
+level: "task"
 title: "Write Ongoing Change Management and PRD Pruning Guide"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "change-management"

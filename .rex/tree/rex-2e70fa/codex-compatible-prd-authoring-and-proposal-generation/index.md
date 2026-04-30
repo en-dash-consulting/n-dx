@@ -1,8 +1,8 @@
 ---
 id: "089d9bc8-d815-4227-85d4-5c53d0621985"
-level: feature
+level: "feature"
 title: "Codex-Compatible PRD Authoring and Proposal Generation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-16T16:55:58.881Z"
 completedAt: "2026-04-16T16:55:58.881Z"

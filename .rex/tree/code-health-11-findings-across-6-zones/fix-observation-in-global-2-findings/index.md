@@ -1,9 +1,9 @@
 ---
 id: "b0a511ce-9bfe-47fc-ab6e-1b66d27302d3"
-level: feature
+level: "feature"
 title: "Fix observation in global (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:45:20.089Z"
 completedAt: "2026-04-20T15:45:20.089Z"

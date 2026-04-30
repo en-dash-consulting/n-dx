@@ -1,8 +1,8 @@
 ---
 id: "7145d6bc-5c6c-46bb-af89-cc65da8337f2"
-level: feature
+level: "feature"
 title: "Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-29T14:13:04.054Z"
 completedAt: "2026-04-29T14:13:04.054Z"

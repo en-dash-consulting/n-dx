@@ -1,9 +1,9 @@
 ---
 id: "1c3f1456-1a2f-4c63-9dcb-8af4d417f60b"
-level: task
+level: "task"
 title: "Implement Claude config validation gauntlet tests"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "testing"
   - "config"

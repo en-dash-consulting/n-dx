@@ -1,9 +1,9 @@
 ---
 id: "d262a54e-0a71-4580-b100-9f7c7e265699"
-level: task
+level: "task"
 title: "Fix documentation in web-helpers: Zone name 'web-helpers' is misleading for a single-component zone — it invites s (+1 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:59:30.427Z"
 completedAt: "2026-04-14T02:03:25.961Z"

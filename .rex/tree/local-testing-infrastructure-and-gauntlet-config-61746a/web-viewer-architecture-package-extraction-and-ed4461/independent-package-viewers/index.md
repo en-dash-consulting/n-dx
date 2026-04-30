@@ -1,9 +1,9 @@
 ---
 id: "ed5f43ba-3b20-49d9-8499-6171625c18b9"
-level: task
+level: "task"
 title: "Independent package viewers"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "architecture"
   - "build"

@@ -1,9 +1,9 @@
 ---
 id: "72581f11-f8ee-46fd-8e2f-60bf6055850e"
-level: task
+level: "task"
 title: "Remove JSON dual-write from PRDStore save operations"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "prd-storage"
@@ -14,7 +14,7 @@ source: "smart-add"
 startedAt: "2026-04-29T02:16:51.764Z"
 completedAt: "2026-04-29T13:57:27.832Z"
 endedAt: "2026-04-29T13:57:27.832Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Dual-write was already removed in commit 348f2f9c. Updated test fixtures to seed prd.md and added 5 regression tests asserting saveDocument/addItem never create or modify prd.json."
 acceptanceCriteria:
   - "PRDStore.saveDocument() writes only to .rex/prd.md and branch-scoped .rex/prd_*.md files — no .rex/prd.json"

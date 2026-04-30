@@ -1,8 +1,8 @@
 ---
 id: "1d7ebe23-5858-42f9-85f0-8173fd686532"
-level: feature
+level: "feature"
 title: "PR Markdown Reviewer Context Enrichment"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T22:20:05.396Z"
 completedAt: "2026-02-22T22:20:05.396Z"

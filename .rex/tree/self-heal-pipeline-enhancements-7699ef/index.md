@@ -1,8 +1,8 @@
 ---
 id: "7699ef03-e874-41f0-aeb0-bbef9868bb39"
-level: epic
+level: "epic"
 title: "Self-Heal Pipeline Enhancements"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T20:16:38.921Z"
 completedAt: "2026-04-14T20:16:38.921Z"

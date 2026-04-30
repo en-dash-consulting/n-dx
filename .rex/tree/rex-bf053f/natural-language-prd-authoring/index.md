@@ -1,8 +1,8 @@
 ---
 id: "95bfdba2-2cba-4921-b614-3a34779e0892"
-level: feature
+level: "feature"
 title: "Natural language PRD authoring"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-09T12:56:47.925Z"
 completedAt: "2026-02-09T12:56:47.925Z"

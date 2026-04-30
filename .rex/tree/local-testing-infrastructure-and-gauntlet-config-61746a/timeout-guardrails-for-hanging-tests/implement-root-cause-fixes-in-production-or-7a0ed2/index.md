@@ -1,9 +1,9 @@
 ---
 id: "7a0ed21e-ffe1-46a5-8110-728fd7e6e768"
-level: task
+level: "task"
 title: "Implement root-cause fixes in production or configuration code"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "tests"
   - "verification"

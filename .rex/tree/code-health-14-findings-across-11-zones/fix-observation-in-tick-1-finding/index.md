@@ -1,9 +1,9 @@
 ---
 id: "3da1eb3a-3b0d-4452-8644-95dc64968811"
-level: feature
+level: "feature"
 title: "Fix observation in tick (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:38:15.824Z"
 completedAt: "2026-04-13T21:38:15.824Z"

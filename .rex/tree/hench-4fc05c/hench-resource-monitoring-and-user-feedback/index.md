@@ -1,8 +1,8 @@
 ---
 id: "a5f844d4-da0c-48e1-9af5-077b75ccbc02"
-level: feature
+level: "feature"
 title: "Hench Resource Monitoring and User Feedback"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T21:12:23.245Z"
 completedAt: "2026-02-26T21:12:23.245Z"

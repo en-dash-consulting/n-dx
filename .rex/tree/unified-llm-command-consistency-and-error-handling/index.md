@@ -1,8 +1,8 @@
 ---
 id: "276aa105-8b1f-4ea5-8250-06a22a1ad42f"
-level: epic
+level: "epic"
 title: "Unified LLM Command Consistency and Error Handling"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-21T17:39:34.467Z"
 completedAt: "2026-04-21T17:39:34.467Z"

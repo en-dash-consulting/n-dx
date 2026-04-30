@@ -1,9 +1,9 @@
 ---
 id: "a90cf2ff-f346-43bb-9df0-c6ec954a712a"
-level: task
+level: "task"
 title: "Update rex write commands (add, edit, remove, move) to persist changes to folder tree after every mutation"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "prd"
   - "cli"

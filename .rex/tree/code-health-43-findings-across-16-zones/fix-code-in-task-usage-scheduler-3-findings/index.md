@@ -1,9 +1,9 @@
 ---
 id: "05826b41-581b-4485-98af-892996fc5620"
-level: feature
+level: "feature"
 title: "Fix code in task-usage-scheduler (3 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:32:07.551Z"
 completedAt: "2026-04-14T01:32:07.551Z"

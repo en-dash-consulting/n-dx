@@ -1,9 +1,9 @@
 ---
 id: "76ab3e87-ff97-40b3-94be-084cc92256fe"
-level: feature
+level: "feature"
 title: "Fix code in packages-web:integration (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:03:50.293Z"
 completedAt: "2026-04-14T01:03:50.293Z"

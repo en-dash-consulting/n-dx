@@ -1,9 +1,9 @@
 ---
 id: "926c6deb-91ed-4b60-8013-3e8c5e03c481"
-level: task
+level: "task"
 title: "Helpful error when users run package commands that belong to ndx"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "ux"

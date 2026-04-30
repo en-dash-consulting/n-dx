@@ -1,9 +1,9 @@
 ---
 id: "cd67dfc1-0053-43fd-8e4f-1722d6b6a982"
-level: task
+level: "task"
 title: "Audit and remediate deprecated npm dependencies across all monorepo packages"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "dependencies"
   - "audit"

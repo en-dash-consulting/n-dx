@@ -1,8 +1,8 @@
 ---
 id: "3257d8b1-30cc-4323-8f36-f724ed1052fc"
-level: feature
+level: "feature"
 title: "PR Build Pipeline and Cross-Platform CLI Validation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-07T14:21:27.955Z"
 completedAt: "2026-04-07T14:21:27.955Z"

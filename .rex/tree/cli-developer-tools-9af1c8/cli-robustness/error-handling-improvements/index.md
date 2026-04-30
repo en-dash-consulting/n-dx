@@ -1,8 +1,8 @@
 ---
 id: "8c669c14-56ac-476d-90e4-18bac1afce18"
-level: task
+level: "task"
 title: "Error Handling Improvements"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-06T14:35:05.946Z"
 completedAt: "2026-02-06T14:35:05.946Z"

@@ -1,8 +1,8 @@
 ---
 id: "a62d284c-e430-4c74-aadf-1972f2d913c0"
-level: task
+level: "task"
 title: "Hench Run Deep-linking"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T08:05:25.131Z"
 completedAt: "2026-02-18T08:05:25.131Z"

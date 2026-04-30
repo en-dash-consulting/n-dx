@@ -1,8 +1,8 @@
 ---
 id: "78798ece-882f-44c9-9996-6eec6e909989"
-level: feature
+level: "feature"
 title: "Commit Hash and Author Metadata on PRD Items"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-30T14:27:57.050Z"
 completedAt: "2026-04-30T14:27:57.050Z"

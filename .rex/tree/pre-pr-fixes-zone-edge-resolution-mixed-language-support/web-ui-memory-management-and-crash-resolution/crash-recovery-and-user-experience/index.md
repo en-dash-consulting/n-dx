@@ -1,8 +1,8 @@
 ---
 id: "8786c4b2-2eaf-4cfb-af07-8d4e60509916"
-level: task
+level: "task"
 title: "Crash Recovery and User Experience"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T20:25:22.995Z"
 completedAt: "2026-02-24T20:25:22.995Z"

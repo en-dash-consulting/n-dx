@@ -1,8 +1,8 @@
 ---
 id: "6efaf2cb-7ad8-454f-8cf7-14ff7eea6119"
-level: task
+level: "task"
 title: "Smart Add UI Integration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T02:16:56.460Z"
 completedAt: "2026-02-11T02:29:18.203Z"

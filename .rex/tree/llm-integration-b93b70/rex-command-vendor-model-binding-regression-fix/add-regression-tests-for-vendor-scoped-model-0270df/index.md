@@ -1,9 +1,9 @@
 ---
 id: "0270df79-5844-45ea-8bd9-da2df2ae8a26"
-level: task
+level: "task"
 title: "Add regression tests for vendor-scoped model selection in rex commands"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "llm"

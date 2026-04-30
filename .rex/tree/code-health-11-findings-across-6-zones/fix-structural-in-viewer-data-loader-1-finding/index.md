@@ -1,9 +1,9 @@
 ---
 id: "15fc8ef8-ac04-4066-b712-9e189d803955"
-level: feature
+level: "feature"
 title: "Fix structural in viewer-data-loader (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T16:25:47.126Z"
 completedAt: "2026-04-20T16:25:47.126Z"

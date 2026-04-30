@@ -1,9 +1,9 @@
 ---
 id: "0d818bc8-36f7-4c4f-a94f-a8572d3a429d"
-level: task
+level: "task"
 title: "Implement duplicate merging"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"

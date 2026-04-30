@@ -1,9 +1,9 @@
 ---
 id: "4ac54c3d-9d24-40a8-a6c1-e9615fdf3e66"
-level: task
+level: "task"
 title: "Audit Codex token validation and budget-check call sites within the hench work run loop"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "codex"
   - "tokens"

@@ -1,8 +1,8 @@
 ---
 id: "0cae57c4-182c-40eb-9d77-af71eb5cb6c7"
-level: feature
+level: "feature"
 title: "Test Suite Validation Gate and Remediation Loop"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T19:35:57.089Z"
 completedAt: "2026-04-14T19:35:57.089Z"

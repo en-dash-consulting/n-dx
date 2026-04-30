@@ -1,8 +1,8 @@
 ---
 id: "95b432f8-c0df-446c-aab5-e639ccbf8ced"
-level: epic
+level: "epic"
 title: "External Integrations"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-07T14:21:28.188Z"
 completedAt: "2026-04-07T14:21:28.188Z"

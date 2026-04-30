@@ -1,8 +1,8 @@
 ---
 id: "26c7a348-54a8-42e4-b06f-1de63b93764c"
-level: task
+level: "task"
 title: "Rex and Hench Vendor Behavior Documentation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-20T23:12:36.052Z"
 completedAt: "2026-02-20T23:12:36.052Z"

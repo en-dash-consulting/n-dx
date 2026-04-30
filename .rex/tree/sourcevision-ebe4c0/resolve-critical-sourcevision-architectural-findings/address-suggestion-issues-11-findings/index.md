@@ -1,9 +1,9 @@
 ---
 id: "1c0d65ba-447b-4285-a3bb-8ecaf18827fa"
-level: task
+level: "task"
 title: "Address suggestion issues (11 findings)"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 source: "sourcevision"
 startedAt: "2026-02-28T05:09:26.029Z"
 completedAt: "2026-02-28T05:20:51.730Z"

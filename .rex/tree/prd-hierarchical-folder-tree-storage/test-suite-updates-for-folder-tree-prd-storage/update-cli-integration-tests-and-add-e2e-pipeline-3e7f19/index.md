@@ -1,9 +1,9 @@
 ---
 id: "3e7f193b-6134-47a0-b90c-fc8d0cd262f3"
-level: task
+level: "task"
 title: "Update CLI integration tests and add e2e pipeline test for folder-tree PRD commands"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "prd"
   - "tests"

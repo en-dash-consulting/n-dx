@@ -1,8 +1,8 @@
 ---
 id: "1b9353a7-41d8-4f55-947c-1aedaadc5932"
-level: task
+level: "task"
 title: "Sidebar Active State on Initial Load"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-06T07:54:44.479Z"
 completedAt: "2026-03-06T07:54:44.479Z"

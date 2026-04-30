@@ -1,9 +1,9 @@
 ---
 id: "8af32cae-af63-4d0f-a1c7-2a6f9e34a3a5"
-level: task
+level: "task"
 title: "Implement dependency audit step in self-heal pipeline"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "self-heal"
   - "dependencies"

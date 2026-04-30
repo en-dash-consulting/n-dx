@@ -1,8 +1,8 @@
 ---
 id: "effae917-a7c4-4c7a-a0f8-2b8dce95ca58"
-level: feature
+level: "feature"
 title: "Per-Command Task Weight Classification and Integration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-15T17:52:00.764Z"
 completedAt: "2026-04-15T17:52:00.764Z"

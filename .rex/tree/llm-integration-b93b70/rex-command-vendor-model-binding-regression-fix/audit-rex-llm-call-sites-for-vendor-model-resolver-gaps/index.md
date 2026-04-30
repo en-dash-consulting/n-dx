@@ -1,9 +1,9 @@
 ---
 id: "633f588d-040d-4187-94a0-84e5e1892e30"
-level: task
+level: "task"
 title: "Audit rex LLM call sites for vendor/model resolver gaps"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "llm"

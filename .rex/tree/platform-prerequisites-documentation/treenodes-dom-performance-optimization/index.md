@@ -1,8 +1,8 @@
 ---
 id: "e93f313b-dc70-41b1-8e14-63b220123347"
-level: feature
+level: "feature"
 title: "TreeNodes DOM Performance Optimization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T21:33:29.008Z"
 completedAt: "2026-02-26T21:33:29.008Z"

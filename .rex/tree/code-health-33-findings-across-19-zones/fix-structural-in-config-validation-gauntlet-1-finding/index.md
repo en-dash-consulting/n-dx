@@ -1,9 +1,9 @@
 ---
 id: "312ab8e2-ebdc-471b-8690-43ee7fcd033f"
-level: feature
+level: "feature"
 title: "Fix structural in config-validation-gauntlet (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T15:10:02.147Z"
 completedAt: "2026-04-18T15:10:02.147Z"

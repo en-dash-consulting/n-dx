@@ -1,9 +1,9 @@
 ---
 id: "9fa85475-a6ff-474a-bf4f-e1f531df7916"
-level: feature
+level: "feature"
 title: "Move file lock to saveDocument for complete write safety"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "reliability"

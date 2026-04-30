@@ -1,9 +1,9 @@
 ---
 id: "3b80109b-5158-4236-8052-6571bb9f69e9"
-level: task
+level: "task"
 title: "Implement PRD-to-folder-tree serializer that writes nested directories with index.md files"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "prd"
   - "storage"

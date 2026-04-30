@@ -1,8 +1,8 @@
 ---
 id: "8ae4d60a-f66a-40aa-afd7-dac7562ec263"
-level: feature
+level: "feature"
 title: "Feature 4: Hench Go Project Support"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T15:14:41.533Z"
 completedAt: "2026-03-26T15:14:41.533Z"

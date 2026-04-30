@@ -1,8 +1,8 @@
 ---
 id: "20bbdb7b-1643-4e14-86de-babe1d145f5e"
-level: task
+level: "task"
 title: "Actionable UI diagnostics and retry guidance"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T01:39:38.087Z"
 completedAt: "2026-02-23T01:39:38.087Z"

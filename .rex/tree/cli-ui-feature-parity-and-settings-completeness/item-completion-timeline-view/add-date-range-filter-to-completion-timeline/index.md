@@ -1,9 +1,9 @@
 ---
 id: "99456edd-c26e-4f03-a362-741c28b79aca"
-level: task
+level: "task"
 title: "Add date range filter to completion timeline"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "web"
   - "ux"

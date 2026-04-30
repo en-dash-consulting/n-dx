@@ -1,9 +1,9 @@
 ---
 id: "4f0263fa-8da5-4a83-811c-01da1c4acdf7"
-level: task
+level: "task"
 title: "Implement cross-PRD duplicate detection with merge-into-older-file resolution"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "smart-add"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-22T18:34:12.341Z"
 completedAt: "2026-04-22T18:57:05.754Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Cross-PRD duplicate detection with older-file preference via ItemFileMap and comparePRDFileAge"
 acceptanceCriteria:
   - "Duplicate detection scans items across all prd_*.json files, not just the current branch's file"

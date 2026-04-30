@@ -1,9 +1,9 @@
 ---
 id: "f2234f89-f5b2-4bab-b901-30744cf878e0"
-level: task
+level: "task"
 title: "Write end-to-end zone detection integration test for the Go fixture"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "go"
   - "sourcevision"

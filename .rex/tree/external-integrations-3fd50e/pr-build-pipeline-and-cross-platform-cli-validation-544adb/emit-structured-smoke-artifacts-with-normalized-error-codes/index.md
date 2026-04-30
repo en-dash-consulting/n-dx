@@ -1,9 +1,9 @@
 ---
 id: "b714bd5d-c003-423e-a367-e759ae74eba1"
-level: task
+level: "task"
 title: "Emit structured smoke artifacts with normalized error codes"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "ci"
   - "artifacts"

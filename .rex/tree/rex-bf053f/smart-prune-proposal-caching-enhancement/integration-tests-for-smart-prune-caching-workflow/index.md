@@ -1,13 +1,13 @@
 ---
 id: "c79dec6c-2402-4a63-a9dd-aa81f4270f83"
-level: task
+level: "task"
 title: "Integration tests for smart prune caching workflow"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "manual"
 startedAt: "2026-03-11T02:15:34.342Z"
 completedAt: "2026-03-11T02:19:12.951Z"
-resolutionType: acknowledgment
+resolutionType: "acknowledgment"
 resolutionDetail: "Integration tests already exist at packages/rex/tests/integration/cli/commands/prune-cache.test.ts with all 4 acceptance criteria covered and passing."
 acceptanceCriteria:
   - "Test: cache file (.rex/pending-smart-prune.json) is written after LLM generation with correct prdHash"

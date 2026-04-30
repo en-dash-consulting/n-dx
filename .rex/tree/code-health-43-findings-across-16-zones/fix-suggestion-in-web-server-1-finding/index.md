@@ -1,9 +1,9 @@
 ---
 id: "b5e80d0d-c827-4499-948b-7dd1a012190c"
-level: feature
+level: "feature"
 title: "Fix suggestion in web-server (1 finding)"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 source: "sourcevision"
 startedAt: "2026-04-14T00:46:26.707Z"
 completedAt: "2026-04-14T00:46:26.707Z"

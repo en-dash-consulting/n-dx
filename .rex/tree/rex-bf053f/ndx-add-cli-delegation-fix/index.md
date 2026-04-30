@@ -1,8 +1,8 @@
 ---
 id: "31fa50b1-31fc-48f3-a311-341ddbd510de"
-level: feature
+level: "feature"
 title: "ndx add CLI Delegation Fix"
-status: completed
+status: "completed"
 startedAt: "2026-03-19T18:48:18.396Z"
 completedAt: "2026-03-19T18:48:18.396Z"
 acceptanceCriteria: []

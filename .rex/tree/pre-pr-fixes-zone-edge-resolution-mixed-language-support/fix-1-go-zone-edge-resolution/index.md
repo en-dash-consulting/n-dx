@@ -1,8 +1,8 @@
 ---
 id: "d373f51a-ed4c-4b13-b1be-0db05e992df5"
-level: feature
+level: "feature"
 title: "Fix 1: Go Zone Edge Resolution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T20:47:10.759Z"
 completedAt: "2026-03-26T20:47:10.759Z"

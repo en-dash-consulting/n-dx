@@ -1,9 +1,9 @@
 ---
 id: "0ee552a6-b9ba-4e0b-b46a-1ece77055084"
-level: feature
+level: "feature"
 title: "Fix code in viewer-data-loader (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T15:25:21.043Z"
 completedAt: "2026-04-20T15:25:21.043Z"

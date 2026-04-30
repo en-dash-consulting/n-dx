@@ -1,8 +1,8 @@
 ---
 id: "351e9c1a-b1af-4d3e-98a6-e559afa1153f"
-level: task
+level: "task"
 title: "Fix Run Count in Sidebar"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T07:58:39.114Z"
 completedAt: "2026-02-18T07:58:39.114Z"

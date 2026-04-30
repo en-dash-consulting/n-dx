@@ -1,9 +1,9 @@
 ---
 id: "69eb6b07-7b69-49cb-8fd9-f1a67a4460ee"
-level: feature
+level: "feature"
 title: "ndx as the single CLI interface"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 startedAt: "2026-04-13T18:35:49.604Z"
 completedAt: "2026-03-24T13:06:25.502Z"
 acceptanceCriteria: []

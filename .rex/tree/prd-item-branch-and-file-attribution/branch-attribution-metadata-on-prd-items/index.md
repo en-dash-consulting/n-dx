@@ -1,8 +1,8 @@
 ---
 id: "578686b2-4fab-45a3-a452-28a8dc45231f"
-level: feature
+level: "feature"
 title: "Branch Attribution Metadata on PRD Items"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T16:57:13.842Z"
 completedAt: "2026-04-24T16:57:13.842Z"

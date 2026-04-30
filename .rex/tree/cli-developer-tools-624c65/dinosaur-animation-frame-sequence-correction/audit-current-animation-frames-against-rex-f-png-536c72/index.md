@@ -1,9 +1,9 @@
 ---
 id: "536c72d7-d8d3-410b-8710-67e24e330690"
-level: task
+level: "task"
 title: "Audit current animation frames against Rex-F.png and identify divergences"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "animation"

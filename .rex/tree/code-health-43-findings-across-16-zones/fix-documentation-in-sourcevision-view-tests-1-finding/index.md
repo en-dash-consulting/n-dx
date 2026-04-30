@@ -1,9 +1,9 @@
 ---
 id: "a7e09490-34bb-4b1d-ad69-a67c94cf167b"
-level: feature
+level: "feature"
 title: "Fix documentation in sourcevision-view-tests (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:59:27.747Z"
 completedAt: "2026-04-14T01:59:27.747Z"

@@ -1,8 +1,8 @@
 ---
 id: "83e1555b-7eae-43d8-917e-459268669243"
-level: task
+level: "task"
 title: "Provider authentication preflight during init"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T03:18:25.981Z"
 completedAt: "2026-02-21T03:18:25.981Z"

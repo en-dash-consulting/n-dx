@@ -1,9 +1,9 @@
 ---
 id: "ac39fe86-e0af-4b0d-b3b0-87bc26d81399"
-level: task
+level: "task"
 title: "Implement multi-location Claude CLI discovery chain with configurable override"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "init"
   - "cli-discovery"

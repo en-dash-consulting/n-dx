@@ -1,9 +1,9 @@
 ---
 id: "bb5f0641-67a7-43d2-b0fe-186faf73c0bc"
-level: task
+level: "task"
 title: "Update cli-brand.test.js snapshot to match redesigned ndx init dinosaur"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "testing"
   - "cli"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-13T16:47:37.099Z"
 completedAt: "2026-04-20T13:38:22.140Z"
-resolutionType: acknowledgment
+resolutionType: "acknowledgment"
 resolutionDetail: "Test already passes. Snapshot content in cli-brand.test.js matches cli-brand.js byte-for-byte. Verified via hex comparison of all 17 lines across all 3 assertions (getMascot, frame 0, frame 1). No changes needed."
 acceptanceCriteria:
   - "tests/e2e/cli-brand.test.js passes cleanly with no snapshot mismatches after the update"

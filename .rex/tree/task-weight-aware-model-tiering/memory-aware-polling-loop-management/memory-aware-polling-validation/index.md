@@ -1,8 +1,8 @@
 ---
 id: "2351e3d1-6135-48c2-bd8f-9b6ad9fc221a"
-level: task
+level: "task"
 title: "Memory-Aware Polling Validation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T04:11:56.269Z"
 completedAt: "2026-02-27T04:11:56.269Z"

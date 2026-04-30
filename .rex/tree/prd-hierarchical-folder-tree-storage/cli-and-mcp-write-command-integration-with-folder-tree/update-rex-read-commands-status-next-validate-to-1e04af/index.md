@@ -1,9 +1,9 @@
 ---
 id: "1e04af28-ca65-4104-941e-af798af61373"
-level: task
+level: "task"
 title: "Update rex read commands (status, next, validate) to read PRD from folder tree"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "prd"
   - "cli"

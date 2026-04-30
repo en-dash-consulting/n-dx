@@ -1,8 +1,8 @@
 ---
 id: "e6e7f530-81fd-49d6-b4cb-42fa539d8771"
-level: feature
+level: "feature"
 title: "Branch Work System of Record"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-25T04:48:07.956Z"
 completedAt: "2026-02-25T04:48:07.956Z"

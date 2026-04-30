@@ -1,8 +1,8 @@
 ---
 id: "c9447ae6-7521-40b0-997d-b56bfaa1993a"
-level: feature
+level: "feature"
 title: "Feature 1: Go-Aware Archetype System"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T08:06:08.926Z"
 completedAt: "2026-03-26T08:06:08.926Z"

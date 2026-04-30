@@ -1,9 +1,9 @@
 ---
 id: "20bbb688-65c2-4331-a508-5b5700272200"
-level: task
+level: "task"
 title: "Add integration tests for Ctrl-C interrupt and rollback prompt interaction"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "testing"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-24T20:56:08.084Z"
 completedAt: "2026-04-24T21:00:00.697Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added a 6th integration test in packages/hench/tests/integration/sigint-prompt.test.ts that explicitly asserts criterion 4 of the acceptance list (\"a second SIGINT during the prompt does not call process.exit(1) and allows the readline to complete\") using vi.spyOn(process, \"exit\") and an outer handler shaped like run.ts's force-exit branch (unconditional process.exit(1)). Confirms: exitSpy never called; outerForceExit never called; readline closed cleanly; outer handler restored exactly once. The previous 5 tests from the sibling commit already covered the other acceptance criteria (prompt presented when dirty files exist, 'y' reverts files, 'n' leaves them, TTY mocking in lieu of real TTY); the new test closes the remaining gap by pinning the no-exit guarantee with a direct process.exit spy."
 acceptanceCriteria:
   - "Test confirms that after SIGINT the rollback prompt is presented when dirty files exist"

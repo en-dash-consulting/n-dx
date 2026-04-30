@@ -1,9 +1,9 @@
 ---
 id: "3788d2a4-0d5d-410b-81e6-0854bceb1510"
-level: task
+level: "task"
 title: "Source subsequent animation frames from nearest reference images and update sequence"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "animation"

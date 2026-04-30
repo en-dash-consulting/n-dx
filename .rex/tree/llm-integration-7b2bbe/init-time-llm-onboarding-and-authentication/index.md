@@ -1,8 +1,8 @@
 ---
 id: "8eaa2e3d-abe4-42aa-89c9-226e9877f2b6"
-level: feature
+level: "feature"
 title: "Init-time LLM Onboarding and Authentication"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T05:23:23.067Z"
 completedAt: "2026-02-21T05:23:23.067Z"

@@ -1,8 +1,8 @@
 ---
 id: "dee97c9f-f407-4ade-a57a-d02ff11fe5cf"
-level: task
+level: "task"
 title: "Project-centric Page Title and Branding"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T10:48:07.257Z"
 completedAt: "2026-02-18T10:48:07.257Z"

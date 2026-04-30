@@ -1,9 +1,9 @@
 ---
 id: "984b4cf8-443b-45c9-9a55-5f40e8f59f1c"
-level: task
+level: "task"
 title: "Write Codebase Onboarding Guide"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "docs"
   - "sourcevision"

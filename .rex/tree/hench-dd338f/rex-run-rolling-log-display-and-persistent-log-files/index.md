@@ -1,8 +1,8 @@
 ---
 id: "8f175c2d-6868-4687-a7e5-355e78f785f1"
-level: feature
+level: "feature"
 title: "Rex Run Rolling Log Display and Persistent Log Files"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T23:44:31.021Z"
 completedAt: "2026-04-08T23:44:31.021Z"

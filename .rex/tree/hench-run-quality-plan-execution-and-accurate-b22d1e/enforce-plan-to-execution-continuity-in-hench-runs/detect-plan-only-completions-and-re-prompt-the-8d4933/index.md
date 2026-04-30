@@ -1,14 +1,15 @@
 ---
 id: "8d493315-ede5-4370-bae3-901630c5ec02"
-level: task
+level: "task"
 title: "Detect plan-only completions and re-prompt the agent to execute before allowing run completion"
-status: pending
-priority: high
+status: "in_progress"
+priority: "high"
 tags:
   - "hench"
   - "agent-loop"
   - "reliability"
 source: "smart-add"
+startedAt: "2026-04-30T19:34:47.206Z"
 acceptanceCriteria:
   - "Run loop classifies each iteration as 'planned-only' vs 'executed' based on whether code-modifying tool calls were issued"
   - "A planned-only terminal iteration triggers an automatic re-prompt requiring execution before the run can be marked complete"
@@ -20,7 +21,7 @@ description: "Add a guard in the hench run loop that classifies the agent's outp
 
 # Detect plan-only completions and re-prompt the agent to execute before allowing run completion
 
-🟠 [pending]
+🟠 [in_progress]
 
 ## Summary
 
@@ -28,7 +29,8 @@ Add a guard in the hench run loop that classifies the agent's output: if the run
 
 ## Info
 
-- **Status:** pending
+- **Status:** in_progress
 - **Priority:** high
 - **Tags:** hench, agent-loop, reliability
 - **Level:** task
+- **Started:** 2026-04-30T19:34:47.206Z

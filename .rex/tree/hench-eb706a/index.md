@@ -1,8 +1,8 @@
 ---
 id: "eb706a5e-011c-485d-ba5e-a8ffc6f17879"
-level: epic
+level: "epic"
 title: "Hench"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-20T19:32:34.107Z"
 completedAt: "2026-04-20T19:32:34.107Z"

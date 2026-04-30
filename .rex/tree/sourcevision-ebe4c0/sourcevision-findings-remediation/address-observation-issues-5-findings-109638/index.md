@@ -1,9 +1,9 @@
 ---
 id: "109638b1-0eda-425d-a785-f2b87ecf6904"
-level: task
+level: "task"
 title: "Address observation issues (5 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-09T00:30:23.465Z"
 completedAt: "2026-03-09T00:48:14.440Z"

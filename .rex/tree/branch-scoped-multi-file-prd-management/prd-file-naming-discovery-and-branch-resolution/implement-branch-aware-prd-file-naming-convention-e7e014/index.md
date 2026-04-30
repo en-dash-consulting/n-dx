@@ -1,9 +1,9 @@
 ---
 id: "e7e01442-70f8-42bf-8763-d31afb20acf9"
-level: task
+level: "task"
 title: "Implement branch-aware PRD file naming convention and git branch/commit resolution"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "storage"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-22T16:18:39.803Z"
 completedAt: "2026-04-22T16:24:16.600Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added branch-naming.ts with sanitizeBranchName, resolveGitBranch, getFirstCommitDate, generatePRDFilename, resolvePRDFilename. 26 unit tests covering pure functions and git-dependent edge cases. Exported from store/index.ts and public.ts."
 acceptanceCriteria:
   - "Generates filenames matching the pattern prd_{sanitized-branch}_{YYYY-MM-DD}.json"

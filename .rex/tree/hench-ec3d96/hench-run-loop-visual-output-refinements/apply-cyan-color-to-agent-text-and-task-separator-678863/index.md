@@ -1,9 +1,9 @@
 ---
 id: "67886370-b75c-4e7a-ad8c-2a66b4f281a9"
-level: task
+level: "task"
 title: "Apply cyan color to agent text and task separator line in hench run output"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "hench"
   - "cli"

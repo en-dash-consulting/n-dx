@@ -1,9 +1,9 @@
 ---
 id: "7be07d44-976d-4d18-a209-887526f741b3"
-level: task
+level: "task"
 title: "Unified init status report instead of mixed sub-init output"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "ux"

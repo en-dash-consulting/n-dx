@@ -1,9 +1,9 @@
 ---
 id: "be4a2c03-b6d3-4b23-8fad-907f6ba4364a"
-level: task
+level: "task"
 title: "Create .local_testing directory structure and gitignore entry"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "infrastructure"
   - "testing"

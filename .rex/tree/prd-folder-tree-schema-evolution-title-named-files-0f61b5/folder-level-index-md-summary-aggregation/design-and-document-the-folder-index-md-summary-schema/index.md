@@ -1,9 +1,9 @@
 ---
 id: "5446296c-cb9c-4442-9640-cdc551e2343a"
-level: task
+level: "task"
 title: "Design and document the folder index.md summary schema"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "prd"
@@ -13,7 +13,7 @@ source: "smart-add"
 startedAt: "2026-04-30T01:27:36.642Z"
 completedAt: "2026-04-30T01:30:51.594Z"
 endedAt: "2026-04-30T01:30:51.594Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Designed and documented the complete index.md summary schema with sections for item display, summary (preserved), progress, commits, changes, and info. Documented regeneration semantics with decision matrix explaining why Summary is preserved while others are regenerated. Included annotated examples for epic, feature, and task folders. Added Regeneration Semantics Matrix and updated Serializer/Parser contracts. Added Related Documentation section linking to CLAUDE.md and AGENTS.md."
 acceptanceCriteria:
   - "Schema document covers every section with field names, source of truth, and regeneration semantics"

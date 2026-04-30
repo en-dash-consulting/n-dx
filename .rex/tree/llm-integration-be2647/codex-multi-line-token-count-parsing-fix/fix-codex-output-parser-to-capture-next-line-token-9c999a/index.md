@@ -1,9 +1,9 @@
 ---
 id: "9c999a92-f89f-469c-a527-5e4aaae920bf"
-level: task
+level: "task"
 title: "Fix Codex output parser to capture next-line token count after 'tokens used' label"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "codex"
   - "token-usage"

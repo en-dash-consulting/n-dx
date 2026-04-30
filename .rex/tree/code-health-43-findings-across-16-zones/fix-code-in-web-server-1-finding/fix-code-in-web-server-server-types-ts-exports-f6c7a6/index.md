@@ -1,9 +1,9 @@
 ---
 id: "f6c7a659-5ffe-46b1-af46-1b77e398ac59"
-level: task
+level: "task"
 title: "Fix code in web-server: server/types.ts exports runtime functions jsonResponse(), errorResponse(), and r"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:32:10.265Z"
 completedAt: "2026-04-14T01:38:07.906Z"

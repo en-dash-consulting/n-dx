@@ -1,9 +1,9 @@
 ---
 id: "c6ef1df9-b607-415f-81b7-3467a67ba9f6"
-level: feature
+level: "feature"
 title: "Fix structural in autonomous-agent-engine (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T15:04:20.413Z"
 completedAt: "2026-04-18T15:04:20.413Z"

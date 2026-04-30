@@ -1,9 +1,9 @@
 ---
 id: "9311f36a-e0e4-4275-90f7-badca8d60ee6"
-level: task
+level: "task"
 title: "Update unit test callers to use shared utilities"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "tests"
   - "unit"

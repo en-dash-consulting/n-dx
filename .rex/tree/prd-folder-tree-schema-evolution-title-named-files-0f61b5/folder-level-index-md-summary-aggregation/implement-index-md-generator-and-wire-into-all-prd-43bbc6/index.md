@@ -1,9 +1,9 @@
 ---
 id: "43bbc65d-fcd9-4709-b024-6ab1b1f13131"
-level: task
+level: "task"
 title: "Implement index.md generator and wire into all PRD write paths"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "prd"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-30T12:59:49.957Z"
 completedAt: "2026-04-30T13:11:32.191Z"
 endedAt: "2026-04-30T13:11:32.191Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented index.md generator and integrated into serializer. Generator produces deterministic output per documented schema with all sections (Item Display, Summary, Progress, Commits, Changes, Info, Children, Subtasks). All PRDStore write paths trigger full tree regeneration, ensuring index.md files are regenerated for changed items and all ancestors. Comprehensive unit tests (28) and E2E tests verify functionality across all item levels."
 acceptanceCriteria:
   - "Generator produces deterministic output given the same input subtree (no timestamps that vary across regenerations)"

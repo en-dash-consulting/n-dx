@@ -1,9 +1,9 @@
 ---
 id: "1fd3f6e9-93e4-484e-9f0d-957cbd16cc91"
-level: feature
+level: "feature"
 title: "Fix suggestion in polling (1 finding)"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 source: "sourcevision"
 startedAt: "2026-04-13T18:49:19.159Z"
 completedAt: "2026-04-13T18:49:19.159Z"

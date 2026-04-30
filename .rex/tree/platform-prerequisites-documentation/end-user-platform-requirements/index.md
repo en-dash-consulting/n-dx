@@ -1,8 +1,8 @@
 ---
 id: "087ff59e-ba8c-4be6-a975-a5c170362498"
-level: feature
+level: "feature"
 title: "End-User Platform Requirements"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T04:42:32.885Z"
 completedAt: "2026-04-19T04:42:32.885Z"

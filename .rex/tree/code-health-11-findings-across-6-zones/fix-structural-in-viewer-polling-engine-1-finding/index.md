@@ -1,9 +1,9 @@
 ---
 id: "40e86ebd-e7be-4c1c-a9bb-4345275afb6a"
-level: feature
+level: "feature"
 title: "Fix structural in viewer-polling-engine (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T16:31:17.838Z"
 completedAt: "2026-04-20T16:31:17.838Z"

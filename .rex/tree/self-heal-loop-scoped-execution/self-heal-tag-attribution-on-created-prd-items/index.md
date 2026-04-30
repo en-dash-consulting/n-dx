@@ -1,8 +1,8 @@
 ---
 id: "2e184cee-25e9-4811-af0a-da72bb9c366f"
-level: feature
+level: "feature"
 title: "Self-Heal Tag Attribution on Created PRD Items"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T18:55:40.239Z"
 completedAt: "2026-04-24T18:55:40.239Z"

@@ -1,8 +1,8 @@
 ---
 id: "1291a3be-9d15-4aa2-9a9e-2d24ae7737f1"
-level: task
+level: "task"
 title: "Polling Suspension for Background Tabs"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T07:12:18.010Z"
 completedAt: "2026-02-26T07:12:18.010Z"

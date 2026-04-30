@@ -1,8 +1,8 @@
 ---
 id: "feat-full-pipeline-subdivision"
-level: task
+level: "task"
 title: "Full-pipeline zone subdivision"
-status: completed
+status: "completed"
 startedAt: "2026-03-02T16:28:00.235Z"
 completedAt: "2026-03-02T16:28:00.235Z"
 acceptanceCriteria: []

@@ -1,9 +1,9 @@
 ---
 id: "c662581c-9dff-413e-ac0b-bbadbeffb85d"
-level: feature
+level: "feature"
 title: "Fix observation in polling (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:02:44.200Z"
 completedAt: "2026-04-13T21:02:44.200Z"

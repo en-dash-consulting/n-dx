@@ -1,9 +1,9 @@
 ---
 id: "9d4e78ef-a61b-4b90-9246-69b9b541e0ad"
-level: feature
+level: "feature"
 title: "Fix move-file in web-server (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T20:09:29.458Z"
 completedAt: "2026-04-13T20:09:29.458Z"

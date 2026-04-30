@@ -1,8 +1,8 @@
 ---
 id: "e4b6edfe-b8e0-4b6a-87d6-b0a79cca4eeb"
-level: feature
+level: "feature"
 title: "Consistent Vendor and Model Resolution Across Commands"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T14:47:55.036Z"
 completedAt: "2026-04-08T14:47:55.036Z"

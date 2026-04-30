@@ -1,8 +1,8 @@
 ---
 id: "90be331b-39aa-4b13-8a38-23e72242e221"
-level: task
+level: "task"
 title: "Selective file filtering"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T09:18:06.075Z"
 completedAt: "2026-02-18T09:18:06.075Z"

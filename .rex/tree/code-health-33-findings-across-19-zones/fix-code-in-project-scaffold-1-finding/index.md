@@ -1,9 +1,9 @@
 ---
 id: "f2bd0934-032a-4ae8-b03b-f97ec7f122ae"
-level: feature
+level: "feature"
 title: "Fix code in project-scaffold (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-17T15:30:03.343Z"
 completedAt: "2026-04-17T15:30:03.343Z"

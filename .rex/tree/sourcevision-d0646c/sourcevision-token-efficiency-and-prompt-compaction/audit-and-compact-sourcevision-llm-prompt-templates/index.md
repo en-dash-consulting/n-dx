@@ -1,9 +1,9 @@
 ---
 id: "c6bca124-43c6-4d98-96a8-03e86a7870b8"
-level: task
+level: "task"
 title: "Audit and compact sourcevision LLM prompt templates"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "llm"

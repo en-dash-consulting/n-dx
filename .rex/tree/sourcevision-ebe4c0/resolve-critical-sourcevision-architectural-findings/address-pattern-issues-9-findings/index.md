@@ -1,9 +1,9 @@
 ---
 id: "d4148da9-5f03-4853-90c8-fd19cc2da658"
-level: task
+level: "task"
 title: "Address pattern issues (9 findings)"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 source: "sourcevision"
 startedAt: "2026-02-28T04:54:32.129Z"
 completedAt: "2026-02-28T05:09:25.735Z"

@@ -1,9 +1,9 @@
 ---
 id: "64fcec7c-8979-4771-bcb6-9c48edb75cad"
-level: task
+level: "task"
 title: "`ndx start` orchestration command"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "dx"

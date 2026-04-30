@@ -1,8 +1,8 @@
 ---
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
-level: epic
+level: "epic"
 title: "CLI & Developer Tools"
-status: completed
+status: "completed"
 startedAt: "2026-04-02T17:55:36.327Z"
 completedAt: "2026-04-10T18:34:32.028Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."

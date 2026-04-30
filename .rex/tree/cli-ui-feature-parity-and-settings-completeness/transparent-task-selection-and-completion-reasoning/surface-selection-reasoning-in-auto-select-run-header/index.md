@@ -1,9 +1,9 @@
 ---
 id: "d0c0c683-75e6-4857-8ef2-0c1a0bb90680"
-level: task
+level: "task"
 title: "Surface selection reasoning in auto-select run header"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "ux"

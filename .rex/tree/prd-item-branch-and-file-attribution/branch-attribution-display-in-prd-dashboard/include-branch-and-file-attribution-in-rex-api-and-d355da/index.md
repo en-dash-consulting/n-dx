@@ -1,9 +1,9 @@
 ---
 id: "d355da37-c17c-4a29-a18b-96ad2e854555"
-level: task
+level: "task"
 title: "Include branch and file attribution in rex API and MCP status responses"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "api"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-24T20:19:01.121Z"
 completedAt: "2026-04-24T20:30:36.537Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added branch/sourceFile attribution to get_prd_status epics, /api/status item nodes, and PRDItemData viewer type"
 acceptanceCriteria:
   - "`GET /api/status` response includes `branch` and `sourceFile` on each item node when present"

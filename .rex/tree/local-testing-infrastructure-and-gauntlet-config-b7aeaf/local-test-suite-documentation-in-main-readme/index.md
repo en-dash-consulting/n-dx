@@ -1,8 +1,8 @@
 ---
 id: "5a24a938-4bbe-4f27-a036-bfdf08400af8"
-level: feature
+level: "feature"
 title: "Local Test Suite Documentation in Main README"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-20T19:44:11.364Z"
 completedAt: "2026-04-20T19:44:11.364Z"

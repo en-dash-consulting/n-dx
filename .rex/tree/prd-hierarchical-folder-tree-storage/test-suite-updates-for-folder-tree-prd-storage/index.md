@@ -1,8 +1,8 @@
 ---
 id: "db58ca72-ee01-426d-8bb0-d0190678cf14"
-level: feature
+level: "feature"
 title: "Test Suite Updates for Folder-Tree PRD Storage"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-28T10:43:59.529Z"
 completedAt: "2026-04-28T10:43:59.529Z"

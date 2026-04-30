@@ -1,9 +1,9 @@
 ---
 id: "addc40f1-decb-4d0c-9f17-6cc455e1590e"
-level: task
+level: "task"
 title: "Write a 5-minute quickstart tutorial"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "docs"
 startedAt: "2026-04-13T18:35:49.604Z"

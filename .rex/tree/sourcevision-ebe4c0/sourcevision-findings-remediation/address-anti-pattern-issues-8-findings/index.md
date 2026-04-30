@@ -1,9 +1,9 @@
 ---
 id: "929b6802-c85a-4cbf-a594-2c968a965306"
-level: task
+level: "task"
 title: "Address anti-pattern issues (8 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-09T00:23:27.753Z"
 completedAt: "2026-03-09T00:29:20.764Z"

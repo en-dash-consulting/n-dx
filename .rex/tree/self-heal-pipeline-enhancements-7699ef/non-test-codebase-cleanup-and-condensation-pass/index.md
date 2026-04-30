@@ -1,8 +1,8 @@
 ---
 id: "b7327b20-6de9-419f-b390-1032c92573fe"
-level: feature
+level: "feature"
 title: "Non-Test Codebase Cleanup and Condensation Pass"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T20:16:38.754Z"
 completedAt: "2026-04-14T20:16:38.754Z"

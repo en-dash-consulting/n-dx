@@ -1,9 +1,9 @@
 ---
 id: "6f416000-3e57-4e87-808b-0f9a14b4dc7c"
-level: feature
+level: "feature"
 title: "Fix code in global (4 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:01:18.085Z"
 completedAt: "2026-04-14T01:01:18.085Z"

@@ -1,9 +1,9 @@
 ---
 id: "69ff9538-093b-45d6-b968-33a46270a048"
-level: task
+level: "task"
 title: "Design folder naming conventions, index.md content schema, and recursive summary contract for each PRD level"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "prd"
   - "storage"

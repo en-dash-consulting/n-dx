@@ -1,8 +1,8 @@
 ---
 id: "0cf188b5-61e7-4aab-8ba5-d101a5e0a582"
-level: task
+level: "task"
 title: "OOM Crash Investigation and Root Cause Analysis"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T19:29:13.108Z"
 completedAt: "2026-02-24T19:29:13.108Z"

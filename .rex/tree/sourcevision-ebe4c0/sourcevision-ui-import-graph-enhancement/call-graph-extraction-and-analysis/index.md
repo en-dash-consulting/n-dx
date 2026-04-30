@@ -1,8 +1,8 @@
 ---
 id: "01490ebc-ec8c-4b4d-b4b3-3120815757ef"
-level: task
+level: "task"
 title: "Call graph extraction and analysis"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T13:22:19.915Z"
 completedAt: "2026-02-11T13:22:19.915Z"

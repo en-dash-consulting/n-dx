@@ -1,9 +1,9 @@
 ---
 id: "59749a83-8ba2-4737-9f91-c1a1f2f0248f"
-level: feature
+level: "feature"
 title: "Fix structural in sourcevision-view-layer (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T02:55:31.149Z"
 completedAt: "2026-04-19T02:55:31.149Z"

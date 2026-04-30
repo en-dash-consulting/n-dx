@@ -1,8 +1,8 @@
 ---
 id: "45e10546-807f-4ea1-a88d-d7739c6667ed"
-level: feature
+level: "feature"
 title: "Claude and Codex Config Validation in Gauntlet"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-15T15:21:21.845Z"
 completedAt: "2026-04-15T15:21:21.845Z"

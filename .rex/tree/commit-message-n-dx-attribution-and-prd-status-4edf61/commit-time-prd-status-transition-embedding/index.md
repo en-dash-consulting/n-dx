@@ -1,8 +1,8 @@
 ---
 id: "e22db08b-4465-4fe8-ad4c-e9f99fc8b259"
-level: feature
+level: "feature"
 title: "Commit-Time PRD Status Transition Embedding"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-29T19:02:57.778Z"
 completedAt: "2026-04-29T19:02:57.778Z"

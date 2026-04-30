@@ -1,9 +1,9 @@
 ---
 id: "418753a7-1d86-446e-a5c7-aeedc63b1ec1"
-level: task
+level: "task"
 title: "Apply yellow coloring to help notes and warning messages in hench CLI output"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "cli"

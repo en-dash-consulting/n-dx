@@ -1,9 +1,9 @@
 ---
 id: "383579c7-0862-4841-8263-fc4d771fff85"
-level: feature
+level: "feature"
 title: "Fix suggestion in rex-2 (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:18:42.281Z"
 completedAt: "2026-04-14T02:18:42.281Z"

@@ -1,8 +1,8 @@
 ---
 id: "c679bde8-9a4b-46bb-a0f8-750bf34fbf95"
-level: task
+level: "task"
 title: "Output and formatting"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"

@@ -1,9 +1,9 @@
 ---
 id: "ff6c5a83-fbcb-4c16-8ef3-279c92f81249"
-level: feature
+level: "feature"
 title: "Fix suggestion in sourcevision-2 (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-03T14:35:08.286Z"
 completedAt: "2026-04-03T14:35:08.286Z"

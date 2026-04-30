@@ -1,9 +1,9 @@
 ---
 id: "72855b7e-99c5-47cb-a742-45a160e0cf58"
-level: task
+level: "task"
 title: "Render interactive PRD-and-merge context graph in the dashboard"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "frontend"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-24T19:50:57.819Z"
 completedAt: "2026-04-24T19:59:27.544Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Built MergeGraphView component with hierarchical layout, pan/zoom, node selection, detail panel, and filter bar. Added merge-graph route, sidebar entry, and PRD view toggle."
 acceptanceCriteria:
   - "New route in the dashboard renders PRD items and merge commits as a connected graph"

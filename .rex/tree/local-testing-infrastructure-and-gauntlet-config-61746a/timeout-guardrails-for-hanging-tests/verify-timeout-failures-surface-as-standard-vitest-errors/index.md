@@ -1,9 +1,9 @@
 ---
 id: "f792fbaf-1a66-4a2f-955e-1e812bc6badb"
-level: task
+level: "task"
 title: "Verify timeout failures surface as standard Vitest errors"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "tests"
   - "timeouts"

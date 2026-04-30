@@ -1,9 +1,9 @@
 ---
 id: "f6ad260e-dd40-4e7f-a308-a6a670f17016"
-level: task
+level: "task"
 title: "Fix code in prd-tree-search: SearchFacets now has three canonical import paths after the prd-tree/index.ts ba (+1 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:03:52.967Z"
 completedAt: "2026-04-14T01:13:19.019Z"

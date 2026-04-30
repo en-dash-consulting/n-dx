@@ -1,9 +1,9 @@
 ---
 id: "42b353ce-031b-4c72-bca3-64983608a8fb"
-level: task
+level: "task"
 title: "Establish Rex-F.png as the canonical first animation frame"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "cli"
   - "animation"

@@ -1,9 +1,9 @@
 ---
 id: "7b4ff540-8a22-4f56-9b0b-dcf9e68f6675"
-level: task
+level: "task"
 title: "Print '=== Iteration n/total ===' banner between hench run loop iterations"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "cli"
@@ -13,7 +13,7 @@ source: "smart-add"
 startedAt: "2026-04-29T18:16:35.551Z"
 completedAt: "2026-04-29T18:21:35.326Z"
 endedAt: "2026-04-29T18:21:35.326Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Extracted formatIterationBanner helper; moved banner from before each iteration to between iterations in both runIterations() and runLoop(); added format/placement tests."
 acceptanceCriteria:
   - "Banner '=== Iteration n/[total] ===' is emitted between each pair of iterations in --iterations=N mode"

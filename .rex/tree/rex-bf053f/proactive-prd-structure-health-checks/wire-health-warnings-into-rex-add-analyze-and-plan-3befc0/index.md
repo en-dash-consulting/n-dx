@@ -1,9 +1,9 @@
 ---
 id: "3befc04b-ce05-4d4e-9dad-ead139784587"
-level: task
+level: "task"
 title: "Wire health warnings into rex add, analyze, and plan write paths"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
 blockedBy:

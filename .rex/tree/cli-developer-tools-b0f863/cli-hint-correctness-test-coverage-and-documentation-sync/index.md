@@ -1,8 +1,8 @@
 ---
 id: "6ba40421-b660-40fb-9c7d-70651bb863e1"
-level: feature
+level: "feature"
 title: "CLI Hint Correctness, Test Coverage, and Documentation Sync"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-13T18:44:45.995Z"
 completedAt: "2026-04-13T18:44:45.995Z"

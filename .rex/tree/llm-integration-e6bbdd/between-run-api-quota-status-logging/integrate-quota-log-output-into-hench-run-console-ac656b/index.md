@@ -1,9 +1,9 @@
 ---
 id: "ac656b7b-240c-45c4-b07f-5f6e8583daf9"
-level: task
+level: "task"
 title: "Integrate quota log output into hench run console with quiet/JSON suppression"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "llm"
   - "quota"

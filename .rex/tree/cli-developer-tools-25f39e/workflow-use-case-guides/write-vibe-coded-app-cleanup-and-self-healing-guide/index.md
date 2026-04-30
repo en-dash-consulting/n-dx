@@ -1,9 +1,9 @@
 ---
 id: "bdf200a2-5695-4716-9ede-73720c5e32c9"
-level: task
+level: "task"
 title: "Write Vibe-Coded App Cleanup and Self-Healing Guide"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "docs"
   - "sourcevision"

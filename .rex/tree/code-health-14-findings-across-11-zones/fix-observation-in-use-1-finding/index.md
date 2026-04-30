@@ -1,9 +1,9 @@
 ---
 id: "afe3615b-d9d8-444d-97e0-06d578292e84"
-level: feature
+level: "feature"
 title: "Fix observation in use (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:49:04.432Z"
 completedAt: "2026-04-13T21:49:04.432Z"

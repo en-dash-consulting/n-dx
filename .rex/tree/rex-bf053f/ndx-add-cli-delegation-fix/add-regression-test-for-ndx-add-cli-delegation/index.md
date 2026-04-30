@@ -1,9 +1,9 @@
 ---
 id: "caf6319e-35fa-4b12-90b9-74440b2a753f"
-level: task
+level: "task"
 title: "Add regression test for ndx add CLI delegation"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "test"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-03-19T18:47:08.893Z"
 completedAt: "2026-03-19T18:48:18.205Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added tests/e2e/cli-add.test.js with 3 tests: successful manual-mode delegation, missing-.rex user-friendly error, and exit code propagation on failure."
 acceptanceCriteria:
   - "Test invokes `ndx add` via child_process spawn against a fixture or temp directory with an initialized `.rex/`"

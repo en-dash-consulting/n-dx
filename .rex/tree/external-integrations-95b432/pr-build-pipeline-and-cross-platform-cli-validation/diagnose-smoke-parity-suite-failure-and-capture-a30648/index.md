@@ -1,9 +1,9 @@
 ---
 id: "a306484a-e1e0-44a2-9740-70fc31efd9ef"
-level: task
+level: "task"
 title: "Diagnose smoke parity suite failure and capture reproducible error context"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "ci"
   - "smoke"

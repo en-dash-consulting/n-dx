@@ -1,9 +1,9 @@
 ---
 id: "0aea4097-e427-4262-80a4-cff4920707e6"
-level: task
+level: "task"
 title: "Render accurate changed-file counts and details in dashboard run summary"
-status: pending
-priority: medium
+status: "pending"
+priority: "medium"
 tags:
   - "web-dashboard"
   - "hench"

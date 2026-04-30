@@ -1,9 +1,9 @@
 ---
 id: "1074c4ff-b1d7-437a-9d3a-570394428e33"
-level: task
+level: "task"
 title: "Add vendor-resilient error handling and retry logic for self-heal batch failures"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "self-heal"
   - "codex"

@@ -1,8 +1,8 @@
 ---
 id: "bd9043b5-1958-4bc7-85e3-f6e3265a9384"
-level: task
+level: "task"
 title: "Enhanced Validation and Error Handling"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-25T16:15:09.286Z"
 completedAt: "2026-02-25T16:15:09.286Z"

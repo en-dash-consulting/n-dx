@@ -1,9 +1,9 @@
 ---
 id: "55b88bcd-8e8a-474a-9053-7e0ceba66ebe"
-level: task
+level: "task"
 title: "Inject ndx project context into pair-programming primary and reviewer executions"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "pair-programming"
   - "context"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-16T16:56:03.913Z"
 completedAt: "2026-04-16T22:07:19.810Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added context assembly pipeline in pair-programming.js and threaded extraContext through hench's run/loop stack into buildPromptEnvelope."
 acceptanceCriteria:
   - "CONTEXT.md is read from .sourcevision/ and passed to the primary hench run when the file exists"

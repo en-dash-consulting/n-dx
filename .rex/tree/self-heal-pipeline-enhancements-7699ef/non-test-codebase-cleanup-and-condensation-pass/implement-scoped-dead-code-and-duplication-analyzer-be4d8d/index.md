@@ -1,9 +1,9 @@
 ---
 id: "be4d8de4-31a8-4caa-bd27-f28902b93d32"
-level: task
+level: "task"
 title: "Implement scoped dead-code and duplication analyzer for production files"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "self-heal"
   - "cleanup"

@@ -1,9 +1,9 @@
 ---
 id: "96780413-6007-4eb0-8550-a118e3d9a8c2"
-level: task
+level: "task"
 title: "Scan and fix stale import paths, deprecated Node.js APIs, and outdated module references across packages"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "imports"
   - "node"

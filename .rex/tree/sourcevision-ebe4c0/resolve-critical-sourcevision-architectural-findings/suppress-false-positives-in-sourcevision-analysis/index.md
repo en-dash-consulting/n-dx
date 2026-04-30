@@ -1,9 +1,9 @@
 ---
 id: "149e7d72-8c46-4a5a-a290-9e9a9e30870b"
-level: task
+level: "task"
 title: "Suppress false positives in SourceVision analysis"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 startedAt: "2026-02-11T17:13:15.631Z"
 completedAt: "2026-02-11T17:13:15.631Z"
 acceptanceCriteria:

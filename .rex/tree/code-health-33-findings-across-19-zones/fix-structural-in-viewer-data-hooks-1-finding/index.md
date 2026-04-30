@@ -1,9 +1,9 @@
 ---
 id: "3007df6a-0c26-44c6-bb84-c2fe748c822a"
-level: feature
+level: "feature"
 title: "Fix structural in viewer-data-hooks (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T02:59:59.476Z"
 completedAt: "2026-04-19T02:59:59.476Z"

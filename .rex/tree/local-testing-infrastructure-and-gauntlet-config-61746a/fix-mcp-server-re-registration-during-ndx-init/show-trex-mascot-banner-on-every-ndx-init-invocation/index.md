@@ -1,9 +1,9 @@
 ---
 id: "2f718148-1812-4472-99bb-56b0396057a8"
-level: task
+level: "task"
 title: "Show trex mascot banner on every ndx init invocation"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 startedAt: "2026-04-09T21:38:43.676Z"
 completedAt: "2026-04-09T21:43:39.451Z"
 acceptanceCriteria: []

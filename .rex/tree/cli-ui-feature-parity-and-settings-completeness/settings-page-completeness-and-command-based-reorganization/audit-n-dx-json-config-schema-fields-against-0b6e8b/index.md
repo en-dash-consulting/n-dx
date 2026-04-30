@@ -1,9 +1,9 @@
 ---
 id: "0b6e8b1d-bf43-42b3-91df-74ed3f234c66"
-level: task
+level: "task"
 title: "Audit .n-dx.json config schema fields against settings page UI controls and document gaps"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "settings"
   - "config"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-19T03:56:20.830Z"
 completedAt: "2026-04-19T03:59:49.910Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Produced docs/config-schema-ui-gap.md: 63 user-editable fields enumerated across all three config files; 19 present, 1 partial, 43 missing. P1–P6 priority gap list with control types and CLI commands. View placement recommendations for sibling implementation task."
 acceptanceCriteria:
   - "All fields from .n-dx.json, .rex/config.json, and .hench/config.json schemas are enumerated"

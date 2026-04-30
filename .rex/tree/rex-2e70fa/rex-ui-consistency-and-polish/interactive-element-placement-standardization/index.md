@@ -1,8 +1,8 @@
 ---
 id: "3c630e22-d440-4a94-a65a-d5009881ce1c"
-level: task
+level: "task"
 title: "Interactive Element Placement Standardization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-03T13:02:37.248Z"
 completedAt: "2026-03-03T13:02:37.248Z"

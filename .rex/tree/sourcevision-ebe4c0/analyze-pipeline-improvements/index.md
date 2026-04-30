@@ -1,8 +1,8 @@
 ---
 id: "e4868f49-5256-4fb7-a775-ac5bf06dbb47"
-level: feature
+level: "feature"
 title: "Analyze pipeline improvements"
-status: completed
+status: "completed"
 tags:
   - "prune"
   - "rex"

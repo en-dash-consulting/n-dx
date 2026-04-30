@@ -1,8 +1,8 @@
 ---
 id: "1aca6c86-7f94-4278-befd-c8d0b125a71d"
-level: task
+level: "task"
 title: "Notion adapter implementation"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"

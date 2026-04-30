@@ -1,8 +1,8 @@
 ---
 id: "8abe3c45-9434-4862-aeee-0f56f107d130"
-level: feature
+level: "feature"
 title: "Runtime Process and Thread Lifecycle Enforcement"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-03T18:50:24.588Z"
 completedAt: "2026-04-03T18:50:24.588Z"

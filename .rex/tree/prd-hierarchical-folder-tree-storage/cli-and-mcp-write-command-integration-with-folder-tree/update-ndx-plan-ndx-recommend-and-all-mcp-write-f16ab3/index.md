@@ -1,9 +1,9 @@
 ---
 id: "f16ab364-971a-43ab-94e7-173a891264d1"
-level: task
+level: "task"
 title: "Update ndx plan, ndx recommend, and all MCP write tools to propagate writes to the folder tree"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "prd"
   - "mcp"

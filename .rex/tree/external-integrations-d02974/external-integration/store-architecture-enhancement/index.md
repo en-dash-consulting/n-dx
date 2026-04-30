@@ -1,8 +1,8 @@
 ---
 id: "5dd8d651-69fd-4deb-a2c0-39af061e0e9b"
-level: task
+level: "task"
 title: "Store Architecture Enhancement"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-09T13:50:56.013Z"
 completedAt: "2026-02-09T13:50:56.013Z"

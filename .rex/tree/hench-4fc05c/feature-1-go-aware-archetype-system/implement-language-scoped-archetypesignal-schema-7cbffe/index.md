@@ -1,9 +1,9 @@
 ---
 id: "7cbffe7e-3bfe-482b-8163-80f69b1690e4"
-level: task
+level: "task"
 title: "Implement language-scoped ArchetypeSignal schema and add Go signals to archetypes"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

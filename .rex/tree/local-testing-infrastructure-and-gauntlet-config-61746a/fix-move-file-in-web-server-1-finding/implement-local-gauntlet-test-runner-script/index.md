@@ -1,9 +1,9 @@
 ---
 id: "3321bd74-f5b9-463c-8d2c-752457fe3ac0"
-level: task
+level: "task"
 title: "Implement local gauntlet test runner script"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "testing"
   - "docker"

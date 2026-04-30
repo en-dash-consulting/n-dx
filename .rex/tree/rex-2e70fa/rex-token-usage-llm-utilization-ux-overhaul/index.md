@@ -1,8 +1,8 @@
 ---
 id: "fdc6c3d4-34f6-4805-8473-a4e672582582"
-level: feature
+level: "feature"
 title: "Rex Token Usage & LLM Utilization UX Overhaul"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T08:45:24.023Z"
 completedAt: "2026-02-21T08:45:24.023Z"

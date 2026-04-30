@@ -1,8 +1,8 @@
 ---
 id: "7de88f8c-5bee-4b9e-9532-7f134c7244ed"
-level: task
+level: "task"
 title: "Smart Add Command Construction and Submission UX Fix"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-06T18:14:07.762Z"
 completedAt: "2026-03-06T18:14:07.762Z"

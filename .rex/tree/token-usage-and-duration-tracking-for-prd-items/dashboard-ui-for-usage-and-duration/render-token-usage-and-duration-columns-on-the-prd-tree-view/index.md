@@ -1,9 +1,9 @@
 ---
 id: "4fdeed51-b742-4d6e-a321-42d2be246084"
-level: task
+level: "task"
 title: "Render token usage and duration columns on the PRD tree view"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "ui"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-23T16:17:13.092Z"
 completedAt: "2026-04-23T16:54:04.691Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added token-rollup and live-duration columns to the PRD tree view."
 acceptanceCriteria:
   - "PRD tree rows display `tokens` (formatted with thousands separators) and `duration` (human-readable: `1.2s`, `4m 10s`, `2h 15m`) for tasks, features, and epics"

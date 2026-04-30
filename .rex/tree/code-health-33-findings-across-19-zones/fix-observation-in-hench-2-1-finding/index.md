@@ -1,9 +1,9 @@
 ---
 id: "32dd257c-d640-4e8e-a077-232b610fce37"
-level: feature
+level: "feature"
 title: "Fix observation in hench-2 (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-17T18:32:36.322Z"
 completedAt: "2026-04-17T18:32:36.322Z"

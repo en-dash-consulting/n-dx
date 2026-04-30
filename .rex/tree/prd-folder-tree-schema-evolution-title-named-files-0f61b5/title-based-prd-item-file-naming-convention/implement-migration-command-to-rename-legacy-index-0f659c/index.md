@@ -1,9 +1,9 @@
 ---
 id: "0f659c06-3f19-4957-88eb-a72ccaaff145"
-level: task
+level: "task"
 title: "Implement migration command to rename legacy index.md files to title-based names"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "migration"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-30T01:05:15.536Z"
 completedAt: "2026-04-30T01:20:07.238Z"
 endedAt: "2026-04-30T01:20:07.238Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Created migrate-folder-tree-filenames.ts with full migration logic including collision detection and logging. Registered in CLI. Added 18 passing unit tests covering all requirements."
 acceptanceCriteria:
   - "CLI command renames all legacy `index.md` files under `.rex/tree/` to their title-based filenames"

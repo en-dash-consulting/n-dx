@@ -1,9 +1,9 @@
 ---
 id: "793e0718-9cd8-4b15-b828-fef49bc92921"
-level: task
+level: "task"
 title: "Fix observation in tick: High coupling (0.56) — 3 imports target \"web\""
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:35:34.109Z"
 completedAt: "2026-04-13T21:38:15.653Z"

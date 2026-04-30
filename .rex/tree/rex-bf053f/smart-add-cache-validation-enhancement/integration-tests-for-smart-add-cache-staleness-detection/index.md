@@ -1,13 +1,13 @@
 ---
 id: "3ac045d9-23d2-442e-8be6-28d13edea664"
-level: task
+level: "task"
 title: "Integration tests for smart-add cache staleness detection"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "manual"
 startedAt: "2026-03-11T02:19:29.143Z"
 completedAt: "2026-03-11T02:24:01.931Z"
-resolutionType: acknowledgment
+resolutionType: "acknowledgment"
 resolutionDetail: "All 6 integration tests already exist in packages/rex/tests/integration/cli/commands/smart-add-cache.test.ts and pass. Tests cover: savePending prdHash writing, loadPending prdHash reading, --accept with matching hash, --accept stale cache rejection, backward-compatible cache without prdHash, and maybeCacheSmartAddProposals hash passthrough. All use mocked LLM and temp directories."
 acceptanceCriteria:
   - "Test: savePending writes prdHash to pending-proposals.json when provided"

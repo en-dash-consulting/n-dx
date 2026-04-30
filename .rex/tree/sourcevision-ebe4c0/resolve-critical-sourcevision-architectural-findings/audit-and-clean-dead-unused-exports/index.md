@@ -1,9 +1,9 @@
 ---
 id: "b6af7300-9330-4523-97fc-119ea106a002"
-level: task
+level: "task"
 title: "Audit and clean dead/unused exports"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 startedAt: "2026-02-11T17:04:34.658Z"
 completedAt: "2026-02-11T17:04:34.658Z"
 acceptanceCriteria:

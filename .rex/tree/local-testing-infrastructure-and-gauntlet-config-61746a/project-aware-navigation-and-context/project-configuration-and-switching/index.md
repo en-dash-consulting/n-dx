@@ -1,8 +1,8 @@
 ---
 id: "986cc829-245a-4756-a64b-84bb9cf11961"
-level: task
+level: "task"
 title: "Project Configuration and Switching"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-17T23:53:56.173Z"
 completedAt: "2026-02-17T23:53:56.173Z"

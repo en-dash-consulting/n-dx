@@ -1,9 +1,9 @@
 ---
 id: "577c74cb-da15-4cb2-aca7-3012fe840896"
-level: feature
+level: "feature"
 title: "Item completion timeline view"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "web"
   - "ux"

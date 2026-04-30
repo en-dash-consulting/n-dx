@@ -1,9 +1,9 @@
 ---
 id: "7ad24227-1245-46bf-99e5-7ece2f6aca8c"
-level: task
+level: "task"
 title: "Implement Codex rate limiting detection and retry in rex LLM call paths"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "codex"
   - "token-usage"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-16T16:54:20.429Z"
 completedAt: "2026-04-16T21:29:18.611Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added onRetry callback to CodexCliProviderOptions and CliProviderOptions. Default writes 'Rate limited — retrying in Xs… (attempt N of M)' to stderr before each rate-limit retry sleep. After exhausting retries on rate-limit, throws actionable ClaudeClientError with guidance instead of raw provider message. Added 4 targeted tests in codex-cli-provider.test.ts."
 acceptanceCriteria:
   - "Rate limit responses from Codex are detected and classified separately from hard errors"

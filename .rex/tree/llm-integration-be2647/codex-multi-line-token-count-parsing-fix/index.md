@@ -1,8 +1,8 @@
 ---
 id: "ed1f0944-536d-44a4-ad18-d2f3e4827e16"
-level: feature
+level: "feature"
 title: "Codex Multi-line Token Count Parsing Fix"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T20:50:00.776Z"
 completedAt: "2026-04-14T20:50:00.776Z"

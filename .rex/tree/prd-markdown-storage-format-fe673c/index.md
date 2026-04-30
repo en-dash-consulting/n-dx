@@ -1,8 +1,8 @@
 ---
 id: "fe673c36-ffc7-45c4-b6d2-09f7112eb214"
-level: epic
+level: "epic"
 title: "PRD Markdown Storage Format"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T16:20:10.167Z"
 completedAt: "2026-04-24T16:20:10.167Z"

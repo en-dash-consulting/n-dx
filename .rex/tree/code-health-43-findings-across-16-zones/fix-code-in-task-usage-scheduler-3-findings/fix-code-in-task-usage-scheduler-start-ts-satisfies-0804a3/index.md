@@ -1,9 +1,9 @@
 ---
 id: "0804a39b-7f33-4fe4-ab2a-7c86b8e491b2"
-level: task
+level: "task"
 title: "Fix code in task-usage-scheduler: start.ts satisfies RegisterSchedulerOptions by passing a concrete options litera (+2 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:27:11.340Z"
 completedAt: "2026-04-14T01:32:07.376Z"

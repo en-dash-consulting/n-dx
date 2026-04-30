@@ -1,8 +1,8 @@
 ---
 id: "eb21a965-6d17-4ee7-b6bd-0f1e6d07ff33"
-level: feature
+level: "feature"
 title: "ANSI Color Reset Consistency in Tool Output"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T18:32:06.317Z"
 completedAt: "2026-04-09T18:32:06.317Z"

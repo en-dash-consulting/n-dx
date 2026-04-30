@@ -1,9 +1,9 @@
 ---
 id: "fcfc2e7c-270b-4367-949e-59992caf6766"
-level: task
+level: "task"
 title: "Add Go guard defaults and language-aware config to Hench"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "go"

@@ -1,9 +1,9 @@
 ---
 id: "5afe5ef6-7961-4969-a843-aa346909b7f4"
-level: task
+level: "task"
 title: "Build landing page with hero and package showcase"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 startedAt: "2026-02-12T18:00:54.148Z"
 completedAt: "2026-02-12T18:09:06.157Z"
 acceptanceCriteria: []

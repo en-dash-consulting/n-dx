@@ -1,8 +1,8 @@
 ---
 id: "61746a37-64cd-4291-802e-aa54e969ec4e"
-level: epic
+level: "epic"
 title: "Local Testing Infrastructure and Gauntlet Config Validation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-15T15:21:22.274Z"
 completedAt: "2026-04-15T15:21:22.274Z"

@@ -1,8 +1,8 @@
 ---
 id: "32799258-d738-428d-8d6f-8a5bfacfb12a"
-level: feature
+level: "feature"
 title: "Workflow Use Case Guides"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T15:52:50.546Z"
 completedAt: "2026-04-14T15:52:50.546Z"

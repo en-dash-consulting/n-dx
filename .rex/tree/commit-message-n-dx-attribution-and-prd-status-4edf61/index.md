@@ -1,8 +1,8 @@
 ---
 id: "4edf6188-9abd-4a6f-8267-e795b86c0ffa"
-level: epic
+level: "epic"
 title: "Commit Message N-DX Attribution and PRD Status Synchronization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-30T14:42:19.241Z"
 completedAt: "2026-04-30T14:42:19.241Z"

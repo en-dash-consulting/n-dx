@@ -1,8 +1,8 @@
 ---
 id: "775f745b-ea30-4160-bbc4-82a660664cae"
-level: task
+level: "task"
 title: "Dynamic port allocation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T02:16:16.768Z"
 completedAt: "2026-02-18T02:16:16.768Z"

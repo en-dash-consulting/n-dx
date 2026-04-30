@@ -1,9 +1,9 @@
 ---
 id: "37c43e3c-bcce-432c-a953-9685f1618999"
-level: task
+level: "task"
 title: "Merge branch-scoped PRD files into single canonical 'prd' file"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "storage"

@@ -1,9 +1,9 @@
 ---
 id: "f223f7ef-a609-4707-88ea-53a7eda45ea6"
-level: feature
+level: "feature"
 title: "Fix documentation in packages-web:unit-server (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:55:10.110Z"
 completedAt: "2026-04-14T01:55:10.110Z"

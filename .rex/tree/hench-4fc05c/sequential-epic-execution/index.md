@@ -1,8 +1,8 @@
 ---
 id: "be267023-2d02-452c-8248-b8eef65a2f2c"
-level: feature
+level: "feature"
 title: "Sequential Epic Execution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-10T19:29:23.741Z"
 completedAt: "2026-02-10T19:29:23.741Z"

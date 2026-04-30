@@ -1,9 +1,9 @@
 ---
 id: "c4b9b3f5-5b3a-43c0-938a-b5cd66810bb1"
-level: task
+level: "task"
 title: "Update rex add and ndx add pipelines to use branch-scoped PRD file creation and targeting"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "cli"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-22T18:57:46.661Z"
 completedAt: "2026-04-22T19:12:07.338Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Wired branch resolution into resolveStore, cmdAdd, and acceptProposals; added target file display in approval flow; 9 new integration tests."
 acceptanceCriteria:
   - "ndx add creates or appends to the current branch's prd_{branch}_{date}.json file"

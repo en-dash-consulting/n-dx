@@ -1,9 +1,9 @@
 ---
 id: "41169580-92d1-4032-b5ee-60ef39f13c52"
-level: task
+level: "task"
 title: "Implement budget-based percent-remaining calculation for active providers"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "llm"
   - "quota"

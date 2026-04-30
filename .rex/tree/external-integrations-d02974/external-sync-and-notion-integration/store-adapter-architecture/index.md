@@ -1,8 +1,8 @@
 ---
 id: "3a5378b3-1cb9-49de-9d51-f6572a92ac8d"
-level: task
+level: "task"
 title: "Store adapter architecture"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"

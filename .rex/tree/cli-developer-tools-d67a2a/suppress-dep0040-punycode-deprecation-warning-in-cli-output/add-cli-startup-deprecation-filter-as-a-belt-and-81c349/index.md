@@ -1,9 +1,9 @@
 ---
 id: "81c3499f-0526-4dd4-8979-e273596a01bd"
-level: task
+level: "task"
 title: "Add CLI startup deprecation filter as a belt-and-suspenders guard"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "cli"
   - "dx"

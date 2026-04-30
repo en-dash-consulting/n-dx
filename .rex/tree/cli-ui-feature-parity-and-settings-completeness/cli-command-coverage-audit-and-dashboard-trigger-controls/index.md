@@ -1,8 +1,8 @@
 ---
 id: "749cecdc-4d4c-4468-ae08-5e28e117996c"
-level: feature
+level: "feature"
 title: "CLI Command Coverage Audit and Dashboard Trigger Controls"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T03:56:04.584Z"
 completedAt: "2026-04-19T03:56:04.584Z"

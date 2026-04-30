@@ -1,9 +1,9 @@
 ---
 id: "c4e93fb7-645d-495d-ade0-9bdff9cbb75c"
-level: feature
+level: "feature"
 title: "Fix anti-pattern in global (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-03T14:34:54.622Z"
 completedAt: "2026-04-03T14:34:54.622Z"

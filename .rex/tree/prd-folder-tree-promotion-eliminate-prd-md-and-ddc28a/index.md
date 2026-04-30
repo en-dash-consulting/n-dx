@@ -1,8 +1,8 @@
 ---
 id: "ddc28a68-428a-4777-9015-542229b71425"
-level: epic
+level: "epic"
 title: "PRD Folder-Tree Promotion: Eliminate prd.md and Enforce Hierarchical Layout"
-status: pending
+status: "pending"
 source: "smart-add"
 ---
 

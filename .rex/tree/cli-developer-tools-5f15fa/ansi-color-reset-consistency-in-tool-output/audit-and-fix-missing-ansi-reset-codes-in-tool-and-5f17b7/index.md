@@ -1,9 +1,9 @@
 ---
 id: "5f17b7af-ba00-43a6-8c6c-dcd5c8bf1d00"
-level: task
+level: "task"
 title: "Audit and fix missing ANSI reset codes in tool and CLI output lines"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "ansi"

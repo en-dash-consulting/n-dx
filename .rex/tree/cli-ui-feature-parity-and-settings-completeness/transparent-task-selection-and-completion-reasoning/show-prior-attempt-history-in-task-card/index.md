@@ -1,9 +1,9 @@
 ---
 id: "e762d16d-81be-4647-8608-cfbe9bda9475"
-level: task
+level: "task"
 title: "Show prior attempt history in task card"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "ux"

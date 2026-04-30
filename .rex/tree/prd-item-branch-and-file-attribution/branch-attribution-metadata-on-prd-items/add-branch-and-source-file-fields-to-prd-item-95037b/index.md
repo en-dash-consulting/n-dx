@@ -1,9 +1,9 @@
 ---
 id: "95037bd6-871c-4a16-bf90-90a081dbfe9e"
-level: task
+level: "task"
 title: "Add branch and source-file fields to PRD item schema and storage"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "schema"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-24T16:39:25.070Z"
 completedAt: "2026-04-24T16:44:27.245Z"
 endedAt: "2026-04-24T16:44:27.245Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added optional branch/sourceFile fields to PRD item typing and validation, preserved them in markdown serialization, and added validation, store round-trip, and status JSON coverage."
 acceptanceCriteria:
   - "PRD item schema accepts optional `branch: string` and `sourceFile: string` fields at all levels (epic, feature, task, subtask)"

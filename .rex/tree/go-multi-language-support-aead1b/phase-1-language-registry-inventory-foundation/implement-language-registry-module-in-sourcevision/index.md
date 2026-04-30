@@ -1,9 +1,9 @@
 ---
 id: "67760efe-1f60-4c4a-9018-d5231486b081"
-level: task
+level: "task"
 title: "Implement language registry module in sourcevision"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "sourcevision"
   - "go"

@@ -1,9 +1,9 @@
 ---
 id: "e15d326f-777c-417d-9437-631e2c6638f9"
-level: task
+level: "task"
 title: "Fix code in sourcevision-analyzers: The sourcevision-analyzers zone is a degenerate 2-file zone containing only dead (+1 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:20:13.352Z"
 completedAt: "2026-04-14T01:21:33.284Z"

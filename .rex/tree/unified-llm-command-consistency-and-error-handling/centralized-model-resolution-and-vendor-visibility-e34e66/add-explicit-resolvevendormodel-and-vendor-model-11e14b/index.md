@@ -1,9 +1,9 @@
 ---
 id: "11e14b47-8392-42ab-ba33-afc6085807d5"
-level: task
+level: "task"
 title: "Add explicit resolveVendorModel and vendor/model header to reshape, reorganize, and prune commands"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "llm"
   - "rex"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-21T17:09:01.983Z"
 completedAt: "2026-04-21T17:17:09.123Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added resolveConfiguredModel + printVendorModelHeader to reshape, reorganize, and prune commands. 19 integration tests verify precedence (flag > config > default) and header ordering."
 acceptanceCriteria:
   - "reshape, reorganize, and prune commands call resolveConfiguredModel with the --model flag before passing to reasonForReshape"

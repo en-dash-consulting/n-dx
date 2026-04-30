@@ -1,9 +1,9 @@
 ---
 id: "3e8d8551-2fd3-4006-803b-e96747fec318"
-level: feature
+level: "feature"
 title: "Fix code in sourcevision-analyzers (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:21:33.459Z"
 completedAt: "2026-04-14T01:21:33.459Z"

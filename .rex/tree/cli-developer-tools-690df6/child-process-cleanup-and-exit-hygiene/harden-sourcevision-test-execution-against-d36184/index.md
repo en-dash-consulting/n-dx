@@ -1,9 +1,9 @@
 ---
 id: "d3618484-b8ab-4ed5-a162-7602873aa162"
-level: task
+level: "task"
 title: "Harden SourceVision test execution against lingering workers and orphaned threads"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "sourcevision"
   - "tests"

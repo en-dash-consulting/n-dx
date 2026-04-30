@@ -1,8 +1,8 @@
 ---
 id: "71e5ae15-08f4-4c57-ba63-b9df2edbe868"
-level: task
+level: "task"
 title: "Deterministic Semantic Diff Command Execution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T03:33:09.436Z"
 completedAt: "2026-02-23T03:33:09.436Z"

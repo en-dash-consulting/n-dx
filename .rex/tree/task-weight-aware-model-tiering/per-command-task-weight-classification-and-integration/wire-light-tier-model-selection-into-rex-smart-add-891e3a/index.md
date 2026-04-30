@@ -1,9 +1,9 @@
 ---
 id: "891e3a9b-8082-4ce5-8a6b-7c5897e38b59"
-level: task
+level: "task"
 title: "Wire light-tier model selection into rex smart-add and lightweight analysis paths"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "smart-add"

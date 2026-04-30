@@ -1,8 +1,8 @@
 ---
 id: "0d84e500-04a1-4186-a4ea-6cf98d305920"
-level: feature
+level: "feature"
 title: "Shared LLM Error Classification with Token Exhaustion, Bad Response, and Rate-Limit Diagnostics"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-21T17:39:34.103Z"
 completedAt: "2026-04-21T17:39:34.103Z"

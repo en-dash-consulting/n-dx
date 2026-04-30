@@ -1,9 +1,9 @@
 ---
 id: "7d140635-dd3c-4488-b008-d9f792b61519"
-level: feature
+level: "feature"
 title: "Fix documentation in global (8 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:51:57.519Z"
 completedAt: "2026-04-14T01:51:57.519Z"

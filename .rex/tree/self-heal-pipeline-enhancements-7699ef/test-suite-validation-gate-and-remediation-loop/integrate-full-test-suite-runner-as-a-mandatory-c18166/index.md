@@ -1,9 +1,9 @@
 ---
 id: "c18166e3-f748-45f9-bda4-958d303783f6"
-level: task
+level: "task"
 title: "Integrate full test suite runner as a mandatory self-heal gate step"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "self-heal"
   - "testing"

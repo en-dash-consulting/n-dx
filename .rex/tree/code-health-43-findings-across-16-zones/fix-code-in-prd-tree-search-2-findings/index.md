@@ -1,9 +1,9 @@
 ---
 id: "46e9648a-b652-4da8-9655-cc1da05e9aba"
-level: feature
+level: "feature"
 title: "Fix code in prd-tree-search (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:13:19.203Z"
 completedAt: "2026-04-14T01:13:19.203Z"

@@ -1,8 +1,8 @@
 ---
 id: "43fa4ae8-01a8-4a30-927c-3d1b94116492"
-level: epic
+level: "epic"
 title: "Web Dashboard"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T04:55:01.751Z"
 completedAt: "2026-04-19T04:55:01.751Z"

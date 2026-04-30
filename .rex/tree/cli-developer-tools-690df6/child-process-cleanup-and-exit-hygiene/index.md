@@ -1,8 +1,8 @@
 ---
 id: "b67648eb-e1a0-4420-89e0-2052b810ead4"
-level: feature
+level: "feature"
 title: "Child Process Cleanup and Exit Hygiene"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-03T14:08:58.077Z"
 completedAt: "2026-04-03T14:08:58.077Z"

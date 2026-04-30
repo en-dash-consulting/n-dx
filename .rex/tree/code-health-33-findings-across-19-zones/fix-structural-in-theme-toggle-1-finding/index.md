@@ -1,9 +1,9 @@
 ---
 id: "21c03cb4-f14d-4496-b4aa-649c2bb42672"
-level: feature
+level: "feature"
 title: "Fix structural in theme-toggle (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T02:56:32.761Z"
 completedAt: "2026-04-19T02:56:32.761Z"

@@ -1,9 +1,9 @@
 ---
 id: "015a9f0b-46fc-4b8a-96e4-eeb04fc1a7f0"
-level: task
+level: "task"
 title: "Implement shared legacy-PRD detection, backup, and migration helper"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "migration"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-30T16:08:53.868Z"
 completedAt: "2026-04-30T16:30:57.868Z"
 endedAt: "2026-04-30T16:30:57.868Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented ensureLegacyPrdMigrated() helper in rex/store that detects, backs up, and migrates legacy .rex/prd.json to folder-tree format. Idempotent via marker file, thread-safe via file locking. Exports from public API for CLI/MCP/web use. 12 unit tests cover idempotency, backup creation, error recovery, concurrency."
 acceptanceCriteria:
   - "Helper detects .rex/prd.json presence and short-circuits when absent or when a folder-tree already reflects its content"

@@ -1,9 +1,9 @@
 ---
 id: "bcd3ec61-7d2f-40b7-96dd-80f864fe3c13"
-level: feature
+level: "feature"
 title: "SourceVision Findings Remediation"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "manual"
 startedAt: "2026-03-06T23:18:28.105Z"
 completedAt: "2026-03-06T23:18:28.105Z"

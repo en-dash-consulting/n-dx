@@ -1,9 +1,9 @@
 ---
 id: "e6615ff0-9b2f-4e35-bd69-51e0b06e68db"
-level: task
+level: "task"
 title: "Enhance scanSourceVision output"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "analysis"
   - "sourcevision"

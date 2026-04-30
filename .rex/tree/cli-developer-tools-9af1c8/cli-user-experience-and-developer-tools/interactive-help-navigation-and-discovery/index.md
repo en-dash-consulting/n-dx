@@ -1,8 +1,8 @@
 ---
 id: "4ade01ce-d446-444b-8130-9bcca7e39ded"
-level: task
+level: "task"
 title: "Interactive help navigation and discovery"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-17T23:24:13.741Z"
 completedAt: "2026-02-17T23:24:13.741Z"

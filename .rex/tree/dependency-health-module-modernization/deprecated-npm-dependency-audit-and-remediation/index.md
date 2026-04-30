@@ -1,8 +1,8 @@
 ---
 id: "f6c36dec-764a-4a56-adc7-cb11e66890c9"
-level: feature
+level: "feature"
 title: "Deprecated npm Dependency Audit and Remediation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T22:59:36.242Z"
 completedAt: "2026-04-08T22:59:36.242Z"

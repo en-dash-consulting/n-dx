@@ -1,9 +1,9 @@
 ---
 id: "d587adc9-56f3-4141-8ec8-4b0483758741"
-level: task
+level: "task"
 title: "Add structure health gate to rex ci / ndx ci"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
   - "ci"

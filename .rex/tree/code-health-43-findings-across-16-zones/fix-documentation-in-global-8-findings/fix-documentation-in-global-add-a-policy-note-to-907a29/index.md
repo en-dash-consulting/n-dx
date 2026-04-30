@@ -1,9 +1,9 @@
 ---
 id: "907a29cc-07c7-4dff-ac5a-31e15ff87e1b"
-level: task
+level: "task"
 title: "Fix documentation in global: Add a policy note to CLAUDE.md's dual-fragility governance section clarifying wh (+7 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:44:33.633Z"
 completedAt: "2026-04-14T01:51:57.343Z"

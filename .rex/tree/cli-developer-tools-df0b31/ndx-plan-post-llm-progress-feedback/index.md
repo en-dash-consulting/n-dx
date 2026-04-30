@@ -1,8 +1,8 @@
 ---
 id: "fea07c28-af09-4696-9999-18eb37be4fc6"
-level: feature
+level: "feature"
 title: "ndx plan Post-LLM Progress Feedback"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T17:58:55.309Z"
 completedAt: "2026-04-09T17:58:55.309Z"

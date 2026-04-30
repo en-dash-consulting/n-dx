@@ -1,9 +1,9 @@
 ---
 id: "0886fe61-3205-466f-a0ee-a3c098622fc1"
-level: task
+level: "task"
 title: "Refactor smoke parity checks to compare normalized error codes"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "ci"
   - "cross-platform"

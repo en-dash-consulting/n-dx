@@ -1,9 +1,9 @@
 ---
 id: "71e079b5-bffc-4424-aa42-9ce682f7befc"
-level: task
+level: "task"
 title: "Create shared test-only utility modules for duplicated setup code"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "tests"
   - "unit"

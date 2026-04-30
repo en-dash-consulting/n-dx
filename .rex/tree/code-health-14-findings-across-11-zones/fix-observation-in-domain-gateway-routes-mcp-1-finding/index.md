@@ -1,9 +1,9 @@
 ---
 id: "31008a00-b60a-418d-9b6b-b3817aeebcb1"
-level: feature
+level: "feature"
 title: "Fix observation in domain-gateway-routes-mcp (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-16T17:26:05.067Z"
 completedAt: "2026-04-16T17:26:05.067Z"

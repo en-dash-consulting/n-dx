@@ -1,9 +1,9 @@
 ---
 id: "81da168f-62be-4c39-a20d-18a53d808d47"
-level: task
+level: "task"
 title: "Document Go zone detection behavior, edge semantics, and known limitations"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "go"
   - "sourcevision"

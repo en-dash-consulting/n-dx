@@ -1,9 +1,9 @@
 ---
 id: "a6199e02-a954-44dd-b49f-c6519fa673e4"
-level: task
+level: "task"
 title: "Implement git change rollback on failed hench runs"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "git"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-16T15:12:12.343Z"
 completedAt: "2026-04-16T21:41:40.638Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added rollbackOnFailure flag to SharedLoopOptions/FinalizeRunOptions, implemented listDirtyPaths+performRollbackIfNeeded helpers in shared.ts, threaded --no-rollback flag through run.ts/runIterations/runLoop/runEpicByEpic/cliLoop/agentLoop, and added 9 integration tests covering all failure statuses and the --no-rollback opt-out."
 acceptanceCriteria:
   - "A pre-run git state marker is captured before hench modifies any files"

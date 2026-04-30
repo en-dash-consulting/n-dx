@@ -1,9 +1,9 @@
 ---
 id: "55d8280d-4b05-4109-99da-f803b8330b1a"
-level: task
+level: "task"
 title: "Configure explicit timeouts on identified hanging-test candidates"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "tests"
   - "timeouts"

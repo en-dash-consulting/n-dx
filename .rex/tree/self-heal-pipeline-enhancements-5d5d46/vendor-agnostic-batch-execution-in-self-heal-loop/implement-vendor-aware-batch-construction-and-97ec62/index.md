@@ -1,9 +1,9 @@
 ---
 id: "97ec62e7-6687-4152-b6f2-cf6a6afaf858"
-level: task
+level: "task"
 title: "Implement vendor-aware batch construction and response handling in self-heal"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "self-heal"
   - "codex"

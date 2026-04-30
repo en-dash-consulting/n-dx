@@ -1,9 +1,9 @@
 ---
 id: "4aa53ba2-b2da-4f6d-9f4a-6b2814f05362"
-level: feature
+level: "feature"
 title: "Landing page for n-dx"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "marketing"
   - "web"

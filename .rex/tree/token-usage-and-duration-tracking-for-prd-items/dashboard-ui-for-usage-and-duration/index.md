@@ -1,8 +1,8 @@
 ---
 id: "ab5ab1c8-0e01-4db6-ada2-025504b83c89"
-level: feature
+level: "feature"
 title: "Dashboard UI for Usage and Duration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T16:54:04.708Z"
 completedAt: "2026-04-23T16:54:04.708Z"

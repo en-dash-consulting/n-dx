@@ -1,8 +1,8 @@
 ---
 id: "b7889f93-f610-4742-9be7-86c0d2da52bb"
-level: task
+level: "task"
 title: "Memory and DOM Optimization for Inactive Tabs"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T03:28:21.925Z"
 completedAt: "2026-02-27T03:28:21.925Z"

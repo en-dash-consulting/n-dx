@@ -1,8 +1,8 @@
 ---
 id: "41a438d4-def7-4e85-ac41-e7b023184764"
-level: feature
+level: "feature"
 title: "Go Fixture Enhancement"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T05:46:12.440Z"
 completedAt: "2026-03-26T05:46:12.440Z"

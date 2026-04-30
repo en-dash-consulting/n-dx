@@ -1,9 +1,9 @@
 ---
 id: "7054370f-4ddb-45ab-85ab-dea1a6619a49"
-level: task
+level: "task"
 title: "Address observation issues (3 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-06T02:34:16.610Z"
 completedAt: "2026-03-06T02:42:01.776Z"

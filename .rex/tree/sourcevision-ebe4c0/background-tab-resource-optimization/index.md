@@ -1,8 +1,8 @@
 ---
 id: "48fb83fc-91ea-4729-b05e-a9f74474a4b2"
-level: feature
+level: "feature"
 title: "Background Tab Resource Optimization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T03:28:22.003Z"
 completedAt: "2026-02-27T03:28:22.003Z"

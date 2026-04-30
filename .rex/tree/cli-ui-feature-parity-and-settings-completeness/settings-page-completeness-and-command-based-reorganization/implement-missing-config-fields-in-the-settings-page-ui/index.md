@@ -1,9 +1,9 @@
 ---
 id: "49f25316-e3df-4362-82dd-28f849a29072"
-level: task
+level: "task"
 title: "Implement missing config fields in the settings page UI"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "settings"
   - "config"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-19T04:00:09.944Z"
 completedAt: "2026-04-19T04:23:06.990Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added LlmProviderView and ProjectSettingsView with server routes for GET/PUT /api/llm/config and /api/project-settings. Fields covered: llm.vendor, llm.claude.model, llm.claude.lightModel, llm.codex.model, llm.codex.lightModel, web.port, language, sourcevision.zones.mergeThreshold, sourcevision.zones.pins. All views use batch-save pattern with dirty tracking and toast feedback. ViewId, sidebar, breadcrumb, view-registry, and domain-settings barrel updated. Typecheck passes cleanly."
 acceptanceCriteria:
   - "All fields flagged as missing in the audit have a corresponding settings UI control"

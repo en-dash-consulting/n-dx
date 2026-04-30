@@ -1,8 +1,8 @@
 ---
 id: "5b719370-1b6a-4cce-99bb-97ef79d064f1"
-level: task
+level: "task"
 title: "Detail Panel Task Creation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T09:43:24.899Z"
 completedAt: "2026-02-18T09:43:24.899Z"

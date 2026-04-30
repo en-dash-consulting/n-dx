@@ -1,8 +1,8 @@
 ---
 id: "a372d24d-aa4e-49e1-b49e-82531a78b92b"
-level: task
+level: "task"
 title: "Markdown and Text File Processing"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-02T08:01:56.527Z"
 completedAt: "2026-03-02T08:01:56.527Z"

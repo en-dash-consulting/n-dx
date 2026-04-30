@@ -1,8 +1,8 @@
 ---
 id: "6687abd2-80f8-43e0-973e-f5242b635378"
-level: feature
+level: "feature"
 title: "Markdown Schema Design and Bidirectional Serialization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T14:24:27.208Z"
 completedAt: "2026-04-24T14:24:27.208Z"

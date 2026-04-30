@@ -1,9 +1,9 @@
 ---
 id: "62872f4e-d9f7-43a9-8ab3-b40bd51f6f32"
-level: feature
+level: "feature"
 title: "Fix suggestion in hench-4 (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:15:49.843Z"
 completedAt: "2026-04-14T02:15:49.843Z"

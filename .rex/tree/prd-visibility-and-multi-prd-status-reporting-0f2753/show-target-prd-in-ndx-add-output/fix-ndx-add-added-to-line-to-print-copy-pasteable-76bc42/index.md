@@ -1,9 +1,9 @@
 ---
 id: "76bc42c5-5e68-4513-b341-e917c07c51e7"
-level: task
+level: "task"
 title: "Fix ndx add 'Added to:' line to print copy-pasteable folder-tree path of the created item"
-status: pending
-priority: medium
+status: "pending"
+priority: "medium"
 tags:
   - "cli"
   - "rex"

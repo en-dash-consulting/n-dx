@@ -1,8 +1,8 @@
 ---
 id: "508bf0a8-88fb-4c17-a183-d5460b066617"
-level: feature
+level: "feature"
 title: "Codex CLI Token Usage Extraction from Run Output"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T20:10:12.593Z"
 completedAt: "2026-04-14T20:10:12.593Z"

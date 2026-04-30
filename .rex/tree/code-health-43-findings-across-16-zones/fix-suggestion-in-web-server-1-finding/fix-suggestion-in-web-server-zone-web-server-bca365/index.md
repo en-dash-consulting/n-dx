@@ -1,9 +1,9 @@
 ---
 id: "bca36520-15e1-43c4-a990-04f221dbe987"
-level: task
+level: "task"
 title: "Fix suggestion in web-server: Zone \"Web Server Composition Root\" (web-server) has catastrophic risk (score: 0."
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 source: "sourcevision"
 startedAt: "2026-04-14T00:31:38.500Z"
 completedAt: "2026-04-14T00:46:26.511Z"

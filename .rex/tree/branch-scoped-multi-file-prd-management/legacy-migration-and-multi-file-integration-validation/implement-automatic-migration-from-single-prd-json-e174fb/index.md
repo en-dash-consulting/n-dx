@@ -1,9 +1,9 @@
 ---
 id: "e174fb23-4ce0-4377-95ca-250538d7635c"
-level: task
+level: "task"
 title: "Implement automatic migration from single prd.json to branch-scoped multi-file format"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "migration"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-22T17:13:43.023Z"
 completedAt: "2026-04-22T17:44:03.271Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented automatic migration from single prd.json to branch-scoped multi-file format via migrateLegacyPRD() in prd-migration.ts, integrated into resolveStore(). Fresh rex init creates branch-scoped files in git repos."
 acceptanceCriteria:
   - "Detects legacy .rex/prd.json on PRDStore initialization and triggers migration"

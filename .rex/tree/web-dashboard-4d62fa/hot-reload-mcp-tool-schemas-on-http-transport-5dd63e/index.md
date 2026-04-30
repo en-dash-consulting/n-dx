@@ -1,16 +1,16 @@
 ---
 id: "5dd63e4e-1bbb-47a8-a0fa-754bc142a377"
-level: feature
+level: "feature"
 title: "Hot-reload MCP tool schemas on HTTP transport without server restart"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "web"
   - "mcp"
   - "dx"
 startedAt: "2026-04-17T04:37:35.876Z"
 completedAt: "2026-04-17T05:02:17.402Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented file-watching + subprocess proxy hot-reload for MCP tool schemas. Three new files + modifications to routes-mcp.ts and start.ts."
 acceptanceCriteria:
   - "After rebuilding rex or sourcevision, the HTTP MCP server serves updated tool schemas without manual restart"

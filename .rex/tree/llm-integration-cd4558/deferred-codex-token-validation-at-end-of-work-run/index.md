@@ -1,8 +1,8 @@
 ---
 id: "fb76efeb-edec-49fd-8bb7-e90d64065796"
-level: feature
+level: "feature"
 title: "Deferred Codex Token Validation at End of Work Run"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-16T15:06:34.342Z"
 completedAt: "2026-04-16T15:06:34.342Z"

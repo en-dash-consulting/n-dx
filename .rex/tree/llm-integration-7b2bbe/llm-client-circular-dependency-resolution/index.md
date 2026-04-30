@@ -1,8 +1,8 @@
 ---
 id: "9dc20526-2080-456f-a3f4-163a748cb89b"
-level: feature
+level: "feature"
 title: "LLM Client Circular Dependency Resolution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T07:27:47.293Z"
 completedAt: "2026-02-24T07:27:47.293Z"

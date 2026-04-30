@@ -1,9 +1,9 @@
 ---
 id: "78ecaa15-4503-4f81-a368-355ced818762"
-level: task
+level: "task"
 title: "Implement unified child-process teardown for n-dx command lifecycles"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "cli"
   - "process-management"

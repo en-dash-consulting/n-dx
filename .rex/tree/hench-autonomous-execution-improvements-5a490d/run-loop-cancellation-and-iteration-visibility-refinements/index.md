@@ -1,8 +1,8 @@
 ---
 id: "3e4e102f-13ba-4281-a006-f009409787f0"
-level: feature
+level: "feature"
 title: "Run Loop Cancellation and Iteration Visibility Refinements"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-29T18:21:35.836Z"
 completedAt: "2026-04-29T18:21:35.836Z"

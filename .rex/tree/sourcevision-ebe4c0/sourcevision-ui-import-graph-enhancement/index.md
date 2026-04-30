@@ -1,8 +1,8 @@
 ---
 id: "b39d3ad8-6c3c-4e9b-9788-d18168348f90"
-level: feature
+level: "feature"
 title: "SourceVision UI Import Graph Enhancement"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T11:29:02.328Z"
 completedAt: "2026-02-18T11:29:02.328Z"

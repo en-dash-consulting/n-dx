@@ -1,8 +1,8 @@
 ---
 id: "653cb773-dd9d-467c-880a-bc8c8de9cbe2"
-level: task
+level: "task"
 title: "rex_edit_item MCP tool"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-09T01:23:07.809Z"
 completedAt: "2026-03-09T01:23:07.809Z"

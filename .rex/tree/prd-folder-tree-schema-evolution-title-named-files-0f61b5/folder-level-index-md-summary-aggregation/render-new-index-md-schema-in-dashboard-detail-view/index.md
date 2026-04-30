@@ -1,9 +1,9 @@
 ---
 id: "80cfba3f-f672-43c3-8fcf-00d416757319"
-level: task
+level: "task"
 title: "Render new index.md schema in dashboard detail view"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "web"
   - "ui"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-30T13:47:03.546Z"
 completedAt: "2026-04-30T14:01:42.678Z"
 endedAt: "2026-04-30T14:01:42.678Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented complete UI rendering of new index.md schema in dashboard detail view. Added server endpoint, markdown parser, UI components, styling, and tests. All acceptance criteria met: renders all sections (progress table sortable by title/status/lastUpdated, commits, changes, info, summary), graceful fallback for legacy content."
 acceptanceCriteria:
   - "Detail panel renders all schema sections (completion table, commits, summary, change list, basic info)"

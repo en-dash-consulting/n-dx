@@ -1,9 +1,9 @@
 ---
 id: "fa93b525-872e-4802-a92b-985a38010776"
-level: task
+level: "task"
 title: "Create Go fixture project and language registry test suite"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

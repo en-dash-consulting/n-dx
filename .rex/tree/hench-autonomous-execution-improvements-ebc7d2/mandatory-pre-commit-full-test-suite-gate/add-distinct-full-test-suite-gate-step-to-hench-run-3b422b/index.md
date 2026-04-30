@@ -1,9 +1,9 @@
 ---
 id: "3b422b8a-8112-461f-b727-b1036b2777ee"
-level: task
+level: "task"
 title: "Add distinct full-test-suite gate step to hench run lifecycle before commit"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "hench"
   - "testing"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-30T15:21:12.772Z"
 completedAt: "2026-04-30T15:39:50.582Z"
 endedAt: "2026-04-30T15:39:50.582Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented mandatory full test suite gate with interactive failure handling, rerun loop, and three-action prompt (rerun/abort/skip). Gate runs unconditionally unless skipFullTestGate flag set, blocks commit on any test failure, and surfaces structured summary with package count and failure details."
 acceptanceCriteria:
   - "A distinct stage labeled as the full-suite test gate appears in hench run output between work completion and commit"

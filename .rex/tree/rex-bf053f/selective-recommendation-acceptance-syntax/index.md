@@ -1,8 +1,8 @@
 ---
 id: "421a6860-70c1-4f5c-879b-da51dc45599a"
-level: feature
+level: "feature"
 title: "Selective Recommendation Acceptance Syntax"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T03:45:05.511Z"
 completedAt: "2026-02-21T03:45:05.511Z"

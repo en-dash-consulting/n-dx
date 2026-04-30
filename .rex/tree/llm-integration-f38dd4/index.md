@@ -1,9 +1,9 @@
 ---
 id: "f38dd45c-a4ee-4eed-ad8c-a667d39c8c86"
-level: epic
+level: "epic"
 title: "LLM Integration"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 source: "sourcevision"
 startedAt: "2026-04-13T21:59:43.253Z"
 completedAt: "2026-04-13T21:59:43.253Z"

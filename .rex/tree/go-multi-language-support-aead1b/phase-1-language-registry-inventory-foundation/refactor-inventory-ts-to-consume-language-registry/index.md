@@ -1,9 +1,9 @@
 ---
 id: "e27102cc-3e46-4c45-a124-0ba8c56fa1b4"
-level: task
+level: "task"
 title: "Refactor inventory.ts to consume language registry"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "sourcevision"
   - "go"

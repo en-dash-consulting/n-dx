@@ -1,8 +1,8 @@
 ---
 id: "dde6d1c4-a1bd-4dfe-9af8-0ec057addf16"
-level: feature
+level: "feature"
 title: "Mandatory Pre-Commit Full Test Suite Gate"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-30T16:08:35.689Z"
 completedAt: "2026-04-30T16:08:35.689Z"

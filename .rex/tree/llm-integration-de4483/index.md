@@ -1,8 +1,8 @@
 ---
 id: "de44833e-deb4-4959-aa0a-2963b2a5b7d0"
-level: epic
+level: "epic"
 title: "LLM Integration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-10T16:27:02.858Z"
 completedAt: "2026-04-10T16:27:02.858Z"

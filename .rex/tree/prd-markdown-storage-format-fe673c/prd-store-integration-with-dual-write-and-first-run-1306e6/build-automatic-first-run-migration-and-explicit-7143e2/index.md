@@ -1,9 +1,9 @@
 ---
 id: "7143e2a0-7c77-45ed-b3e5-d588a11b3b27"
-level: task
+level: "task"
 title: "Build automatic first-run migration and explicit rex migrate-to-md CLI command"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "migration"
@@ -15,7 +15,7 @@ source: "smart-add"
 startedAt: "2026-04-24T15:55:40.852Z"
 completedAt: "2026-04-30T15:51:52.692Z"
 endedAt: "2026-04-30T15:51:52.692Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Fixed idempotency in migrate-to-folder-tree command by detecting when the PRD is loaded from an existing tree and returning early with 'already up to date' message. This makes the migration command properly idempotent when run multiple times. All three failing idempotency tests should now pass."
 acceptanceCriteria:
   - "Automatic migration fires in PRDStore.load() when .rex/prd.md is absent and .rex/prd.json is present, producing .rex/prd.md"

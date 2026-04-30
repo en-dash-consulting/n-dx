@@ -1,9 +1,9 @@
 ---
 id: "22625730-8bd0-4b82-8e61-2144ee207ea8"
-level: task
+level: "task"
 title: "Rewrite commands.md to be user-centric"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "docs"
 blockedBy:

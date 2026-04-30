@@ -1,8 +1,8 @@
 ---
 id: "14ccf232-bbb7-4c27-ba62-b7a4b2e52049"
-level: feature
+level: "feature"
 title: "Show Target PRD in ndx add Output"
-status: pending
+status: "pending"
 source: "smart-add"
 acceptanceCriteria: []
 ---

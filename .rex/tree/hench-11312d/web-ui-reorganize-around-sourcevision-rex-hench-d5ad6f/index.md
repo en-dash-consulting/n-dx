@@ -1,9 +1,9 @@
 ---
 id: "d5ad6f16-156d-496f-99e5-0230dd48cd47"
-level: feature
+level: "feature"
 title: "Web UI: Reorganize around SourceVision / Rex / Hench sections"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "ux"

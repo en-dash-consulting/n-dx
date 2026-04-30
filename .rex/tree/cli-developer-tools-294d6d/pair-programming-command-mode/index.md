@@ -1,8 +1,8 @@
 ---
 id: "8a8661f8-f768-412e-afda-f603f604f2fb"
-level: feature
+level: "feature"
 title: "Pair-Programming Command Mode"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-16T16:56:22.389Z"
 completedAt: "2026-04-16T16:56:22.389Z"

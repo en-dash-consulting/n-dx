@@ -1,8 +1,8 @@
 ---
 id: "e97d385e-68db-4791-a6ea-3f65c1b503d9"
-level: epic
+level: "epic"
 title: "PRD Folder-Tree Promotion: Eliminate prd.md and Enforce Hierarchical Layout"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-29T18:28:26.962Z"
 completedAt: "2026-04-29T18:28:26.962Z"

@@ -1,8 +1,8 @@
 ---
 id: "f00043c7-f5de-4d79-ab17-19fc6bd8d8db"
-level: epic
+level: "epic"
 title: "Go / Multi-Language Support"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T05:57:25.506Z"
 completedAt: "2026-03-26T05:57:25.506Z"

@@ -1,9 +1,9 @@
 ---
 id: "4c31ebc0-15a1-487b-b3c7-01b6f2005c25"
-level: task
+level: "task"
 title: "Fix documentation in web-server: packages/web/src/server/ contains two *types.ts files with opposite runtime cont (+1 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:03:28.821Z"
 completedAt: "2026-04-14T02:06:00.524Z"

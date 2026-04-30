@@ -1,8 +1,8 @@
 ---
 id: "83a33c2a-31d7-4d71-95a3-246233fdc056"
-level: task
+level: "task"
 title: "Direct Package Command Access"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-05T16:50:15.245Z"
 completedAt: "2026-02-05T16:50:15.245Z"

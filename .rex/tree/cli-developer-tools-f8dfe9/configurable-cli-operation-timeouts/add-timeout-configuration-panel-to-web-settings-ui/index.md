@@ -1,9 +1,9 @@
 ---
 id: "1160eb2b-e2d9-40ab-8f3a-fade05c697b8"
-level: task
+level: "task"
 title: "Add timeout configuration panel to web settings UI"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "web-ui"
   - "config"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-03T18:58:26.092Z"
 completedAt: "2026-04-20T14:09:06.617Z"
-resolutionType: acknowledgment
+resolutionType: "acknowledgment"
 resolutionDetail: "Feature fully implemented in packages/web: CliTimeoutsView (cli-timeout.ts), routes-cli-timeout.ts (GET/PUT /api/cli/timeouts), CSS, view registry, server route registration, and unit tests. All 5 ACs satisfied."
 acceptanceCriteria:
   - "The settings UI includes a 'CLI Timeouts' section showing the global timeout and any active per-command overrides"

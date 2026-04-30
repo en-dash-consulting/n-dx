@@ -1,8 +1,8 @@
 ---
 id: "373c6363-4810-416d-9ce8-c38dfd850c96"
-level: task
+level: "task"
 title: "Hench Codex Output Parsing Hardening"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-20T22:31:32.197Z"
 completedAt: "2026-02-20T22:31:32.197Z"

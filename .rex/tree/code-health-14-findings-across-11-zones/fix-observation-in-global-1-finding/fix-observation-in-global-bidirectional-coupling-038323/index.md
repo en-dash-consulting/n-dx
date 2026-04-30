@@ -1,9 +1,9 @@
 ---
 id: "03832394-1df4-4f12-82c5-b55a9d76914a"
-level: task
+level: "task"
 title: "Fix observation in global: Bidirectional coupling: \"web-server\" ↔ \"web-viewer\" (31+72 crossings) — consider"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "self-heal"
   - "codex"

@@ -1,9 +1,9 @@
 ---
 id: "21053225-b2aa-42d4-aa96-266c5da07491"
-level: task
+level: "task"
 title: "Implement folder-tree-to-PRD parser that aggregates index.md files into the PRD item tree"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "prd"
   - "storage"

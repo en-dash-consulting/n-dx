@@ -1,9 +1,9 @@
 ---
 id: "bc5b3bcf-7f83-4d63-b219-201a8812d9e7"
-level: feature
+level: "feature"
 title: "Fix move-file in web-viewer (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:11:49.484Z"
 completedAt: "2026-04-14T02:11:49.484Z"

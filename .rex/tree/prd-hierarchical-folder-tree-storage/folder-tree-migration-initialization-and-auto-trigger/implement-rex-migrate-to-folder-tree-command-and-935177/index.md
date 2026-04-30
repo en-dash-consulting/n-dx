@@ -1,9 +1,9 @@
 ---
 id: "93517780-f058-4e22-b52b-7bbba2c45c2d"
-level: task
+level: "task"
 title: "Implement rex migrate-to-folder-tree command and auto-trigger detection"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "prd"
   - "migration"

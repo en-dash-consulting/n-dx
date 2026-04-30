@@ -1,9 +1,9 @@
 ---
 id: "83cafd67-4b87-4a64-a16f-936f0b78b775"
-level: task
+level: "task"
 title: "Add integration tests validating TTY-aware color emission and NO_COLOR suppression across all CLI tools"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "testing"

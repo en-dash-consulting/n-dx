@@ -1,9 +1,9 @@
 ---
 id: "1a72b5c1-bc52-42f6-8918-402065d6e324"
-level: task
+level: "task"
 title: "Add Windows pipeline stage for ndx install-and-run smoke validation"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "ci"
   - "pipeline"

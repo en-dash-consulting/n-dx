@@ -1,8 +1,8 @@
 ---
 id: "9e57dd9f-9e44-4068-b5a2-84d29cdbb3e9"
-level: task
+level: "task"
 title: "Interactive Graph Controls"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T04:08:43.326Z"
 completedAt: "2026-02-11T04:08:43.326Z"

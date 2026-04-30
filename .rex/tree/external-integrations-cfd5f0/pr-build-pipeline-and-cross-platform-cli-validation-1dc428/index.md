@@ -1,8 +1,8 @@
 ---
 id: "1dc42829-b53b-41f2-b05c-d987c79c7437"
-level: feature
+level: "feature"
 title: "PR Build Pipeline and Cross-Platform CLI Validation Hardening"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-07T20:06:31.825Z"
 completedAt: "2026-04-07T20:06:31.825Z"

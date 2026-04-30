@@ -1,8 +1,8 @@
 ---
 id: "0f2753b7-473c-49a9-b57f-8d7f475df420"
-level: epic
+level: "epic"
 title: "PRD Visibility and Multi-PRD Status Reporting"
-status: pending
+status: "pending"
 source: "smart-add"
 ---
 

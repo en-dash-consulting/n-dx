@@ -1,8 +1,8 @@
 ---
 id: "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3"
-level: epic
+level: "epic"
 title: "LLM Integration"
-status: completed
+status: "completed"
 startedAt: "2026-04-13T18:35:49.604Z"
 completedAt: "2026-04-14T20:10:12.757Z"
 description: "AI client infrastructure: vendor-neutral LLM foundation, token usage tracking and analytics, budget management, vendor support (Claude, Codex), onboarding and authentication."

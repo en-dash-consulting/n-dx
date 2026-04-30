@@ -1,9 +1,9 @@
 ---
 id: "d567173b-1770-490a-9757-41712acaa91d"
-level: task
+level: "task"
 title: "Implement multi-language detection and extend Manifest schema"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

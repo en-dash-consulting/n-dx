@@ -1,9 +1,9 @@
 ---
 id: "70b824a2-9dfd-440f-8e89-576a8e0fc586"
-level: task
+level: "task"
 title: "Refactor Codex token accumulation to defer validation and reporting until run completion"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "codex"
   - "tokens"

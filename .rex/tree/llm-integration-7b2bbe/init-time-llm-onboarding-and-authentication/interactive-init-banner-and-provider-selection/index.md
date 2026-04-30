@@ -1,8 +1,8 @@
 ---
 id: "cdfde982-2b40-486b-915e-be886020c942"
-level: task
+level: "task"
 title: "Interactive init banner and provider selection"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T05:23:23.023Z"
 completedAt: "2026-02-21T05:23:23.023Z"

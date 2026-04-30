@@ -1,9 +1,9 @@
 ---
 id: "c42858ab-4a23-467f-b6e2-fccee6cb99f6"
-level: task
+level: "task"
 title: "Write integration tests validating the Go import graph against the fixture project"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "go"
   - "sourcevision"

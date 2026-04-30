@@ -1,8 +1,8 @@
 ---
 id: "62f4a08a-7130-4b91-a8dc-ea5f37ab7d89"
-level: epic
+level: "epic"
 title: "Dependency Health & Module Modernization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T23:50:07.453Z"
 completedAt: "2026-04-08T23:50:07.453Z"

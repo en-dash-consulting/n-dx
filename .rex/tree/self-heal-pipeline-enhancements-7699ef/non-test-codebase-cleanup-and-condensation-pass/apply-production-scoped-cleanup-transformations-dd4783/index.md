@@ -1,9 +1,9 @@
 ---
 id: "dd478339-ddfe-4ec9-bbe4-857f91e8ea64"
-level: task
+level: "task"
 title: "Apply production-scoped cleanup transformations with test-exclusion hard guard"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "self-heal"
   - "cleanup"

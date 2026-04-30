@@ -1,9 +1,9 @@
 ---
 id: "bc5defb9-d003-450a-bdba-6bc728c22ff5"
-level: feature
+level: "feature"
 title: "Fix structural in viewer-ui-hub (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T03:05:51.342Z"
 completedAt: "2026-04-19T03:05:51.342Z"

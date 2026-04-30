@@ -1,8 +1,8 @@
 ---
 id: "44c38797-0009-4f44-8adc-38b5bd5a830e"
-level: feature
+level: "feature"
 title: "Cross-PRD Duplicate Detection and Merge-Into-Older Semantics"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-22T19:12:07.716Z"
 completedAt: "2026-04-22T19:12:07.716Z"

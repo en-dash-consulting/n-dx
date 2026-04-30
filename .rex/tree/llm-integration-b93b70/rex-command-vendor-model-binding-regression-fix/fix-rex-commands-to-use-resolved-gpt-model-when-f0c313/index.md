@@ -1,9 +1,9 @@
 ---
 id: "f0c313d6-0218-4020-98c8-68034346c23a"
-level: task
+level: "task"
 title: "Fix rex commands to use resolved GPT model when vendor is codex"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "llm"

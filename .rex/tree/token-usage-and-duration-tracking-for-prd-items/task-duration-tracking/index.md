@@ -1,8 +1,8 @@
 ---
 id: "db3f2b10-1f3d-46be-a276-9274fceff25d"
-level: feature
+level: "feature"
 title: "Task Duration Tracking"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T17:11:13.162Z"
 completedAt: "2026-04-23T17:11:13.162Z"

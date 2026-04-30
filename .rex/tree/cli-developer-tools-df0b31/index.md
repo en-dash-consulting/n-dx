@@ -1,8 +1,8 @@
 ---
 id: "df0b312f-6a01-48f7-87ca-cefd3a1cd29f"
-level: epic
+level: "epic"
 title: "CLI & Developer Tools"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T17:58:55.447Z"
 completedAt: "2026-04-09T17:58:55.447Z"

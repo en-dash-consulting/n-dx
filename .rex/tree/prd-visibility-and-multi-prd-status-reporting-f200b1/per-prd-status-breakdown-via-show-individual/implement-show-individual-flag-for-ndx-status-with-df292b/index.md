@@ -1,9 +1,9 @@
 ---
 id: "df292b37-e2f6-448f-ba8b-22f6f301a41e"
-level: task
+level: "task"
 title: "Implement --show-individual flag for ndx status with per-PRD breakdown"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
   - "cli"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-27T05:35:57.785Z"
 completedAt: "2026-04-27T13:13:51.778Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented --show-individual flag for ndx/rex status with per-PRD breakdown (sections + JSON array)"
 acceptanceCriteria:
   - "ndx status --show-individual prints one labeled section per PRD file (canonical .rex/prd.md plus any branch-scoped .rex/prd_{branch}_{date}.md)"

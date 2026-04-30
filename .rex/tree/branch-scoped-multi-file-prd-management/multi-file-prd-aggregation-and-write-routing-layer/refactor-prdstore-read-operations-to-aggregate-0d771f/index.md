@@ -1,9 +1,9 @@
 ---
 id: "0d771f43-357d-4893-8d41-b33385ca0d30"
-level: task
+level: "task"
 title: "Refactor PRDStore read operations to aggregate items across all PRD files"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "storage"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-22T16:31:12.511Z"
 completedAt: "2026-04-22T16:39:53.735Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Refactored FileStore.loadDocument() to aggregate items from all prd_*.json files plus legacy prd.json. Added loadSingleFile(), mergeDocuments() private helpers. ID collision detection throws with filename details. withTransaction isolated to primary prd.json for write safety."
 acceptanceCriteria:
   - "PRDStore load path merges items from every prd_*.json file in .rex/"

@@ -1,16 +1,16 @@
 ---
 id: "1132550d-e4dc-4103-b86a-c849b46d60f5"
-level: task
+level: "task"
 title: "Update root and package READMEs for new PRD structure and recent merges"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "documentation"
   - "readme"
 source: "smart-add"
 startedAt: "2026-04-23T03:02:59.730Z"
 completedAt: "2026-04-23T03:06:08.854Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added legacy-migration note to README.md §Output Files and packages/rex/README.md §Project structure (new §PRD file layout subsection with before/after file tree). Other package READMEs already match current single-file PRD behavior — no edits needed for PRD scope."
 acceptanceCriteria:
   - "All README files referencing .rex/prd.json describe the multi-file format accurately"

@@ -1,9 +1,9 @@
 ---
 id: "1f2d2024-1223-40c6-bfde-66f52c150d4e"
-level: task
+level: "task"
 title: "Review test suites for observable hang-risk patterns"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "tests"
   - "reliability"

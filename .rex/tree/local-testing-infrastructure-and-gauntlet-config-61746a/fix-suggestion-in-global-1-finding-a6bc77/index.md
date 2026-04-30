@@ -1,9 +1,9 @@
 ---
 id: "a6bc77c4-a492-4678-87cc-00f1d1954c97"
-level: feature
+level: "feature"
 title: "Fix suggestion in global (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:59:29.365Z"
 completedAt: "2026-04-13T21:59:29.365Z"

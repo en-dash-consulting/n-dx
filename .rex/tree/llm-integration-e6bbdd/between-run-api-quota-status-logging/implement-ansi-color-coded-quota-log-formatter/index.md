@@ -1,9 +1,9 @@
 ---
 id: "4fbde3c0-c586-45c1-9309-fab162520b05"
-level: task
+level: "task"
 title: "Implement ANSI color-coded quota log formatter"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "llm"
   - "quota"

@@ -1,8 +1,8 @@
 ---
 id: "f9b208b6-43d9-44d3-a1cf-518e956aabd5"
-level: feature
+level: "feature"
 title: "Shared Unit Test Utilities"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-02T17:55:31.910Z"
 completedAt: "2026-04-02T17:55:31.910Z"

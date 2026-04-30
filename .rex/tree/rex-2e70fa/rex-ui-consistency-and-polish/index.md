@@ -1,8 +1,8 @@
 ---
 id: "b73ae2ff-6ed0-46dd-94a3-e297e837549f"
-level: feature
+level: "feature"
 title: "Rex UI Consistency and Polish"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-03T13:02:37.327Z"
 completedAt: "2026-03-03T13:02:37.327Z"

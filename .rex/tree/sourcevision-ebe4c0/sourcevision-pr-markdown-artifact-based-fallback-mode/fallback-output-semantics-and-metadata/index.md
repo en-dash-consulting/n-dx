@@ -1,8 +1,8 @@
 ---
 id: "238c6bbe-efc7-478f-8dfd-e3a1414de563"
-level: task
+level: "task"
 title: "Fallback Output Semantics and Metadata"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T02:07:03.655Z"
 completedAt: "2026-02-23T02:07:03.655Z"

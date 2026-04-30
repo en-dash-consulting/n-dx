@@ -1,9 +1,9 @@
 ---
 id: "8f25e643-7876-4875-befe-8f7959a2e7de"
-level: feature
+level: "feature"
 title: "Fix suggestion in hench-2 (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T03:08:16.188Z"
 completedAt: "2026-04-19T03:08:16.188Z"

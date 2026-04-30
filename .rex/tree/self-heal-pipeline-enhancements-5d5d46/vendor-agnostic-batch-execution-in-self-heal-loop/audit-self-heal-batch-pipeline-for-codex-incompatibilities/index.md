@@ -1,9 +1,9 @@
 ---
 id: "1f2e1438-4f55-4ac3-9061-23b01e5d92aa"
-level: task
+level: "task"
 title: "Audit self-heal batch pipeline for Codex incompatibilities"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "self-heal"
   - "codex"

@@ -1,9 +1,9 @@
 ---
 id: "ece5c797-5a9d-4272-96f9-1fceffde9204"
-level: task
+level: "task"
 title: "Run project-wide test commands and compare against baseline coverage"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "tests"
   - "verification"

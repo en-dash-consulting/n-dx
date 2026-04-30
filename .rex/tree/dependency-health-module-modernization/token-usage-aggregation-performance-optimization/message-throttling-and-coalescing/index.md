@@ -1,8 +1,8 @@
 ---
 id: "4a39248e-94d2-4bca-a1eb-0bb06ac724fb"
-level: task
+level: "task"
 title: "Message Throttling and Coalescing"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T16:13:44.287Z"
 completedAt: "2026-02-26T16:13:44.287Z"

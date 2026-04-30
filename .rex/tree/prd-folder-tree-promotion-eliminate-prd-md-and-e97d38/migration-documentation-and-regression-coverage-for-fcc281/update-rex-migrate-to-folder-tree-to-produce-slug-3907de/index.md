@@ -1,9 +1,9 @@
 ---
 id: "3907de2e-6713-42b3-a260-47f05c6dbe71"
-level: task
+level: "task"
 title: "Update rex migrate-to-folder-tree to produce slug-named directories and offer prd.md removal"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "prd"
   - "migration"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-29T16:01:29.610Z"
 completedAt: "2026-04-29T18:16:15.362Z"
 endedAt: "2026-04-29T18:16:15.362Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Rewrote cmdMigrateToFolderTree with legacy source loading, level-count summary, and delete prompt"
 acceptanceCriteria:
   - "Migration command produces folder tree with slug-based directory names at all four levels"

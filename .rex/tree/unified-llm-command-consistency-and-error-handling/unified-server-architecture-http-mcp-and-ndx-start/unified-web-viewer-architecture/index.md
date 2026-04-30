@@ -1,8 +1,8 @@
 ---
 id: "29a51b12-7b95-4b13-817b-18d1d7c27e31"
-level: task
+level: "task"
 title: "Unified web viewer architecture"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-06T05:44:41.814Z"
 completedAt: "2026-02-06T05:44:41.814Z"

@@ -1,9 +1,9 @@
 ---
 id: "e2ddb064-3972-475d-8162-91d33caa5ec3"
-level: task
+level: "task"
 title: "Audit and repair CLI hint text across all commands"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "dx"

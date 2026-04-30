@@ -1,9 +1,9 @@
 ---
 id: "8f811dac-e4f2-4e47-84ea-8c425a1d6328"
-level: task
+level: "task"
 title: "Detect and expose invocation context in hench runner"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "visibility"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-20T18:27:53.277Z"
 completedAt: "2026-04-20T18:37:20.851Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added invocationContext field to RunRecord to detect and expose whether hench is invoked via CLI (ndx work) or API (HTTP/MCP). The context is emitted via output stream and persisted in run metadata for both CLI and dashboard visibility."
 acceptanceCriteria:
   - "Hench detects CLI vs HTTP/API invocation context at run start"

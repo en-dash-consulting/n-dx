@@ -1,8 +1,8 @@
 ---
 id: "4a348f37-2be0-4808-a5f4-ae265c10b7b6"
-level: feature
+level: "feature"
 title: "Feature 2: Go Server Route Detection"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T07:47:26.043Z"
 completedAt: "2026-03-26T07:47:26.043Z"

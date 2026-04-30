@@ -1,9 +1,9 @@
 ---
 id: "53558943-22ff-4e1a-b1e8-787b51bb7639"
-level: task
+level: "task"
 title: "Add model selection for analyze"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"

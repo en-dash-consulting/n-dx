@@ -1,9 +1,9 @@
 ---
 id: "40d16bdb-e1a6-4619-b52d-163811e82156"
-level: task
+level: "task"
 title: "Catalog reusable helper-function patterns in unit tests"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "tests"
   - "unit"

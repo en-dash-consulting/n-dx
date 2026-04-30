@@ -1,8 +1,8 @@
 ---
 id: "9dbecc75-f550-4b7b-b3b7-fc2bb3ffef53"
-level: feature
+level: "feature"
 title: "macOS Local Docker Test Suite"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-20T19:16:21.371Z"
 completedAt: "2026-04-20T19:16:21.371Z"

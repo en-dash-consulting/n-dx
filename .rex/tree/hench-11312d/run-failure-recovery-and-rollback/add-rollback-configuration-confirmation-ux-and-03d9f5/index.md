@@ -1,9 +1,9 @@
 ---
 id: "03d9f52f-7ec7-452d-9d62-5c391269c2c5"
-level: task
+level: "task"
 title: "Add rollback configuration, confirmation UX, and regression tests"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "config"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-16T15:20:54.970Z"
 completedAt: "2026-04-20T13:50:13.888Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added rollbackOnFailure to HenchConfig schema (v1.ts + validate.ts). Updated run.ts to read config.rollbackOnFailure (default true) with --no-rollback always winning. Added --yes flag threading through all run functions to FinalizeRunOptions. Implemented interactive TTY confirmation prompt in performRollbackIfNeeded (skipped in non-TTY/CI or when yes=true). Documented hench.rollbackOnFailure in config.js help text. Added 6 integration tests in rollback-config.test.ts covering config=false suppression, config=true rollback, CI auto-confirm, --yes flag, and --no-rollback + yes with PRD reset."
 acceptanceCriteria:
   - "hench.rollbackOnFailure config key defaults to true and is documented in ndx config --help"

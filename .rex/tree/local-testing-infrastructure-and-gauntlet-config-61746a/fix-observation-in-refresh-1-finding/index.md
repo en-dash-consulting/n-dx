@@ -1,9 +1,9 @@
 ---
 id: "c126fff3-4adf-400d-a2ad-460501940c81"
-level: feature
+level: "feature"
 title: "Fix observation in refresh (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:08:04.523Z"
 completedAt: "2026-04-13T21:08:04.523Z"

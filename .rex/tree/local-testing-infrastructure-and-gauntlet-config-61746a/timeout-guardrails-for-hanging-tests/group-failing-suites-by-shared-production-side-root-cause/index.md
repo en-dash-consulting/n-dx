@@ -1,9 +1,9 @@
 ---
 id: "cf78aa03-deb6-44b0-bc79-f1fb5c30b891"
-level: task
+level: "task"
 title: "Group failing suites by shared production-side root cause"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "tests"
   - "triage"

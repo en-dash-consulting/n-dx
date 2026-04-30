@@ -1,8 +1,8 @@
 ---
 id: "d0297439-0e0f-41de-9867-3b08f755a246"
-level: epic
+level: "epic"
 title: "External Integrations"
-status: completed
+status: "completed"
 startedAt: "2026-04-13T18:35:49.604Z"
 completedAt: "2026-03-24T04:16:45.798Z"
 description: "Store adapters, bidirectional sync (Notion, future backends), CI/CD pipeline automation, and external service configuration."

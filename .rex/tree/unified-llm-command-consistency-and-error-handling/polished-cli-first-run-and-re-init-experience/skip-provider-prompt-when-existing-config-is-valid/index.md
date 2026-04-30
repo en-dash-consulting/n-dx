@@ -1,9 +1,9 @@
 ---
 id: "224703a3-3a67-44ef-9e01-375c0990827b"
-level: task
+level: "task"
 title: "Skip provider prompt when existing config is valid"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "ux"

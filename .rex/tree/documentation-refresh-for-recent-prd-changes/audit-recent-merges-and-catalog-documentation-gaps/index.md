@@ -1,8 +1,8 @@
 ---
 id: "4c28fbf8-94bd-4950-8ad8-24578929ab44"
-level: feature
+level: "feature"
 title: "Audit Recent Merges and Catalog Documentation Gaps"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T02:50:03.489Z"
 completedAt: "2026-04-23T02:50:03.489Z"

@@ -1,9 +1,9 @@
 ---
 id: "2e1d7e90-5f15-49bf-a919-0e4faa742105"
-level: task
+level: "task"
 title: "Add per-tier model override fields to LLMConfig schema and config loader"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "llm-client"
   - "config"

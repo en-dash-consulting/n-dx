@@ -1,9 +1,9 @@
 ---
 id: "08f6d0b0-9462-494e-adf9-2830113caede"
-level: task
+level: "task"
 title: "Surface active vendor and model in ndx console output"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "llm"
   - "ux"

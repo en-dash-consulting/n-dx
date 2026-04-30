@@ -1,9 +1,9 @@
 ---
 id: "2ba0deed-63c0-4650-bc6d-fb2fafb22687"
-level: task
+level: "task"
 title: "Add go.mod scanner, Go skip patterns, and test coverage to Rex"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
   - "go"

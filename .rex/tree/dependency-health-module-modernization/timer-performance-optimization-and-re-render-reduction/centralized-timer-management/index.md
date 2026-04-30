@@ -1,8 +1,8 @@
 ---
 id: "bf969580-2a1c-43da-a518-17e38e904b3b"
-level: task
+level: "task"
 title: "Centralized Timer Management"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T06:53:49.640Z"
 completedAt: "2026-02-26T06:53:49.640Z"

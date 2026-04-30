@@ -1,9 +1,9 @@
 ---
 id: "e96db771-5ed0-4ba8-a70b-74a30f462f65"
-level: feature
+level: "feature"
 title: "Unified Server Architecture: HTTP MCP and ndx start"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "dx"
   - "mcp"

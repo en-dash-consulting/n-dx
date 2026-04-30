@@ -1,8 +1,8 @@
 ---
 id: "c12a5570-d983-44b5-b112-1aa386de0a50"
-level: task
+level: "task"
 title: "LoE Threshold-Driven Proposal Decomposition"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-03T07:31:24.963Z"
 completedAt: "2026-03-03T07:31:24.963Z"

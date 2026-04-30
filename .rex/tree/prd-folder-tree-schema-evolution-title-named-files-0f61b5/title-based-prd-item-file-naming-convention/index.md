@@ -1,8 +1,8 @@
 ---
 id: "1797eb3e-8ef9-4148-80fe-966693dd4e97"
-level: feature
+level: "feature"
 title: "Title-Based PRD Item File Naming Convention"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-30T01:26:33.258Z"
 completedAt: "2026-04-30T01:26:33.258Z"

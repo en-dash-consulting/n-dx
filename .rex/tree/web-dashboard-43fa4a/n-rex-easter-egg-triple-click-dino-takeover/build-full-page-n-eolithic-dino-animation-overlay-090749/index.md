@@ -1,9 +1,9 @@
 ---
 id: "090749f5-1693-4d49-9a88-47387823670d"
-level: task
+level: "task"
 title: "Build full-page N-eolithic dino animation overlay with dismiss interaction"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "web"
   - "ui"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-19T04:42:49.026Z"
 completedAt: "2026-04-19T04:47:38.918Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Created NeolithicOverlay component with ASCII dino animation, full-viewport styling, dismiss-on-click/keypress, and useNeolithicOverlay hook with custom event seam for gesture detector."
 acceptanceCriteria:
   - "Overlay covers the full viewport and sits above all other content (z-index above nav, modals, tooltips)"

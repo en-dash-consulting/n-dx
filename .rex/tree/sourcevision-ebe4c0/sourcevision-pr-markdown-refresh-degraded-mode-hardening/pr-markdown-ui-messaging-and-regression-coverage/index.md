@@ -1,8 +1,8 @@
 ---
 id: "39cfec87-52fc-4c7b-bc2c-c6a6581f5138"
-level: task
+level: "task"
 title: "PR Markdown UI messaging and regression coverage"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T23:34:13.134Z"
 completedAt: "2026-02-22T23:34:13.134Z"

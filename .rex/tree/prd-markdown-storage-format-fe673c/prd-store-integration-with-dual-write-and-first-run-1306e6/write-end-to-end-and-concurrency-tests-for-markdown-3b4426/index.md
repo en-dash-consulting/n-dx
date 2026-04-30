@@ -1,9 +1,9 @@
 ---
 id: "3b442642-e7e9-49a4-96fc-debd8da30fc1"
-level: task
+level: "task"
 title: "Write end-to-end and concurrency tests for markdown-primary PRD storage"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "testing"

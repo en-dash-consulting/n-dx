@@ -1,16 +1,16 @@
 ---
 id: "292dff9b-7b0c-406e-b1db-468128d58a11"
-level: task
+level: "task"
 title: "Audit past-week merges and produce a documentation delta report"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "documentation"
   - "audit"
 source: "smart-add"
 startedAt: "2026-04-23T02:44:58.277Z"
 completedAt: "2026-04-23T02:50:03.477Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Produced docs/doc-delta-audit.md: categorized all 7 past-week main-branch merges + 10 feature/new-PRD-design commits, mapped each to required edits in README.md / CLAUDE.md / AGENTS.md / PACKAGE_GUIDELINES.md / TESTING.md / per-package READMEs, and listed doc files requiring zero changes."
 acceptanceCriteria:
   - "git log --since='7 days ago' output captured and each merge categorized"

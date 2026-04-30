@@ -1,9 +1,9 @@
 ---
 id: "0150c623-cefa-46e5-a3a0-51aad861311b"
-level: task
+level: "task"
 title: "Rename single-command and sc CLI entrypoints to pair-programming and bicker"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "rename"

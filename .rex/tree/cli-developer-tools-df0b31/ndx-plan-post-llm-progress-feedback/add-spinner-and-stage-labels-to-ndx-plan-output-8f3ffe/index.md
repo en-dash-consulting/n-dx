@@ -1,9 +1,9 @@
 ---
 id: "8f3ffe22-c031-4b7a-97e4-c4895439d6ea"
-level: task
+level: "task"
 title: "Add spinner and stage labels to ndx plan output between LLM response and proposal display"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "ndx-plan"

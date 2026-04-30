@@ -1,9 +1,9 @@
 ---
 id: "8c77e354-5210-461d-b84e-d2212f927e8d"
-level: task
+level: "task"
 title: "Fix god function detection metric inflation"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 startedAt: "2026-02-11T18:04:28.014Z"
 completedAt: "2026-02-11T18:04:28.014Z"
 acceptanceCriteria:

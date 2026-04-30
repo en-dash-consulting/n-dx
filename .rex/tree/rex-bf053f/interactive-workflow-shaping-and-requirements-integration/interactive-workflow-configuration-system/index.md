@@ -1,8 +1,8 @@
 ---
 id: "26afc8aa-e8bd-4e94-b0d7-cc82aef6589d"
-level: task
+level: "task"
 title: "Interactive Workflow Configuration System"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T04:14:26.844Z"
 completedAt: "2026-02-11T05:51:25.351Z"

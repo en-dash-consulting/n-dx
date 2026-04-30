@@ -1,9 +1,9 @@
 ---
 id: "c9867c35-7f69-401d-9908-03bac57a4d6c"
-level: task
+level: "task"
 title: "Validate all CLI commands, MCP tools, and web dashboard against multi-file PRD backend"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "testing"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-22T18:12:08.412Z"
 completedAt: "2026-04-22T18:32:20.652Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Updated web prd-io.ts for multi-file aggregation, routes-data.ts for aggregated serving, search-index.ts for multi-file mtime tracking. Added 36 tests covering all acceptance criteria."
 acceptanceCriteria:
   - "rex status, next, validate, analyze, recommend, and prune produce correct output with items spanning multiple PRD files"

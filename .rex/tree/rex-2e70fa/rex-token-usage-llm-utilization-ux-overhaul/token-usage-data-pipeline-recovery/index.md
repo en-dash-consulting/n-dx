@@ -1,8 +1,8 @@
 ---
 id: "530ae182-1f26-4cc4-bc77-314954ec2112"
-level: task
+level: "task"
 title: "Token Usage Data Pipeline Recovery"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T08:11:27.793Z"
 completedAt: "2026-02-21T08:11:27.793Z"

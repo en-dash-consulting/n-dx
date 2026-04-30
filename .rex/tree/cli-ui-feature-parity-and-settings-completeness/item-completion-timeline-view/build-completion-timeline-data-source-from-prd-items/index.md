@@ -1,9 +1,9 @@
 ---
 id: "8fd96b07-8037-4722-a80d-88269f148e90"
-level: task
+level: "task"
 title: "Build completion timeline data source from PRD items"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "web"
   - "rex"

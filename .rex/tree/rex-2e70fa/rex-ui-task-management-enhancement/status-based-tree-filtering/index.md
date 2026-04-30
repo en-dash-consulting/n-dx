@@ -1,8 +1,8 @@
 ---
 id: "0a8093cf-e35f-424a-9fb6-3d6bda39f935"
-level: task
+level: "task"
 title: "Status-based Tree Filtering"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-09T19:11:15.938Z"
 completedAt: "2026-02-09T19:11:15.938Z"

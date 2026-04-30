@@ -1,9 +1,9 @@
 ---
 id: "5392be41-1f99-42d2-8f70-fe6185663517"
-level: task
+level: "task"
 title: "Define OS-agnostic CLI error code taxonomy"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "ci"
   - "cli"

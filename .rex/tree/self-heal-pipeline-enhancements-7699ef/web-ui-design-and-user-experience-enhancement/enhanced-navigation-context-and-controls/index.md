@@ -1,8 +1,8 @@
 ---
 id: "c32f6e7d-847f-463f-9c20-bdab777a4308"
-level: task
+level: "task"
 title: "Enhanced Navigation Context and Controls"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-09T20:41:37.051Z"
 completedAt: "2026-02-09T20:41:37.051Z"

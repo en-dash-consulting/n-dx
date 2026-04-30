@@ -1,9 +1,9 @@
 ---
 id: "7a7249e7-1a6b-4e09-bf2c-73a4cea7d4de"
-level: task
+level: "task"
 title: "Add visual regression snapshot for ndx init dinosaur output"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "cli"
   - "testing"

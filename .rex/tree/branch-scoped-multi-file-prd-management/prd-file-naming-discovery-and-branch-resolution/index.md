@@ -1,8 +1,8 @@
 ---
 id: "f648a519-2015-486a-849f-782ba79e970f"
-level: feature
+level: "feature"
 title: "PRD File Naming, Discovery, and Branch Resolution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-22T16:30:27.569Z"
 completedAt: "2026-04-22T16:30:27.569Z"

@@ -1,9 +1,9 @@
 ---
 id: "553258ae-5779-478f-8962-69dc48f72763"
-level: task
+level: "task"
 title: "Address relationship issues (3 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-09T00:57:19.422Z"
 completedAt: "2026-03-09T01:07:42.717Z"

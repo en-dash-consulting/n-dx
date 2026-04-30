@@ -1,8 +1,8 @@
 ---
 id: "fe5bf3cc-7584-4e97-9a58-e1d5ff37c6bd"
-level: feature
+level: "feature"
 title: "Zone Detection Validation for Go Projects"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T05:57:25.393Z"
 completedAt: "2026-03-26T05:57:25.393Z"

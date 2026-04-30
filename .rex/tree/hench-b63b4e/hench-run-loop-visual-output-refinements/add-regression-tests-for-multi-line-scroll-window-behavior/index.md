@@ -1,9 +1,9 @@
 ---
 id: "cd39ee5e-585e-49a2-85a1-3b2b77b8f87e"
-level: task
+level: "task"
 title: "Add regression tests for multi-line scroll window behavior"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "cli"

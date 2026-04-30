@@ -1,9 +1,9 @@
 ---
 id: "ef198516-592b-473a-8a8f-e0c7a0b12bc1"
-level: task
+level: "task"
 title: "Redesign ndx init ASCII dinosaur to match Rex-F.png proportions"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "cli"
   - "branding"

@@ -1,8 +1,8 @@
 ---
 id: "2171d478-2d5b-4926-8e85-837f52c99abd"
-level: feature
+level: "feature"
 title: "Rex UI Task Management Enhancement"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T09:43:24.958Z"
 completedAt: "2026-02-18T09:43:24.958Z"

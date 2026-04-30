@@ -1,9 +1,9 @@
 ---
 id: "1d772c01-64dc-4038-ae5d-6797fc23766f"
-level: task
+level: "task"
 title: "Surface clear user-facing migration notification across CLI, MCP, and dashboard"
-status: pending
-priority: medium
+status: "pending"
+priority: "medium"
 tags:
   - "cli"
   - "ux"

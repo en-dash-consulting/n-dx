@@ -1,8 +1,8 @@
 ---
 id: "79851c84-e061-42b7-866a-c4d3697c686e"
-level: feature
+level: "feature"
 title: "Hench UI Real-time Task Monitoring"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T09:11:29.123Z"
 completedAt: "2026-02-18T09:11:29.123Z"

@@ -1,8 +1,8 @@
 ---
 id: "fe904ed1-7e5d-4f9b-b893-72520a24b807"
-level: task
+level: "task"
 title: "Graph Organization and Layout"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T04:03:13.848Z"
 completedAt: "2026-02-11T04:03:13.848Z"

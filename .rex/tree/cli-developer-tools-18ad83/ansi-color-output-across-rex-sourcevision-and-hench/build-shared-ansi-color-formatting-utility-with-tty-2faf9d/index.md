@@ -1,9 +1,9 @@
 ---
 id: "2faf9d58-2878-4e12-a9e3-b613591fd7bd"
-level: task
+level: "task"
 title: "Build shared ANSI color formatting utility with TTY and NO_COLOR support"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "color"

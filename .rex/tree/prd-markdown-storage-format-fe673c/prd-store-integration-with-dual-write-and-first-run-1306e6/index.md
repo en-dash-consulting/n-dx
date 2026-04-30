@@ -1,8 +1,8 @@
 ---
 id: "1306e659-dcaf-4303-b890-a8fdd5b706c8"
-level: feature
+level: "feature"
 title: "PRD Store Integration with Dual-Write and First-Run Migration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T16:20:10.156Z"
 completedAt: "2026-04-24T16:20:10.156Z"

@@ -1,9 +1,9 @@
 ---
 id: "be167d08-8687-4ad6-a8cd-aeb929f8d838"
-level: task
+level: "task"
 title: "Apply color formatting to hench and ndx orchestrator output"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "ndx"

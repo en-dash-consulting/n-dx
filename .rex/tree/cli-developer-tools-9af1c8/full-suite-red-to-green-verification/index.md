@@ -1,8 +1,8 @@
 ---
 id: "982f45e5-cb5f-41be-84a3-3736378247c9"
-level: feature
+level: "feature"
 title: "Full-Suite Red-to-Green Verification"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-02T17:19:13.841Z"
 completedAt: "2026-04-02T17:19:13.841Z"

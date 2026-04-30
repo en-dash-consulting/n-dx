@@ -1,8 +1,8 @@
 ---
 id: "0f1065fb-1549-49f6-aa03-991d7e6eadee"
-level: task
+level: "task"
 title: "Interactive parent-child inconsistency resolution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T21:13:45.905Z"
 completedAt: "2026-02-24T21:13:45.905Z"

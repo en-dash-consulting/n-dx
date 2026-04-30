@@ -1,9 +1,9 @@
 ---
 id: "abcddab7-0602-4fb4-9f69-5a4101b41a73"
-level: task
+level: "task"
 title: "Propagate resolved vendor/model uniformly to all LLM call sites"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "llm"
   - "consistency"

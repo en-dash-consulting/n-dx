@@ -1,8 +1,8 @@
 ---
 id: "28bd8b48-2012-42dd-9148-d844a082cb8b"
-level: feature
+level: "feature"
 title: "API vs CLI Invocation Context Detection and Display"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-20T18:43:09.805Z"
 completedAt: "2026-04-20T18:43:09.805Z"

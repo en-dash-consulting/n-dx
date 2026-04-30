@@ -1,8 +1,8 @@
 ---
 id: "405c9fcf-2258-472f-8eb7-30d5b7ae0b8a"
-level: feature
+level: "feature"
 title: "Model Tier Registry and Weight-Aware Resolution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-15T17:25:49.451Z"
 completedAt: "2026-04-15T17:25:49.451Z"

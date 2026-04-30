@@ -1,9 +1,9 @@
 ---
 id: "1056a6db-d382-44d4-a7d3-df91a8a899d5"
-level: task
+level: "task"
 title: "Fix documentation in packages-web:unit-server: packages-web:unit-server meets the dual-fragility criteria (cohesion 0.45, coupl"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:54:28.241Z"
 completedAt: "2026-04-14T01:55:09.936Z"

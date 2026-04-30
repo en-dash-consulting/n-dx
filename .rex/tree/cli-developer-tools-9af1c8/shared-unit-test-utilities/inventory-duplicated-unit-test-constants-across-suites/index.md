@@ -1,9 +1,9 @@
 ---
 id: "7ed4c848-e4be-4f6e-b495-5d70a9457fec"
-level: task
+level: "task"
 title: "Inventory duplicated unit-test constants across suites"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "tests"
   - "unit"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-02T17:55:20.914Z"
 completedAt: "2026-04-20T13:16:41.814Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Created tests/unit-test-constant-inventory.md cataloging 6 constants in 4+ unit test files with file lists and consolidation recommendations."
 acceptanceCriteria:
   - "A concrete inventory exists for duplicated constants used in more than four unit test files"

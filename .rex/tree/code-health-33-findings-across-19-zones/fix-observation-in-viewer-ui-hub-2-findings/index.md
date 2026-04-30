@@ -1,9 +1,9 @@
 ---
 id: "d4b40fac-925e-4578-a37f-f3066399b768"
-level: feature
+level: "feature"
 title: "Fix observation in viewer-ui-hub (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T14:47:49.220Z"
 completedAt: "2026-04-18T14:47:49.220Z"

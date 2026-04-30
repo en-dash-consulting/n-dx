@@ -1,9 +1,9 @@
 ---
 id: "768c9835-31a7-4113-996b-ab7749a731a4"
-level: task
+level: "task"
 title: "Branded n-dx ASCII art CLI header for init"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "cli"
   - "branding"

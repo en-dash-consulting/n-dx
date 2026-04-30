@@ -1,9 +1,9 @@
 ---
 id: "35803d82-ef26-418f-ac27-0b28b33217a9"
-level: task
+level: "task"
 title: "Implement test-failure remediation sub-loop in self-heal"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "self-heal"
   - "testing"

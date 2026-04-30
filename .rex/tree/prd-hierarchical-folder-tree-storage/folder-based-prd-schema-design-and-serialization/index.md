@@ -1,8 +1,8 @@
 ---
 id: "7286f1c2-ad19-4f85-baa9-cebb3c77a49d"
-level: feature
+level: "feature"
 title: "Folder-Based PRD Schema Design and Serialization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-27T19:20:57.818Z"
 completedAt: "2026-04-27T19:20:57.818Z"

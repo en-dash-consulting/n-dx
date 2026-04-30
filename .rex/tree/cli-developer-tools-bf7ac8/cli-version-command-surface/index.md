@@ -1,8 +1,8 @@
 ---
 id: "b3e82a63-746a-474e-af59-947d8a0f0fb9"
-level: feature
+level: "feature"
 title: "CLI Version Command Surface"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-06T19:23:14.349Z"
 completedAt: "2026-04-06T19:23:14.349Z"

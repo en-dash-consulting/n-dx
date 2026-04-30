@@ -1,8 +1,8 @@
 ---
 id: "79e50af8-c363-4345-970a-23006d04e1f4"
-level: epic
+level: "epic"
 title: "PRD Hierarchical Folder Tree Storage"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-28T10:43:59.641Z"
 completedAt: "2026-04-28T10:43:59.641Z"

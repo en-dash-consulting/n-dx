@@ -1,9 +1,9 @@
 ---
 id: "ecbbbb0f-87cf-4437-a2e7-8ee508714e32"
-level: feature
+level: "feature"
 title: "Resolve critical SourceVision architectural findings"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "tech-debt"
   - "sourcevision"

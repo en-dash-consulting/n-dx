@@ -1,8 +1,8 @@
 ---
 id: "7fefed1c-bdb4-47af-b35f-36985135ac1f"
-level: feature
+level: "feature"
 title: "Deterministic Task Utilization Budget Fallback"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T19:41:05.319Z"
 completedAt: "2026-02-22T19:41:05.319Z"

@@ -1,8 +1,8 @@
 ---
 id: "2ad53ca7-841a-4c3e-861a-d7f0eb6301d5"
-level: feature
+level: "feature"
 title: "Rex Task and Epic Deletion Functionality"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T17:27:43.138Z"
 completedAt: "2026-02-24T17:27:43.138Z"

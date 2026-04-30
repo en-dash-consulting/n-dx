@@ -1,8 +1,8 @@
 ---
 id: "3c667571-af87-44b2-86c5-7752d0b58d57"
-level: task
+level: "task"
 title: "Fallback Trigger and Quality Regression Coverage"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T00:51:43.680Z"
 completedAt: "2026-02-23T00:51:43.680Z"

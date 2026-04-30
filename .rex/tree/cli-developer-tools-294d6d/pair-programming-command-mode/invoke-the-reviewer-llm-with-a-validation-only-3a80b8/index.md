@@ -1,9 +1,9 @@
 ---
 id: "3a80b875-f796-476f-b456-912b2ae1604a"
-level: task
+level: "task"
 title: "Invoke the reviewer LLM with a validation-only constraint prompt"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "pair-programming"
   - "review"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-16T16:56:11.179Z"
 completedAt: "2026-04-20T13:10:31.398Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "All five acceptance criteria are met by the existing implementation in packages/core/pair-programming.js and tests/integration/pair-programming.test.js. No code changes required."
 acceptanceCriteria:
   - "The reviewer vendor CLI is invoked with an LLM prompt after the primary completes, not just a shell test run"

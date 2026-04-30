@@ -1,9 +1,9 @@
 ---
 id: "800f8220-0386-48d2-b566-22b5e46c3cea"
-level: task
+level: "task"
 title: "Write Autonomous Overnight Operation Guide ('Run While You Sleep')"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "docs"
   - "hench"

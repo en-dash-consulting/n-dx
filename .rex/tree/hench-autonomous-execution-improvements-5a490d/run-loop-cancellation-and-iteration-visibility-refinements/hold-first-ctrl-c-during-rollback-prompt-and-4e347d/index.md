@@ -1,9 +1,9 @@
 ---
 id: "4e347dad-facb-4d23-a35d-6c7d19ce2d60"
-level: task
+level: "task"
 title: "Hold first Ctrl+C during rollback prompt and require second Ctrl+C to exit"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "cli"

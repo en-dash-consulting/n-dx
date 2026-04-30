@@ -1,9 +1,9 @@
 ---
 id: "c57e4a98-4567-4caa-ad64-1dd6667e7316"
-level: task
+level: "task"
 title: "Add regression tests for Codex multi-line 'tokens used' output format"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "rex"

@@ -1,9 +1,9 @@
 ---
 id: "0e2b33cb-8962-4461-8bf6-b9da271a3197"
-level: task
+level: "task"
 title: "Add regression tests asserting the 'Added to:' path resolves on disk for all PRD item levels"
-status: pending
-priority: medium
+status: "pending"
+priority: "medium"
 tags:
   - "test"
   - "rex"

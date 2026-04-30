@@ -1,8 +1,8 @@
 ---
 id: "4ca9aac4-cd85-4af3-96d9-c4274e2d9f83"
-level: feature
+level: "feature"
 title: "CLI User Experience and Developer Tools"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-24T20:33:37.695Z"
 completedAt: "2026-02-24T20:33:37.695Z"

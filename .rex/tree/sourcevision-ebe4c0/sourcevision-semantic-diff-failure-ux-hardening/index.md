@@ -1,8 +1,8 @@
 ---
 id: "b52062bc-db8a-424a-b470-78c735f83174"
-level: feature
+level: "feature"
 title: "SourceVision Semantic Diff Failure UX Hardening"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T01:39:38.148Z"
 completedAt: "2026-02-23T01:39:38.148Z"

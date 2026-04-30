@@ -1,9 +1,9 @@
 ---
 id: "4a9be3cc-25d6-4429-ae79-304f10d097fb"
-level: task
+level: "task"
 title: "Implement top-level version flag handling for ndx and n-dx"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "ux"

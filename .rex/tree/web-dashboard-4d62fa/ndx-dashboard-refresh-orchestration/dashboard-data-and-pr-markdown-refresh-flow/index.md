@@ -1,8 +1,8 @@
 ---
 id: "be4e1924-967b-40aa-a76b-c05287f04df6"
-level: task
+level: "task"
 title: "Dashboard Data and PR Markdown Refresh Flow"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T19:40:48.516Z"
 completedAt: "2026-02-21T19:40:48.516Z"

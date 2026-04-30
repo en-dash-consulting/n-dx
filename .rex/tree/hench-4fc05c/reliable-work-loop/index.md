@@ -1,8 +1,8 @@
 ---
 id: "6b0c3873-5607-4adc-9027-abd8d70ab0e3"
-level: feature
+level: "feature"
 title: "Reliable work loop"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-04T18:33:18.839Z"
 completedAt: "2026-02-04T18:33:18.839Z"

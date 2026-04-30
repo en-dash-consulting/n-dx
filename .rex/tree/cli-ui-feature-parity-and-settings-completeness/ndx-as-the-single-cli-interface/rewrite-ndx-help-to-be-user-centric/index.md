@@ -1,9 +1,9 @@
 ---
 id: "6440a3d3-00b3-4599-ac3a-836fb27945e7"
-level: task
+level: "task"
 title: "Rewrite ndx --help to be user-centric"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "ux"

@@ -1,9 +1,9 @@
 ---
 id: "ea5ba3f2-4f9e-46b1-9874-23bdc62f8130"
-level: task
+level: "task"
 title: "Make Hench agent prompts language-aware for Go projects"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "go"

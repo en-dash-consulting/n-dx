@@ -1,9 +1,9 @@
 ---
 id: "07714a07-008e-4254-a0cd-56b15766afa4"
-level: task
+level: "task"
 title: "Populate branch attribution on item create and edit across all write paths"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "hench"

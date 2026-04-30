@@ -1,8 +1,8 @@
 ---
 id: "3415b5f0-3496-4813-8cc9-9f571044d49c"
-level: feature
+level: "feature"
 title: "Run Failure Recovery and Rollback"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-16T15:21:00.385Z"
 completedAt: "2026-04-16T15:21:00.385Z"

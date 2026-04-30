@@ -1,9 +1,9 @@
 ---
 id: "6ce9b707-d96d-4133-a871-bd663e6d966c"
-level: task
+level: "task"
 title: "Define structure health thresholds and add to rex config schema"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
 startedAt: "2026-03-24T19:53:16.787Z"

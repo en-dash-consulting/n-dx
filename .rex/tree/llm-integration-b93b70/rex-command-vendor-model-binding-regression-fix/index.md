@@ -1,8 +1,8 @@
 ---
 id: "d1438d1e-9233-4fff-a6d9-6a218d5d50bc"
-level: feature
+level: "feature"
 title: "Rex Command Vendor-Model Binding Regression Fix"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T15:52:18.334Z"
 completedAt: "2026-04-08T15:52:18.334Z"

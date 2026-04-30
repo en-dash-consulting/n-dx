@@ -1,9 +1,9 @@
 ---
 id: "a070e70d-af05-40aa-b6e7-0f06eea257ea"
-level: task
+level: "task"
 title: "Add language field to .n-dx.json schema and wire config support"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "config"
   - "sourcevision"

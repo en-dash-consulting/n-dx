@@ -1,9 +1,9 @@
 ---
 id: "4f87bb38-11d7-48e9-a143-d9efa9f251ab"
-level: epic
+level: "epic"
 title: "Sourcevision LLM eval harness & token reduction"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 startedAt: "2026-04-28T15:11:46.163Z"
 completedAt: "2026-04-28T15:11:46.163Z"
 endedAt: "2026-04-28T15:11:46.163Z"

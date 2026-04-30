@@ -1,8 +1,8 @@
 ---
 id: "9b6955b8-74b9-46cc-ab58-ea8ce5ae5ac8"
-level: task
+level: "task"
 title: "UI Resource Visibility and Controls"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T20:39:57.069Z"
 completedAt: "2026-02-26T20:39:57.069Z"

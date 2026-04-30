@@ -1,9 +1,9 @@
 ---
 id: "e1319df0-a11c-47c5-b4a2-840ea087160f"
-level: task
+level: "task"
 title: "Implement cross-platform parity assertions for deterministic CLI responses"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "ci"
   - "parity"

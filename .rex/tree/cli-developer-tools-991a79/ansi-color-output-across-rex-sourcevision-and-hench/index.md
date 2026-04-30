@@ -1,8 +1,8 @@
 ---
 id: "e7370225-ce8d-43e5-a1cc-2e4efb876d2e"
-level: feature
+level: "feature"
 title: "ANSI Color Output Across Rex, SourceVision, and Hench"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T21:08:10.870Z"
 completedAt: "2026-04-08T21:08:10.870Z"

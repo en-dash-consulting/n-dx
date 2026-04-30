@@ -1,9 +1,9 @@
 ---
 id: "41f5c040-e836-40ee-97af-ae5477fe6ae1"
-level: task
+level: "task"
 title: "Hide completed items by default in status views"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "prune"
   - "reshape"

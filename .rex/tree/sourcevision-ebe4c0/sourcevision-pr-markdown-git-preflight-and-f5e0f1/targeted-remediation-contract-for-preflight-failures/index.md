@@ -1,8 +1,8 @@
 ---
 id: "acefbd28-96c3-40fe-a8fe-0539b9eee1bb"
-level: task
+level: "task"
 title: "Targeted Remediation Contract for Preflight Failures"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T02:33:50.106Z"
 completedAt: "2026-02-23T02:33:50.106Z"

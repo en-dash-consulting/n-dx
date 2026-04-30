@@ -1,8 +1,8 @@
 ---
 id: "ef9224cb-e708-4ff4-9dcd-954a86905915"
-level: feature
+level: "feature"
 title: "Update Documentation for New PRD Structure"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T03:15:07.837Z"
 completedAt: "2026-04-24T20:55:20.195Z"

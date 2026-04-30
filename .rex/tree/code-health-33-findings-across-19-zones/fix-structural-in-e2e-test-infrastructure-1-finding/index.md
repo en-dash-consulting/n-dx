@@ -1,9 +1,9 @@
 ---
 id: "98d8a394-b9e6-4248-a2f0-4bf288b1f44e"
-level: feature
+level: "feature"
 title: "Fix structural in e2e-test-infrastructure (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T15:15:50.152Z"
 completedAt: "2026-04-18T15:15:50.152Z"

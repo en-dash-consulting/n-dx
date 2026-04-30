@@ -1,8 +1,8 @@
 ---
 id: "1c7ad386-e477-4dc3-87c8-deeb2ac1102e"
-level: task
+level: "task"
 title: "Live Refresh and Graceful Degradation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T05:40:54.335Z"
 completedAt: "2026-02-21T05:40:54.335Z"

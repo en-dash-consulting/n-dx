@@ -1,8 +1,8 @@
 ---
 id: "d2635b48-f2a7-43c6-985c-c20b6479dd8f"
-level: epic
+level: "epic"
 title: "Task-Weight-Aware Model Tiering"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-15T17:52:01.299Z"
 completedAt: "2026-04-15T17:52:01.299Z"

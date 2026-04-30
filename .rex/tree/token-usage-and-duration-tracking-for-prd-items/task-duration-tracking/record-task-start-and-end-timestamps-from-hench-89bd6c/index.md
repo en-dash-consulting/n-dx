@@ -1,9 +1,9 @@
 ---
 id: "89bd6c5d-093b-480d-91ba-965289768925"
-level: task
+level: "task"
 title: "Record task start and end timestamps from hench runs and status transitions"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "prd"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-23T16:03:02.619Z"
 completedAt: "2026-04-23T16:16:21.009Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added startedAt/endedAt/activeIntervals timing fields to PRDItem; extended computeTimestampUpdates to stamp them on every status transition; shipped getTaskDuration helper with 14 unit tests."
 acceptanceCriteria:
   - "`.rex/prd.json` items gain `startedAt`, `endedAt`, and `activeIntervals: [{start, end}]` fields, backfilled as optional so existing PRDs load unchanged"

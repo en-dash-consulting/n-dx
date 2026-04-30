@@ -1,9 +1,9 @@
 ---
 id: "3a247c6a-8613-490d-888e-016ae0dd5ec2"
-level: task
+level: "task"
 title: "Add aliased, blank, and dot import files to the Go fixture and update go.mod"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "go"
   - "sourcevision"

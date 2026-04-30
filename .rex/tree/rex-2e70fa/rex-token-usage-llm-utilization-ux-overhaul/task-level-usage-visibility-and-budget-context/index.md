@@ -1,8 +1,8 @@
 ---
 id: "6a135d15-14d8-4983-b2f7-1e136bbb3c1c"
-level: task
+level: "task"
 title: "Task-Level Usage Visibility and Budget Context"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T08:19:46.249Z"
 completedAt: "2026-02-21T08:19:46.249Z"

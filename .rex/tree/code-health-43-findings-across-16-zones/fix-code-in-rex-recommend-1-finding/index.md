@@ -1,9 +1,9 @@
 ---
 id: "f439f940-24bc-46a2-b7bd-9fe6021af6d3"
-level: feature
+level: "feature"
 title: "Fix code in rex-recommend (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:14:13.523Z"
 completedAt: "2026-04-14T01:14:13.523Z"

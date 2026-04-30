@@ -1,9 +1,9 @@
 ---
 id: "afab2a23-e2c0-4d95-9325-256f8f5192fd"
-level: task
+level: "task"
 title: "Write comprehensive unit tests for go-imports.ts covering all syntax variants and edge cases"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "go"
   - "sourcevision"

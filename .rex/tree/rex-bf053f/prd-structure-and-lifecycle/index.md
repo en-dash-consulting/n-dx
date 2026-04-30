@@ -1,8 +1,8 @@
 ---
 id: "d6d0cbed-f63a-4434-a004-166c39cc8d2c"
-level: feature
+level: "feature"
 title: "PRD structure and lifecycle"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-04T17:19:07.559Z"
 completedAt: "2026-02-04T17:19:07.559Z"

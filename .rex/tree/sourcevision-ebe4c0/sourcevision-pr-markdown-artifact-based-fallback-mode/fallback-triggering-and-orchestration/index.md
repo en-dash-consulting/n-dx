@@ -1,8 +1,8 @@
 ---
 id: "39d1c66e-759d-4d23-a74d-1245a9187919"
-level: task
+level: "task"
 title: "Fallback Triggering and Orchestration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T01:11:08.148Z"
 completedAt: "2026-02-23T01:11:08.148Z"

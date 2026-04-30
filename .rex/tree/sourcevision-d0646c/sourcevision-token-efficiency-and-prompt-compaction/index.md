@@ -1,8 +1,8 @@
 ---
 id: "ede8a6b4-dff8-4576-abea-3af9fbd7eaba"
-level: feature
+level: "feature"
 title: "SourceVision Token Efficiency and Prompt Compaction"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T15:56:50.053Z"
 completedAt: "2026-04-14T15:56:50.053Z"

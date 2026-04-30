@@ -1,9 +1,9 @@
 ---
 id: "2fc45532-6443-43ad-ba55-c0668a2fcd33"
-level: task
+level: "task"
 title: "Add regression tests that verify hint surfacing and follow-through correctness"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "testing"

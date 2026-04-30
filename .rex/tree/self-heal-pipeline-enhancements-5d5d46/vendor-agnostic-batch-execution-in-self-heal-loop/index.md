@@ -1,8 +1,8 @@
 ---
 id: "e0d22237-06af-4147-a3d7-c3a95c202d59"
-level: feature
+level: "feature"
 title: "Vendor-Agnostic Batch Execution in Self-Heal Loop"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T21:36:07.553Z"
 completedAt: "2026-04-14T21:36:07.553Z"

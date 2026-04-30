@@ -1,9 +1,9 @@
 ---
 id: "6a128173-0145-42a0-99bb-54308b9c0ec1"
-level: epic
+level: "epic"
 title: "Code Health: 33 findings across 19 zones"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T03:24:10.418Z"
 completedAt: "2026-04-19T03:24:10.418Z"

@@ -1,9 +1,9 @@
 ---
 id: "dd9a6c51-116a-4497-842c-df4640507902"
-level: task
+level: "task"
 title: "Diagnose and fix changed-file capture so run records reflect actual commit diffs"
-status: pending
-priority: high
+status: "pending"
+priority: "high"
 tags:
   - "hench"
   - "telemetry"

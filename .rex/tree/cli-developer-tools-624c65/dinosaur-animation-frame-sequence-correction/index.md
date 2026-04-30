@@ -1,8 +1,8 @@
 ---
 id: "6db5328c-2df6-437a-80a1-771fa55401a5"
-level: feature
+level: "feature"
 title: "Dinosaur Animation Frame Sequence Correction"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T17:48:19.524Z"
 completedAt: "2026-04-09T17:48:19.524Z"

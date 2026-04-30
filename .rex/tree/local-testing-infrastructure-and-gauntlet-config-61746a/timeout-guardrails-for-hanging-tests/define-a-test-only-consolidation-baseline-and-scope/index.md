@@ -1,9 +1,9 @@
 ---
 id: "794b70a1-8956-4afe-bdf4-38def2e397b7"
-level: task
+level: "task"
 title: "Define a test-only consolidation baseline and scope"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "tests"
   - "unit"

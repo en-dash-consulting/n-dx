@@ -1,8 +1,8 @@
 ---
 id: "65020dbd-1993-4e79-8a34-f4d414a9ec1e"
-level: feature
+level: "feature"
 title: "Legacy Migration and Multi-File Integration Validation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-22T18:32:21.013Z"
 completedAt: "2026-04-22T18:32:21.013Z"

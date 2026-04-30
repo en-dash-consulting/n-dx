@@ -1,8 +1,8 @@
 ---
 id: "568a1a3c-eacd-4304-a46e-9f8c42d9901f"
-level: feature
+level: "feature"
 title: "Folder Tree Migration, Initialization, and Auto-Trigger"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-28T10:06:18.341Z"
 completedAt: "2026-04-28T10:06:18.341Z"

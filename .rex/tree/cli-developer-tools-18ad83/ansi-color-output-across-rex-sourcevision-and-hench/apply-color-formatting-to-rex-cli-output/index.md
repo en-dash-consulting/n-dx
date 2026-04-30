@@ -1,9 +1,9 @@
 ---
 id: "0225e4e7-659e-40f3-917d-ee6b81515379"
-level: task
+level: "task"
 title: "Apply color formatting to rex CLI output"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "cli"

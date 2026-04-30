@@ -1,9 +1,9 @@
 ---
 id: "71575514-5f7c-4500-ae0c-49a21183c2d4"
-level: task
+level: "task"
 title: "Fix code in global: Establish a satellite zone testing policy requiring every production file in a s (+3 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T00:46:29.439Z"
 completedAt: "2026-04-14T01:01:17.902Z"

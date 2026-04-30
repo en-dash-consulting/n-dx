@@ -1,9 +1,9 @@
 ---
 id: "774bf7cb-f8e0-4b00-afa3-d0f63d10d5fe"
-level: task
+level: "task"
 title: "Implement targeted fix for smoke parity regression"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "ci"
   - "smoke"

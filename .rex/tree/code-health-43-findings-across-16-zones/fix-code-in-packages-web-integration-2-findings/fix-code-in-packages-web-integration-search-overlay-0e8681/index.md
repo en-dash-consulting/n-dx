@@ -1,9 +1,9 @@
 ---
 id: "0e8681dc-e39d-4f02-9aba-7972cbda15a3"
-level: task
+level: "task"
 title: "Fix code in packages-web:integration: search-overlay.ts is missing from the PANEL_FILES constant in boundary-check.tes (+1 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:01:20.813Z"
 completedAt: "2026-04-14T01:03:50.078Z"

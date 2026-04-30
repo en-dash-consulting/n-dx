@@ -1,9 +1,9 @@
 ---
 id: "1052726c-5e00-4305-873f-3d98ca6bcd5d"
-level: task
+level: "task"
 title: "Document timeout strategies for at-risk suites"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "tests"
   - "reliability"

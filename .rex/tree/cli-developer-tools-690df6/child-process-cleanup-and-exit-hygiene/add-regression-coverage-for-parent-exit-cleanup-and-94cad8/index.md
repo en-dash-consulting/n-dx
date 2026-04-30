@@ -1,9 +1,9 @@
 ---
 id: "94cad81d-4c83-4c9f-aac5-e97259687f24"
-level: task
+level: "task"
 title: "Add regression coverage for parent-exit cleanup and orphan prevention"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "testing"
   - "regression"

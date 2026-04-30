@@ -1,8 +1,8 @@
 ---
 id: "1c8695a6-c31f-4411-8db6-4ba115776617"
-level: feature
+level: "feature"
 title: "SourceVision PR Markdown Quality & Manual Refresh"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T07:42:35.430Z"
 completedAt: "2026-02-21T07:42:35.430Z"

@@ -1,8 +1,8 @@
 ---
 id: "c8582d6b-6088-49bb-8d94-cdf81bc4dc54"
-level: feature
+level: "feature"
 title: "Dependency Health Pass"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-14T19:48:08.783Z"
 completedAt: "2026-04-14T19:48:08.783Z"

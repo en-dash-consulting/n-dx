@@ -1,9 +1,9 @@
 ---
 id: "36e132ef-5b70-4ddd-8469-daf8be5cf497"
-level: task
+level: "task"
 title: "MCP over HTTP transport"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "mcp"
   - "transport"

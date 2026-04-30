@@ -1,8 +1,8 @@
 ---
 id: "9aaa6f12-199e-4737-9b0e-737a76ed23fc"
-level: feature
+level: "feature"
 title: "Suppress DEP0040 punycode Deprecation Warning in CLI Output"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T15:36:34.920Z"
 completedAt: "2026-04-08T15:36:34.920Z"

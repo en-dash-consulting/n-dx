@@ -1,8 +1,8 @@
 ---
 id: "a19a8bac-6c65-4590-b2b7-543d9e01843c"
-level: feature
+level: "feature"
 title: "Interactive Workflow Shaping and Requirements Integration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-11T04:14:29.222Z"
 completedAt: "2026-02-11T05:51:25.416Z"

@@ -1,9 +1,9 @@
 ---
 id: "19509120-0d5b-4aac-a83e-2b200ed8aabf"
-level: task
+level: "task"
 title: "Modify imports.ts to route .go files to the Go import parser"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "go"
   - "sourcevision"

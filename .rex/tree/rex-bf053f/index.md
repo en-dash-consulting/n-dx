@@ -1,8 +1,8 @@
 ---
 id: "bf053fb2-509d-4acf-aa61-7243e66027e5"
-level: epic
+level: "epic"
 title: "Rex"
-status: completed
+status: "completed"
 startedAt: "2026-03-24T20:09:27.774Z"
 completedAt: "2026-03-24T20:09:27.774Z"
 description: "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json."

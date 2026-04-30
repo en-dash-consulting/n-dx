@@ -1,9 +1,9 @@
 ---
 id: "3817e46d-04c6-4a5d-8559-abc3e3bbe0b6"
-level: task
+level: "task"
 title: "Fix documentation in integration: Codify a co-evolution rule in TESTING.md: each new entry in CLAUDE.md's injectio"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:52:00.230Z"
 completedAt: "2026-04-14T01:54:25.369Z"

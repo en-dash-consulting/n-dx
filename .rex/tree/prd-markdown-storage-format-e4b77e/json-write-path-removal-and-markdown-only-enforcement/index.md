@@ -1,8 +1,8 @@
 ---
 id: "21a86676-166a-4af7-bc57-39af1f47d2ba"
-level: feature
+level: "feature"
 title: "JSON Write Path Removal and Markdown-Only Enforcement"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-29T03:45:50.036Z"
 completedAt: "2026-04-29T03:45:50.036Z"

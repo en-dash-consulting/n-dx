@@ -1,8 +1,8 @@
 ---
 id: "af74f85e-9303-4dba-9b64-97c9b645d432"
-level: feature
+level: "feature"
 title: "Developer Environment Prerequisites Documentation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T04:56:26.463Z"
 completedAt: "2026-04-19T04:56:26.463Z"

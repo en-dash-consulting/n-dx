@@ -1,8 +1,8 @@
 ---
 id: "6840c2dc-3dc0-4354-a07c-85c780df4ff4"
-level: feature
+level: "feature"
 title: "Robust Claude CLI Discovery for ndx init"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-10T16:27:02.649Z"
 completedAt: "2026-04-10T16:27:02.649Z"

@@ -1,8 +1,8 @@
 ---
 id: "aac0a41c-0157-4cca-a75d-efd7655ba909"
-level: feature
+level: "feature"
 title: "Import Analyzer Language Dispatch"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T05:34:37.680Z"
 completedAt: "2026-03-26T05:34:37.680Z"

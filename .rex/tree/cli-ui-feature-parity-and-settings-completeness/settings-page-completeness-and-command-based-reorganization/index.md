@@ -1,8 +1,8 @@
 ---
 id: "dc5e6696-7575-4983-b8c5-a73711bc4d8f"
-level: feature
+level: "feature"
 title: "Settings Page Completeness and Command-Based Reorganization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T04:37:38.162Z"
 completedAt: "2026-04-19T04:37:38.162Z"

@@ -1,9 +1,9 @@
 ---
 id: "f73fe756-18f6-40fd-bdee-0001e40795ed"
-level: task
+level: "task"
 title: "Implement and integrate Codex CLI token usage extraction into hench run tracking"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "codex"
   - "token-tracking"

@@ -1,8 +1,8 @@
 ---
 id: "956b7119-989e-41f1-ba0e-3e8d26494fee"
-level: feature
+level: "feature"
 title: "Phase 1: Language Registry & Inventory Foundation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T04:05:46.055Z"
 completedAt: "2026-03-26T04:05:46.055Z"

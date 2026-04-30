@@ -1,8 +1,8 @@
 ---
 id: "09c29ff9-de59-49d7-a1a7-66120c7cb933"
-level: task
+level: "task"
 title: "Zone Slideout Interaction Regression Fix"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-06T17:07:35.610Z"
 completedAt: "2026-03-06T17:07:35.610Z"

@@ -1,9 +1,9 @@
 ---
 id: "9474e0c0-dfca-486a-9b62-5b66fea5d235"
-level: task
+level: "task"
 title: "Add assistant-integration cross-vendor contract integration test"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 startedAt: "2026-04-10T18:27:43.479Z"
 completedAt: "2026-04-10T18:34:31.731Z"
 acceptanceCriteria: []

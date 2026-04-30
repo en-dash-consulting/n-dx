@@ -1,9 +1,9 @@
 ---
 id: "939ef567-fbd3-423f-94c7-a51b95fdcf68"
-level: task
+level: "task"
 title: "Implement Go route detection analyzer and integrate into the server-route pipeline"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

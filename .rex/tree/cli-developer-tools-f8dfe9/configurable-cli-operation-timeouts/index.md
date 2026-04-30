@@ -1,8 +1,8 @@
 ---
 id: "888de653-60ad-43bf-843c-a859341d22a3"
-level: feature
+level: "feature"
 title: "Configurable CLI Operation Timeouts"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-03T19:06:50.409Z"
 completedAt: "2026-04-03T19:06:50.409Z"

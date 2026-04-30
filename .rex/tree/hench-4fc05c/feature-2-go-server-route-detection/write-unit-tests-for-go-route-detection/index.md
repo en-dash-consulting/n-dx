@@ -1,9 +1,9 @@
 ---
 id: "49bff344-1bbe-4196-9a38-a507b841960c"
-level: task
+level: "task"
 title: "Write unit tests for Go route detection"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

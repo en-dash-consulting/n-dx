@@ -1,8 +1,8 @@
 ---
 id: "epic-recursive-zone-arch"
-level: feature
+level: "feature"
 title: "Recursive zone architecture"
-status: completed
+status: "completed"
 tags:
   - "sourcevision"
   - "zones"

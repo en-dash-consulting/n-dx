@@ -1,9 +1,9 @@
 ---
 id: "4fc2aacd-651b-4499-8555-2a6f2c8007ba"
-level: task
+level: "task"
 title: "Filter hench task selection to self-heal tagged items when running in self-heal mode"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "self-heal"
   - "hench"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-24T14:36:54.749Z"
 completedAt: "2026-04-24T15:03:15.777Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added tags filter to PrioritizationOptions, findNextTask, findActionableTasks; threaded through hench run via --tags flag; ndx self-heal now passes --tags=self-heal"
 acceptanceCriteria:
   - "ndx self-heal passes a 'self-heal' tag constraint to hench/rex task selection"

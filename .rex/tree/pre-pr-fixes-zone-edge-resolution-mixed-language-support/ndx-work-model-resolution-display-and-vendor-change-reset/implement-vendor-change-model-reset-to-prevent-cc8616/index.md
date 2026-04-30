@@ -1,9 +1,9 @@
 ---
 id: "cc8616dd-581e-4fa7-abb4-6276b2e0882c"
-level: task
+level: "task"
 title: "Implement vendor-change model reset to prevent cross-vendor stale config"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "config"
   - "llm"

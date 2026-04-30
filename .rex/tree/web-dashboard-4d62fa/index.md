@@ -1,8 +1,8 @@
 ---
 id: "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
-level: epic
+level: "epic"
 title: "Web Dashboard"
-status: completed
+status: "completed"
 startedAt: "2026-03-24T05:27:03.754Z"
 completedAt: "2026-03-24T20:36:04.012Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."

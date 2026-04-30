@@ -1,9 +1,9 @@
 ---
 id: "f00023d2-c399-4bd2-beb8-481549a6ad37"
-level: task
+level: "task"
 title: "Intercept SIGINT during hench run loop and transition to graceful cancellation state"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "signal-handling"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-20T19:16:56.406Z"
 completedAt: "2026-04-20T19:23:48.298Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented SIGINT handler in agent loop with cancellation flag, graceful exit at loop boundary, and proper handler cleanup. Added \"cancelled\" status to schema. All tests pass."
 acceptanceCriteria:
   - "Pressing Ctrl+C during an active agent loop does not exit the process immediately — it sets a cancellation flag"

@@ -1,9 +1,9 @@
 ---
 id: "084b2529-7458-4255-bc7b-18b6388932e9"
-level: task
+level: "task"
 title: "Define TaskWeight type and per-vendor tier model constants in llm-client"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "llm-client"
   - "model-resolution"

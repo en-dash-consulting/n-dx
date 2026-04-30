@@ -1,9 +1,9 @@
 ---
 id: "d8036b40-fcf9-4d56-a89d-d315041e995b"
-level: task
+level: "task"
 title: "Extract smart-add error classifier into shared LLM error utility and extend ERROR_HINTS"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "llm"
   - "rex"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-21T16:39:13.741Z"
 completedAt: "2026-04-21T16:48:16.941Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Extracted classifySmartAddError into shared classifyLLMError in rex/src/cli/llm-error-classifier.ts. Added 5 new CLI_ERROR_CODES (AUTH_FAILED, LLM_RATE_LIMITED, LLM_SERVER_ERROR, NETWORK_ERROR, TIMEOUT). Extended ERROR_HINTS with 4 LLM patterns. 28 unit tests for the new classifier."
 acceptanceCriteria:
   - "New shared module exports classifyLLMError function that smart-add.ts imports instead of the inline classifier"

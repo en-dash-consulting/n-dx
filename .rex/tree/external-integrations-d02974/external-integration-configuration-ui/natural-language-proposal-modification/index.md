@@ -1,8 +1,8 @@
 ---
 id: "a5b424c6-5598-45cc-aa64-1bf986d041ed"
-level: task
+level: "task"
 title: "Natural language proposal modification"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T08:42:14.151Z"
 completedAt: "2026-02-18T08:42:14.151Z"

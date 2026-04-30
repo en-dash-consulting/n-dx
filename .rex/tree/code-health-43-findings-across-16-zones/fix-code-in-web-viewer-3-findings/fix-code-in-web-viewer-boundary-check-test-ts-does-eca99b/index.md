@@ -1,9 +1,9 @@
 ---
 id: "eca99bb2-a2f8-42d8-a125-b41bf0da112e"
-level: task
+level: "task"
 title: "Fix code in web-viewer: boundary-check.test.ts does not assert that viewer→server imports are type-only. (+2 more)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:38:10.792Z"
 completedAt: "2026-04-14T01:44:30.788Z"

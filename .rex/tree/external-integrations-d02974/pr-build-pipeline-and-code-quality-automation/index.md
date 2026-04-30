@@ -1,8 +1,8 @@
 ---
 id: "84562611-0193-412e-8642-7f5b0fab1d85"
-level: feature
+level: "feature"
 title: "PR Build Pipeline and Code Quality Automation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T18:08:30.754Z"
 completedAt: "2026-02-24T18:08:30.754Z"

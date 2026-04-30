@@ -1,8 +1,8 @@
 ---
 id: "b1e130e0-cc75-400b-9a3c-ca1cb5ed2897"
-level: feature
+level: "feature"
 title: "Web UI Design and User Experience Enhancement"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-09T21:01:23.519Z"
 completedAt: "2026-02-09T21:01:23.519Z"

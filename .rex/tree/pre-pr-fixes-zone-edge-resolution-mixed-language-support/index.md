@@ -1,8 +1,8 @@
 ---
 id: "4700c8ae-721d-4f18-86e7-1eaf5a559bb4"
-level: epic
+level: "epic"
 title: "Pre-PR Fixes: Zone Edge Resolution & Mixed-Language Support"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T21:19:10.882Z"
 completedAt: "2026-03-26T21:19:10.882Z"

@@ -1,8 +1,8 @@
 ---
 id: "0344cef0-f17f-47ed-a52b-b6ba601f983e"
-level: feature
+level: "feature"
 title: "Web UI Memory Management and Crash Resolution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T20:25:23.092Z"
 completedAt: "2026-02-24T20:25:23.092Z"

@@ -1,9 +1,9 @@
 ---
 id: "c9f50a60-abe8-4f8e-91a4-2da8d9a4bf10"
-level: task
+level: "task"
 title: "Add troubleshooting guide for common issues"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "docs"
 startedAt: "2026-04-13T18:35:49.604Z"

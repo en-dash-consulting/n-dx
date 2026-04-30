@@ -1,8 +1,8 @@
 ---
 id: "be363df5-da5d-42a8-b5fa-6bfaf294982d"
-level: feature
+level: "feature"
 title: "Consolidate PRD Files into Single 'prd' File"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T02:30:34.820Z"
 completedAt: "2026-04-23T02:30:34.820Z"

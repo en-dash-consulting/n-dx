@@ -1,8 +1,8 @@
 ---
 id: "545bde64-ebf9-47f9-936c-2e68831d7c30"
-level: task
+level: "task"
 title: "Sidebar Navigation and Layout Optimization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-09T19:58:32.477Z"
 completedAt: "2026-02-09T19:58:32.477Z"

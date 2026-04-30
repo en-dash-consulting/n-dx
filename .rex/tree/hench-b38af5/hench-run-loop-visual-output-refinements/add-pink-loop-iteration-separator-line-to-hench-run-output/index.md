@@ -1,9 +1,9 @@
 ---
 id: "62f1d0e6-b4d7-408d-9fcd-64b6bd7c05ff"
-level: task
+level: "task"
 title: "Add pink loop-iteration separator line to hench run output"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "hench"
   - "cli"

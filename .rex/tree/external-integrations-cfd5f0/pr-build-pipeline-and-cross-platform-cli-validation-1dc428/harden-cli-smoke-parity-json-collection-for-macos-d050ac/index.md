@@ -1,9 +1,9 @@
 ---
 id: "d050ace2-ba93-4528-8370-98be3ac9348f"
-level: task
+level: "task"
 title: "Harden CLI smoke parity JSON collection for macOS and Windows runners"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "ci"
   - "cli"

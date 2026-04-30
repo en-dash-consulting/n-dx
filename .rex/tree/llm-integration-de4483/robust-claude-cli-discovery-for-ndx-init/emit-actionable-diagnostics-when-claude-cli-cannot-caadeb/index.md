@@ -1,9 +1,9 @@
 ---
 id: "caadeba9-0971-4a34-b088-63c4e76d8a6b"
-level: task
+level: "task"
 title: "Emit actionable diagnostics when Claude CLI cannot be located"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "init"
   - "error-handling"

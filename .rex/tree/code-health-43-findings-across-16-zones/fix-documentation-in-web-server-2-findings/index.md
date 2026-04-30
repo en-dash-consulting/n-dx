@@ -1,9 +1,9 @@
 ---
 id: "e985fe67-805b-4070-8fb6-2a6f6f4abc9c"
-level: feature
+level: "feature"
 title: "Fix documentation in web-server (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:06:00.698Z"
 completedAt: "2026-04-14T02:06:00.698Z"

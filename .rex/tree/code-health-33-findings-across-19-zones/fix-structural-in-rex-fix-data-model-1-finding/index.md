@@ -1,9 +1,9 @@
 ---
 id: "4023370f-31f6-4b8d-af9f-9068504e82bb"
-level: feature
+level: "feature"
 title: "Fix structural in rex-fix-data-model (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T02:47:47.477Z"
 completedAt: "2026-04-19T02:47:47.477Z"

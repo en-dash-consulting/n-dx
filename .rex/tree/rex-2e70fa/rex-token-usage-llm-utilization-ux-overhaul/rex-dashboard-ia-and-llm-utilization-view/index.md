@@ -1,8 +1,8 @@
 ---
 id: "b87128a0-7994-44a9-bd61-c729106aff5c"
-level: task
+level: "task"
 title: "Rex Dashboard IA and LLM Utilization View"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-21T08:45:23.981Z"
 completedAt: "2026-02-21T08:45:23.981Z"

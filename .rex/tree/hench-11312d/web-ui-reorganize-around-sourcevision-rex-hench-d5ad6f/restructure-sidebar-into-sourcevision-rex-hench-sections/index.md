@@ -1,9 +1,9 @@
 ---
 id: "abbf736c-5dfb-42b9-a67b-867f52c1be2c"
-level: task
+level: "task"
 title: "Restructure sidebar into SourceVision / Rex / Hench sections"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "sidebar"

@@ -1,8 +1,8 @@
 ---
 id: "469c7900-cd34-4919-bc40-5f474a96654a"
-level: feature
+level: "feature"
 title: "Ctrl-C Interrupt Rollback Prompt Coordination"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T21:00:00.715Z"
 completedAt: "2026-04-24T21:00:00.715Z"

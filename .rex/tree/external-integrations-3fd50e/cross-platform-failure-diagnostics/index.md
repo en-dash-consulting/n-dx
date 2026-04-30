@@ -1,8 +1,8 @@
 ---
 id: "4ee969d6-cb9e-41c1-85ac-f79b3b6a6ac3"
-level: feature
+level: "feature"
 title: "Cross-Platform Failure Diagnostics"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-07T22:58:12.823Z"
 completedAt: "2026-04-07T22:58:12.823Z"

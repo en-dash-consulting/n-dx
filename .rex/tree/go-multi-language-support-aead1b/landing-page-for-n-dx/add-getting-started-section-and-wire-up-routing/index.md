@@ -1,9 +1,9 @@
 ---
 id: "28610126-7a2c-4f76-b375-d190d2cb166d"
-level: task
+level: "task"
 title: "Add getting started section and wire up routing"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 startedAt: "2026-02-12T20:17:12.692Z"
 completedAt: "2026-02-12T20:21:20.896Z"
 acceptanceCriteria: []

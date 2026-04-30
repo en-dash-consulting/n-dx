@@ -1,9 +1,9 @@
 ---
 id: "94bc747b-104f-45d3-a0d4-22e48b415188"
-level: task
+level: "task"
 title: "Fix structural in viewer-polling-engine: Cohesion (0.4) and coupling (0.6) are both at warning thresholds; the three-file"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T16:26:11.760Z"
 completedAt: "2026-04-20T16:31:17.736Z"

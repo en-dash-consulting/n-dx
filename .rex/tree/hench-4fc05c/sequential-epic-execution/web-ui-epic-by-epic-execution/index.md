@@ -1,8 +1,8 @@
 ---
 id: "d001b4cf-b90c-48ae-b8c2-e1a422841516"
-level: task
+level: "task"
 title: "Web UI Epic-by-Epic Execution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-10T19:22:25.616Z"
 completedAt: "2026-02-10T19:22:25.616Z"

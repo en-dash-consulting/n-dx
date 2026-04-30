@@ -1,9 +1,9 @@
 ---
 id: "a699a497-d58e-4c3d-afc7-b029b2b3c2ee"
-level: task
+level: "task"
 title: "Auto-tag PRD items created during self-heal runs with 'self-heal' marker"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "self-heal"
   - "rex"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-24T18:45:57.994Z"
 completedAt: "2026-04-24T18:55:40.211Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added NDX_SELF_HEAL env var propagation in core self-heal, plus withSelfHealTag helper that rex's FileStore.addItem and createItemsFromRecommendations use to stamp the 'self-heal' tag at creation time. Tests cover both self-heal and non-self-heal paths, and the updateItem path is confirmed not to retag existing items."
 acceptanceCriteria:
   - "All PRD items created via ndx self-heal carry the 'self-heal' tag"

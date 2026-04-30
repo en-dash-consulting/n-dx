@@ -1,9 +1,9 @@
 ---
 id: "30bd6623-4c94-461d-a4f3-42614114db05"
-level: task
+level: "task"
 title: "Append n-dx authorship and vendor/model audit trailer to hench-generated commit messages"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "commit"
@@ -12,7 +12,7 @@ source: "smart-add"
 startedAt: "2026-04-29T19:03:10.292Z"
 completedAt: "2026-04-29T19:17:11.656Z"
 endedAt: "2026-04-29T19:17:11.656Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented N-DX authorship trailer that appends vendor, model, run ID, and optional weight to commit messages. Extended RunRecord schema, updated InitRunOptions, and added trailer generation in performCommitPromptIfNeeded. Added comprehensive integration tests verifying format, weight display, and git compatibility. All acceptance criteria met."
 acceptanceCriteria:
   - "Every commit produced by `ndx work` (interactive, --auto, and --loop modes) ends with an `N-DX:` trailer line that names the vendor and the resolved model id"

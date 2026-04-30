@@ -1,8 +1,8 @@
 ---
 id: "0926d1fd-8215-4a09-abca-6b5e619df0a5"
-level: task
+level: "task"
 title: "Force-create Auditability and Visibility"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T20:59:56.613Z"
 completedAt: "2026-02-22T20:59:56.613Z"

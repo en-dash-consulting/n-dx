@@ -1,9 +1,9 @@
 ---
 id: "4bc33a6b-3827-44e3-8e6d-154653c9b4c3"
-level: feature
+level: "feature"
 title: "Fix code in web-helpers (1 finding)"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 source: "sourcevision"
 startedAt: "2026-04-14T00:31:35.774Z"
 completedAt: "2026-04-14T00:31:35.774Z"

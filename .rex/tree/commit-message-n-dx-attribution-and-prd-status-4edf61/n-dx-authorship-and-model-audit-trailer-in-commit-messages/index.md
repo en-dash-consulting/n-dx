@@ -1,8 +1,8 @@
 ---
 id: "44afa388-cfb8-4087-af42-1cd635819312"
-level: feature
+level: "feature"
 title: "N-DX Authorship and Model Audit Trailer in Commit Messages"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-30T14:42:17.312Z"
 completedAt: "2026-04-30T14:42:17.312Z"

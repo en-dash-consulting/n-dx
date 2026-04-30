@@ -1,9 +1,9 @@
 ---
 id: "3742b95d-2265-4a08-b021-70aab56337be"
-level: feature
+level: "feature"
 title: "Fix observation in token (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:44:25.224Z"
 completedAt: "2026-04-13T21:44:25.224Z"

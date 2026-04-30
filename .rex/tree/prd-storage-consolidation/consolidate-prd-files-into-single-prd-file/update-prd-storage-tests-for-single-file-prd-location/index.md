@@ -1,9 +1,9 @@
 ---
 id: "54be143d-cb14-4fe1-89e1-376b8a224755"
-level: task
+level: "task"
 title: "Update PRD storage tests for single-file 'prd' location"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "tests"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-23T02:22:15.872Z"
 completedAt: "2026-04-23T02:30:34.809Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added legacy multi-file fixture under packages/rex/tests/fixtures/legacy-multifile-prd/ and a new prd-migration.test.ts describe block that copies the fixture into a fresh .rex/, runs migrateLegacyPRD (and resolveStore), and asserts the merged prd.json has identical item content and that execution-log.jsonl is preserved byte-for-byte. Prior multi-file test suites had already been removed/converted; every remaining rex and web test references the single prd.json. Full rex (3457) and web (2618) test suites pass."
 acceptanceCriteria:
   - "All rex store tests reference the new single 'prd' file path"

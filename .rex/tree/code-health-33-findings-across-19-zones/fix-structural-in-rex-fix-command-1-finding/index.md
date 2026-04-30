@@ -1,9 +1,9 @@
 ---
 id: "5d586da2-f978-41f3-b5d5-2d25080f865b"
-level: feature
+level: "feature"
 title: "Fix structural in rex-fix-command (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T02:44:53.874Z"
 completedAt: "2026-04-19T02:44:53.874Z"

@@ -1,8 +1,8 @@
 ---
 id: "b81be3e0-2651-4773-9127-420132e31604"
-level: epic
+level: "epic"
 title: "PRD Item Branch and File Attribution"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T20:41:18.643Z"
 completedAt: "2026-04-24T20:41:18.643Z"

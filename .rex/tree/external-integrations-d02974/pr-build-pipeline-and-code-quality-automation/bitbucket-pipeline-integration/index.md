@@ -1,8 +1,8 @@
 ---
 id: "2ac7ce3e-e098-44de-b8ae-07fd2bf64b19"
-level: task
+level: "task"
 title: "Bitbucket Pipeline Integration"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T18:08:30.681Z"
 completedAt: "2026-02-24T18:08:30.681Z"

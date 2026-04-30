@@ -1,9 +1,9 @@
 ---
 id: "e49a1812-e055-435f-8c78-b059cc724fc4"
-level: task
+level: "task"
 title: "Extract viewer from sourcevision into shared web package"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "architecture"
   - "viewer"

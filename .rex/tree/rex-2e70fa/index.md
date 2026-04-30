@@ -1,8 +1,8 @@
 ---
 id: "2e70fa19-0875-4c5e-82c4-cd33bfb12c37"
-level: epic
+level: "epic"
 title: "Rex"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-16T16:55:59.938Z"
 completedAt: "2026-04-16T16:55:59.938Z"

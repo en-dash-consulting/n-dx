@@ -1,9 +1,9 @@
 ---
 id: "f0294876-d42d-497e-a3c6-c5abf7a374ed"
-level: feature
+level: "feature"
 title: "Proactive PRD structure health checks"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
   - "quality"

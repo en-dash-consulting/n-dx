@@ -1,8 +1,8 @@
 ---
 id: "33907346-1639-4f74-9e6f-b3ba456cc911"
-level: task
+level: "task"
 title: "Chunked proposal acceptance"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-06T04:00:51.629Z"
 completedAt: "2026-02-06T04:43:01.162Z"

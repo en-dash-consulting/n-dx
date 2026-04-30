@@ -1,9 +1,9 @@
 ---
 id: "17537d98-1b67-41d7-923c-d5b688af0260"
-level: feature
+level: "feature"
 title: "Fix observation in sourcevision-3 (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-16T20:02:14.565Z"
 completedAt: "2026-04-16T20:02:14.565Z"

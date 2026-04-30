@@ -1,9 +1,9 @@
 ---
 id: "2de3bf8b-961a-42ca-aacf-fba4c29fde3a"
-level: feature
+level: "feature"
 title: "Fix observation in web-2 (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:53:18.531Z"
 completedAt: "2026-04-13T21:53:18.531Z"

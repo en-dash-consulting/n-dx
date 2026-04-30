@@ -1,9 +1,9 @@
 ---
 id: "982777ca-fa74-4b7a-ae46-5c4329cf8ace"
-level: task
+level: "task"
 title: "Render branch badges on PRD tree rows and add branch filter to toolbar"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "ui"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-24T20:33:05.022Z"
 completedAt: "2026-04-24T20:41:18.610Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added branch badge to tree rows and branch filter dropdown to toolbar, with URL-persisted filter state."
 acceptanceCriteria:
   - "Each tree row renders a visually distinct badge showing the branch name when the item has `branch` set"

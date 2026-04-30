@@ -1,8 +1,8 @@
 ---
 id: "b22d1e1f-adfe-40b7-92c3-94f60808938c"
-level: epic
+level: "epic"
 title: "Hench Run Quality: Plan Execution and Accurate Change Reporting"
-status: pending
+status: "pending"
 source: "smart-add"
 ---
 

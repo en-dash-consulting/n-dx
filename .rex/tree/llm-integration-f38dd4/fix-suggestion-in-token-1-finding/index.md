@@ -1,9 +1,9 @@
 ---
 id: "3fb82f2e-dbe8-4495-8b10-a78d52c4a906"
-level: feature
+level: "feature"
 title: "Fix suggestion in token (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T21:59:36.959Z"
 completedAt: "2026-04-13T21:59:36.959Z"

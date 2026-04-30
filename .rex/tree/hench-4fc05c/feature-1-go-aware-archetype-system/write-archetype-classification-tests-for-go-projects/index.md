@@ -1,9 +1,9 @@
 ---
 id: "4cba126c-e847-4510-8f4f-09e3272fb552"
-level: task
+level: "task"
 title: "Write archetype classification tests for Go projects"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

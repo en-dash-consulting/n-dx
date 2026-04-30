@@ -1,9 +1,9 @@
 ---
 id: "d3b0080a-4418-44e8-a838-2aaef97bf36b"
-level: feature
+level: "feature"
 title: "Fix structural in global (4 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T15:26:10.947Z"
 completedAt: "2026-04-18T15:26:10.947Z"

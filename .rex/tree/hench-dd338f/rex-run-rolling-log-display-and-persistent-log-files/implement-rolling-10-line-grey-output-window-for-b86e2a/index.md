@@ -1,9 +1,9 @@
 ---
 id: "b86e2af1-19c7-43ee-90a1-c82ce7038fae"
-level: task
+level: "task"
 title: "Implement rolling 10-line grey output window for rex run console"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "cli"

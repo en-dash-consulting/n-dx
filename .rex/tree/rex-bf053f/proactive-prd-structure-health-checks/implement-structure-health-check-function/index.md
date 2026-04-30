@@ -1,9 +1,9 @@
 ---
 id: "bf1fd080-e3f7-4af9-8ee3-1626df8da8d7"
-level: task
+level: "task"
 title: "Implement structure health check function"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
 blockedBy:

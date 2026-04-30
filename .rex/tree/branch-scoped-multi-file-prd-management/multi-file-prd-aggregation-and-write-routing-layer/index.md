@@ -1,8 +1,8 @@
 ---
 id: "e006db37-8fc4-4380-bc61-78218dd03e18"
-level: feature
+level: "feature"
 title: "Multi-File PRD Aggregation and Write Routing Layer"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-22T17:05:50.268Z"
 completedAt: "2026-04-22T17:05:50.268Z"

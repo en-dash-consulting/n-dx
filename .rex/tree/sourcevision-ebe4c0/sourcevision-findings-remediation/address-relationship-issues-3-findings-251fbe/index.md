@@ -1,9 +1,9 @@
 ---
 id: "251fbe0a-8b4f-4cb0-a22a-326bf24e64f4"
-level: task
+level: "task"
 title: "Address relationship issues (3 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-03-05T05:13:25.945Z"
 completedAt: "2026-03-05T05:18:59.365Z"

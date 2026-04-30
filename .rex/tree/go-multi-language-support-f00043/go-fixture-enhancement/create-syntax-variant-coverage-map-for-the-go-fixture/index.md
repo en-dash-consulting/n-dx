@@ -1,9 +1,9 @@
 ---
 id: "7e41ce28-7691-4211-8b95-a325919bdb6b"
-level: task
+level: "task"
 title: "Create syntax variant coverage map for the Go fixture"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "go"
   - "sourcevision"

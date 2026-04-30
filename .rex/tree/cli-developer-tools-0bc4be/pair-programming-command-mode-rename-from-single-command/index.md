@@ -1,8 +1,8 @@
 ---
 id: "9611c581-175a-4c59-8d3a-e265e8383745"
-level: feature
+level: "feature"
 title: "Pair-Programming Command Mode (rename from single-command)"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-16T16:19:56.284Z"
 completedAt: "2026-04-16T16:19:56.284Z"

@@ -1,9 +1,9 @@
 ---
 id: "400f7e1e-ab50-429d-917b-dc38aa41ff3a"
-level: task
+level: "task"
 title: "Audit all ndx CLI commands against web dashboard feature coverage and document gaps"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "cli"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-19T03:35:57.566Z"
 completedAt: "2026-04-19T03:39:08.521Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Created docs/cli-ui-gap.md: 33 commands enumerated, rated full/partial/none, ranked by impact with implementation estimates."
 acceptanceCriteria:
   - "All ndx CLI commands and significant sub-commands are enumerated and evaluated"

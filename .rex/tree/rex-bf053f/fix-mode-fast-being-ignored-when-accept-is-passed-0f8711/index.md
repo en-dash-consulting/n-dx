@@ -1,9 +1,9 @@
 ---
 id: "0f8711c6-1dc3-4e54-b156-54579f60771f"
-level: feature
+level: "feature"
 title: "Fix --mode=fast being ignored when --accept is passed to reorganize"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
   - "bugfix"

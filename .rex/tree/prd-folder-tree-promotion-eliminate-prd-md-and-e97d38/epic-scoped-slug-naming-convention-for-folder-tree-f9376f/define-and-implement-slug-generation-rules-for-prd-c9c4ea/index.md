@@ -1,9 +1,9 @@
 ---
 id: "c9c4ea2f-cfc6-4ff3-946e-3021df15d4e8"
-level: task
+level: "task"
 title: "Define and implement slug generation rules for PRD folder names at all hierarchy levels"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "prd"
   - "storage"

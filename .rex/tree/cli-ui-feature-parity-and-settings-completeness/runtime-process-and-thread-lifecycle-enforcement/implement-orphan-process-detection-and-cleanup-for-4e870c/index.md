@@ -1,9 +1,9 @@
 ---
 id: "4e870c51-cd43-47a2-89f2-02e8e4f3ce57"
-level: task
+level: "task"
 title: "Implement orphan process detection and cleanup for spawned subcommands"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "process-lifecycle"
   - "cli"

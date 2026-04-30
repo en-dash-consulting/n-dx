@@ -1,9 +1,9 @@
 ---
 id: "f61ca69b-1aba-4e71-b9df-121025c37d70"
-level: task
+level: "task"
 title: "Add rate-limit cooldown detection with retry-after countdown and timeout state messaging"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "llm"
   - "error-handling"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-21T17:24:02.504Z"
 completedAt: "2026-04-21T17:39:33.708Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added rate-limit.ts with Retry-After header parsing, countdown formatting, auto-retry threshold, SDK error extraction, and timeout classification. Enhanced ClaudeClientError with retryAfterMs field. Updated API provider to extract Retry-After from SDK errors, honor it for delays, and surface onRetry callback. Enhanced classifyLLMError with LLMErrorContext for command/vendor/model suffixes, structured retryAfterSeconds countdown, budget usage vs limit display, and network vs API timeout distinction. 43 new unit tests, 3 downstream test updates."
 acceptanceCriteria:
   - "Rate-limit responses with Retry-After header display countdown in human-readable format (e.g., 'Rate limited — retry in 47s')"

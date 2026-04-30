@@ -1,8 +1,8 @@
 ---
 id: "07874b87-6683-4b55-8ed9-1555c5bd0d88"
-level: feature
+level: "feature"
 title: "Token Usage Aggregation Performance Optimization"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-27T04:40:55.059Z"
 completedAt: "2026-02-27T04:40:55.059Z"

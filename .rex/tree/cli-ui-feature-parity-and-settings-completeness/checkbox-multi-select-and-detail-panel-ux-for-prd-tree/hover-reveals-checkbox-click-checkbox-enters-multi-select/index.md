@@ -1,9 +1,9 @@
 ---
 id: "81019293-1603-40e3-a410-e532d832b87b"
-level: task
+level: "task"
 title: "Hover reveals checkbox, click checkbox enters multi-select"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "web"
   - "ux"

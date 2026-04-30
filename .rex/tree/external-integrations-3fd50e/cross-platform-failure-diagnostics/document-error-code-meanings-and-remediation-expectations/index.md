@@ -1,9 +1,9 @@
 ---
 id: "47b55bf8-f68b-48c0-b7bb-c469ff552436"
-level: task
+level: "task"
 title: "Document error code meanings and remediation expectations"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "docs"
   - "diagnostics"

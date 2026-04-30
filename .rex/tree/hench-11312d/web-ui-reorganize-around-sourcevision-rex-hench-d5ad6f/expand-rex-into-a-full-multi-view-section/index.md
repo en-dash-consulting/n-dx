@@ -1,9 +1,9 @@
 ---
 id: "12e7cfc8-0007-43bf-a0f4-d28b0825e3e1"
-level: task
+level: "task"
 title: "Expand Rex into a full multi-view section"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "rex"

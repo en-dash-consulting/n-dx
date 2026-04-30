@@ -1,9 +1,9 @@
 ---
 id: "914d5466-e655-4cd3-b88e-4f9499b7a3b4"
-level: task
+level: "task"
 title: "Click row opens detail panel, show checkbox without auto-selecting"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "web"
   - "ux"

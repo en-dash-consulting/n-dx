@@ -1,9 +1,9 @@
 ---
 id: "48ee8da4-56b6-4201-ae86-5e9372b45543"
-level: task
+level: "task"
 title: "Color-code [Tool], [Agent], and vendor prefix labels in hench run output"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "cli"

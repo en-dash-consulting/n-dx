@@ -1,9 +1,9 @@
 ---
 id: "c5ba3c69-5738-421f-8648-76956e36b869"
-level: task
+level: "task"
 title: "Apply semantic success and pause colors to hench run-loop status messages"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "cli"

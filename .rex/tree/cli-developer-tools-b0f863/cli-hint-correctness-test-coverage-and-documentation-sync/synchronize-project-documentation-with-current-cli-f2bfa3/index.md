@@ -1,9 +1,9 @@
 ---
 id: "f2bfa3e5-ff03-4c8d-b294-5850185bb5a9"
-level: task
+level: "task"
 title: "Synchronize project documentation with current CLI command surface"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "docs"
   - "cli"

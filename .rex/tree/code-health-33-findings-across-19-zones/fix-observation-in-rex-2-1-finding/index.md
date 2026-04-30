@@ -1,9 +1,9 @@
 ---
 id: "e9735e68-f6f5-4328-9bb8-40fadfd265ff"
-level: feature
+level: "feature"
 title: "Fix observation in rex-2 (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-17T18:52:50.777Z"
 completedAt: "2026-04-17T18:52:50.777Z"

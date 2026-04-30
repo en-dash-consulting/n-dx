@@ -1,8 +1,8 @@
 ---
 id: "baf1a80c-fbe1-4df9-a08b-d1cfec3d0e6f"
-level: task
+level: "task"
 title: "Incremental Aggregation System"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T16:38:30.297Z"
 completedAt: "2026-02-26T16:38:30.297Z"

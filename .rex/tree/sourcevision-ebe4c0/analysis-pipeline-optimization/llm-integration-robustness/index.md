@@ -1,8 +1,8 @@
 ---
 id: "d9c40582-36ed-4426-862a-5dad0a402e3c"
-level: task
+level: "task"
 title: "LLM Integration Robustness"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-08T16:27:52.564Z"
 completedAt: "2026-02-08T16:27:52.564Z"

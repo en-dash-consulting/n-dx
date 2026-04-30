@@ -1,9 +1,9 @@
 ---
 id: "d97894ab-858b-4fc4-a4ff-239ffc3b4ba3"
-level: feature
+level: "feature"
 title: "Fix observation in panel (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-13T20:52:30.340Z"
 completedAt: "2026-04-13T20:52:30.340Z"

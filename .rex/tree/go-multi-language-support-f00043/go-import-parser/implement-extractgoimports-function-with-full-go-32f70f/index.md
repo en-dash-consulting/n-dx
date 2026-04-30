@@ -1,9 +1,9 @@
 ---
 id: "32f70fa2-70d8-4b26-98a1-e54baeccbf97"
-level: task
+level: "task"
 title: "Implement extractGoImports function with full Go import syntax coverage"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "go"
   - "sourcevision"

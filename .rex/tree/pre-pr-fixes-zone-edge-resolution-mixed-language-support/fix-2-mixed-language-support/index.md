@@ -1,8 +1,8 @@
 ---
 id: "a40abbfe-7834-4adc-885b-70e7d80092e1"
-level: feature
+level: "feature"
 title: "Fix 2: Mixed-Language Support"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T21:19:10.766Z"
 completedAt: "2026-03-26T21:19:10.766Z"

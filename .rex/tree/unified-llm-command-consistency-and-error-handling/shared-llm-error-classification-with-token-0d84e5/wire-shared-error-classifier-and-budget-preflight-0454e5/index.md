@@ -1,9 +1,9 @@
 ---
 id: "0454e5d5-4f7e-42e8-becd-05c05fdfd2e2"
-level: task
+level: "task"
 title: "Wire shared error classifier and budget preflight into reshape, reorganize, prune, and sourcevision analyze"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "llm"
   - "rex"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-21T16:49:30.563Z"
 completedAt: "2026-04-21T17:07:20.491Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Moved classifyLLMError to @n-dx/llm-client foundation tier. Wired budget preflight + classified error handling into reshape, reorganize, prune, and sourcevision analyze. 51 new tests across 3 packages."
 acceptanceCriteria:
   - "reshape, reorganize, prune, and sourcevision analyze call preflightBudgetCheck (or equivalent) before LLM calls when budget config is present"

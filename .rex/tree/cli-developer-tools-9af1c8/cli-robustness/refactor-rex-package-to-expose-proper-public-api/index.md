@@ -1,9 +1,9 @@
 ---
 id: "fdd4fece-07ba-47c9-9611-6603a8bed17f"
-level: task
+level: "task"
 title: "Refactor rex package to expose proper public API"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "refactoring"
   - "architecture"

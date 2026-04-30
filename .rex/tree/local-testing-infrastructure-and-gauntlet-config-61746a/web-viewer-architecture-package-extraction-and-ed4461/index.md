@@ -1,9 +1,9 @@
 ---
 id: "ed4461f5-7667-4c72-bbee-f39457b951fe"
-level: feature
+level: "feature"
 title: "Web Viewer Architecture: Package Extraction and Independent Viewers"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "viewer"
   - "architecture"

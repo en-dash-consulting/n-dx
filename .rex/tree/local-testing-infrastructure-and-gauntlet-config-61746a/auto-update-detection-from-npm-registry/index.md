@@ -1,9 +1,9 @@
 ---
 id: "dcf6018e-e658-4708-ae6e-1bd23431748f"
-level: feature
+level: "feature"
 title: "Auto-Update Detection from npm Registry"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "ux"

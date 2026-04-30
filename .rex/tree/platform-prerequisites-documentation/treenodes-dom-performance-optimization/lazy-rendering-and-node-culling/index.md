@@ -1,8 +1,8 @@
 ---
 id: "f8b985a1-3c7e-4b22-bad3-dead0c200e05"
-level: task
+level: "task"
 title: "Lazy Rendering and Node Culling"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-26T17:09:19.325Z"
 completedAt: "2026-02-26T17:09:19.325Z"

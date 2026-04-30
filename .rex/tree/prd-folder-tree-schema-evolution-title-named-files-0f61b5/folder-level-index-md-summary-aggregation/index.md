@@ -1,8 +1,8 @@
 ---
 id: "722b727d-718f-4012-aa28-25e0af91def5"
-level: feature
+level: "feature"
 title: "Folder-Level index.md Summary Aggregation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-30T14:01:44.202Z"
 completedAt: "2026-04-30T14:01:44.202Z"

@@ -1,9 +1,9 @@
 ---
 id: "caa57841-e765-418d-9c47-035b2a0a01f3"
-level: task
+level: "task"
 title: "Simplify and compact sourcevision analysis code for readability and reduced context size"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "sourcevision"
   - "refactor"

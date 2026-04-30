@@ -1,9 +1,9 @@
 ---
 id: "35ccf9ee-0cb4-48b8-8aa3-185d76939c20"
-level: task
+level: "task"
 title: "Implement bidirectional markdown serializer and parser with round-trip fidelity tests"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "storage"
@@ -12,7 +12,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-23T19:49:17.111Z"
 completedAt: "2026-04-24T14:24:27.185Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Implemented markdown-serializer.ts and markdown-parser.ts with self-contained YAML codec. Exported from public.ts. 128 new tests covering full field set, round-trip invariant, and all edge cases. All 3711 existing tests pass."
 acceptanceCriteria:
   - "Serializer converts a complete in-memory PRD tree to a markdown string that matches the schema spec"

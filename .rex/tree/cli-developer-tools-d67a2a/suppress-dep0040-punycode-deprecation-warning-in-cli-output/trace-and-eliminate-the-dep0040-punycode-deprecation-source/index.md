@@ -1,9 +1,9 @@
 ---
 id: "1a926c58-e25d-417b-96ef-0694ac9153e8"
-level: task
+level: "task"
 title: "Trace and eliminate the DEP0040 punycode deprecation source"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "dx"

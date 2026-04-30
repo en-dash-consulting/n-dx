@@ -1,9 +1,9 @@
 ---
 id: "121aefae-1c0b-4f83-b83c-fe972d76a29d"
-level: task
+level: "task"
 title: "Write tests for Hench Go guard defaults, test runner, and language-aware prompts"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "go"

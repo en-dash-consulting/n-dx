@@ -1,9 +1,9 @@
 ---
 id: "797fa0aa-caa0-433f-aa50-de87f0c05e90"
-level: feature
+level: "feature"
 title: "Checkbox multi-select and detail panel UX for PRD tree"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 startedAt: "2026-03-24T20:12:05.010Z"
 completedAt: "2026-03-24T20:12:05.010Z"
 acceptanceCriteria: []

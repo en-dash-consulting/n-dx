@@ -1,8 +1,8 @@
 ---
 id: "f69ce6c6-57f4-4fc6-8f06-beb5e538d8fc"
-level: feature
+level: "feature"
 title: "CLI Robustness"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-06T15:45:56.722Z"
 completedAt: "2026-02-06T15:45:56.722Z"

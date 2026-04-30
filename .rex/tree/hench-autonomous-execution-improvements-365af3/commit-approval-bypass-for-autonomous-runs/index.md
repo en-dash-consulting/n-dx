@@ -1,8 +1,8 @@
 ---
 id: "3ca4d0d8-070b-476f-8c90-79bf6b349021"
-level: feature
+level: "feature"
 title: "Commit Approval Bypass for Autonomous Runs"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T03:25:03.715Z"
 completedAt: "2026-04-23T03:25:03.715Z"

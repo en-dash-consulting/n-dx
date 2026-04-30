@@ -1,8 +1,8 @@
 ---
 id: "3319282b-6b83-4d6d-b729-2c7b8526b9a4"
-level: feature
+level: "feature"
 title: "N-Rex Easter Egg — Triple-Click Dino Takeover"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T04:55:01.717Z"
 completedAt: "2026-04-19T04:55:01.717Z"

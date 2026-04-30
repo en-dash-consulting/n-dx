@@ -1,8 +1,8 @@
 ---
 id: "e28b4532-a04a-4a0f-bbdc-2636edf9fb1e"
-level: task
+level: "task"
 title: "Interactive Duplicate Override Decision Flow"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T21:11:08.060Z"
 completedAt: "2026-02-22T21:11:08.060Z"

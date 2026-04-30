@@ -1,9 +1,9 @@
 ---
 id: "5831bfa9-0b2e-40b7-ac96-35bce716948f"
-level: task
+level: "task"
 title: "Fix structural in global: Three of five zones sit at or below cohesion 0.4; all three (web-3, polling, web"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-20T16:13:43.334Z"
 completedAt: "2026-04-20T16:20:28.231Z"

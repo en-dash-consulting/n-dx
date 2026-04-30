@@ -1,9 +1,9 @@
 ---
 id: "26f04993-67f4-4d3a-a573-fd9d35d448a0"
-level: task
+level: "task"
 title: "Reorganize settings page layout to group settings by associated CLI command"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "settings"
   - "web"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-19T04:23:26.685Z"
 completedAt: "2026-04-19T04:37:38.124Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Reorganized sidebar SETTINGS section into CLI command order; renamed section headers in project-settings, feature-toggles, llm-provider, hench-config; moved hench-config from HENCH section and notion-config from REX section into SETTINGS."
 acceptanceCriteria:
   - "Settings page has clearly labeled sections corresponding to ndx CLI commands or 'General / All Commands'"

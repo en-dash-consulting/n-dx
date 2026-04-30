@@ -1,9 +1,9 @@
 ---
 id: "f0645116-8597-4efc-8a1f-6b171e91d122"
-level: task
+level: "task"
 title: "Integrate config validation tests into CI/CD gauntlet stage"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "ci-cd"
   - "testing"

@@ -1,9 +1,9 @@
 ---
 id: "013bc11c-ec20-4ac2-8463-9c17adf31fe4"
-level: feature
+level: "feature"
 title: "Auto Re-Init Detection for Stale Projects"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "ux"

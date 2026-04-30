@@ -1,9 +1,9 @@
 ---
 id: "00b9416d-868f-4c13-93f5-9507096d46d7"
-level: task
+level: "task"
 title: "Add unit and integration tests for weight-aware model resolution across packages"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "testing"
   - "llm-client"

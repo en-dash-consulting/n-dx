@@ -1,8 +1,8 @@
 ---
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
-level: epic
+level: "epic"
 title: "Hench"
-status: completed
+status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
 completedAt: "2026-03-26T15:22:13.999Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."

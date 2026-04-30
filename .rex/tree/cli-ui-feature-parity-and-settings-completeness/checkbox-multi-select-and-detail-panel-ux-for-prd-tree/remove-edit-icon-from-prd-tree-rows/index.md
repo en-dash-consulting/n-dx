@@ -1,9 +1,9 @@
 ---
 id: "c243c06f-07a2-4c26-b8d6-a333266e0ea4"
-level: task
+level: "task"
 title: "Remove Edit icon from PRD tree rows"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "web"
   - "ux"

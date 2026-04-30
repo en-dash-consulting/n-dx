@@ -1,8 +1,8 @@
 ---
 id: "aa92ccd9-989b-4296-8935-c83c771f34d0"
-level: feature
+level: "feature"
 title: "Token Usage Attribution per PRD Item"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-23T16:02:11.657Z"
 completedAt: "2026-04-23T16:02:11.657Z"

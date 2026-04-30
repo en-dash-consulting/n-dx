@@ -1,9 +1,9 @@
 ---
 id: "e081ca17-aa6a-47e4-ad19-0ab77f8adb98"
-level: task
+level: "task"
 title: "Classify changes in run summary (code/docs/config/metadata-only)"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "hench"
   - "ux"

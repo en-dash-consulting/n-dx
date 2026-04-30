@@ -1,9 +1,9 @@
 ---
 id: "eb208a9e-1443-4fd0-8d1c-899dea1a2ba8"
-level: task
+level: "task"
 title: "Audit and remove residual JSON write calls from rex CLI and MCP handlers"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "cli"
@@ -13,7 +13,7 @@ source: "smart-add"
 startedAt: "2026-04-29T02:06:16.128Z"
 completedAt: "2026-04-29T02:15:01.144Z"
 endedAt: "2026-04-29T02:15:01.144Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Removed writeFile calls targeting prd.json and branch-scoped prd_*.json from resolvePRDFile (prd-discovery.ts) and cmdInit (init.ts). No production write code for prd.json remains in packages/rex/src outside the ndx-start cache path."
 acceptanceCriteria:
   - "A grep for prd.json write patterns in packages/rex/src yields no production write code outside the ndx-start cache path"

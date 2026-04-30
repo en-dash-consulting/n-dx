@@ -1,9 +1,9 @@
 ---
 id: "b3bdcdb5-1bed-46be-8190-56b022fa5787"
-level: task
+level: "task"
 title: "Trace ndx plan output flow and identify the silent gap after 'Done.'"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "ndx-plan"

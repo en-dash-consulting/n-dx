@@ -1,9 +1,9 @@
 ---
 id: "1ae1ab98-c9b0-47a6-ba63-dded0edb0d51"
-level: task
+level: "task"
 title: "Implement token usage tracking, reporting, and budget checking"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "token-usage"
   - "aggregation"

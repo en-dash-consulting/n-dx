@@ -1,8 +1,8 @@
 ---
 id: "1311822b-671e-4fc4-93a0-816540324e25"
-level: task
+level: "task"
 title: "Work-History Narrative Synthesis"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T04:50:23.155Z"
 completedAt: "2026-02-23T04:50:23.155Z"

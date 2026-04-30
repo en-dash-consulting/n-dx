@@ -1,8 +1,8 @@
 ---
 id: "749a57e8-c3c2-4a85-9603-298f69766902"
-level: task
+level: "task"
 title: "Configuration Management"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-06T15:17:39.610Z"
 completedAt: "2026-02-06T15:17:39.610Z"

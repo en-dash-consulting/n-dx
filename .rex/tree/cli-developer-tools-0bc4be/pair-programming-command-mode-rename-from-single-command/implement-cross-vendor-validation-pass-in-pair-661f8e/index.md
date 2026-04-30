@@ -1,9 +1,9 @@
 ---
 id: "661f8e0c-ab58-46b9-98e7-e3340bf7bda8"
-level: task
+level: "task"
 title: "Implement cross-vendor validation pass in pair-programming mode"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "llm"
   - "multi-vendor"

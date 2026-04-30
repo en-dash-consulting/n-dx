@@ -1,9 +1,9 @@
 ---
 id: "bad1ef80-40ca-44b1-8d8b-eff1b4b0ecd5"
-level: task
+level: "task"
 title: "Strengthen task-completion criteria to require evidence of code changes for code-classified tasks"
-status: pending
-priority: high
+status: "pending"
+priority: "high"
 tags:
   - "hench"
   - "prd"

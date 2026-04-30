@@ -1,8 +1,8 @@
 ---
 id: "4d3d81ee-2ec5-486c-a768-d0b0a333b90d"
-level: task
+level: "task"
 title: "Credential Helper Command Surface"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T01:20:36.708Z"
 completedAt: "2026-02-23T01:20:36.708Z"

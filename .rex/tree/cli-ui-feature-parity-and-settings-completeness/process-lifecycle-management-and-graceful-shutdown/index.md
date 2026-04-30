@@ -1,8 +1,8 @@
 ---
 id: "f95ede7e-3b79-4370-9c8b-0174c83ead4c"
-level: feature
+level: "feature"
 title: "Process Lifecycle Management and Graceful Shutdown"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T07:53:24.088Z"
 completedAt: "2026-02-24T07:53:24.088Z"

@@ -1,9 +1,9 @@
 ---
 id: "643cd3bf-fb50-41d4-8adb-f8148ed951cc"
-level: task
+level: "task"
 title: "Fix suggestion in sourcevision-4: Zone \"sourcevision-4\" has a numeric suffix indicating an overflow community — pi"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:18:44.946Z"
 completedAt: "2026-04-14T02:20:30.022Z"

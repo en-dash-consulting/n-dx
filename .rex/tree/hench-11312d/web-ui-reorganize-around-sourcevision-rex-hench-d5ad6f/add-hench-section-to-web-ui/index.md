@@ -1,9 +1,9 @@
 ---
 id: "94f1e7cc-da17-4ea9-b86d-1696de282b97"
-level: task
+level: "task"
 title: "Add Hench section to web UI"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "web"
   - "hench"

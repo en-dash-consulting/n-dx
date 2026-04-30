@@ -1,9 +1,9 @@
 ---
 id: "b1dc5843-120b-4151-933c-82fdead1faf3"
-level: task
+level: "task"
 title: "Audit and enforce worker thread cleanup across all CLI entry points"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "process-lifecycle"
   - "cli"

@@ -1,9 +1,9 @@
 ---
 id: "012cf7ae-dcd3-45bc-87a5-98b69c1d48b8"
-level: task
+level: "task"
 title: "Build Windows Docker container with ndx dependencies"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "infrastructure"
   - "docker"

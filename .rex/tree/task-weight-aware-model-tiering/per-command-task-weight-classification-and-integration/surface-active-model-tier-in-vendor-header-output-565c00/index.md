@@ -1,9 +1,9 @@
 ---
 id: "565c00fb-4271-4187-a75e-2a10c0cb060a"
-level: task
+level: "task"
 title: "Surface active model tier in vendor header output and log task weight reasoning"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "llm-client"
   - "cli-output"

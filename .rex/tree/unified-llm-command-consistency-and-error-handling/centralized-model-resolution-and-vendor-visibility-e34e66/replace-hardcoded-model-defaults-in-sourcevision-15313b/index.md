@@ -1,9 +1,9 @@
 ---
 id: "15313bb7-1100-46df-84c7-bbdb8f82c571"
-level: task
+level: "task"
 title: "Replace hardcoded model defaults in sourcevision analyze with centralized resolveVendorModel"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "llm"
   - "sourcevision"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-21T17:17:51.175Z"
 completedAt: "2026-04-21T17:23:33.325Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Replaced hardcoded DEFAULT_MODEL/DEFAULT_CODEX_MODEL fallbacks in resolveAnalyzeTokenEventMetadata with resolveVendorModel(rawVendor, llmConfig) from @n-dx/llm-client. Removed DEFAULT_MODEL/DEFAULT_CODEX_MODEL imports from analyze.ts. Updated 3 existing unit tests and added 3 new ones (config override, vendor switch). Created integration test (5 cases) verifying .n-dx.json model/vendor config is reflected in token event metadata."
 acceptanceCriteria:
   - "resolveAnalyzeTokenEventMetadata uses resolveVendorModel(vendor, llmConfig) instead of hardcoded DEFAULT_MODEL/DEFAULT_CODEX_MODEL"

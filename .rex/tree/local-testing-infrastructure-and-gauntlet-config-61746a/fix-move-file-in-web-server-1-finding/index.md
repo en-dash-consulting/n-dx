@@ -1,8 +1,8 @@
 ---
 id: "c7df08dc-dcfe-40bd-87de-62734cc58581"
-level: feature
+level: "feature"
 title: "Fix move-file in web-server (1 finding)"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-15T15:03:35.252Z"
 completedAt: "2026-04-15T15:03:35.252Z"

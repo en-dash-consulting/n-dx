@@ -1,8 +1,8 @@
 ---
 id: "e117f1d3-5b28-4fe0-ad8b-8acc7c030963"
-level: feature
+level: "feature"
 title: "Feature 3: Rex Scanner Go Support"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-26T15:22:13.888Z"
 completedAt: "2026-03-26T15:22:13.888Z"

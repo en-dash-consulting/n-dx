@@ -1,9 +1,9 @@
 ---
 id: "6fe462af-722d-4fb6-b082-2f9ab301c2d7"
-level: feature
+level: "feature"
 title: "Fix code in sourcevision-view-tests (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:27:08.622Z"
 completedAt: "2026-04-14T01:27:08.622Z"

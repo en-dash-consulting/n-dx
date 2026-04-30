@@ -1,9 +1,9 @@
 ---
 id: "d01f7636-0eff-4d7c-b827-736bd7e1039d"
-level: task
+level: "task"
 title: "Stabilize repeatable parity verification across original macOS and Windows CI steps"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "ci"
   - "pipeline"

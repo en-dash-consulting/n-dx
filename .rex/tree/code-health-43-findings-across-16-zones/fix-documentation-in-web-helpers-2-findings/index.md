@@ -1,9 +1,9 @@
 ---
 id: "9df71711-8089-4ba1-8933-725aa23ccfdc"
-level: feature
+level: "feature"
 title: "Fix documentation in web-helpers (2 findings)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T02:03:26.140Z"
 completedAt: "2026-04-14T02:03:26.140Z"

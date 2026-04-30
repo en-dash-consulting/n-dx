@@ -1,8 +1,8 @@
 ---
 id: "dd84153c-7c4d-488a-8ca6-81eab6623c2c"
-level: task
+level: "task"
 title: "Circular Dependency Analysis and Planning"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-24T07:02:22.107Z"
 completedAt: "2026-02-24T07:02:22.107Z"

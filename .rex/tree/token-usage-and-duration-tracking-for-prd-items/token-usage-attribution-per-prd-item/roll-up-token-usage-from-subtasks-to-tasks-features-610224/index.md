@@ -1,9 +1,9 @@
 ---
 id: "61022482-f8de-4c2b-8cc0-78946df52c94"
-level: task
+level: "task"
 title: "Roll up token usage from subtasks to tasks, features, and epics"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "aggregation"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-23T15:52:30.570Z"
 completedAt: "2026-04-23T16:02:11.645Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added pure per-PRD-item token rollup (aggregateItemTokenUsage) in packages/rex/src/core/item-token-rollup.ts + get_token_usage MCP tool. Tests cover self/descendants/total rollup, property-style invariant on random trees, orphan handling, and sub-50ms perf on 500 items × 5k runs."
 acceptanceCriteria:
   - "A pure function `aggregateTokenUsage(prd, runs)` returns a map of `itemId -> { self, descendants, total }` token counts"

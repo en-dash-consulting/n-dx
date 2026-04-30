@@ -1,8 +1,8 @@
 ---
 id: "24b988d0-3d52-4354-b74e-23d966bdb9dd"
-level: epic
+level: "epic"
 title: "Branch-Scoped Multi-File PRD Management"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-22T19:12:08.018Z"
 completedAt: "2026-04-22T19:12:08.018Z"

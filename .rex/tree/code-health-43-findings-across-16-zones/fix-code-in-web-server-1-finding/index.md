@@ -1,9 +1,9 @@
 ---
 id: "31f3c63c-f33f-4b2c-88f1-59f3ae423072"
-level: feature
+level: "feature"
 title: "Fix code in web-server (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:38:08.081Z"
 completedAt: "2026-04-14T01:38:08.081Z"

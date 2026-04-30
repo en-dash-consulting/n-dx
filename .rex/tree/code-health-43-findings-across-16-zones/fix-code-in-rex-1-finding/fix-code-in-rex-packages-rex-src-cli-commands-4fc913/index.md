@@ -1,9 +1,9 @@
 ---
 id: "4fc913c5-82c4-4fb0-958f-ba5836822c0d"
-level: task
+level: "task"
 title: "Fix code in rex: packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, "
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:14:16.214Z"
 completedAt: "2026-04-14T01:20:10.484Z"

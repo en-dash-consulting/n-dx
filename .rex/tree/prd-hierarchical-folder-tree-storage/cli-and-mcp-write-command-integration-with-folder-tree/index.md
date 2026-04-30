@@ -1,8 +1,8 @@
 ---
 id: "ce2ecf83-8a69-4ccc-ad43-6243d4c3646b"
-level: feature
+level: "feature"
 title: "CLI and MCP Write Command Integration with Folder Tree"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-28T00:06:30.996Z"
 completedAt: "2026-04-28T00:06:30.996Z"

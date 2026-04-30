@@ -1,9 +1,9 @@
 ---
 id: "52811e0d-fa0f-4cf8-9879-020d35f90473"
-level: task
+level: "task"
 title: "Design and document the markdown schema for full-fidelity PRD tree representation"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "rex"
   - "storage"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-23T19:26:31.234Z"
 completedAt: "2026-04-23T19:46:56.962Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Created packages/rex/docs/prd-markdown-schema.md — authoritative spec for the PRD markdown format covering all fields, hierarchy encoding, edge cases, and parser/serializer contracts."
 acceptanceCriteria:
   - "Schema spec document exists at packages/rex/docs/prd-markdown-schema.md"

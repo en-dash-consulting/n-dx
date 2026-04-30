@@ -1,8 +1,8 @@
 ---
 id: "f200b1f3-8c59-4ff4-86c9-788ee6e2f1db"
-level: epic
+level: "epic"
 title: "PRD Visibility and Multi-PRD Status Reporting"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-27T13:13:51.820Z"
 completedAt: "2026-04-27T13:13:51.820Z"

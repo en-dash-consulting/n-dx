@@ -1,8 +1,8 @@
 ---
 id: "fe3eb56e-a017-4e19-980d-d3590b632824"
-level: task
+level: "task"
 title: "File and Format Detection"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-09T16:13:11.734Z"
 completedAt: "2026-02-09T16:13:11.734Z"

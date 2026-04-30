@@ -1,8 +1,8 @@
 ---
 id: "d8b6399f-f670-4018-a9c9-366534f485ae"
-level: feature
+level: "feature"
 title: "Git-Independent PR Markdown Generation"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-23T04:50:23.216Z"
 completedAt: "2026-02-23T04:50:23.216Z"

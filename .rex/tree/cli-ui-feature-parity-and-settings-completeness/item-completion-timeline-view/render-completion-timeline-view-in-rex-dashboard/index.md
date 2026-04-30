@@ -1,9 +1,9 @@
 ---
 id: "380ea760-5f73-4474-8057-81e62e5266a6"
-level: task
+level: "task"
 title: "Render completion timeline view in Rex dashboard"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "web"
   - "ux"

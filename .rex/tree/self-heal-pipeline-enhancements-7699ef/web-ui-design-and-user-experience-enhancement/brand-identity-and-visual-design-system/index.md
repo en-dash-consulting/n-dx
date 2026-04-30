@@ -1,8 +1,8 @@
 ---
 id: "f5464d5e-1d5e-4e83-be3a-3e9aca398177"
-level: task
+level: "task"
 title: "Brand Identity and Visual Design System"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-09T20:12:59.725Z"
 completedAt: "2026-02-09T20:12:59.725Z"

@@ -1,9 +1,9 @@
 ---
 id: "8fc4844a-d6f9-480e-94c6-c8536f89c207"
-level: feature
+level: "feature"
 title: "Audit MCP tool schemas against PRDItem fields"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
   - "mcp"

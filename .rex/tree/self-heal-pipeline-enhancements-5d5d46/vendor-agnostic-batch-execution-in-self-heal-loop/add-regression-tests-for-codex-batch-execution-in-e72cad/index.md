@@ -1,9 +1,9 @@
 ---
 id: "e72caddd-238f-426f-b191-4adec1de560d"
-level: task
+level: "task"
 title: "Add regression tests for Codex batch execution in the self-heal pipeline"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "self-heal"
   - "codex"

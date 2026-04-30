@@ -1,9 +1,9 @@
 ---
 id: "506bf2d9-72ce-4570-848c-95c464e15840"
-level: task
+level: "task"
 title: "Write contributor prerequisites and platform-specific setup guide"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "docs"
   - "dx"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-19T04:55:04.167Z"
 completedAt: "2026-04-19T04:56:26.426Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Created CONTRIBUTING.md with contributor prerequisites, pnpm workspace bootstrap, build/test commands, macOS Xcode CLI tool callout, Windows WSL2/Docker notes. Linked from README.md Contributing section."
 acceptanceCriteria:
   - "A 'Development Setup' section or CONTRIBUTING.md exists and is linked from the README"

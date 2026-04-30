@@ -1,8 +1,8 @@
 ---
 id: "1b15f101-807e-4372-8ba2-23e99f10860b"
-level: feature
+level: "feature"
 title: "Hench Run-Loop Visual Output Refinements"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-08T23:29:06.643Z"
 completedAt: "2026-04-08T23:29:06.643Z"

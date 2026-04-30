@@ -1,9 +1,9 @@
 ---
 id: "8d4e7984-e4d4-4cbf-b458-23f6e24fa676"
-level: task
+level: "task"
 title: "Add file-level locking to PRD store to prevent concurrent write corruption"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "rex"
   - "reliability"

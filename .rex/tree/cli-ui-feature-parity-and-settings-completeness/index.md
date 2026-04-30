@@ -1,8 +1,8 @@
 ---
 id: "b638da12-7755-49e6-9237-6f11891303b1"
-level: epic
+level: "epic"
 title: "CLI-UI Feature Parity and Settings Completeness"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-19T04:37:38.193Z"
 completedAt: "2026-04-19T04:37:38.193Z"

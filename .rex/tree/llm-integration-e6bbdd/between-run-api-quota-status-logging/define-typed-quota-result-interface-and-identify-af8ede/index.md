@@ -1,9 +1,9 @@
 ---
 id: "af8ede6d-f8ff-4460-9816-34ed51c3fa7d"
-level: task
+level: "task"
 title: "Define typed quota result interface and identify invocation point in hench run loop"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "llm"
   - "quota"

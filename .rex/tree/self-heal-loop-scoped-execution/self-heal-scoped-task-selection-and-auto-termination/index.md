@@ -1,8 +1,8 @@
 ---
 id: "ae28134a-cb7d-4427-87f0-55094e3500d0"
-level: feature
+level: "feature"
 title: "Self-Heal Scoped Task Selection and Auto-Termination"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T15:25:12.963Z"
 completedAt: "2026-04-24T15:25:12.963Z"

@@ -1,9 +1,9 @@
 ---
 id: "74047536-342a-4358-b2ec-33e783786b2a"
-level: task
+level: "task"
 title: "Add regression coverage and help text for version flags"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "testing"

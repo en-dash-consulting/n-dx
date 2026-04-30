@@ -1,8 +1,8 @@
 ---
 id: "0fb7be48-74a2-495d-a184-dced4d6d2d87"
-level: feature
+level: "feature"
 title: "Timeout Guardrails for Hanging Tests"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-02T17:37:00.910Z"
 completedAt: "2026-04-02T17:37:00.910Z"

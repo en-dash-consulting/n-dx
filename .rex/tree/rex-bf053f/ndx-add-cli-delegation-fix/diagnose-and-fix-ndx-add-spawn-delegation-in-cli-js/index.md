@@ -1,9 +1,9 @@
 ---
 id: "ed519429-b3c8-4b93-bf6c-ef9b3233fd06"
-level: task
+level: "task"
 title: "Diagnose and fix ndx add spawn delegation in cli.js"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "cli"
   - "bugfix"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-03-19T18:17:38.180Z"
 completedAt: "2026-03-19T18:23:25.880Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Fixed handleAdd in cli.js to use process.cwd() instead of resolveDir(rest) for the requireInit check. The add command's positional args are descriptions, not directory paths, so resolveDir was misinterpreting them. Rex's dispatchAdd already handles dir resolution internally via resolveSmartAddArgs."
 acceptanceCriteria:
   - "`ndx add \"some description\"` completes without a missing-.rex error when run from a directory containing `.rex/`"

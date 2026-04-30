@@ -1,9 +1,9 @@
 ---
 id: "4c930737-e43a-47ee-9ba9-b417fe9d6146"
-level: task
+level: "task"
 title: "Fix LLM analysis in reorganize command returning invalid responses"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "rex"
   - "bugfix"

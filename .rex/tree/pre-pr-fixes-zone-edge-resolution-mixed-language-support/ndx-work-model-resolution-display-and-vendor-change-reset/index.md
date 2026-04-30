@@ -1,9 +1,9 @@
 ---
 id: "3d1dfc17-ba48-4fb7-8b2e-392593740605"
-level: feature
+level: "feature"
 title: "ndx work Model Resolution, Display, and Vendor-Change Reset"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "smart-add"
 startedAt: "2026-04-14T16:33:04.573Z"
 completedAt: "2026-04-14T16:33:04.573Z"

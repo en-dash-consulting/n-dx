@@ -1,9 +1,9 @@
 ---
 id: "d8f5d40d-a68f-4da7-8c97-63e5513ff034"
-level: task
+level: "task"
 title: "Implement default long timeout with per-command override support"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "timeout"

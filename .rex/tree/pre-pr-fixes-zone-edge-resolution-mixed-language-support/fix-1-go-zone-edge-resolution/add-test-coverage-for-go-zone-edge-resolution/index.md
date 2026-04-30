@@ -1,9 +1,9 @@
 ---
 id: "95dde960-5ab0-4acd-b53e-7004ce3591d4"
-level: task
+level: "task"
 title: "Add test coverage for Go zone edge resolution"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

@@ -1,9 +1,9 @@
 ---
 id: "d9eaeb4f-6fb4-4ead-b644-4bc2d99ba4d6"
-level: task
+level: "task"
 title: "Implement centralized vendor/model resolver with newest-model default"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "llm"
   - "config"

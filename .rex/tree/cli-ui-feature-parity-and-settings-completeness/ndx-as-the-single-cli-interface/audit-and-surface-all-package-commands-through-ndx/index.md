@@ -1,9 +1,9 @@
 ---
 id: "70cd90a1-cb38-4536-ae0b-671af963878f"
-level: task
+level: "task"
 title: "Audit and surface all package commands through ndx"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "cli"
   - "ux"

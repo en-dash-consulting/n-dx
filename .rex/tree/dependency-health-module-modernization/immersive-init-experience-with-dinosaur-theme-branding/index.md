@@ -1,9 +1,9 @@
 ---
 id: "ccbcaf61-4e36-4fb0-b965-be25520ae453"
-level: feature
+level: "feature"
 title: "Immersive Init Experience with Dinosaur Theme & Branding"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "ux"
   - "branding"
@@ -11,7 +11,7 @@ tags:
 source: "conversation"
 startedAt: "2026-04-08T04:29:31.235Z"
 completedAt: "2026-04-08T04:41:56.446Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Created cli-brand.js as single home for brand assets (mascot, phase messages, colors). Rewrote handleInit with themed phase messages, branded recap, NO_COLOR/quiet graceful degradation. 4 new tests added."
 acceptanceCriteria:
   - "Cute dinosaur ASCII mascot (~8-12 lines) displayed in purple brand color at init start"

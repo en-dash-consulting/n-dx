@@ -1,9 +1,9 @@
 ---
 id: "d167596a-802c-4832-b797-b9d6a418774b"
-level: task
+level: "task"
 title: "Implement triple-click gesture detector with probabilistic trigger gate on the rex icon"
-status: completed
-priority: low
+status: "completed"
+priority: "low"
 tags:
   - "web"
   - "ui"

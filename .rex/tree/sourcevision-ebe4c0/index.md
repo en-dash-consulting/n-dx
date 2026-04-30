@@ -1,8 +1,8 @@
 ---
 id: "ebe4c082-7e93-44ee-a286-cf01c05dd907"
-level: epic
+level: "epic"
 title: "SourceVision"
-status: completed
+status: "completed"
 startedAt: "2026-04-13T18:35:49.604Z"
 completedAt: "2026-03-24T04:16:45.798Z"
 description: "Static analysis engine: file inventory, import graph, zone detection (Louvain community detection), React component catalog, PR markdown generation. Produces .sourcevision/CONTEXT.md and llms.txt for AI consumption."

@@ -1,8 +1,8 @@
 ---
 id: "e34e664a-b788-41e5-ad5d-95c94d9abd8a"
-level: feature
+level: "feature"
 title: "Centralized Model Resolution and Vendor Visibility Across All LLM Commands"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-21T17:23:33.802Z"
 completedAt: "2026-04-21T17:23:33.802Z"

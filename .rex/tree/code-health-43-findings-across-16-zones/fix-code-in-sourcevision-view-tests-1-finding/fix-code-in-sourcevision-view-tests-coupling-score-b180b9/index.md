@@ -1,9 +1,9 @@
 ---
 id: "b180b915-2dd1-45dc-bfdc-681ac87d8cbd"
-level: task
+level: "task"
 title: "Fix code in sourcevision-view-tests: Coupling score 0.75 is produced entirely by false-positive string-literal edges,"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:21:36.154Z"
 completedAt: "2026-04-14T01:27:08.447Z"

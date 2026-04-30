@@ -1,9 +1,9 @@
 ---
 id: "44a1fcf3-1830-407b-acc1-889e6f45e8f2"
-level: task
+level: "task"
 title: "Add test coverage for mixed-language detection"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "go"

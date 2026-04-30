@@ -1,9 +1,9 @@
 ---
 id: "51364a6f-bb3e-4b55-8523-ed490367ec37"
-level: task
+level: "task"
 title: "Apply color formatting to sourcevision CLI output"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "sourcevision"
   - "cli"

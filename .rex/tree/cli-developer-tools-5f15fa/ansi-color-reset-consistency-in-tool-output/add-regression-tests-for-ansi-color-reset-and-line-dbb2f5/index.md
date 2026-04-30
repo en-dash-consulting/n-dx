@@ -1,9 +1,9 @@
 ---
 id: "dbb2f5ef-4e60-431a-9e9f-8ade8f2eba28"
-level: task
+level: "task"
 title: "Add regression tests for ANSI color reset and line-boundary consistency"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "ansi"

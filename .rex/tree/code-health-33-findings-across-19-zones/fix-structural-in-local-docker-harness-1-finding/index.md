@@ -1,9 +1,9 @@
 ---
 id: "29d832fa-e3d5-45e1-91ef-58caba7f899c"
-level: feature
+level: "feature"
 title: "Fix structural in local-docker-harness (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-18T15:29:56.845Z"
 completedAt: "2026-04-18T15:29:56.845Z"

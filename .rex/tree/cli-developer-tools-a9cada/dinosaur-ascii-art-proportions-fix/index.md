@@ -1,8 +1,8 @@
 ---
 id: "453e030c-021c-4f41-a39f-eb7804e356b4"
-level: feature
+level: "feature"
 title: "Dinosaur ASCII Art Proportions Fix"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-09T15:06:38.369Z"
 completedAt: "2026-04-09T15:06:38.369Z"

@@ -1,9 +1,9 @@
 ---
 id: "8d046ac6-f628-4bbb-91e9-39db17263341"
-level: task
+level: "task"
 title: "Fix code in rex-recommend: Add unit tests for recommend/similarity.ts (140 lines, zero tests). At minimum, "
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:13:21.922Z"
 completedAt: "2026-04-14T01:14:13.346Z"

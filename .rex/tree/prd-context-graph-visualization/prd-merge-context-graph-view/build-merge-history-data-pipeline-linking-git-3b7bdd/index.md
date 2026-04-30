@@ -1,9 +1,9 @@
 ---
 id: "3b7bdd81-eb20-42c7-89b1-145131665551"
-level: task
+level: "task"
 title: "Build merge history data pipeline linking git merges to PRD items"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "web"
   - "backend"

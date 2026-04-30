@@ -1,9 +1,9 @@
 ---
 id: "d10a172b-4b1f-4da1-8736-ec9ae8e11b12"
-level: task
+level: "task"
 title: "Add MacOS pipeline stage for ndx install-and-run smoke validation"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "ci"
   - "pipeline"

@@ -1,9 +1,9 @@
 ---
 id: "a1fc3ffa-000f-46fc-b2bf-c5c4b667ef1a"
-level: feature
+level: "feature"
 title: "Fix suggestion in viewer-ui-hub (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T03:13:55.222Z"
 completedAt: "2026-04-19T03:13:55.222Z"

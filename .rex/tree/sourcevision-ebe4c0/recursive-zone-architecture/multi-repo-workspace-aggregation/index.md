@@ -1,8 +1,8 @@
 ---
 id: "feat-multi-repo-workspace"
-level: task
+level: "task"
 title: "Multi-repo workspace aggregation"
-status: completed
+status: "completed"
 startedAt: "2026-03-03T06:55:31.871Z"
 completedAt: "2026-03-03T06:55:31.871Z"
 acceptanceCriteria: []

@@ -1,8 +1,8 @@
 ---
 id: "9f96a45d-092e-4ea2-a76d-b21551cedbba"
-level: feature
+level: "feature"
 title: "Branch Attribution Display in PRD Dashboard"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-04-24T20:41:18.632Z"
 completedAt: "2026-04-24T20:41:18.632Z"

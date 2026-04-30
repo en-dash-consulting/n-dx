@@ -1,9 +1,9 @@
 ---
 id: "27e2cb62-a5ac-4c35-bded-8fe671973086"
-level: feature
+level: "feature"
 title: "Fix documentation in rex (1 finding)"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-14T01:57:07.126Z"
 completedAt: "2026-04-14T01:57:07.126Z"

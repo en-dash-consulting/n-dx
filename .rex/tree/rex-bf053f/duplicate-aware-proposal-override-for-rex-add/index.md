@@ -1,8 +1,8 @@
 ---
 id: "15572c21-1d8f-4aa1-b105-82b516e71ad0"
-level: feature
+level: "feature"
 title: "Duplicate-aware Proposal Override for rex add"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-22T21:18:12.472Z"
 completedAt: "2026-02-22T21:18:12.472Z"

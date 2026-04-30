@@ -1,8 +1,8 @@
 ---
 id: "ff24d31d-6bfc-4ed8-979e-2bc790ed8549"
-level: feature
+level: "feature"
 title: "Smart Prune Proposal Caching Enhancement"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-03-06T05:59:33.851Z"
 completedAt: "2026-03-11T02:19:13.174Z"

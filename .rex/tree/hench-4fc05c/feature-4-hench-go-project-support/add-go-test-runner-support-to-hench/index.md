@@ -1,9 +1,9 @@
 ---
 id: "a6862705-ed72-4d1a-aab7-090c85e50582"
-level: task
+level: "task"
 title: "Add Go test runner support to Hench"
-status: completed
-priority: high
+status: "completed"
+priority: "high"
 tags:
   - "hench"
   - "go"

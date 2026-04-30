@@ -1,8 +1,8 @@
 ---
 id: "3bf3754c-c0d0-4fb7-9cbd-5ebbddb85d51"
-level: feature
+level: "feature"
 title: "Analysis Pipeline Optimization"
-status: completed
+status: "completed"
 source: "llm"
 startedAt: "2026-02-09T18:57:57.186Z"
 completedAt: "2026-02-09T19:05:28.857Z"

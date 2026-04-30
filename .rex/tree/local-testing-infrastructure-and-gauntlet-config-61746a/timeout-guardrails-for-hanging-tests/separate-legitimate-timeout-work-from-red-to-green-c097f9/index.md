@@ -1,9 +1,9 @@
 ---
 id: "c097f90b-722b-41b3-9777-492db05e50da"
-level: task
+level: "task"
 title: "Separate legitimate timeout work from red-to-green defect fixes"
-status: completed
-priority: critical
+status: "completed"
+priority: "critical"
 tags:
   - "tests"
   - "triage"

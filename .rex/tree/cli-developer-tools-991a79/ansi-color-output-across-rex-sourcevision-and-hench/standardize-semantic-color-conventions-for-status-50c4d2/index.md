@@ -1,9 +1,9 @@
 ---
 id: "50c4d2b6-d8e8-49dd-9c8a-ee66b0f9b89d"
-level: task
+level: "task"
 title: "Standardize semantic color conventions for status and log-level output across all CLI tools"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "cli"
   - "ux"

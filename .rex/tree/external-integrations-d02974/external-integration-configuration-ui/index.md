@@ -1,8 +1,8 @@
 ---
 id: "5fd0de0b-02c3-4895-88be-a0b13f404b8e"
-level: feature
+level: "feature"
 title: "External Integration Configuration UI"
-status: completed
+status: "completed"
 source: "smart-add"
 startedAt: "2026-02-18T09:31:53.840Z"
 completedAt: "2026-02-18T09:31:53.840Z"

@@ -1,9 +1,9 @@
 ---
 id: "75c7df48-1438-4a03-8467-34bc0de734ae"
-level: task
+level: "task"
 title: "Implement structured inter-model handoff so reviewer findings are fed back to the primary"
-status: completed
-priority: medium
+status: "completed"
+priority: "medium"
 tags:
   - "pair-programming"
   - "handoff"
@@ -11,7 +11,7 @@ tags:
 source: "smart-add"
 startedAt: "2026-04-16T16:56:18.148Z"
 completedAt: "2026-04-20T14:00:04.943Z"
-resolutionType: code-change
+resolutionType: "code-change"
 resolutionDetail: "Added ReviewFeedback struct, parseReviewerOutput parser, buildRemediationContext builder, runReviewerLlmCapturing (tee to terminal + capture), wired feedback loop into handlePairProgramming with --skip-feedback flag"
 acceptanceCriteria:
   - "Reviewer output is parsed into a structured ReviewFeedback object with fields: passed (bool), errors (string[]), suggestedFixes (string[]), testVerdict (passed|failed|skipped)"
