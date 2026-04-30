@@ -44,12 +44,14 @@ import type { PRDStore } from "../store/index.js";
 type McpResult = {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
+  warning?: string; // One-time warning (e.g., for migration notifications)
 };
 
-function textResult(text: string, isError = false): McpResult {
+function textResult(text: string, isError = false, warning?: string): McpResult {
   return {
     content: [{ type: "text" as const, text }],
     ...(isError ? { isError: true } : {}),
+    ...(warning ? { warning } : {}),
   };
 }
 

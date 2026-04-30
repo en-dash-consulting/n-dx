@@ -13,6 +13,7 @@ import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { green, yellow, red } from "@n-dx/llm-client";
+import { emitMigrationNotification } from "../migration-notification.js";
 import type { PRDDocument } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PromptFn } from "./validate-interactive.js";
@@ -46,8 +47,9 @@ export async function cmdValidate(
   const rexDir = join(dir, REX_DIR);
   const checks: CheckResult[] = [];
   let migrationError: LegacyPrdMigrationError | null = null;
+  let migrationResult;
   try {
-    await ensureLegacyPrdMigrated(dir);
+    migrationResult = await ensureLegacyPrdMigrated(dir);
   } catch (err) {
     if (err instanceof LegacyPrdMigrationError) {
       migrationError = err;
@@ -91,6 +93,12 @@ export async function cmdValidate(
   } else {
     try {
       store = await resolveStore(rexDir);
+
+      // Emit migration notification to CLI and execution log
+      if (migrationResult) {
+        await emitMigrationNotification(migrationResult, flags, (entry) => store!.appendLog(entry));
+      }
+
       const loaded = await store.loadDocument();
       const result = validateDocument(loaded);
       if (result.ok) {

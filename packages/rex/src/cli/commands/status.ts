@@ -6,6 +6,7 @@ import { verify } from "../../core/verify.js";
 import { CLIError } from "../errors.js";
 import { REX_DIR } from "./constants.js";
 import { result, isQuiet } from "../output.js";
+import { emitMigrationNotification } from "../migration-notification.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
@@ -79,7 +80,7 @@ export async function cmdStatus(
   flags: Record<string, string>,
 ): Promise<void> {
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
-  await ensureLegacyPrdMigrated(dir);
+  const migrationResult = await ensureLegacyPrdMigrated(dir);
 
   const format = flags.format;
   const showCoverage = flags.coverage === "true";
@@ -98,6 +99,9 @@ export async function cmdStatus(
 
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Emit migration notification to CLI and execution log
+  await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));
   const doc = await store.loadDocument();
   doc.items = await loadItemsPreferFolderTree(rexDir, store);
 

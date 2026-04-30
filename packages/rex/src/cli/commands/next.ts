@@ -5,6 +5,7 @@ import { findNextTask, collectCompletedIds, explainSelection } from "../../core/
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { bold, yellow, red, dim, colorStatus } from "@n-dx/llm-client";
+import { emitMigrationNotification } from "../migration-notification.js";
 
 function colorPriority(priority: string): string {
   switch (priority) {
@@ -20,10 +21,13 @@ export async function cmdNext(
   flags: Record<string, string>,
 ): Promise<void> {
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
-  await ensureLegacyPrdMigrated(dir);
+  const migrationResult = await ensureLegacyPrdMigrated(dir);
 
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Emit migration notification to CLI and execution log
+  await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));
   const doc = await store.loadDocument();
   doc.items = await loadItemsPreferFolderTree(rexDir, store);
 

@@ -4,6 +4,7 @@ import { REX_DIR } from "./constants.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, requireRexDir } from "../errors.js";
 import { info, result } from "../output.js";
+import { emitMigrationNotification } from "../migration-notification.js";
 import { validateTransition } from "../../core/transitions.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { findAutoCompletions } from "../../core/parent-completion.js";
@@ -26,11 +27,14 @@ export async function cmdUpdate(
   }
 
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before writing PRD
-  await ensureLegacyPrdMigrated(dir);
+  const migrationResult = await ensureLegacyPrdMigrated(dir);
 
   requireRexDir(dir);
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Emit migration notification to CLI and execution log
+  await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));
 
   const existing = await store.getItem(id);
   if (!existing) {

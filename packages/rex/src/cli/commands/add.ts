@@ -16,6 +16,7 @@ import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
+import { emitMigrationNotification } from "../migration-notification.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../../schema/index.js";
 
 export async function cmdAdd(
@@ -24,7 +25,7 @@ export async function cmdAdd(
   flags: Record<string, string>,
 ): Promise<void> {
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before writing PRD
-  await ensureLegacyPrdMigrated(dir);
+  const migrationResult = await ensureLegacyPrdMigrated(dir);
 
   const title = flags.title;
   if (!title) {
@@ -36,6 +37,9 @@ export async function cmdAdd(
 
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Emit migration notification to CLI and execution log
+  await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));
 
   // Ensure the current branch's PRD file exists and is the write target.
   // resolveStore does a read-only lookup; resolvePRDFile creates the file if needed.
