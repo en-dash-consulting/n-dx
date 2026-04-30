@@ -41,7 +41,7 @@ const KNOWN_FIELDS = new Set([
   "tokenUsage", "duration",
   "resolutionType", "resolutionDetail", "failureReason",
   "requirements",
-  "overrideMarker", "mergedProposals",
+  "overrideMarker", "mergedProposals", "commits",
   "description", "children",
 ]);
 
@@ -307,6 +307,7 @@ function emitSequenceItem(item: unknown, indent: string): string[] {
 
 function orderedSequenceObjectEntries(obj: Record<string, unknown>): Array<[string, unknown]> {
   // ActiveInterval shape: start first, then end (if present), then alphabetical extras.
+  // CommitAttribution shape: hash, author, authorEmail, timestamp, then message (if present).
   // Requirement / generic objects: id and title first, then alphabetical.
   const keys = Object.keys(obj);
 
@@ -314,6 +315,22 @@ function orderedSequenceObjectEntries(obj: Record<string, unknown>): Array<[stri
     const ordered: Array<[string, unknown]> = [["start", obj["start"]]];
     if (keys.includes("end")) ordered.push(["end", obj["end"]]);
     for (const k of keys.filter(k => k !== "start" && k !== "end").sort()) {
+      ordered.push([k, obj[k]]);
+    }
+    return ordered;
+  }
+
+  // CommitAttribution: hash, author, authorEmail, timestamp, message (optional)
+  if (keys.includes("hash") && keys.includes("timestamp")) {
+    const ordered: Array<[string, unknown]> = [["hash", obj["hash"]]];
+    const fieldsAfterHash = ["author", "authorEmail", "timestamp"];
+    for (const k of fieldsAfterHash) {
+      if (keys.includes(k)) {
+        ordered.push([k, obj[k]]);
+      }
+    }
+    // Remaining fields (like message) in alphabetical order
+    for (const k of keys.filter(k => !["hash", ...fieldsAfterHash].includes(k)).sort()) {
       ordered.push([k, obj[k]]);
     }
     return ordered;

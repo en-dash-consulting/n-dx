@@ -197,6 +197,25 @@ export interface MergedProposalRecord {
   source: "smart-add";
 }
 
+/**
+ * Commit attribution: hash, author, and timestamp of a commit
+ * associated with this PRD item. Array accumulates as an item
+ * is touched across multiple commits (especially for items
+ * completed across multiple commits).
+ */
+export interface CommitAttribution {
+  /** Full git commit SHA-1 hash (40 hex characters). */
+  hash: string;
+  /** Commit author name (from git config or commit object). */
+  author: string;
+  /** Author email address. */
+  authorEmail: string;
+  /** ISO 8601 timestamp of the commit. */
+  timestamp: string;
+  /** Optional commit message (first line). */
+  message?: string;
+}
+
 /** All valid requirement categories as a Set. */
 export const VALID_REQUIREMENT_CATEGORIES = new Set<RequirementCategory>([
   "technical",
@@ -275,6 +294,8 @@ export interface PRDItem {
   overrideMarker?: DuplicateOverrideMarker;
   /** Present when duplicate proposals were merged into this existing item. */
   mergedProposals?: MergedProposalRecord[];
+  /** Commits (SHA hash + author + timestamp) associated with this item. */
+  commits?: CommitAttribution[];
   children?: PRDItem[];
   [key: string]: unknown;
 }

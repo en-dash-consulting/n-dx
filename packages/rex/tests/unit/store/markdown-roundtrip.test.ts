@@ -552,3 +552,164 @@ describe("round-trip: edge cases", () => {
     assertRoundTrip(doc);
   });
 });
+
+// ── Commit attribution ───────────────────────────────────────────────────────
+
+describe("round-trip: commit attribution", () => {
+  it("item with no commits round-trips correctly", () => {
+    assertRoundTrip(minimalDoc([epic()]));
+  });
+
+  it("item with single commit round-trips correctly", () => {
+    assertRoundTrip(
+      minimalDoc([
+        epic({
+          commits: [
+            {
+              hash: "abc123def456abc123def456abc123def456abc1",
+              author: "Alice",
+              authorEmail: "alice@example.com",
+              timestamp: "2026-04-30T10:00:00.000Z",
+              message: "Implement feature",
+            },
+          ],
+        }),
+      ]),
+    );
+  });
+
+  it("item with multiple commits round-trips correctly", () => {
+    assertRoundTrip(
+      minimalDoc([
+        epic({
+          commits: [
+            {
+              hash: "abc123def456abc123def456abc123def456abc1",
+              author: "Alice",
+              authorEmail: "alice@example.com",
+              timestamp: "2026-04-30T10:00:00.000Z",
+            },
+            {
+              hash: "def456abc123def456abc123def456abc123def45",
+              author: "Bob",
+              authorEmail: "bob@example.com",
+              timestamp: "2026-04-30T11:00:00.000Z",
+              message: "Fix issue",
+            },
+          ],
+        }),
+      ]),
+    );
+  });
+
+  it("commits array serializes in stable field order", () => {
+    const item = epic({
+      commits: [
+        {
+          hash: "abc123def456abc123def456abc123def456abc1",
+          author: "Alice",
+          authorEmail: "alice@example.com",
+          timestamp: "2026-04-30T10:00:00.000Z",
+          message: "Feature",
+        },
+      ],
+    });
+    const doc = minimalDoc([item]);
+    const serialized = serializeDocument(doc);
+    const lines = serialized.split("\n");
+
+    // Find the commits section
+    const commitsIdx = lines.findIndex(l => l.includes("commits:"));
+    const hashIdx = lines.findIndex((l, i) => i > commitsIdx && l.includes("hash:"));
+    const authorIdx = lines.findIndex((l, i) => i > commitsIdx && l.includes("author:"));
+    const emailIdx = lines.findIndex((l, i) => i > commitsIdx && l.includes("authorEmail:"));
+    const tsIdx = lines.findIndex((l, i) => i > commitsIdx && l.includes("timestamp:"));
+
+    // Verify order: hash < author < authorEmail < timestamp
+    expect(hashIdx).toBeGreaterThan(commitsIdx);
+    expect(hashIdx).toBeLessThan(authorIdx);
+    expect(authorIdx).toBeLessThan(emailIdx);
+    expect(emailIdx).toBeLessThan(tsIdx);
+  });
+
+  it("legacy items without commits field parse cleanly", () => {
+    // Simulate legacy PRD file without commits field
+    const legacy = `---
+schema: rex/v1
+title: Legacy Project
+items:
+  - id: "11111111-1111-1111-1111-111111111111"
+    level: epic
+    title: Old Item
+    status: completed
+---`;
+
+    const parsed = parseDocument(legacy);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.data.items[0].commits).toBeUndefined();
+      // Round-trip should work
+      const reserialized = serializeDocument(parsed.data);
+      const reparsed = parseDocument(reserialized);
+      expect(reparsed.ok).toBe(true);
+      expect(reparsed.data.items[0].commits).toBeUndefined();
+    }
+  });
+
+  it("item with empty commits array omits field on serialization", () => {
+    // Empty arrays should be omitted from serialization
+    const item = epic({ commits: [] });
+    const doc = minimalDoc([item]);
+    const serialized = serializeDocument(doc);
+
+    // Empty commits array should not appear in output
+    expect(serialized).not.toContain("commits:");
+  });
+
+  it("commit without optional message round-trips correctly", () => {
+    assertRoundTrip(
+      minimalDoc([
+        epic({
+          commits: [
+            {
+              hash: "abc123def456abc123def456abc123def456abc1",
+              author: "Alice",
+              authorEmail: "alice@example.com",
+              timestamp: "2026-04-30T10:00:00.000Z",
+            },
+          ],
+        }),
+      ]),
+    );
+  });
+
+  it("multiple items with commits all round-trip correctly", () => {
+    const doc = minimalDoc([
+      epic({
+        id: "e1",
+        commits: [
+          {
+            hash: "abc123def456abc123def456abc123def456abc1",
+            author: "Alice",
+            authorEmail: "alice@example.com",
+            timestamp: "2026-04-30T10:00:00.000Z",
+          },
+        ],
+        children: [
+          feature({
+            id: "f1",
+            commits: [
+              {
+                hash: "def456abc123def456abc123def456abc123def45",
+                author: "Bob",
+                authorEmail: "bob@example.com",
+                timestamp: "2026-04-30T11:00:00.000Z",
+              },
+            ],
+          }),
+        ],
+      }),
+    ]);
+    assertRoundTrip(doc);
+  });
+});

@@ -44,6 +44,16 @@ export const RequirementSchema = z
   })
   .strict();
 
+export const CommitAttributionSchema = z
+  .object({
+    hash: z.string(),
+    author: z.string(),
+    authorEmail: z.string(),
+    timestamp: z.string(),
+    message: z.string().optional(),
+  })
+  .strict();
+
 export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
   z
     .object({
@@ -60,6 +70,7 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       source: z.string().optional(),
       blockedBy: z.array(z.string()).optional(),
       requirements: z.array(RequirementSchema).optional(),
+      commits: z.array(CommitAttributionSchema).optional(),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       endedAt: z.string().optional(),

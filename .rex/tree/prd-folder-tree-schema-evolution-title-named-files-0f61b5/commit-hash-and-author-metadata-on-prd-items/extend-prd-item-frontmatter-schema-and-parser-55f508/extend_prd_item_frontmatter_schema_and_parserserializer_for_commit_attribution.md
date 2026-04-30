@@ -2,13 +2,14 @@
 id: "55f50853-4273-46d0-ab1b-e809505ea707"
 level: "task"
 title: "Extend PRD item frontmatter schema and parser/serializer for commit attribution"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "rex"
   - "prd"
   - "schema"
 source: "smart-add"
+startedAt: "2026-04-30T13:11:49.744Z"
 acceptanceCriteria:
   - "PRDItem type includes `commits: CommitAttribution[]` with documented field semantics"
   - "Markdown serializer emits commit attribution under a stable frontmatter key with array-of-objects layout"
