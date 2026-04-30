@@ -20,6 +20,7 @@ import { mkdir, readFile, writeFile, readdir, rm, rename, stat } from "node:fs/p
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { PRDItem } from "../schema/index.js";
+import { titleToFilename } from "./title-to-filename.js";
 
 const MAX_SLUG_LENGTH = 60;
 const SHORT_ID_LENGTH = 6;
@@ -74,7 +75,11 @@ export async function serializeFolderTree(
     const features = (epic.children ?? []).filter(c => c.level === "feature");
     const featureSlugs = resolveSiblingSlugs(features);
     const content = renderItemIndexMd(epic, features, featureSlugs);
-    await writeIfChanged(join(epicDir, "index.md"), content, result);
+    const epicFilename = titleToFilename(epic.title);
+    const epicPath = join(epicDir, epicFilename);
+    await writeIfChanged(epicPath, content, result);
+    // Clean up any orphaned markdown files in this directory (title renames)
+    await removeOrphanedMarkdownFiles(epicDir, epicFilename);
 
     const expectedFeatureSlugs = new Set<string>();
     for (const feature of features) {
@@ -86,7 +91,11 @@ export async function serializeFolderTree(
       const tasks = (feature.children ?? []).filter(c => c.level === "task");
       const taskSlugs = resolveSiblingSlugs(tasks);
       const featureContent = renderItemIndexMd(feature, tasks, taskSlugs);
-      await writeIfChanged(join(featureDir, "index.md"), featureContent, result);
+      const featureFilename = titleToFilename(feature.title);
+      const featurePath = join(featureDir, featureFilename);
+      await writeIfChanged(featurePath, featureContent, result);
+      // Clean up any orphaned markdown files in this directory (title renames)
+      await removeOrphanedMarkdownFiles(featureDir, featureFilename);
 
       const expectedTaskSlugs = new Set<string>();
       for (const task of tasks) {
@@ -98,7 +107,11 @@ export async function serializeFolderTree(
         const subtasks = (task.children ?? []).filter(c => c.level === "subtask");
         const subtaskSlugs = resolveSiblingSlugs(subtasks);
         const taskContent = renderItemIndexMd(task, subtasks, subtaskSlugs);
-        await writeIfChanged(join(taskDir, "index.md"), taskContent, result);
+        const taskFilename = titleToFilename(task.title);
+        const taskPath = join(taskDir, taskFilename);
+        await writeIfChanged(taskPath, taskContent, result);
+        // Clean up any orphaned markdown files in this directory (title renames)
+        await removeOrphanedMarkdownFiles(taskDir, taskFilename);
 
         const expectedSubtaskSlugs = new Set<string>();
         for (const subtask of subtasks) {
@@ -108,7 +121,11 @@ export async function serializeFolderTree(
           await ensureDir(subtaskDir, result);
 
           const subtaskContent = renderItemIndexMd(subtask, [], new Map());
-          await writeIfChanged(join(subtaskDir, "index.md"), subtaskContent, result);
+          const subtaskFilename = titleToFilename(subtask.title);
+          const subtaskPath = join(subtaskDir, subtaskFilename);
+          await writeIfChanged(subtaskPath, subtaskContent, result);
+          // Clean up any orphaned markdown files in this directory (title renames)
+          await removeOrphanedMarkdownFiles(subtaskDir, subtaskFilename);
         }
 
         await removeStaleSubdirs(taskDir, expectedSubtaskSlugs, result);
@@ -323,6 +340,44 @@ function emitYamlField(lines: string[], key: string, value: unknown): void {
     }
   } else {
     lines.push(`${key}: ${JSON.stringify(String(value))}`);
+  }
+}
+
+// ── Orphaned file cleanup ─────────────────────────────────────────────────────
+
+/**
+ * Remove orphaned markdown files in a directory.
+ *
+ * When an item's title changes, the old markdown file is left behind.
+ * This function scans the directory for any .md files other than the current
+ * item filename and removes them. Non-throwing: silently continues on errors
+ * (permissions, missing dir, etc.).
+ *
+ * @param dir - Directory to scan
+ * @param currentFilename - The current item's markdown filename to keep
+ */
+async function removeOrphanedMarkdownFiles(dir: string, currentFilename: string): Promise<void> {
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    // Directory not readable or missing - nothing to clean
+    return;
+  }
+
+  for (const entry of entries) {
+    // Skip the current item file and non-markdown files
+    if (entry === currentFilename || !entry.endsWith(".md")) {
+      continue;
+    }
+
+    // Remove the orphaned markdown file
+    try {
+      const filePath = join(dir, entry);
+      await rm(filePath, { force: true });
+    } catch {
+      // Silently continue on removal errors
+    }
   }
 }
 

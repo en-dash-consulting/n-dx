@@ -13,5 +13,5 @@ description: "Replace the current per-item `index.md` convention with markdown f
 | Title | Status |
 |-------|--------|
 | [Define title-to-filename normalization rules and implement pure helper](./define-title-to-filename-normalization-rules-and-d429d9/index.md) | completed |
-| [Implement migration command to rename legacy index.md files to title-based names](./implement-migration-command-to-rename-legacy-index-0f659c/index.md) | in_progress |
-| [Update PRD folder-tree serializer and parser to read/write title-named markdown files](./update-prd-folder-tree-serializer-and-parser-to-4ab625/index.md) | pending |
+| [Implement migration command to rename legacy index.md files to title-based names](./implement-migration-command-to-rename-legacy-index-0f659c/index.md) | completed |
+| [Update PRD folder-tree serializer and parser to read/write title-named markdown files](./update-prd-folder-tree-serializer-and-parser-to-4ab625/index.md) | in_progress |

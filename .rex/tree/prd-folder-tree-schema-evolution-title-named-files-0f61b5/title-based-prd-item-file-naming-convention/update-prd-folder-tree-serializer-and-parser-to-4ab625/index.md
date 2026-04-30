@@ -2,13 +2,14 @@
 id: "4ab625ca-f021-4bd7-9983-1240bfe54a5d"
 level: "task"
 title: "Update PRD folder-tree serializer and parser to read/write title-named markdown files"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "rex"
   - "prd"
   - "storage"
 source: "smart-add"
+startedAt: "2026-04-30T01:20:22.264Z"
 acceptanceCriteria:
   - "Serializer writes item content to `<normalized-title>.md` in the item directory"
   - "Parser locates the item file via deterministic naming, falling back to `index.md` only when the title-named file is absent"

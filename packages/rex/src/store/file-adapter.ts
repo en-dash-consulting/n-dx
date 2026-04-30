@@ -17,6 +17,7 @@ import { parseDocument } from "./markdown-parser.js";
 import { serializeDocument } from "./markdown-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
+import { titleToFilename } from "./title-to-filename.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
@@ -241,6 +242,9 @@ export class FileStore implements PRDStore {
    * is no longer used to route writes — every mutation lands in `.rex/tree/`.
    * Per-item attribution (`branch`, `sourceFile`) still travels with each
    * item via {@link applyWriteAttribution}.
+   *
+   * Title renames are handled by the cleanup step in serializeFolderTree,
+   * which removes orphaned markdown files within item directories.
    */
   private async withFileTransaction<T>(
     _filename: string,

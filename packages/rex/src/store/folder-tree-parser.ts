@@ -26,6 +26,7 @@ import type {
   Priority,
   ResolutionType,
 } from "../schema/index.js";
+import { titleToFilename } from "./title-to-filename.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -64,26 +65,34 @@ export async function parseFolderTree(treeRoot: string): Promise<FolderParseResu
 
   for (const epicDir of await listSubdirs(treeRoot)) {
     const epicPath = join(treeRoot, epicDir);
-    const epic = await parseItemFile(join(epicPath, "index.md"), "epic", warnings);
+    const epicFile = await discoverItemFile(epicPath, warnings);
+    if (!epicFile) continue;
+    const epic = await parseItemFile(epicFile, "epic", warnings);
     if (!epic) continue;
 
     const featureItems: PRDItem[] = [];
     for (const featureDir of await listSubdirs(epicPath)) {
       const featurePath = join(epicPath, featureDir);
-      const feature = await parseItemFile(join(featurePath, "index.md"), "feature", warnings);
+      const featureFile = await discoverItemFile(featurePath, warnings);
+      if (!featureFile) continue;
+      const feature = await parseItemFile(featureFile, "feature", warnings);
       if (!feature) continue;
 
       const taskItems: PRDItem[] = [];
       for (const taskDir of await listSubdirs(featurePath)) {
         const taskPath = join(featurePath, taskDir);
-        const task = await parseTaskFile(join(taskPath, "index.md"), warnings);
+        const taskFile = await discoverItemFile(taskPath, warnings);
+        if (!taskFile) continue;
+        const task = await parseTaskFile(taskFile, warnings);
         if (task) {
           const legacySubtasks = task.children ?? [];
           const subtaskItems: PRDItem[] = [];
 
           for (const subtaskDir of await listSubdirs(taskPath)) {
             const subtaskPath = join(taskPath, subtaskDir);
-            const subtask = await parseItemFile(join(subtaskPath, "index.md"), "subtask", warnings);
+            const subtaskFile = await discoverItemFile(subtaskPath, warnings);
+            if (!subtaskFile) continue;
+            const subtask = await parseItemFile(subtaskFile, "subtask", warnings);
             if (subtask) subtaskItems.push(subtask);
           }
 
@@ -131,6 +140,56 @@ async function listSubdirs(dir: string): Promise<string[]> {
     if (await isDirectory(join(dir, entry))) dirs.push(entry);
   }
   return dirs.sort();
+}
+
+/**
+ * Discover the item file in a directory, using title-named files with fallback
+ * to legacy index.md.
+ *
+ * Discovery algorithm:
+ * 1. Scan directory for `.md` files (excluding index.md)
+ * 2. If exactly one non-index markdown file exists, return its full path
+ * 3. Else if `index.md` exists, return its full path (legacy fallback)
+ * 4. Else return null and emit warning
+ *
+ * This supports migration: during transition, both title-named and index.md
+ * can coexist. The deterministic discovery rule ensures consistent behavior.
+ */
+async function discoverItemFile(
+  dir: string,
+  warnings: ParseWarning[],
+): Promise<string | null> {
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    warnings.push({ path: dir, message: "Directory not readable" });
+    return null;
+  }
+
+  // Find all .md files (excluding index.md)
+  const markdownFiles = entries.filter(
+    (f) => f.endsWith(".md") && f !== "index.md",
+  );
+
+  // If exactly one non-index markdown file, use it
+  if (markdownFiles.length === 1) {
+    return join(dir, markdownFiles[0]);
+  }
+
+  // Else fall back to index.md if it exists
+  const indexPath = join(dir, "index.md");
+  try {
+    await stat(indexPath);
+    return indexPath;
+  } catch {
+    // Neither title-named nor index.md exists
+    warnings.push({
+      path: dir,
+      message: "No item markdown file found (expected index.md or title-named .md file)",
+    });
+    return null;
+  }
 }
 
 // ── index.md parsing ──────────────────────────────────────────────────────────
