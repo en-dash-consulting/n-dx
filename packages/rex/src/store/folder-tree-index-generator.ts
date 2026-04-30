@@ -214,7 +214,6 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
     "sourceFile",
     "requirements",
     "activeIntervals",
-    "overrideMarker",
     "mergedProposals",
     "tokenUsage",
     "duration",
@@ -249,9 +248,17 @@ function emitYamlField(lines: string[], key: string, value: unknown): void {
     } else {
       lines.push(`${key}:`);
       for (const item of value) {
-        lines.push(`  - ${JSON.stringify(String(item))}`);
+        if (item !== null && typeof item === "object" && !Array.isArray(item)) {
+          // Object items emit as inline JSON (valid YAML flow mapping).
+          lines.push(`  - ${JSON.stringify(item)}`);
+        } else {
+          lines.push(`  - ${JSON.stringify(String(item))}`);
+        }
       }
     }
+  } else if (value !== null && typeof value === "object") {
+    // Plain objects emit as inline JSON (valid YAML flow mapping).
+    lines.push(`${key}: ${JSON.stringify(value)}`);
   } else {
     // Quote all scalar values consistently with folder-tree-serializer.ts
     lines.push(`${key}: ${JSON.stringify(String(value))}`);

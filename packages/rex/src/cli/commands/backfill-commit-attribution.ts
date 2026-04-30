@@ -14,8 +14,7 @@ import { promisify } from "node:util";
 import { join } from "node:path";
 import { info, warn } from "../output.js";
 import { resolveStore } from "../../store/index.js";
-import type { PRDItem } from "../../schema/index.js";
-import type { CommitAttribution } from "../../schema/v1.js";
+import type { PRDItem, CommitAttribution } from "../../schema/index.js";
 
 const execAsync = promisify(execFile);
 

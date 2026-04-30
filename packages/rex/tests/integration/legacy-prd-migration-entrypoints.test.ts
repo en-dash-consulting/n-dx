@@ -40,7 +40,7 @@ function setupTestProject(): string {
   // Create a simple legacy prd.json if fixture doesn't exist
   const legacyPrdPath = join(rexDir, "prd.json");
   const samplePrd = {
-    version: 1,
+    schema: "rex/v1",
     title: "Test PRD",
     items: [
       {
@@ -75,7 +75,12 @@ function setupTestProject(): string {
 
   // Create config.json (required by rex commands)
   const configPath = join(rexDir, "config.json");
-  const config = { model: "claude-opus", budget: { limit: 0, abort: false } };
+  const config = {
+    schema: "rex/v1",
+    project: "legacy-migration-test",
+    adapter: "file",
+    model: "claude-opus",
+  };
   writeFileSync(configPath, JSON.stringify(config, null, 2));
 
   return testDir;

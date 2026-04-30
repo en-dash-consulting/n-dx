@@ -64,99 +64,69 @@ export async function serializeFolderTree(
   };
 
   await ensureDir(treeRoot, result);
-
-  const rootSlugs = resolveSiblingSlugs(items);
-  const expectedEpicSlugs = new Set<string>();
-  for (const epic of items) {
-    const epicSlug = requireSlug(rootSlugs, epic);
-    expectedEpicSlugs.add(epicSlug);
-    const epicDir = join(treeRoot, epicSlug);
-    await ensureDir(epicDir, result);
-
-    const features = (epic.children ?? []).filter(c => c.level === "feature");
-    const featureSlugs = resolveSiblingSlugs(features);
-    const content = renderItemIndexMd(epic, features, featureSlugs);
-    const epicFilename = titleToFilename(epic.title);
-    const epicPath = join(epicDir, epicFilename);
-    await writeIfChanged(epicPath, content, result);
-    // Clean up any orphaned markdown files in this directory (title renames)
-    await removeOrphanedMarkdownFiles(epicDir, epicFilename);
-    // Generate and write index.md for the epic
-    const epicIndexContent = generateIndexMd(epic, features, []);
-    const epicIndexPath = join(epicDir, "index.md");
-    await writeIfChanged(epicIndexPath, epicIndexContent, result);
-
-    const expectedFeatureSlugs = new Set<string>();
-    for (const feature of features) {
-      const featureSlug = requireSlug(featureSlugs, feature);
-      expectedFeatureSlugs.add(featureSlug);
-      const featureDir = join(epicDir, featureSlug);
-      await ensureDir(featureDir, result);
-
-      const tasks = (feature.children ?? []).filter(c => c.level === "task");
-      const taskSlugs = resolveSiblingSlugs(tasks);
-      const featureContent = renderItemIndexMd(feature, tasks, taskSlugs);
-      const featureFilename = titleToFilename(feature.title);
-      const featurePath = join(featureDir, featureFilename);
-      await writeIfChanged(featurePath, featureContent, result);
-      // Clean up any orphaned markdown files in this directory (title renames)
-      await removeOrphanedMarkdownFiles(featureDir, featureFilename);
-      // Generate and write index.md for the feature
-      const featureIndexContent = generateIndexMd(feature, tasks, []);
-      const featureIndexPath = join(featureDir, "index.md");
-      await writeIfChanged(featureIndexPath, featureIndexContent, result);
-
-      const expectedTaskSlugs = new Set<string>();
-      for (const task of tasks) {
-        const taskSlug = requireSlug(taskSlugs, task);
-        expectedTaskSlugs.add(taskSlug);
-        const taskDir = join(featureDir, taskSlug);
-        await ensureDir(taskDir, result);
-
-        const subtasks = (task.children ?? []).filter(c => c.level === "subtask");
-        const subtaskSlugs = resolveSiblingSlugs(subtasks);
-        const taskContent = renderItemIndexMd(task, subtasks, subtaskSlugs);
-        const taskFilename = titleToFilename(task.title);
-        const taskPath = join(taskDir, taskFilename);
-        await writeIfChanged(taskPath, taskContent, result);
-        // Clean up any orphaned markdown files in this directory (title renames)
-        await removeOrphanedMarkdownFiles(taskDir, taskFilename);
-        // Generate and write index.md for the task
-        const taskIndexContent = generateIndexMd(task, subtasks, []);
-        const taskIndexPath = join(taskDir, "index.md");
-        await writeIfChanged(taskIndexPath, taskIndexContent, result);
-
-        const expectedSubtaskSlugs = new Set<string>();
-        for (const subtask of subtasks) {
-          const subtaskSlug = requireSlug(subtaskSlugs, subtask);
-          expectedSubtaskSlugs.add(subtaskSlug);
-          const subtaskDir = join(taskDir, subtaskSlug);
-          await ensureDir(subtaskDir, result);
-
-          const subtaskContent = renderItemIndexMd(subtask, [], new Map());
-          const subtaskFilename = titleToFilename(subtask.title);
-          const subtaskPath = join(subtaskDir, subtaskFilename);
-          await writeIfChanged(subtaskPath, subtaskContent, result);
-          // Clean up any orphaned markdown files in this directory (title renames)
-          await removeOrphanedMarkdownFiles(subtaskDir, subtaskFilename);
-          // Generate and write index.md for the subtask
-          const subtaskIndexContent = generateIndexMd(subtask, [], []);
-          const subtaskIndexPath = join(subtaskDir, "index.md");
-          await writeIfChanged(subtaskIndexPath, subtaskIndexContent, result);
-        }
-
-        await removeStaleSubdirs(taskDir, expectedSubtaskSlugs, result);
-      }
-
-      await removeStaleSubdirs(featureDir, expectedTaskSlugs, result);
-    }
-
-    await removeStaleSubdirs(epicDir, expectedFeatureSlugs, result);
-  }
-
-  await removeStaleSubdirs(treeRoot, expectedEpicSlugs, result);
+  await serializeChildren(items, treeRoot, result);
 
   return result;
+}
+
+/**
+ * Recursively serialize a list of sibling items into `parentDir`.
+ *
+ * Each item gets its own directory, regardless of level. Children are
+ * serialized one level deeper, also regardless of level. This preserves
+ * skip-level placements that are legal under {@link LEVEL_HIERARCHY}
+ * (e.g. a task placed directly under an epic without an intermediate
+ * feature) without dropping or re-typing data.
+ *
+ * The directory contains:
+ *   - `<title>.md` — the item's primary markdown (with full frontmatter)
+ *   - `index.md`   — human-readable summary (Progress / Subtask sections)
+ * and one subdirectory per child, recursively.
+ *
+ * Stale sibling directories under `parentDir` (items removed from the
+ * source tree) are deleted via {@link removeStaleSubdirs}.
+ */
+async function serializeChildren(
+  items: PRDItem[],
+  parentDir: string,
+  result: SerializeResult,
+): Promise<void> {
+  // Position-keyed slugs survive duplicate-id inputs: id-keyed lookups would
+  // collapse two same-id items into one slot. The public id-keyed
+  // `resolveSiblingSlugs` API is unchanged for external callers — only this
+  // internal serialization path uses positional slugs.
+  const positionalSlugs = resolvePositionalSiblingSlugs(items);
+  const expectedSlugs = new Set<string>();
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const itemSlug = positionalSlugs[i];
+    expectedSlugs.add(itemSlug);
+    const itemDir = join(parentDir, itemSlug);
+    await ensureDir(itemDir, result);
+
+    const children = item.children ?? [];
+    const childSlugs = resolveSiblingSlugs(children);
+
+    // Item file: <title>.md with full frontmatter and a Children link table.
+    const itemContent = renderItemIndexMd(item, children, childSlugs);
+    const itemFilename = titleToFilename(item.title);
+    const itemPath = join(itemDir, itemFilename);
+    await writeIfChanged(itemPath, itemContent, result);
+    await removeOrphanedMarkdownFiles(itemDir, itemFilename);
+
+    // index.md: human-readable summary (delegates to generateIndexMd, which
+    // selectively renders Progress / Subtask sections based on item.level).
+    const itemIndexContent = generateIndexMd(item, children, []);
+    const itemIndexPath = join(itemDir, "index.md");
+    await writeIfChanged(itemIndexPath, itemIndexContent, result);
+
+    // Always recurse so stale child subdirectories are cleaned up even when
+    // the item now has no children (e.g. after a move that empties this parent).
+    await serializeChildren(children, itemDir, result);
+  }
+
+  await removeStaleSubdirs(parentDir, expectedSlugs, result);
 }
 
 /**
@@ -188,6 +158,47 @@ export function slugifyTitle(title: string): string {
  * gets a short ID suffix. This keeps results deterministic regardless of item
  * order and avoids giving the first item a privileged unsuffixed path.
  */
+/**
+ * Resolve final directory slugs by position so duplicate-id inputs survive.
+ *
+ * Returns an array aligned with `items`. When two siblings share an id (a
+ * pre-existing PRD-data invariant violation that downstream `validate`
+ * surfaces), each instance still gets its own directory — the migration is
+ * lossless even on malformed input. Falls back to position suffixes for
+ * remaining slug collisions after the title- and id-based suffix rules
+ * already applied by the existing slug system.
+ */
+function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
+  const unsuffixed = items.map((item) => slugifyTitle(item.title));
+  const titleCounts = new Map<string, number>();
+  for (const slug of unsuffixed) {
+    titleCounts.set(slug, (titleCounts.get(slug) ?? 0) + 1);
+  }
+
+  const initial = items.map((item, i) => {
+    const normalized = normalizeTitleSlug(item.title);
+    const titleCollides = (titleCounts.get(unsuffixed[i]) ?? 0) > 1;
+    if (requiresLongSuffix(item.title, normalized) || titleCollides) {
+      return appendShortIdSuffix(normalized, item.id);
+    }
+    return unsuffixed[i];
+  });
+
+  // Final dedup pass — for genuinely identical (title, id) pairs append a
+  // position suffix so each item still gets its own directory.
+  const finalCounts = new Map<string, number>();
+  for (const slug of initial) {
+    finalCounts.set(slug, (finalCounts.get(slug) ?? 0) + 1);
+  }
+  const seen = new Map<string, number>();
+  return initial.map((slug) => {
+    if ((finalCounts.get(slug) ?? 0) <= 1) return slug;
+    const idx = seen.get(slug) ?? 0;
+    seen.set(slug, idx + 1);
+    return `${slug}-${idx + 1}`;
+  });
+}
+
 export function resolveSiblingSlugs(items: PRDItem[]): Map<string, string> {
   const unsuffixedById = new Map<string, string>();
   const counts = new Map<string, number>();
@@ -313,7 +324,7 @@ const ORDERED_FIELDS: ReadonlyArray<string> = [
  */
 const STORAGE_FIELDS = new Set([
   "children", "branch", "sourceFile", "requirements",
-  "activeIntervals", "overrideMarker", "mergedProposals",
+  "activeIntervals", "mergedProposals",
   "tokenUsage", "duration", "loeRationale", "loeConfidence",
 ]);
 
@@ -352,9 +363,17 @@ function emitYamlField(lines: string[], key: string, value: unknown): void {
     } else {
       lines.push(`${key}:`);
       for (const item of value) {
-        lines.push(`  - ${JSON.stringify(String(item))}`);
+        if (item !== null && typeof item === "object" && !Array.isArray(item)) {
+          // Object items emit as inline JSON (valid YAML flow mapping).
+          lines.push(`  - ${JSON.stringify(item)}`);
+        } else {
+          lines.push(`  - ${JSON.stringify(String(item))}`);
+        }
       }
     }
+  } else if (value !== null && typeof value === "object") {
+    // Plain objects emit as inline JSON (valid YAML flow mapping).
+    lines.push(`${key}: ${JSON.stringify(value)}`);
   } else {
     lines.push(`${key}: ${JSON.stringify(String(value))}`);
   }

@@ -26,7 +26,6 @@ import type {
   Priority,
   ResolutionType,
 } from "../schema/index.js";
-import { titleToFilename } from "./title-to-filename.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -49,9 +48,13 @@ export interface FolderParseResult {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Parse the folder tree at `treeRoot` into a list of epic PRDItems with
- * nested children. Never throws; missing treeRoot returns empty items with
- * a warning.
+ * Parse the folder tree at `treeRoot` into a list of PRDItems with nested
+ * children. Never throws; missing treeRoot returns empty items with a warning.
+ *
+ * Each item's level comes from its frontmatter — directory depth is treated
+ * as a hint, not as authoritative. This lets the tree round-trip every shape
+ * legal under {@link LEVEL_HIERARCHY} (e.g. a task placed directly under an
+ * epic) without re-typing items.
  */
 export async function parseFolderTree(treeRoot: string): Promise<FolderParseResult> {
   const warnings: ParseWarning[] = [];
@@ -63,58 +66,65 @@ export async function parseFolderTree(treeRoot: string): Promise<FolderParseResu
     return { items, warnings };
   }
 
-  for (const epicDir of await listSubdirs(treeRoot)) {
-    const epicPath = join(treeRoot, epicDir);
-    const epicFile = await discoverItemFile(epicPath, warnings);
-    if (!epicFile) continue;
-    const epic = await parseItemFile(epicFile, "epic", warnings);
-    if (!epic) continue;
-
-    const featureItems: PRDItem[] = [];
-    for (const featureDir of await listSubdirs(epicPath)) {
-      const featurePath = join(epicPath, featureDir);
-      const featureFile = await discoverItemFile(featurePath, warnings);
-      if (!featureFile) continue;
-      const feature = await parseItemFile(featureFile, "feature", warnings);
-      if (!feature) continue;
-
-      const taskItems: PRDItem[] = [];
-      for (const taskDir of await listSubdirs(featurePath)) {
-        const taskPath = join(featurePath, taskDir);
-        const taskFile = await discoverItemFile(taskPath, warnings);
-        if (!taskFile) continue;
-        const task = await parseTaskFile(taskFile, warnings);
-        if (task) {
-          const legacySubtasks = task.children ?? [];
-          const subtaskItems: PRDItem[] = [];
-
-          for (const subtaskDir of await listSubdirs(taskPath)) {
-            const subtaskPath = join(taskPath, subtaskDir);
-            const subtaskFile = await discoverItemFile(subtaskPath, warnings);
-            if (!subtaskFile) continue;
-            const subtask = await parseItemFile(subtaskFile, "subtask", warnings);
-            if (subtask) subtaskItems.push(subtask);
-          }
-
-          const seenSubtaskIds = new Set(subtaskItems.map(subtask => subtask.id));
-          for (const legacySubtask of legacySubtasks) {
-            if (!seenSubtaskIds.has(legacySubtask.id)) subtaskItems.push(legacySubtask);
-          }
-
-          if (subtaskItems.length > 0) task.children = subtaskItems;
-          taskItems.push(task);
-        }
-      }
-
-      if (taskItems.length > 0) feature.children = taskItems;
-      featureItems.push(feature);
-    }
-
-    if (featureItems.length > 0) epic.children = featureItems;
-    items.push(epic);
+  for (const childDir of await listSubdirs(treeRoot)) {
+    const item = await parseDirRecursive(join(treeRoot, childDir), 1, warnings);
+    if (item) items.push(item);
   }
 
   return { items, warnings };
+}
+
+/**
+ * Recursively parse a directory in the folder tree into a PRDItem.
+ *
+ * The item's `level` is taken from its frontmatter. `depth` is passed through
+ * only to provide a useful hint when frontmatter is missing or malformed.
+ */
+async function parseDirRecursive(
+  dir: string,
+  depth: number,
+  warnings: ParseWarning[],
+): Promise<PRDItem | null> {
+  const itemFile = await discoverItemFile(dir, warnings);
+  if (!itemFile) return null;
+
+  const item = await parseItemFileFromFrontmatter(itemFile, depth, warnings);
+  if (!item) return null;
+
+  // Recursively parse subdirectories as children.
+  const childItems: PRDItem[] = [];
+  for (const childDir of await listSubdirs(dir)) {
+    const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings);
+    if (child) childItems.push(child);
+  }
+
+  // Tasks may also carry legacy `## Subtask:` sections in their index.md.
+  // Merge them in, preferring directory-based subtasks on id collisions.
+  if (item.level === "task") {
+    const legacySubtasks = await readLegacySubtasksIfTask(itemFile, warnings);
+    if (legacySubtasks.length > 0) {
+      const seenIds = new Set(childItems.map((c) => c.id));
+      for (const legacy of legacySubtasks) {
+        if (!seenIds.has(legacy.id)) childItems.push(legacy);
+      }
+    }
+  }
+
+  if (childItems.length > 0) item.children = childItems;
+  return item;
+}
+
+/**
+ * Read a task's index.md and extract any legacy `## Subtask:` sections.
+ * Returns an empty array if the file isn't a legacy task file.
+ */
+async function readLegacySubtasksIfTask(
+  filePath: string,
+  warnings: ParseWarning[],
+): Promise<PRDItem[]> {
+  const text = await readIndexFile(filePath, warnings);
+  if (text === null) return [];
+  return parseSubtaskSections(text, filePath, warnings);
 }
 
 // ── Directory utilities ───────────────────────────────────────────────────────
@@ -195,12 +205,13 @@ async function discoverItemFile(
 // ── index.md parsing ──────────────────────────────────────────────────────────
 
 /**
- * Read and parse an index.md for an epic or feature. Returns null and emits
- * a warning if the file is missing or its frontmatter is malformed.
+ * Read an item's markdown file and build a PRDItem from its frontmatter.
+ * The item's `level` is taken from frontmatter; `depth` is used only to
+ * emit a warning when the two disagree (it is not authoritative).
  */
-async function parseItemFile(
+async function parseItemFileFromFrontmatter(
   filePath: string,
-  expectedLevel: "epic" | "feature" | "subtask",
+  depth: number,
   warnings: ParseWarning[],
 ): Promise<PRDItem | null> {
   const text = await readIndexFile(filePath, warnings);
@@ -209,30 +220,7 @@ async function parseItemFile(
   const fm = parseFrontmatter(text, filePath, warnings);
   if (fm === null) return null;
 
-  return buildItem(fm, filePath, expectedLevel, warnings);
-}
-
-/**
- * Read and parse a task index.md, including any embedded `## Subtask:` sections.
- * Returns null and emits a warning if the file is missing or malformed.
- */
-async function parseTaskFile(
-  filePath: string,
-  warnings: ParseWarning[],
-): Promise<PRDItem | null> {
-  const text = await readIndexFile(filePath, warnings);
-  if (text === null) return null;
-
-  const fm = parseFrontmatter(text, filePath, warnings);
-  if (fm === null) return null;
-
-  const task = buildItem(fm, filePath, "task", warnings);
-  if (!task) return null;
-
-  const subtasks = parseSubtaskSections(text, filePath, warnings);
-  if (subtasks.length > 0) task.children = subtasks;
-
-  return task;
+  return buildItem(fm, filePath, depth, warnings);
 }
 
 async function readIndexFile(filePath: string, warnings: ParseWarning[]): Promise<string | null> {
@@ -249,9 +237,10 @@ async function readIndexFile(filePath: string, warnings: ParseWarning[]): Promis
 function buildItem(
   fm: Record<string, unknown>,
   filePath: string,
-  expectedLevel: "epic" | "feature" | "task" | "subtask",
+  depth: number,
   warnings: ParseWarning[],
 ): PRDItem | null {
+  const expectedLevel = depthToLevel(depth);
   const id = asString(fm["id"]);
   if (!id) {
     warnings.push({ path: filePath, message: "Missing required frontmatter field: id" });
@@ -315,11 +304,13 @@ function buildItem(
 
   // acceptanceCriteria: preserve whenever present in frontmatter (any level).
   // Feature and task items default to [] when the field is absent; epics and
-  // subtasks do not.
+  // subtasks do not. We use the frontmatter level here so that skip-level
+  // placements (e.g. a task at depth 2) get the right default for their
+  // actual level rather than for the depth-derived level.
   const ac = asStringList(fm["acceptanceCriteria"]);
   if (ac !== null) {
     item.acceptanceCriteria = ac;
-  } else if (expectedLevel === "feature" || expectedLevel === "task") {
+  } else if (level === "feature" || level === "task") {
     item.acceptanceCriteria = [];
   }
 
@@ -338,21 +329,36 @@ function buildItem(
     }
   }
 
-  if (level !== expectedLevel) {
+  // Frontmatter `level` is authoritative — directory depth is just a hint.
+  // Skip-level placements (e.g. a task at depth 2 with no intermediate
+  // feature) are legal under LEVEL_HIERARCHY, so we surface a warning when
+  // depth and frontmatter disagree but never mutate the level.
+  if (expectedLevel !== null && level !== expectedLevel) {
     warnings.push({
       path: filePath,
-      message: `Frontmatter level "${level}" does not match expected "${expectedLevel}" at this depth`,
+      message: `Frontmatter level "${level}" does not match depth-derived level "${expectedLevel}" — preserving frontmatter (item id=${id})`,
     });
-    // Use the directory-nesting depth as authoritative — override the level field.
-    item.level = expectedLevel;
   }
 
   return item;
 }
 
-// ── Subtask section parsing ───────────────────────────────────────────────────
+/**
+ * Depth-to-level mapping used as a hint when frontmatter level is missing
+ * or to surface a warning when the two disagree. Returns null for depths
+ * outside the canonical 4-level hierarchy.
+ */
+function depthToLevel(depth: number): "epic" | "feature" | "task" | "subtask" | null {
+  switch (depth) {
+    case 1: return "epic";
+    case 2: return "feature";
+    case 3: return "task";
+    case 4: return "subtask";
+    default: return null;
+  }
+}
 
-const SUBTASK_HEADING = /^## Subtask: (.+)$/m;
+// ── Subtask section parsing ───────────────────────────────────────────────────
 
 /**
  * Parse `## Subtask: {title}` sections from the body of a task index.md.
@@ -606,6 +612,16 @@ function parseYamlSequence(lines: string[], start: number, seqIndent: number): [
     if (!trimmed.startsWith("- ") && trimmed !== "-") break;
 
     const rest = trimmed.startsWith("- ") ? trimmed.slice(2) : "";
+    // Inline JSON flow mapping (e.g. emitted for object-array fields like `commits`).
+    if (rest.startsWith("{") && rest.endsWith("}")) {
+      try {
+        items.push(JSON.parse(rest));
+        i++;
+        continue;
+      } catch {
+        // Fall through to scalar parsing if it isn't valid JSON.
+      }
+    }
     items.push(parseScalar(rest));
     i++;
   }
@@ -723,6 +739,15 @@ function parseScalar(s: string): unknown {
   s = s.trim();
   if (s === "" || s === "null" || s === "~") return null;
   if (s === "[]") return [];
+  // Inline JSON flow mapping or sequence (emitted for nested object/array fields).
+  if ((s.startsWith("{") && s.endsWith("}")) ||
+      (s.startsWith("[") && s.endsWith("]"))) {
+    try {
+      return JSON.parse(s);
+    } catch {
+      // Fall through to plain-scalar handling if it isn't valid JSON.
+    }
+  }
   if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
     return s.slice(1, -1)
       .replace(/\\"/g, '"')

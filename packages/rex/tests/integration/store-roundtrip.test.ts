@@ -131,8 +131,7 @@ describe("Store roundtrip integration", () => {
     expect(epic?.title).toBe("Attributed Epic");
   });
 
-  it("passthrough preserves scalar unknown fields, coerces complex objects to strings", async () => {
-    // Write doc with unknown fields directly
+  it("passthrough preserves both scalar and complex unknown fields", async () => {
     const docWithExtras: PRDDocument = {
       schema: SCHEMA_VERSION,
       title: "Extended",
@@ -144,6 +143,7 @@ describe("Store roundtrip integration", () => {
           level: "epic",
           customString: "preserved",
           customMeta: { internal: true },
+          customList: [{ a: 1 }, { a: 2 }],
         } as PRDItem,
       ],
     } as PRDDocument;
@@ -151,15 +151,14 @@ describe("Store roundtrip integration", () => {
 
     const reloaded = await store.loadDocument();
     const item = reloaded.items[0] as Record<string, unknown>;
-    // Scalar unknown fields are preserved
     expect(item.customString).toBe("preserved");
-    // Nested objects are coerced to strings, not preserved as objects
-    expect(typeof item.customMeta).toBe("string");
+    expect(item.customMeta).toEqual({ internal: true });
+    expect(item.customList).toEqual([{ a: 1 }, { a: 2 }]);
   });
 
-  it("does not persist storage metadata (overrideMarker) to folder tree", async () => {
-    // Storage fields like overrideMarker are not persisted to folder-tree
-    // because they are internal metadata, not item content
+  it("persists overrideMarker through round-trip", async () => {
+    // overrideMarker is a defined schema field (DuplicateOverrideMarker) and
+    // round-trips losslessly through the folder tree.
     await store.addItem({
       id: "epic-normal",
       title: "Normal Epic",
@@ -167,28 +166,29 @@ describe("Store roundtrip integration", () => {
       level: "epic",
     });
 
+    const marker = {
+      type: "duplicate_guard_override" as const,
+      reason: "exact_title" as const,
+      reasonRef: "exact_title:epic-existing",
+      matchedItemId: "epic-existing",
+      matchedItemTitle: "Existing Epic",
+      matchedItemLevel: "epic" as const,
+      matchedItemStatus: "completed" as const,
+      createdAt: "2026-02-22T20:30:44.000Z",
+    };
+
     await store.addItem({
       id: "epic-force",
       title: "Force-created Epic",
       status: "pending",
       level: "epic",
-      overrideMarker: {
-        type: "duplicate_guard_override",
-        reason: "exact_title",
-        reasonRef: "exact_title:epic-existing",
-        matchedItemId: "epic-existing",
-        matchedItemTitle: "Existing Epic",
-        matchedItemLevel: "epic",
-        matchedItemStatus: "completed",
-        createdAt: "2026-02-22T20:30:44.000Z",
-      },
+      overrideMarker: marker,
     });
 
-    // overrideMarker exists during the addItem call but is not persisted
     const loaded = await store.loadDocument();
     const forceCreated = loaded.items.find((item) => item.id === "epic-force");
 
-    expect(forceCreated?.overrideMarker).toBeUndefined();
+    expect(forceCreated?.overrideMarker).toEqual(marker);
     expect(forceCreated?.title).toBe("Force-created Epic");
   });
 

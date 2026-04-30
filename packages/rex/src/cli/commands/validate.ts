@@ -8,7 +8,7 @@ import {
   resolveEpiclessFeatures,
   applyEpiclessResolutions,
 } from "./validate-interactive.js";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
@@ -39,11 +39,22 @@ export async function cmdValidate(
   flags: Record<string, string>,
   options?: ValidateOptions,
 ): Promise<void> {
-  // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD
-  await ensureLegacyPrdMigrated(dir);
-
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD.
+  // A migration error (typically a malformed legacy prd.json) is surfaced as a
+  // failed PRD schema check rather than an uncaught throw — the rest of the
+  // validate pipeline still runs against whatever else is on disk.
   const rexDir = join(dir, REX_DIR);
   const checks: CheckResult[] = [];
+  let migrationError: LegacyPrdMigrationError | null = null;
+  try {
+    await ensureLegacyPrdMigrated(dir);
+  } catch (err) {
+    if (err instanceof LegacyPrdMigrationError) {
+      migrationError = err;
+    } else {
+      throw err;
+    }
+  }
 
   // Check config.json schema
   try {
@@ -67,29 +78,38 @@ export async function cmdValidate(
     });
   }
 
-  // Check PRD schema (Markdown is authoritative; FileStore performs legacy migration if needed)
+  // Check PRD schema (folder-tree is authoritative; legacy migration ran above).
+  // A migration failure short-circuits this check with the migration error.
   let doc: PRDDocument | null = null;
   let store: PRDStore | null = null;
-  try {
-    store = await resolveStore(rexDir);
-    const loaded = await store.loadDocument();
-    const result = validateDocument(loaded);
-    if (result.ok) {
-      doc = result.data as PRDDocument;
-      checks.push({ name: "PRD schema", pass: true, errors: [] });
-    } else {
-      checks.push({
-        name: "PRD schema",
-        pass: false,
-        errors: result.errors.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
-      });
-    }
-  } catch (err) {
+  if (migrationError !== null) {
     checks.push({
       name: "PRD schema",
       pass: false,
-      errors: [(err as Error).message],
+      errors: [migrationError.message],
     });
+  } else {
+    try {
+      store = await resolveStore(rexDir);
+      const loaded = await store.loadDocument();
+      const result = validateDocument(loaded);
+      if (result.ok) {
+        doc = result.data as PRDDocument;
+        checks.push({ name: "PRD schema", pass: true, errors: [] });
+      } else {
+        checks.push({
+          name: "PRD schema",
+          pass: false,
+          errors: result.errors.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+        });
+      }
+    } catch (err) {
+      checks.push({
+        name: "PRD schema",
+        pass: false,
+        errors: [(err as Error).message],
+      });
+    }
   }
 
   // Override with folder-tree items for structural checks.

@@ -628,15 +628,16 @@ describe("parseFolderTree: field fidelity", () => {
     expect((parsedFeature as Record<string, unknown>)["loe"]).toBe("m");
   });
 
-  it("reconstructs level from directory depth, not frontmatter field", async () => {
-    // Write an epic index.md with level: feature (mismatch) — parser should
-    // use depth (epic) and emit a warning.
-    const epicDir = join(testDir, "depth-mismatch-11111111");
-    await mkdir(epicDir, { recursive: true });
-    await writeFile(join(epicDir, "index.md"), [
+  it("preserves frontmatter level when it disagrees with directory depth", async () => {
+    // Skip-level placements (e.g. depth-2 tasks) are legal under
+    // LEVEL_HIERARCHY, so the parser must preserve the frontmatter level and
+    // surface the disagreement as a warning rather than mutating the field.
+    const itemDir = join(testDir, "depth-mismatch-11111111");
+    await mkdir(itemDir, { recursive: true });
+    await writeFile(join(itemDir, "index.md"), [
       "---",
       'id: "11111111-1111-1111-1111-111111111111"',
-      "level: feature",  // wrong — depth says epic
+      "level: feature",  // disagrees with depth-1 expectation of "epic"
       'title: "Mismatch"',
       "status: pending",
       "---",
@@ -644,7 +645,7 @@ describe("parseFolderTree: field fidelity", () => {
 
     const result = await parseFolderTree(testDir);
     expect(result.items).toHaveLength(1);
-    expect(result.items[0].level).toBe("epic"); // depth wins
+    expect(result.items[0].level).toBe("feature"); // frontmatter wins
     expect(result.warnings.some(w => w.message.includes("does not match"))).toBe(true);
   });
 });

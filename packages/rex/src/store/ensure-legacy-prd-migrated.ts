@@ -23,7 +23,9 @@ import { join } from "node:path";
 import { stat, readFile, copyFile, rename } from "node:fs/promises";
 import { withLock } from "./file-lock.js";
 import { validateDocument, PRDDocumentSchema } from "../schema/validate.js";
-import { serializeFolderTree, parseFolderTree } from "./index.js";
+import { serializeFolderTree } from "./index.js";
+import { atomicWriteJSON } from "./atomic-write.js";
+import { discoverPRDFiles } from "./prd-discovery.js";
 import type { z } from "zod";
 
 /** Result of a legacy-PRD migration attempt. */
@@ -31,7 +33,12 @@ export interface LegacyPrdMigrationResult {
   /** `true` when prd.json was successfully migrated to the folder tree. */
   migrated: boolean;
   /** Reason the migration was skipped when `migrated` is `false`. */
-  reason?: "no-legacy-file" | "already-migrated" | "tree-exists" | "prd-json-invalid";
+  reason?:
+    | "no-legacy-file"
+    | "already-migrated"
+    | "tree-exists"
+    | "prd-json-invalid"
+    | "branch-scoped-files-present";
   /** Path to the backup file when `migrated` is `true`. */
   backupPath?: string;
   /** Number of items migrated when `migrated` is `true`. */
@@ -142,6 +149,16 @@ export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMig
     return { migrated: false, reason: "tree-exists" };
   }
 
+  // Step 3b: Defer migration when branch-scoped legacy files (`prd_<branch>_<date>.json`)
+  // are present alongside `prd.json`. The legacy multi-file model is still in
+  // active use; running migration would silently lose the branch files'
+  // source-file attribution that callers like `rex status --show-individual`
+  // depend on. Once those files are removed or merged manually, migration runs.
+  const branchFiles = await discoverPRDFiles(rexDir);
+  if (branchFiles.length > 0) {
+    return { migrated: false, reason: "branch-scoped-files-present" };
+  }
+
   // Step 4-9: Migration pipeline (protected by lock to prevent concurrent races)
   return withLock(lockPath, async () => {
     // Re-check after acquiring lock (another process may have completed migration)
@@ -203,6 +220,17 @@ export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMig
       throw new LegacyPrdMigrationError(
         `Failed to serialize folder tree: ${String(err)}`,
         "Check disk space and permissions in .rex/. Backup is at " + backupPath,
+      );
+    }
+
+    // Persist the document title alongside the tree. Without this,
+    // `FileStore.loadDocument()` defaults the title to "PRD" after migration.
+    try {
+      await atomicWriteJSON(join(rexDir, "tree-meta.json"), { title: doc.title });
+    } catch (err) {
+      throw new LegacyPrdMigrationError(
+        `Failed to write tree-meta.json: ${String(err)}`,
+        "Folder tree was written but document title was not persisted. Backup is at " + backupPath,
       );
     }
 

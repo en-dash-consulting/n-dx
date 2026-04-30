@@ -252,6 +252,9 @@ describe("backfill-commit-attribution", () => {
     const store = new FolderTreeStore(rexDir);
     await store.saveDocument(doc);
 
+    // Stage a change before the trailer commit — git commit needs something to commit.
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
     await execAsync(`git commit -F ${messageFile}`, { cwd: projectDir });
 
     // Run backfill — should not error
