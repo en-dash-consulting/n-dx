@@ -42,6 +42,11 @@ export {
   withSelfHealTag,
 } from "./self-heal-tag.js";
 export { withLock, acquireLock } from "./file-lock.js";
+export {
+  ensureLegacyPrdMigrated,
+  LegacyPrdMigrationError,
+} from "./ensure-legacy-prd-migrated.js";
+export type { LegacyPrdMigrationResult } from "./ensure-legacy-prd-migrated.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
 export { LiveNotionClient } from "./notion-client.js";

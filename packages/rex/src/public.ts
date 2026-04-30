@@ -107,6 +107,11 @@ export {
   PRDMarkdownMigrationError,
 } from "./store/prd-md-migration.js";
 export type { MarkdownMigrationResult } from "./store/prd-md-migration.js";
+export {
+  ensureLegacyPrdMigrated,
+  LegacyPrdMigrationError,
+} from "./store/ensure-legacy-prd-migrated.js";
+export type { LegacyPrdMigrationResult } from "./store/ensure-legacy-prd-migrated.js";
 
 // ---- Integration schema system ----------------------------------------------
 

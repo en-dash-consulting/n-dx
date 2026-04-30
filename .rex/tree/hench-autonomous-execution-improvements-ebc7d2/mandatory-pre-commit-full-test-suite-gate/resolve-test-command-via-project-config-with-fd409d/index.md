@@ -2,7 +2,7 @@
 id: "fd409d4d-381c-4f55-afaa-220d4bc74f11"
 level: task
 title: "Resolve test command via project config with interactive prompt fallback for unknown or inaccessible suites"
-status: in_progress
+status: completed
 priority: high
 tags:
   - "hench"
@@ -10,6 +10,10 @@ tags:
   - "ux"
 source: "smart-add"
 startedAt: "2026-04-30T15:52:10.503Z"
+completedAt: "2026-04-30T16:08:34.119Z"
+endedAt: "2026-04-30T16:08:34.119Z"
+resolutionType: code-change
+resolutionDetail: "Implemented test command resolution with config precedence chain and interactive prompt fallback. Added fullTestCommand field to HenchConfig schema. Created resolveTestCommand module with config loading, auto-detection from package.json, and interactive prompting with persistence. Integrated into finalizeRun lifecycle. Added comprehensive unit tests and documented dynamic import. All acceptance criteria met."
 acceptanceCriteria:
   - "Config schema supports a fullTestCommand field in .hench/config.json with documented precedence rules"
   - "Auto-detection falls back to package.json test scripts when the config field is absent"
@@ -22,7 +26,7 @@ description: "Implement a resolution chain for the full-suite test command: read
 
 # Resolve test command via project config with interactive prompt fallback for unknown or inaccessible suites
 
-🟠 [in_progress]
+🟠 [completed]
 
 ## Summary
 
@@ -30,8 +34,10 @@ Implement a resolution chain for the full-suite test command: read from .hench/c
 
 ## Info
 
-- **Status:** in_progress
+- **Status:** completed
 - **Priority:** high
 - **Tags:** hench, config, ux
 - **Level:** task
 - **Started:** 2026-04-30T15:52:10.503Z
+- **Completed:** 2026-04-30T16:08:34.119Z
+- **Duration:** 16m

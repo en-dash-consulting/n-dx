@@ -20,7 +20,7 @@ Any CLI command, MCP tool, or web server entry point that reads or writes the PR
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Implement shared legacy-PRD detection, backup, and migration helper | task | pending | 1970-01-01 |
+| Implement shared legacy-PRD detection, backup, and migration helper | task | in_progress | 2026-04-30 |
 | Surface clear user-facing migration notification across CLI, MCP, and dashboard | task | pending | 1970-01-01 |
 | Wire legacy-PRD migration check into all PRD-touching command entry points | task | pending | 1970-01-01 |
 

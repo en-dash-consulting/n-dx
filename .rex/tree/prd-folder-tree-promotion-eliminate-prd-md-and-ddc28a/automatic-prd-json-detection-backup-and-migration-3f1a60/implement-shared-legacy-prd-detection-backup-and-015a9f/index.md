@@ -2,13 +2,14 @@
 id: "015a9f0b-46fc-4b8a-96e4-eeb04fc1a7f0"
 level: task
 title: "Implement shared legacy-PRD detection, backup, and migration helper"
-status: pending
+status: in_progress
 priority: high
 tags:
   - "rex"
   - "migration"
   - "prd"
 source: "smart-add"
+startedAt: "2026-04-30T16:08:53.868Z"
 acceptanceCriteria:
   - "Helper detects .rex/prd.json presence and short-circuits when absent or when a folder-tree already reflects its content"
   - "Backup file is written to .rex/ with a timestamped suffix before any destructive action and is preserved on success and failure"
@@ -21,7 +22,7 @@ description: "Add a single helper (e.g. ensureLegacyPrdMigrated) in the rex pack
 
 # Implement shared legacy-PRD detection, backup, and migration helper
 
-🟠 [pending]
+🟠 [in_progress]
 
 ## Summary
 
@@ -29,7 +30,8 @@ Add a single helper (e.g. ensureLegacyPrdMigrated) in the rex package that check
 
 ## Info
 
-- **Status:** pending
+- **Status:** in_progress
 - **Priority:** high
 - **Tags:** rex, migration, prd
 - **Level:** task
+- **Started:** 2026-04-30T16:08:53.868Z
