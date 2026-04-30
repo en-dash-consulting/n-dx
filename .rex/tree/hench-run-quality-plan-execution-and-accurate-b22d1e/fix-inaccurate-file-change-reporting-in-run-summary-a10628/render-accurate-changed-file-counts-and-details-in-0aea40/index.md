@@ -2,13 +2,18 @@
 id: "0aea4097-e427-4262-80a4-cff4920707e6"
 level: "task"
 title: "Render accurate changed-file counts and details in dashboard run summary"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "web-dashboard"
   - "hench"
   - "ui"
 source: "smart-add"
+startedAt: "2026-04-30T20:36:31.044Z"
+completedAt: "2026-04-30T20:43:44.189Z"
+endedAt: "2026-04-30T20:43:44.189Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented dashboard rendering of accurate changed-file counts with per-file details. Added FileChangesList component using CollapsibleSection to display git status codes and file classifications. Integrated into RunDetailView to show explicit 'no changes' for zero-file runs. Added regression tests with known fileChangesWithStatus entries. All acceptance criteria met."
 acceptanceCriteria:
   - "Run summary card displays the total changed-file count from the run record"
   - "Expanding the row reveals per-file path and git status"
@@ -20,7 +25,7 @@ description: "Update the dashboard's run summary view to consume the corrected c
 
 # Render accurate changed-file counts and details in dashboard run summary
 
-🟡 [pending]
+🟡 [completed]
 
 ## Summary
 
@@ -28,7 +33,10 @@ Update the dashboard's run summary view to consume the corrected changed-file da
 
 ## Info
 
-- **Status:** pending
+- **Status:** completed
 - **Priority:** medium
 - **Tags:** web-dashboard, hench, ui
 - **Level:** task
+- **Started:** 2026-04-30T20:36:31.044Z
+- **Completed:** 2026-04-30T20:43:44.189Z
+- **Duration:** 7m

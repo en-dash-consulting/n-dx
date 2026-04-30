@@ -2,7 +2,7 @@
 id: "1d772c01-64dc-4038-ae5d-6797fc23766f"
 level: "task"
 title: "Surface clear user-facing migration notification across CLI, MCP, and dashboard"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cli"
@@ -10,6 +10,11 @@ tags:
   - "mcp"
   - "web"
 source: "smart-add"
+startedAt: "2026-04-30T20:18:47.106Z"
+completedAt: "2026-04-30T20:36:06.643Z"
+endedAt: "2026-04-30T20:36:06.643Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented complete migration notification system: CLI banners with ANSI colors respecting NO_COLOR/TTY, execution log entries, MCP warning field injection, and comprehensive unit tests (45 tests). Wired into 5 core CLI commands. Suppression under --quiet/--json flags with always-on logging pattern."
 acceptanceCriteria:
   - "CLI banner is rendered using the existing ANSI color utility, respects NO_COLOR and TTY detection, and clearly states 'prd.json detected and migrated', backup path, and folder-tree path"
   - "Banner is suppressed when --quiet or --json is active, and replaced by a structured stderr/log entry"

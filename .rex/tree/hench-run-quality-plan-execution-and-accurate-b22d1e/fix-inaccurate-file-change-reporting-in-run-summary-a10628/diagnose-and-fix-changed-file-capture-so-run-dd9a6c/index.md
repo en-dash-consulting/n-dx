@@ -2,7 +2,7 @@
 id: "dd9a6c51-116a-4497-842c-df4640507902"
 level: "task"
 title: "Diagnose and fix changed-file capture so run records reflect actual commit diffs"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "hench"
@@ -10,6 +10,10 @@ tags:
   - "git"
 source: "smart-add"
 startedAt: "2026-04-30T20:06:32.352Z"
+completedAt: "2026-04-30T20:17:58.322Z"
+endedAt: "2026-04-30T20:17:58.322Z"
+resolutionType: "code-change"
+resolutionDetail: "Created git-changed-files module with deterministic post-commit capture using git show --name-status. Integrated into performCommitPromptIfNeeded to capture exact files from commit SHAs. Added fileChangesWithStatus field to RunSummaryData schema. Comprehensive test coverage: 13 unit tests + 5 integration tests verifying single/multi-commit scenarios with all change types (add, modify, delete) against git output."
 acceptanceCriteria:
   - "Run record includes the exact set of files modified by commits attributable to that run, verified against git diff-tree against the run's commit SHA(s)"
   - "Capture is anchored to commit SHAs created during the run rather than to a working-tree snapshot, removing race conditions with staging/commit"
@@ -21,7 +25,7 @@ description: "Trace the changed-files capture path end to end: the git command i
 
 # Diagnose and fix changed-file capture so run records reflect actual commit diffs
 
-🟠 [in_progress]
+🟠 [completed]
 
 ## Summary
 
@@ -29,8 +33,10 @@ Trace the changed-files capture path end to end: the git command invoked, the wo
 
 ## Info
 
-- **Status:** in_progress
+- **Status:** completed
 - **Priority:** high
 - **Tags:** hench, telemetry, git
 - **Level:** task
 - **Started:** 2026-04-30T20:06:32.352Z
+- **Completed:** 2026-04-30T20:17:58.322Z
+- **Duration:** 11m

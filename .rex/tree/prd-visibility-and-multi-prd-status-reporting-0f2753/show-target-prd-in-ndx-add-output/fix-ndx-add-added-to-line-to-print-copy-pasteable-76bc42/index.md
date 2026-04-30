@@ -2,13 +2,18 @@
 id: "76bc42c5-5e68-4513-b341-e917c07c51e7"
 level: "task"
 title: "Fix ndx add 'Added to:' line to print copy-pasteable folder-tree path of the created item"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cli"
   - "rex"
   - "ux"
 source: "smart-add"
+startedAt: "2026-04-30T20:51:12.922Z"
+completedAt: "2026-04-30T21:00:16.441Z"
+endedAt: "2026-04-30T21:00:16.441Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented folder-tree path output for ndx add command. Created getFolderTreePath utility that computes workspace-relative paths like .rex/tree/epic-slug/feature-slug/task-slug. Updated cmdAdd and cmdSmartAdd to use the utility instead of outputting markdown PRD file paths. All regression tests pass."
 acceptanceCriteria:
   - "'Added to:' prints a path that exists on disk after the command completes for every created level (epic, feature, task, subtask)"
   - "Path is workspace-relative and shell-pasteable (no truncation, no ellipses, no decorative quoting that would break copy-paste)"
@@ -20,7 +25,7 @@ description: "After the PRD storage migration to the slug-based folder tree unde
 
 # Fix ndx add 'Added to:' line to print copy-pasteable folder-tree path of the created item
 
-🟡 [pending]
+🟡 [completed]
 
 ## Summary
 
@@ -28,7 +33,10 @@ After the PRD storage migration to the slug-based folder tree under .rex/tree/, 
 
 ## Info
 
-- **Status:** pending
+- **Status:** completed
 - **Priority:** medium
 - **Tags:** cli, rex, ux
 - **Level:** task
+- **Started:** 2026-04-30T20:51:12.922Z
+- **Completed:** 2026-04-30T21:00:16.441Z
+- **Duration:** 9m
