@@ -20,7 +20,7 @@ The run summary and dashboard are reporting zero changed files for runs whose co
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Diagnose and fix changed-file capture so run records reflect actual commit diffs | task | pending | 1970-01-01 |
+| Diagnose and fix changed-file capture so run records reflect actual commit diffs | task | in_progress | 2026-04-30 |
 | Render accurate changed-file counts and details in dashboard run summary | task | pending | 1970-01-01 |
 
 ## Info

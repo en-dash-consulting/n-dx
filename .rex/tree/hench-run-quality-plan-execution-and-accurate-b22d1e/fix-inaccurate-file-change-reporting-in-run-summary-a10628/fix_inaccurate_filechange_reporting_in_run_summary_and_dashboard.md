@@ -12,5 +12,5 @@ description: "The run summary and dashboard are reporting zero changed files for
 
 | Title | Status |
 |-------|--------|
-| [Diagnose and fix changed-file capture so run records reflect actual commit diffs](./diagnose-and-fix-changed-file-capture-so-run-dd9a6c/index.md) | pending |
+| [Diagnose and fix changed-file capture so run records reflect actual commit diffs](./diagnose-and-fix-changed-file-capture-so-run-dd9a6c/index.md) | in_progress |
 | [Render accurate changed-file counts and details in dashboard run summary](./render-accurate-changed-file-counts-and-details-in-0aea40/index.md) | pending |

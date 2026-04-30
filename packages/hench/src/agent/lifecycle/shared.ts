@@ -986,7 +986,7 @@ export async function performCommitPromptIfNeeded(
     const gateResult = validateTaskCompletion(run);
     if (!gateResult.valid) {
       // Reject completion: code-modifying tool calls made but no code file changes
-      run.status = "failing";
+      run.status = "failed";
       run.error = gateResult.reason;
       info(`\n${gateResult.reason}`);
       try { unlinkSync(msgPath); } catch { /* ignore */ }

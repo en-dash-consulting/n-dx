@@ -18,7 +18,7 @@ No summary provided.
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Enforce Plan-to-Execution Continuity in Hench Runs | feature | pending | 1970-01-01 |
+| Enforce Plan-to-Execution Continuity in Hench Runs | feature | completed | 2026-04-30 |
 | Fix Inaccurate File-Change Reporting in Run Summary and Dashboard | feature | pending | 1970-01-01 |
 
 ## Info

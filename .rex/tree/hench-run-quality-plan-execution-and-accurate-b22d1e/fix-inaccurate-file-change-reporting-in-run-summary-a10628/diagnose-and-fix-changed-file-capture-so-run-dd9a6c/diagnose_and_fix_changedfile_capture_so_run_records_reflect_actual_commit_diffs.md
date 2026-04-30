@@ -2,13 +2,14 @@
 id: "dd9a6c51-116a-4497-842c-df4640507902"
 level: "task"
 title: "Diagnose and fix changed-file capture so run records reflect actual commit diffs"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "hench"
   - "telemetry"
   - "git"
 source: "smart-add"
+startedAt: "2026-04-30T20:06:32.352Z"
 acceptanceCriteria:
   - "Run record includes the exact set of files modified by commits attributable to that run, verified against git diff-tree against the run's commit SHA(s)"
   - "Capture is anchored to commit SHAs created during the run rather than to a working-tree snapshot, removing race conditions with staging/commit"
