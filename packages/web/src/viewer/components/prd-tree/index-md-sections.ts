@@ -143,49 +143,79 @@ export function ProgressTable({ rows }: { rows: ProgressRow[] }) {
 }
 
 /**
- * Commits List with optional git linking
+ * Commits Table with author, hash (linked), and timestamp
  */
 export function CommitsList({ commits, gitRemoteUrl }: { commits: CommitRef[]; gitRemoteUrl?: string }) {
+  if (commits.length === 0) {
+    return h(
+      "div",
+      { class: "detail-commits-section detail-commits-empty" },
+      h("p", { class: "detail-commits-empty-state" }, "No commits recorded"),
+    );
+  }
+
   return h(
     "div",
     { class: "detail-commits-section" },
     h(
-      "ul",
-      { class: "detail-commits-list" },
-      commits.map((commit) => {
-        let commitLink;
+      "table",
+      { class: "detail-commits-table" },
+      h(
+        "thead",
+        null,
+        h(
+          "tr",
+          null,
+          h("th", null, "Author"),
+          h("th", null, "Hash"),
+          h("th", null, "Message"),
+          h("th", null, "Timestamp"),
+        ),
+      ),
+      h(
+        "tbody",
+        null,
+        commits.map((commit) => {
+          const shortHash = commit.hash.slice(0, 7);
+          let hashCell;
 
-        if (gitRemoteUrl) {
-          // Generate GitHub/GitLab link
-          const repoUrl = gitRemoteUrl.replace(/\.git$/, "");
-          const commitUrl = `${repoUrl}/commit/${commit.hash}`;
-          commitLink = h(
-            "a",
-            {
-              href: commitUrl,
-              target: "_blank",
-              rel: "noopener noreferrer",
-              class: "commit-hash-link",
-              title: `View on ${repoUrl}`,
-            },
-            `\`${commit.hash}\``,
+          if (gitRemoteUrl) {
+            // Generate GitHub/GitLab link
+            const repoUrl = gitRemoteUrl.replace(/\.git$/, "");
+            const commitUrl = `${repoUrl}/commit/${commit.hash}`;
+            hashCell = h(
+              "a",
+              {
+                href: commitUrl,
+                target: "_blank",
+                rel: "noopener noreferrer",
+                class: "commit-hash-link",
+                title: commit.hash,
+              },
+              shortHash,
+            );
+          } else {
+            // Plain text with full hash on hover
+            hashCell = h(
+              "code",
+              {
+                class: "commit-hash",
+                title: commit.hash,
+              },
+              shortHash,
+            );
+          }
+
+          return h(
+            "tr",
+            { key: commit.hash, class: "detail-commit-row" },
+            h("td", { class: "commit-author" }, commit.author),
+            h("td", { class: "commit-hash-cell" }, hashCell),
+            h("td", { class: "commit-message" }, commit.message || "—"),
+            h("td", { class: "commit-timestamp" }, commit.timestamp),
           );
-        } else {
-          // Plain text fallback
-          commitLink = h("code", { class: "commit-hash" }, commit.hash);
-        }
-
-        return h(
-          "li",
-          { key: commit.hash, class: "detail-commit-item" },
-          commitLink,
-          " — ",
-          commit.message,
-          " (",
-          h("span", { class: "commit-date" }, commit.date),
-          ")",
-        );
-      }),
+        }),
+      ),
     ),
   );
 }

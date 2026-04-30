@@ -22,7 +22,7 @@ Extend each PRD item's markdown frontmatter with structured fields for the full 
 |-------|-------|--------|--------------|
 | Extend PRD item frontmatter schema and parser/serializer for commit attribution | task | completed | 2026-04-30 |
 | Populate commit attribution on hench-driven status transitions and from commit-message trailers | task | completed | 2026-04-30 |
-| Surface commit attribution in dashboard PRD detail view and folder index summaries | task | pending | 1970-01-01 |
+| Surface commit attribution in dashboard PRD detail view and folder index summaries | task | in_progress | 2026-04-30 |
 
 ## Info
 

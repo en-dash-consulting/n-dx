@@ -2,13 +2,14 @@
 id: "fa572435-b461-4086-b370-97cfb9edd2b6"
 level: "task"
 title: "Surface commit attribution in dashboard PRD detail view and folder index summaries"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "web"
   - "ui"
   - "prd"
 source: "smart-add"
+startedAt: "2026-04-30T14:02:14.454Z"
 acceptanceCriteria:
   - "Detail panel shows a commits table with author, short hash (linked to remote when configured), full hash on hover, and timestamp"
   - "`index.md` summary's per-task commit section consumes the same data source"

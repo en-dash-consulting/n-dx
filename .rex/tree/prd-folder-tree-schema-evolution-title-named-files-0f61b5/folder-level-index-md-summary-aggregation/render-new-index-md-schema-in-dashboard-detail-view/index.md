@@ -2,7 +2,7 @@
 id: "80cfba3f-f672-43c3-8fcf-00d416757319"
 level: task
 title: "Render new index.md schema in dashboard detail view"
-status: in_progress
+status: completed
 priority: medium
 tags:
   - "web"
@@ -10,6 +10,10 @@ tags:
   - "prd"
 source: "smart-add"
 startedAt: "2026-04-30T13:47:03.546Z"
+completedAt: "2026-04-30T14:01:42.678Z"
+endedAt: "2026-04-30T14:01:42.678Z"
+resolutionType: code-change
+resolutionDetail: "Implemented complete UI rendering of new index.md schema in dashboard detail view. Added server endpoint, markdown parser, UI components, styling, and tests. All acceptance criteria met: renders all sections (progress table sortable by title/status/lastUpdated, commits, changes, info, summary), graceful fallback for legacy content."
 acceptanceCriteria:
   - "Detail panel renders all schema sections (completion table, commits, summary, change list, basic info)"
   - "Completion table is sortable by title, status, and last-updated"
@@ -21,7 +25,7 @@ description: "Update the web dashboard PRD detail panel to recognize the new `in
 
 # Render new index.md schema in dashboard detail view
 
-🟡 [in_progress]
+🟡 [completed]
 
 ## Summary
 
@@ -29,8 +33,10 @@ Update the web dashboard PRD detail panel to recognize the new `index.md` summar
 
 ## Info
 
-- **Status:** in_progress
+- **Status:** completed
 - **Priority:** medium
 - **Tags:** web, ui, prd
 - **Level:** task
 - **Started:** 2026-04-30T13:47:03.546Z
+- **Completed:** 2026-04-30T14:01:42.678Z
+- **Duration:** 14m

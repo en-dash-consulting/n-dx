@@ -182,19 +182,59 @@
 }
 
 /* Commits section */
-.detail-commits-list {
-  list-style: none;
-  padding: 0;
-  margin: var(--space-2) 0 0 0;
+.detail-commits-section {
+  margin-top: var(--space-2);
 }
 
-.detail-commit-item {
-  font-size: 12px;
-  padding: var(--space-1) 0;
-  margin: 0;
-  font-family: monospace;
+.detail-commits-empty {
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--bg-hover);
+  border-radius: 4px;
   color: var(--text-dim);
-  line-height: 1.5;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.detail-commits-empty-state {
+  margin: 0;
+  padding: 0;
+}
+
+.detail-commits-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: var(--space-2);
+}
+
+.detail-commits-table th {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  background-color: var(--bg-hover);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.detail-commits-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-light);
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.detail-commits-table tr:hover td {
+  background-color: var(--bg-hover);
+}
+
+.commit-author {
+  color: var(--text-dim);
+  font-family: inherit;
+}
+
+.commit-hash-cell {
+  color: var(--text-dim);
 }
 
 .commit-hash-link {
@@ -202,6 +242,8 @@
   text-decoration: none;
   cursor: pointer;
   transition: color 0.15s ease;
+  font-family: monospace;
+  font-size: 11px;
 }
 
 .commit-hash-link:hover {
@@ -212,11 +254,27 @@
 .commit-hash {
   color: var(--text-dim);
   font-size: 11px;
+  cursor: default;
 }
 
-.commit-date {
+.commit-hash:hover {
+  color: var(--text);
+}
+
+.commit-message {
+  color: var(--text-dim);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.commit-timestamp {
   color: var(--text-dim-2);
   font-size: 11px;
+  white-space: nowrap;
+  font-family: inherit;
 }
 
 /* Changes section */

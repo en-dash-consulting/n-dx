@@ -14,4 +14,4 @@ description: "Extend each PRD item's markdown frontmatter with structured fields
 |-------|--------|
 | [Extend PRD item frontmatter schema and parser/serializer for commit attribution](./extend-prd-item-frontmatter-schema-and-parser-55f508/index.md) | completed |
 | [Populate commit attribution on hench-driven status transitions and from commit-message trailers](./populate-commit-attribution-on-hench-driven-status-8956fb/index.md) | completed |
-| [Surface commit attribution in dashboard PRD detail view and folder index summaries](./surface-commit-attribution-in-dashboard-prd-detail-fa5724/index.md) | pending |
+| [Surface commit attribution in dashboard PRD detail view and folder index summaries](./surface-commit-attribution-in-dashboard-prd-detail-fa5724/index.md) | in_progress |

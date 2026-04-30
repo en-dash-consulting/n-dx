@@ -1,12 +1,16 @@
+// @vitest-environment jsdom
 /**
  * Unit tests for index.md markdown parser.
  */
 
 import { describe, it, expect } from "vitest";
+import { h, render } from "preact";
 import {
   parseIndexMd,
   type IndexMdSections,
 } from "../../../src/viewer/utils/index-md-parser.js";
+import { CommitsList } from "../../../src/viewer/components/prd-tree/index-md-sections.js";
+import type { CommitRef } from "../../../src/viewer/utils/index-md-parser.js";
 
 describe("index-md-parser", () => {
   describe("parseIndexMd", () => {
@@ -34,8 +38,10 @@ This is a test summary about the feature.
 
 ## Commits
 
-- \`abc123\` — Initial implementation (2026-04-28)
-- \`def456\` — Bug fix (2026-04-29)
+| Author | Hash | Message | Timestamp |
+|--------|------|---------|-----------|
+| Alice | \`abc123\` | Initial implementation | 2026-04-28T10:00:00Z |
+| Bob | \`def456\` | Bug fix | 2026-04-29T11:00:00Z |
 
 ## Changes
 
@@ -69,6 +75,8 @@ This is a subtask description.
       expect(sections.progress?.[0].status).toBe("completed");
       expect(sections.commits).toHaveLength(2);
       expect(sections.commits?.[0].hash).toBe("abc123");
+      expect(sections.commits?.[0].author).toBe("Alice");
+      expect(sections.commits?.[0].message).toBe("Initial implementation");
       expect(sections.changes).toHaveLength(1);
       expect(sections.info).toHaveLength(3);
       expect(sections.subtasks).toHaveLength(1);
@@ -112,7 +120,7 @@ Just a summary, no other sections.
       });
     });
 
-    it("parses commits list correctly", () => {
+    it("parses commits list correctly (legacy bullet format)", () => {
       const markdown = `## Commits
 
 - \`abc1234567890\` — First commit (2026-04-25)
@@ -122,11 +130,28 @@ Just a summary, no other sections.
       const sections = parseIndexMd(markdown);
 
       expect(sections.commits).toHaveLength(2);
-      expect(sections.commits?.[0]).toEqual({
-        hash: "abc1234567890",
-        message: "First commit",
-        date: "2026-04-25",
-      });
+      expect(sections.commits?.[0].hash).toBe("abc1234567890");
+      expect(sections.commits?.[0].message).toBe("First commit");
+      expect(sections.commits?.[0].timestamp).toBe("2026-04-25");
+      expect(sections.commits?.[0].author).toBe("unknown"); // Legacy format
+    });
+
+    it("parses commits table format correctly", () => {
+      const markdown = `## Commits
+
+| Author | Hash | Message | Timestamp |
+|--------|------|---------|-----------|
+| John Doe | \`abc1234\` | Add feature | 2026-04-30T12:00:00Z |
+| Jane Smith | \`def5678\` | Fix bug | 2026-04-30T13:00:00Z |
+`;
+
+      const sections = parseIndexMd(markdown);
+
+      expect(sections.commits).toHaveLength(2);
+      expect(sections.commits?.[0].author).toBe("John Doe");
+      expect(sections.commits?.[0].hash).toBe("abc1234");
+      expect(sections.commits?.[0].message).toBe("Add feature");
+      expect(sections.commits?.[0].timestamp).toBe("2026-04-30T12:00:00Z");
     });
 
     it("parses changes section correctly", () => {
@@ -248,5 +273,179 @@ This is a summary with trailing spaces.
       expect(sections.summary?.trim()).toBe("This is a summary with trailing spaces.");
       expect(sections.info).toBeDefined();
     });
+
+    it("handles commits with short hashes", () => {
+      const markdown = `## Commits
+
+| Author | Hash | Message | Timestamp |
+|--------|------|---------|-----------|
+| Charlie | \`cc3333\` | Fix issue | 2026-04-30T15:00:00Z |
+`;
+
+      const sections = parseIndexMd(markdown);
+
+      expect(sections.commits).toBeDefined();
+      expect(sections.commits).toHaveLength(1);
+      expect(sections.commits?.[0].author).toBe("Charlie");
+      expect(sections.commits?.[0].hash).toBe("cc3333");
+    });
+
+    it("returns undefined for non-table commit content", () => {
+      const markdown = `## Commits
+
+No commits recorded
+`;
+
+      const sections = parseIndexMd(markdown);
+
+      // When commits content doesn't match expected formats, no commits are returned
+      expect(sections.commits).toBeUndefined();
+    });
+  });
+});
+
+describe("CommitsList component rendering", () => {
+  function renderToDiv(vnode: ReturnType<typeof h>) {
+    const root = document.createElement("div");
+    render(vnode, root);
+    return root;
+  }
+
+  it("renders empty state when no commits are provided", () => {
+    const root = renderToDiv(h(CommitsList, { commits: [] }));
+    expect(root.textContent).toContain("No commits recorded");
+    expect(root.querySelector("table")).toBeNull();
+  });
+
+  it("renders a table with correct column headers", () => {
+    const commits: CommitRef[] = [
+      {
+        hash: "abc1234567890abcdef1234567890abcdef12345",
+        author: "John Doe",
+        authorEmail: "john@example.com",
+        timestamp: "2026-04-30T12:00:00Z",
+        message: "Add feature X",
+      },
+    ];
+
+    const root = renderToDiv(h(CommitsList, { commits }));
+    const table = root.querySelector("table");
+    expect(table).not.toBeNull();
+
+    const headers = Array.from(table!.querySelectorAll("thead th")).map((h) => h.textContent);
+    expect(headers).toContain("Author");
+    expect(headers).toContain("Hash");
+    expect(headers).toContain("Message");
+    expect(headers).toContain("Timestamp");
+  });
+
+  it("renders commit data correctly in table rows", () => {
+    const commits: CommitRef[] = [
+      {
+        hash: "abc1234567890abcdef1234567890abcdef12345",
+        author: "John Doe",
+        authorEmail: "john@example.com",
+        timestamp: "2026-04-30T12:00:00Z",
+        message: "Add feature X",
+      },
+    ];
+
+    const root = renderToDiv(h(CommitsList, { commits }));
+    expect(root.textContent).toContain("John Doe");
+    expect(root.textContent).toContain("Add feature X");
+    expect(root.textContent).toContain("2026-04-30T12:00:00Z");
+  });
+
+  it("renders short hash (7 characters) in table", () => {
+    const commits: CommitRef[] = [
+      {
+        hash: "abc1234567890abcdef1234567890abcdef12345",
+        author: "Alice",
+        authorEmail: "alice@example.com",
+        timestamp: "2026-04-30T12:00:00Z",
+      },
+    ];
+
+    const root = renderToDiv(h(CommitsList, { commits }));
+    const hashCells = Array.from(root.querySelectorAll(".commit-hash-cell"));
+    expect(hashCells[0].textContent).toContain("abc1234");
+  });
+
+  it("provides full hash in title attribute for hover preview", () => {
+    const fullHash = "abc1234567890abcdef1234567890abcdef12345";
+    const commits: CommitRef[] = [
+      {
+        hash: fullHash,
+        author: "Bob",
+        authorEmail: "bob@example.com",
+        timestamp: "2026-04-30T12:00:00Z",
+      },
+    ];
+
+    const root = renderToDiv(h(CommitsList, { commits }));
+    const hashElement = root.querySelector("[title]");
+    expect(hashElement?.getAttribute("title")).toBe(fullHash);
+  });
+
+  it("renders linked hash when gitRemoteUrl is provided", () => {
+    const commits: CommitRef[] = [
+      {
+        hash: "abc1234567890abcdef1234567890abcdef12345",
+        author: "Charlie",
+        authorEmail: "charlie@example.com",
+        timestamp: "2026-04-30T12:00:00Z",
+        message: "Fix bug Y",
+      },
+    ];
+
+    const root = renderToDiv(
+      h(CommitsList, {
+        commits,
+        gitRemoteUrl: "https://github.com/example/repo.git",
+      }),
+    );
+
+    const link = root.querySelector("a.commit-hash-link");
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute("href")).toContain("abc1234567890abcdef1234567890abcdef12345");
+    expect(link?.getAttribute("target")).toBe("_blank");
+  });
+
+  it("handles multiple commits correctly", () => {
+    const commits: CommitRef[] = [
+      {
+        hash: "111111111111111111111111111111111111111",
+        author: "User1",
+        authorEmail: "user1@example.com",
+        timestamp: "2026-04-30T12:00:00Z",
+        message: "First commit",
+      },
+      {
+        hash: "222222222222222222222222222222222222222",
+        author: "User2",
+        authorEmail: "user2@example.com",
+        timestamp: "2026-04-30T13:00:00Z",
+        message: "Second commit",
+      },
+    ];
+
+    const root = renderToDiv(h(CommitsList, { commits }));
+    const rows = Array.from(root.querySelectorAll("tbody tr"));
+    expect(rows.length).toBe(2);
+  });
+
+  it("handles commits without messages gracefully", () => {
+    const commits: CommitRef[] = [
+      {
+        hash: "abc1234567890abcdef1234567890abcdef12345",
+        author: "David",
+        authorEmail: "david@example.com",
+        timestamp: "2026-04-30T12:00:00Z",
+      },
+    ];
+
+    const root = renderToDiv(h(CommitsList, { commits }));
+    const messageCell = root.querySelector(".commit-message");
+    expect(messageCell?.textContent).toBe("—");
   });
 });

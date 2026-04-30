@@ -16,8 +16,10 @@ export interface ProgressRow {
 
 export interface CommitRef {
   hash: string;
-  message: string;
-  date: string;
+  author: string;
+  authorEmail: string;
+  timestamp: string;
+  message?: string;
 }
 
 export interface ChangeEntry {
@@ -148,25 +150,64 @@ function parseProgressTable(content: string): ProgressRow[] {
 }
 
 /**
- * Parse the Commits list from markdown.
- * Expected format: Bullet list with hash — message (date)
+ * Parse the Commits table from markdown.
+ * Expected format: Markdown table with columns: Author, Hash, Message, Timestamp
+ * Also handles legacy bullet-list format for backward compatibility.
  */
 function parseCommitsList(content: string): CommitRef[] {
   const commits: CommitRef[] = [];
   const lines = content.split("\n");
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || !trimmed.startsWith("-")) continue;
+  // Try to parse as table first (new format)
+  let dataStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes("---") && lines[i].includes("|")) {
+      dataStart = i + 1;
+      break;
+    }
+  }
 
-    // Format: - `hash` — message (date)
-    const match = trimmed.match(/`([a-f0-9]+)`\s*—\s*(.+?)\s*\(([^)]+)\)/);
-    if (match) {
-      commits.push({
-        hash: match[1],
-        message: match[2].trim(),
-        date: match[3].trim(),
-      });
+  if (dataStart > 0) {
+    // Parse table format
+    for (let i = dataStart; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || !line.startsWith("|")) break;
+
+      // Split by pipe and trim each cell
+      const parts = line.split("|");
+      // Remove leading/trailing empty elements from pipe delimiters
+      const cells = parts.slice(1, -1).map((c) => c.trim());
+
+      if (cells.length >= 4) {
+        // Cells: [author, hash, message, timestamp]
+        let hash = cells[1].replace(/`/g, "").trim();
+
+        commits.push({
+          hash: hash,
+          author: cells[0] || "",
+          authorEmail: "", // Not available in table format, would need separate field
+          timestamp: cells[3] || "",
+          message: cells[2] || "",
+        });
+      }
+    }
+  } else {
+    // Fallback: parse legacy bullet-list format
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("-")) continue;
+
+      // Legacy format: - `hash` — message (date)
+      const match = trimmed.match(/`([a-f0-9]+)`\s*—\s*(.+?)\s*\(([^)]+)\)/);
+      if (match) {
+        commits.push({
+          hash: match[1],
+          author: "unknown",
+          authorEmail: "",
+          timestamp: match[3].trim(),
+          message: match[2].trim(),
+        });
+      }
     }
   }
 

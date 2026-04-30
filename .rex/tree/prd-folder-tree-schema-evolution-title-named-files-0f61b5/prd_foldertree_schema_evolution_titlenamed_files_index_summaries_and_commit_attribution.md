@@ -11,5 +11,5 @@ source: "smart-add"
 | Title | Status |
 |-------|--------|
 | [Commit Hash and Author Metadata on PRD Items](./commit-hash-and-author-metadata-on-prd-items/index.md) | pending |
-| [Folder-Level index.md Summary Aggregation](./folder-level-index-md-summary-aggregation/index.md) | pending |
+| [Folder-Level index.md Summary Aggregation](./folder-level-index-md-summary-aggregation/index.md) | completed |
 | [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-naming-convention/index.md) | completed |

@@ -74,12 +74,19 @@ export function generateIndexMd(
     item.status === "in_progress" ||
     item.status === "failing"
   ) {
-    const commits = extractCommits(recentLog, item.id);
+    const commits = renderCommitsFromItem(item);
     if (commits.length > 0) {
       lines.push("## Commits");
       lines.push("");
+      lines.push("| Author | Hash | Message | Timestamp |");
+      lines.push("|--------|------|---------|-----------|");
       for (const commit of commits) {
-        lines.push(`- \`${commit.hash}\` — ${commit.message} (${commit.date})`);
+        const shortHash = commit.hash.slice(0, 7);
+        const fullHash = commit.hash;
+        const author = commit.author || "unknown";
+        const message = (commit.message || "").replace(/\|/g, "\\|");
+        const timestamp = commit.timestamp || "";
+        lines.push(`| ${author} | \`${shortHash}\` | ${message} | ${timestamp} |`);
       }
       lines.push("");
     }
@@ -272,8 +279,25 @@ function getLastUpdatedDate(item: PRDItem): string {
 
 interface CommitInfo {
   hash: string;
-  message: string;
-  date: string;
+  author: string;
+  authorEmail: string;
+  timestamp: string;
+  message?: string;
+}
+
+function renderCommitsFromItem(item: PRDItem): CommitInfo[] {
+  if (!item.commits || item.commits.length === 0) {
+    return [];
+  }
+  // Convert CommitAttribution array directly to CommitInfo
+  // Commits are stored in reverse chronological order (newest first) in the item
+  return item.commits.map(commit => ({
+    hash: commit.hash,
+    author: commit.author,
+    authorEmail: commit.authorEmail,
+    timestamp: commit.timestamp,
+    message: commit.message,
+  }));
 }
 
 function extractCommits(_log: LogEntry[], _itemId: string): CommitInfo[] {
