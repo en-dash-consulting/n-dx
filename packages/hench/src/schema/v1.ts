@@ -448,6 +448,16 @@ export interface RunSummaryData {
   testsRun: TestRecord[];
   /** Automatic post-task test results. */
   postRunTests?: PostRunTestRecord;
+  /**
+   * Files changed with their git status codes (A/M/D/R/C/T).
+   *
+   * Populated from git diff-tree after commit. Format is "STATUS\tPATH"
+   * matching git's output. Provides accurate tracking of what was actually
+   * committed, replacing tool-call-based heuristics.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  fileChangesWithStatus?: string[];
   counts: SummaryCounts;
 }
 

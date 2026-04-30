@@ -27,6 +27,7 @@ import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { saveRun } from "../../store/runs.js";
 import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
+import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
@@ -1121,7 +1122,7 @@ export async function performCommitPromptIfNeeded(
     });
     info(`Commit created — ${stagedCount} file(s).`);
 
-    // Capture commit attribution after successful commit
+    // Capture commit attribution and changed files after successful commit
     if (store && taskId && run.status === "completed") {
       try {
         // Get the commit SHA
@@ -1130,6 +1131,23 @@ export async function performCommitPromptIfNeeded(
           timeout: 10_000,
         });
         const sha = shaOutput.trim();
+
+        // Capture changed files from this commit using git diff-tree
+        // This provides the authoritative, deterministic list of what was actually committed
+        try {
+          const changes = await captureCommitChanges(sha, projectDir);
+          if (run.structuredSummary && changes.length > 0) {
+            // Update filesChanged with the paths
+            run.structuredSummary.filesChanged = extractPaths(changes);
+            run.structuredSummary.counts.filesChanged = changes.length;
+            // Store the detailed status information
+            run.structuredSummary.fileChangesWithStatus = formatChanges(changes);
+            detail(`Captured ${changes.length} file change(s) from commit ${sha.slice(0, 7)}`);
+          }
+        } catch (err) {
+          // Best-effort: if git diff-tree fails, proceed with attribution
+          detail(`Warning: could not capture changed files: ${(err as Error).message}`);
+        }
 
         // Get commit metadata: hash, timestamp, author, email
         const format = "%H%n%cI%n%an%n%ae";
