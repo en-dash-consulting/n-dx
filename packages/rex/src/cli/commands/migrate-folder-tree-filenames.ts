@@ -1,7 +1,7 @@
 /**
  * Migration command: rename legacy index.md files to title-based filenames.
  *
- * Walks the `.rex/tree/` directory structure, reads the `title` field from each
+ * Walks the `.rex/prd_tree/` directory structure, reads the `title` field from each
  * `index.md`, and renames the file to match the normalized title-based filename.
  *
  * This prepares the folder tree for the schema evolution where `index.md` is
@@ -39,7 +39,7 @@ export interface MigrationResult {
 /**
  * Migrate legacy index.md files to title-based filenames.
  *
- * Walks `.rex/tree/` recursively, renames each `index.md` to its title-based
+ * Walks `.rex/prd_tree/` recursively, renames each `index.md` to its title-based
  * filename equivalent, logs each rename, and returns a summary.
  *
  * Idempotent: re-running after migration completes is a no-op.

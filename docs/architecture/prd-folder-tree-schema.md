@@ -6,10 +6,10 @@ Normative contract for the serializer (PRD → folder tree) and parser (folder t
 
 ## Directory Layout
 
-Tree root: `.rex/tree/` (configurable). Within it, the PRD hierarchy maps to nested directories:
+Tree root: `.rex/prd_tree/` (configurable). Within it, the PRD hierarchy maps to nested directories:
 
 ```
-.rex/tree/
+.rex/prd_tree/
 ├── {epic-slug}/
 │   ├── {epic_title}.md
 │   └── {feature-slug}/
@@ -96,7 +96,7 @@ As PRD item storage evolves from directory-based slug indexing to title-based ma
 - **Round-trip safe:** `f(f(x)) = f(x)` — applying the function twice yields the same result as applying once
 - **Idempotent:** Already-normalized filenames are not changed
 - **Collision-prone inputs merge:** Titles differing only in punctuation normalize to the same filename
-- **Length capped:** Filenames are capped at 40 characters including `.md` to keep nested `.rex/tree` paths below Windows checkout limits
+- **Length capped:** Filenames are capped at 40 characters including `.md` to keep nested `.rex/prd_tree` paths below Windows checkout limits
 
 ### Examples
 
@@ -788,7 +788,7 @@ The parser (folder tree → PRD) must:
 
 This schema is the normative storage contract for the PRD folder-tree format. For broader context:
 
-- **CLAUDE.md** (`Key Files` section): Describes `.rex/tree/` as the sole writable PRD surface and references this schema document.
+- **CLAUDE.md** (`Key Files` section): Describes `.rex/prd_tree/` as the sole writable PRD surface and references this schema document.
 - **AGENTS.md** (Public guidance): Links to this schema for agents implementing PRD operations.
 - **Implementation**: The `rex` package implements serialization and parsing according to this schema:
   - `packages/rex/src/store/folder-tree-serializer.ts` — writes files to disk (title-named per-item `.md`, plus orphan cleanup for renamed titles)

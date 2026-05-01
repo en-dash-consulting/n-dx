@@ -104,7 +104,7 @@ Date: 2026-04-29
 - **File**: `packages/rex/src/cli/commands/folder-tree-sync.ts`
 - **Lines**: 76–80
 - **Operation**: Detects missing folder tree, auto-migrates from prd.md
-- **Code**: `warn('Migrating .rex/prd.md → .rex/tree/ (first run)')`
+- **Code**: `warn('Migrating .rex/prd.md → .rex/prd_tree/ (first run)')`
 - **Call Path**: `loadItemsPreferFolderTree()` used by `status`, `next`, `validate` commands
 - **Status**: Will become no-op once prd.md is removed (tree always present)
 
@@ -218,7 +218,7 @@ Date: 2026-04-29
 10. **status-sections.ts** → Update status reporting to reflect folder-tree paths
 
 ### Phase 5: Status & Reporting
-11. **status-sections.ts:330** → Update canonical path to `.rex/tree/`
+11. **status-sections.ts:330** → Update canonical path to `.rex/prd_tree/`
 12. **rex status --show-individual** → Load from folder-tree sub-paths
 
 ### Phase 6: Verification
@@ -235,7 +235,7 @@ Current state:
 - **No writes to these files** (all writes go to prd.md)
 
 Future state (folder-tree):
-- Replace with sub-paths under `.rex/tree/`: `.rex/tree/prd_feature-x_2026-04-26/`
+- Replace with sub-paths under `.rex/prd_tree/`: `.rex/prd_tree/prd_feature-x_2026-04-26/`
 - Preserve `sourceFile` attribution field so item origin is still traceable
 - No behavioral changes; consolidation logic remains the same
 

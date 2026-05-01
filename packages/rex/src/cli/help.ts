@@ -14,6 +14,7 @@
 
 import { formatHelp } from "@n-dx/llm-client";
 import type { HelpDefinition } from "@n-dx/llm-client";
+import { PRD_TREE_DIRNAME } from "../store/index.js";
 
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {
@@ -544,11 +545,11 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
   "migrate-to-folder-tree": {
     tool: "rex",
     command: "migrate-to-folder-tree",
-    summary: "migrate prd.md to the .rex/tree/ folder-tree format",
+    summary: `migrate prd.md to the .rex/${PRD_TREE_DIRNAME}/ folder-tree format`,
     usage: "rex migrate-to-folder-tree [dir] [--yes]",
     description:
       "Reads the current PRD from .rex/prd.md (or branch-scoped prd_*_*.md files,\n" +
-      "or prd.json as a fallback) and writes the full folder tree to .rex/tree/\n" +
+      `or prd.json as a fallback) and writes the full folder tree to .rex/${PRD_TREE_DIRNAME}/\n` +
       "using slug-based directory names at all four hierarchy levels.\n\n" +
       "After a successful migration, prompts to delete prd.md and any branch-scoped\n" +
       "prd_{branch}_{date}.md files. Pass --yes to auto-confirm deletion.\n\n" +

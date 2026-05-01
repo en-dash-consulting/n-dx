@@ -4,7 +4,7 @@
  * For each write operation, this test verifies that:
  *   1. `.rex/prd.json` is NOT created or modified.
  *   2. `.rex/prd.md` is NOT created (write backend migrated to folder-tree).
- *   3. `.rex/tree/` reflects the mutation (folder-tree is the sole write surface).
+ *   3. `.rex/prd_tree/` reflects the mutation (folder-tree is the sole write surface).
  *
  * This guards against silent re-introduction of JSON or markdown write calls
  * in the FileStore write path.

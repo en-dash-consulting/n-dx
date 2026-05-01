@@ -410,7 +410,7 @@ describe("Task Completion Gate", () => {
           {
             turn: 1,
             tool: "write_file",
-            input: { path: ".rex/tree/item/index.md", content: "metadata" },
+            input: { path: ".rex/prd_tree/item/index.md", content: "metadata" },
             output: "Written",
             durationMs: 50,
           },

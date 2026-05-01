@@ -1,7 +1,7 @@
 /**
  * Folder-tree-to-PRD parser.
  *
- * Traverses a .rex/tree/ directory (or configurable root), parses each
+ * Traverses a .rex/prd_tree/ directory (or configurable root), parses each
  * index.md, and reconstructs the full PRD item tree in memory.
  *
  * Contract (see docs/architecture/prd-folder-tree-schema.md):

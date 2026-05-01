@@ -6,7 +6,7 @@
  * `merge_items` tool calls.
  *
  * All tests use isolated temporary directories and clean up on exit.
- * No test references prd.md paths; all assertions target .rex/tree/ via
+ * No test references prd.md paths; all assertions target .rex/prd_tree/ via
  * parseFolderTree.
  */
 

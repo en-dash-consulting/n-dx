@@ -2,7 +2,7 @@
  * Regression guard: PRD mutations must not write to prd.md or branch-scoped files.
  *
  * After the migration to folder-tree as the sole write backend, these tests
- * verify that PRD mutations write ONLY to `.rex/tree/` and never create or
+ * verify that PRD mutations write ONLY to `.rex/prd_tree/` and never create or
  * modify `prd.md` or branch-scoped `prd_{branch}_{date}.md` files.
  *
  * This guards against accidental introduction of prd.md writes in:
@@ -296,7 +296,7 @@ describe("prd.md and branch-scoped files are never created/modified", {
 
     // Verify warning was issued
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("prd.md exists alongside .rex/tree/"),
+      expect.stringContaining(`prd.md exists alongside .rex/${PRD_TREE_DIRNAME}/`),
     );
 
     // Verify tree was used (not prd.md) — doc should have items from tree

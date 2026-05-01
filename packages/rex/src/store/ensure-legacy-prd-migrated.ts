@@ -8,7 +8,7 @@
  * Migration flow:
  * 1. Detect if `.rex/prd.json` exists — if not, return no-op
  * 2. Check for `.rex/prd.json.migrated` marker — if present, already migrated, return no-op
- * 3. Check if `.rex/tree/` exists and contains items — if yes, already migrated, return no-op
+ * 3. Check if `.rex/<PRD_TREE_DIRNAME>/` exists and contains items — if yes, already migrated, return no-op
  * 4. Acquire file lock (`.rex/prd.json.lock`) to prevent concurrent races
  * 5. Create timestamped backup (`.rex/prd.json.backup-YYYYMMDD-HHMMSS`)
  * 6. Load and validate prd.json

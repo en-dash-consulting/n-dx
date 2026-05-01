@@ -251,7 +251,7 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
 
       paths.push(addedToPath);
 
-      // All paths must start with .rex/tree/
+      // All paths must start with .rex/prd_tree/
       expect(addedToPath).toMatch(PRD_TREE_PATH_PREFIX);
       // No absolute paths
       expect(addedToPath).not.toMatch(/^\//);

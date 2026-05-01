@@ -2,11 +2,11 @@
  * E2E tests asserting correct folder-tree state after rex CLI write commands.
  *
  * Verifies that `rex add`, `rex update`, `rex remove`, and `rex move` each
- * produce the expected `.rex/tree/` directory structure, and that `rex status`
+ * produce the expected `.rex/prd_tree/` directory structure, and that `rex status`
  * and `rex next` read from the tree rather than hardcoded prd.md paths.
  *
  * All tests use isolated temporary directories and clean up on exit.
- * No test references prd.md paths; all assertions target `.rex/tree/`.
+ * No test references prd.md paths; all assertions target `.rex/prd_tree/`.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -139,7 +139,7 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("add epic creates an epic directory in .rex/tree/", async () => {
+  it("add epic creates an epic directory in .rex/prd_tree/", async () => {
     const out = run(["add", "epic", tmpDir, "--title=Auth System", "--priority=high"]);
     const id = extractId(out);
 
@@ -218,7 +218,7 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     expect(indexMd).not.toContain(`"Old Title"`);
   });
 
-  it("remove epic deletes its directory from .rex/tree/", async () => {
+  it("remove epic deletes its directory from .rex/prd_tree/", async () => {
     const epicOut = run(["add", "epic", tmpDir, "--title=To Remove"]);
     const epicId = extractId(epicOut);
 

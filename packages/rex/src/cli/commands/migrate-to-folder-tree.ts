@@ -28,7 +28,7 @@ const PRD_MARKDOWN_FILENAME = "prd.md";
  * One-shot migration from prd.md to the folder-tree format.
  *
  * Reads the current PRD from prd.md (or branch-scoped variants, or prd.json as
- * a fallback), serializes it to the folder tree at `.rex/tree/`, and prints a
+ * a fallback), serializes it to the folder tree at `.rex/prd_tree/`, and prints a
  * summary showing item counts per PRD level.
  *
  * After a successful first migration, offers to delete prd.md and any
@@ -103,7 +103,7 @@ export async function cmdMigrateToFolderTree(
 /**
  * Load a PRD document for migration, trying sources in priority order:
  * 1. prd.md (primary Markdown) + any branch-scoped prd_*_*.md files
- * 2. Existing .rex/tree/ folder tree (idempotent re-run after prd.md deletion)
+ * 2. Existing .rex/prd_tree/ folder tree (idempotent re-run after prd.md deletion)
  * 3. prd.json (legacy JSON fallback)
  */
 async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<{ doc: PRDDocument; fromTree: boolean }> {
@@ -138,7 +138,7 @@ async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<{ d
 
   throw new CLIError(
     "No PRD source found.",
-    "Expected .rex/prd.md, .rex/tree/, or .rex/prd.json.",
+    `Expected .rex/prd.md, .rex/${FOLDER_TREE_SUBDIR}/, or .rex/prd.json.`,
   );
 }
 

@@ -34,7 +34,7 @@ import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 // ---------------------------------------------------------------------------
 
 /**
- * PRDStore implementation that uses `.rex/tree/` as the primary PRD backend.
+ * PRDStore implementation that uses `.rex/prd_tree/` as the primary PRD backend.
  * Document title is persisted in `tree-meta.json` in the same directory.
  */
 export class FolderTreeStore implements PRDStore {

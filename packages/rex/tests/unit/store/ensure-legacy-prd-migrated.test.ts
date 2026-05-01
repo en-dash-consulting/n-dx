@@ -258,7 +258,7 @@ describe("ensureLegacyPrdMigrated", () => {
   it("preserves backup if tree serialization fails", async () => {
     writeFileSync(join(rexDir, "prd.json"), JSON.stringify(SAMPLE_PRD));
 
-    // Make .rex/tree unwritable (simulate filesystem error during serialization)
+    // Make .rex/<PRD_TREE_DIRNAME> unwritable (simulate filesystem error during serialization)
     const treePath = join(rexDir, PRD_TREE_DIRNAME);
     mkdirSync(treePath);
     // Note: On most systems, we can't reliably make a directory unwritable
@@ -364,7 +364,7 @@ describe("ensureLegacyPrdMigrated", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Auto-rename of legacy `.rex/tree/` to canonical `.rex/<PRD_TREE_DIRNAME>/`
+  // Auto-rename of legacy `.rex/prd_tree/` to canonical `.rex/<PRD_TREE_DIRNAME>/`
   // ─────────────────────────────────────────────────────────────────────────
   // These tests verify the directory rename that runs at the start of every
   // `ensureLegacyPrdMigrated` call. They are skipped while PRD_TREE_DIRNAME
@@ -377,7 +377,7 @@ describe("ensureLegacyPrdMigrated", () => {
   skipUnlessRenamed(
     "auto-renames legacy .rex/tree to .rex/<PRD_TREE_DIRNAME> and preserves item content",
     async () => {
-      // Create a legacy `.rex/tree/` with a sample item — and no canonical dir.
+      // Create a legacy `.rex/prd_tree/` with a sample item — and no canonical dir.
       const legacyTree = join(rexDir, "tree");
       const epicSlug = "sample-epic-abc12345";
       mkdirSync(join(legacyTree, epicSlug), { recursive: true });

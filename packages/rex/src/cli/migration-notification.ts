@@ -20,7 +20,7 @@ import type { LogEntry } from "../schema/v1.js";
  * The banner includes:
  * - "prd.json detected and migrated" heading
  * - Backup file path (yellow)
- * - Folder-tree location (.rex/tree)
+ * - Folder-tree location (.rex/prd_tree)
  * - Suggestion to inspect with rex status
  *
  * @param backupPath - Path to the timestamped backup file

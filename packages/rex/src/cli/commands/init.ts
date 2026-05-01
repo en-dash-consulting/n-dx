@@ -54,7 +54,7 @@ export async function cmdInit(
     info("Created workflow.md (edit to add project-specific rules)");
   }
 
-  // .rex/tree/ — folder-tree scaffold (created once; not overwritten)
+  // .rex/prd_tree/ — folder-tree scaffold (created once; not overwritten)
   const treeDir = join(rexDir, FOLDER_TREE_SUBDIR);
   await mkdir(treeDir, { recursive: true });
   const treeRootStub = join(treeDir, "index.md");

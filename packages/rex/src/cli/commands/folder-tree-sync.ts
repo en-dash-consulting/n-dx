@@ -2,10 +2,10 @@
  * Folder-tree sync and read helpers.
  *
  * `syncFolderTree` — called after every PRD write mutation to re-serialize the
- * in-memory store to the `.rex/tree/` folder structure.
+ * in-memory store to the `.rex/prd_tree/` folder structure.
  *
  * `loadItemsPreferFolderTree` — canonical read path for status, next, and
- * validate. Reads items from the required `.rex/tree/` folder tree; throws if
+ * validate. Reads items from the required `.rex/prd_tree/` folder tree; throws if
  * the tree is absent (directing the user to run `rex migrate-to-folder-tree`).
  */
 
@@ -24,7 +24,7 @@ import type { PRDItem } from "../../schema/index.js";
 export const FOLDER_TREE_SUBDIR = PRD_TREE_DIRNAME;
 
 /**
- * Re-serialize the full PRD to the folder tree at `<rexDir>/tree/`.
+ * Re-serialize the full PRD to the folder tree at `<rexDir>/<PRD_TREE_DIRNAME>/`.
  *
  * Loads the current document state from the store and writes it to the
  * folder structure. Errors propagate to the caller.
@@ -36,7 +36,7 @@ export async function syncFolderTree(rexDir: string, store: PRDStore): Promise<v
 }
 
 /**
- * Load PRD items from the folder tree at `<rexDir>/tree/`.
+ * Load PRD items from the folder tree at `<rexDir>/<PRD_TREE_DIRNAME>/`.
  *
  * Reads from the folder tree and merges the parsed items with the full-fidelity
  * store items to reattach routing/metadata fields that the tree format does

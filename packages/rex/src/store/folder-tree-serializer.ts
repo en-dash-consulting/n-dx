@@ -2,7 +2,7 @@
  * PRD-to-folder-tree serializer.
  *
  * Converts an in-memory PRD item tree to a nested directory structure under
- * a configurable tree root (default: `.rex/tree/`). Each epic, feature, task,
+ * a configurable tree root (default: `.rex/prd_tree/`). Each epic, feature, task,
  * and subtask maps to one directory containing one `index.md`.
  *
  * Contract (see docs/architecture/prd-folder-tree-schema.md):

@@ -188,7 +188,7 @@ export class FileStore implements PRDStore {
 
   /**
    * Map an item back to its logical "owner file" key for the in-memory
-   * itemToFile map. The actual on-disk write target is the folder-tree at `.rex/tree/`,
+   * itemToFile map. The actual on-disk write target is the folder-tree at `.rex/prd_tree/`,
    * but the map is preserved so backwards-compatible APIs (getKnownFiles, ownership
    * inspection) continue to work. The key is derived from the item's
    * `sourceFile` attribution, normalized to a bare legacy `.json` filename
@@ -239,7 +239,7 @@ export class FileStore implements PRDStore {
    *
    * Folder-tree is the sole writable surface. The `_filename` argument is
    * accepted for callsite-compat with the historical multi-file layout but
-   * is no longer used to route writes — every mutation lands in `.rex/tree/`.
+   * is no longer used to route writes — every mutation lands in `.rex/prd_tree/`.
    * Per-item attribution (`branch`, `sourceFile`) still travels with each
    * item via {@link applyWriteAttribution}.
    *
@@ -388,10 +388,10 @@ export class FileStore implements PRDStore {
   /**
    * Load and validate the consolidated PRD document.
    *
-   * Reads from the folder-tree format at `.rex/tree/` when present. If the tree
+   * Reads from the folder-tree format at `.rex/prd_tree/` when present. If the tree
    * has not been created yet, falls back to legacy read-only sources
    * (`prd.md`, then `prd.json`/branch JSON files) so pre-migration projects and
-   * tests can still be inspected. Mutations still persist only to `.rex/tree/`.
+   * tests can still be inspected. Mutations still persist only to `.rex/prd_tree/`.
    *
    * Document title is read from `tree-meta.json` if present; defaults to "PRD".
    */
@@ -433,7 +433,7 @@ export class FileStore implements PRDStore {
       // Check if the tree directory is missing
       if (this.isMissingFileError(error)) {
         throw new Error(
-          `No PRD found at .rex/tree/. ` +
+          `No PRD found at .rex/${PRD_TREE_DIRNAME}/. ` +
             `Run 'rex migrate-to-folder-tree' to initialize the folder-tree backend.`,
         );
       }
@@ -459,14 +459,14 @@ export class FileStore implements PRDStore {
   private warnPrdMdIgnored(): void {
     // eslint-disable-next-line no-console
     console.warn(
-      `Warning: .rex/prd.md exists alongside .rex/tree/ (folder-tree). ` +
+      `Warning: .rex/prd.md exists alongside .rex/${PRD_TREE_DIRNAME}/ (folder-tree). ` +
       `The tree is authoritative; prd.md is ignored and will be removed in a future version. ` +
       `To remove this warning, delete: rm .rex/prd.md`,
     );
   }
 
   /**
-   * Persist a PRD document to the folder-tree backend at `.rex/tree/`.
+   * Persist a PRD document to the folder-tree backend at `.rex/prd_tree/`.
    * No prd.md or branch-scoped files are written.
    *
    * When not already inside {@link withTransaction}, acquires the folder-tree

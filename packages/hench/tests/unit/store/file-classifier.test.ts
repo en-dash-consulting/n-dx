@@ -118,7 +118,7 @@ describe("File Classifier", () => {
       });
 
       it("classifies files in .rex/ directory as metadata", () => {
-        expect(classifyFile(".rex/tree/task-1/index.md")).toBe("metadata");
+        expect(classifyFile(".rex/prd_tree/task-1/index.md")).toBe("metadata");
         expect(classifyFile(".rex/prd.md")).toBe("metadata");
       });
     });

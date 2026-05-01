@@ -7,7 +7,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 ## Packages
 
 - **sourcevision** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption.
-- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
+- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/prd_tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 
 ## Monorepo Structure
@@ -151,7 +151,7 @@ sv <command> [args]               # alias for sourcevision
 |------|---------|
 | `.sourcevision/CONTEXT.md` | AI-readable codebase summary |
 | `.sourcevision/manifest.json` | Analysis metadata and version |
-| `.rex/tree/` | PRD storage root — slug-based folder tree; one directory per item (epic/feature/task) containing `index.md` |
+| `.rex/prd_tree/` | PRD storage root — slug-based folder tree; one directory per item (epic/feature/task) containing `index.md` |
 | `.rex/prd.md` | (Legacy) flat Markdown PRD; migration source for `rex migrate-to-folder-tree`. Absent after migration. |
 | `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
@@ -169,7 +169,7 @@ sv <command> [args]               # alias for sourcevision
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 
-> **PRD file layout.** `.rex/tree/` is the sole writable PRD surface. Each item (epic/feature/task) maps to a slug-named directory containing `index.md`; subtasks are encoded as sections within the parent task's `index.md`. No JSON files are written by the rex CLI, MCP tools, or `rex update`. `.rex/prd.md` and branch-scoped `.rex/prd_{branch}_{date}.md` files are legacy migration sources — absent after running `rex migrate-to-folder-tree`. `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running; do not read it from code outside the web server.
+> **PRD file layout.** `.rex/prd_tree/` is the sole writable PRD surface. Each item (epic/feature/task) maps to a slug-named directory containing `index.md`; subtasks are encoded as sections within the parent task's `index.md`. No JSON files are written by the rex CLI, MCP tools, or `rex update`. `.rex/prd.md` and branch-scoped `.rex/prd_{branch}_{date}.md` files are legacy migration sources — absent after running `rex migrate-to-folder-tree`. `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running; do not read it from code outside the web server.
 
 > **PRD folder tree schema.** The primary PRD storage format maps each PRD level (epic → feature → task) to a directory containing an `index.md`. Subtasks are encoded as sections within the parent task's `index.md`. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
 

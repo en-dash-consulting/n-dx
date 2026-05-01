@@ -239,7 +239,7 @@ describe("resolveStore", () => {
     expect(doc1).toEqual(doc2);
   });
 
-  // FileStore mutations write only to .rex/tree/; prd.md is no longer
+  // FileStore mutations write only to .rex/prd_tree/; prd.md is no longer
   // regenerated, so this single-file-mode write contract no longer applies.
   it.skip("writes new root items to prd.md regardless of the current branch (single-file mode)", async () => {
     await mkdir(tmpDir, { recursive: true });
