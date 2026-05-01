@@ -20,8 +20,8 @@ Profile and optimize the folder-tree write path so that ndx add, rex add, edit_i
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Implement atomic, fast write path for prd_tree mutations with crash-safety guarantees | task | in_progress | 2026-05-01 |
-| Profile prd_tree write path and identify bottlenecks for single-item add and edit operations | task | pending | 1970-01-01 |
+| Implement atomic, fast write path for prd_tree mutations with crash-safety guarantees | task | completed | 2026-05-01 |
+| Profile prd_tree write path and identify bottlenecks for single-item add and edit operations | task | in_progress | 2026-05-01 |
 
 ## Info
 

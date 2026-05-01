@@ -2,13 +2,14 @@
 id: "bbf2dd9a-3f5a-4bb9-a263-ca8931caaaa5"
 level: "task"
 title: "Profile prd_tree write path and identify bottlenecks for single-item add and edit operations"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "rex"
   - "performance"
   - "prd"
 source: "smart-add"
+startedAt: "2026-05-01T14:17:39.295Z"
 acceptanceCriteria:
   - "Profiling harness measures end-to-end latency for ndx add and rex edit_item on small/medium/large fixture PRDs"
   - "Top three bottlenecks are documented with file paths and measured cost in milliseconds"

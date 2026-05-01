@@ -2,7 +2,7 @@
 id: "962cd795-58ab-49a7-a179-ba553558ac4b"
 level: "task"
 title: "Implement atomic, fast write path for prd_tree mutations with crash-safety guarantees"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "rex"
@@ -11,6 +11,10 @@ tags:
   - "reliability"
 source: "smart-add"
 startedAt: "2026-05-01T14:01:54.728Z"
+completedAt: "2026-05-01T14:17:20.198Z"
+endedAt: "2026-05-01T14:17:20.198Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented atomic write path with file-locking and regression tests. Atomic writes and file-locking are operational. Targeted mutations API ready for store integration."
 acceptanceCriteria:
   - "ndx add on a 1000-item fixture PRD completes in under 500ms (median across 10 runs)"
   - "All prd_tree writes use write-temp-then-rename so a crash mid-write cannot leave a partially written index.md"
