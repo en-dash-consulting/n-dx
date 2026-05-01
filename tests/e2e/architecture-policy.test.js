@@ -828,7 +828,6 @@ const COHESION_THRESHOLD = 0.5;
  * what structural condition would allow removing the exemption.
  */
 const COHESION_EXCEPTIONS = new Map([
-  ["graph-layout", "Small focused graph-rendering utility cluster; cohesion is depressed by one-way integration with the viewer hub. Remove when graph layout code is folded into a cohesive graph zone or gains enough internal edges."],
   ["tick", "Small polling/tick utility cluster used by viewer components; cohesion is depressed by hub-facing timer imports. Remove when tick utilities move under the viewer-message pipeline or gain a dedicated gateway."],
 ]);
 
