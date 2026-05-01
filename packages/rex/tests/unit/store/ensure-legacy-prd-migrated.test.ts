@@ -362,4 +362,78 @@ describe("ensureLegacyPrdMigrated", () => {
     expect(result.migrated).toBe(true);
     expect(result.itemCount).toBe(3);
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Auto-rename of legacy `.rex/tree/` to canonical `.rex/<PRD_TREE_DIRNAME>/`
+  // ─────────────────────────────────────────────────────────────────────────
+  // These tests verify the directory rename that runs at the start of every
+  // `ensureLegacyPrdMigrated` call. They are skipped while PRD_TREE_DIRNAME
+  // is still "tree" (the rename guard makes the operation a no-op). When
+  // the constant flips to "prd_tree" in the follow-up step, these tests
+  // exercise the live rename path.
+
+  const skipUnlessRenamed = PRD_TREE_DIRNAME === "tree" ? it.skip : it;
+
+  skipUnlessRenamed(
+    "auto-renames legacy .rex/tree to .rex/<PRD_TREE_DIRNAME> and preserves item content",
+    async () => {
+      // Create a legacy `.rex/tree/` with a sample item — and no canonical dir.
+      const legacyTree = join(rexDir, "tree");
+      const epicSlug = "sample-epic-abc12345";
+      mkdirSync(join(legacyTree, epicSlug), { recursive: true });
+      writeFileSync(
+        join(legacyTree, epicSlug, "index.md"),
+        "---\nid: \"abc12345-0000-0000-0000-000000000001\"\nlevel: \"epic\"\ntitle: \"Sample Epic\"\nstatus: \"pending\"\n---\n\n# Sample Epic\n",
+      );
+
+      const result = await ensureLegacyPrdMigrated(dir);
+
+      // Migration result is no-op (no prd.json was present), but the rename
+      // is a side-effect that runs unconditionally before the rest of the flow.
+      expect(result.migrated).toBe(false);
+      expect(result.reason).toBe("no-legacy-file");
+
+      // Legacy directory is gone, canonical directory exists, item content preserved.
+      expect(existsSync(legacyTree)).toBe(false);
+      const canonical = join(rexDir, PRD_TREE_DIRNAME);
+      expect(existsSync(canonical)).toBe(true);
+      const content = readFileSync(join(canonical, epicSlug, "index.md"), "utf-8");
+      expect(content).toContain("Sample Epic");
+      expect(content).toContain("abc12345-0000-0000-0000-000000000001");
+    },
+  );
+
+  skipUnlessRenamed(
+    "refuses to rename when both legacy and canonical directories exist",
+    async () => {
+      // Set up both: caller has done a partial fix and we should not merge.
+      const legacyTree = join(rexDir, "tree");
+      mkdirSync(legacyTree, { recursive: true });
+      writeFileSync(join(legacyTree, "stray.md"), "stray content");
+
+      const canonical = join(rexDir, PRD_TREE_DIRNAME);
+      mkdirSync(canonical, { recursive: true });
+      writeFileSync(join(canonical, "real.md"), "real content");
+
+      await ensureLegacyPrdMigrated(dir);
+
+      // Both directories survive — no merge, no overwrite.
+      expect(existsSync(join(legacyTree, "stray.md"))).toBe(true);
+      expect(existsSync(join(canonical, "real.md"))).toBe(true);
+    },
+  );
+
+  skipUnlessRenamed(
+    "is a no-op when only the canonical directory exists",
+    async () => {
+      const canonical = join(rexDir, PRD_TREE_DIRNAME);
+      mkdirSync(canonical, { recursive: true });
+      writeFileSync(join(canonical, "real.md"), "real content");
+
+      await ensureLegacyPrdMigrated(dir);
+
+      expect(existsSync(canonical)).toBe(true);
+      expect(existsSync(join(rexDir, "tree"))).toBe(false);
+    },
+  );
 });

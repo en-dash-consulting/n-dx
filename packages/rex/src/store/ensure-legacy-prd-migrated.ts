@@ -133,6 +133,23 @@ export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMig
   const treePath = join(rexDir, PRD_TREE_DIRNAME);
   const lockPath = join(rexDir, "prd.json.lock");
 
+  // Auto-rename legacy `.rex/tree/` directory to the canonical `.rex/<PRD_TREE_DIRNAME>/`
+  // location. The literal "tree" here is the legacy directory name and must
+  // never be reused elsewhere in the codebase. The rename is a no-op while
+  // PRD_TREE_DIRNAME itself is "tree" (oldTreePath === newTreePath); it
+  // activates when the constant is renamed in a follow-up step. The
+  // !existsSync(treePath) guard preserves all data — if both directories
+  // already exist, the rename refuses silently and downstream reads continue
+  // targeting the canonical path.
+  const legacyTreePath = join(rexDir, "tree");
+  if (
+    legacyTreePath !== treePath &&
+    (await dirExists(legacyTreePath)) &&
+    !(await dirExists(treePath))
+  ) {
+    await rename(legacyTreePath, treePath);
+  }
+
   // Step 1: Check if already migrated (marker file present)
   // This check comes first because prd.json may have been renamed to prd.json.migrated
   if (await fileExists(prdJsonMigratedMarker)) {
