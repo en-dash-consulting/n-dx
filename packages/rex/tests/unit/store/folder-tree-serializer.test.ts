@@ -24,6 +24,7 @@ import {
 } from "../../../src/store/folder-tree-serializer.js";
 import { parseFolderTree } from "../../../src/store/folder-tree-parser.js";
 import { titleToFilename } from "../../../src/store/title-to-filename.js";
+import { PRD_TREE_DIRNAME } from "../../../src/store/index.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
 // ── Test setup ────────────────────────────────────────────────────────────────
@@ -209,7 +210,7 @@ describe("serializeFolderTree: directory structure", () => {
 
     const files = await collectFiles(testDir);
     const repoRelativePaths = files.map((file) =>
-      `.rex/tree/${relative(testDir, file).split(sep).join("/")}`,
+      `.rex/${PRD_TREE_DIRNAME}/${relative(testDir, file).split(sep).join("/")}`,
     );
     const maxLength = Math.max(...repoRelativePaths.map((path) => path.length));
     expect(maxLength).toBeLessThanOrEqual(220);

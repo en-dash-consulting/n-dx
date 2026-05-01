@@ -8,4 +8,4 @@
  * hardcoding the literal string. Renaming the directory is therefore a
  * single-line change here.
  */
-export const PRD_TREE_DIRNAME = "tree";
+export const PRD_TREE_DIRNAME = "prd_tree";

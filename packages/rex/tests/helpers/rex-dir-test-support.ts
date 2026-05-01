@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 import { parseDocument } from "../../src/store/markdown-parser.js";
 import { titleToFilename } from "../../src/store/title-to-filename.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 /**
  * Write a test PRD by creating the folder tree structure synchronously.
@@ -32,7 +33,7 @@ export function writePRD(dir: string, doc: PRDDocument): void {
 
   // Reset the tree so successive writePRD calls in the same temp dir do not
   // leak items from a previous run.
-  const treePath = join(dir, ".rex", "tree");
+  const treePath = join(dir, ".rex", PRD_TREE_DIRNAME);
   if (existsSync(treePath)) rmSync(treePath, { recursive: true, force: true });
   // prd.md is the legacy fallback's write target; clear it so the next CLI
   // load re-materializes from the freshly written prd.json.
@@ -56,7 +57,7 @@ export function writePRD(dir: string, doc: PRDDocument): void {
   if (new Set(allIds).size !== allIds.length) return;
 
   // Create minimal folder tree structure for tests
-  mkdirSync(join(dir, ".rex", "tree"), { recursive: true });
+  mkdirSync(join(dir, ".rex", PRD_TREE_DIRNAME), { recursive: true });
 
   const writeItem = (itemDir: string, item: PRDItem): void => {
     mkdirSync(itemDir, { recursive: true });
@@ -66,7 +67,7 @@ export function writePRD(dir: string, doc: PRDDocument): void {
   // Write each epic as a directory with a title-named markdown file
   for (const epic of doc.items) {
     if (epic.level !== "epic") continue;
-    const epicDir = join(dir, ".rex", "tree", epic.id);
+    const epicDir = join(dir, ".rex", PRD_TREE_DIRNAME, epic.id);
     writeItem(epicDir, epic);
 
     // Write features
@@ -183,7 +184,7 @@ export function readPRD(dir: string): PRDDocument {
     // No tree-meta.json; use default title
   }
 
-  const treeRoot = join(dir, ".rex", "tree");
+  const treeRoot = join(dir, ".rex", PRD_TREE_DIRNAME);
   if (!existsSync(treeRoot)) {
     try {
       const raw = readFileSync(join(dir, ".rex", "prd.json"), "utf-8");

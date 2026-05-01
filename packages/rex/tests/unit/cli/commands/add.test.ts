@@ -84,7 +84,7 @@ describe("cmdAdd", () => {
     await expect(cmdAdd(tmp, "epic", { title: "My Epic" })).resolves.toBeUndefined();
   });
 
-  it("prints 'Added to: .rex/tree/...' for canonical (non-git) writes", async () => {
+  it(`prints 'Added to: .rex/${PRD_TREE_DIRNAME}/...' for canonical (non-git) writes`, async () => {
     const lines: string[] = [];
     const original = console.log;
     console.log = (...args: unknown[]): void => { lines.push(args.join(" ")); };
@@ -94,7 +94,7 @@ describe("cmdAdd", () => {
       console.log = original;
     }
 
-    expect(lines.some((l) => l.includes("Added to: .rex/tree/"))).toBe(true);
+    expect(lines.some((l) => l.includes(`Added to: .rex/${PRD_TREE_DIRNAME}/`))).toBe(true);
     // Path line precedes "Created" summary
     const addedIdx = lines.findIndex((l) => l.includes("Added to:"));
     const createdIdx = lines.findIndex((l) => l.includes("Created epic"));
@@ -113,7 +113,7 @@ describe("cmdAdd", () => {
     }
 
     const parsed = JSON.parse(lines.join("\n"));
-    expect(parsed.folderTreePath).toMatch(/^\.rex\/tree\//);
+    expect(parsed.folderTreePath).toMatch(new RegExp(`^\\.rex\\/${PRD_TREE_DIRNAME}\\/`));
     expect(parsed.title).toBe("Json Epic");
   });
 

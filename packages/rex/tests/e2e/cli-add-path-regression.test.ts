@@ -18,6 +18,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
+
+const PRD_TREE_PATH_PREFIX = new RegExp(`^\\.rex\\/${PRD_TREE_DIRNAME}\\/`);
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -70,7 +73,7 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
     const addedToPath = parseAddedToPath(output);
 
     // Path must be workspace-relative
-    expect(addedToPath).toMatch(/^\.rex\/tree\//);
+    expect(addedToPath).toMatch(PRD_TREE_PATH_PREFIX);
     expect(addedToPath).not.toMatch(/^\//);
     expect(addedToPath).not.toMatch(/^\.\//);
 
@@ -94,7 +97,7 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
     const addedToPath = parseAddedToPath(featureOutput);
 
     // Path must be workspace-relative
-    expect(addedToPath).toMatch(/^\.rex\/tree\//);
+    expect(addedToPath).toMatch(PRD_TREE_PATH_PREFIX);
     expect(addedToPath).not.toMatch(/^\//);
     expect(addedToPath).not.toMatch(/^\.\//);
 
@@ -130,7 +133,7 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
     const addedToPath = parseAddedToPath(taskOutput);
 
     // Path must be workspace-relative
-    expect(addedToPath).toMatch(/^\.rex\/tree\//);
+    expect(addedToPath).toMatch(PRD_TREE_PATH_PREFIX);
     expect(addedToPath).not.toMatch(/^\//);
     expect(addedToPath).not.toMatch(/^\.\//);
 
@@ -175,7 +178,7 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
     const addedToPath = parseAddedToPath(subtaskOutput);
 
     // Path must be workspace-relative
-    expect(addedToPath).toMatch(/^\.rex\/tree\//);
+    expect(addedToPath).toMatch(PRD_TREE_PATH_PREFIX);
     expect(addedToPath).not.toMatch(/^\//);
     expect(addedToPath).not.toMatch(/^\.\//);
 
@@ -216,7 +219,7 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
     const addedToPath = parseAddedToPath(taskOutput);
 
     // Must be the task path, not the parent paths
-    expect(addedToPath).toMatch(/^\.rex\/tree\//);
+    expect(addedToPath).toMatch(PRD_TREE_PATH_PREFIX);
     expect(addedToPath).toContain("docker");
 
     // Path must exist
@@ -249,7 +252,7 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
       paths.push(addedToPath);
 
       // All paths must start with .rex/tree/
-      expect(addedToPath).toMatch(/^\.rex\/tree\//);
+      expect(addedToPath).toMatch(PRD_TREE_PATH_PREFIX);
       // No absolute paths
       expect(addedToPath).not.toMatch(/^\//);
       // No leading ./
@@ -273,11 +276,11 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
     // Add multiple items and verify each outputs a consistent path format
     const output1 = run(tmpDir, ["add", "epic", "--title=First Epic"]);
     const path1 = parseAddedToPath(output1);
-    expect(path1).toMatch(/^\.rex\/tree\//);
+    expect(path1).toMatch(PRD_TREE_PATH_PREFIX);
 
     const output2 = run(tmpDir, ["add", "epic", "--title=Second Epic"]);
     const path2 = parseAddedToPath(output2);
-    expect(path2).toMatch(/^\.rex\/tree\//);
+    expect(path2).toMatch(PRD_TREE_PATH_PREFIX);
 
     // Both paths should exist on disk
     await stat(join(tmpDir, path1));

@@ -137,7 +137,7 @@ describe("cmdMigrateToFolderTree", () => {
     await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
 
     const out = output();
-    expect(out).toContain("Migrated .rex/prd.md → .rex/tree/");
+    expect(out).toContain(`Migrated .rex/prd.md → .rex/${PRD_TREE_DIRNAME}/`);
     expect(out).toMatch(/folder.*created/);
     expect(out).toMatch(/item file.*written/);
   });
