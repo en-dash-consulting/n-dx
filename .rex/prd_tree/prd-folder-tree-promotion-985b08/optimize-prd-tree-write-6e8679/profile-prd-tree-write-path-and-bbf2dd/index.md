@@ -2,7 +2,7 @@
 id: "bbf2dd9a-3f5a-4bb9-a263-ca8931caaaa5"
 level: "task"
 title: "Profile prd_tree write path and identify bottlenecks for single-item add and edit operations"
-status: "completed"
+status: "in_progress"
 priority: "high"
 tags:
   - "rex"
@@ -20,7 +20,7 @@ description: "Instrument the folder-tree write path (slug generation, parent tra
 
 # Profile prd_tree write path and identify bottlenecks for single-item add and edit operations
 
-✅ [completed]
+🟠 [in_progress]
 
 ## Summary
 
@@ -28,34 +28,8 @@ Instrument the folder-tree write path (slug generation, parent traversal, index.
 
 ## Info
 
-- **Status:** completed
+- **Status:** in_progress
 - **Priority:** high
 - **Tags:** rex, performance, prd
 - **Level:** task
 - **Started:** 2026-05-01T14:17:39.295Z
-- **Completed:** 2026-05-01T14:25:00.000Z
-
-## Results
-
-✅ **All acceptance criteria met:**
-
-1. ✅ **Profiling harness** created at `packages/rex/tests/integration/profile-prd-tree-write.test.ts`
-   - Measures end-to-end latency for parseFolderTree, serializeFolderTree, addItem, updateItem
-   - Runs on small (20), medium (200), large (1000) item fixture PRDs
-   - Fixtures created with proportional epic/feature structure
-
-2. ✅ **Top 3 bottlenecks documented** in `docs/performance/prd-tree-write-baseline.md`:
-   - serializeFolderTree: 192ms avg, 465ms max (packages/rex/src/store/folder-tree-serializer.ts:55-70)
-   - parseFolderTree: 72ms avg, 173ms max (packages/rex/src/store/folder-tree-parser.ts:1-100)
-   - addItem: 2ms avg, 3ms max (packages/rex/src/store/folder-tree-store.ts:87-111)
-
-3. ✅ **Profiling artifacts checked in**:
-   - Test: packages/rex/tests/integration/profile-prd-tree-write.test.ts
-   - Scripts: scripts/profile-prd-tree-write.mjs, scripts/profile-store-write.mjs
-   - Documentation: docs/performance/prd-tree-write-baseline.md
-
-4. ✅ **Baseline numbers recorded**:
-   - Small (20): parse 5ms, serialize 12ms
-   - Medium (200): parse 38ms, serialize 98ms  
-   - Large (1000): parse 173ms, serialize 465ms
-   - Includes cost analysis and optimization roadmap
