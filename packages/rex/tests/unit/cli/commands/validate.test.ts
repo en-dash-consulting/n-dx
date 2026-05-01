@@ -6,6 +6,7 @@ import { cmdValidate } from "../../../../src/cli/commands/validate.js";
 import { writePRD, writeConfig } from "../../../helpers/rex-dir-test-support.js";
 import { serializeFolderTree } from "../../../../src/store/folder-tree-serializer.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 const VALID_CONFIG = {
   schema: "rex/v1",
@@ -642,7 +643,7 @@ describe("cmdValidate — folder tree read path", () => {
   it("passes all structural checks when tree exists and items are valid", async () => {
     writeFileSync(join(tmpDir, ".rex", "config.json"), JSON.stringify(VALID_CONFIG_FOR_TREE));
     writeFileSync(join(tmpDir, ".rex", "prd.json"), JSON.stringify(VALID_PRD_FOR_TREE));
-    await serializeFolderTree(VALID_PRD_FOR_TREE.items, join(tmpDir, ".rex", "tree"));
+    await serializeFolderTree(VALID_PRD_FOR_TREE.items, join(tmpDir, ".rex", PRD_TREE_DIRNAME));
 
     await cmdValidate(tmpDir, {});
     expect(exitSpy).not.toHaveBeenCalled();
@@ -675,7 +676,7 @@ describe("cmdValidate — folder tree read path", () => {
 
     writeFileSync(join(tmpDir, ".rex", "config.json"), JSON.stringify(VALID_CONFIG_FOR_TREE));
     writeFileSync(join(tmpDir, ".rex", "prd.json"), JSON.stringify(prdWithEmptyEpic));
-    await serializeFolderTree(prdWithEmptyEpic.items, join(tmpDir, ".rex", "tree"));
+    await serializeFolderTree(prdWithEmptyEpic.items, join(tmpDir, ".rex", PRD_TREE_DIRNAME));
 
     await cmdValidate(tmpDir, { format: "json" });
 

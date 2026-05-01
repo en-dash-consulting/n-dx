@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { parseFolderTree } from "../../src/store/folder-tree-parser.js";
 import type { PRDItem } from "../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -35,7 +36,7 @@ async function expectCanonicalFilesInSync(tmpDir: string): Promise<{
   title: string;
   items: PRDItem[];
 }> {
-  const { items } = await parseFolderTree(join(tmpDir, ".rex", "tree"));
+  const { items } = await parseFolderTree(join(tmpDir, ".rex", PRD_TREE_DIRNAME));
   return { schema: "rex/v1", title: "PRD", items };
 }
 

@@ -7,6 +7,7 @@ import { cmdUpdate } from "../../../../src/cli/commands/update.js";
 import { readPRD, writePRD } from "../../../helpers/rex-dir-test-support.js";
 import { slugify } from "../../../../src/store/folder-tree-serializer.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 describe("cmdUpdate", () => {
   let tmp: string;
@@ -417,7 +418,7 @@ describe("cmdUpdate", () => {
     it("writes folder tree after a status update", async () => {
       await cmdUpdate(tmp, itemId, { status: "in_progress" });
 
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       expect(existsSync(treeRoot)).toBe(true);
       const epicDir = join(treeRoot, slugify("Test item", itemId));
       expect(existsSync(epicDir)).toBe(true);
@@ -429,7 +430,7 @@ describe("cmdUpdate", () => {
     it("writes folder tree after a title update", async () => {
       await cmdUpdate(tmp, itemId, { title: "New title" });
 
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       expect(existsSync(treeRoot)).toBe(true);
       const entries = readdirSync(treeRoot).filter((e) =>
         statSync(join(treeRoot, e)).isDirectory(),
@@ -444,7 +445,7 @@ describe("cmdUpdate", () => {
     it("writes folder tree after deletion (removes epic folder)", async () => {
       // First, write the tree by updating status
       await cmdUpdate(tmp, itemId, { status: "in_progress" });
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       expect(existsSync(treeRoot)).toBe(true);
 
       // Deleting removes the item; the folder tree should have no subdirectories

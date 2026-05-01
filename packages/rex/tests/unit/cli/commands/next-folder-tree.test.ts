@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { cmdNext } from "../../../../src/cli/commands/next.js";
 import { serializeFolderTree } from "../../../../src/store/index.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 const NEXT_PRD: PRDDocument = {
   schema: "rex/v1",
@@ -73,7 +74,7 @@ describe("cmdNext — folder tree read path", () => {
 
   it("selects next task from folder tree when tree exists", async () => {
     writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(NEXT_PRD));
-    await serializeFolderTree(NEXT_PRD.items, join(tmp, ".rex", "tree"));
+    await serializeFolderTree(NEXT_PRD.items, join(tmp, ".rex", PRD_TREE_DIRNAME));
 
     await cmdNext(tmp, {});
     expect(output()).toContain("Task Beta");

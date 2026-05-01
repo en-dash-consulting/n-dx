@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { RexConfigSchema } from "../../src/schema/validate.js";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../src/schema/v1.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -41,7 +42,7 @@ describe("rex init", () => {
 
     const rexDir = join(tmpDir, ".rex");
     await access(join(rexDir, "config.json"));
-    await access(join(rexDir, "tree", "index.md"));
+    await access(join(rexDir, PRD_TREE_DIRNAME, "index.md"));
     await access(join(rexDir, "execution-log.jsonl"));
     await access(join(rexDir, "workflow.md"));
   });
@@ -97,7 +98,7 @@ describe("rex init", () => {
     expect(config.project).toBe("my-custom-project");
 
     const treeIndex = await readFile(
-      join(tmpDir, ".rex", "tree", "index.md"),
+      join(tmpDir, ".rex", PRD_TREE_DIRNAME, "index.md"),
       "utf-8",
     );
     expect(treeIndex).toContain("# my-custom-project");
@@ -118,7 +119,7 @@ describe("rex init", () => {
       await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
     );
     const treeIndex = await readFile(
-      join(tmpDir, ".rex", "tree", "index.md"),
+      join(tmpDir, ".rex", PRD_TREE_DIRNAME, "index.md"),
       "utf-8",
     );
     expect(treeIndex).toContain(`# ${config.project}`);
@@ -156,7 +157,7 @@ describe("rex init", () => {
     expect(output).toContain("already exists");
 
     // tree scaffold should still be present
-    await access(join(tmpDir, ".rex", "tree", "index.md"));
+    await access(join(tmpDir, ".rex", PRD_TREE_DIRNAME, "index.md"));
   });
 
   it("preserves valid files on re-run", async () => {
@@ -165,7 +166,7 @@ describe("rex init", () => {
     const rexDir = join(tmpDir, ".rex");
     const configRaw1 = await readFile(join(rexDir, "config.json"), "utf-8");
     const treeIndexRaw1 = await readFile(
-      join(rexDir, "tree", "index.md"),
+      join(rexDir, PRD_TREE_DIRNAME, "index.md"),
       "utf-8",
     );
 
@@ -173,7 +174,7 @@ describe("rex init", () => {
 
     const configRaw2 = await readFile(join(rexDir, "config.json"), "utf-8");
     const treeIndexRaw2 = await readFile(
-      join(rexDir, "tree", "index.md"),
+      join(rexDir, PRD_TREE_DIRNAME, "index.md"),
       "utf-8",
     );
 

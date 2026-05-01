@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { FolderTreeStore } from "../../src/store/folder-tree-store.js";
 import type { PRDItem } from "../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 describe("index.md generation: E2E", () => {
   let testDir: string;
@@ -50,7 +51,7 @@ describe("index.md generation: E2E", () => {
     await store.addItem(epic);
 
     // Find the epic directory dynamically
-    const treeRoot = join(testDir, ".rex", "tree");
+    const treeRoot = join(testDir, ".rex", PRD_TREE_DIRNAME);
     const epicDirs = await readdir(treeRoot);
     expect(epicDirs.length).toBeGreaterThan(0);
 
@@ -103,7 +104,7 @@ describe("index.md generation: E2E", () => {
     await store.addItem(task, feature.id);
 
     // Read epic's index.md and verify Progress table
-    const treeRoot = join(testDir, ".rex", "tree");
+    const treeRoot = join(testDir, ".rex", PRD_TREE_DIRNAME);
     const epicDirs = await readdir(treeRoot);
     const epicContent = await findIndexMdInDir(join(treeRoot, epicDirs[0]));
 
@@ -169,7 +170,7 @@ describe("index.md generation: E2E", () => {
     await store.addItem(subtask2, task.id);
 
     // Find and read task's index.md
-    const treeRoot = join(testDir, ".rex", "tree");
+    const treeRoot = join(testDir, ".rex", PRD_TREE_DIRNAME);
     const epicDir = (await readdir(treeRoot))[0];
     const featureDir = (await readdir(join(treeRoot, epicDir)))[0];
     const taskDir = (await readdir(join(treeRoot, epicDir, featureDir)))[0];
@@ -224,7 +225,7 @@ describe("index.md generation: E2E", () => {
     await store.addItem(task, feature.id);
 
     // Find and read task's index.md
-    const treeRoot = join(testDir, ".rex", "tree");
+    const treeRoot = join(testDir, ".rex", PRD_TREE_DIRNAME);
     const epicDir = (await readdir(treeRoot))[0];
     const featureDir = (await readdir(join(treeRoot, epicDir)))[0];
     const taskDir = (await readdir(join(treeRoot, epicDir, featureDir)))[0];
@@ -280,7 +281,7 @@ describe("index.md generation: E2E", () => {
     });
 
     // Verify the feature's index.md was regenerated with updated Progress
-    const treeRoot = join(testDir, ".rex", "tree");
+    const treeRoot = join(testDir, ".rex", PRD_TREE_DIRNAME);
     const epicDir = (await readdir(treeRoot))[0];
     const featureDir = (await readdir(join(treeRoot, epicDir)))[0];
     const content = await findIndexMdInDir(join(treeRoot, epicDir, featureDir));

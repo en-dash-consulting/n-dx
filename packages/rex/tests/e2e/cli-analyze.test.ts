@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { readPRD } from "../helpers/rex-dir-test-support.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -194,7 +195,7 @@ describe("Billing", () => {
       }
       return count;
     }
-    const treeRoot = join(tmpDir, ".rex", "tree");
+    const treeRoot = join(tmpDir, ".rex", PRD_TREE_DIRNAME);
     const treeIndexCount = await countItemFiles(treeRoot);
 
     expect(treeIndexCount).toBe(prdNonSubtaskCount);

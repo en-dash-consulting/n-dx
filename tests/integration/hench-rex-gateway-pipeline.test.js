@@ -45,12 +45,12 @@ function makeTmpProject(items) {
   );
 
   // Create minimal folder-tree structure for tests
-  mkdirSync(join(rexDir, "tree"), { recursive: true });
+  mkdirSync(join(rexDir, gw.PRD_TREE_DIRNAME), { recursive: true });
 
   // Write each item to the folder tree
   // Simple implementation: just write epics for now (test items are simple)
   for (const item of doc.items) {
-    const itemDir = join(rexDir, "tree", item.id);
+    const itemDir = join(rexDir, gw.PRD_TREE_DIRNAME, item.id);
     mkdirSync(itemDir, { recursive: true });
     const markdown = createItemMarkdown(item);
     writeFileSync(join(itemDir, "index.md"), markdown, "utf-8");

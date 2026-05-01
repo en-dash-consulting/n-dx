@@ -11,6 +11,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync
 import { tmpdir } from "node:os";
 import { ensureLegacyPrdMigrated, LegacyPrdMigrationError } from "../../../src/store/ensure-legacy-prd-migrated.js";
 import type { PRDDocument } from "../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../../src/store/index.js";
 
 /** Minimal valid PRD document for testing. */
 const SAMPLE_PRD: PRDDocument = {
@@ -99,7 +100,7 @@ describe("ensureLegacyPrdMigrated", () => {
     writeFileSync(join(rexDir, "prd.json"), JSON.stringify(SAMPLE_PRD));
 
     // Create a minimal tree structure
-    const treePath = join(rexDir, "tree");
+    const treePath = join(rexDir, PRD_TREE_DIRNAME);
     mkdirSync(treePath, { recursive: true });
     const epicDir = join(treePath, "test-epic");
     mkdirSync(epicDir, { recursive: true });
@@ -131,7 +132,7 @@ describe("ensureLegacyPrdMigrated", () => {
     expect(result.reason).toBeUndefined();
 
     // Tree should exist with content
-    expect(existsSync(join(rexDir, "tree"))).toBe(true);
+    expect(existsSync(join(rexDir, PRD_TREE_DIRNAME))).toBe(true);
 
     // Backup should exist with timestamp
     expect(existsSync(result.backupPath!)).toBe(true);
@@ -258,7 +259,7 @@ describe("ensureLegacyPrdMigrated", () => {
     writeFileSync(join(rexDir, "prd.json"), JSON.stringify(SAMPLE_PRD));
 
     // Make .rex/tree unwritable (simulate filesystem error during serialization)
-    const treePath = join(rexDir, "tree");
+    const treePath = join(rexDir, PRD_TREE_DIRNAME);
     mkdirSync(treePath);
     // Note: On most systems, we can't reliably make a directory unwritable
     // for the current process without affecting our own ability to clean up.
@@ -321,7 +322,7 @@ describe("ensureLegacyPrdMigrated", () => {
     expect(backups.length).toBe(1);
 
     // Tree should exist with items
-    expect(existsSync(join(rexDir, "tree"))).toBe(true);
+    expect(existsSync(join(rexDir, PRD_TREE_DIRNAME))).toBe(true);
   });
 
   // ─────────────────────────────────────────────────────────────────────────

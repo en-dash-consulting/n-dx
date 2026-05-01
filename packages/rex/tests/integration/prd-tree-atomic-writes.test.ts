@@ -16,6 +16,7 @@ import { FolderTreeStore } from "../../src/store/folder-tree-store.js";
 import type { PRDItem } from "../../src/schema/index.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import { acquireLock } from "../../src/store/file-lock.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 // ── Test fixtures ──────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ describe("prd_tree atomic writes and crash-safety", () => {
       expect(doc.items[0].title).toBe("Test Item");
 
       // Check that no temp files were left behind
-      const treeDir = join(rexDir, "tree");
+      const treeDir = join(rexDir, PRD_TREE_DIRNAME);
       const entries = await readdir(treeDir, { recursive: true });
       const tmpFiles = entries.filter((e) => typeof e === "string" && e.includes(".tmp"));
       expect(tmpFiles).toHaveLength(0);
@@ -115,7 +116,7 @@ describe("prd_tree atomic writes and crash-safety", () => {
 
     it("can recover from crashed write that left incomplete directory", async () => {
       // Manually create an incomplete directory (simulating mid-write crash)
-      const incompleteDir = join(rexDir, "tree", "incomplete-item");
+      const incompleteDir = join(rexDir, PRD_TREE_DIRNAME, "incomplete-item");
       await mkdir(incompleteDir, { recursive: true });
 
       // Try to add a new item — should not fail
@@ -133,7 +134,7 @@ describe("prd_tree atomic writes and crash-safety", () => {
       await store.addItem(item1);
 
       // Find the actual directory and index.md created by the serializer
-      const treeDir = join(rexDir, "tree");
+      const treeDir = join(rexDir, PRD_TREE_DIRNAME);
       const epicDirs = await readdir(treeDir);
       if (epicDirs.length === 0) {
         throw new Error("No epic directory created");
@@ -282,7 +283,7 @@ describe("prd_tree atomic writes and crash-safety", () => {
       // See folder-tree-mutations.ts for the optimized API.
       this.timeout(60000);
       // Create 1000-item fixture
-      const items = await create1000ItemFixture(join(rexDir, "tree"));
+      const items = await create1000ItemFixture(join(rexDir, PRD_TREE_DIRNAME));
       const emptyDoc = { schema: SCHEMA_VERSION, title: "Large PRD", items };
       await store.saveDocument(emptyDoc);
 
@@ -313,7 +314,7 @@ describe("prd_tree atomic writes and crash-safety", () => {
       // DEFERRED: Requires mutations optimization integration.
       this.timeout(30000);
       // Create 1000-item fixture
-      const items = await create1000ItemFixture(join(rexDir, "tree"));
+      const items = await create1000ItemFixture(join(rexDir, PRD_TREE_DIRNAME));
       const emptyDoc = { schema: SCHEMA_VERSION, title: "Large PRD", items };
       await store.saveDocument(emptyDoc);
 

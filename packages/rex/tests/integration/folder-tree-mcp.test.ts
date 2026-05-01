@@ -27,6 +27,7 @@ import {
   handleMergeItems,
 } from "../../src/cli/mcp-tools.js";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 // ── Setup helpers ─────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ async function setupRexDir(tmpDir: string) {
 
 /** Parse the folder tree and return all items flattened in traversal order. */
 async function flatTreeItems(rexDir: string): Promise<PRDItem[]> {
-  const treeRoot = join(rexDir, "tree");
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const { items } = await parseFolderTree(treeRoot);
   const flat: PRDItem[] = [];
   function collect(list: PRDItem[]) {
@@ -56,7 +57,7 @@ async function flatTreeItems(rexDir: string): Promise<PRDItem[]> {
 
 /** Parse the folder tree and return the top-level epic items (with children). */
 async function treeEpics(rexDir: string): Promise<PRDItem[]> {
-  const treeRoot = join(rexDir, "tree");
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const { items, warnings } = await parseFolderTree(treeRoot);
   expect(warnings).toHaveLength(0);
   return items;
@@ -68,7 +69,7 @@ async function treeEpics(rexDir: string): Promise<PRDItem[]> {
  * markdown file, falling back to `index.md`.
  */
 async function readIndexMd(rexDir: string, ...pathParts: string[]): Promise<string> {
-  const itemDir = join(rexDir, "tree", ...pathParts);
+  const itemDir = join(rexDir, PRD_TREE_DIRNAME, ...pathParts);
   const entries = await readdir(itemDir);
   const titleNamed = entries.filter((f) => f.endsWith(".md") && f !== "index.md");
   if (titleNamed.length === 1) return readFile(join(itemDir, titleNamed[0]), "utf-8");

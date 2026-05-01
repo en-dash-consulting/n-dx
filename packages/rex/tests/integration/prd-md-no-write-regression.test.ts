@@ -42,6 +42,7 @@ vi.mock("../../src/analyze/llm-bridge.js", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 
 import { reasonFromDescription } from "../../src/analyze/reason.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -93,7 +94,7 @@ async function branchScopedFilesExist(dir: string): Promise<string[]> {
 
 async function folderTreeExists(dir: string): Promise<boolean> {
   try {
-    await access(join(dir, ".rex", "tree"), constants.F_OK);
+    await access(join(dir, ".rex", PRD_TREE_DIRNAME), constants.F_OK);
     return true;
   } catch {
     return false;
@@ -102,7 +103,7 @@ async function folderTreeExists(dir: string): Promise<boolean> {
 
 async function seedFolderTree(rexDir: string): Promise<void> {
   // Create minimal folder tree structure
-  const treeDir = join(rexDir, "tree");
+  const treeDir = join(rexDir, PRD_TREE_DIRNAME);
   await mkdir(treeDir, { recursive: true });
 
   // Create tree-meta.json
@@ -323,7 +324,7 @@ describe("prd.md and branch-scoped files are never created/modified", {
     await writeFile(prdJsonPath, toCanonicalJSON(prdJson), "utf-8");
 
     // Remove the tree to force legacy load
-    const treeDir = join(rexDir, "tree");
+    const treeDir = join(rexDir, PRD_TREE_DIRNAME);
     await rm(treeDir, { recursive: true, force: true });
     const treeMetaPath = join(rexDir, "tree-meta.json");
     try {

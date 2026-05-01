@@ -7,6 +7,7 @@ import { cmdRemove } from "../../../../src/cli/commands/remove.js";
 import { readPRD, writePRD } from "../../../helpers/rex-dir-test-support.js";
 import { slugify } from "../../../../src/store/folder-tree-serializer.js";
 import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 function makePrd(items: PRDItem[] = []): PRDDocument {
   return { schema: "rex/v1", title: "test", items } as PRDDocument;
@@ -477,7 +478,7 @@ describe("cmdRemove", () => {
 
       await cmdRemove(tmp, "e1", "epic", { yes: "true" });
 
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       expect(existsSync(treeRoot)).toBe(true);
       expect(existsSync(join(treeRoot, slugify("Epic One", "e1")))).toBe(false);
       expect(existsSync(join(treeRoot, slugify("Epic Two", "e2")))).toBe(true);
@@ -488,7 +489,7 @@ describe("cmdRemove", () => {
 
       await cmdRemove(tmp, "t1", "task", { yes: "true" });
 
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       const epicDir = join(treeRoot, slugify("Epic One", "e1"));
       const featureDir = join(epicDir, slugify("Feature 1", "f1"));
       expect(existsSync(join(featureDir, slugify("Task 1", "t1")))).toBe(false);
@@ -516,7 +517,7 @@ describe("cmdRemove", () => {
 
       await cmdRemove(tmp, "f1", "feature", { yes: "true" });
 
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       const epicDir = join(treeRoot, slugify("Epic One", "e1"));
       expect(existsSync(join(epicDir, slugify("Feature One", "f1")))).toBe(false);
       expect(existsSync(join(epicDir, slugify("Feature Two", "f2")))).toBe(true);

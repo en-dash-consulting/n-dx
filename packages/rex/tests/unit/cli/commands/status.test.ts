@@ -15,6 +15,7 @@ import {
 import { CLIError } from "../../../../src/cli/errors.js";
 import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
 import type { CoverageMap } from "../../../../src/cli/commands/status.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 function writePRD(dir: string, doc: PRDDocument): void {
   writeFileSync(join(dir, ".rex", "prd.json"), JSON.stringify(doc));
@@ -1447,7 +1448,7 @@ describe("cmdStatus — folder tree read path", () => {
 
   it("reads items from tree when tree already exists", async () => {
     writeFileSync(join(tmp, ".rex", "prd.json"), JSON.stringify(FOLDER_TREE_PRD));
-    await serializeFolderTree(FOLDER_TREE_PRD.items, join(tmp, ".rex", "tree"));
+    await serializeFolderTree(FOLDER_TREE_PRD.items, join(tmp, ".rex", PRD_TREE_DIRNAME));
 
     await cmdStatus(tmp, { format: "tree", all: "true" });
     const out = output();

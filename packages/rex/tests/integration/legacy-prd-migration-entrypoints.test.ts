@@ -26,6 +26,7 @@ import { createRexMcpServer } from "../../src/cli/mcp.js";
 
 // Import store functions
 import { resolveStore } from "../../src/store/index.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 const FIXTURE_DIR = resolve("packages/rex/tests/fixtures/legacy-multifile-prd");
 
@@ -101,7 +102,7 @@ function verifyMigrationState(testDir: string): {
   itemCount: number;
 } {
   const rexDir = join(testDir, ".rex");
-  const treeDir = join(rexDir, "tree");
+  const treeDir = join(rexDir, PRD_TREE_DIRNAME);
   const treeExists = existsSync(treeDir);
 
   // Check for backup file (format: prd.json.backup-YYYYMMDD-HHMMSS)

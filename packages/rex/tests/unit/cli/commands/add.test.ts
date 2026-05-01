@@ -8,6 +8,7 @@ import { cmdAdd } from "../../../../src/cli/commands/add.js";
 import { readPRD, writePRD } from "../../../helpers/rex-dir-test-support.js";
 import { parseDocument } from "../../../../src/store/markdown-parser.js";
 import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 function makePrd(items: PRDItem[] = []): PRDDocument {
   return { schema: "rex/v1", title: "test", items } as PRDDocument;
@@ -416,7 +417,7 @@ describe("cmdAdd – blockedBy support", () => {
 
       await cmdAdd(tmp, "epic", { title: "My Epic", format: "json" });
 
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       expect(existsSync(treeRoot)).toBe(true);
 
       // Exactly one directory under the tree root
@@ -440,7 +441,7 @@ describe("cmdAdd – blockedBy support", () => {
 
       await cmdAdd(tmp, "feature", { title: "Child Feature", parent: "epic-aa", format: "json" });
 
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       // Find the epic directory by enumerating tree entries; the slug shape
       // is now "parent-epic" with no id suffix when there's no collision.
       const epicEntries = readdirSync(treeRoot).filter((e) =>

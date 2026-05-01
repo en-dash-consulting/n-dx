@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -130,7 +131,7 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-tree-"));
-    treeRoot = join(tmpDir, ".rex", "tree");
+    treeRoot = join(tmpDir, ".rex", PRD_TREE_DIRNAME);
     run(["init", tmpDir]);
   });
 

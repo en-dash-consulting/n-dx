@@ -25,6 +25,7 @@ import {
   SCHEMA_VERSION,
 } from "../../src/public.js";
 import { FolderTreeStore } from "../../src/store/folder-tree-store.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Fixtures
@@ -91,7 +92,7 @@ async function createFixtureOnDisk(
   workDir: string,
   items: PRDItem[]
 ): Promise<void> {
-  const treeDir = join(workDir, "tree");
+  const treeDir = join(workDir, PRD_TREE_DIRNAME);
   await mkdir(treeDir, { recursive: true });
 
   const startMs = performance.now();
@@ -378,7 +379,7 @@ describe("Profile: PRD folder-tree write path", () => {
   it("should profile parseFolderTree on small PRD (20 items)", async () => {
     const fixture = fixtures[0];
     const workDir = join(TEMP_DIR, fixture.name);
-    const treeDir = join(workDir, "tree");
+    const treeDir = join(workDir, PRD_TREE_DIRNAME);
 
     const timing = await profileParseFolderTree(treeDir, fixture.itemCount);
     timings[fixture.name].parseFolderTree = timing;
@@ -390,7 +391,7 @@ describe("Profile: PRD folder-tree write path", () => {
   it("should profile parseFolderTree on medium PRD (200 items)", async () => {
     const fixture = fixtures[1];
     const workDir = join(TEMP_DIR, fixture.name);
-    const treeDir = join(workDir, "tree");
+    const treeDir = join(workDir, PRD_TREE_DIRNAME);
 
     const timing = await profileParseFolderTree(treeDir, fixture.itemCount);
     timings[fixture.name].parseFolderTree = timing;
@@ -402,7 +403,7 @@ describe("Profile: PRD folder-tree write path", () => {
   it("should profile parseFolderTree on large PRD (1000 items)", async () => {
     const fixture = fixtures[2];
     const workDir = join(TEMP_DIR, fixture.name);
-    const treeDir = join(workDir, "tree");
+    const treeDir = join(workDir, PRD_TREE_DIRNAME);
 
     const timing = await profileParseFolderTree(treeDir, fixture.itemCount);
     timings[fixture.name].parseFolderTree = timing;
@@ -414,7 +415,7 @@ describe("Profile: PRD folder-tree write path", () => {
   it("should profile serializeFolderTree on small PRD (20 items)", async () => {
     const fixture = fixtures[0];
     const workDir = join(TEMP_DIR, fixture.name);
-    const treeDir = join(workDir, "tree");
+    const treeDir = join(workDir, PRD_TREE_DIRNAME);
 
     const timing = await profileSerializeFolderTree(treeDir, fixture.items, fixture.itemCount);
     timings[fixture.name].serializeFolderTree = timing;
@@ -426,7 +427,7 @@ describe("Profile: PRD folder-tree write path", () => {
   it("should profile serializeFolderTree on medium PRD (200 items)", async () => {
     const fixture = fixtures[1];
     const workDir = join(TEMP_DIR, fixture.name);
-    const treeDir = join(workDir, "tree");
+    const treeDir = join(workDir, PRD_TREE_DIRNAME);
 
     const timing = await profileSerializeFolderTree(treeDir, fixture.items, fixture.itemCount);
     timings[fixture.name].serializeFolderTree = timing;
@@ -438,7 +439,7 @@ describe("Profile: PRD folder-tree write path", () => {
   it("should profile serializeFolderTree on large PRD (1000 items)", async () => {
     const fixture = fixtures[2];
     const workDir = join(TEMP_DIR, fixture.name);
-    const treeDir = join(workDir, "tree");
+    const treeDir = join(workDir, PRD_TREE_DIRNAME);
 
     const timing = await profileSerializeFolderTree(treeDir, fixture.items, fixture.itemCount);
     timings[fixture.name].serializeFolderTree = timing;

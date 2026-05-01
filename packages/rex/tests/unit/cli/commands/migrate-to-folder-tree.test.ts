@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { cmdMigrateToFolderTree } from "../../../../src/cli/commands/migrate-to-folder-tree.js";
 import { titleToFilename } from "../../../../src/store/title-to-filename.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 const SAMPLE_PRD: PRDDocument = {
   schema: "rex/v1",
@@ -108,7 +109,7 @@ describe("cmdMigrateToFolderTree", () => {
 
     await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
 
-    const treeDir = join(tmp, ".rex", "tree");
+    const treeDir = join(tmp, ".rex", PRD_TREE_DIRNAME);
     expect(existsSync(treeDir)).toBe(true);
 
     const epicDirs = subdirs(treeDir);
@@ -158,7 +159,7 @@ describe("cmdMigrateToFolderTree", () => {
     await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
     await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
 
-    const treeDir = join(tmp, ".rex", "tree");
+    const treeDir = join(tmp, ".rex", PRD_TREE_DIRNAME);
     expect(subdirs(treeDir)).toHaveLength(1);
   });
 

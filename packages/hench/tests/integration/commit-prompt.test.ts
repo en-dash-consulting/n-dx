@@ -8,6 +8,7 @@ import { exec as execCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
 
 const execAsync = promisify(execCb);
 
@@ -248,7 +249,7 @@ describe("performCommitPromptIfNeeded (PRD status integration)", () => {
     rexDir = join(projectDir, ".rex");
     await initConfig(henchDir);
     await mkdir(join(henchDir, "runs"), { recursive: true });
-    await mkdir(join(rexDir, "tree", "task-slug-1"), { recursive: true });
+    await mkdir(join(rexDir, PRD_TREE_DIRNAME, "task-slug-1"), { recursive: true });
 
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -273,11 +274,11 @@ describe("performCommitPromptIfNeeded (PRD status integration)", () => {
     );
 
     // Create initial PRD task file with status "in_progress"
-    const taskIndexPath = join(rexDir, "tree", "task-slug-1", "index.md");
+    const taskIndexPath = join(rexDir, PRD_TREE_DIRNAME, "task-slug-1", "index.md");
     const initialTaskContent = `# Task
 status: in_progress
 `;
-    await mkdir(join(rexDir, "tree", "task-slug-1"), { recursive: true });
+    await mkdir(join(rexDir, PRD_TREE_DIRNAME, "task-slug-1"), { recursive: true });
     await writeFile(taskIndexPath, initialTaskContent, "utf-8");
 
     // Create initial code file
@@ -346,7 +347,7 @@ status: in_progress
     );
     const files = commitFiles.trim().split("\n");
     expect(files).toContain("src.ts");
-    expect(files.some((f) => f.includes(".rex/tree"))).toBe(true);
+    expect(files.some((f) => f.includes(`.rex/${PRD_TREE_DIRNAME}`))).toBe(true);
 
     // Verify the PRD file content shows status: completed
     const committedTask = readFileSync(taskIndexPath, "utf-8");
@@ -377,7 +378,7 @@ status: in_progress
         "../../src/agent/lifecycle/shared.js"
       );
 
-      const taskIndexPath = join(rexDir, "tree", "task-slug-1", "index.md");
+      const taskIndexPath = join(rexDir, PRD_TREE_DIRNAME, "task-slug-1", "index.md");
       const initialTaskContent = `# Task
 status: in_progress
 `;

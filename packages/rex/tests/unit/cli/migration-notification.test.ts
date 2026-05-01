@@ -11,6 +11,7 @@ import {
   emitMigrationNotification,
 } from "../../../src/cli/migration-notification.js";
 import type { LegacyPrdMigrationResult } from "../../../src/store/ensure-legacy-prd-migrated.js";
+import { PRD_TREE_DIRNAME } from "../../../src/store/index.js";
 import { setQuiet, isQuiet, resetColorCache } from "@n-dx/llm-client";
 
 describe("Migration Notification", () => {
@@ -47,7 +48,7 @@ describe("Migration Notification", () => {
 
     it("includes folder-tree path", () => {
       const banner = formatMigrationBanner(".rex/prd.json.backup-20260430-123456", 5);
-      expect(banner).toContain(".rex/tree");
+      expect(banner).toContain(`.rex/${PRD_TREE_DIRNAME}`);
     });
 
     it("includes suggestion to run rex status", () => {
@@ -57,7 +58,7 @@ describe("Migration Notification", () => {
 
     it("uses default folder-tree path when not provided", () => {
       const banner = formatMigrationBanner(".rex/prd.json.backup-20260430-123456", 5);
-      expect(banner).toContain(".rex/tree");
+      expect(banner).toContain(`.rex/${PRD_TREE_DIRNAME}`);
     });
 
     it("uses custom folder-tree path when provided", () => {

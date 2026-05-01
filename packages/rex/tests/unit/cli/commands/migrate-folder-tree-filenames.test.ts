@@ -15,6 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { cmdMigrateFolderTreeFilenames } from "../../../../src/cli/commands/migrate-folder-tree-filenames.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 /** Simple index.md fixture. */
 function writeIndexMd(path: string, title: string, id: string = "test-id"): void {
@@ -36,7 +37,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
 
   beforeEach(() => {
     tmp = mkdtempSync(join(tmpdir(), "rex-migrate-filenames-test-"));
-    mkdirSync(join(tmp, ".rex", "tree"), { recursive: true });
+    mkdirSync(join(tmp, ".rex", PRD_TREE_DIRNAME), { recursive: true });
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
@@ -58,7 +59,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   }
 
   it("migrates simple index.md to title-based filename", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "Web Dashboard");
 
@@ -71,7 +72,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("handles punctuation in titles", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "My: Title? (test)");
 
@@ -81,7 +82,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("handles whitespace in titles", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "  spaces  ");
 
@@ -91,7 +92,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("handles Unicode characters", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "Héros & Légendes");
 
@@ -101,7 +102,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("handles empty or invalid titles by using fallback", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "!!!???");
 
@@ -111,7 +112,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("is idempotent: re-running after migration shows no-op", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "Web Dashboard");
 
@@ -125,7 +126,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("is idempotent: re-running on already-migrated tree is no-op", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "Web Dashboard");
 
@@ -148,7 +149,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("skips files that are already migrated (title-based filename)", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     // Create a title-based file directly
     writeIndexMd(join(itemDir, "web_dashboard.md"), "Web Dashboard");
@@ -160,7 +161,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("migrates nested structure: epic → feature → task", async () => {
-    const epicDir = join(tmp, ".rex", "tree", "epic-1");
+    const epicDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     const featureDir = join(epicDir, "feature-1");
     const taskDir = join(featureDir, "task-1");
     mkdirSync(taskDir, { recursive: true });
@@ -183,7 +184,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("detects collision among siblings and applies ID suffix", async () => {
-    const epicDir = join(tmp, ".rex", "tree", "epic-1");
+    const epicDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(epicDir);
     mkdirSync(join(epicDir, "feature-1"));
     mkdirSync(join(epicDir, "feature-2"));
@@ -214,7 +215,7 @@ describe("cmdMigrateFolderTreeFilenames", () => {
   });
 
   it("preserves file content during migration", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     const originalContent = `---
 id: test-123
@@ -239,7 +240,7 @@ More details here.
   });
 
   it("skips files with missing title field", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     const malformed = `---
 id: test-123
@@ -257,7 +258,7 @@ No title field.
   });
 
   it("handles mixed content: some index.md, some title-based", async () => {
-    const epicDir = join(tmp, ".rex", "tree", "epic-1");
+    const epicDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     const featureDir = join(epicDir, "feature-1");
     mkdirSync(featureDir, { recursive: true });
 
@@ -273,7 +274,7 @@ No title field.
   });
 
   it("skips non-directory entries in tree root", async () => {
-    const treeRoot = join(tmp, ".rex", "tree");
+    const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
     writeFileSync(join(treeRoot, "readme.txt"), "This is not an item directory");
 
     await cmdMigrateFolderTreeFilenames(tmp);
@@ -283,7 +284,7 @@ No title field.
   });
 
   it("handles missing tree directory gracefully", async () => {
-    rmSync(join(tmp, ".rex", "tree"), { recursive: true });
+    rmSync(join(tmp, ".rex", PRD_TREE_DIRNAME), { recursive: true });
 
     await cmdMigrateFolderTreeFilenames(tmp);
 
@@ -297,7 +298,7 @@ No title field.
   });
 
   it("handles titles with leading/trailing underscores", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "_test_case_");
 
@@ -307,7 +308,7 @@ No title field.
   });
 
   it("round-trip safe: f(f(x)) = f(x)", async () => {
-    const itemDir = join(tmp, ".rex", "tree", "epic-1");
+    const itemDir = join(tmp, ".rex", PRD_TREE_DIRNAME, "epic-1");
     mkdirSync(itemDir);
     writeIndexMd(join(itemDir, "index.md"), "web_dashboard.md");
 

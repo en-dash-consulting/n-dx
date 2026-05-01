@@ -7,6 +7,7 @@ import { cmdMove } from "../../../../src/cli/commands/move.js";
 import { readPRD, writePRD } from "../../../helpers/rex-dir-test-support.js";
 import { slugify } from "../../../../src/store/folder-tree-serializer.js";
 import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
+import { PRD_TREE_DIRNAME } from "../../../../src/store/index.js";
 
 function makePrd(items: PRDItem[] = []): PRDDocument {
   return { schema: "rex/v1", title: "test", items } as PRDDocument;
@@ -224,7 +225,7 @@ describe("cmdMove", () => {
       await cmdMove(tmp, "f1", { parent: "e2" });
 
       // Tree root should be created
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       expect(existsSync(treeRoot)).toBe(true);
 
       const epic1Dir = join(treeRoot, slugify("Epic 1", "e1"));
@@ -243,7 +244,7 @@ describe("cmdMove", () => {
 
       await cmdMove(tmp, "f1", { parent: "e2" });
 
-      const treeRoot = join(tmp, ".rex", "tree");
+      const treeRoot = join(tmp, ".rex", PRD_TREE_DIRNAME);
       const featureSlug = slugify("Feature 1", "f1");
 
       // e1's item markdown should NOT reference the moved feature.

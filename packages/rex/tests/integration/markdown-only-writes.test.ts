@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { FileStore } from "../../src/store/file-adapter.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import { toCanonicalJSON } from "../../src/core/canonical.js";
+import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,7 +32,7 @@ async function seedRexDir(rexDir: string): Promise<void> {
   await mkdir(rexDir, { recursive: true });
   await Promise.all([
     (async () => {
-      const treeDir = join(rexDir, "tree");
+      const treeDir = join(rexDir, PRD_TREE_DIRNAME);
       await mkdir(treeDir, { recursive: true });
 
       // Write tree-meta.json
@@ -83,7 +84,7 @@ async function prdJsonExists(rexDir: string): Promise<boolean> {
 
 async function folderTreeExists(rexDir: string): Promise<boolean> {
   try {
-    await access(join(rexDir, "tree"), constants.F_OK);
+    await access(join(rexDir, PRD_TREE_DIRNAME), constants.F_OK);
     return true;
   } catch {
     return false;
