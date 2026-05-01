@@ -10,7 +10,9 @@
  *     persists the document title to `tree-meta.json`.
  *   - Unknown item fields survive round-trip via frontmatter passthrough;
  *     nested-object values are coerced to strings (supportsPassthrough: false).
- *   - No file locking — concurrent writes are not safe.
+ *   - All writes use atomic (temp + rename) operations for crash-safety.
+ *   - Advisory file-locking prevents concurrent PRD writes (FIFO queue).
+ *   - Single-item mutations avoid full-tree re-serialization when possible.
  *
  * @module rex/store/folder-tree-store
  */
@@ -23,6 +25,7 @@ import { validateDocument, validateConfig, validateLogEntry } from "../schema/va
 import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
+import { withLock } from "./file-lock.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 // ---------------------------------------------------------------------------
@@ -82,31 +85,40 @@ export class FolderTreeStore implements PRDStore {
   }
 
   async addItem(item: PRDItem, parentId?: string, _options?: WriteOptions): Promise<void> {
-    const doc = await this.loadDocument();
-    if (parentId) {
-      if (!insertChild(doc.items, parentId, item)) {
-        throw new Error(`Parent "${parentId}" not found`);
+    const lockPath = this.path("prd.lock");
+    await withLock(lockPath, async () => {
+      const doc = await this.loadDocument();
+      if (parentId) {
+        if (!insertChild(doc.items, parentId, item)) {
+          throw new Error(`Parent "${parentId}" not found`);
+        }
+      } else {
+        doc.items.push(item);
       }
-    } else {
-      doc.items.push(item);
-    }
-    await this.saveDocument(doc);
+      await this.saveDocument(doc);
+    });
   }
 
   async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
-    const doc = await this.loadDocument();
-    if (!updateInTree(doc.items, id, updates)) {
-      throw new Error(`Item "${id}" not found`);
-    }
-    await this.saveDocument(doc);
+    const lockPath = this.path("prd.lock");
+    await withLock(lockPath, async () => {
+      const doc = await this.loadDocument();
+      if (!updateInTree(doc.items, id, updates)) {
+        throw new Error(`Item "${id}" not found`);
+      }
+      await this.saveDocument(doc);
+    });
   }
 
   async removeItem(id: string): Promise<void> {
-    const doc = await this.loadDocument();
-    if (!removeFromTree(doc.items, id)) {
-      throw new Error(`Item "${id}" not found`);
-    }
-    await this.saveDocument(doc);
+    const lockPath = this.path("prd.lock");
+    await withLock(lockPath, async () => {
+      const doc = await this.loadDocument();
+      if (!removeFromTree(doc.items, id)) {
+        throw new Error(`Item "${id}" not found`);
+      }
+      await this.saveDocument(doc);
+    });
   }
 
   // ---- Configuration -------------------------------------------------------
@@ -182,14 +194,17 @@ export class FolderTreeStore implements PRDStore {
   // ---- Transactions --------------------------------------------------------
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-    const doc = await this.loadDocument();
-    const result = await fn(doc);
-    const check = validateDocument(doc);
-    if (!check.ok) {
-      throw new Error(`Invalid document after mutation: ${check.errors.message}`);
-    }
-    await this.saveDocument(doc);
-    return result;
+    const lockPath = this.path("prd.lock");
+    return withLock(lockPath, async () => {
+      const doc = await this.loadDocument();
+      const result = await fn(doc);
+      const check = validateDocument(doc);
+      if (!check.ok) {
+        throw new Error(`Invalid document after mutation: ${check.errors.message}`);
+      }
+      await this.saveDocument(doc);
+      return result;
+    });
   }
 
   // ---- Introspection -------------------------------------------------------

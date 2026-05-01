@@ -2,7 +2,7 @@
 id: "7b6be42e-d317-4f02-b0b7-aa1eba1cd3dc"
 level: "task"
 title: "Audit and remove all prd.md read fallbacks and write paths from ndx add and rex add pipelines"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "rex"
@@ -10,6 +10,10 @@ tags:
   - "cli"
 source: "smart-add"
 startedAt: "2026-05-01T13:58:28.708Z"
+completedAt: "2026-05-01T14:01:36.497Z"
+endedAt: "2026-05-01T14:01:36.497Z"
+resolutionType: "code-change"
+resolutionDetail: "Removed all prd.md write paths and read fallbacks from ndx add and rex add pipelines. Modified FileStore.loadLegacyDocument to not write prd.md, added runtime warning when prd.md coexists with tree/, removed prd.md creation from rex init, and added comprehensive regression tests. All acceptance criteria met."
 acceptanceCriteria:
   - "No production code path under ndx add, rex add, or smart-add reads .rex/prd.md"
   - "No production code path under ndx add, rex add, or smart-add writes .rex/prd.md"
@@ -20,7 +24,7 @@ description: "Trace every code path reachable from ndx add, rex add, and the sma
 
 # Audit and remove all prd.md read fallbacks and write paths from ndx add and rex add pipelines
 
-🟠 [in_progress]
+🟠 [completed]
 
 ## Summary
 
@@ -28,8 +32,10 @@ Trace every code path reachable from ndx add, rex add, and the smart-add LLM pip
 
 ## Info
 
-- **Status:** in_progress
+- **Status:** completed
 - **Priority:** high
 - **Tags:** rex, prd, cli
 - **Level:** task
 - **Started:** 2026-05-01T13:58:28.708Z
+- **Completed:** 2026-05-01T14:01:36.497Z
+- **Duration:** 3m

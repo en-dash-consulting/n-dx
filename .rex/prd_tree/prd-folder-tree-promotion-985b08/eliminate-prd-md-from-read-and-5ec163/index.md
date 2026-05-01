@@ -21,7 +21,7 @@ Audit ndx add, rex add, and the smart-add pipeline to ensure none of them read f
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
 | Add architecture-policy test enforcing prd.md is not read or written outside migration helper | task | pending | 1970-01-01 |
-| Audit and remove all prd.md read fallbacks and write paths from ndx add and rex add pipelines | task | in_progress | 2026-05-01 |
+| Audit and remove all prd.md read fallbacks and write paths from ndx add and rex add pipelines | task | completed | 2026-05-01 |
 
 ## Info
 

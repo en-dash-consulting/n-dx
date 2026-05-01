@@ -12,5 +12,5 @@ description: "Profile and optimize the folder-tree write path so that ndx add, r
 
 | Title | Status |
 |-------|--------|
-| [Implement atomic, fast write path for prd_tree mutations with crash-safety guarantees](./implement-atomic-fast-write-962cd7/index.md) | pending |
+| [Implement atomic, fast write path for prd_tree mutations with crash-safety guarantees](./implement-atomic-fast-write-962cd7/index.md) | in_progress |
 | [Profile prd_tree write path and identify bottlenecks for single-item add and edit operations](./profile-prd-tree-write-path-and-bbf2dd/index.md) | pending |

@@ -199,6 +199,13 @@ function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
   });
 }
 
+/**
+ * Resolve final directory slugs for sibling items.
+ * If two siblings normalize to the same unsuffixed slug, every colliding item
+ * gets a short ID suffix.
+ *
+ * @public — used by folder-tree-mutations for rendering
+ */
 export function resolveSiblingSlugs(items: PRDItem[]): Map<string, string> {
   const unsuffixedById = new Map<string, string>();
   const counts = new Map<string, number>();
@@ -277,8 +284,10 @@ function requireMapValue(map: Map<string, string>, key: string): string {
 /**
  * Render the index.md for any item.
  * Includes a `## Children` section if `children` is non-empty.
+ *
+ * @public — used by folder-tree-mutations for targeted rewrites
  */
-function renderItemIndexMd(
+export function renderItemIndexMd(
   item: PRDItem,
   children: PRDItem[],
   childSlugs: Map<string, string>,
