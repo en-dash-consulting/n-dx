@@ -4,7 +4,7 @@
 
 import type { PRDItem } from "../schema/index.js";
 import { findItem } from "../core/tree.js";
-import { slugify } from "../store/index.js";
+import { slugify, PRD_TREE_DIRNAME } from "../store/index.js";
 
 /**
  * Compute the folder-tree path for a given item.
@@ -20,8 +20,8 @@ export function getFolderTreePath(items: PRDItem[], itemId: string): string | un
 
   const { item, parents } = entry;
 
-  // Build path segments: .rex/tree/<ancestor-slugs>/<item-slug>
-  const pathSegments = [".rex", "tree"];
+  // Build path segments: .rex/<PRD_TREE_DIRNAME>/<ancestor-slugs>/<item-slug>
+  const pathSegments = [".rex", PRD_TREE_DIRNAME];
 
   // Add ancestor slugs
   for (const ancestor of parents) {

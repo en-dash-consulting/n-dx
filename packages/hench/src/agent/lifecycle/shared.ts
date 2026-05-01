@@ -16,7 +16,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, findItem } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { getCurrentHead, execShellCmd, execStdout } from "../../process/exec.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
@@ -1020,7 +1020,7 @@ export async function performCommitPromptIfNeeded(
       // legacy markdown fallback for older projects.
       try {
         const prdPaths = [
-          existsSync(join(projectDir, ".rex", "tree")) ? ".rex/tree" : undefined,
+          existsSync(join(projectDir, ".rex", PRD_TREE_DIRNAME)) ? join(".rex", PRD_TREE_DIRNAME) : undefined,
           existsSync(join(projectDir, ".rex", "prd.md")) ? ".rex/prd.md" : undefined,
         ].filter((p): p is string => Boolean(p));
 

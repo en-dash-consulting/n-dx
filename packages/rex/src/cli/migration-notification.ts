@@ -10,6 +10,7 @@
 
 import { bold, yellow, dim, isColorEnabled } from "@n-dx/llm-client";
 import { isQuiet } from "./output.js";
+import { PRD_TREE_DIRNAME } from "../store/index.js";
 import type { LegacyPrdMigrationResult } from "../store/ensure-legacy-prd-migrated.js";
 import type { LogEntry } from "../schema/v1.js";
 
@@ -29,7 +30,7 @@ import type { LogEntry } from "../schema/v1.js";
 export function formatMigrationBanner(
   backupPath: string,
   itemCount: number,
-  folderTreePath: string = ".rex/tree",
+  folderTreePath: string = `.rex/${PRD_TREE_DIRNAME}`,
 ): string {
   const lines: string[] = [];
 

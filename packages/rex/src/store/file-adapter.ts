@@ -19,6 +19,7 @@ import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { titleToFilename } from "./title-to-filename.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
+import { PRD_TREE_DIRNAME } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -62,7 +63,7 @@ export class FileStore implements PRDStore {
   }
 
   private get treeRoot(): string {
-    return this.path("tree");
+    return this.path(PRD_TREE_DIRNAME);
   }
 
   setCurrentBranchFile(filename: string): void {

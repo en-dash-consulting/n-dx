@@ -26,6 +26,7 @@ import { validateDocument, PRDDocumentSchema } from "../schema/validate.js";
 import { serializeFolderTree } from "./index.js";
 import { atomicWriteJSON } from "./atomic-write.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
+import { PRD_TREE_DIRNAME } from "./paths.js";
 import type { z } from "zod";
 
 /** Result of a legacy-PRD migration attempt. */
@@ -129,7 +130,7 @@ export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMig
   const rexDir = join(dir, ".rex");
   const prdJsonPath = join(rexDir, "prd.json");
   const prdJsonMigratedMarker = join(rexDir, "prd.json.migrated");
-  const treePath = join(rexDir, "tree");
+  const treePath = join(rexDir, PRD_TREE_DIRNAME);
   const lockPath = join(rexDir, "prd.json.lock");
 
   // Step 1: Check if already migrated (marker file present)

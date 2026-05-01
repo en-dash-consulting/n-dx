@@ -26,6 +26,7 @@ import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tre
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
+import { PRD_TREE_DIRNAME } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 // ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@ export class FolderTreeStore implements PRDStore {
 
   constructor(rexDir: string) {
     this.rexDir = rexDir;
-    this.treeRoot = join(rexDir, "tree");
+    this.treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   }
 
   private path(file: string): string {

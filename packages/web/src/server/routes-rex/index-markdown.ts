@@ -11,6 +11,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { loadPRDSync } from "../prd-io.js";
 import { jsonResponse, errorResponse } from "../response-utils.js";
+import { PRD_TREE_DIRNAME } from "../rex-gateway.js";
 import type { ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 
@@ -109,7 +110,7 @@ export function getIndexMarkdown(
   ctx: ServerContext,
   itemId: string,
 ): boolean {
-  const treeRoot = join(ctx.rexDir, "tree");
+  const treeRoot = join(ctx.rexDir, PRD_TREE_DIRNAME);
 
   // Load PRD to get structure
   const prd = loadPRDSync(ctx.rexDir);
