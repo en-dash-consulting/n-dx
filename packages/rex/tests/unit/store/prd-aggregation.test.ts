@@ -1,19 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { FileStore, ensureRexDir } from "../../../src/store/file-adapter.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
-import { parseDocument } from "../../../src/store/markdown-parser.js";
 import type { PRDDocument, PRDItem } from "../../../src/schema/index.js";
-
-async function readMarkdown(path: string): Promise<PRDDocument> {
-  const raw = await readFile(path, "utf-8");
-  const parsed = parseDocument(raw);
-  if (!parsed.ok) throw parsed.error;
-  return parsed.data;
-}
 
 function makeDoc(title: string, items: PRDItem[]): PRDDocument {
   return { schema: SCHEMA_VERSION, title, items };
@@ -406,56 +398,5 @@ describe("PRDStore aggregation", () => {
       });
     });
 
-    it("collapses legacy JSON sources into a single prd.md on save", async () => {
-      await writeFile(
-        join(rexDir, "prd.json"),
-        toCanonicalJSON(
-          makeDoc("Primary", [makeItem("e0", "Primary Epic")]),
-        ),
-        "utf-8",
-      );
-      await writeFile(
-        join(rexDir, "prd_branch_2025-01-01.json"),
-        toCanonicalJSON(
-          makeDoc("Branch", [makeItem("e1", "Branch Epic")]),
-        ),
-        "utf-8",
-      );
-
-      await store.withTransaction(async () => {});
-
-      // All items end up merged into the single prd.md.
-      const merged = await readMarkdown(join(rexDir, "prd.md"));
-      const ids = merged.items.map((i) => i.id).sort();
-      expect(ids).toEqual(["e0", "e1"]);
-    });
-
-    // Mutations write only to .rex/tree/ now; prd.md is no longer regenerated,
-    // so the merge-into-prd.md path no longer exists.
-    it.skip("addItem without parentId merges into prd.md alongside legacy items", async () => {
-      await writeFile(
-        join(rexDir, "prd.json"),
-        toCanonicalJSON(makeDoc("Primary", [])),
-        "utf-8",
-      );
-      await writeFile(
-        join(rexDir, "prd_branch_2025-01-01.json"),
-        toCanonicalJSON(
-          makeDoc("Branch", [makeItem("e1", "Branch Epic")]),
-        ),
-        "utf-8",
-      );
-
-      await store.addItem(makeItem("e2", "New Epic"));
-
-      // Single-file Markdown mode: every item lives in prd.md after the
-      // first load (legacy branch JSON sources are merged in, then unused).
-      const merged = await readMarkdown(join(rexDir, "prd.md"));
-      const ids = merged.items.map((i) => i.id).sort();
-      expect(ids).toEqual(["e1", "e2"]);
-
-      const doc = await store.loadDocument();
-      expect(doc.items).toHaveLength(2);
-    });
   });
 });

@@ -4,12 +4,8 @@ import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import {
-  RexConfigSchema,
-  PRDDocumentSchema,
-} from "../../src/schema/validate.js";
+import { RexConfigSchema } from "../../src/schema/validate.js";
 import { SCHEMA_VERSION, DEFAULT_CONFIG } from "../../src/schema/v1.js";
-import { parseDocument } from "../../src/store/markdown-parser.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -45,7 +41,7 @@ describe("rex init", () => {
 
     const rexDir = join(tmpDir, ".rex");
     await access(join(rexDir, "config.json"));
-    await access(join(rexDir, "prd.md"));
+    await access(join(rexDir, "tree", "index.md"));
     await access(join(rexDir, "execution-log.jsonl"));
     await access(join(rexDir, "workflow.md"));
   });
@@ -100,11 +96,11 @@ describe("rex init", () => {
 
     expect(config.project).toBe("my-custom-project");
 
-    const markdown = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
-    const parsed = parseDocument(markdown);
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) throw parsed.error;
-    expect(parsed.data.title).toBe("my-custom-project");
+    const treeIndex = await readFile(
+      join(tmpDir, ".rex", "tree", "index.md"),
+      "utf-8",
+    );
+    expect(treeIndex).toContain("# my-custom-project");
   });
 
   it("defaults project name to directory basename", async () => {
@@ -116,51 +112,17 @@ describe("rex init", () => {
     expect(config.project).toBe(basename(tmpDir));
   });
 
-  it("creates valid prd.md", async () => {
-    run(["init", tmpDir]);
-    const markdown = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
-    const parsed = parseDocument(markdown);
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) throw parsed.error;
-    expect(parsed.data.schema).toBe("rex/v1");
-    expect(parsed.data.items).toEqual([]);
-  });
-
-  it("creates prd.md that passes schema validation", async () => {
-    run(["init", tmpDir]);
-    const markdown = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
-    const parsed = parseDocument(markdown);
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) throw parsed.error;
-    const result = PRDDocumentSchema.safeParse(parsed.data);
-
-    expect(result.success).toBe(true);
-    if (!result.success) {
-      throw new Error(`Schema validation failed: ${result.error.message}`);
-    }
-  });
-
-  it("creates prd.md with correct schema version", async () => {
-    run(["init", tmpDir]);
-    const markdown = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
-    const parsed = parseDocument(markdown);
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) throw parsed.error;
-
-    expect(parsed.data.schema).toBe(SCHEMA_VERSION);
-  });
-
-  it("creates prd.md with title matching project name", async () => {
+  it("creates tree/index.md scaffold with project title", async () => {
     run(["init", tmpDir]);
     const config = JSON.parse(
       await readFile(join(tmpDir, ".rex", "config.json"), "utf-8"),
     );
-    const markdown = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
-    const parsed = parseDocument(markdown);
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) throw parsed.error;
-
-    expect(parsed.data.title).toBe(config.project);
+    const treeIndex = await readFile(
+      join(tmpDir, ".rex", "tree", "index.md"),
+      "utf-8",
+    );
+    expect(treeIndex).toContain(`# ${config.project}`);
+    expect(treeIndex).toContain("rex add epic");
   });
 
   it("creates empty execution-log.jsonl", async () => {
@@ -193,12 +155,8 @@ describe("rex init", () => {
     const output = run(["init", tmpDir]);
     expect(output).toContain("already exists");
 
-    // prd.md should still be valid
-    const markdown = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
-    const parsed = parseDocument(markdown);
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) throw parsed.error;
-    expect(parsed.data.schema).toBe("rex/v1");
+    // tree scaffold should still be present
+    await access(join(tmpDir, ".rex", "tree", "index.md"));
   });
 
   it("preserves valid files on re-run", async () => {
@@ -206,26 +164,25 @@ describe("rex init", () => {
 
     const rexDir = join(tmpDir, ".rex");
     const configRaw1 = await readFile(join(rexDir, "config.json"), "utf-8");
-    const prdMdRaw1 = await readFile(join(rexDir, "prd.md"), "utf-8");
+    const treeIndexRaw1 = await readFile(
+      join(rexDir, "tree", "index.md"),
+      "utf-8",
+    );
 
     run(["init", tmpDir]);
 
     const configRaw2 = await readFile(join(rexDir, "config.json"), "utf-8");
-    const prdMdRaw2 = await readFile(join(rexDir, "prd.md"), "utf-8");
+    const treeIndexRaw2 = await readFile(
+      join(rexDir, "tree", "index.md"),
+      "utf-8",
+    );
 
     // Files unchanged
     expect(configRaw2).toBe(configRaw1);
-    expect(prdMdRaw2).toBe(prdMdRaw1);
+    expect(treeIndexRaw2).toBe(treeIndexRaw1);
 
     // config still passes schema validation
     const configResult = RexConfigSchema.safeParse(JSON.parse(configRaw2));
     expect(configResult.success).toBe(true);
-
-    // prd.md still parses and passes schema validation
-    const parsedMd = parseDocument(prdMdRaw2);
-    expect(parsedMd.ok).toBe(true);
-    if (!parsedMd.ok) throw parsedMd.error;
-    const docResult = PRDDocumentSchema.safeParse(parsedMd.data);
-    expect(docResult.success).toBe(true);
   });
 });

@@ -2,7 +2,7 @@
 id: "bbf2dd9a-3f5a-4bb9-a263-ca8931caaaa5"
 level: "task"
 title: "Profile prd_tree write path and identify bottlenecks for single-item add and edit operations"
-status: "in_progress"
+status: "pending"
 priority: "high"
 tags:
   - "rex"

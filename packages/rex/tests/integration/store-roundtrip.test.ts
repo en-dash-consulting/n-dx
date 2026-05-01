@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createStore, ensureRexDir } from "../../src/store/index.js";
@@ -254,42 +254,6 @@ describe("Store roundtrip integration", () => {
       ],
     } as unknown as PRDDocument;
     await expect(store.saveDocument(badDoc)).rejects.toThrow("Invalid document");
-  });
-
-  it("migrates from prd.json and continues reading from folder tree", async () => {
-    // Set up legacy prd.json fixture and remove prd.md to trigger migration
-    await unlink(join(rexDir, "prd.md"));
-    await writeFile(
-      join(rexDir, "prd.json"),
-      toCanonicalJSON({
-        schema: SCHEMA_VERSION,
-        title: "Integration Test",
-        items: [],
-      }),
-      "utf-8",
-    );
-
-    const doc = await store.loadDocument();
-    expect(doc.title).toBe("Integration Test");
-
-    // After first load, the document should be persisted to folder tree
-    const reloaded = await store.loadDocument();
-    expect(reloaded.title).toBe("Integration Test");
-
-    // Update prd.json with different content; folder tree should take precedence
-    await writeFile(
-      join(rexDir, "prd.json"),
-      toCanonicalJSON({
-        schema: SCHEMA_VERSION,
-        title: "Corrupted JSON Should Be Ignored",
-        items: [{ id: "json-only", title: "JSON only", status: "pending", level: "epic" }],
-      }),
-      "utf-8",
-    );
-
-    const secondRead = await store.loadDocument();
-    expect(secondRead).toEqual(reloaded);
-    expect(secondRead.title).toBe("Integration Test");
   });
 
   it("serializes rapid single-file mutations without corrupting folder tree", async () => {
