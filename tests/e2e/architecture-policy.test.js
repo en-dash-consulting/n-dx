@@ -73,6 +73,8 @@ const ALLOWED = new Set([
   "packages/core/codex-integration.js",
   // CI preflight script — runs build/test/check steps via child processes
   "scripts/preflight.mjs",
+  // Performance profiling script — measures PRD write latency via pnpm exec
+  "scripts/profile-prd-tree-write.mjs",
 ]);
 
 /** Directories to skip entirely. */
