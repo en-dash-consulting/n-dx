@@ -26,6 +26,8 @@ const EXPECTED_EXPORTS = [
   "assertSchemaVersion",
   // Store factory
   "resolveStore",
+  // Folder-tree storage path
+  "PRD_TREE_DIRNAME",
   // Tree utilities
   "findItem",
   "walkTree",
@@ -84,8 +86,8 @@ describe("rex-gateway compatibility", () => {
     }
   });
 
-  // Constants (non-function exports) — SCHEMA_VERSION is a string constant
-  const CONSTANT_EXPORTS = new Set(["SCHEMA_VERSION"]);
+  // Constants (non-function exports) — string constants
+  const CONSTANT_EXPORTS = new Set(["SCHEMA_VERSION", "PRD_TREE_DIRNAME"]);
 
   // Verify each individual export to give clear diagnostics on failure
   for (const name of EXPECTED_EXPORTS) {

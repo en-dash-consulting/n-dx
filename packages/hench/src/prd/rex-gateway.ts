@@ -90,6 +90,9 @@ export { SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion } from "@n-dx/r
 // ---- Store factory ----------------------------------------------------------
 export { resolveStore } from "@n-dx/rex";
 
+// ---- Folder-tree storage path -----------------------------------------------
+export { PRD_TREE_DIRNAME } from "@n-dx/rex";
+
 // ---- Tree utilities ---------------------------------------------------------
 export { findItem, walkTree } from "@n-dx/rex";
 

@@ -27,6 +27,9 @@ export { createRexMcpServer } from "@n-dx/rex";
 export { ensureLegacyPrdMigrated } from "@n-dx/rex";
 export type { LegacyPrdMigrationResult } from "@n-dx/rex";
 
+// ---- Rex folder-tree storage path -------------------------------------------
+export { PRD_TREE_DIRNAME } from "@n-dx/rex";
+
 // ---- Rex schema version contract --------------------------------------------
 export { SCHEMA_VERSION, isCompatibleSchema } from "@n-dx/rex";
 

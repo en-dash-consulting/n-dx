@@ -1,5 +1,6 @@
 export type { PRDStore, StoreCapabilities } from "./contracts.js";
 export { FileStore, ensureRexDir, PRD_FILENAME } from "./file-adapter.js";
+export { PRD_TREE_DIRNAME } from "./paths.js";
 export {
   sanitizeBranchName,
   resolveGitBranch,

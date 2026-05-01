@@ -176,7 +176,7 @@ describe("hench → rex gateway contract", () => {
     "acknowledgeFinding",
   ];
 
-  const GATEWAY_CONSTANTS = ["SCHEMA_VERSION"];
+  const GATEWAY_CONSTANTS = ["SCHEMA_VERSION", "PRD_TREE_DIRNAME"];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -370,6 +370,7 @@ describe("web → rex gateway contract", () => {
     "VALID_REQUIREMENT_CATEGORIES",
     "VALID_VALIDATION_TYPES",
     "CHILD_LEVEL",
+    "PRD_TREE_DIRNAME",
   ];
 
   for (const name of GATEWAY_FUNCTIONS) {
@@ -558,7 +559,7 @@ describe("gateway export auto-detection", () => {
         "findAutoCompletions", "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
-      ...["SCHEMA_VERSION"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
@@ -639,7 +640,7 @@ describe("gateway export auto-detection", () => {
         "serializeDocument", "parseDocument",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "CHILD_LEVEL"],
-      ...["SCHEMA_VERSION"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

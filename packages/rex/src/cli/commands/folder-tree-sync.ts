@@ -10,13 +10,18 @@
  */
 
 import { join } from "node:path";
-import { serializeFolderTree, parseFolderTree } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDItem } from "../../schema/index.js";
 
-/** Subdirectory name within `.rex/` that holds the folder tree. */
-export const FOLDER_TREE_SUBDIR = "tree";
+/**
+ * Subdirectory name within `.rex/` that holds the folder tree.
+ *
+ * Re-exported under the `FOLDER_TREE_SUBDIR` name for legacy CLI consumers;
+ * new code should import `PRD_TREE_DIRNAME` directly from `../../store/index.js`.
+ */
+export const FOLDER_TREE_SUBDIR = PRD_TREE_DIRNAME;
 
 /**
  * Re-serialize the full PRD to the folder tree at `<rexDir>/tree/`.
