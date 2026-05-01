@@ -1,0 +1,36 @@
+---
+id: "962cd795-58ab-49a7-a179-ba553558ac4b"
+level: "task"
+title: "Implement atomic, fast write path for prd_tree mutations with crash-safety guarantees"
+status: "pending"
+priority: "high"
+tags:
+  - "rex"
+  - "performance"
+  - "prd"
+  - "reliability"
+source: "smart-add"
+acceptanceCriteria:
+  - "ndx add on a 1000-item fixture PRD completes in under 500ms (median across 10 runs)"
+  - "All prd_tree writes use write-temp-then-rename so a crash mid-write cannot leave a partially written index.md"
+  - "No full-tree re-serialization occurs on single-item add or edit; only the affected directory and its parent index.md are touched"
+  - "File-locking or equivalent guard prevents concurrent writers from corrupting prd_tree state"
+  - "Regression tests cover crash-safety (simulated kill mid-write) and concurrent-writer rejection"
+  - "Profiling baseline from the prior task confirms measurable latency improvement"
+description: "Apply targeted optimizations identified in profiling: cache parent-chain lookups during a single command invocation, batch directory creation, write index.md via temp-file-and-rename for atomicity, and avoid full-tree re-serialization when only one item changes. Single-item add latency should drop below 500ms on a 1000-item PRD."
+---
+
+# Implement atomic, fast write path for prd_tree mutations with crash-safety guarantees
+
+🟠 [pending]
+
+## Summary
+
+Apply targeted optimizations identified in profiling: cache parent-chain lookups during a single command invocation, batch directory creation, write index.md via temp-file-and-rename for atomicity, and avoid full-tree re-serialization when only one item changes. Single-item add latency should drop below 500ms on a 1000-item PRD.
+
+## Info
+
+- **Status:** pending
+- **Priority:** high
+- **Tags:** rex, performance, prd, reliability
+- **Level:** task

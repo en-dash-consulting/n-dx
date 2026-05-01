@@ -277,4 +277,133 @@ describe("prd.md and branch-scoped files are never created/modified", {
     expect(branchFiles).toHaveLength(0);
     expect(await prdMdExists(tmpDir)).toBe(false);
   });
+
+  // ---- prd.md read fallback behavior -----
+
+  it("FileStore.loadDocument warns when prd.md coexists with tree/", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const store = new FileStore(rexDir);
+
+    // Create a legacy prd.md alongside the tree
+    const prdMdPath = join(rexDir, "prd.md");
+    const legacyContent = "# Legacy PRD\nContent before tree";
+    await writeFile(prdMdPath, legacyContent, "utf-8");
+
+    // Load document (should warn)
+    const doc = await store.loadDocument();
+
+    // Verify warning was issued
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("prd.md exists alongside .rex/tree/"),
+    );
+
+    // Verify tree was used (not prd.md) — doc should have items from tree
+    expect(doc.items[0]?.id).toBe("epic-1");
+    expect(doc.items[0]?.title).toBe("Initial Epic");
+
+    warnSpy.mockRestore();
+  });
+
+  it("FileStore.loadDocument does not write prd.md when migrating from JSON", async () => {
+    // Create a prd.json and config (no tree, no prd.md)
+    const prdJsonPath = join(rexDir, "prd.json");
+    const prdJson = {
+      schema: SCHEMA_VERSION,
+      title: "From JSON",
+      items: [
+        {
+          id: "json-epic",
+          title: "From JSON Epic",
+          level: "epic",
+          status: "pending",
+        },
+      ],
+    };
+    await writeFile(prdJsonPath, toCanonicalJSON(prdJson), "utf-8");
+
+    // Remove the tree to force legacy load
+    const treeDir = join(rexDir, "tree");
+    await rm(treeDir, { recursive: true, force: true });
+    const treeMetaPath = join(rexDir, "tree-meta.json");
+    try {
+      await access(treeMetaPath);
+      await rm(treeMetaPath);
+    } catch {
+      // File already gone
+    }
+
+    const store = new FileStore(rexDir);
+    const doc = await store.loadDocument();
+
+    // Verify prd.md was NOT created
+    expect(await prdMdExists(tmpDir)).toBe(false);
+
+    // Verify document was loaded correctly from prd.json
+    expect(doc.items[0]?.id).toBe("json-epic");
+    expect(doc.title).toBe("From JSON");
+  });
+
+  it("tree/ is authoritative when both prd.md and tree/ exist", async () => {
+    const store = new FileStore(rexDir);
+
+    // Create divergent prd.md with different content
+    const prdMdPath = join(rexDir, "prd.md");
+    // Manually write a legacy prd.md with different items
+    const conflictingContent = [
+      "---",
+      "schema: 1.0.0",
+      "title: Conflicting Title",
+      "---",
+      "",
+      "# Conflicting PRD",
+      "",
+      "## conflict-epic",
+      "",
+      "Different content",
+    ].join("\n");
+    await writeFile(prdMdPath, conflictingContent, "utf-8");
+
+    // Suppress warning for this test
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Load document
+    const doc = await store.loadDocument();
+
+    // Verify tree items are used (epic-1, not conflict-epic)
+    expect(doc.items[0]?.id).toBe("epic-1");
+    expect(doc.items[0]?.title).toBe("Initial Epic");
+    expect(doc.title).toBe("Test PRD");
+
+    warnSpy.mockRestore();
+  });
+
+  it("ndx add with prd.md present mutates only the folder tree", async () => {
+    // Create a legacy prd.md alongside the tree
+    const prdMdPath = join(rexDir, "prd.md");
+    const legacyContent = "# Legacy PRD";
+    await writeFile(prdMdPath, legacyContent, "utf-8");
+
+    // Get initial prd.md content
+    const contentBefore = await readFile(prdMdPath, "utf-8");
+
+    // Suppress warning
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Perform add operation (simulated via store.addItem)
+    const store = new FileStore(rexDir);
+    await store.addItem({ id: "epic-2", title: "New Epic", status: "pending", level: "epic" });
+
+    // Verify prd.md was not modified
+    const contentAfter = await readFile(prdMdPath, "utf-8");
+    expect(contentAfter).toBe(contentBefore);
+
+    // Verify tree was updated (tree should now have epic-2)
+    const doc = await store.loadDocument();
+    const newEpic = doc.items.find((item) => item.id === "epic-2");
+    expect(newEpic).toBeDefined();
+    expect(newEpic?.title).toBe("New Epic");
+
+    warnSpy.mockRestore();
+  });
 });

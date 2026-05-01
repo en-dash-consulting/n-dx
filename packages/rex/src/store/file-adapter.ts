@@ -14,7 +14,6 @@ import {
   toMarkdownSourcePath,
 } from "./prd-md-migration.js";
 import { parseDocument } from "./markdown-parser.js";
-import { serializeDocument } from "./markdown-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { titleToFilename } from "./title-to-filename.js";
@@ -361,7 +360,7 @@ export class FileStore implements PRDStore {
     }
     const doc = await this.loadDocumentFromJsonSources();
     const attributed = this.withMarkdownSourceAttribution(doc);
-    await writeFile(this.markdownPath, serializeDocument(attributed), "utf-8");
+    // Do not write prd.md here — folder-tree is the sole writable PRD surface
     this.rebuildOwnershipFromItems(attributed);
     return attributed;
   }
@@ -398,6 +397,11 @@ export class FileStore implements PRDStore {
   async loadDocument(): Promise<PRDDocument> {
     if (!(await this.directoryExists(this.treeRoot))) {
       return this.loadLegacyDocument();
+    }
+
+    // Warn if prd.md coexists with tree/ — tree is authoritative
+    if (await this.fileExists(PRD_MARKDOWN_FILENAME)) {
+      this.warnPrdMdIgnored();
     }
 
     // Read document title from tree-meta.json. Its presence also signals the
@@ -449,6 +453,15 @@ export class FileStore implements PRDStore {
     if (await this.fileExists(PRD_FILENAME)) return true;
     const branchFiles = await discoverPRDFiles(this.rexDir);
     return branchFiles.length > 0;
+  }
+
+  private warnPrdMdIgnored(): void {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `Warning: .rex/prd.md exists alongside .rex/tree/ (folder-tree). ` +
+      `The tree is authoritative; prd.md is ignored and will be removed in a future version. ` +
+      `To remove this warning, delete: rm .rex/prd.md`,
+    );
   }
 
   /**
