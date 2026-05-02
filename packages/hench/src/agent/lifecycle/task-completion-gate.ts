@@ -9,11 +9,11 @@
  * This prevents false completions where the agent claims to have completed code
  * work but only produced documentation or configuration changes.
  *
- * @module hench/validation/task-completion-gate
+ * @module hench/agent/lifecycle/task-completion-gate
  */
 
-import type { RunRecord, ToolCallRecord } from "../schema/index.js";
-import { classifyChangedFiles, getCodeFiles } from "../store/file-classifier.js";
+import type { RunRecord, ToolCallRecord } from "../../schema/index.js";
+import { classifyChangedFiles, getCodeFiles } from "../../store/file-classifier.js";
 
 // ---------------------------------------------------------------------------
 // Types

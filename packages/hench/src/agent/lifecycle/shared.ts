@@ -38,7 +38,7 @@ import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig } from "../../store/project-config.js";
-import { validateTaskCompletion } from "../../validation/task-completion-gate.js";
+import { validateTaskCompletion } from "./task-completion-gate.js";
 
 // ---------------------------------------------------------------------------
 // Display helpers

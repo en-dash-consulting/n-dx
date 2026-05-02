@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { validateTaskCompletion } from "../../../src/validation/task-completion-gate.js";
-import type { RunRecord } from "../../../src/schema/index.js";
+import { validateTaskCompletion } from "../../../../src/agent/lifecycle/task-completion-gate.js";
+import type { RunRecord } from "../../../../src/schema/index.js";
 
 describe("Task Completion Gate", () => {
   const createRun = (overrides?: Partial<RunRecord>): RunRecord => ({

@@ -182,6 +182,8 @@
         "sourcevision-view-tests": "test",
         "domain-gateway-routes-mcp": "test",
         "web-unit": "test",
+        "web-server-unit": "test",
+        "web-merge-graph-tests": "test",
         "web-4": "test",
         "rex-2": "test",
         "rex-unit": "test",

@@ -823,13 +823,23 @@ describe("architecture policy: process execution", () => {
 const COHESION_THRESHOLD = 0.5;
 
 /**
+ * Minimum file count for the cohesion gate to apply.
+ *
+ * Cohesion is the ratio of internal-to-total edges; for very small zones a
+ * single missing edge swings the metric by 0.2+, producing false positives
+ * that whack-a-mole between Louvain re-clusterings. The project already
+ * documents 5 files as the reliability floor (see CLAUDE.md, web-shared
+ * governance section). Zones below this size are skipped here and governed
+ * by structural rules instead (two-consumer rule, boundary-check tests).
+ */
+const MIN_FILES_FOR_COHESION_GATE = 5;
+
+/**
  * Zones exempt from the cohesion gate with documented justifications.
  * Each entry must explain why the zone cannot meet the threshold and
  * what structural condition would allow removing the exemption.
  */
-const COHESION_EXCEPTIONS = new Map([
-  ["tick", "Small polling/tick utility cluster used by viewer components; cohesion is depressed by hub-facing timer imports. Remove when tick utilities move under the viewer-message pipeline or gain a dedicated gateway."],
-]);
+const COHESION_EXCEPTIONS = new Map([]);
 
 describe("architecture policy: zone cohesion gate", () => {
   it(`all production zones meet minimum cohesion threshold (${COHESION_THRESHOLD})`, () => {
@@ -852,6 +862,10 @@ describe("architecture policy: zone cohesion gate", () => {
 
       // Skip zones without cohesion metrics
       if (cohesion === undefined || cohesion === null) continue;
+
+      // Skip statistically-noisy small zones (see MIN_FILES_FOR_COHESION_GATE)
+      const fileCount = summary.fileCount ?? summary.files?.length ?? 0;
+      if (fileCount < MIN_FILES_FOR_COHESION_GATE) continue;
 
       // Skip test/infrastructure zones
       const zoneType = zoneTypes[dir];
@@ -894,6 +908,11 @@ describe("architecture policy: zone cohesion gate", () => {
       }
       const summary = JSON.parse(readFileSync(summaryPath, "utf-8"));
       const cohesion = summary.riskMetrics?.cohesion;
+      const fileCount = summary.fileCount ?? summary.files?.length ?? 0;
+      if (fileCount < MIN_FILES_FOR_COHESION_GATE) {
+        stale.push(`${zoneId} (zone has ${fileCount} files; auto-skipped by size threshold)`);
+        continue;
+      }
       if (cohesion !== undefined && cohesion >= COHESION_THRESHOLD) {
         stale.push(`${zoneId} (cohesion ${cohesion} now meets threshold)`);
       }
