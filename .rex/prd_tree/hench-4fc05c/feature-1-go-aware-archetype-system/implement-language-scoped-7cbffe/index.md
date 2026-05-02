@@ -1,0 +1,49 @@
+---
+id: "7cbffe7e-3bfe-482b-8163-80f69b1690e4"
+level: "task"
+title: "Implement language-scoped ArchetypeSignal schema and add Go signals to archetypes"
+status: "completed"
+priority: "high"
+tags:
+  - "sourcevision"
+  - "go"
+  - "archetypes"
+  - "schema"
+source: "smart-add"
+startedAt: "2026-03-26T07:47:26.333Z"
+completedAt: "2026-03-26T08:01:03.235Z"
+acceptanceCriteria:
+  - "ArchetypeSignal interface has optional `languages?: string[]` field"
+  - "Zod validation schema accepts the new field"
+  - "Signals without a languages field fire for all project languages (backward compatible)"
+  - "Signals with `languages: [\"go\"]` only fire when project language is Go"
+  - "Signals with `languages: [\"typescript\", \"javascript\"]` only fire for JS/TS projects"
+  - "`entrypoint` archetype has Go signals: `{ kind: \"filename\", pattern: \"^main\\.go$\", weight: 0.9 }` and `{ kind: \"directory\", pattern: \"/cmd/\", weight: 0.7, languages: [\"go\"] }`"
+  - "`types` archetype has Go signals: `types.go` (0.9), `models.go` (0.8), `entities.go` (0.8) filename patterns"
+  - "`route-handler` archetype has Go signals: `handler.go`, `handlers.go` filename patterns and `/handler/`, `/handlers/` directory patterns (0.8)"
+  - "`config` archetype has Go signal: `config.go` filename pattern (0.7)"
+  - "`test-helper` archetype has Go signals: `/testdata/` (0.9) and `/testutil/` (0.8) directory patterns"
+  - "`route-module`, `component` (tsx/jsx signals), `hook`, and `page` archetypes are scoped with `languages: [\"typescript\", \"javascript\"]`"
+  - "Go fixture files classify correctly: `cmd/api/main.go` → entrypoint, `internal/handler/user.go` → route-handler, `internal/config/config.go` → config, testdata/ files → test-helper"
+  - "React-specific archetypes do not fire for Go project files"
+  - "All existing archetype tests pass unchanged (no regression)"
+description: "Extend `ArchetypeSignal` in `packages/sourcevision/src/schema/v1.ts` with an optional `languages?: string[]` field, update the Zod validation schema in `validate.ts`, and update the classification engine in `classify.ts` to filter signals by detected project language before scoring. Then modify `BUILTIN_ARCHETYPES` in `archetypes.ts` to add Go-specific signals to `entrypoint`, `types`, `route-handler`, `config`, and `test-helper` archetypes, and scope React-specific archetypes (`route-module`, `component`, `hook`, `page`) to `languages: [\"typescript\", \"javascript\"]`. The schema change is the prerequisite for the signal work; both are delivered together to avoid a partial-state intermediate commit."
+---
+
+# Implement language-scoped ArchetypeSignal schema and add Go signals to archetypes
+
+🟠 [completed]
+
+## Summary
+
+Extend `ArchetypeSignal` in `packages/sourcevision/src/schema/v1.ts` with an optional `languages?: string[]` field, update the Zod validation schema in `validate.ts`, and update the classification engine in `classify.ts` to filter signals by detected project language before scoring. Then modify `BUILTIN_ARCHETYPES` in `archetypes.ts` to add Go-specific signals to `entrypoint`, `types`, `route-handler`, `config`, and `test-helper` archetypes, and scope React-specific archetypes (`route-module`, `component`, `hook`, `page`) to `languages: ["typescript", "javascript"]`. The schema change is the prerequisite for the signal work; both are delivered together to avoid a partial-state intermediate commit.
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Tags:** sourcevision, go, archetypes, schema
+- **Level:** task
+- **Started:** 2026-03-26T07:47:26.333Z
+- **Completed:** 2026-03-26T08:01:03.235Z
+- **Duration:** 13m

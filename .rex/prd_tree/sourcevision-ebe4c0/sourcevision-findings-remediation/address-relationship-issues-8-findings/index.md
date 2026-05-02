@@ -1,0 +1,39 @@
+---
+id: "101568f8-c073-4554-8403-393697baa51c"
+level: "task"
+title: "Address relationship issues (8 findings)"
+status: "completed"
+priority: "critical"
+source: "sourcevision"
+startedAt: "2026-03-11T04:15:01.001Z"
+completedAt: "2026-03-11T04:32:28.910Z"
+resolutionType: "code-change"
+resolutionDetail: "Fixed 3 critical findings with code/config changes, fixed 3 pre-existing test failures, acknowledged 5 warnings as by-design or false positives. Details: (1) crash→external.ts cycle broken by importing ViewId from shared/view-id.js directly with boundary-check exemption; (2) progressive-loader.ts zone-pinned to web-viewer to fix web-unit misclassification; (3) routes-mcp.ts zone-pinned to web-server to fix messaging-pipeline misplacement; (4) routes-data.ts imports verified safe (server-side only, no viewer contamination); (5) sourcevision→web import confirmed false positive (no actual cross-tier import); (6) hench-agent-monitor web-shared bypass acknowledged as by-design (viewer components legitimately need viewer); (7) rex-fix-command acknowledged as having legitimate domain logic; (8) hub-and-spoke partially addressed by crash cycle fix."
+acceptanceCriteria: []
+description: "- hench-agent-monitor bypasses the web-shared foundation layer entirely (0 imports) and depends exclusively on web-viewer (11 imports) — any future need for shared utilities will route through the viewer abstraction rather than the designated foundation layer\n- The fix command zone has net zero structural contribution beyond delegation — with 7 imports from rex-prd-engine and only 1 reverse edge, it is closer to a pass-through adapter than a domain zone; if its only role is translating CLI args to rex-prd-engine calls, it could be inlined into the CLI command layer without architectural loss.\n- crash ↔ web-viewer (3+2 crossings) and panel ↔ web-viewer (11+4 crossings) both create bidirectional satellite relationships with the same hub zone; the pattern of multiple low-cohesion satellite zones bidirectionally coupled to one high-cohesion core zone is a hub-and-spoke anti-pattern that makes web-viewer changes high-risk.\n- packages/web/src/viewer/crash/crash-detector.ts imports ViewId from external.ts (viewer zone) while packages/web/src/viewer/performance/index.ts imports from crash/index.js — bidirectional dependency between the 'crash' detected zone and 'web-application-core' forms a cycle; crash should depend on viewer types through a one-way edge only.\n- web-viewer imports 1 symbol from web-unit (a test zone) — production code acquiring a runtime dependency on a test zone is a structural boundary violation that could accidentally pull test-only utilities into the production bundle; identify the import and relocate the shared symbol to web-shared or a dedicated viewer utility module.\n- routes-data.ts (server route handler, 3-file zone) imports 7 symbols from the 338-file web-application-core zone which contains viewer components; the asymmetric edge count (7 in from the small zone, 1 out from the large zone) indicates routes-data.ts is consuming viewer-side abstractions — these must be verified as type-only imports to prevent server code from acquiring a Preact runtime dependency.\n- sourcevision (domain tier) has 1 import targeting the web-server zone that likely resolves to web-task-usage-scheduler/shared-types.ts; this inverts the four-tier dependency hierarchy at a concrete file level — the referenced type must be relocated to a foundation-tier package (@n-dx/llm-client or a new shared package) to restore tier integrity.\n- routes-mcp.ts has exactly one consumer (server/start.ts) inside the server composition root but landed in the messaging-pipeline zone; this placement splits the MCP request lifecycle across two zones and obscures the full server routing surface during audits."
+recommendationMeta: "[object Object]"
+---
+
+# Address relationship issues (8 findings)
+
+🔴 [completed]
+
+## Summary
+
+- hench-agent-monitor bypasses the web-shared foundation layer entirely (0 imports) and depends exclusively on web-viewer (11 imports) — any future need for shared utilities will route through the viewer abstraction rather than the designated foundation layer
+- The fix command zone has net zero structural contribution beyond delegation — with 7 imports from rex-prd-engine and only 1 reverse edge, it is closer to a pass-through adapter than a domain zone; if its only role is translating CLI args to rex-prd-engine calls, it could be inlined into the CLI command layer without architectural loss.
+- crash ↔ web-viewer (3+2 crossings) and panel ↔ web-viewer (11+4 crossings) both create bidirectional satellite relationships with the same hub zone; the pattern of multiple low-cohesion satellite zones bidirectionally coupled to one high-cohesion core zone is a hub-and-spoke anti-pattern that makes web-viewer changes high-risk.
+- packages/web/src/viewer/crash/crash-detector.ts imports ViewId from external.ts (viewer zone) while packages/web/src/viewer/performance/index.ts imports from crash/index.js — bidirectional dependency between the 'crash' detected zone and 'web-application-core' forms a cycle; crash should depend on viewer types through a one-way edge only.
+- web-viewer imports 1 symbol from web-unit (a test zone) — production code acquiring a runtime dependency on a test zone is a structural boundary violation that could accidentally pull test-only utilities into the production bundle; identify the import and relocate the shared symbol to web-shared or a dedicated viewer utility module.
+- routes-data.ts (server route handler, 3-file zone) imports 7 symbols from the 338-file web-application-core zone which contains viewer components; the asymmetric edge count (7 in from the small zone, 1 out from the large zone) indicates routes-data.ts is consuming viewer-side abstractions — these must be verified as type-only imports to prevent server code from acquiring a Preact runtime dependency.
+- sourcevision (domain tier) has 1 import targeting the web-server zone that likely resolves to web-task-usage-scheduler/shared-types.ts; this inverts the four-tier dependency hierarchy at a concrete file level — the referenced type must be relocated to a foundation-tier package (@n-dx/llm-client or a new shared package) to restore tier integrity.
+- routes-mcp.ts has exactly one consumer (server/start.ts) inside the server composition root but landed in the messaging-pipeline zone; this placement splits the MCP request lifecycle across two zones and obscures the full server routing surface during audits.
+
+## Info
+
+- **Status:** completed
+- **Priority:** critical
+- **Level:** task
+- **Started:** 2026-03-11T04:15:01.001Z
+- **Completed:** 2026-03-11T04:32:28.910Z
+- **Duration:** 17m

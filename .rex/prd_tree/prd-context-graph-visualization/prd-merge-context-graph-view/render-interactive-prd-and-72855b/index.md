@@ -1,0 +1,43 @@
+---
+id: "72855b7e-99c5-47cb-a742-45a160e0cf58"
+level: "task"
+title: "Render interactive PRD-and-merge context graph in the dashboard"
+status: "completed"
+priority: "high"
+tags:
+  - "web"
+  - "frontend"
+  - "viewer"
+  - "ui"
+source: "smart-add"
+startedAt: "2026-04-24T19:50:57.819Z"
+completedAt: "2026-04-24T19:59:27.544Z"
+resolutionType: "code-change"
+resolutionDetail: "Built MergeGraphView component with hierarchical layout, pan/zoom, node selection, detail panel, and filter bar. Added merge-graph route, sidebar entry, and PRD view toggle."
+acceptanceCriteria:
+  - "New route in the dashboard renders PRD items and merge commits as a connected graph"
+  - "Clicking a merge node shows the list of files added, modified, and deleted in that merge"
+  - "Clicking a PRD node highlights all merges that contributed to it"
+  - "View supports filtering by epic, feature, date range, and completion status"
+  - "Graph degrades gracefully for repos with no merge history and for PRD items with no associated merges"
+  - "View is reachable from the existing PRD tree view with a clear toggle or link"
+description: "Build a new dashboard view that renders the PRD tree as a force-directed or hierarchical context graph with merge commit nodes attached to the PRD items they implemented. Users should be able to pan, zoom, select a merge node to see the files it added/changed, and filter by epic, feature, or time range. This gives users a single visual surface to understand how code shipped into the repo maps back to planned work."
+---
+
+# Render interactive PRD-and-merge context graph in the dashboard
+
+🟠 [completed]
+
+## Summary
+
+Build a new dashboard view that renders the PRD tree as a force-directed or hierarchical context graph with merge commit nodes attached to the PRD items they implemented. Users should be able to pan, zoom, select a merge node to see the files it added/changed, and filter by epic, feature, or time range. This gives users a single visual surface to understand how code shipped into the repo maps back to planned work.
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Tags:** web, frontend, viewer, ui
+- **Level:** task
+- **Started:** 2026-04-24T19:50:57.819Z
+- **Completed:** 2026-04-24T19:59:27.544Z
+- **Duration:** 8m

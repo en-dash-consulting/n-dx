@@ -1,0 +1,26 @@
+---
+id: "afab2a23-e2c0-4d95-9325-256f8f5192fd"
+level: "task"
+title: "Write comprehensive unit tests for go-imports.ts covering all syntax variants and edge cases"
+status: "completed"
+priority: "critical"
+tags:
+  - "go"
+  - "sourcevision"
+  - "imports"
+  - "tests"
+source: "smart-add"
+startedAt: "2026-03-26T05:07:43.892Z"
+completedAt: "2026-03-26T05:10:44.563Z"
+acceptanceCriteria:
+  - "Tests cover single-line and grouped import block parsing"
+  - "Tests cover aliased, blank, and dot import variants in isolation"
+  - "Tests verify stdlib imports produce stdlib: prefixed external entries"
+  - "Tests verify third-party imports are classified as external"
+  - "Tests verify internal imports resolve to correct relative directory paths"
+  - "Tests cover comment lines and blank lines inside grouped import blocks"
+  - "Tests verify source string literals do not produce spurious import edges"
+  - "All tests pass with zero failures when run against the Go fixture files"
+  - "Test file is placed adjacent to go-imports.ts or in the package unit test directory"
+description: "Write unit tests for go-imports.ts using the existing Go fixture at packages/sourcevision/tests/fixtures/go-project/, which contains real Go files with stdlib, third-party, and internal imports. Tests must cover every import syntax variant, alias and blank import handling, module path resolution from go.mod, and edge cases such as comments inside import blocks and string literals that resemble import statements."
+---

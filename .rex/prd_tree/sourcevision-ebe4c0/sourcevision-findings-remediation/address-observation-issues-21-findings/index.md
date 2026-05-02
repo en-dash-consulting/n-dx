@@ -1,0 +1,52 @@
+---
+id: "ac044315-bef3-449a-8fdb-fce20ca917ec"
+level: "task"
+title: "Address observation issues (21 findings)"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-03-10T04:21:59.647Z"
+completedAt: "2026-03-10T04:28:49.126Z"
+resolutionType: "code-change"
+resolutionDetail: "Addressed 21 observation findings: added script documentation, expanded barrel exports (components + polling), routed cross-zone imports through barrels to reduce entry point surface, audited sourcevision views (clean). Structural coupling/cohesion findings acknowledged as architecturally expected."
+acceptanceCriteria: []
+description: "- Zone ID 'hench-unit' should be renamed — the '-unit' suffix implies test-only content but this zone contains the full hench production implementation alongside its tests, which violates the project's zone naming convention.\n- High coupling (0.71) — 3 imports target \"web-application-core\"\n- Low cohesion (0.29) — files are loosely related, consider splitting this zone\n- Cohesion 0.29 is below threshold; crash-detector.ts and use-crash-recovery.ts have weak intra-zone import density, suggesting the utility is consumed broadly rather than exclusively by the hook.\n- Coupling 0.71 to web-viewer exceeds the high threshold; recovery logic reaches across many viewer primitives, which increases the blast radius of any viewer refactor.\n- High coupling (0.67) — 3 imports target \"web-application-core\"\n- Low cohesion (0.33) — files are loosely related, consider splitting this zone\n- Cohesion 0.33 is below threshold; the zone spans hooks, a state store, and restart logic without a unifying internal import chain — the barrel index.ts partially compensates but does not eliminate the gap.\n- Coupling 0.67 is at the high-coupling boundary; polling hooks are necessarily bound to Preact state, but verify no polling module reaches into panel or status zones unnecessarily.\n- Scripts are excluded from the monorepo build and test pipelines, creating a maintenance blind spot — document their usage and expected Node version in a top-level comment.\n- Bidirectional coupling: \"web-application-core\" ↔ \"web-dashboard\" (16+18 crossings) — consider extracting shared interface\n- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects\n- src/shared/glob.ts is the only production source file in this zone; if it is imported by files in hench-unit, it may have been residually placed here by Louvain rather than belonging to the package config zone.\n- High coupling (0.71) — 2 imports target \"web-application-core\"\n- Cohesion 0.29 is below the healthy threshold — the zone contains only 3 files yet spans component and hook abstraction layers without a shared directory anchor.\n- Coupling 0.71 exceeds the high-coupling threshold; status display is tightly bound to web-viewer primitives, which limits independent testing.\n- High coupling (0.71) — 5 imports target \"web-application-core\"\n- Cohesion 0.29 is below threshold, but for a page-layer zone this is structurally expected — pages fan out to shared components rather than importing peer pages.\n- Coupling 0.71 reflects page components depending on the broader web-viewer primitive set; audit that no sourcevision view imports server-side or gateway modules directly.\n- 11 entry points — wide API surface, consider consolidating exports\n- 14 entry points — wide API surface, consider consolidating exports"
+recommendationMeta: "[object Object]"
+---
+
+# Address observation issues (21 findings)
+
+🟠 [completed]
+
+## Summary
+
+- Zone ID 'hench-unit' should be renamed — the '-unit' suffix implies test-only content but this zone contains the full hench production implementation alongside its tests, which violates the project's zone naming convention.
+- High coupling (0.71) — 3 imports target "web-application-core"
+- Low cohesion (0.29) — files are loosely related, consider splitting this zone
+- Cohesion 0.29 is below threshold; crash-detector.ts and use-crash-recovery.ts have weak intra-zone import density, suggesting the utility is consumed broadly rather than exclusively by the hook.
+- Coupling 0.71 to web-viewer exceeds the high threshold; recovery logic reaches across many viewer primitives, which increases the blast radius of any viewer refactor.
+- High coupling (0.67) — 3 imports target "web-application-core"
+- Low cohesion (0.33) — files are loosely related, consider splitting this zone
+- Cohesion 0.33 is below threshold; the zone spans hooks, a state store, and restart logic without a unifying internal import chain — the barrel index.ts partially compensates but does not eliminate the gap.
+- Coupling 0.67 is at the high-coupling boundary; polling hooks are necessarily bound to Preact state, but verify no polling module reaches into panel or status zones unnecessarily.
+- Scripts are excluded from the monorepo build and test pipelines, creating a maintenance blind spot — document their usage and expected Node version in a top-level comment.
+- Bidirectional coupling: "web-application-core" ↔ "web-dashboard" (16+18 crossings) — consider extracting shared interface
+- Fan-in hotspot: packages/rex/src/schema/index.ts receives calls from 24 files — high-impact module, changes may have wide ripple effects
+- src/shared/glob.ts is the only production source file in this zone; if it is imported by files in hench-unit, it may have been residually placed here by Louvain rather than belonging to the package config zone.
+- High coupling (0.71) — 2 imports target "web-application-core"
+- Cohesion 0.29 is below the healthy threshold — the zone contains only 3 files yet spans component and hook abstraction layers without a shared directory anchor.
+- Coupling 0.71 exceeds the high-coupling threshold; status display is tightly bound to web-viewer primitives, which limits independent testing.
+- High coupling (0.71) — 5 imports target "web-application-core"
+- Cohesion 0.29 is below threshold, but for a page-layer zone this is structurally expected — pages fan out to shared components rather than importing peer pages.
+- Coupling 0.71 reflects page components depending on the broader web-viewer primitive set; audit that no sourcevision view imports server-side or gateway modules directly.
+- 11 entry points — wide API surface, consider consolidating exports
+- 14 entry points — wide API surface, consider consolidating exports
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Level:** task
+- **Started:** 2026-03-10T04:21:59.647Z
+- **Completed:** 2026-03-10T04:28:49.126Z
+- **Duration:** 6m

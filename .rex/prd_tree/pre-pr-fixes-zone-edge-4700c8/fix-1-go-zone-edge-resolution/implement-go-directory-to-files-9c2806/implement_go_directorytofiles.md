@@ -1,0 +1,27 @@
+---
+id: "9c28061d-d830-4ebb-9389-fae26db29adf"
+level: "task"
+title: "Implement Go directory-to-files resolver and update zone pipeline"
+status: "completed"
+priority: "high"
+tags:
+  - "sourcevision"
+  - "go"
+  - "zones"
+source: "smart-add"
+startedAt: "2026-03-26T20:30:24.097Z"
+completedAt: "2026-03-26T20:47:10.595Z"
+acceptanceCriteria:
+  - "Directory-to-files resolver utility returns the exact file for JS/TS-style file path inputs"
+  - "Resolver returns all files whose paths begin with the directory prefix for Go-style directory path inputs"
+  - "`buildUndirectedGraph()` expands directory-target edges into file-level edges before graph construction so Louvain receives real file-level nodes"
+  - "`buildCrossings()` falls back to prefix matching (`edge.to + \"/\"`) when exact `fileToZone` lookup fails"
+  - "`computeZoneMetrics()` applies the same prefix expansion when computing cohesion and coupling from the graph"
+  - "Go projects with cross-package imports produce non-zero zone crossings"
+  - "Zone coupling scores are non-zero for zones with incoming or outgoing cross-package imports"
+  - "Zone cohesion scores reflect intra-package import density"
+  - "PocketBase re-analysis produces significantly more than 49 crossings"
+  - "grit re-analysis produces non-zero crossings between Go zones"
+  - "JS/TS zone crossing results are unchanged (no regression)"
+description: "Go import edges from `go-imports.ts` target package directories (e.g., `internal/generate`) rather than individual files. The zone crossing algorithm in `buildCrossings()` (zones.ts ~1475), the Louvain graph builder in `buildUndirectedGraph()` (louvain.ts), and `computeZoneMetrics()` all do exact string lookups against file paths — silently dropping every Go cross-zone edge. Create a directory-to-files resolver utility and apply it at all three consumption points so directory-targeted edges expand to their constituent files. JS/TS exact-match behavior must remain unchanged."
+---

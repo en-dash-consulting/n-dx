@@ -1,0 +1,26 @@
+---
+id: "7b4ff540-8a22-4f56-9b0b-dcf9e68f6675"
+level: "task"
+title: "Print '=== Iteration n/total ===' banner between hench run loop iterations"
+status: "completed"
+priority: "medium"
+tags:
+  - "hench"
+  - "cli"
+  - "run-loop"
+  - "output"
+source: "smart-add"
+startedAt: "2026-04-29T18:16:35.551Z"
+completedAt: "2026-04-29T18:21:35.326Z"
+endedAt: "2026-04-29T18:21:35.326Z"
+resolutionType: "code-change"
+resolutionDetail: "Extracted formatIterationBanner helper; moved banner from before each iteration to between iterations in both runIterations() and runLoop(); added format/placement tests."
+acceptanceCriteria:
+  - "Banner '=== Iteration n/[total] ===' is emitted between each pair of iterations in --iterations=N mode"
+  - "Banner '=== Iteration n ===' (no total) is emitted between iterations in unbounded --loop mode"
+  - "Banner appears after the prior iteration's commit step and run summary, not before them"
+  - "No banner is emitted before the first iteration or after the final iteration"
+  - "Banner uses the existing run-loop visual style (consistent with the pink iteration separator from feature d1d0627e) and respects NO_COLOR"
+  - "Regression test verifies banner placement relative to commit and run-summary output for a multi-iteration run"
+description: "When hench runs in iterative mode (--iterations=N or --loop), each iteration boundary is currently invisible in the console output, making it hard to tell which iteration produced which work. Emit a clearly delimited banner of the form '=== Iteration n/[total] ===' (or '=== Iteration n ===' when total is unbounded for --loop) at the boundary between iterations. The banner must print after the previous iteration's code changes have been committed and its run summary has been rendered, and before the next iteration's task selection begins."
+---

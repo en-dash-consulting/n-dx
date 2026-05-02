@@ -50,22 +50,22 @@ afterEach(() => {
 // ── Phase 1: Boot ─────────────────────────────────────────────────────────
 
 describe("refreshPRDCache — boot phase", () => {
-  it("creates .cache/prd.json from prd.md", () => {
+  it("creates .cache/prd.json from prd.md", async () => {
     writeFileSync(join(rexDir, "prd.md"), makePrdMd("Boot PRD", [{ id: "e1", title: "First Epic" }]));
 
-    refreshPRDCache(rexDir);
+    await refreshPRDCache(rexDir);
 
     const cachePath = join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON);
     expect(existsSync(cachePath)).toBe(true);
   });
 
-  it("cache content matches the parsed prd.md document", () => {
+  it("cache content matches the parsed prd.md document", async () => {
     writeFileSync(
       join(rexDir, "prd.md"),
       makePrdMd("My PRD", [{ id: "e1", title: "Alpha Epic" }, { id: "e2", title: "Beta Epic" }]),
     );
 
-    refreshPRDCache(rexDir);
+    await refreshPRDCache(rexDir);
 
     const cached = JSON.parse(readFileSync(join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON), "utf-8"));
     expect(cached.title).toBe("My PRD");
@@ -74,20 +74,20 @@ describe("refreshPRDCache — boot phase", () => {
     expect(cached.items[1].id).toBe("e2");
   });
 
-  it("does nothing when prd.md is absent", () => {
-    refreshPRDCache(rexDir);
+  it("does nothing when prd.md is absent", async () => {
+    await refreshPRDCache(rexDir);
 
     expect(existsSync(join(rexDir, PRD_CACHE_DIR))).toBe(false);
   });
 
-  it("overwrites a stale cache when prd.md exists", () => {
+  it("overwrites a stale cache when prd.md exists", async () => {
     const cacheDir = join(rexDir, PRD_CACHE_DIR);
     mkdirSync(cacheDir, { recursive: true });
     writeFileSync(join(cacheDir, PRD_CACHE_JSON), JSON.stringify({ title: "Stale", schema: "rex/v1", items: [] }));
 
     writeFileSync(join(rexDir, "prd.md"), makePrdMd("Fresh PRD"));
 
-    refreshPRDCache(rexDir);
+    await refreshPRDCache(rexDir);
 
     const cached = JSON.parse(readFileSync(join(cacheDir, PRD_CACHE_JSON), "utf-8"));
     expect(cached.title).toBe("Fresh PRD");
@@ -97,9 +97,9 @@ describe("refreshPRDCache — boot phase", () => {
 // ── Phase 2: Watch (mutation) ─────────────────────────────────────────────
 
 describe("refreshPRDCache — mutation phase", () => {
-  it("updates cache when prd.md is mutated and refresh is called again", () => {
+  it("updates cache when prd.md is mutated and refresh is called again", async () => {
     writeFileSync(join(rexDir, "prd.md"), makePrdMd("Before", [{ id: "e1", title: "Old Epic" }]));
-    refreshPRDCache(rexDir);
+    await refreshPRDCache(rexDir);
 
     const v1 = JSON.parse(readFileSync(join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON), "utf-8"));
     expect(v1.title).toBe("Before");
@@ -108,7 +108,7 @@ describe("refreshPRDCache — mutation phase", () => {
       join(rexDir, "prd.md"),
       makePrdMd("After", [{ id: "e1", title: "Old Epic" }, { id: "e2", title: "New Epic" }]),
     );
-    refreshPRDCache(rexDir);
+    await refreshPRDCache(rexDir);
 
     const v2 = JSON.parse(readFileSync(join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON), "utf-8"));
     expect(v2.title).toBe("After");
@@ -119,9 +119,9 @@ describe("refreshPRDCache — mutation phase", () => {
 // ── Phase 3: Shutdown ─────────────────────────────────────────────────────
 
 describe("cache cleanup — shutdown phase", () => {
-  it("removing the cache dir leaves no trace on disk", () => {
+  it("removing the cache dir leaves no trace on disk", async () => {
     writeFileSync(join(rexDir, "prd.md"), makePrdMd("Shutdown Test"));
-    refreshPRDCache(rexDir);
+    await refreshPRDCache(rexDir);
 
     const cacheDir = join(rexDir, PRD_CACHE_DIR);
     expect(existsSync(cacheDir)).toBe(true);
@@ -132,9 +132,9 @@ describe("cache cleanup — shutdown phase", () => {
     expect(existsSync(join(rexDir, "prd.md"))).toBe(true);
   });
 
-  it("prd.md is unaffected by cache removal", () => {
+  it("prd.md is unaffected by cache removal", async () => {
     writeFileSync(join(rexDir, "prd.md"), makePrdMd("Source of Truth", [{ id: "e1", title: "Epic" }]));
-    refreshPRDCache(rexDir);
+    await refreshPRDCache(rexDir);
 
     rmSync(join(rexDir, PRD_CACHE_DIR), { recursive: true, force: true });
 

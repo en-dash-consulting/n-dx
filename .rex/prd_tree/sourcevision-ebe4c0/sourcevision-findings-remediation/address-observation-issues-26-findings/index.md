@@ -1,0 +1,57 @@
+---
+id: "de890e4f-84bf-4eb8-8b5c-4c8b84156509"
+level: "task"
+title: "Address observation issues (26 findings)"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-03-11T16:01:06.651Z"
+completedAt: "2026-03-11T16:10:27.878Z"
+resolutionType: "config-override"
+resolutionDetail: "Addressed 26 observation findings via zone pin corrections in .n-dx.json: dissolved viewer-prd-interaction (4 files → web-viewer), dissolved web-viewer-unit-tests (2 files → web-viewer), completed prd-fix-command cleanup (3 files → rex-prd-engine), consolidated rex-e2e-config (5 e2e tests → rex-cli-e2e, 2 config/fixture files → appropriate zones). Verified inverted dependencies (server→viewer) are already resolved via injection pattern. Metric-based observations acknowledged as documented in CLAUDE.md governance."
+acceptanceCriteria: []
+description: "- High coupling (0.64) — 7 imports target \"rex-prd-engine\"\n- Low cohesion (0.36) — files are loosely related, consider splitting this zone\n- Cohesion 0.36 and coupling 0.64 confirm dual-fragility status — additions must satisfy the two-consumer rule and CLI-only content policy per CLAUDE.md satellite zone governance.\n- Bidirectional coupling: \"server-usage-scheduler\" ↔ \"web-viewer\" (3+39 crossings) — consider extracting shared interface\n- Two files in this zone (scheduler-startup.test.js, web-server-viewer-boundary.test.js) are flagged in CLAUDE.md as sole-coverage required tests; they lack any in-file annotation marking them as such, which is a skip-risk during refactoring.\n- High coupling (0.75) — 8 imports target \"rex-prd-engine\"\n- Cohesion 0.25 and coupling 0.75 are the worst metrics in this batch — active governance required; evaluate whether core/fix.ts deserves its own module or should be inlined into the command handler.\n- core/fix.ts living outside the cli/ subdirectory blurs the satellite zone boundary defined in CLAUDE.md; if it has a single consumer (fix.ts), it violates the two-consumer rule and should be co-located or promoted.\n- High coupling (0.82) — 3 imports target \"rex-prd-engine\"\n- Low cohesion (0.18) — files are loosely related, consider splitting this zone\n- Bidirectional imports between rex-core-utilities and rex-prd-engine (3 outbound, 8 inbound) suggest verify.ts or keywords.ts depend on types defined in the main engine — this circular shape should be resolved by moving shared types to schema or making the dependency strictly one-directional.\n- Cohesion 0.18 and coupling 0.82 indicate two unrelated utilities grouped together; splitting them into their dominant consumer zones or absorbing them into rex-prd-engine would eliminate the bidirectional dependency.\n- Cohesion 0 is a warning signal: these 8 files share no import edges with each other, meaning community detection has grouped package-root artifacts by proximity rather than relationship. This zone likely should not exist as a standalone zone — its contents belong in rex-e2e (test files) or be excluded from zone analysis (generated files, config).\n- Bidirectional dependency with rex-core (rex-unit→rex-core: 8, rex-core→rex-unit: 3) introduces a latent cycle; if keywords.ts or verify.ts import from core tree or schema modules, a true circular dependency exists and should be resolved.\n- 3 outbound imports into web-viewer from this server-side zone invert the expected dependency direction; trace these imports to determine whether a shared type or web-shared abstraction would eliminate the upward dependency.\n- High coupling (0.74) — 12 imports target \"web-viewer\"\n- Low cohesion (0.26) — files are loosely related, consider splitting this zone\n- Cohesion (0.26) is well below the 0.4 warning threshold and coupling (0.74) exceeds 0.6 — this zone meets the dual-fragility criteria requiring active governance on additions.\n- The prd.ts view is the sole declared entry point, but use-toast and use-feature-toggle are likely consumed outside this zone too — verify via import graph to determine whether they should be promoted to the viewer hub.\n- 12 entry points — wide API surface, consider consolidating exports\n- Bidirectional imports with web-viewer (web imports web-viewer × 23, web-viewer imports web × 7) create a cycle risk — verify these do not form a runtime circular dependency in the bundled output.\n- 24 entry points — wide API surface, consider consolidating exports\n- web-server → web-viewer (3 imports) is an inverted dependency: the server composition root should not import from the viewer layer. These 3 imports should be traced and relocated or abstracted behind shared types.\n- High coupling (1) — 7 imports target \"web-viewer\"\n- Both test files target components that live in the Web Viewer Hub zone; moving them into packages/web/tests/unit/viewer alongside peer viewer tests would improve discoverability and eliminate the orphan zone.\n- Cohesion of 0 and coupling of 1 means the community-detection algorithm grouped these files by elimination rather than affinity — they have no shared internal imports."
+recommendationMeta: "[object Object]"
+---
+
+# Address observation issues (26 findings)
+
+🟠 [completed]
+
+## Summary
+
+- High coupling (0.64) — 7 imports target "rex-prd-engine"
+- Low cohesion (0.36) — files are loosely related, consider splitting this zone
+- Cohesion 0.36 and coupling 0.64 confirm dual-fragility status — additions must satisfy the two-consumer rule and CLI-only content policy per CLAUDE.md satellite zone governance.
+- Bidirectional coupling: "server-usage-scheduler" ↔ "web-viewer" (3+39 crossings) — consider extracting shared interface
+- Two files in this zone (scheduler-startup.test.js, web-server-viewer-boundary.test.js) are flagged in CLAUDE.md as sole-coverage required tests; they lack any in-file annotation marking them as such, which is a skip-risk during refactoring.
+- High coupling (0.75) — 8 imports target "rex-prd-engine"
+- Cohesion 0.25 and coupling 0.75 are the worst metrics in this batch — active governance required; evaluate whether core/fix.ts deserves its own module or should be inlined into the command handler.
+- core/fix.ts living outside the cli/ subdirectory blurs the satellite zone boundary defined in CLAUDE.md; if it has a single consumer (fix.ts), it violates the two-consumer rule and should be co-located or promoted.
+- High coupling (0.82) — 3 imports target "rex-prd-engine"
+- Low cohesion (0.18) — files are loosely related, consider splitting this zone
+- Bidirectional imports between rex-core-utilities and rex-prd-engine (3 outbound, 8 inbound) suggest verify.ts or keywords.ts depend on types defined in the main engine — this circular shape should be resolved by moving shared types to schema or making the dependency strictly one-directional.
+- Cohesion 0.18 and coupling 0.82 indicate two unrelated utilities grouped together; splitting them into their dominant consumer zones or absorbing them into rex-prd-engine would eliminate the bidirectional dependency.
+- Cohesion 0 is a warning signal: these 8 files share no import edges with each other, meaning community detection has grouped package-root artifacts by proximity rather than relationship. This zone likely should not exist as a standalone zone — its contents belong in rex-e2e (test files) or be excluded from zone analysis (generated files, config).
+- Bidirectional dependency with rex-core (rex-unit→rex-core: 8, rex-core→rex-unit: 3) introduces a latent cycle; if keywords.ts or verify.ts import from core tree or schema modules, a true circular dependency exists and should be resolved.
+- 3 outbound imports into web-viewer from this server-side zone invert the expected dependency direction; trace these imports to determine whether a shared type or web-shared abstraction would eliminate the upward dependency.
+- High coupling (0.74) — 12 imports target "web-viewer"
+- Low cohesion (0.26) — files are loosely related, consider splitting this zone
+- Cohesion (0.26) is well below the 0.4 warning threshold and coupling (0.74) exceeds 0.6 — this zone meets the dual-fragility criteria requiring active governance on additions.
+- The prd.ts view is the sole declared entry point, but use-toast and use-feature-toggle are likely consumed outside this zone too — verify via import graph to determine whether they should be promoted to the viewer hub.
+- 12 entry points — wide API surface, consider consolidating exports
+- Bidirectional imports with web-viewer (web imports web-viewer × 23, web-viewer imports web × 7) create a cycle risk — verify these do not form a runtime circular dependency in the bundled output.
+- 24 entry points — wide API surface, consider consolidating exports
+- web-server → web-viewer (3 imports) is an inverted dependency: the server composition root should not import from the viewer layer. These 3 imports should be traced and relocated or abstracted behind shared types.
+- High coupling (1) — 7 imports target "web-viewer"
+- Both test files target components that live in the Web Viewer Hub zone; moving them into packages/web/tests/unit/viewer alongside peer viewer tests would improve discoverability and eliminate the orphan zone.
+- Cohesion of 0 and coupling of 1 means the community-detection algorithm grouped these files by elimination rather than affinity — they have no shared internal imports.
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Level:** task
+- **Started:** 2026-03-11T16:01:06.651Z
+- **Completed:** 2026-03-11T16:10:27.878Z
+- **Duration:** 9m

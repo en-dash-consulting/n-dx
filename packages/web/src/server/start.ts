@@ -17,7 +17,7 @@ import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
-import { collectAllIds, createRexMcpServer, parseDocument } from "./rex-gateway.js";
+import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
@@ -236,30 +236,63 @@ function isInScope(scope: ViewerScope | undefined, pkg: ViewerScope): boolean {
 }
 
 /**
- * Regenerate `.rex/.cache/prd.json` from `prd.md`.
- * Called at server boot and whenever the `prd.md` watcher fires.
+ * Regenerate `.rex/.cache/prd.json` from the folder-tree backend (preferred)
+ * or legacy `prd.md`. Called at server boot and whenever the rex watcher fires.
  * Failures are logged but not thrown — a missing or corrupt cache degrades
- * gracefully (loadPRDSync falls back to parsing prd.md directly).
+ * gracefully (loadPRDSync falls back to parsing the source on disk).
  * @internal exported for integration testing only
  */
-export function refreshPRDCache(rexDir: string): void {
+export async function refreshPRDCache(rexDir: string): Promise<void> {
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const prdMdPath = join(rexDir, "prd.md");
-  if (!existsSync(prdMdPath)) return;
-  try {
-    const parsed = parseDocument(readFileSync(prdMdPath, "utf-8"));
-    if (!parsed.ok) {
-      console.warn(`[prd-cache] prd.md parse error: ${parsed.error.message}`);
+
+  let doc: { schema: string; title: string; items: unknown[] } | null = null;
+
+  if (existsSync(treeRoot)) {
+    try {
+      const { items, warnings } = await parseFolderTree(treeRoot);
+      let title = "PRD";
+      try {
+        const meta = JSON.parse(readFileSync(join(rexDir, "tree-meta.json"), "utf-8")) as Record<string, unknown>;
+        if (typeof meta["title"] === "string") title = meta["title"];
+      } catch {
+        // tree-meta.json is optional
+      }
+      doc = { schema: SCHEMA_VERSION, title, items };
+      for (const w of warnings) {
+        console.warn(`[prd-cache] folder-tree warning at ${w.path}: ${w.message}`);
+      }
+    } catch (err) {
+      console.warn(`[prd-cache] folder-tree parse error: ${(err as Error).message}`);
+    }
+  } else if (existsSync(prdMdPath)) {
+    try {
+      const parsed = parseDocument(readFileSync(prdMdPath, "utf-8"));
+      if (!parsed.ok) {
+        console.warn(`[prd-cache] prd.md parse error: ${parsed.error.message}`);
+        return;
+      }
+      doc = parsed.data;
+    } catch (err) {
+      console.warn(`[prd-cache] prd.md read error: ${(err as Error).message}`);
       return;
     }
+  } else {
+    return;
+  }
+
+  if (!doc) return;
+
+  try {
     const cacheDir = join(rexDir, PRD_CACHE_DIR);
     mkdirSync(cacheDir, { recursive: true });
     writeFileSync(
       join(cacheDir, PRD_CACHE_JSON),
-      JSON.stringify(parsed.data, null, 2) + "\n",
+      JSON.stringify(doc, null, 2) + "\n",
       "utf-8",
     );
   } catch (err) {
-    console.warn(`[prd-cache] failed to refresh cache: ${(err as Error).message}`);
+    console.warn(`[prd-cache] failed to write cache: ${(err as Error).message}`);
   }
 }
 
@@ -298,26 +331,48 @@ function registerRexWatcher(
   rexDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
   ws: ReturnType<typeof createWebSocketManager>,
-): FSWatcher | null {
-  if (!isInScope(scope, "rex") || !existsSync(rexDir)) return null;
+): FSWatcher[] {
+  if (!isInScope(scope, "rex") || !existsSync(rexDir)) return [];
   const debouncedRefresh = debounce(() => {
-    refreshPRDCache(rexDir);
-    watcher.refresh();
-    ws.broadcast({
-      type: "rex:prd-changed",
-      timestamp: new Date().toISOString(),
+    void refreshPRDCache(rexDir).then(() => {
+      watcher.refresh();
+      ws.broadcast({
+        type: "rex:prd-changed",
+        timestamp: new Date().toISOString(),
+      });
     });
   }, WATCHER_DEBOUNCE_MS);
+
+  const watchers: FSWatcher[] = [];
+
+  // Watch .rex/ for legacy prd.md and tree-meta.json changes
   try {
-    return watch(rexDir, (_eventType, filename) => {
-      if (filename === "prd.md" || (typeof filename === "string" && /^prd_.*\.md$/.test(filename))) {
+    watchers.push(watch(rexDir, (_eventType, filename) => {
+      if (
+        filename === "prd.md" ||
+        filename === "tree-meta.json" ||
+        (typeof filename === "string" && /^prd_.*\.md$/.test(filename))
+      ) {
         debouncedRefresh();
       }
-    });
+    }));
   } catch {
     // ignore
-    return null;
   }
+
+  // Watch .rex/prd_tree/ recursively for folder-tree changes
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
+  if (existsSync(treeRoot)) {
+    try {
+      watchers.push(watch(treeRoot, { recursive: true }, () => {
+        debouncedRefresh();
+      }));
+    } catch {
+      // fs.watch recursive may not be supported on every platform — non-fatal
+    }
+  }
+
+  return watchers;
 }
 
 function registerHenchWatcher(
@@ -391,8 +446,9 @@ function registerWatchers(
   const watchers: FSWatcher[] = [];
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) watchers.push(sv);
-  const rex = registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws);
-  if (rex) watchers.push(rex);
+  for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
+    watchers.push(w);
+  }
   const hench = registerHenchWatcher(ctx.scope, henchRunsDir, ws);
   if (hench) watchers.push(hench);
   const dev = registerDevViewerWatcher(ctx.dev, viewerPath, watcher, ws);
@@ -749,10 +805,10 @@ export async function startServer(
       // ── Generate ephemeral PRD JSON cache ──────────────────────────────
       // `.rex/.cache/prd.json` is the fast-path read target for all web
       // route handlers while the server is running. It is regenerated here
-      // at boot and refreshed by the prd.md file watcher on every change.
-      // The `.cache/` directory is removed on shutdown.
+      // at boot and refreshed by the rex watcher on every change. The
+      // `.cache/` directory is removed on shutdown.
       if (isInScope(scope, "rex") && existsSync(rexDir)) {
-        refreshPRDCache(rexDir);
+        await refreshPRDCache(rexDir);
       }
 
       logStartup(actualPort, ctx, watcherHandles.henchRunsDir);

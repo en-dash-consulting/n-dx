@@ -1,0 +1,45 @@
+---
+id: "982777ca-fa74-4b7a-ae46-5c4329cf8ace"
+level: "task"
+title: "Render branch badges on PRD tree rows and add branch filter to toolbar"
+status: "completed"
+priority: "high"
+tags:
+  - "web"
+  - "ui"
+  - "dashboard"
+  - "preact"
+source: "smart-add"
+startedAt: "2026-04-24T20:33:05.022Z"
+completedAt: "2026-04-24T20:41:18.610Z"
+resolutionType: "code-change"
+resolutionDetail: "Added branch badge to tree rows and branch filter dropdown to toolbar, with URL-persisted filter state."
+acceptanceCriteria:
+  - "Each tree row renders a visually distinct badge showing the branch name when the item has `branch` set"
+  - "Items without `branch` attribution show no badge and no empty placeholder"
+  - "Hovering or clicking the branch badge shows a tooltip with the full `sourceFile` path"
+  - "Branch badges are visually distinct from existing status badges (color, shape, or prefix)"
+  - "A branch filter dropdown appears in the PRD tree toolbar only when items from more than one branch are present in the loaded data"
+  - "Selecting a branch in the filter hides items whose `branch` does not match; selecting 'All' restores the full tree"
+  - "Filter state is preserved through same-session navigation (e.g., switching tabs and returning)"
+  - "No visual regression on tree rows that have no attribution data"
+description: "Display a compact branch badge on each PRD tree row (epic, feature, task, subtask) when `branch` is set, and add a branch filter control to the tree toolbar so users can focus the view on items belonging to a specific branch. Items without attribution display no badge. The filter should be unobtrusive when only one branch is present."
+---
+
+# Render branch badges on PRD tree rows and add branch filter to toolbar
+
+🟠 [completed]
+
+## Summary
+
+Display a compact branch badge on each PRD tree row (epic, feature, task, subtask) when `branch` is set, and add a branch filter control to the tree toolbar so users can focus the view on items belonging to a specific branch. Items without attribution display no badge. The filter should be unobtrusive when only one branch is present.
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Tags:** web, ui, dashboard, preact
+- **Level:** task
+- **Started:** 2026-04-24T20:33:05.022Z
+- **Completed:** 2026-04-24T20:41:18.610Z
+- **Duration:** 8m

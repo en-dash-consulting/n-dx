@@ -111,3 +111,6 @@ export type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";
 
 // ---- Rex Markdown serializer / parser (used by prd-io cache) ----------------
 export { serializeDocument, parseDocument } from "@n-dx/rex";
+
+// ---- Rex folder-tree parser (used by prd-io cache) --------------------------
+export { parseFolderTree } from "@n-dx/rex";

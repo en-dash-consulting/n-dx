@@ -1,0 +1,43 @@
+---
+id: "5446296c-cb9c-4442-9640-cdc551e2343a"
+level: "task"
+title: "Design and document the folder index.md summary schema"
+status: "completed"
+priority: "high"
+tags:
+  - "rex"
+  - "prd"
+  - "schema"
+  - "docs"
+source: "smart-add"
+startedAt: "2026-04-30T01:27:36.642Z"
+completedAt: "2026-04-30T01:30:51.594Z"
+endedAt: "2026-04-30T01:30:51.594Z"
+resolutionType: "code-change"
+resolutionDetail: "Designed and documented the complete index.md summary schema with sections for item display, summary (preserved), progress, commits, changes, and info. Documented regeneration semantics with decision matrix explaining why Summary is preserved while others are regenerated. Included annotated examples for epic, feature, and task folders. Added Regeneration Semantics Matrix and updated Serializer/Parser contracts. Added Related Documentation section linking to CLAUDE.md and AGENTS.md."
+acceptanceCriteria:
+  - "Schema document covers every section with field names, source of truth, and regeneration semantics"
+  - "Annotated example index.md included for an epic, a feature, and a task folder"
+  - "Decision recorded for each section as `regenerated` (overwritten on every write) or `preserved` (round-trip-safe across regeneration)"
+  - "Schema reviewed against existing PRDStore data model — every field has a backing source"
+  - "Linked from CLAUDE.md and AGENTS.md sections that describe folder-tree storage"
+description: "Specify the exact sections, headings, and ordering for the new `index.md` summary file: header block with item identity, completion table (child slug, title, status, last-updated), per-task commit list, prose summary block (sourced from the item description or hench-generated), change list (recent edits), and basic info (priority, tags, branch attribution, dates). Document the schema in `docs/architecture/prd-folder-tree-schema.md` with an annotated example. Decide whether the prose summary is human-edited or fully regenerated."
+---
+
+# Design and document the folder index.md summary schema
+
+🟠 [completed]
+
+## Summary
+
+Specify the exact sections, headings, and ordering for the new `index.md` summary file: header block with item identity, completion table (child slug, title, status, last-updated), per-task commit list, prose summary block (sourced from the item description or hench-generated), change list (recent edits), and basic info (priority, tags, branch attribution, dates). Document the schema in `docs/architecture/prd-folder-tree-schema.md` with an annotated example. Decide whether the prose summary is human-edited or fully regenerated.
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Tags:** rex, prd, schema, docs
+- **Level:** task
+- **Started:** 2026-04-30T01:27:36.642Z
+- **Completed:** 2026-04-30T01:30:51.594Z
+- **Duration:** 3m

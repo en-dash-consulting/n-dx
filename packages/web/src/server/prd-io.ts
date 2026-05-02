@@ -32,7 +32,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { PRDDocument } from "./rex-gateway.js";
-import { SCHEMA_VERSION, isCompatibleSchema, serializeDocument, parseDocument } from "./rex-gateway.js";
+import { SCHEMA_VERSION, isCompatibleSchema, serializeDocument, parseDocument, PRD_TREE_DIRNAME } from "./rex-gateway.js";
 
 /** Primary Markdown PRD file. */
 const PRD_MD_FILENAME = "prd.md";
@@ -68,8 +68,24 @@ export function discoverMarkdownPRDFiles(rexDir: string): string[] {
   }
 }
 
-/** Check whether a readable PRD exists (Markdown primary, legacy JSON fallback). */
+/** Check whether a readable PRD exists (folder tree primary, Markdown + legacy JSON fallback). */
 export function prdExists(rexDir: string): boolean {
+  // Primary: folder-tree backend (.rex/prd_tree/)
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
+  if (existsSync(treeRoot)) {
+    try {
+      // Treat the tree as present only when it actually contains items
+      // (an empty directory shouldn't fool the data manifest).
+      if (readdirSync(treeRoot).some((name) => !name.startsWith("."))) {
+        return true;
+      }
+    } catch {
+      // Fall through
+    }
+  }
+  // Cache fallback (server-generated)
+  if (existsSync(join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON))) return true;
+  // Legacy Markdown
   if (existsSync(prdMdPath(rexDir))) return true;
   // Legacy fallback: accept prd.json written by older code or REST routes
   return existsSync(join(rexDir, "prd.json"));
@@ -169,6 +185,10 @@ export function prdPath(rexDir: string): string {
 export function prdMaxMtimeMs(rexDir: string): number {
   let max = 0;
 
+  // Walk folder-tree (primary)
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
+  max = Math.max(max, walkMaxMtimeMs(treeRoot));
+
   // Stat primary prd.md
   try {
     const mtime = statSync(prdMdPath(rexDir)).mtimeMs;
@@ -195,5 +215,38 @@ export function prdMaxMtimeMs(rexDir: string): number {
     // File absent — skip
   }
 
+  return max;
+}
+
+/** Recursively scan `dir` for the latest mtime across files and directories. */
+function walkMaxMtimeMs(dir: string): number {
+  let max = 0;
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return 0;
+  }
+  try {
+    const dirMtime = statSync(dir).mtimeMs;
+    if (dirMtime > max) max = dirMtime;
+  } catch {
+    // ignore
+  }
+  for (const name of entries) {
+    const full = join(dir, name);
+    let info;
+    try {
+      info = statSync(full);
+    } catch {
+      continue;
+    }
+    if (info.isDirectory()) {
+      const sub = walkMaxMtimeMs(full);
+      if (sub > max) max = sub;
+    } else if (info.mtimeMs > max) {
+      max = info.mtimeMs;
+    }
+  }
   return max;
 }

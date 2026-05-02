@@ -1,0 +1,46 @@
+---
+id: "ac656b7b-240c-45c4-b07f-5f6e8583daf9"
+level: "task"
+title: "Integrate quota log output into hench run console with quiet/JSON suppression"
+status: "completed"
+priority: "high"
+tags:
+  - "llm"
+  - "quota"
+  - "cli"
+  - "hench"
+  - "codex"
+source: "smart-add"
+startedAt: "2026-04-08T18:15:31.162Z"
+completedAt: "2026-04-08T18:29:09.274Z"
+acceptanceCriteria:
+  - "Log line is printed after each run showing remaining quota per provider/model"
+  - "Log line is suppressed when `--quiet` flag is active"
+  - "Log line is suppressed when output format is JSON"
+  - "No log line is emitted if quota data is unavailable (graceful omission)"
+  - "Integration test verifies the yellow and red thresholds trigger at correct boundaries through the full output path"
+  - "After each completed hench run, the quota percent-remaining line is printed to stdout before the next run begins"
+  - "Output is suppressed when --quiet or --format=json flags are active"
+  - "If the Codex quota fetch fails, the inter-run line prints a degraded indicator (e.g. 'quota: unavailable') rather than crashing the loop"
+  - "An integration test verifies the quota line appears in normal mode and is absent in quiet/JSON modes"
+  - "No quota fetch is attempted when the active vendor is not Codex"
+description: "Connect the Codex quota fetch result to the existing ANSI color-coded quota log formatter and integrate the formatted line into the hench run loop at the inter-run boundary. The output should be suppressed in quiet mode and omitted from structured JSON output, consistent with the suppression contract documented in the existing 'Integrate quota log output' task. This task covers the wiring layer only — the formatter and fetch adapter are handled by sibling tasks."
+---
+
+# Integrate quota log output into hench run console with quiet/JSON suppression
+
+🟠 [completed]
+
+## Summary
+
+Connect the Codex quota fetch result to the existing ANSI color-coded quota log formatter and integrate the formatted line into the hench run loop at the inter-run boundary. The output should be suppressed in quiet mode and omitted from structured JSON output, consistent with the suppression contract documented in the existing 'Integrate quota log output' task. This task covers the wiring layer only — the formatter and fetch adapter are handled by sibling tasks.
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Tags:** llm, quota, cli, hench, codex
+- **Level:** task
+- **Started:** 2026-04-08T18:15:31.162Z
+- **Completed:** 2026-04-08T18:29:09.274Z
+- **Duration:** 13m

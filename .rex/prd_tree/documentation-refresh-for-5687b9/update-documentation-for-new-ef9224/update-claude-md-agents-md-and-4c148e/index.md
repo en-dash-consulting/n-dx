@@ -1,0 +1,47 @@
+---
+id: "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae"
+level: "task"
+title: "Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend"
+status: "completed"
+priority: "high"
+tags:
+  - "documentation"
+  - "assistant-instructions"
+  - "docs"
+  - "rex"
+source: "smart-add"
+startedAt: "2026-04-23T02:51:02.824Z"
+completedAt: "2026-04-24T15:41:44.804Z"
+acceptanceCriteria:
+  - "assistant-assets/project-guidance.md updated with multi-file PRD layout and branch-scoping behavior"
+  - "claude-addendum.md updated if any Claude-specific deep sections reference PRD file layout"
+  - "CLAUDE.md Key Files table reflects actual .rex/ directory contents under multi-file format"
+  - "AGENTS.md regenerated from updated source and contains the same PRD-structure updates"
+  - "MCP concurrency contract section mentions multi-file write implications if applicable"
+  - "ndx init regeneration verified to produce no unexpected diffs beyond the intended updates"
+  - "CLAUDE.md Key Files table lists .rex/prd.md as primary PRD storage; .rex/prd.json entry notes it is a sync artifact"
+  - "AGENTS.md Key Files table updated consistently with CLAUDE.md"
+  - "Concurrency contract table rows that reference .rex/prd.json are updated to .rex/prd.md"
+  - "MCP write tools documentation notes that mutations write to prd.md (with prd.json as secondary sync)"
+  - "assistant-assets/project-guidance.md updated so ndx init regenerates correct instruction files"
+  - "No remaining documentation references prd.json as the sole or primary PRD storage location"
+description: "Update CLAUDE.md and AGENTS.md (plus their shared source assistant-assets/project-guidance.md and claude-addendum.md) so assistant instructions reflect the multi-file branch-scoped PRD layout, the .rex/ directory structure under the new format, and the MCP concurrency rules as they apply to multi-file writes. Ensure the 'Key Files' table and any PRD-related examples are current. Regenerate AGENTS.md and CLAUDE.md via ndx init after editing the assistant-assets source so both stay in sync."
+---
+
+# Update CLAUDE.md, AGENTS.md, and assistant-assets for new PRD backend
+
+🟠 [completed]
+
+## Summary
+
+Update CLAUDE.md and AGENTS.md (plus their shared source assistant-assets/project-guidance.md and claude-addendum.md) so assistant instructions reflect the multi-file branch-scoped PRD layout, the .rex/ directory structure under the new format, and the MCP concurrency rules as they apply to multi-file writes. Ensure the 'Key Files' table and any PRD-related examples are current. Regenerate AGENTS.md and CLAUDE.md via ndx init after editing the assistant-assets source so both stay in sync.
+
+## Info
+
+- **Status:** completed
+- **Priority:** high
+- **Tags:** documentation, assistant-instructions, docs, rex
+- **Level:** task
+- **Started:** 2026-04-23T02:51:02.824Z
+- **Completed:** 2026-04-24T15:41:44.804Z
+- **Duration:** 1d 12h 50m
