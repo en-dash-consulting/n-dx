@@ -34,11 +34,11 @@ const {
   loadCleanupConfig,
   DEFAULT_CLEANUP_INTERVAL_MS,
 } = await import(
-  "../../packages/web/dist/server/usage-cleanup-scheduler.js"
+  "../../packages/web/dist/server/task-usage/usage-cleanup-scheduler.js"
 );
 
 const { registerUsageScheduler } = await import(
-  "../../packages/web/dist/server/register-scheduler.js"
+  "../../packages/web/dist/server/task-usage/register-scheduler.js"
 );
 
 // Import collectAllIds from rex to verify the cross-package data flow
