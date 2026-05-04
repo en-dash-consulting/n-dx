@@ -1,5 +1,15 @@
 # @n-dx/hench
 
+## 0.3.2
+
+### Patch Changes
+
+- [#186](https://github.com/en-dash-consulting/n-dx/pull/186) [`015b06a`](https://github.com/en-dash-consulting/n-dx/commit/015b06ad9fde134cee0f9a45e4fb310fa7a5fddd) Thanks [@endash-shal](https://github.com/endash-shal)! - new PRD structure and smaller fixes
+
+- Updated dependencies [[`015b06a`](https://github.com/en-dash-consulting/n-dx/commit/015b06ad9fde134cee0f9a45e4fb310fa7a5fddd)]:
+  - @n-dx/rex@0.3.2
+  - @n-dx/llm-client@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes
