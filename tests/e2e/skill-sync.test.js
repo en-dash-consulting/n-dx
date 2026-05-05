@@ -22,7 +22,7 @@ const ROOT = join(import.meta.dirname, "../..");
  * Skills are stored as flat <name>.md files (e.g., ndx-plan.md).
  */
 function listSkillFiles() {
-  const skillsDir = join(ROOT, "assistant-assets", "skills");
+  const skillsDir = join(ROOT, "packages/core/assistant-assets", "skills");
   if (!existsSync(skillsDir)) return [];
   return readdirSync(skillsDir, { withFileTypes: true })
     .filter((d) => d.isFile() && d.name.endsWith(".md"))

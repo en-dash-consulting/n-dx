@@ -42,6 +42,7 @@
     "sv": "./bin/sourcevision.js"
   },
   "files": [
+    "assistant-assets/",
     "bin/",
     "cli.js",
     "cli-brand.js",

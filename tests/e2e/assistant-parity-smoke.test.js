@@ -228,7 +228,7 @@ describe("startup banner uses vendor-neutral MCP framing", () => {
 
 describe("project guidance uses assistant-neutral language", () => {
   const guidanceSrc = readFileSync(
-    join(ROOT, "assistant-assets/project-guidance.md"),
+    join(ROOT, "packages/core/assistant-assets/project-guidance.md"),
     "utf-8",
   );
 
@@ -305,7 +305,7 @@ describe("help definitions use vendor-neutral language", () => {
 describe("Claude-only wording regression guard", () => {
   it("project-guidance.md does not use 'calls Claude API or CLI' for hench", () => {
     const src = readFileSync(
-      join(ROOT, "assistant-assets/project-guidance.md"),
+      join(ROOT, "packages/core/assistant-assets/project-guidance.md"),
       "utf-8",
     );
     expect(src).not.toContain("calls Claude API or CLI");

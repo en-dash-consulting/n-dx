@@ -15,7 +15,8 @@ import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const ASSET_DIR = resolve(__dir, "../../assistant-assets");
+// Colocated with this module so the directory ships inside the published tarball.
+const ASSET_DIR = resolve(__dir, "assistant-assets");
 
 // ── Manifest ─────────────────────────────────────────────────────────────────
 
