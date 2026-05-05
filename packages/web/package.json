@@ -40,7 +40,7 @@
     "prepare": "pnpm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@n-dx/llm-client": "workspace:*",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",

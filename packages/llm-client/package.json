@@ -32,7 +32,7 @@
     "prepare": "pnpm run build"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.85.0"
+    "@anthropic-ai/sdk": "^0.94.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

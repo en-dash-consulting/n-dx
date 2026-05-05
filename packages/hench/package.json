@@ -35,7 +35,7 @@
     "prepare": "pnpm run build"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.85.0",
+    "@anthropic-ai/sdk": "^0.94.0",
     "@n-dx/llm-client": "workspace:*",
     "@n-dx/rex": "workspace:*",
     "zod": "^3.22.0"

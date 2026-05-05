@@ -35,7 +35,7 @@
     "prepare": "pnpm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@n-dx/llm-client": "workspace:*",
     "ora": "^8.0.1",
     "zod": "^3.22.0"

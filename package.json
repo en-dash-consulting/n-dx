@@ -34,7 +34,20 @@
     "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.30.0",
     "vitepress": "^1.6.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "picomatch@<2.3.2": "^2.3.2",
+      "picomatch@>=4.0.0 <4.0.4": "^4.0.4",
+      "postcss": "^8.5.10",
+      "hono": "^4.12.14",
+      "@hono/node-server": "^1.19.13",
+      "ajv@>=7.0.0-alpha.0 <8.18.0": "^8.18.0",
+      "path-to-regexp@>=8.0.0 <8.4.0": "^8.4.0",
+      "qs@>=6.7.0 <6.14.2": "^6.14.2",
+      "vite@>=7.0.0 <7.3.2": "^7.3.2"
+    }
   },
   "packageManager": "pnpm@10.33.0"
 }
