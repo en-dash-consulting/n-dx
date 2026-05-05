@@ -36,7 +36,7 @@ describe("web server shared types boundary", () => {
 
   it("register-scheduler exports the facade function", async () => {
     const mod = await import(
-      "../../packages/web/dist/server/register-scheduler.js"
+      "../../packages/web/dist/server/task-usage/register-scheduler.js"
     );
 
     expect(typeof mod.registerUsageScheduler).toBe("function");
@@ -44,7 +44,7 @@ describe("web server shared types boundary", () => {
 
   it("usage-cleanup-scheduler exports core functions", async () => {
     const mod = await import(
-      "../../packages/web/dist/server/usage-cleanup-scheduler.js"
+      "../../packages/web/dist/server/task-usage/usage-cleanup-scheduler.js"
     );
 
     expect(typeof mod.startUsageCleanupScheduler).toBe("function");
@@ -84,7 +84,7 @@ describe("web → rex gateway contract", () => {
 describe("cleanup data flow type compatibility", () => {
   it("identifyOrphanedEntries produces OrphanedEntry-compatible objects", async () => {
     const { identifyOrphanedEntries } = await import(
-      "../../packages/web/dist/server/usage-cleanup-scheduler.js"
+      "../../packages/web/dist/server/task-usage/usage-cleanup-scheduler.js"
     );
 
     const taskUsage = {
@@ -103,7 +103,7 @@ describe("cleanup data flow type compatibility", () => {
 
   it("DEFAULT_CLEANUP_INTERVAL_MS is 7 days in milliseconds", async () => {
     const { DEFAULT_CLEANUP_INTERVAL_MS } = await import(
-      "../../packages/web/dist/server/usage-cleanup-scheduler.js"
+      "../../packages/web/dist/server/task-usage/usage-cleanup-scheduler.js"
     );
 
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
