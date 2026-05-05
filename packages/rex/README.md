@@ -9,7 +9,11 @@ PRD management and implementation workflow CLI. Rex maintains a structured produ
 ## Install
 
 ```bash
+npm install -g @n-dx/core
+# or
 pnpm add -g @n-dx/core
+# or
+yarn global add @n-dx/core
 ```
 
 ## Quick start

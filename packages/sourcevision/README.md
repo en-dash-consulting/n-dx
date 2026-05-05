@@ -9,7 +9,9 @@ Codebase analysis tool that produces structured, git-friendly JSON output descri
 ## Quick Start
 
 ```bash
-npm i -g sourcevision
+# Install @n-dx/core — it bundles sourcevision and registers the `sourcevision` / `sv` binaries
+npm install -g @n-dx/core      # or: pnpm add -g @n-dx/core / yarn global add @n-dx/core
+
 sourcevision analyze
 sourcevision serve
 ```

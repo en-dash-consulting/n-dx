@@ -16,7 +16,14 @@ This guide assumes a **new or empty project**. If you're adding ndx to a codebas
 ## 1. Install
 
 ```sh
+# npm
+npm install -g @n-dx/core
+
+# pnpm
 pnpm add -g @n-dx/core
+
+# yarn
+yarn global add @n-dx/core
 ```
 
 ## 2. Initialize
@@ -24,12 +31,18 @@ pnpm add -g @n-dx/core
 Navigate to your project and run:
 
 ```sh
-ndx init .
+ndx init
 ```
+
+You'll first be asked to choose an **LLM provider** (Claude or Codex):
+
+![choose LLM provider prompt](../../documentation/ndx_choose_vendor_init.png)
+
+Then you'll pick a **model** for that provider, after which init runs to completion:
 
 ![init local response example](../../documentation/ndx_init.png)
 
-You'll be asked to choose an LLM provider (Claude or Codex). The init command sets up everything — analysis metadata, PRD storage, agent configuration, and assistant-specific artifacts:
+The init command sets up everything — analysis metadata, PRD storage, agent configuration, and assistant-specific artifacts:
 
 - **Claude**: `CLAUDE.md`, `.claude/skills/`, `.claude/settings.local.json`, MCP server registration
 - **Codex**: `AGENTS.md`, `.agents/skills/`, `.codex/config.toml`
@@ -43,18 +56,24 @@ Running `ndx init` again is safe. It detects existing assistant surfaces and reu
 ## 3. Add to the PRD
 
 ```sh
-ndx add "<add what you want create>"
+ndx add "<describe what you want to create>"
 ```
 
 ![ndx add #1](../../documentation/ndx_add_1.png)
 ![ndx add #2](../../documentation/ndx_add_2.png)
 
-This scans your project: file inventory, import graph, architectural zones, React components. Results are written to `.sourcevision/` and used by subsequent commands.
+`ndx add` takes your natural-language description, asks the configured LLM to draft a PRD proposal (epics → features → tasks), and prints it for review. At the bottom you'll see:
 
-## 4. work on the PRD
+```
+accept proposals? (y=all / n=none / b#=break down / c=consolidate / 1,2,…=select)
+```
+
+Press `y` to accept everything into `.rex/prd_tree/`, or pick specific items.
+
+## 4. Work on the PRD
 
 ```sh
-ndx work --auto .
+ndx work --auto
 ```
 
 ![ndx work example](../../documentation/ndx_work.png)
@@ -64,7 +83,7 @@ The agent picks the highest-priority pending task, builds a brief with codebase 
 ## 5. Check progress
 
 ```sh
-ndx status .
+ndx status
 ```
 
 ![ndx status example](../../documentation/ndx_status.png)
@@ -76,7 +95,7 @@ You'll see a tree of epics, features, and tasks with completion stats.
 Check how your PRD has been implemented:
 
 ```sh
-ndx analyze .
+ndx analyze
 ```
 
 ![ndx analyze example](../../documentation/ndx_analyze.png)
@@ -84,7 +103,7 @@ ndx analyze .
 Analyze writes only to `.sourcevision/` — file inventory, import graph, zones, findings. No PRD changes yet. Then read what it found:
 
 ```sh
-ndx recommend --actionable-only .
+ndx recommend --actionable-only
 ```
 
 ![ndx analyze example](../../documentation/ndx_reccomend_1.png)
@@ -94,10 +113,10 @@ Skim `.sourcevision/CONTEXT.md` for the AI-readable summary, and use the recomme
 ## 7. Start the dashboard
 
 ```sh
-ndx start .
+ndx start
 ```
 
-![ndx analyze example](../../documentation/ndx_start.png)
+![ndx start example](../../documentation/ndx_start.png)
 
 Opens a web dashboard at `http://localhost:3117` with interactive views of your codebase analysis, PRD tree, and agent runs.
 

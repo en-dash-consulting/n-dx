@@ -8,7 +8,14 @@
 ## Installation
 
 ```sh
+# npm
+npm install -g @n-dx/core
+
+# pnpm
 pnpm add -g @n-dx/core
+
+# yarn
+yarn global add @n-dx/core
 ```
 
 After installing, `ndx` (or `n-dx`) is available as the primary command. See the [Quickstart](./quickstart) for a 5-minute walkthrough. To build from source, see [Contributing](https://github.com/en-dash-consulting/n-dx#contributing).

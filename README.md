@@ -73,11 +73,21 @@ See [`.local_testing/README.md`](.local_testing/) for advanced usage:
 
 ## Quick Start
 
-**Prerequisites:** Node.js ≥ 18 (22 LTS recommended) and pnpm ≥ 10.
+**Prerequisites:** Node.js ≥ 18 (22 LTS recommended).
+
+Install with whichever package manager you use:
 
 ```sh
-pnpm add -g @n-dx/core      # install from npm
+npm install -g @n-dx/core
+# or
+pnpm add -g @n-dx/core
+# or
+yarn global add @n-dx/core
+```
 
+Then run:
+
+```sh
 ndx init .                  # initialize project (.sourcevision/.rex/.hench)
 ndx config llm.vendor claude .
 
