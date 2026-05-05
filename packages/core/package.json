@@ -64,6 +64,7 @@
     "child-lifecycle.js",
     "cli-timeout.js",
     "update-check.js",
+    "pair-programming.js",
     "stale-check.js"
   ],
   "scripts": {
