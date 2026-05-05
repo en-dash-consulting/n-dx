@@ -283,16 +283,27 @@ function timed<T>(fn: () => T): [T, number] {
   return [result, elapsed];
 }
 
-/** Run fn N times and return the median elapsed time in ms. */
+/**
+ * Run fn many times and return the median per-call elapsed time in ms.
+ *
+ * Iterations are batched inside each timed block: sub-millisecond calls
+ * have per-sample noise (OS scheduling, JIT, GC) comparable to the work
+ * itself, so timing individual calls makes the median wobble enough to
+ * flake the linear-scaling ratio assertions. Batching amortizes that
+ * noise across many runs and keeps each measurement in a range
+ * `performance.now()` can resolve cleanly.
+ */
 function timedMedian(fn: () => void, iterations = 20): number {
-  // Warmup
-  fn();
-  fn();
+  // Warmup — let JIT settle.
+  for (let i = 0; i < 3; i++) fn();
+
+  const BATCHES = 7;
+  const ITERS_PER_BATCH = Math.max(iterations, 50);
   const times: number[] = [];
-  for (let i = 0; i < iterations; i++) {
+  for (let b = 0; b < BATCHES; b++) {
     const start = performance.now();
-    fn();
-    times.push(performance.now() - start);
+    for (let i = 0; i < ITERS_PER_BATCH; i++) fn();
+    times.push((performance.now() - start) / ITERS_PER_BATCH);
   }
   times.sort((a, b) => a - b);
   return times[Math.floor(times.length / 2)];
