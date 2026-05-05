@@ -1,5 +1,16 @@
 # @n-dx/web
 
+## 0.3.3
+
+### Patch Changes
+
+- [#193](https://github.com/en-dash-consulting/n-dx/pull/193) [`700f356`](https://github.com/en-dash-consulting/n-dx/commit/700f356b146864e2aacafd9f0cace42a7942add8) Thanks [@en-drza](https://github.com/en-drza)! - Fix broken external links in the landing page. GitHub links pointed to the old `endash/n-dx` org handle (now `en-dash-consulting/n-dx`) and the npm link pointed to the old unscoped `n-dx` package (now `@n-dx/core`). Updated all six occurrences including the inline security manifest comment.
+
+- Updated dependencies []:
+  - @n-dx/rex@0.3.3
+  - @n-dx/sourcevision@0.3.3
+  - @n-dx/llm-client@0.3.3
+
 ## 0.3.2
 
 ### Patch Changes
