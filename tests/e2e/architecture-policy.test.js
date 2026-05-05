@@ -409,7 +409,7 @@ const CYCLE_EXEMPT_ZONE_TYPES = new Set(["test", "infrastructure"]);
 const CYCLE_EXCEPTIONS = new Map([
   ["incremental", "Small incremental analysis cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
   ["mcp", "Rex MCP tools cluster; cycles with the duplicate-named 'web' zone (first file in rex package) making intra-rex edges appear cross-package to the cycle detector."],
-  ["refresh", "Small viewer refresh-throttle cluster in packages/web/; all observed cycle edges (refresh → web and web → refresh) are intra-packages/web imports, but the multi-package 'web' Louvain zone's first file is in packages/rex so packageFamily('web') resolves to 'rex', making these intra-package edges appear cross-package to the cycle detector."],
+  ["refresh-throttle-pipeline", "Small viewer refresh-throttle cluster in packages/web/; all observed cycle edges (refresh-throttle-pipeline → web and web → refresh-throttle-pipeline) are intra-packages/web imports, but the multi-package 'web' Louvain zone's first file is in packages/rex so packageFamily('web') resolves to 'rex', making these intra-package edges appear cross-package to the cycle detector."],
   ["rex-core", "Small rex core cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason — both zones are in the rex package."],
   ["rex-recommend", "Small rex recommendation cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["rex-store", "Rex store/persistence cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
