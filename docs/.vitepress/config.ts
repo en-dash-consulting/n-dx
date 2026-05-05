@@ -28,6 +28,7 @@ export default defineConfig({
           text: "Guide",
           items: [
             { text: "Quickstart", link: "/guide/quickstart" },
+            { text: "Existing Project Onboarding", link: "/guide/existing-project" },
             { text: "Getting Started", link: "/guide/getting-started" },
             { text: "Workflow", link: "/guide/workflow" },
             { text: "Commands", link: "/guide/commands" },

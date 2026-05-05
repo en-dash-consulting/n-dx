@@ -1,6 +1,12 @@
 # Quickstart
 
+![En-d-Rex](../../documentation/n-d-rex.png)
+
 Get from zero to a working PRD in under 5 minutes.
+
+::: tip Onboarding an existing repo?
+This guide assumes a **new or empty project**. If you're adding ndx to a codebase that already has real history, see [Existing project onboarding](./existing-project) — it adds a pre-flight cleanup pass and `.gitignore` setup.
+:::
 
 ## Prerequisites
 
@@ -21,6 +27,8 @@ Navigate to your project and run:
 ndx init .
 ```
 
+![init local response example](../../documentation/ndx_init.png)
+
 You'll be asked to choose an LLM provider (Claude or Codex). The init command sets up everything — analysis metadata, PRD storage, agent configuration, and assistant-specific artifacts:
 
 - **Claude**: `CLAUDE.md`, `.claude/skills/`, `.claude/settings.local.json`, MCP server registration
@@ -32,21 +40,26 @@ By default both surfaces are provisioned. Use `--claude-only` or `--codex-only` 
 Running `ndx init` again is safe. It detects existing assistant surfaces and reuses them. If only one assistant's artifacts exist, re-init skips the other unless you explicitly request it.
 :::
 
-## 3. Analyze your codebase
+## 3. Add to the PRD
 
 ```sh
-ndx analyze .
+ndx add "<add what you want create>"
 ```
+
+![ndx add #1](../../documentation/ndx_add_1.png)
+![ndx add #2](../../documentation/ndx_add_2.png)
 
 This scans your project: file inventory, import graph, architectural zones, React components. Results are written to `.sourcevision/` and used by subsequent commands.
 
-## 4. Generate a PRD
+## 4. work on the PRD
 
 ```sh
-ndx plan --accept .
+ndx work --auto .
 ```
 
-This runs the analysis and generates PRD proposals based on findings — anti-patterns, missing features, architectural gaps. The `--accept` flag adds them to your PRD automatically. Without it, you'll review proposals interactively.
+![ndx work example](../../documentation/ndx_work.png)
+
+The agent picks the highest-priority pending task, builds a brief with codebase context, runs an LLM tool-use loop to implement it, and records the results.
 
 ## 5. Check progress
 
@@ -54,21 +67,37 @@ This runs the analysis and generates PRD proposals based on findings — anti-pa
 ndx status .
 ```
 
+![ndx status example](../../documentation/ndx_status.png)
+
 You'll see a tree of epics, features, and tasks with completion stats.
 
-## 6. Execute a task
+## 6. Analyze your changes (optional)
+
+Check how your PRD has been implemented:
 
 ```sh
-ndx work --auto .
+ndx analyze .
 ```
 
-The agent picks the highest-priority pending task, builds a brief with codebase context, runs an LLM tool-use loop to implement it, and records the results.
+![ndx analyze example](../../documentation/ndx_analyze.png)
+
+Analyze writes only to `.sourcevision/` — file inventory, import graph, zones, findings. No PRD changes yet. Then read what it found:
+
+```sh
+ndx recommend --actionable-only .
+```
+
+![ndx analyze example](../../documentation/ndx_reccomend_1.png)
+
+Skim `.sourcevision/CONTEXT.md` for the AI-readable summary, and use the recommend output to see what ndx thinks needs work. The goal here is a mental model — you don't need to act on anything yet.
 
 ## 7. Start the dashboard
 
 ```sh
 ndx start .
 ```
+
+![ndx analyze example](../../documentation/ndx_start.png)
 
 Opens a web dashboard at `http://localhost:3117` with interactive views of your codebase analysis, PRD tree, and agent runs.
 
