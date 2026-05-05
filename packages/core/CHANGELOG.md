@@ -1,5 +1,16 @@
 # @n-dx/core
 
+## 0.3.3
+
+### Patch Changes
+
+- Updated dependencies [[`700f356`](https://github.com/en-dash-consulting/n-dx/commit/700f356b146864e2aacafd9f0cace42a7942add8)]:
+  - @n-dx/web@0.3.3
+  - @n-dx/rex@0.3.3
+  - @n-dx/hench@0.3.3
+  - @n-dx/sourcevision@0.3.3
+  - @n-dx/llm-client@0.3.3
+
 ## 0.3.2
 
 ### Patch Changes

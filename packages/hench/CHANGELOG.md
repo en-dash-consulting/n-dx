@@ -1,5 +1,13 @@
 # @n-dx/hench
 
+## 0.3.3
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @n-dx/rex@0.3.3
+  - @n-dx/llm-client@0.3.3
+
 ## 0.3.2
 
 ### Patch Changes
