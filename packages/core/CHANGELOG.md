@@ -1,5 +1,20 @@
 # @n-dx/core
 
+## 0.3.3
+
+### Patch Changes
+
+- [#194](https://github.com/en-dash-consulting/n-dx/pull/194) [`e1dbec6`](https://github.com/en-dash-consulting/n-dx/commit/e1dbec68bd350dc15293fbf473b0c285a09c4f04) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix `ndx` crashing on launch with `ERR_MODULE_NOT_FOUND: ./pair-programming.js`. The file is now included in the published `@n-dx/core` package's `files` array; previously `cli.js` imported a file that was excluded from the tarball.
+
+  Docs: add an **Existing project onboarding** guide for adopting ndx into a repo with real history, expand the **Quickstart** with screenshots of `ndx init` / `analyze` / `plan` / `status` / `work`, and add a `@n-dx/core` package README so the npm landing page is no longer empty.
+
+- Updated dependencies [[`700f356`](https://github.com/en-dash-consulting/n-dx/commit/700f356b146864e2aacafd9f0cace42a7942add8)]:
+  - @n-dx/web@0.3.3
+  - @n-dx/rex@0.3.3
+  - @n-dx/hench@0.3.3
+  - @n-dx/sourcevision@0.3.3
+  - @n-dx/llm-client@0.3.3
+
 ## 0.3.2
 
 ### Patch Changes
