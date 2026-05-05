@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/core",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publishConfig": {
     "access": "public"
   },
@@ -64,6 +64,7 @@
     "child-lifecycle.js",
     "cli-timeout.js",
     "update-check.js",
+    "pair-programming.js",
     "stale-check.js"
   ],
   "scripts": {
