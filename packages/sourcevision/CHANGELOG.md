@@ -1,5 +1,16 @@
 # @n-dx/sourcevision
 
+## 0.3.2
+
+### Patch Changes
+
+- [#189](https://github.com/en-dash-consulting/n-dx/pull/189) [`907c5fe`](https://github.com/en-dash-consulting/n-dx/commit/907c5fe8ace0139ab44f323f6a411ed35abb1363) Thanks [@dnaniel](https://github.com/dnaniel)! - Refresh the SourceVision Map experience with cohesive zone/import exploration, remove obsolete Zones navigation, gate PR Markdown behind a feature flag, and dedupe promoted sub-analysis zones.
+
+- [#174](https://github.com/en-dash-consulting/n-dx/pull/174) [`9237f50`](https://github.com/en-dash-consulting/n-dx/commit/9237f509d505659f134f52a9effa6a4f9666fe48) Thanks [@dnaniel](https://github.com/dnaniel)! - Add sourcevision LLM eval harness under `tests/gauntlet/sourcevision-evals/` with fixture projects, golden recording pipeline (`pnpm gauntlet:evals:record`), and gated scoring tests (`pnpm gauntlet:evals`). Enables measured eval-score deltas on future optimization PRs (model swaps, payload reduction, heuristic-first classification).
+
+- Updated dependencies []:
+  - @n-dx/llm-client@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes
