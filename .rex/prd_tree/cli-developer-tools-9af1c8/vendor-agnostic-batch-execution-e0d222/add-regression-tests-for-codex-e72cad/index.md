@@ -2,7 +2,7 @@
 id: "e72caddd-238f-426f-b191-4adec1de560d"
 level: "task"
 title: "Add regression tests for Codex batch execution in the self-heal pipeline"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "self-heal"
@@ -11,6 +11,10 @@ tags:
   - "testing"
 source: "smart-add"
 startedAt: "2026-04-14T21:20:05.017Z"
+completedAt: "2026-05-06T02:43:53.309Z"
+endedAt: "2026-05-06T02:43:53.309Z"
+resolutionType: "code-change"
+resolutionDetail: "Added unit test (self-heal-task-selector.test.ts) with sentinel + tag filter assertions, and integration test (self-heal-tag-scoping.test.ts) with 3 tests covering mixed-PRD scoping, regression guard, and retry-with-scoping. Fixed 4 pre-existing flaky test failures in the web package."
 acceptanceCriteria:
   - "At least one integration test executes a self-heal batch with a Codex mock and asserts a successful result"
   - "At least one test asserts that a Codex parse error triggers retry and eventually continues the loop"
@@ -25,7 +29,7 @@ description: "Cover the hardened scoping with tests that would have caught the o
 
 # Add regression tests for Codex batch execution in the self-heal pipeline
 
-🟠 [in_progress]
+🟠 [completed]
 
 ## Summary
 
@@ -33,8 +37,10 @@ Cover the hardened scoping with tests that would have caught the original leak. 
 
 ## Info
 
-- **Status:** in_progress
+- **Status:** completed
 - **Priority:** high
 - **Tags:** self-heal, codex, hench, testing
 - **Level:** task
 - **Started:** 2026-04-14T21:20:05.017Z
+- **Completed:** 2026-05-06T02:43:53.309Z
+- **Duration:** 21d 5h 23m
