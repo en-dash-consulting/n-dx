@@ -794,7 +794,7 @@ function findBodyStart(text: string): number {
 //   - `>`, `>-`, `>+`, `|`, `|-`, `|+` block scalars (for description fields)
 //   - Block sequences of plain or quoted scalars (for tags, acceptanceCriteria)
 
-function parseFrontmatter(
+export function parseFrontmatter(
   text: string,
   filePath: string,
   warnings: ParseWarning[],

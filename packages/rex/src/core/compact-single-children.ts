@@ -21,6 +21,27 @@
 
 import { readdir, readFile, writeFile, rm, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { parseFrontmatter, type ParseWarning } from "../store/folder-tree-parser.js";
+import { emitYamlField } from "../store/folder-tree-serializer.js";
+
+/**
+ * Parent fields that are structural (not item content) and must not be
+ * embedded as `__parent*` ancestor fields. `children` is reconstructed from
+ * directory nesting; storage/routing fields belong to the runtime, not the
+ * tree.
+ */
+const STRUCTURAL_PARENT_FIELDS = new Set<string>([
+  "children",
+  "branch",
+  "sourceFile",
+  "requirements",
+  "activeIntervals",
+  "mergedProposals",
+  "tokenUsage",
+  "duration",
+  "loeRationale",
+  "loeConfidence",
+]);
 
 /**
  * Result of running the single-child compaction migration.
@@ -180,10 +201,14 @@ async function compactWrapper(
     return;
   }
 
-  // Extract frontmatter from parent's index.md
-  const parentFrontmatter = extractFrontmatter(parentContent);
-  if (!parentFrontmatter) {
-    // No parent metadata found - might be malformed, skip
+  // Parse the parent's frontmatter once via the canonical YAML parser.
+  // This handles block scalars, inline JSON flow mappings, empty arrays,
+  // nested mappings, and any future field shapes — line-based parsing
+  // could not.
+  const parseWarnings: ParseWarning[] = [];
+  const parentFm = parseFrontmatter(parentContent, parentIndexPath, parseWarnings);
+  if (!parentFm) {
+    // No parsable frontmatter — might be malformed, skip
     return;
   }
 
@@ -205,7 +230,7 @@ async function compactWrapper(
     try {
       let childContent = await readFile(childFilePath, "utf-8");
       // Embed parent fields if not already present
-      childContent = embedParentFieldsInMarkdown(childContent, parentFrontmatter);
+      childContent = embedParentFieldsInMarkdown(childContent, parentFm);
       await writeFile(childFilePath, childContent, "utf-8");
     } catch (err) {
       result.errors.push({
@@ -242,29 +267,41 @@ async function compactWrapper(
 }
 
 /**
- * Extract YAML frontmatter from a markdown file.
- * Returns the frontmatter block (excluding the --- delimiters) or null if not found.
- */
-function extractFrontmatter(content: string): string | null {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  return match ? match[1] : null;
-}
-
-/**
  * Embed parent metadata fields into a child's markdown file.
  *
- * If the child already has __parent* fields, returns content unchanged (idempotent).
- * Otherwise, inserts __parent* fields from the parent into the child's frontmatter.
+ * If the child already has any `__parent*` field, returns content unchanged
+ * (idempotent — the child has already been flattened on a previous pass).
  *
- * Handles YAML arrays and nested structures by preserving their formatting.
+ * Otherwise, appends a `__parent*`-prefixed copy of every value-bearing
+ * field from the parsed parent frontmatter to the child's frontmatter,
+ * driven by parsed YAML rather than line-level text manipulation:
+ *
+ *   - The parent's frontmatter is supplied pre-parsed as a `Record`, so
+ *     block scalars, inline JSON flow mappings, empty arrays, and nested
+ *     structures all round-trip correctly.
+ *   - Each field is re-emitted via the same `emitYamlField` helper the
+ *     serializer uses, so the appended lines match the encoding rules
+ *     of the rest of the tree.
+ *   - Keys already starting with `__parent` (an ancestor chain in a
+ *     nested single-child case) get an additional `__parent` prefix to
+ *     preserve the chain. Other keys are camelCased
+ *     (`id` → `__parentId`, `description` → `__parentDescription`).
+ *   - Structural fields (`children` and runtime/storage fields) are
+ *     skipped — they aren't ancestor metadata.
+ *
+ * The child's existing frontmatter text is preserved verbatim; only the
+ * new `__parent*` lines are appended before the closing `---`.
  */
-function embedParentFieldsInMarkdown(childContent: string, parentFrontmatter: string): string {
-  // Check if already has __parent fields (idempotent)
+function embedParentFieldsInMarkdown(
+  childContent: string,
+  parentFm: Record<string, unknown>,
+): string {
+  // Idempotent: any existing __parent* field means this file was already flattened.
   if (childContent.includes("__parent")) {
     return childContent;
   }
 
-  // Find child's frontmatter
+  // Locate the child's frontmatter block.
   const fmMatch = childContent.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) {
     // No frontmatter - shouldn't happen, but return unchanged
@@ -274,55 +311,23 @@ function embedParentFieldsInMarkdown(childContent: string, parentFrontmatter: st
   const childFm = fmMatch[1];
   const afterFm = childContent.substring(fmMatch.index! + fmMatch[0].length);
 
-  // Parse parent frontmatter into lines, handling YAML arrays
-  const parentLines = parseYamlLines(parentFrontmatter);
+  // Re-emit each parent field with a __parent prefix, using the canonical
+  // YAML emitter so arrays, objects, and scalars all encode correctly.
+  const embeddedLines: string[] = [];
+  for (const [key, value] of Object.entries(parentFm)) {
+    if (value === undefined || value === null) continue;
+    if (STRUCTURAL_PARENT_FIELDS.has(key)) continue;
+    const prefixedKey = key.startsWith("__parent")
+      ? `__parent${key}`                                       // ancestor chain: __parentId → __parent__parentId
+      : `__parent${key.charAt(0).toUpperCase()}${key.slice(1)}`; // id → __parentId
+    emitYamlField(embeddedLines, prefixedKey, value);
+  }
 
-  // Add __parent prefix to each parent field, converting keys to camelCase
-  const embeddedLines = parentLines.map((line) => {
-    // For array items (lines starting with "  -"), prefix the parent key with __parent
-    if (line.startsWith("  -")) {
-      return line; // Keep array items as-is (they're part of their parent key)
-    }
-
-    // Parse "key: value" format and add __parent prefix with camelCase key
-    const colonIdx = line.indexOf(":");
-    if (colonIdx === -1) {
-      return `__parent${line}`;
-    }
-
-    const key = line.substring(0, colonIdx).trim();
-    const rest = line.substring(colonIdx);
-    const camelKey = toCamelCaseKey(key);
-    return `__parent${camelKey}${rest}`;
-  });
+  if (embeddedLines.length === 0) {
+    return childContent;
+  }
 
   // Insert embedded lines at the end of child's frontmatter (before the closing ---)
   const updatedFm = `${childFm}${childFm.endsWith("\n") ? "" : "\n"}${embeddedLines.join("\n")}\n`;
-  const newContent = `---\n${updatedFm}---${afterFm}`;
-
-  return newContent;
-}
-
-/**
- * Parse YAML lines from a frontmatter block.
- * Returns an array of lines, handling YAML arrays and nested structures.
- * Skips empty lines and comments.
- */
-function parseYamlLines(frontmatter: string): string[] {
-  return frontmatter
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      return trimmed && !trimmed.startsWith("#");
-    });
-}
-
-/**
- * Convert a YAML key name to its camelCase equivalent.
- * Maps lowercase keys like "id", "status" to "Id", "Status" for __parent prefixing.
- */
-function toCamelCaseKey(yamlKey: string): string {
-  if (yamlKey.length === 0) return yamlKey;
-  // Capitalize first letter (id -> Id, status -> Status)
-  return yamlKey.charAt(0).toUpperCase() + yamlKey.slice(1);
+  return `---\n${updatedFm}---${afterFm}`;
 }

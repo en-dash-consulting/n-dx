@@ -479,8 +479,13 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
   }
 }
 
-/** Emit one YAML key-value line (or block) into `lines`. */
-function emitYamlField(lines: string[], key: string, value: unknown): void {
+/**
+ * Emit one YAML key-value line (or block) into `lines`.
+ *
+ * @public — used by core/compact-single-children to re-emit prefixed parent
+ * fields with the same encoding rules as the rest of the serializer.
+ */
+export function emitYamlField(lines: string[], key: string, value: unknown): void {
   if (Array.isArray(value)) {
     if (value.length === 0) {
       lines.push(`${key}: []`);
