@@ -596,6 +596,17 @@ function validateLLMVendor(value) {
 }
 
 /**
+ * Validate llm.autoFailover.
+ */
+function validateAutoFailover(value) {
+  if (typeof value !== "boolean") {
+    throw new Error(
+      `Invalid autoFailover value. Expected "true" or "false", got "${value}"`,
+    );
+  }
+}
+
+/**
  * Validators for llm.* config keys in .n-dx.json.
  * Keys are setting paths relative to the llm section.
  */
@@ -607,6 +618,7 @@ const LLM_VALIDATORS = {
   "codex.cli_path": validateCodexCliPath,
   "codex.api_endpoint": validateApiEndpoint,
   "codex.model": validateModel,
+  autoFailover: validateAutoFailover,
 };
 
 /**
@@ -967,6 +979,10 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     When set, commands that explicitly opt into the
                                     light tier use this model.
                                     Falls back to gpt-5.4-mini if not set.
+  llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
+                                    When true, hench retries failed runs on fallback models
+                                    before surfacing the original error. Disabled by default
+                                    to preserve existing behavior.
 
 Claude preflight error codes:
   NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED  Claude CLI is not installed; install it before retrying
@@ -1092,6 +1108,8 @@ Examples:
                                                Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
+  n-dx config llm.autoFailover true            Enable automatic model/vendor failover
+  n-dx config llm.autoFailover false           Disable automatic failover
   n-dx config features.rex.showTokenBudget true
                                                Enable token budget display on tasks
   n-dx config language go                      Set primary project language to Go

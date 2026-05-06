@@ -1044,6 +1044,75 @@ describe("n-dx config", () => {
     });
   });
 
+  // ── LLM autoFailover config ────────────────────────────────────────────────
+
+  describe("llm.autoFailover config", () => {
+    it("sets llm.autoFailover to true in .n-dx.json", async () => {
+      const out = run(["llm.autoFailover", "true", tmpDir]);
+      expect(out).toContain("llm.autoFailover = true");
+
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.autoFailover).toBe(true);
+    });
+
+    it("sets llm.autoFailover to false in .n-dx.json", async () => {
+      run(["llm.autoFailover", "true", tmpDir]); // First set to true
+      const out = run(["llm.autoFailover", "false", tmpDir]);
+      expect(out).toContain("llm.autoFailover = false");
+
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.autoFailover).toBe(false);
+    });
+
+    it("gets llm.autoFailover value", async () => {
+      run(["llm.autoFailover", "true", tmpDir]);
+      const out = run(["llm.autoFailover", tmpDir]);
+      expect(out.trim()).toBe("true");
+    });
+
+    it("rejects invalid boolean values", () => {
+      const stderr = runFail(["llm.autoFailover", "yes", tmpDir]);
+      expect(stderr).toContain("Expected \"true\" or \"false\"");
+    });
+
+    it("returns autoFailover in JSON mode", async () => {
+      run(["llm.autoFailover", "true", tmpDir]);
+      const out = run(["llm.autoFailover", "--json", tmpDir]);
+      expect(JSON.parse(out)).toBe(true);
+    });
+
+    it("shows autoFailover in help text", () => {
+      const output = run(["--help"]);
+      expect(output).toContain("llm.autoFailover");
+      expect(output).toContain("automatic");
+      expect(output).toContain("failover");
+    });
+
+    it("includes examples for autoFailover", () => {
+      const output = run(["--help"]);
+      expect(output).toContain("n-dx config llm.autoFailover true");
+      expect(output).toContain("n-dx config llm.autoFailover false");
+    });
+
+    it("preserves other llm config when setting autoFailover", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "claude" } }, null, 2) + "\n",
+      );
+      run(["llm.autoFailover", "true", tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.autoFailover).toBe(true);
+      expect(config.llm.vendor).toBe("claude");
+    });
+
+    it("shows autoFailover in config SHOW ALL mode", async () => {
+      run(["llm.autoFailover", "true", tmpDir]);
+      const out = run([tmpDir]);
+      expect(out).toContain("autoFailover");
+      expect(out).toContain("true");
+    });
+  });
+
   // ── Language config ────────────────────────────────────────────────────────
 
   describe("language config", () => {
