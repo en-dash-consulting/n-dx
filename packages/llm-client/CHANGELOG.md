@@ -1,5 +1,11 @@
 # @n-dx/llm-client
 
+## 0.3.4
+
+### Patch Changes
+
+- [#197](https://github.com/en-dash-consulting/n-dx/pull/197) [`3aabfef`](https://github.com/en-dash-consulting/n-dx/commit/3aabfefc59c0e6246767e1af0ee4e0ddf0ce8307) Thanks [@endash-shal](https://github.com/endash-shal)! - added more documentation changes
+
 ## 0.3.3
 
 ## 0.3.2
