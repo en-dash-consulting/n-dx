@@ -2,7 +2,10 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "pending"
+status: "completed"
+startedAt: "2026-05-06T13:26:50.051Z"
+completedAt: "2026-05-06T13:26:50.051Z"
+endedAt: "2026-05-06T13:26:50.051Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
 ---
 
@@ -31,7 +34,7 @@ description: "PRD persistence model: folder-tree storage, markdown serialization
 | [Per-PRD Status Breakdown via --show-individual](./per-prd-status-breakdown-via-73fc1e/index.md) | completed |
 | [PRD File Naming, Discovery, and Branch Resolution](./prd-file-naming-discovery-and-f648a5/index.md) | completed |
 | [PRD Store Integration with Dual-Write and First-Run Migration](./prd-store-integration-with-dual-1306e6/index.md) | completed |
-| [Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location](./rename-rex-tree-to-rex-prd-tree-c94d8e/index.md) | pending |
+| [Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location](./rename-rex-tree-to-rex-prd-tree-c94d8e/index.md) | completed |
 | [Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend](./retire-prd-md-and-promote-7145d6/index.md) | completed |
 | [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-14ccf2/index.md) | completed |
 | [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-e430a1/index.md) | completed |

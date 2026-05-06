@@ -2,13 +2,16 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "pending"
+status: "completed"
+startedAt: "2026-05-06T13:26:50.051Z"
+completedAt: "2026-05-06T13:26:50.051Z"
+endedAt: "2026-05-06T13:26:50.051Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
 ---
 
 # PRD Storage & Schema
 
- [pending]
+ [completed]
 
 ## Summary
 
@@ -39,7 +42,7 @@ PRD persistence model: folder-tree storage, markdown serialization, schema evolu
 | Per-PRD Status Breakdown via --show-individual | feature | completed | 2026-04-27 |
 | PRD File Naming, Discovery, and Branch Resolution | feature | completed | 2026-04-22 |
 | PRD Store Integration with Dual-Write and First-Run Migration | feature | completed | 2026-04-24 |
-| Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location | feature | pending | 1970-01-01 |
+| Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location | feature | completed | 2026-05-06 |
 | Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend | feature | completed | 2026-04-29 |
 | Show Target PRD in ndx add Output | feature | completed | 2026-04-30 |
 | Show Target PRD in ndx add Output | feature | completed | 2026-04-27 |
@@ -48,5 +51,8 @@ PRD persistence model: folder-tree storage, markdown serialization, schema evolu
 
 ## Info
 
-- **Status:** pending
+- **Status:** completed
 - **Level:** epic
+- **Started:** 2026-05-06T13:26:50.051Z
+- **Completed:** 2026-05-06T13:26:50.051Z
+- **Duration:** < 1m
