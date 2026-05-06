@@ -35,7 +35,7 @@ PRD persistence model: folder-tree storage, markdown serialization, schema evolu
 | Markdown Schema Design and Bidirectional Serialization | feature | completed | 2026-04-24 |
 | Migration, Documentation, and Regression Coverage for Folder-Tree-Only Storage | feature | completed | 2026-04-29 |
 | Multi-File PRD Aggregation and Write Routing Layer | feature | completed | 2026-04-22 |
-| Optimize prd_tree Write Performance for Add and Edit Commands | feature | pending | 1970-01-01 |
+| Optimize prd_tree Write Performance for Add and Edit Commands | feature | completed | 2026-05-06 |
 | Per-PRD Status Breakdown via --show-individual | feature | completed | 2026-04-27 |
 | PRD File Naming, Discovery, and Branch Resolution | feature | completed | 2026-04-22 |
 | PRD Store Integration with Dual-Write and First-Run Migration | feature | completed | 2026-04-24 |

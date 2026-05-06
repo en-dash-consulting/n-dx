@@ -13,4 +13,4 @@ description: "The 'project setup is stale' notice is currently emitted in CLI co
 | Title | Status |
 |-------|--------|
 | [Add regression tests asserting stale-setup notice fires only on missing tool directories](./add-regression-tests-asserting-4cabb3/index.md) | pending |
-| [Replace stale-setup trigger with direct existence check for .sourcevision, .rex, and .hench folders](./replace-stale-setup-trigger-dffc3d/index.md) | pending |
+| [Replace stale-setup trigger with direct existence check for .sourcevision, .rex, and .hench folders](./replace-stale-setup-trigger-dffc3d/index.md) | completed |

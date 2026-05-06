@@ -20,7 +20,7 @@ Rename the canonical PRD folder-tree storage directory from .rex/tree to .rex/pr
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Rename .rex/tree path constants and update all serializer/parser/store call sites | task | pending | 1970-01-01 |
+| Rename .rex/tree path constants and update all serializer/parser/store call sites | task | completed | 2026-05-06 |
 | Update CLAUDE.md, README, and folder-tree schema docs to reference .rex/prd_tree | task | pending | 1970-01-01 |
 
 ## Info

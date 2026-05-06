@@ -14,7 +14,7 @@ description: "The self-heal loop batch processing fails when the active vendor i
 
 | Title | Status |
 |-------|--------|
-| [Add regression tests for Codex batch execution in the self-heal pipeline](./add-regression-tests-for-codex-e72cad/index.md) | in_progress |
+| [Add regression tests for Codex batch execution in the self-heal pipeline](./add-regression-tests-for-codex-e72cad/index.md) | completed |
 | [Add vendor-resilient error handling and retry logic for self-heal batch failures](./add-vendor-resilient-error-1074c4/index.md) | completed |
 | [Audit self-heal batch pipeline for Codex incompatibilities](./audit-self-heal-batch-pipeline-1f2e14/index.md) | completed |
 | [Implement vendor-aware batch construction and response handling in self-heal](./implement-vendor-aware-batch-97ec62/index.md) | completed |

@@ -12,5 +12,5 @@ description: "Rename the canonical PRD folder-tree storage directory from .rex/t
 
 | Title | Status |
 |-------|--------|
-| [Rename .rex/tree path constants and update all serializer/parser/store call sites](./rename-rex-tree-path-constants-235b32/index.md) | pending |
+| [Rename .rex/tree path constants and update all serializer/parser/store call sites](./rename-rex-tree-path-constants-235b32/index.md) | completed |
 | [Update CLAUDE.md, README, and folder-tree schema docs to reference .rex/prd_tree](./update-claude-md-readme-and-48ac9b/index.md) | pending |

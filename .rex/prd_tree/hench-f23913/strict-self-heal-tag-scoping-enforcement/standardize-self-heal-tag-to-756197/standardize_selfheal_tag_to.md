@@ -2,13 +2,14 @@
 id: "75619751-480b-48cb-b543-7409f49387b0"
 level: "task"
 title: "Standardize self-heal tag to 'self-heal-items' across creation and selection paths"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "hench"
   - "self-heal"
   - "prd"
 source: "smart-add"
+startedAt: "2026-05-06T03:12:31.242Z"
 acceptanceCriteria:
   - "A single exported constant defines the self-heal tag value and is imported by both the creation paths and the selector"
   - "Every PRD item created during a self-heal run carries the 'self-heal-items' tag in its persisted frontmatter"

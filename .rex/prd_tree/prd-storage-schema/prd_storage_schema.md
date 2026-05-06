@@ -27,7 +27,7 @@ description: "PRD persistence model: folder-tree storage, markdown serialization
 | [Markdown Schema Design and Bidirectional Serialization](./markdown-schema-design-and-6687ab/index.md) | completed |
 | [Migration, Documentation, and Regression Coverage for Folder-Tree-Only Storage](./migration-documentation-and-fcc281/index.md) | completed |
 | [Multi-File PRD Aggregation and Write Routing Layer](./multi-file-prd-aggregation-and-e006db/index.md) | completed |
-| [Optimize prd_tree Write Performance for Add and Edit Commands](./optimize-prd-tree-write-6e8679/index.md) | pending |
+| [Optimize prd_tree Write Performance for Add and Edit Commands](./optimize-prd-tree-write-6e8679/index.md) | completed |
 | [Per-PRD Status Breakdown via --show-individual](./per-prd-status-breakdown-via-73fc1e/index.md) | completed |
 | [PRD File Naming, Discovery, and Branch Resolution](./prd-file-naming-discovery-and-f648a5/index.md) | completed |
 | [PRD Store Integration with Dual-Write and First-Run Migration](./prd-store-integration-with-dual-1306e6/index.md) | completed |

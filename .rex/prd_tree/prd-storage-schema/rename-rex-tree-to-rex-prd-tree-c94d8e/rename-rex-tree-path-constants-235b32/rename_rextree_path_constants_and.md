@@ -2,7 +2,7 @@
 id: "235b322d-5e4d-4160-b09b-f5a501cebc00"
 level: "task"
 title: "Rename .rex/tree path constants and update all serializer/parser/store call sites"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "rex"
@@ -10,6 +10,11 @@ tags:
   - "storage"
   - "migration"
 source: "smart-add"
+startedAt: "2026-05-06T02:56:06.092Z"
+completedAt: "2026-05-06T03:02:33.473Z"
+endedAt: "2026-05-06T03:02:33.473Z"
+resolutionType: "code-change"
+resolutionDetail: "All acceptance criteria already met in codebase; added missing integration tests."
 acceptanceCriteria:
   - "Single shared constant defines the prd_tree directory name; no hardcoded '.rex/tree' strings remain in production code"
   - "All PRD reads and writes (CLI, MCP, web server, hench gateway) target .rex/prd_tree"

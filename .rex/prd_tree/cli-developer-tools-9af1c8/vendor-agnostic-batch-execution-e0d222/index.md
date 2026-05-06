@@ -22,7 +22,7 @@ The self-heal loop batch processing fails when the active vendor is Codex. Batch
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Add regression tests for Codex batch execution in the self-heal pipeline | task | in_progress | 2026-04-14 |
+| Add regression tests for Codex batch execution in the self-heal pipeline | task | completed | 2026-05-06 |
 | Add vendor-resilient error handling and retry logic for self-heal batch failures | task | completed | 2026-04-14 |
 | Audit self-heal batch pipeline for Codex incompatibilities | task | completed | 2026-04-14 |
 | Implement vendor-aware batch construction and response handling in self-heal | task | completed | 2026-04-14 |

@@ -21,7 +21,7 @@ The 'project setup is stale' notice is currently emitted in CLI contexts where i
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
 | Add regression tests asserting stale-setup notice fires only on missing tool directories | task | pending | 1970-01-01 |
-| Replace stale-setup trigger with direct existence check for .sourcevision, .rex, and .hench folders | task | pending | 1970-01-01 |
+| Replace stale-setup trigger with direct existence check for .sourcevision, .rex, and .hench folders | task | completed | 2026-05-06 |
 
 ## Info
 

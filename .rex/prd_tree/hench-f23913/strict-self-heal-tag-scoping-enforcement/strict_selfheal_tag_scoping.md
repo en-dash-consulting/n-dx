@@ -12,4 +12,4 @@ description: "The self-heal loop is documented to tag items it creates and to on
 
 | Title | Status |
 |-------|--------|
-| [Standardize self-heal tag to 'self-heal-items' across creation and selection paths](./standardize-self-heal-tag-to-756197/index.md) | pending |
+| [Standardize self-heal tag to 'self-heal-items' across creation and selection paths](./standardize-self-heal-tag-to-756197/index.md) | in_progress |

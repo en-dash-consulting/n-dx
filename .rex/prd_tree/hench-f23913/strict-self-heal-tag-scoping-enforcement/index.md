@@ -20,7 +20,7 @@ The self-heal loop is documented to tag items it creates and to only operate on 
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Standardize self-heal tag to 'self-heal-items' across creation and selection paths | task | pending | 1970-01-01 |
+| Standardize self-heal tag to 'self-heal-items' across creation and selection paths | task | in_progress | 2026-05-06 |
 
 ## Info
 
