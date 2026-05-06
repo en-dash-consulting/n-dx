@@ -121,7 +121,7 @@ async function callWithFailover(
   } catch (originalError) {
     // If failover is disabled, rethrow immediately (no-op path)
     if (!llmConfig.autoFailover) {
-      throw originalError;
+    throw originalError;
     }
 
     const err = originalError as Error;
