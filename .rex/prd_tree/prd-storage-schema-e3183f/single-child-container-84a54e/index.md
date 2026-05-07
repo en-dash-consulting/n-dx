@@ -23,9 +23,9 @@ Eliminate unnecessary wrapper directories in the PRD folder tree when a parent c
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
-| Add regression tests for single-child compaction across write path and reshape migration | task | completed | 2026-05-06 |
+| Add regression tests for single-child compaction across write path and reshape migration | task | pending | 2026-05-06 |
 | Add single-child detection to PRD folder-tree serializer to skip container directory when parent has exactly one child | task | completed | 2026-05-06 |
-| Implement single-child compaction migration pass in `ndx reshape` to flatten existing over-wrapped directories | task | completed | 2026-05-06 |
+| Implement single-child compaction migration pass in `ndx reshape` to flatten existing over-wrapped directories | task | pending | 2026-05-06 |
 
 ## Info
 

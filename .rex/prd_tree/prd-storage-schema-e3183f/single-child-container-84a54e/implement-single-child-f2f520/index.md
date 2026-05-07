@@ -2,16 +2,17 @@
 id: "f2f52014-a452-4e7d-9665-73649f549473"
 level: "task"
 title: "Implement single-child compaction migration pass in `ndx reshape` to flatten existing over-wrapped directories"
-status: "completed"
+status: "pending"
 priority: "high"
 tags:
   - "rex"
   - "reshape"
   - "migration"
   - "folder-tree"
+  - "prd-storage"
+  - "bug"
 source: "smart-add"
 startedAt: "2026-05-06T19:51:56.539Z"
-completedAt: "2026-05-06T20:05:34.770Z"
 endedAt: "2026-05-06T20:05:34.770Z"
 resolutionType: "code-change"
 resolutionDetail: "Implemented compactSingleChildren migration with full integration into reshape command. Detects and collapses single-child wrapper directories, embeds parent metadata using __parent* fields, and is idempotent. Includes unit and integration tests verifying correct operation and idempotency."
@@ -21,12 +22,17 @@ acceptanceCriteria:
   - "Running `ndx reshape` a second time on an already-compacted tree makes zero changes and exits cleanly"
   - "Reshape output includes a count of directories compacted (or 'nothing to compact' when none found)"
   - "If a wrapper directory's index.md contains metadata not present on the child, that metadata is merged into the child's frontmatter before deletion"
+  - "reshape detects all folders containing exactly one named file and one index.md"
+  - "reshape deletes the index.md from each such folder and logs each removal"
+  - "Named file content is verified parseable and data-complete before index.md is removed"
+  - "reshape is idempotent: re-running on an already-cleaned tree produces no changes and exits cleanly"
+  - "Archive entry is written for each removed index.md so the operation is auditable and reversible"
 description: "Add a compaction step to `ndx reshape` that scans the existing `.rex/prd_tree/` for directories containing exactly one non-index child file plus an index.md, then collapses them: the child file is moved up to the grandparent directory and the now-empty wrapper directory (with its index.md) is removed. The reshape command should report how many directories were compacted. The migration must be idempotent — running reshape twice on an already-compacted tree produces no further changes and no errors."
 ---
 
 # Implement single-child compaction migration pass in `ndx reshape` to flatten existing over-wrapped directories
 
-🟠 [completed]
+🟠 [pending]
 
 ## Summary
 
@@ -34,10 +40,10 @@ Add a compaction step to `ndx reshape` that scans the existing `.rex/prd_tree/` 
 
 ## Info
 
-- **Status:** completed
+- **Status:** pending
 - **Priority:** high
-- **Tags:** rex, reshape, migration, folder-tree
+- **Tags:** rex, reshape, migration, folder-tree, prd-storage, bug
 - **Level:** task
 - **Started:** 2026-05-06T19:51:56.539Z
-- **Completed:** 2026-05-06T20:05:34.770Z
+- **Ended:** 2026-05-06T20:05:34.770Z
 - **Duration:** 13m

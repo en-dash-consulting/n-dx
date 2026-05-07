@@ -144,9 +144,21 @@ async function serializeChildren(
 
     // index.md: human-readable summary (delegates to generateIndexMd, which
     // selectively renders Progress / Subtask sections based on item.level).
-    const itemIndexContent = generateIndexMd(item, children, []);
-    const itemIndexPath = join(itemDir, "index.md");
-    await writeIfChanged(itemIndexPath, itemIndexContent, result);
+    // Only write index.md when the item has children — suppresses duplicate
+    // frontmatter for leaf items and ensures index.md serves as a hub/summary only.
+    if (children.length > 0) {
+      const itemIndexContent = generateIndexMd(item, children, []);
+      const itemIndexPath = join(itemDir, "index.md");
+      await writeIfChanged(itemIndexPath, itemIndexContent, result);
+    } else {
+      // For leaf items (no children), remove any stale index.md
+      const itemIndexPath = join(itemDir, "index.md");
+      try {
+        await rm(itemIndexPath, { force: true });
+      } catch {
+        // File may not exist — silently continue
+      }
+    }
 
     // Always recurse so stale child subdirectories are cleaned up even when
     // the item now has no children (e.g. after a move that empties this parent).
