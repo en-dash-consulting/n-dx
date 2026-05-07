@@ -2,7 +2,7 @@
 id: "f2f52014-a452-4e7d-9665-73649f549473"
 level: "task"
 title: "Implement single-child compaction migration pass in `ndx reshape` to flatten existing over-wrapped directories"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "rex"
@@ -13,9 +13,10 @@ tags:
   - "bug"
 source: "smart-add"
 startedAt: "2026-05-06T19:51:56.539Z"
-endedAt: "2026-05-06T20:05:34.770Z"
+completedAt: "2026-05-07T00:15:11.819Z"
+endedAt: "2026-05-07T00:15:11.819Z"
 resolutionType: "code-change"
-resolutionDetail: "Implemented compactSingleChildren migration with full integration into reshape command. Detects and collapses single-child wrapper directories, embeds parent metadata using __parent* fields, and is idempotent. Includes unit and integration tests verifying correct operation and idempotency."
+resolutionDetail: "Implemented compactSingleChildren migration with full integration into reshape command. Detects and collapses single-child wrapper directories, embeds parent metadata using __parent* fields, and is idempotent. Includes unit and integration tests verifying correct operation and idempotency. Implementation spans: (1) compact-single-children.ts migration function, (2) reshape.ts CLI command integration, (3) folder-tree-serializer.ts forward-direction optimization. All acceptance criteria met."
 acceptanceCriteria:
   - "`ndx reshape` detects and collapses all directories matching the single-child + index.md pattern in the current prd_tree"
   - "After compaction, the collapsed child item is accessible by all rex read commands (status, next, get_item) with correct parent attribution"
@@ -32,7 +33,7 @@ description: "Add a compaction step to `ndx reshape` that scans the existing `.r
 
 # Implement single-child compaction migration pass in `ndx reshape` to flatten existing over-wrapped directories
 
-🟠 [pending]
+🟠 [completed]
 
 ## Summary
 
@@ -40,10 +41,10 @@ Add a compaction step to `ndx reshape` that scans the existing `.rex/prd_tree/` 
 
 ## Info
 
-- **Status:** pending
+- **Status:** completed
 - **Priority:** high
 - **Tags:** rex, reshape, migration, folder-tree, prd-storage, bug
 - **Level:** task
 - **Started:** 2026-05-06T19:51:56.539Z
-- **Ended:** 2026-05-06T20:05:34.770Z
-- **Duration:** 13m
+- **Completed:** 2026-05-07T00:15:11.819Z
+- **Duration:** 4h 23m
