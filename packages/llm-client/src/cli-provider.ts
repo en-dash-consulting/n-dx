@@ -226,11 +226,38 @@ function extractStdoutError(stdout: string, format: "json" | "stream-json"): str
 }
 
 /**
- * Parse --output-format json envelope: { result: "...", input_tokens, ... }
+ * Parse --output-format json output.
+ *
+ * Handles both shapes the Claude Code CLI has emitted in this mode:
+ *   - Legacy single envelope: `{ result: "...", input_tokens, ... }`
+ *   - Newer JSON array of stream events:
+ *     `[{type:"system",...}, {type:"assistant",...}, {type:"result", result:"...", usage:{...}}]`
+ *
+ * For the array form, the assistant text lives in the `result` field of the
+ * `{type:"result"}` event and tokens live in the same event's nested `usage`
+ * object — `parseStreamTokenUsage` already handles that nesting.
  */
 function parseJsonOutput(stdout: string): CompletionResult {
   try {
-    const envelope = JSON.parse(stdout) as Record<string, unknown>;
+    const parsed = JSON.parse(stdout) as unknown;
+
+    if (Array.isArray(parsed)) {
+      for (const event of parsed) {
+        if (
+          event &&
+          typeof event === "object" &&
+          (event as Record<string, unknown>).type === "result"
+        ) {
+          const env = event as Record<string, unknown>;
+          const text = typeof env.result === "string" ? env.result : stdout;
+          const tokenUsage = parseStreamTokenUsage(env);
+          return { text, tokenUsage };
+        }
+      }
+      return { text: stdout };
+    }
+
+    const envelope = parsed as Record<string, unknown>;
     const text = typeof envelope.result === "string" ? envelope.result : stdout;
     const tokenUsage = parseCliTokenUsage(envelope);
     return { text, tokenUsage };

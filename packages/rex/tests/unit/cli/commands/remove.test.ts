@@ -485,7 +485,14 @@ describe("cmdRemove", () => {
     });
 
     it("removes task folder from tree after task removal", async () => {
-      writePRD(tmp, makePrd(fullTree()));
+      // Use a tree where Feature 1 keeps two tasks after the removal so it is
+      // not collapsed by single-child compaction. Without a sibling, removing
+      // t1 would leave Feature 1 with one child (t2), triggering compaction
+      // and eliding the feature directory.
+      const items = JSON.parse(JSON.stringify(fullTree())) as ReturnType<typeof fullTree>;
+      const f1 = items[0].children![0];
+      f1.children!.push({ id: "t9", title: "Task Nine", level: "task", status: "pending" } as any);
+      writePRD(tmp, makePrd(items));
 
       await cmdRemove(tmp, "t1", "task", { yes: "true" });
 

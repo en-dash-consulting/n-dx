@@ -47,41 +47,40 @@ export function readContextMd(dir) {
 }
 
 /**
- * Build a compact PRD status excerpt from `.rex/prd.md` (current source of
- * truth) or `.rex/prd.json` (legacy fallback). Markdown is parsed by spawning
- * `rex parse-md --stdin`. Includes only epic/feature/task titles and their
- * statuses — no descriptions or acceptance criteria, to keep the payload small.
+ * Build a compact PRD status excerpt from the folder-tree (current source of
+ * truth) or from legacy prd.json. Includes only epic/feature/task titles and
+ * their statuses — no descriptions or acceptance criteria, to keep the payload
+ * small.
  *
  * @param {string} dir  Project root directory.
  * @returns {{ content: string | null; warning?: string }}
  */
 export function buildPrdStatusExcerpt(dir) {
-  const mdPath = join(dir, ".rex", "prd.md");
-  const jsonPath = join(dir, ".rex", "prd.json");
+  const rexDir = join(dir, ".rex");
+  const prdTreePath = join(rexDir, "prd_tree");
+  const jsonPath = join(rexDir, "prd.json");
 
   /** @type {{ title?: string; items?: unknown } | null} */
   let doc = null;
 
-  if (existsSync(mdPath)) {
+  if (existsSync(prdTreePath)) {
     try {
-      const md = readFileSync(mdPath, "utf-8");
-      const out = execFileSync("rex", ["parse-md", "--stdin"], {
-        input: md,
+      const out = execFileSync("rex", ["status", "--format=json", dir], {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
       });
       doc = JSON.parse(out);
     } catch (err) {
-      return { content: null, warning: `Could not parse .rex/prd.md: ${err.message}` };
+      return { content: null, warning: `Could not load PRD status: ${err.message}` };
     }
   } else if (existsSync(jsonPath)) {
     try {
       doc = JSON.parse(readFileSync(jsonPath, "utf-8"));
     } catch (err) {
-      return { content: null, warning: `Could not read .rex/prd.json: ${err.message}` };
+      return { content: null, warning: `Could not read prd.json: ${err.message}` };
     }
   } else {
-    return { content: null, warning: "PRD not found at .rex/prd.md — skipping PRD context" };
+    return { content: null, warning: "PRD not found — skipping PRD context" };
   }
 
   try {

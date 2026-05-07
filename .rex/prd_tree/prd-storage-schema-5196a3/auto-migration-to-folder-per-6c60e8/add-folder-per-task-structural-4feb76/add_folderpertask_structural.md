@@ -1,0 +1,21 @@
+---
+id: "4feb768c-2c8b-42d4-abb1-92fcb755106e"
+level: "task"
+title: "Add folder-per-task structural migration pass to ndx reshape and ndx add"
+status: "in_progress"
+priority: "high"
+tags:
+  - "prd-storage"
+  - "migration"
+  - "cli"
+source: "smart-add"
+startedAt: "2026-05-07T19:26:13.571Z"
+acceptanceCriteria:
+  - "ndx reshape detects and migrates non-conforming task-level .md files to folder/index.md form"
+  - "ndx reshape detects subtask .md files that have orphan child siblings (slug-prefixed) and promotes them to folders"
+  - "ndx add runs the same structural check as a pre-write step before persisting new items, refusing to write if migration is needed and the user declines"
+  - "Migration is idempotent — a second run on a conforming tree makes zero filesystem changes"
+  - "Migration emits a per-item log (count of converted items, paths, before/after) to the console and to .rex/execution-log.jsonl"
+  - "Regression tests cover: bare task .md, leaf subtask with children, deeply nested mixed-mode trees, and idempotency on already-conforming trees"
+description: "Extend the existing reshape command (and the pre-write hook used by ndx add) with a new structural pass that scans the PRD tree, detects any task-level items stored as bare .md files or any subtasks-with-children stored as bare .md files, and rewrites them in-place to the folder-with-index.md form. The pass must be idempotent (running it twice is a no-op on a conforming tree), preserve all frontmatter and content, and emit a per-item migration log so the user can audit what changed. Reuse the single-child compaction pass plumbing in ndx reshape as the integration point."
+---

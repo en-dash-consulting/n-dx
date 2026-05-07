@@ -175,8 +175,10 @@ describe("Billing", () => {
     // Count per-item markdown files in item directories. The serializer writes
     // a title-named .md file per item (e.g. `epic_alpha.md`); legacy `index.md`
     // is also accepted by the parser. Skip the tree root's own index.md stub
-    // (depth 0) which `rex init` creates as a human-readable scaffold. Count
-    // only title-named files, not index.md (which is a fallback for parser).
+    // (depth 0) which `rex init` creates as a human-readable scaffold. Single-
+    // child-compacted parents do not get their own file — their metadata is
+    // embedded in the surviving descendant via `__parent*` frontmatter — so
+    // count those as well to verify no item went missing on disk.
     async function countItemFiles(dir: string, depth = 0): Promise<number> {
       let count = 0;
       try {
@@ -188,6 +190,18 @@ describe("Billing", () => {
             count += await countItemFiles(entryPath, depth + 1);
           } else if (entry.endsWith(".md") && entry !== "index.md" && depth > 0) {
             count++;
+            // A compacted parent's data is folded into this file's frontmatter;
+            // count one extra item per `__parentId` ancestor field present.
+            try {
+              const text = await readFile(entryPath, "utf8");
+              const fm = text.match(/^---\n([\s\S]*?)\n---/);
+              if (fm) {
+                const ancestorIds = fm[1].match(/^__parent(?:__parent)*Id:/gm);
+                if (ancestorIds) count += ancestorIds.length;
+              }
+            } catch {
+              // ignore
+            }
           }
         }
       } catch {

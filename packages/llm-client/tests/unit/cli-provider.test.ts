@@ -127,6 +127,62 @@ describe("createCliClient — stdout error envelope", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("extracts text from JSON-array stream form (newer Claude Code CLI)", async () => {
+    // Newer Claude Code CLI versions emit --output-format json as a JSON
+    // array of stream events ending with a {type:"result", result:"..."} event,
+    // not a single envelope. The provider must unwrap the array and pick the
+    // result event's `result` field as the assistant text.
+    const arrayBody = JSON.stringify([
+      { type: "system", subtype: "init", session_id: "abc" },
+      { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "hello" }] } },
+      {
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        result: "ASSISTANT_PAYLOAD",
+        usage: { input_tokens: 12, output_tokens: 7 },
+      },
+    ]);
+    const { dir, path } = writeFakeCli(
+      `#!/bin/sh\ncat > /dev/null\nprintf '%s' '${arrayBody.replace(/'/g, "'\\''")}'\nexit 0\n`,
+    );
+
+    try {
+      const client = createCliClient({
+        claudeConfig: { cli_path: path },
+        maxRetries: 0,
+      });
+      const result = await client.complete({ prompt: "test", model: "claude-sonnet-4-6" });
+      expect(result.text).toBe("ASSISTANT_PAYLOAD");
+      expect(result.tokenUsage).toMatchObject({ input: 12, output: 7 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("still supports legacy single-envelope JSON form", async () => {
+    const envelope = JSON.stringify({
+      result: "LEGACY_PAYLOAD",
+      input_tokens: 5,
+      output_tokens: 9,
+    });
+    const { dir, path } = writeFakeCli(
+      `#!/bin/sh\ncat > /dev/null\nprintf '%s' '${envelope.replace(/'/g, "'\\''")}'\nexit 0\n`,
+    );
+
+    try {
+      const client = createCliClient({
+        claudeConfig: { cli_path: path },
+        maxRetries: 0,
+      });
+      const result = await client.complete({ prompt: "test", model: "claude-sonnet-4-6" });
+      expect(result.text).toBe("LEGACY_PAYLOAD");
+      expect(result.tokenUsage).toMatchObject({ input: 5, output: 9 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("createCliClient — LLMProvider interface", () => {

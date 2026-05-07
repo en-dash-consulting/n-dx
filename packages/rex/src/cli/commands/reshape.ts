@@ -8,6 +8,7 @@ import { ARCHIVE_FILE, loadArchive, trimArchive } from "../../core/archive.js";
 import { reasonForReshape, formatReshapeProposal } from "../../analyze/reshape-reason.js";
 import { setLLMConfig, setClaudeConfig, resolveConfiguredModel } from "../../analyze/reason.js";
 import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
+import { compactSingleChildren } from "../../core/compact-single-children.js";
 import { printVendorModelHeader } from "@n-dx/llm-client";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
@@ -32,6 +33,22 @@ export async function cmdReshape(
       "Run 'rex analyze' first to build your PRD.",
     );
   }
+
+  // Run single-child compaction migration pass
+  const treeRoot = join(rexDir, "prd_tree");
+  info("Compacting single-child directories...");
+  const compactionResult = await compactSingleChildren(treeRoot);
+  if (compactionResult.errors.length > 0) {
+    for (const err of compactionResult.errors) {
+      warn(`  Warning: ${err.error} (${err.path})`);
+    }
+  }
+  if (compactionResult.compactedCount > 0) {
+    info(`Compacted ${compactionResult.compactedCount} single-child director${compactionResult.compactedCount === 1 ? "y" : "ies"}.`);
+  }
+
+  // Reload document after compaction
+  const docAfterCompaction = await store.loadDocument();
 
   // Load LLM config
   const llmConfig = await loadLLMConfig(rexDir);
@@ -78,7 +95,7 @@ export async function cmdReshape(
   let proposals: ReshapeProposal[];
   let tokenUsage: Awaited<ReturnType<typeof reasonForReshape>>["tokenUsage"];
   try {
-    const reshapeResult = await reasonForReshape(doc.items, { dir, model: resolvedModel });
+    const reshapeResult = await reasonForReshape(docAfterCompaction.items, { dir, model: resolvedModel });
     proposals = reshapeResult.proposals;
     tokenUsage = reshapeResult.tokenUsage;
   } catch (err) {
@@ -100,7 +117,7 @@ export async function cmdReshape(
   // Display proposals
   info(`\nFound ${proposals.length} reshape proposal${proposals.length === 1 ? "" : "s"}:\n`);
   for (let i = 0; i < proposals.length; i++) {
-    info(`${i + 1}. ${formatReshapeProposal(proposals[i], doc.items)}`);
+    info(`${i + 1}. ${formatReshapeProposal(proposals[i], docAfterCompaction.items)}`);
     info("");
   }
 
@@ -126,7 +143,7 @@ export async function cmdReshape(
   if (accept) {
     accepted = proposals;
   } else if (process.stdin.isTTY) {
-    accepted = await interactiveReview(proposals, doc.items);
+    accepted = await interactiveReview(proposals, docAfterCompaction.items);
   } else {
     info("Proposals shown above. Run with --accept to apply, or use interactively in a TTY.");
     return;
@@ -138,7 +155,7 @@ export async function cmdReshape(
   }
 
   // Apply accepted proposals
-  const reshapeResult = applyReshape(doc.items, accepted);
+  const reshapeResult = applyReshape(docAfterCompaction.items, accepted);
 
   // Report errors
   for (const err of reshapeResult.errors) {

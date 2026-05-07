@@ -205,57 +205,167 @@ export function readPRD(dir: string): PRDDocument {
 
 /**
  * Synchronous folder-tree parser for test support.
- * Mirrors the async parseFolderTree but uses readdirSync and readFileSync.
+ * Mirrors the async parseFolderTree (folder-tree-parser.ts) including
+ * single-child compaction reconstruction via `__parent*` frontmatter fields.
  */
 function readFolderTreeSync(treeRoot: string): PRDItem[] {
   const items: PRDItem[] = [];
+  for (const childDirName of listSubdirNames(treeRoot)) {
+    const item = parseDirRecursiveSync(join(treeRoot, childDirName));
+    if (item) items.push(item);
+  }
+  return items;
+}
 
-  // List epics (depth 1)
-  const epicDirs = listSubdirNames(treeRoot);
+function parseDirRecursiveSync(dir: string): PRDItem | null {
+  const itemPath = discoverItemFile(dir);
+  if (!itemPath) return null;
+  const item = parseItemFromMarkdown(readFileSync(itemPath, "utf-8")) as PRDItem | null;
+  if (!item) return null;
 
-  for (const epicDirName of epicDirs) {
-    const epicDir = join(treeRoot, epicDirName);
-    const epicItem = parseItemFromDir(epicDir);
-    if (!epicItem) continue;
-
-    const epicChildren: PRDItem[] = [];
-
-    // List features and tasks (depth 2)
-    const childDirs = listSubdirNames(epicDir);
-
-    for (const childDirName of childDirs) {
-      const childDir = join(epicDir, childDirName);
-      const childItem = parseItemFromDir(childDir);
-      if (!childItem) continue;
-
-      // List tasks under features (depth 3)
-      if (childItem.level === "feature") {
-        const featureChildren: PRDItem[] = [];
-        const taskDirs = listSubdirNames(childDir);
-
-        for (const taskDirName of taskDirs) {
-          const taskDir = join(childDir, taskDirName);
-          const taskItem = parseItemFromDir(taskDir);
-          if (!taskItem) continue;
-
-          const subtasks = readSubtasksSync(taskDir);
-          if (subtasks.length > 0) taskItem.children = subtasks;
-          featureChildren.push(taskItem as PRDItem);
-        }
-        if (featureChildren.length > 0) childItem.children = featureChildren;
-      } else if (childItem.level === "task") {
-        const subtasks = readSubtasksSync(childDir);
-        if (subtasks.length > 0) childItem.children = subtasks;
+  // Single-child compaction: this item itself was flattened into its grandparent's
+  // directory and carries `__parentId` etc. Reconstruct the parent chain and use
+  // this item's subdirectories as the (deepest) item's own children.
+  if ((item as Record<string, unknown>).__parentId !== undefined) {
+    const directParent = reconstructParentFromChild(item);
+    cleanupParentMetadata(item);
+    if (directParent) {
+      const childItems: PRDItem[] = [];
+      for (const childDirName of listSubdirNames(dir)) {
+        const child = parseDirRecursiveSync(join(dir, childDirName));
+        if (child) childItems.push(child);
       }
+      if (childItems.length > 0) item.children = childItems;
+      directParent.children = [item];
 
-      epicChildren.push(childItem as PRDItem);
+      // Walk further up if the reconstructed parent itself carried ancestor
+      // fields (deeply nested single-child compaction).
+      let ancestor: PRDItem = directParent;
+      while ((ancestor as Record<string, unknown>).__parentId !== undefined) {
+        const grandparent = reconstructParentFromChild(ancestor);
+        cleanupParentMetadata(ancestor);
+        if (!grandparent) break;
+        grandparent.children = [ancestor];
+        ancestor = grandparent;
+      }
+      return ancestor;
     }
-
-    if (epicChildren.length > 0) epicItem.children = epicChildren;
-    items.push(epicItem as PRDItem);
   }
 
-  return items;
+  // Otherwise look for compacted siblings: orphaned `.md` files in this directory
+  // whose frontmatter carries `__parentId`. Each such file represents a feature
+  // (or lower) whose own directory was elided because it had a single child.
+  const orphans = findOrphanedChildrenInDir(dir, itemPath);
+  const childItems: PRDItem[] = [];
+  const reconstructedParents = new Map<string, PRDItem>();
+  for (const orphan of orphans) {
+    const directParent = reconstructParentFromChild(orphan);
+    cleanupParentMetadata(orphan);
+    if (!directParent) continue;
+    // The orphan may itself need its own subdirectories as children — but
+    // because the orphan lives at parent-dir level, it has no subdirectory of
+    // its own. (Its grand-children, if any, sit under sibling subdirs of its
+    // own directory tree, which is unreachable here.) For test fixture
+    // purposes the production case we care about is the leaf orphan: a task
+    // whose feature was compacted. Subdirectories of this orphan don't exist
+    // on disk, so we leave its `children` undefined.
+
+    // Walk further up if the parent itself carries ancestor fields.
+    let topAncestor: PRDItem = directParent;
+    while ((topAncestor as Record<string, unknown>).__parentId !== undefined) {
+      const grandparent = reconstructParentFromChild(topAncestor);
+      cleanupParentMetadata(topAncestor);
+      if (!grandparent) break;
+      grandparent.children = [topAncestor];
+      topAncestor = grandparent;
+    }
+
+    // Coalesce orphans that share a parent id (e.g. multiple compacted siblings
+    // pointing back at the same feature) into one reconstructed parent.
+    const existing = reconstructedParents.get(directParent.id);
+    if (existing) {
+      existing.children = [...(existing.children ?? []), orphan];
+    } else {
+      directParent.children = [orphan];
+      reconstructedParents.set(directParent.id, directParent);
+      childItems.push(topAncestor);
+    }
+  }
+
+  // Walk regular subdirectories.
+  for (const childDirName of listSubdirNames(dir)) {
+    const child = parseDirRecursiveSync(join(dir, childDirName));
+    if (child) childItems.push(child);
+  }
+
+  if (childItems.length > 0) item.children = childItems;
+  return item;
+}
+
+function findOrphanedChildrenInDir(dir: string, itemFile: string): PRDItem[] {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const orphans: PRDItem[] = [];
+  for (const entry of entries) {
+    if (!entry.endsWith(".md") || entry === "index.md") continue;
+    const path = join(dir, entry);
+    if (path === itemFile) continue;
+    const parsed = parseItemFromMarkdown(readFileSync(path, "utf-8")) as PRDItem | null;
+    if (!parsed) continue;
+    if ((parsed as Record<string, unknown>).__parentId === undefined) continue;
+    orphans.push(parsed);
+  }
+  return orphans;
+}
+
+function reconstructParentFromChild(child: PRDItem): PRDItem | null {
+  const r = child as Record<string, unknown>;
+  const id = r.__parentId as string | undefined;
+  const title = r.__parentTitle as string | undefined;
+  const level = r.__parentLevel as string | undefined;
+  const status = r.__parentStatus as string | undefined;
+  if (!id || !title || !level || !status) return null;
+
+  const parent: PRDItem = { id, title, level: level as PRDItem["level"], status: status as PRDItem["status"] };
+  const optionalFields: Array<[string, keyof PRDItem | string]> = [
+    ["__parentDescription", "description"],
+    ["__parentPriority", "priority"],
+    ["__parentTags", "tags"],
+    ["__parentBlockedBy", "blockedBy"],
+    ["__parentSource", "source"],
+    ["__parentStartedAt", "startedAt"],
+    ["__parentCompletedAt", "completedAt"],
+    ["__parentEndedAt", "endedAt"],
+    ["__parentResolutionType", "resolutionType"],
+    ["__parentResolutionDetail", "resolutionDetail"],
+    ["__parentFailureReason", "failureReason"],
+    ["__parentAcceptanceCriteria", "acceptanceCriteria"],
+    ["__parentLoe", "loe"],
+  ];
+  for (const [src, dst] of optionalFields) {
+    if (r[src] !== undefined) {
+      (parent as Record<string, unknown>)[dst] = r[src];
+    }
+  }
+  // Forward any `__parent__parent*` ancestor fields onto the reconstructed
+  // parent (stripping one __parent prefix) so the chain walk can continue.
+  for (const [k, v] of Object.entries(r)) {
+    if (k.startsWith("__parent__parent")) {
+      (parent as Record<string, unknown>)[k.slice("__parent".length)] = v;
+    }
+  }
+  return parent;
+}
+
+function cleanupParentMetadata(item: PRDItem): void {
+  const r = item as Record<string, unknown>;
+  for (const k of Object.keys(r)) {
+    if (k.startsWith("__parent")) delete r[k];
+  }
 }
 
 function listSubdirNames(dir: string): string[] {
@@ -287,21 +397,6 @@ function discoverItemFile(dir: string): string | null {
   const indexPath = join(dir, "index.md");
   if (existsSync(indexPath)) return indexPath;
   return null;
-}
-
-function parseItemFromDir(dir: string): Partial<PRDItem> | null {
-  const path = discoverItemFile(dir);
-  if (!path) return null;
-  return parseItemFromMarkdown(readFileSync(path, "utf-8"));
-}
-
-function readSubtasksSync(taskDir: string): PRDItem[] {
-  const subtasks: PRDItem[] = [];
-  for (const subtaskDirName of listSubdirNames(taskDir)) {
-    const subtaskItem = parseItemFromDir(join(taskDir, subtaskDirName));
-    if (subtaskItem) subtasks.push(subtaskItem as PRDItem);
-  }
-  return subtasks;
 }
 
 /**

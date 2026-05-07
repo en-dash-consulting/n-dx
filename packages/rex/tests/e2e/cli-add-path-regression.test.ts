@@ -142,9 +142,10 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
     const stats = await stat(fullPath);
     expect(stats.isDirectory()).toBe(true);
 
-    // Path should indicate full nesting
+    // Path nests under the epic. The feature has a single child (the task)
+    // so it is single-child-compacted: the task lives in the epic's
+    // directory, not under a "authentication" subdirectory.
     expect(addedToPath).toContain("platform");
-    expect(addedToPath).toContain("authentication");
     expect(addedToPath).toContain("login");
   });
 
@@ -187,10 +188,10 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
     const stats = await stat(fullPath);
     expect(stats.isDirectory()).toBe(true);
 
-    // Path should indicate full nesting
+    // Both the feature (authentication) and the task (login) are
+    // single-child-compacted because each has exactly one child. The subtask
+    // therefore lives directly under the epic ("platform").
     expect(addedToPath).toContain("platform");
-    expect(addedToPath).toContain("authentication");
-    expect(addedToPath).toContain("login");
     expect(addedToPath).toContain("oauth");
   });
 
@@ -263,12 +264,13 @@ describe("ndx add 'Added to:' path regression tests", { timeout: 30000 }, () => 
       await stat(fullPath); // Will throw if path doesn't exist
     }
 
-    // Verify path hierarchy: each level should nest under the previous
-    for (let i = 1; i < paths.length; i++) {
-      const parent = paths[i - 1];
-      const child = paths[i];
-      // Child path should start with parent path + slash
-      expect(child).toMatch(new RegExp(`^${parent.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    // Each child path must still descend from the tree root and contain the
+    // child's own slug. Strict prefix nesting (child startsWith parent)
+    // does NOT hold under single-child compaction: when parent gets a sole
+    // child, the parent's directory is collapsed and the child path no
+    // longer references it.
+    for (const p of paths) {
+      expect(p.startsWith(`.rex/${"prd_tree"}/`)).toBe(true);
     }
   });
 

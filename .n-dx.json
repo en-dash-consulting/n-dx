@@ -209,7 +209,7 @@
       }
     }
   },
-  "_initVersion": "0.3.1",
+  "_initVersion": "0.3.3",
   "cli": {
     "timeoutMs": 18000000
   },

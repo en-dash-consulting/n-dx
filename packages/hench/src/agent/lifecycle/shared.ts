@@ -1019,9 +1019,11 @@ export async function performCommitPromptIfNeeded(
       // land in the same commit. Prefer the current folder-tree store, with a
       // legacy markdown fallback for older projects.
       try {
+        const rexDir = join(projectDir, ".rex");
+        const prdMarkdownFilename = "prd.md";
         const prdPaths = [
-          existsSync(join(projectDir, ".rex", PRD_TREE_DIRNAME)) ? join(".rex", PRD_TREE_DIRNAME) : undefined,
-          existsSync(join(projectDir, ".rex", "prd.md")) ? ".rex/prd.md" : undefined,
+          existsSync(join(rexDir, PRD_TREE_DIRNAME)) ? join(".rex", PRD_TREE_DIRNAME) : undefined,
+          existsSync(join(rexDir, prdMarkdownFilename)) ? join(".rex", prdMarkdownFilename) : undefined,
         ].filter((p): p is string => Boolean(p));
 
         for (const prdPath of prdPaths) {

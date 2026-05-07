@@ -764,6 +764,165 @@ describe("parseFolderTree: round-trip fidelity", () => {
   });
 });
 
+// ── Single-child optimization: feature with one task ───────────────────────
+
+describe("parseFolderTree: single-child optimization", () => {
+  it("round-trips single-child feature→task with parent metadata embedded", async () => {
+    // Create: epic with feature (has 1 task), feature with 1 task
+    const task = makeTask("33333333-3333-3333-3333-333333333333", "My Task", {
+      acceptanceCriteria: ["Task AC"],
+      status: "in_progress",
+    });
+    const feature = makeFeature("22222222-2222-2222-2222-222222222222", "My Feature", {
+      acceptanceCriteria: ["Feature AC"],
+      children: [task],
+      priority: "high",
+      description: "Feature description.",
+    });
+    const epic = makeEpic("11111111-1111-1111-1111-111111111111", "My Epic", {
+      children: [feature],
+      description: "Epic description.",
+    });
+
+    // Serialize using folder-tree serializer (which should optimize single-child)
+    const { serializeFolderTree } = await import("../../../src/store/folder-tree-serializer.js");
+    await serializeFolderTree([epic], testDir);
+
+    // Parse back
+    const result = await parseFolderTree(testDir);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.items).toHaveLength(1);
+
+    // Reconstruct and verify tree structure
+    const parsedEpic = result.items[0];
+    expect(parsedEpic.id).toBe(epic.id);
+    expect(parsedEpic.title).toBe(epic.title);
+    expect(parsedEpic.level).toBe("epic");
+    expect(parsedEpic.description).toBe("Epic description.");
+    expect(parsedEpic.children).toHaveLength(1);
+
+    const parsedFeature = parsedEpic.children![0];
+    expect(parsedFeature.id).toBe(feature.id);
+    expect(parsedFeature.title).toBe(feature.title);
+    expect(parsedFeature.level).toBe("feature");
+    expect(parsedFeature.description).toBe("Feature description.");
+    expect(parsedFeature.priority).toBe("high");
+    expect(parsedFeature.acceptanceCriteria).toEqual(["Feature AC"]);
+    expect(parsedFeature.children).toHaveLength(1);
+
+    const parsedTask = parsedFeature.children![0];
+    expect(parsedTask.id).toBe(task.id);
+    expect(parsedTask.title).toBe(task.title);
+    expect(parsedTask.level).toBe("task");
+    expect(parsedTask.status).toBe("in_progress");
+    expect(parsedTask.acceptanceCriteria).toEqual(["Task AC"]);
+  });
+
+  it("does NOT collapse multi-child feature (creates normal structure)", async () => {
+    // Create: feature with 2 tasks (multi-child, should NOT collapse)
+    const { serializeFolderTree } = await import("../../../src/store/folder-tree-serializer.js");
+    const task1 = makeTask("t1111111-1111-1111-1111-111111111111", "Task 1");
+    const task2 = makeTask("t2222222-2222-2222-2222-222222222222", "Task 2");
+    const feature = makeFeature("22222222-2222-2222-2222-222222222222", "Feature", {
+      children: [task1, task2],
+    });
+    const epic = makeEpic("11111111-1111-1111-1111-111111111111", "Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+
+    // Verify filesystem structure: should have feature-slug subdirectory containing task subdirs
+    // (We don't directly test filesystem, but verify parsing succeeds and structure is intact)
+    const result = await parseFolderTree(testDir);
+    expect(result.warnings).toHaveLength(0);
+
+    const parsedEpic = result.items[0];
+    const parsedFeature = parsedEpic.children![0];
+    expect(parsedFeature.children).toHaveLength(2);
+    expect(parsedFeature.children![0].id).toBe(task1.id);
+    expect(parsedFeature.children![1].id).toBe(task2.id);
+  });
+
+  it("preserves all parent metadata during single-child collapse", async () => {
+    const { serializeFolderTree } = await import("../../../src/store/folder-tree-serializer.js");
+    const task = makeTask("t3333333-3333-3333-3333-333333333333", "Task");
+    const feature = makeFeature("f2222222-2222-2222-2222-222222222222", "Feature", {
+      description: "Feature description",
+      priority: "critical",
+      tags: ["web", "api", "core"],
+      source: "analyze",
+      blockedBy: ["blocked-task-id"],
+      children: [task],
+      status: "completed",
+      completedAt: "2026-05-01T10:00:00.000Z",
+    });
+    const epic = makeEpic("e1111111-1111-1111-1111-111111111111", "Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+    const result = await parseFolderTree(testDir);
+    expect(result.warnings).toHaveLength(0);
+
+    const parsedFeature = result.items[0].children![0];
+    expect(parsedFeature.description).toBe("Feature description");
+    expect(parsedFeature.priority).toBe("critical");
+    expect(parsedFeature.tags).toEqual(["web", "api", "core"]);
+    expect(parsedFeature.source).toBe("analyze");
+    expect(parsedFeature.blockedBy).toEqual(["blocked-task-id"]);
+    expect(parsedFeature.status).toBe("completed");
+    expect(parsedFeature.completedAt).toBe("2026-05-01T10:00:00.000Z");
+  });
+
+  it("handles skip-level single-child (feature→subtask, no task)", async () => {
+    const { serializeFolderTree } = await import("../../../src/store/folder-tree-serializer.js");
+    // Create: feature with only subtask child (no intermediate task)
+    const subtask = makeSubtask("s4444444-4444-4444-4444-444444444444", "Subtask");
+    const feature = makeFeature("f3333333-3333-3333-3333-333333333333", "Feature", {
+      children: [subtask],
+    });
+    const epic = makeEpic("e2222222-2222-2222-2222-222222222222", "Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+    const result = await parseFolderTree(testDir);
+    expect(result.warnings).toHaveLength(0);
+
+    const parsedFeature = result.items[0].children![0];
+    expect(parsedFeature.level).toBe("feature");
+    expect(parsedFeature.children).toHaveLength(1);
+    expect(parsedFeature.children![0].level).toBe("subtask");
+    expect(parsedFeature.children![0].title).toBe("Subtask");
+  });
+
+  it("nested single-child: epic→feature→task all single-child", async () => {
+    const { serializeFolderTree } = await import("../../../src/store/folder-tree-serializer.js");
+    // Create deeply nested single-child chain
+    const task = makeTask("t5555555-5555-5555-5555-555555555555", "Task");
+    const feature = makeFeature("f4444444-4444-4444-4444-444444444444", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("e3333333-3333-3333-3333-333333333333", "Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+    const result = await parseFolderTree(testDir);
+    expect(result.warnings).toHaveLength(0);
+
+    // Verify full chain reconstructed correctly
+    const parsedEpic = result.items[0];
+    expect(parsedEpic.level).toBe("epic");
+    const parsedFeature = parsedEpic.children![0];
+    expect(parsedFeature.level).toBe("feature");
+    const parsedTask = parsedFeature.children![0];
+    expect(parsedTask.level).toBe("task");
+    expect(parsedTask.id).toBe(task.id);
+  });
+});
+
 // ── Performance: 200-item tree < 500 ms ──────────────────────────────────────
 
 describe("parseFolderTree: performance", () => {

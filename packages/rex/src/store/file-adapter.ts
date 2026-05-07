@@ -457,11 +457,12 @@ export class FileStore implements PRDStore {
   }
 
   private warnPrdMdIgnored(): void {
+    const prdMarkdownFile = "prd.md";
     // eslint-disable-next-line no-console
     console.warn(
-      `Warning: .rex/prd.md exists alongside .rex/${PRD_TREE_DIRNAME}/ (folder-tree). ` +
-      `The tree is authoritative; prd.md is ignored and will be removed in a future version. ` +
-      `To remove this warning, delete: rm .rex/prd.md`,
+      `Warning: .rex/${prdMarkdownFile} exists alongside .rex/${PRD_TREE_DIRNAME}/ (folder-tree). ` +
+      `The tree is authoritative; ${prdMarkdownFile} is ignored and will be removed in a future version. ` +
+      `To remove this warning, delete: rm .rex/${prdMarkdownFile}`,
     );
   }
 

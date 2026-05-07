@@ -64,13 +64,15 @@ export async function serializeFolderTree(
   };
 
   await ensureDir(treeRoot, result);
-  await serializeChildren(items, treeRoot, result);
+  const writtenSlugs = await writeSiblings(items, treeRoot, result);
+  await removeStaleSubdirs(treeRoot, writtenSlugs, result);
 
   return result;
 }
 
 /**
- * Recursively serialize a list of sibling items into `parentDir`.
+ * Recursively serialize a list of sibling items into `parentDir` and return
+ * the set of directory names written directly inside `parentDir`.
  *
  * Each item gets its own directory, regardless of level. Children are
  * serialized one level deeper, also regardless of level. This preserves
@@ -78,55 +80,165 @@ export async function serializeFolderTree(
  * (e.g. a task placed directly under an epic without an intermediate
  * feature) without dropping or re-typing data.
  *
- * The directory contains:
- *   - `<title>.md` — the item's primary markdown (with full frontmatter)
- *   - `index.md`   — human-readable summary (Progress / Subtask sections)
- * and one subdirectory per child, recursively.
+ * Single-child optimization: When an item is a feature (or lower) with exactly
+ * one child, the child's file is written directly to `parentDir`, and the
+ * parent's metadata is embedded in the child's frontmatter using `__parent*`
+ * fields. The parent's own directory is skipped. The child's slug is included
+ * in the returned set so the caller's `removeStaleSubdirs` cleanup at
+ * `parentDir` does not delete it.
  *
- * Stale sibling directories under `parentDir` (items removed from the
- * source tree) are deleted via {@link removeStaleSubdirs}.
+ * Each non-optimized item's directory contains:
+ *   - `<title>.md` — the item's primary markdown (with full frontmatter)
+ *   - `index.md`   — human-readable summary (only when the item has children)
+ * and one subdirectory per child, recursively. Stale child subdirectories
+ * (items removed from the source tree) are cleaned up at the *child* level
+ * before this function returns the slugs it wrote.
  */
-async function serializeChildren(
+async function writeSiblings(
   items: PRDItem[],
   parentDir: string,
   result: SerializeResult,
-): Promise<void> {
+): Promise<Set<string>> {
   // Position-keyed slugs survive duplicate-id inputs: id-keyed lookups would
-  // collapse two same-id items into one slot. The public id-keyed
-  // `resolveSiblingSlugs` API is unchanged for external callers — only this
-  // internal serialization path uses positional slugs.
+  // collapse two same-id items into one slot.
   const positionalSlugs = resolvePositionalSiblingSlugs(items);
-  const expectedSlugs = new Set<string>();
+  const writtenSlugs = new Set<string>();
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const itemSlug = positionalSlugs[i];
-    expectedSlugs.add(itemSlug);
-    const itemDir = join(parentDir, itemSlug);
-    await ensureDir(itemDir, result);
-
     const children = item.children ?? [];
     const childSlugs = resolveSiblingSlugs(children);
 
-    // Item file: <title>.md with full frontmatter and a Children link table.
+    // Single-child optimization: when this item is a feature (or lower) with
+    // exactly one child, skip the directory for `item` and write the child
+    // directly into `parentDir`. The recursion returns whichever slug landed
+    // at `parentDir` (it may itself be a further-optimized descendant).
+    const isFeatureOrLower = item.level !== "epic";
+    if (isFeatureOrLower && children.length === 1) {
+      const singleChild = children[0];
+      embedParentMetadata(singleChild, item);
+      const innerSlugs = await writeSiblings([singleChild], parentDir, result);
+      for (const slug of innerSlugs) writtenSlugs.add(slug);
+      continue;
+    }
+
+    // Multi-child (or zero-child) case: create the item's own directory and
+    // recurse into it.
+    writtenSlugs.add(itemSlug);
+    const itemDir = join(parentDir, itemSlug);
+    await ensureDir(itemDir, result);
+
     const itemContent = renderItemIndexMd(item, children, childSlugs);
     const itemFilename = titleToFilename(item.title);
     const itemPath = join(itemDir, itemFilename);
     await writeIfChanged(itemPath, itemContent, result);
     await removeOrphanedMarkdownFiles(itemDir, itemFilename);
 
-    // index.md: human-readable summary (delegates to generateIndexMd, which
-    // selectively renders Progress / Subtask sections based on item.level).
-    const itemIndexContent = generateIndexMd(item, children, []);
+    // index.md: human-readable summary. Only emitted for items with children
+    // (containers/hubs); leaf items rely on `<title>.md` alone.
     const itemIndexPath = join(itemDir, "index.md");
-    await writeIfChanged(itemIndexPath, itemIndexContent, result);
+    if (children.length > 0) {
+      const itemIndexContent = generateIndexMd(item, children, []);
+      await writeIfChanged(itemIndexPath, itemIndexContent, result);
+    } else {
+      try {
+        await rm(itemIndexPath, { force: true });
+      } catch {
+        // File may not exist — silently continue
+      }
+    }
 
-    // Always recurse so stale child subdirectories are cleaned up even when
-    // the item now has no children (e.g. after a move that empties this parent).
-    await serializeChildren(children, itemDir, result);
+    // Recurse into the item's directory and clean it up against the slugs we
+    // actually wrote there. Cleanup is keyed off the recursion's *return
+    // value*, not the loop's local accumulator, so single-child-optimized
+    // descendants survive even when their direct parent was elided.
+    const childWrittenSlugs = await writeSiblings(children, itemDir, result);
+    await removeStaleSubdirs(itemDir, childWrittenSlugs, result);
   }
 
-  await removeStaleSubdirs(parentDir, expectedSlugs, result);
+  return writtenSlugs;
+}
+
+/**
+ * Embed parent metadata into a child item using `__parent*` fields.
+ * These fields are preserved through serialization and can be used by the
+ * parser to reconstruct the parent during single-child optimization round-trips.
+ *
+ * Called only when a parent has exactly one child and single-child optimization applies.
+ *
+ * Note: Does not embed the parent's own `__parent*` fields (which would be from
+ * the parent's parent). Those are handled separately during recursive embedding.
+ */
+function embedParentMetadata(child: PRDItem, parent: PRDItem): void {
+  const childRecord = child as Record<string, unknown>;
+
+  // Embed all parent metadata using __parent prefix
+  childRecord.__parentId = parent.id;
+  childRecord.__parentTitle = parent.title;
+  childRecord.__parentStatus = parent.status;
+  childRecord.__parentLevel = parent.level;
+
+  if (parent.description !== undefined) {
+    childRecord.__parentDescription = parent.description;
+  }
+  if (parent.priority !== undefined) {
+    childRecord.__parentPriority = parent.priority;
+  }
+  if (parent.tags !== undefined) {
+    childRecord.__parentTags = parent.tags;
+  }
+  if (parent.blockedBy !== undefined) {
+    childRecord.__parentBlockedBy = parent.blockedBy;
+  }
+  if (parent.source !== undefined) {
+    childRecord.__parentSource = parent.source;
+  }
+  if (parent.startedAt !== undefined) {
+    childRecord.__parentStartedAt = parent.startedAt;
+  }
+  if (parent.completedAt !== undefined) {
+    childRecord.__parentCompletedAt = parent.completedAt;
+  }
+  if (parent.endedAt !== undefined) {
+    childRecord.__parentEndedAt = parent.endedAt;
+  }
+  if (parent.resolutionType !== undefined) {
+    childRecord.__parentResolutionType = parent.resolutionType;
+  }
+  if (parent.resolutionDetail !== undefined) {
+    childRecord.__parentResolutionDetail = parent.resolutionDetail;
+  }
+  if (parent.failureReason !== undefined) {
+    childRecord.__parentFailureReason = parent.failureReason;
+  }
+  if (parent.acceptanceCriteria !== undefined) {
+    childRecord.__parentAcceptanceCriteria = parent.acceptanceCriteria;
+  }
+  if ((parent as Record<string, unknown>).loe !== undefined) {
+    childRecord.__parentLoe = (parent as Record<string, unknown>).loe;
+  }
+  // Preserve any unknown fields from parent as well.
+  // If the parent has __parent* fields (from its own parent), copy them with
+  // an additional __parent prefix to preserve the ancestor chain.
+  const knownParentFields = new Set([
+    "id", "level", "title", "status", "description", "priority", "tags", "blockedBy",
+    "source", "startedAt", "completedAt", "endedAt", "resolutionType",
+    "resolutionDetail", "failureReason", "acceptanceCriteria", "loe", "children",
+  ]);
+  for (const [key, value] of Object.entries(parent)) {
+    if (knownParentFields.has(key) || value === undefined || value === null) {
+      continue;
+    }
+    if (key.startsWith("__parent")) {
+      // Preserve ancestor fields with an additional __parent prefix
+      // __parentId → __parent__parentId, __parentTitle → __parent__parentTitle, etc.
+      childRecord[`__parent${key}`] = value;
+    } else {
+      // Add __parent prefix for other unknown fields
+      childRecord[`__parent${key.charAt(0).toUpperCase()}${key.slice(1)}`] = value;
+    }
+  }
 }
 
 /**
@@ -364,8 +476,13 @@ function emitFrontmatter(lines: string[], item: PRDItem): void {
   }
 }
 
-/** Emit one YAML key-value line (or block) into `lines`. */
-function emitYamlField(lines: string[], key: string, value: unknown): void {
+/**
+ * Emit one YAML key-value line (or block) into `lines`.
+ *
+ * @public — used by core/compact-single-children to re-emit prefixed parent
+ * fields with the same encoding rules as the rest of the serializer.
+ */
+export function emitYamlField(lines: string[], key: string, value: unknown): void {
   if (Array.isArray(value)) {
     if (value.length === 0) {
       lines.push(`${key}: []`);

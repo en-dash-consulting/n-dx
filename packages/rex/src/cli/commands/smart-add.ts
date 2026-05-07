@@ -1140,7 +1140,11 @@ function determineSmartAddModelSource(vendor: LLMVendor, llmConfig: LLMConfig): 
   return "default";
 }
 
-async function initializeSmartAddLLM(dir: string, format?: string): Promise<void> {
+async function initializeSmartAddLLM(
+  dir: string,
+  format?: string,
+  requestedModel?: string,
+): Promise<void> {
   const rexConfigDir = join(dir, REX_DIR);
   const llmConfig = await loadLLMConfig(rexConfigDir);
   setLLMConfig(llmConfig);
@@ -1150,11 +1154,13 @@ async function initializeSmartAddLLM(dir: string, format?: string): Promise<void
   const vendor = getLLMVendor();
   llmDebug(`resolved vendor=${vendor ?? "unknown"} configDir=${rexConfigDir}`);
   if (vendor) {
-    const resolvedModel = await resolveSmartAddModel(dir);
+    const resolvedModel = await resolveSmartAddModel(dir, requestedModel);
     const defaultModel = resolveVendorModel(vendor, llmConfig);
-    const modelSource = resolvedModel && resolvedModel !== defaultModel
-      ? "configured"
-      : determineSmartAddModelSource(vendor, llmConfig);
+    const modelSource: "cli-override" | "configured" | "default" = requestedModel
+      ? "cli-override"
+      : resolvedModel && resolvedModel !== defaultModel
+        ? "configured"
+        : determineSmartAddModelSource(vendor, llmConfig);
     printVendorModelHeader(vendor, llmConfig, {
       format,
       resolvedModel,
@@ -1706,7 +1712,7 @@ export async function cmdSmartAdd(
     );
   }
 
-  await initializeSmartAddLLM(dir, flags.format);
+  await initializeSmartAddLLM(dir, flags.format, flags.model);
   if (await replayCachedIfRequested(dir, input, flags.format)) {
     return;
   }

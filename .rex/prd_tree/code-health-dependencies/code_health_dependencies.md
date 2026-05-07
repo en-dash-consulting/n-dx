@@ -16,9 +16,9 @@ recommendationMeta: "[object Object]"
 | Title | Status |
 |-------|--------|
 | [Deprecated npm Dependency Audit and Remediation](./deprecated-npm-dependency-audit-f6c36d/index.md) | completed |
-| [Fix anti-pattern in global (1 finding)](./fix-anti-pattern-in-global-1-9ee6a6/index.md) | completed |
 | [Fix anti-pattern in global (1 finding)](./fix-anti-pattern-in-global-1-f98f84/index.md) | completed |
 | [Fix anti-pattern in global (2 findings)](./fix-anti-pattern-in-global-2-findings/index.md) | completed |
+| [Fix anti-pattern in global (1 finding)](./fix-anti-pattern-in-global-1-9ee6a6/index.md) | completed |
 | [Fix code in global (4 findings)](./fix-code-in-global-4-findings/index.md) | completed |
 | [Fix code in packages-web:integration (2 findings)](./fix-code-in-packages-web-76ab3e/index.md) | completed |
 | [Fix code in prd-tree-search (2 findings)](./fix-code-in-prd-tree-search-2-findings/index.md) | completed |
@@ -43,16 +43,16 @@ recommendationMeta: "[object Object]"
 | [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-19e84f/index.md) | completed |
 | [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-9d4e78/index.md) | completed |
 | [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-573db5/index.md) | completed |
-| [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-9590ed/index.md) | completed |
 | [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-bc5b3b/index.md) | completed |
 | [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-f190d1/index.md) | completed |
+| [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-9590ed/index.md) | completed |
 | [Fix observation in domain-gateway-routes-mcp (1 finding)](./fix-observation-in-domain-31008a/index.md) | completed |
-| [Fix observation in global (1 finding)](./fix-observation-in-global-1-044c0c/index.md) | completed |
-| [Fix observation in global (1 finding)](./fix-observation-in-global-1-1e94a9/index.md) | completed |
 | [Fix observation in global (2 findings)](./fix-observation-in-global-2-findings/index.md) | completed |
+| [Fix observation in global (1 finding)](./fix-observation-in-global-1-1e94a9/index.md) | completed |
+| [Fix observation in global (1 finding)](./fix-observation-in-global-1-044c0c/index.md) | completed |
 | [Fix observation in health (1 finding)](./fix-observation-in-health-1-finding/index.md) | completed |
-| [Fix observation in hench (1 finding)](./fix-observation-in-hench-1-finding/index.md) | completed |
 | [Fix observation in hench-2 (1 finding)](./fix-observation-in-hench-2-1-finding/index.md) | completed |
+| [Fix observation in hench (1 finding)](./fix-observation-in-hench-1-finding/index.md) | completed |
 | [Fix observation in rex-2 (1 finding)](./fix-observation-in-rex-2-1-finding/index.md) | completed |
 | [Fix observation in rex-core (1 finding)](./fix-observation-in-rex-core-1-finding/index.md) | completed |
 | [Fix observation in rex-fix (1 finding)](./fix-observation-in-rex-fix-1-finding/index.md) | completed |
@@ -67,8 +67,8 @@ recommendationMeta: "[object Object]"
 | [Fix structural in autonomous-agent-engine (1 finding)](./fix-structural-in-autonomous-c6ef1d/index.md) | completed |
 | [Fix structural in config-validation-gauntlet (1 finding)](./fix-structural-in-config-312ab8/index.md) | completed |
 | [Fix structural in e2e-test-infrastructure (1 finding)](./fix-structural-in-e2e-test-98d8a3/index.md) | completed |
-| [Fix structural in global (1 finding)](./fix-structural-in-global-1-finding/index.md) | completed |
 | [Fix structural in global (4 findings)](./fix-structural-in-global-4-findings/index.md) | completed |
+| [Fix structural in global (1 finding)](./fix-structural-in-global-1-finding/index.md) | completed |
 | [Fix structural in local-docker-harness (1 finding)](./fix-structural-in-local-docker-29d832/index.md) | completed |
 | [Fix structural in polling-lifecycle (1 finding)](./fix-structural-in-polling-3dd2cc/index.md) | completed |
 | [Fix structural in project-scaffold (1 finding)](./fix-structural-in-project-cff8b8/index.md) | completed |
@@ -83,9 +83,9 @@ recommendationMeta: "[object Object]"
 | [Fix suggestion in hench-2 (1 finding)](./fix-suggestion-in-hench-2-1-finding/index.md) | completed |
 | [Fix suggestion in hench-4 (1 finding)](./fix-suggestion-in-hench-4-1-finding/index.md) | completed |
 | [Fix suggestion in rex-2 (1 finding)](./fix-suggestion-in-rex-2-1-finding/index.md) | completed |
-| [Fix suggestion in sourcevision-3 (1 finding)](./fix-suggestion-in-sourcevision-4e6c04/index.md) | completed |
 | [Fix suggestion in sourcevision-4 (1 finding)](./fix-suggestion-in-sourcevision-7d6bf1/index.md) | completed |
 | [Fix suggestion in sourcevision-2 (1 finding)](./fix-suggestion-in-sourcevision-ff6c5a/index.md) | completed |
+| [Fix suggestion in sourcevision-3 (1 finding)](./fix-suggestion-in-sourcevision-4e6c04/index.md) | completed |
 | [Fix suggestion in viewer-ui-hub (1 finding)](./fix-suggestion-in-viewer-ui-hub-a1fc3f/index.md) | completed |
 | [Fix suggestion in web-3 (1 finding)](./fix-suggestion-in-web-3-1-finding/index.md) | completed |
 | [Fix suggestion in web-server (1 finding)](./fix-suggestion-in-web-server-1-finding/index.md) | completed |

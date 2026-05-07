@@ -181,6 +181,9 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     const featId = extractId(featOut);
     const taskOut = run(["add", "task", tmpDir, "--title=Task Alpha", `--parent=${featId}`, "--priority=high"]);
     const taskId = extractId(taskOut);
+    // Add a sibling task so the feature has 2 children and isn't collapsed by
+    // single-child compaction.
+    run(["add", "task", tmpDir, "--title=Task Beta", `--parent=${featId}`]);
 
     const epicDir = (await findItemDir(treeRoot, epicId))!;
     const featDir = (await findItemDir(join(treeRoot, epicDir), featId))!;
@@ -236,6 +239,10 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
     const featId = extractId(featOut);
     const taskOut = run(["add", "task", tmpDir, "--title=Task", `--parent=${featId}`]);
     const taskId = extractId(taskOut);
+    // Add a sibling task so the feature is not single-child-compacted; the
+    // feature directory must exist for this test to verify subdirectory
+    // removal.
+    run(["add", "task", tmpDir, "--title=Sibling Task", `--parent=${featId}`]);
 
     const epicDir = (await findItemDir(treeRoot, epicId))!;
     const featDir = (await findItemDir(join(treeRoot, epicDir), featId))!;

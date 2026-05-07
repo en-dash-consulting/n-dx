@@ -85,7 +85,9 @@ describe("Vitest timeout failures", () => {
     expect(result.durationMs).toBeLessThan(10_000);
     expect(output).toMatch(/Test timed out in 150ms/);
     expect(output).toContain("fails with a Vitest timeout");
-    expect(output).toContain("keeps fast tests passing");
+    // "keeps fast tests passing" is no longer surfaced by name in vitest v4's
+    // default reporter — passing tests are only counted, not listed by name.
+    // The count assertions below confirm the second test ran and passed.
     expect(output).toMatch(/1 failed/);
     expect(output).toMatch(/1 passed/);
 

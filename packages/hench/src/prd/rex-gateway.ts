@@ -99,6 +99,9 @@ export { findItem, walkTree } from "@n-dx/rex";
 // ---- Task selection ---------------------------------------------------------
 export { findNextTask, findActionableTasks, collectCompletedIds, explainSelection } from "@n-dx/rex";
 
+// ---- Self-heal tag scoping --------------------------------------------------
+export { SELF_HEAL_TAG } from "@n-dx/rex";
+
 // ---- Timestamps -------------------------------------------------------------
 export { computeTimestampUpdates } from "@n-dx/rex";
 

@@ -1,0 +1,25 @@
+---
+id: "793e0718-9cd8-4b15-b828-fef49bc92921"
+level: "task"
+title: "Fix observation in tick: High coupling (0.56) — 3 imports target \"web\""
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-13T21:35:34.109Z"
+completedAt: "2026-04-13T21:38:15.653Z"
+acceptanceCriteria: []
+description: "- High coupling (0.56) — 3 imports target \"web\""
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-13T21:38:15.824Z"
+__parentDescription: "- High coupling (0.56) — 3 imports target \"web\""
+__parentId: "3da1eb3a-3b0d-4452-8644-95dc64968811"
+__parentLevel: "feature"
+__parentParentId: "0de5be78-d295-4f71-be5d-38594a355240"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-13T21:38:15.824Z"
+__parentStatus: "completed"
+__parentTitle: "Fix observation in tick (1 finding)"
+recommendationMeta: "[object Object]"
+---

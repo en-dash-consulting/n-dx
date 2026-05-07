@@ -49,6 +49,20 @@ describe("index.md generation: E2E", () => {
     };
 
     await store.addItem(epic);
+    // Leaf items do not get an index.md (only `<title>.md`); add a child so
+    // the epic is a non-leaf and gets the human-readable index.md summary.
+    await store.addItem(
+      {
+        id: "feat-placeholder",
+        level: "feature",
+        title: "Placeholder Feature",
+        status: "pending",
+        description: "",
+        acceptanceCriteria: [],
+        children: [],
+      },
+      epic.id,
+    );
 
     // Find the epic directory dynamically
     const treeRoot = join(testDir, ".rex", PRD_TREE_DIRNAME);

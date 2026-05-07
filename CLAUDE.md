@@ -229,7 +229,7 @@ pnpm typecheck      # typecheck all packages
 
 ## Assistant Instruction Files
 
-`ndx init` generates per-assistant instruction files from a shared source of truth (`packages/core/assistant-assets/project-guidance.md`). Each file has a defined role:
+`ndx init` generates per-assistant instruction files from a shared source of truth (`assistant-assets/project-guidance.md`). Each file has a defined role:
 
 | File | Role | Generated from |
 |------|------|----------------|
@@ -239,7 +239,7 @@ pnpm typecheck      # typecheck all packages
 
 **Design invariant:** Both `AGENTS.md` and `CLAUDE.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
 
-Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
+Re-run `ndx init` to regenerate all instruction files after changes to `assistant-assets/`.
 
 ## Command Aliases
 

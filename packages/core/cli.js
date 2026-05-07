@@ -315,13 +315,6 @@ let updateCheckQuiet = false;
 let staleCheckResult = null;
 
 /**
- * The n-dx version recorded in .n-dx.json at last init, if available.
- * Used to display "initialized with n-dx X.Y" in the staleness notice.
- * @type {string | null}
- */
-let staleCheckInitVersion = null;
-
-/**
  * Commands that skip the stale check — either they have no project context
  * (help, version) or they are about to fix staleness (init).
  */
@@ -367,13 +360,11 @@ async function flushAndExit(code = 0) {
         }
       }
 
-      // Show staleness notice when the project setup is incomplete or outdated.
+      // Show staleness notice when one or more tool directories are missing.
       // Written to stderr so JSON stdout output stays machine-parseable.
       if (code === 0 && !updateCheckQuiet && staleCheckResult && staleCheckResult.length > 0) {
         try {
-          process.stderr.write(
-            formatStalenessNotice(staleCheckResult, { initVersion: staleCheckInitVersion }) + "\n",
-          );
+          process.stderr.write(formatStalenessNotice(staleCheckResult) + "\n");
         } catch {
           // Never block exit for stale-check display errors.
         }
@@ -2344,14 +2335,6 @@ async function main() {
   if (!updateCheckQuiet && command && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp) {
     try {
       staleCheckResult = checkProjectStaleness(dir);
-      // Read the recorded init version from .n-dx.json for the notice message.
-      try {
-        const ndxConfig = join(dir, ".n-dx.json");
-        if (existsSync(ndxConfig)) {
-          const cfg = JSON.parse(readFileSync(ndxConfig, "utf-8"));
-          staleCheckInitVersion = typeof cfg._initVersion === "string" ? cfg._initVersion : null;
-        }
-      } catch { /* ignore */ }
     } catch {
       // Non-fatal — stale check failure never blocks command execution.
     }

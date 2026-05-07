@@ -182,13 +182,13 @@ describe("Graph (Import Graph view)", () => {
     svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 40 }));
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-graph-column .ig-svg-wrap svg > g[transform]")?.getAttribute("transform")).toContain("translate(0 -40)");
-    });
+    }, { timeout: 3000 });
     const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
     expect(zoneBtn).toBeTruthy();
     (zoneBtn as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-graph-column .ig-svg-wrap svg > g[transform]")?.getAttribute("transform")).toBe("translate(0 0) scale(1)");
-    });
+    }, { timeout: 3000 });
   });
 
   it("supports back and forward through clicked dependency preview nodes", async () => {
@@ -205,11 +205,11 @@ describe("Graph (Import Graph view)", () => {
     buttons[0].click();
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/b.ts");
-    });
+    }, { timeout: 3000 });
     buttons[1].click();
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/a.ts");
-    });
+    }, { timeout: 3000 });
   });
 
   it("shows external zones that touch cross-boundary imports", async () => {

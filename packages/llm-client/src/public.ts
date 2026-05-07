@@ -346,6 +346,12 @@ export {
 } from "./rate-limit.js";
 export type { TimeoutKind } from "./rate-limit.js";
 
+// Vendor-specific failover chains for automatic model/vendor fallback
+export {
+  getNextFailoverAttempt,
+} from "./vendor-failover.js";
+export type { FailoverAttemptResult } from "./vendor-failover.js";
+
 // CLI help formatting
 export {
   isColorEnabled,

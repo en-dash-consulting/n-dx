@@ -1,4 +1,6 @@
 import { readFile } from "node:fs/promises";
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
@@ -164,6 +166,57 @@ export async function readProjectContext(dir: string): Promise<string> {
 }
 
 
+/**
+ * Best-effort write of a parse-failure artifact to the OS temp dir.
+ * Returns the file path on success, null if the write failed (read-only fs,
+ * permission, etc.). Failure here must not mask the original parser error.
+ */
+function writeParseFailureArtifact(
+  rawResponse: string,
+  extractedJson: string,
+  underlyingError: string,
+): string | null {
+  try {
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const path = join(tmpdir(), `ndx-add-failure-${ts}.txt`);
+    const body = [
+      "# ndx add — LLM parse failure",
+      `# Timestamp: ${new Date().toISOString()}`,
+      "",
+      "## Underlying error",
+      underlyingError,
+      "",
+      "## Extracted JSON slice (passed to JSON.parse)",
+      extractedJson,
+      "",
+      "## Full raw LLM response",
+      rawResponse,
+      "",
+    ].join("\n");
+    writeFileSync(path, body, "utf8");
+    return path;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Throw a parse-failure error with a `[ndx-debug:<path>]` sentinel appended,
+ * so the foundation-tier classifier (llm-error-classifier) can surface the
+ * captured-response path back to the user.
+ */
+function throwParseFailure(
+  message: string,
+  rawResponse: string,
+  extractedJson: string,
+): never {
+  const path = writeParseFailureArtifact(rawResponse, extractedJson, message);
+  if (path) {
+    throw new Error(`${message} [ndx-debug:${path}]`);
+  }
+  throw new Error(message);
+}
+
 export function parseProposalResponse(raw: string): Proposal[] {
   const text = extractJson(raw);
 
@@ -176,7 +229,11 @@ export function parseProposalResponse(raw: string): Proposal[] {
     if (repaired) {
       parsed = JSON.parse(repaired);
     } else {
-      throw new Error(`Invalid JSON in LLM response: ${text.slice(0, 200)}`);
+      throwParseFailure(
+        `Invalid JSON in LLM response: ${text.slice(0, 200)}`,
+        raw,
+        text,
+      );
     }
   }
 
@@ -208,9 +265,10 @@ export function parseProposalResponse(raw: string): Proposal[] {
     }
   }
 
-  // Nothing salvageable — throw with original error detail
-  throw new Error(
+  throwParseFailure(
     `LLM response failed schema validation: ${strict.error.issues.map((i) => i.message).join("; ")}`,
+    raw,
+    text,
   );
 }
 

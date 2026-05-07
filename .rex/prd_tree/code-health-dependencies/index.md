@@ -40,9 +40,9 @@ Automated recommendations from SourceVision analysis. 4 zone+category groups cov
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
 | Deprecated npm Dependency Audit and Remediation | feature | completed | 2026-04-08 |
-| Fix anti-pattern in global (1 finding) | feature | completed | 2026-04-17 |
 | Fix anti-pattern in global (1 finding) | feature | completed | 2026-04-20 |
 | Fix anti-pattern in global (2 findings) | feature | completed | 2026-04-03 |
+| Fix anti-pattern in global (1 finding) | feature | completed | 2026-04-17 |
 | Fix code in global (4 findings) | feature | completed | 2026-04-14 |
 | Fix code in packages-web:integration (2 findings) | feature | completed | 2026-04-14 |
 | Fix code in prd-tree-search (2 findings) | feature | completed | 2026-04-14 |
@@ -67,16 +67,16 @@ Automated recommendations from SourceVision analysis. 4 zone+category groups cov
 | Fix move-file in web-server (1 finding) | feature | completed | 2026-04-14 |
 | Fix move-file in web-server (1 finding) | feature | completed | 2026-04-13 |
 | Fix move-file in web-viewer (1 finding) | feature | completed | 2026-04-20 |
-| Fix move-file in web-viewer (1 finding) | feature | completed | 2026-04-17 |
 | Fix move-file in web-viewer (1 finding) | feature | completed | 2026-04-14 |
 | Fix move-file in web-viewer (1 finding) | feature | completed | 2026-04-03 |
+| Fix move-file in web-viewer (1 finding) | feature | completed | 2026-04-17 |
 | Fix observation in domain-gateway-routes-mcp (1 finding) | feature | completed | 2026-04-16 |
-| Fix observation in global (1 finding) | feature | completed | 2026-04-17 |
-| Fix observation in global (1 finding) | feature | completed | 2026-04-16 |
 | Fix observation in global (2 findings) | feature | completed | 2026-04-20 |
+| Fix observation in global (1 finding) | feature | completed | 2026-04-16 |
+| Fix observation in global (1 finding) | feature | completed | 2026-04-17 |
 | Fix observation in health (1 finding) | feature | completed | 2026-04-13 |
-| Fix observation in hench (1 finding) | feature | completed | 2026-04-20 |
 | Fix observation in hench-2 (1 finding) | feature | completed | 2026-04-17 |
+| Fix observation in hench (1 finding) | feature | completed | 2026-04-20 |
 | Fix observation in rex-2 (1 finding) | feature | completed | 2026-04-17 |
 | Fix observation in rex-core (1 finding) | feature | completed | 2026-04-18 |
 | Fix observation in rex-fix (1 finding) | feature | completed | 2026-04-18 |
@@ -91,8 +91,8 @@ Automated recommendations from SourceVision analysis. 4 zone+category groups cov
 | Fix structural in autonomous-agent-engine (1 finding) | feature | completed | 2026-04-18 |
 | Fix structural in config-validation-gauntlet (1 finding) | feature | completed | 2026-04-18 |
 | Fix structural in e2e-test-infrastructure (1 finding) | feature | completed | 2026-04-18 |
-| Fix structural in global (1 finding) | feature | completed | 2026-04-20 |
 | Fix structural in global (4 findings) | feature | completed | 2026-04-18 |
+| Fix structural in global (1 finding) | feature | completed | 2026-04-20 |
 | Fix structural in local-docker-harness (1 finding) | feature | completed | 2026-04-18 |
 | Fix structural in polling-lifecycle (1 finding) | feature | completed | 2026-04-19 |
 | Fix structural in project-scaffold (1 finding) | feature | completed | 2026-04-19 |
@@ -107,9 +107,9 @@ Automated recommendations from SourceVision analysis. 4 zone+category groups cov
 | Fix suggestion in hench-2 (1 finding) | feature | completed | 2026-04-19 |
 | Fix suggestion in hench-4 (1 finding) | feature | completed | 2026-04-14 |
 | Fix suggestion in rex-2 (1 finding) | feature | completed | 2026-04-14 |
-| Fix suggestion in sourcevision-3 (1 finding) | feature | completed | 2026-04-03 |
 | Fix suggestion in sourcevision-4 (1 finding) | feature | completed | 2026-04-14 |
 | Fix suggestion in sourcevision-2 (1 finding) | feature | completed | 2026-04-03 |
+| Fix suggestion in sourcevision-3 (1 finding) | feature | completed | 2026-04-03 |
 | Fix suggestion in viewer-ui-hub (1 finding) | feature | completed | 2026-04-19 |
 | Fix suggestion in web-3 (1 finding) | feature | completed | 2026-04-19 |
 | Fix suggestion in web-server (1 finding) | feature | completed | 2026-04-14 |

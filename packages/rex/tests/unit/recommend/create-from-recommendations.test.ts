@@ -2059,8 +2059,8 @@ describe("createItemsFromRecommendations", () => {
       ]);
 
       const doc = await readPrd(tmpDir);
-      expect(doc.items[0].tags).toEqual(["self-heal"]);
-      expect(doc.items[1].tags).toEqual(["perf", "self-heal"]);
+      expect(doc.items[0].tags).toEqual(["self-heal-items"]);
+      expect(doc.items[1].tags).toEqual(["perf", "self-heal-items"]);
     });
 
     it("does not tag items when NDX_SELF_HEAL is unset", async () => {
@@ -2094,12 +2094,12 @@ describe("createItemsFromRecommendations", () => {
           description: "already has the tag",
           priority: "low",
           source: "sourcevision",
-          tags: ["self-heal", "other"],
+          tags: ["self-heal-items", "other"],
         },
       ]);
 
       const doc = await readPrd(tmpDir);
-      expect(doc.items[0].tags).toEqual(["self-heal", "other"]);
+      expect(doc.items[0].tags).toEqual(["self-heal-items", "other"]);
     });
   });
 });

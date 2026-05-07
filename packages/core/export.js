@@ -149,9 +149,8 @@ export async function runExport(args) {
   // ── Validate prerequisites ─────────────────────────────────────────────
   const missing = [];
   if (!existsSync(svDir)) missing.push(".sourcevision");
-  const prdMdPath = join(rexDir, "prd.md");
-  const prdJsonPath = join(rexDir, "prd.json");
-  if (!existsSync(prdMdPath) && !existsSync(prdJsonPath)) missing.push(".rex/prd.md");
+  const prdTreePath = join(rexDir, "prd_tree");
+  if (!existsSync(prdTreePath)) missing.push(".rex/prd_tree");
   if (missing.length > 0) {
     console.error(`Error: Missing ${missing.join(", ")} in ${dir}`);
     console.error("Hint: Run 'ndx init' and 'ndx plan' first.");
@@ -171,7 +170,6 @@ export async function runExport(args) {
     findNextTask,
     collectCompletedIds,
     computeHealthScore,
-    parseDocument,
   } = rexPublic;
 
   // Clean output directory
@@ -193,16 +191,15 @@ export async function runExport(args) {
   // ── Step 2: Pre-render PRD data ────────────────────────────────────────
   console.log("[export] pre-rendering PRD data...");
   let prdDoc;
-  if (existsSync(prdMdPath)) {
-    const md = readFileSync(prdMdPath, "utf-8");
-    const parsed = parseDocument(md);
-    if (!parsed.ok) {
-      throw new Error(`Failed to parse .rex/prd.md: ${parsed.error.message}`);
-    }
-    prdDoc = parsed.data;
-  } else {
-    // Legacy fallback for projects that have not been migrated yet.
-    prdDoc = readJSON(prdJsonPath);
+  try {
+    const statusJson = execSync(`rex status --format=json "${dir}"`, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    prdDoc = JSON.parse(statusJson);
+  } catch (err) {
+    console.error(`[export] failed to load PRD: ${err.message}`);
+    process.exit(1);
   }
   const items = prdDoc.items || [];
 

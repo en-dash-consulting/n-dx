@@ -126,4 +126,66 @@ describe("loadLLMConfig", () => {
     expect(cfg.codex?.lightModel).toBeUndefined();
     expect(cfg.codex?.model).toBe("gpt-5");
   });
+
+  it("reads llm.autoFailover when set to true", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          autoFailover: true,
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.autoFailover).toBe(true);
+  });
+
+  it("reads llm.autoFailover when set to false", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          autoFailover: false,
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.autoFailover).toBe(false);
+  });
+
+  it("ignores non-boolean autoFailover values", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          autoFailover: "true",
+          vendor: "claude",
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.autoFailover).toBeUndefined();
+    expect(cfg.vendor).toBe("claude");
+  });
+
+  it("returns undefined for autoFailover when not set", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "claude",
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.autoFailover).toBeUndefined();
+  });
 });

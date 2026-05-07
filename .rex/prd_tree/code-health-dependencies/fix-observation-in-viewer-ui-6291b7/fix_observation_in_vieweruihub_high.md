@@ -1,0 +1,26 @@
+---
+id: "6291b72e-8ea9-44b0-9028-9474ca8af4ea"
+level: "task"
+title: "Fix observation in viewer-ui-hub: High coupling (0.63) — 5 imports target \"web-viewer\" (+1 more)"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-18T14:38:28.275Z"
+completedAt: "2026-04-18T14:47:49.182Z"
+resolutionType: "code-change"
+resolutionDetail: "Fixed search-overlay.ts to import NavigateTo through api.ts gateway instead of directly from types.ts (leaf reach-in violation). Commit: 76116c37."
+acceptanceCriteria: []
+description: "- High coupling (0.63) — 5 imports target \"web-viewer\"\n- Low cohesion (0.38) — files are loosely related, consider splitting this zone"
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-18T14:47:49.220Z"
+__parentDescription: "- High coupling (0.63) — 5 imports target \"web-viewer\"\n- Low cohesion (0.38) — files are loosely related, consider splitting this zone"
+__parentId: "d4b40fac-925e-4578-a37f-f3066399b768"
+__parentLevel: "feature"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-18T14:47:49.220Z"
+__parentStatus: "completed"
+__parentTitle: "Fix observation in viewer-ui-hub (2 findings)"
+recommendationMeta: "[object Object]"
+---

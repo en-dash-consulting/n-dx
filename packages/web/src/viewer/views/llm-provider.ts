@@ -26,6 +26,7 @@ interface LlmConfigResponse {
   claude: VendorConfig;
   codex: VendorConfig;
   legacyClaude: VendorConfig;
+  autoFailover?: boolean;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -132,6 +133,39 @@ function ModelField({
   );
 }
 
+function ToggleField({
+  fieldKey,
+  label,
+  description,
+  value,
+  onChange,
+  dirty,
+}: {
+  fieldKey: string;
+  label: string;
+  description: string;
+  value: boolean;
+  onChange: (key: string, v: boolean) => void;
+  dirty: boolean;
+}) {
+  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
+    h("label", { class: "llm-field-label", htmlFor: fieldKey },
+      label,
+      dirty ? h("span", { class: "llm-dirty-indicator" }, " •") : null,
+    ),
+    h("p", { class: "llm-field-desc" }, description),
+    h("div", { class: "llm-field-row" },
+      h("input", {
+        id: fieldKey,
+        type: "checkbox",
+        class: "llm-checkbox-input",
+        checked: value,
+        onChange: (e: Event) => onChange(fieldKey, (e.target as HTMLInputElement).checked),
+      }),
+    ),
+  );
+}
+
 function VendorSection({
   vendorId,
   config,
@@ -201,6 +235,8 @@ export function LlmProviderView() {
 
   // Pending edits: fieldKey → raw string value
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+  // Pending toggle edits: fieldKey → boolean value
+  const [editToggles, setEditToggles] = useState<Record<string, boolean>>({});
   // Vendor selection may differ from saved
   const [pendingVendor, setPendingVendor] = useState<string | null | undefined>(undefined);
 
@@ -241,6 +277,10 @@ export function LlmProviderView() {
     setEditValues((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleToggleChange = useCallback((key: string, value: boolean) => {
+    setEditToggles((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
   // Compute dirty set
   const dirtyKeys = new Set<string>();
   if (data) {
@@ -257,13 +297,20 @@ export function LlmProviderView() {
   }
   const vendorDirty = pendingVendor !== undefined && pendingVendor !== (data?.vendor ?? null);
 
-  const hasPendingChanges = dirtyKeys.size > 0 || vendorDirty;
+  // Track dirty state for toggles
+  const dirtyToggles = new Set<string>();
+  if (data && "autoFailover" in editToggles) {
+    const saved = data.autoFailover ?? false;
+    if (editToggles.autoFailover !== saved) dirtyToggles.add("autoFailover");
+  }
+
+  const hasPendingChanges = dirtyKeys.size > 0 || vendorDirty || dirtyToggles.size > 0;
 
   const handleSave = useCallback(async () => {
     setSaving(true);
     setError(null);
     try {
-      const changes: Record<string, string | null> = {};
+      const changes: Record<string, string | null | boolean> = {};
 
       if (vendorDirty) {
         changes["llm.vendor"] = pendingVendor;
@@ -274,6 +321,12 @@ export function LlmProviderView() {
         const raw = editValues[key] ?? "";
         // Map "claude.model" → "llm.claude.model"
         changes[`llm.${vendorId}.${field}`] = raw.trim() === "" ? null : raw.trim();
+      }
+
+      for (const key of dirtyToggles) {
+        if (key === "autoFailover") {
+          changes["llm.autoFailover"] = editToggles.autoFailover;
+        }
       }
 
       const res = await fetch("/api/llm/config", {
@@ -291,6 +344,7 @@ export function LlmProviderView() {
       const json = await res.json() as { config: LlmConfigResponse };
       setData(json.config);
       setEditValues({});
+      setEditToggles({});
       setPendingVendor(undefined);
 
       setToast("LLM settings saved");
@@ -301,10 +355,11 @@ export function LlmProviderView() {
     } finally {
       setSaving(false);
     }
-  }, [vendorDirty, pendingVendor, dirtyKeys, editValues]);
+  }, [vendorDirty, pendingVendor, dirtyKeys, dirtyToggles, editValues, editToggles]);
 
   const handleDiscard = useCallback(() => {
     setEditValues({});
+    setEditToggles({});
     setPendingVendor(undefined);
     setError(null);
   }, []);
@@ -366,6 +421,18 @@ export function LlmProviderView() {
       onChange: handleVendorChange,
     }),
 
+    // ── Failover settings
+    h("div", { class: "llm-failover-section" },
+      h(ToggleField, {
+        fieldKey: "autoFailover",
+        label: "Automatic Failover",
+        description: "When enabled, hench will retry failed runs on fallback models before surfacing the original error.",
+        value: editToggles.autoFailover ?? data?.autoFailover ?? false,
+        onChange: handleToggleChange,
+        dirty: dirtyToggles.has("autoFailover"),
+      }),
+    ),
+
     // ── Per-vendor model sections
     h("div", { class: "llm-vendors" },
       VENDORS.map((v) =>
@@ -405,7 +472,7 @@ export function LlmProviderView() {
     hasPendingChanges
       ? h("div", { class: "llm-save-bar" },
           h("span", { class: "llm-save-bar-hint" },
-            `${dirtyKeys.size + (vendorDirty ? 1 : 0)} unsaved change${dirtyKeys.size + (vendorDirty ? 1 : 0) === 1 ? "" : "s"}`,
+            `${dirtyKeys.size + dirtyToggles.size + (vendorDirty ? 1 : 0)} unsaved change${dirtyKeys.size + dirtyToggles.size + (vendorDirty ? 1 : 0) === 1 ? "" : "s"}`,
           ),
           h("button", {
             class: "llm-btn llm-btn-secondary",

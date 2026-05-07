@@ -31,7 +31,10 @@ import type { PRDItemData, PRDDocumentData, ItemStatus } from "../../../src/view
  * implementation accidentally triggers a full re-render.
  */
 const FRAME_BUDGET_MS = 16;
-const BUDGET_MULTIPLIER = 3;
+// jsdom renders are ~10× slower than a real browser frame.
+// The multiplier gives headroom in parallel CI / monorepo runs without
+// masking genuine O(n²) regressions (those produce 10–20× overhead, not just 10×).
+const BUDGET_MULTIPLIER = 10;
 
 function makeLargeTree(totalItems: number, runningCount: number): PRDItemData[] {
   // 10 epics, each with features; features have tasks. A handful of

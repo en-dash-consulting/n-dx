@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
@@ -844,13 +844,16 @@ export async function cmdRun(
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";
   const skipDeps = flags["skip-deps"] === "true";
-  const tagsFilter = flags["tags"]
+  let tagsFilter = flags["tags"]
     ? (flags["tags"] as string).split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
 
   // Apply self-heal mode to config so it flows through to prompt building
   if (selfHeal) {
     config.selfHeal = true;
+    // In self-heal mode, automatically restrict to self-heal-items.
+    // Tag filter can still be combined with other explicit tags via --tags.
+    tagsFilter = tagsFilter ? [...tagsFilter, SELF_HEAL_TAG] : [SELF_HEAL_TAG];
   }
 
   if (llmVendor === "codex" && provider === "api" && !dryRun) {

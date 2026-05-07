@@ -26,8 +26,19 @@ import { cmdInit } from "../../src/cli/commands/init.js";
 const {
   capturedSmartAddModels,
   mockReasonFromDescriptions,
+  capturedHeaderCalls,
+  mockPrintVendorModelHeader,
 } = vi.hoisted(() => {
   const capturedSmartAddModels: string[] = [];
+  const capturedHeaderCalls: Array<{
+    vendor: string;
+    options?: { modelSource?: string; resolvedModel?: string };
+  }> = [];
+  const mockPrintVendorModelHeader = vi.fn(
+    (vendor: string, _config: unknown, options?: { modelSource?: string; resolvedModel?: string }) => {
+      capturedHeaderCalls.push({ vendor, options });
+    },
+  );
   const mockReasonFromDescriptions = vi.fn(async (
     _descriptions: string[],
     _existing: unknown[],
@@ -63,7 +74,20 @@ const {
       },
     };
   });
-  return { capturedSmartAddModels, mockReasonFromDescriptions };
+  return {
+    capturedSmartAddModels,
+    mockReasonFromDescriptions,
+    capturedHeaderCalls,
+    mockPrintVendorModelHeader,
+  };
+});
+
+vi.mock("@n-dx/llm-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
+  return {
+    ...actual,
+    printVendorModelHeader: mockPrintVendorModelHeader,
+  };
 });
 
 vi.mock("../../src/analyze/index.js", async () => {
@@ -97,7 +121,9 @@ describe("task-weight model resolution in rex commands", () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-task-weight-model-"));
     await cmdInit(tmpDir, {});
     capturedSmartAddModels.length = 0;
+    capturedHeaderCalls.length = 0;
     mockReasonFromDescriptions.mockClear();
+    mockPrintVendorModelHeader.mockClear();
     originalIsTTY = process.stdin.isTTY;
     Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
   });
@@ -269,6 +295,54 @@ describe("task-weight model resolution in rex commands", () => {
 
       expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
       expect(capturedSmartAddModels[0]).toBe(NEWEST_MODELS.codex);
+    });
+  });
+
+  // ── Header modelSource reporting ───────────────────────────────────────────
+
+  describe("printVendorModelHeader modelSource", () => {
+    it("reports cli-override when --model flag is passed", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          llm: { vendor: "claude", claude: { model: "claude-sonnet-4-6" } },
+        }),
+        "utf-8",
+      );
+
+      await cmdSmartAdd(
+        tmpDir,
+        "Add user authentication",
+        { model: "claude-opus-4-7" },
+        {},
+      );
+
+      expect(mockPrintVendorModelHeader).toHaveBeenCalled();
+      const lastCall = capturedHeaderCalls[capturedHeaderCalls.length - 1];
+      expect(lastCall.options?.modelSource).toBe("cli-override");
+      expect(lastCall.options?.resolvedModel).toBe("claude-opus-4-7");
+    });
+
+    it("reports configured when only .n-dx.json sets a model", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          llm: { vendor: "claude", claude: { model: "claude-opus-4-7" } },
+        }),
+        "utf-8",
+      );
+
+      await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
+
+      const lastCall = capturedHeaderCalls[capturedHeaderCalls.length - 1];
+      expect(lastCall.options?.modelSource).toBe("configured");
+    });
+
+    it("reports default when no flag and no config model", async () => {
+      await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
+
+      const lastCall = capturedHeaderCalls[capturedHeaderCalls.length - 1];
+      expect(lastCall.options?.modelSource).toBe("default");
     });
   });
 });

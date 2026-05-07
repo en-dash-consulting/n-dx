@@ -116,19 +116,21 @@ describe("cmdMigrateToFolderTree", () => {
     expect(epicDirs).toHaveLength(1);
     expect(epicDirs[0]).toMatch(/epic-alpha/);
 
+    // The feature has a single child (Task Apple) so single-child compaction
+    // collapses its directory and writes the task directly under the epic.
     const epicDir = join(treeDir, epicDirs[0]);
-    const featureDirs = subdirs(epicDir);
-    expect(featureDirs).toHaveLength(1);
-    expect(featureDirs[0]).toMatch(/feature-one/);
-
-    const featureDir = join(epicDir, featureDirs[0]);
-    const taskDirs = subdirs(featureDir);
+    const taskDirs = subdirs(epicDir);
     expect(taskDirs).toHaveLength(1);
     expect(taskDirs[0]).toMatch(/task-apple/);
 
     const epicIndex = readFileSync(join(epicDir, titleToFilename("Epic Alpha")), "utf-8");
     expect(epicIndex).toContain("Epic Alpha");
     expect(epicIndex).toContain("e1111111");
+
+    // The compacted feature's metadata is embedded in the task's frontmatter.
+    const taskMd = readFileSync(join(epicDir, taskDirs[0], titleToFilename("Task Apple")), "utf-8");
+    expect(taskMd).toContain("__parentId");
+    expect(taskMd).toContain("Feature One");
   });
 
   it("prints creation summary on first run", async () => {

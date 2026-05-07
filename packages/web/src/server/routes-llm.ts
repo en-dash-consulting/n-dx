@@ -38,12 +38,14 @@ export interface LlmConfigResponse {
    * These are read-only — writes go to the modern llm.claude.* namespace.
    */
   legacyClaude: VendorConfig;
+  /** Enable automatic failover on model/vendor errors. */
+  autoFailover?: boolean;
 }
 
 /** Shape expected by PUT /api/llm/config. */
 interface LlmConfigPutBody {
-  /** Dot-path → string value (or null to delete). */
-  changes: Record<string, string | null>;
+  /** Dot-path → string, boolean, or null value. */
+  changes: Record<string, string | boolean | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +62,7 @@ const VALID_PATHS = new Set([
   "llm.claude.lightModel",
   "llm.codex.model",
   "llm.codex.lightModel",
+  "llm.autoFailover",
   "claude.model",
   "claude.lightModel",
 ]);
@@ -123,7 +126,7 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
   const legacyClaude = (config["claude"] ?? {}) as Record<string, unknown>;
 
-  return {
+  const result: LlmConfigResponse = {
     vendor: typeof llm["vendor"] === "string" ? llm["vendor"] : null,
     claude: {
       model: getString(llmClaude, "model"),
@@ -138,6 +141,12 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
       lightModel: getString(legacyClaude, "lightModel"),
     },
   };
+
+  if (typeof llm["autoFailover"] === "boolean") {
+    result.autoFailover = llm["autoFailover"];
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -177,11 +186,19 @@ export async function handleLlmRoute(
           errorResponse(res, 400, `Unknown LLM config path: "${path}". Valid paths: ${[...VALID_PATHS].join(", ")}`);
           return true;
         }
-        if (value !== null && typeof value !== "string") {
-          errorResponse(res, 400, `Value for "${path}" must be a string or null, got ${typeof value}`);
-          return true;
+        // autoFailover accepts boolean values; other paths accept strings
+        if (path === "llm.autoFailover") {
+          if (value !== null && typeof value !== "boolean") {
+            errorResponse(res, 400, `Value for "${path}" must be a boolean or null, got ${typeof value}`);
+            return true;
+          }
+        } else {
+          if (value !== null && typeof value !== "string") {
+            errorResponse(res, 400, `Value for "${path}" must be a string or null, got ${typeof value}`);
+            return true;
+          }
         }
-        if (path === "llm.vendor" && value !== null && !VALID_VENDORS.has(value)) {
+        if (path === "llm.vendor" && value !== null && !VALID_VENDORS.has(value.toString())) {
           errorResponse(res, 400, `llm.vendor must be "claude" or "codex", got "${value}"`);
           return true;
         }

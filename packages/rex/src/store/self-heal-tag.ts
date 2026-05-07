@@ -13,7 +13,7 @@
  */
 
 /** Tag applied to PRD items created during a self-heal run. */
-export const SELF_HEAL_TAG = "self-heal";
+export const SELF_HEAL_TAG = "self-heal-items";
 
 /** Environment variable signalling that the current process is part of a self-heal run. */
 export const SELF_HEAL_ENV_VAR = "NDX_SELF_HEAL";

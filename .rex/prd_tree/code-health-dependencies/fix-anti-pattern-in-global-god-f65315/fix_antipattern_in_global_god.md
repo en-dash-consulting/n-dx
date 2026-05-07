@@ -1,0 +1,26 @@
+---
+id: "f653153b-52d7-4155-8773-51258364aeda"
+level: "task"
+title: "Fix anti-pattern in global: God function: handleInit in packages/core/cli.js calls 40 unique functions — con"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-17T15:11:24.224Z"
+completedAt: "2026-04-17T15:22:09.410Z"
+resolutionType: "code-change"
+resolutionDetail: "Decomposed handleInit into 8 focused helpers: parseInitFlagSet, buildInitArgs, repairInitConfig, resolveInitAssistants, selectInitLLMProvider, runSubInitPhase (lifted from nested), persistInitLLMConfig, printStaticInitSummary. Reduced from 290 lines/40 unique call sites to ~100 lines/~18 call sites."
+acceptanceCriteria: []
+description: "- God function: handleInit in packages/core/cli.js calls 40 unique functions — consider decomposing into smaller, focused functions"
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-17T15:22:09.583Z"
+__parentDescription: "- God function: handleInit in packages/core/cli.js calls 40 unique functions — consider decomposing into smaller, focused functions"
+__parentId: "9ee6a611-4094-4df5-8948-00f4cbdf65af"
+__parentLevel: "feature"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-17T15:22:09.583Z"
+__parentStatus: "completed"
+__parentTitle: "Fix anti-pattern in global (1 finding)"
+recommendationMeta: "[object Object]"
+---

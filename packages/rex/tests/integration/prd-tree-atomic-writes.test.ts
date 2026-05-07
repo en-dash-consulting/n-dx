@@ -128,55 +128,41 @@ describe("prd_tree atomic writes and crash-safety", () => {
       expect(doc.items).toHaveLength(1);
     });
 
-    it("partial index.md is replaced atomically on subsequent writes", async () => {
-      // Add first item
-      const item1 = makeItem("test-1", "Item One");
-      await store.addItem(item1);
+    it("partial item markdown is replaced atomically on subsequent writes", async () => {
+      // Use an epic with a child so both `index.md` (the human-readable summary
+      // for non-leaf items) and `<title>.md` (frontmatter source of truth) are
+      // written. Corrupting only the human-readable index.md leaves the item
+      // discoverable via title.md fallback so the next save can rewrite both.
+      const epic = makeItem("test-1", "Item One", "epic");
+      await store.addItem(epic);
+      await store.addItem(makeItem("test-1-child", "Child", "task"), "test-1");
 
-      // Find the actual directory and index.md created by the serializer
       const treeDir = join(rexDir, PRD_TREE_DIRNAME);
-      const epicDirs = await readdir(treeDir);
-      if (epicDirs.length === 0) {
-        throw new Error("No epic directory created");
-      }
-
-      // Traverse to find the index.md file
-      let indexPath: string | null = null;
-      for (const dir of epicDirs) {
-        const itemDir = join(treeDir, dir);
-        const indexCandidate = join(itemDir, "index.md");
-        try {
-          await readFile(indexCandidate, "utf-8");
-          indexPath = indexCandidate;
-          break;
-        } catch {
-          // Not this directory
-        }
-      }
-
-      if (!indexPath) {
-        throw new Error(`Could not find index.md in tree`);
-      }
+      const [epicDirName] = await readdir(treeDir);
+      const indexMdPath = join(treeDir, epicDirName, "index.md");
 
       // Manually corrupt the index.md to simulate partial write
-      await writeFile(indexPath, "CORRUPTED");
+      await writeFile(indexMdPath, "CORRUPTED");
 
-      // Update the item — should rewrite atomically
+      // Update the item — saveDocument re-serializes the full tree, which
+      // rewrites the corrupted index.md atomically (temp + rename).
       await store.updateItem("test-1", { title: "Item One Updated" });
 
-      // Verify the file is complete and not corrupted (may be in a different directory now)
+      // Verify the item survives the round-trip with the new title.
       const doc = await store.loadDocument();
       expect(doc.items[0].title).toBe("Item One Updated");
 
-      // Verify no "CORRUPTED" content remains in any index.md
+      // Verify no "CORRUPTED" content remains in any item markdown
       const allIndexContents: string[] = [];
       for (const dir of await readdir(treeDir)) {
-        const indexCandidate = join(treeDir, dir, "index.md");
-        try {
-          const content = await readFile(indexCandidate, "utf-8");
-          allIndexContents.push(content);
-        } catch {
-          // Not an index file
+        const itemDir = join(treeDir, dir);
+        const entries = await readdir(itemDir);
+        for (const md of entries.filter((f) => f.endsWith(".md"))) {
+          try {
+            allIndexContents.push(await readFile(join(itemDir, md), "utf-8"));
+          } catch {
+            // Not readable — skip
+          }
         }
       }
       const combinedContent = allIndexContents.join("\n");

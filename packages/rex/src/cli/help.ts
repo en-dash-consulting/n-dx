@@ -545,20 +545,18 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
   "migrate-to-folder-tree": {
     tool: "rex",
     command: "migrate-to-folder-tree",
-    summary: `migrate prd.md to the .rex/${PRD_TREE_DIRNAME}/ folder-tree format`,
+    summary: `migrate legacy PRD formats to the .rex/${PRD_TREE_DIRNAME}/ folder-tree format`,
     usage: "rex migrate-to-folder-tree [dir] [--yes]",
     description:
-      "Reads the current PRD from .rex/prd.md (or branch-scoped prd_*_*.md files,\n" +
-      `or prd.json as a fallback) and writes the full folder tree to .rex/${PRD_TREE_DIRNAME}/\n` +
-      "using slug-based directory names at all four hierarchy levels.\n\n" +
-      "After a successful migration, prompts to delete prd.md and any branch-scoped\n" +
-      "prd_{branch}_{date}.md files. Pass --yes to auto-confirm deletion.\n\n" +
-      "Idempotent: re-running on an already-migrated project (even after prd.md has\n" +
-      "been deleted) is a no-op. Prints a summary of item counts per PRD level and\n" +
-      "folders/files created.",
+      `Migrates PRD from legacy formats (markdown or JSON) to the canonical folder-tree format at .rex/${PRD_TREE_DIRNAME}/.\n` +
+      "Uses slug-based directory names at all four hierarchy levels.\n\n" +
+      "After a successful migration, prompts to delete legacy files.\n" +
+      "Pass --yes to auto-confirm deletion.\n\n" +
+      `Idempotent: re-running on an already-migrated project (where .rex/${PRD_TREE_DIRNAME}/ exists) is a no-op.\n` +
+      "Prints a summary of item counts per PRD level and folders/files created.",
     examples: [
-      { command: "rex migrate-to-folder-tree", description: "Migrate and prompt to delete prd.md" },
-      { command: "rex migrate-to-folder-tree --yes", description: "Migrate and auto-delete prd.md" },
+      { command: "rex migrate-to-folder-tree", description: "Migrate and prompt to delete legacy files" },
+      { command: "rex migrate-to-folder-tree --yes", description: "Migrate and auto-delete legacy files" },
       { command: "rex migrate-to-folder-tree ./my-project", description: "Migrate a specific project" },
     ],
     related: ["init", "status", "validate"],
@@ -566,15 +564,15 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
   "migrate-to-md": {
     tool: "rex",
     command: "migrate-to-md",
-    summary: "create prd.md from an existing prd.json",
+    summary: "DEPRECATED: create markdown PRD from an existing JSON source",
     usage: "rex migrate-to-md [dir]",
     description:
-      "Converts the local .rex/prd.json document into .rex/prd.md using the\n" +
-      "markdown serializer, verifies that parsing the generated markdown yields\n" +
-      "the same in-memory PRD tree, and leaves prd.json untouched.",
+      "DEPRECATED: This command migrates from .rex/prd.json to a legacy markdown format.\n" +
+      "The folder-tree format (.rex/prd_tree/) is now the recommended migration target.\n" +
+      "Use 'rex migrate-to-folder-tree' instead for new projects.",
     examples: [
-      { command: "rex migrate-to-md", description: "Generate .rex/prd.md in the current project" },
-      { command: "rex migrate-to-md ./my-project", description: "Generate .rex/prd.md in a specific project" },
+      { command: "rex migrate-to-md", description: "Migrate to markdown in the current project (deprecated)" },
+      { command: "rex migrate-to-md ./my-project", description: "Migrate to markdown in a specific project (deprecated)" },
     ],
     related: ["init", "validate", "status"],
   },

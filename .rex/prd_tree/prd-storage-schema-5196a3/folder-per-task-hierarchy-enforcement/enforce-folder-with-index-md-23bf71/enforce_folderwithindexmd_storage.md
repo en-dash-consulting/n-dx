@@ -1,0 +1,20 @@
+---
+id: "23bf714b-1e57-472a-b13a-379961501ef7"
+level: "task"
+title: "Enforce folder-with-index.md storage for tasks and dual-mode subtask serialization"
+status: "pending"
+priority: "high"
+tags:
+  - "prd-storage"
+  - "schema"
+  - "serializer"
+source: "smart-add"
+acceptanceCriteria:
+  - "Task-level items are always serialized as a folder containing index.md, never as a bare .md file"
+  - "Leaf subtasks (no children) are serialized as title-named .md files; subtasks with children are serialized as folders containing index.md"
+  - "Existing title-uniqueness checks are reused at every level — no duplicate sibling slugs in any folder"
+  - "Serializer→parser round-trip preserves all item fields and parent-child relationships across mixed file/folder subtasks"
+  - "All PRD write paths (rex CLI, MCP write tools, ndx plan --accept, hench transitions) produce conforming layouts"
+  - "docs/architecture/prd-folder-tree-schema.md is updated to reflect the dual-mode subtask rule"
+description: "Update the PRD folder-tree serializer and parser so every task-level item is always written as a directory named by its title slug containing an index.md file, while subtasks may be either a leaf .md file (no children) or a recursive folder (with children) following the same rule. Includes round-trip parser/serializer fidelity, uniqueness checks reusing the existing title-uniqueness validation, and updates to all PRD write paths (rex CLI add/edit, MCP add_item/edit_item, ndx plan acceptance, hench commit-time updates)."
+---

@@ -1,0 +1,26 @@
+---
+id: "4099aa58-c7ee-4bcd-96e7-0b563a7aaca8"
+level: "task"
+title: "Fix observation in rex-core: High coupling (0.67) — 2 imports target \"rex-fix\""
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-18T14:29:35.888Z"
+completedAt: "2026-04-18T14:35:25.371Z"
+resolutionType: "code-change"
+resolutionDetail: "core/fix.ts pass-through deleted; public.ts and cli/commands/fix.ts already import directly from fix/index.js; rex-core zone dissolved, committed as a2156e8d"
+acceptanceCriteria: []
+description: "- High coupling (0.67) — 2 imports target \"rex-fix\""
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-18T14:35:25.408Z"
+__parentDescription: "- High coupling (0.67) — 2 imports target \"rex-fix\""
+__parentId: "0463cb81-0af7-480f-89c3-16d3425e4e83"
+__parentLevel: "feature"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-18T14:35:25.408Z"
+__parentStatus: "completed"
+__parentTitle: "Fix observation in rex-core (1 finding)"
+recommendationMeta: "[object Object]"
+---

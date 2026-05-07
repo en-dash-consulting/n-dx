@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFile, mkdtemp, rm } from "node:fs/promises";
+import { writeFile, mkdtemp, rm, readFile as readFileAsync } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -1764,6 +1765,68 @@ describe("parseProposalResponse — enhanced", () => {
 
     expect(proposals).toHaveLength(1);
     expect(proposals[0].epic.title).toBe("API");
+  });
+});
+
+describe("parseProposalResponse — debug capture on failure", () => {
+  function extractDebugPath(message: string): string | null {
+    const match = /\[ndx-debug:([^\]]+)\]/.exec(message);
+    return match ? match[1] : null;
+  }
+
+  it("writes a debug artifact and embeds [ndx-debug:<path>] sentinel on schema failure", async () => {
+    const raw = JSON.stringify([{ bad: "data" }, { also: "bad" }]);
+
+    let captured: Error | null = null;
+    try {
+      parseProposalResponse(raw);
+    } catch (e) {
+      captured = e as Error;
+    }
+    expect(captured).not.toBeNull();
+    expect(captured!.message).toMatch(/schema validation/);
+
+    const path = extractDebugPath(captured!.message);
+    expect(path).not.toBeNull();
+    expect(path!.startsWith(tmpdir())).toBe(true);
+    expect(existsSync(path!)).toBe(true);
+
+    const body = await readFileAsync(path!, "utf8");
+    expect(body).toContain("# ndx add — LLM parse failure");
+    expect(body).toContain("## Full raw LLM response");
+    expect(body).toContain(raw);
+    expect(body).toContain("schema validation");
+  });
+
+  it("writes a debug artifact and embeds sentinel on invalid-JSON failure", async () => {
+    const raw = "I cannot generate that — sorry.";
+
+    let captured: Error | null = null;
+    try {
+      parseProposalResponse(raw);
+    } catch (e) {
+      captured = e as Error;
+    }
+    expect(captured).not.toBeNull();
+    expect(captured!.message).toMatch(/Invalid JSON/);
+
+    const path = extractDebugPath(captured!.message);
+    expect(path).not.toBeNull();
+    expect(existsSync(path!)).toBe(true);
+
+    const body = await readFileAsync(path!, "utf8");
+    expect(body).toContain(raw);
+  });
+
+  it("does not write a debug artifact on successful parse", () => {
+    const raw = JSON.stringify([
+      {
+        epic: { title: "Good" },
+        features: [{ title: "F", tasks: [{ title: "T" }] }],
+      },
+    ]);
+    // Successful parse: no error means no sentinel/file.
+    expect(() => parseProposalResponse(raw)).not.toThrow();
   });
 });
 

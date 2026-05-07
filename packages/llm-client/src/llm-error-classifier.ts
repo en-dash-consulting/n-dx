@@ -93,6 +93,16 @@ export function classifyLLMError(
   const ctx = typeof context === "string" ? { label: context } as LLMErrorContext : context;
   const suffix = formatErrorSuffix(vendor, ctx);
 
+  // Upstream parsers (e.g. parseProposalResponse) may embed a
+  // `[ndx-debug:<path>]` sentinel in the thrown error message, pointing at a
+  // file containing the raw LLM response. Extract it so the parse branch can
+  // surface the path and underlying error detail back to the user.
+  const debugMatch = /\s*\[ndx-debug:([^\]]+)\]/.exec(err.message);
+  const debugPath = debugMatch ? debugMatch[1] : null;
+  const cleanedMessage = debugMatch
+    ? err.message.replace(debugMatch[0], "").trim()
+    : err.message;
+
   // ── Authentication (401, invalid key, expired token) ──────────────
   const isAuthError =
     /\b401\b/.test(msg) ||
@@ -230,10 +240,17 @@ export function classifyLLMError(
     msg.includes("schema validation") ||
     msg.includes("truncated")
   ) {
+    let message = `LLM returned an unparseable response.${suffix}`;
+    let suggestion =
+      "Try again — LLM outputs can vary. If this persists, try a different model with --model.";
+    if (debugPath) {
+      message += ` Raw response saved to ${debugPath}. Underlying error: ${cleanedMessage}.`;
+      suggestion +=
+        " Inspect the captured response to see what the LLM actually returned.";
+    }
     return {
-      message: `LLM returned an unparseable response.${suffix}`,
-      suggestion:
-        "Try again — LLM outputs can vary. If this persists, try a different model with --model.",
+      message,
+      suggestion,
       category: "parse",
     };
   }

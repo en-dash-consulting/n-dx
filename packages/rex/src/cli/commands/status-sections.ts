@@ -265,7 +265,7 @@ export function renderAutoCompletableHints(items: PRDItem[]): void {
 
 /** A single PRD file's contribution to the status report. */
 export interface PerPRDStatusSection {
-  /** Repo-relative markdown path, e.g. ".rex/prd.md". */
+  /** Repo-relative path to the PRD source, e.g. ".rex/prd_tree/". */
   prdPath: string;
   /** Stats computed over this section's items only. */
   stats: TreeStats;
@@ -308,7 +308,7 @@ export function splitItemsByFile(
 /**
  * Build per-PRD sections from a loaded document and a FileStore.
  *
- * Always includes the canonical `.rex/prd.md` path (even when empty) so a
+ * Always includes the canonical `.rex/prd_tree/` path (even when empty) so a
  * single-PRD project still produces one section. Branch-scoped files
  * discovered on disk that have no items are also included with empty stats.
  */

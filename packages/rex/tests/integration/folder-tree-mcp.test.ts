@@ -237,10 +237,12 @@ describe("MCP write tools — folder tree state", () => {
     const task = flat.find((i) => i.id === taskId);
     expect(task?.priority).toBe("critical");
 
+    // The feature has a single child (the task) so single-child compaction
+    // collapses its directory. The task's file is written directly under the
+    // epic's directory with __parent* metadata embedded.
     const epicSlug = slug("Prio Epic", epicId);
-    const featSlug = slug("Prio Feature", featId);
     const taskSlug = slug("Prio Task", taskId);
-    const taskIndexMd = await readIndexMd(rexDir, epicSlug, featSlug, taskSlug);
+    const taskIndexMd = await readIndexMd(rexDir, epicSlug, taskSlug);
     expect(taskIndexMd).toContain(`"critical"`);
   });
 
@@ -275,10 +277,10 @@ describe("MCP write tools — folder tree state", () => {
     const task = flat.find((i) => i.id === taskId);
     expect(task?.status).toBe("completed");
 
+    // Feature is single-child-compacted — its directory does not exist on disk.
     const epicSlug = slug("Status Epic", epicId);
-    const featSlug = slug("Status Feature", featId);
     const taskSlug = slug("Status Task", taskId);
-    const taskIndexMd = await readIndexMd(rexDir, epicSlug, featSlug, taskSlug);
+    const taskIndexMd = await readIndexMd(rexDir, epicSlug, taskSlug);
     expect(taskIndexMd).toContain(`"completed"`);
   });
 
@@ -299,6 +301,14 @@ describe("MCP write tools — folder tree state", () => {
       parentId: featId,
     });
     const { id: taskId } = JSON.parse(taskRes.content[0].text) as { id: string };
+    // Add a sibling task so the feature has 2 children and is not collapsed
+    // by single-child compaction. Without this the feature directory would
+    // not exist on disk.
+    await handleAddItem(store, tmpDir, rexDir, {
+      title: "Task Y",
+      level: "task",
+      parentId: featId,
+    });
 
     await handleUpdateTaskStatus(store, tmpDir, { id: taskId, status: "in_progress" });
 

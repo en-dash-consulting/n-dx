@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY } from "../../prd/llm-gateway.js";
+import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt } from "../../prd/llm-gateway.js";
 import type { LLMProvider } from "../../prd/llm-gateway.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
@@ -84,6 +84,104 @@ async function callWithRetry(
   }
 
   throw lastError;
+}
+
+/**
+ * Failover-aware LLM invocation wrapper.
+ *
+ * When llm.autoFailover is enabled and a retryable error occurs (rate-limit,
+ * server, network, timeout), walks the vendor/model failover chain before
+ * surfacing the error. Preserves the original error verbatim for rethrow
+ * after exhaustion to maintain byte-identical error messaging.
+ *
+ * Non-retryable errors (auth, budget, parse, unknown) bypass failover and
+ * surface immediately. When autoFailover is disabled, this is a no-op
+ * (calls callWithRetry directly).
+ */
+async function callWithFailover(
+  currentClient: Anthropic,
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  config: HenchConfig,
+  originalVendor: string,
+  originalModel: string,
+  henchDir: string,
+  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
+  projectDir: string,
+  store: PRDStore,
+  taskId: string,
+  testCommand: string | undefined,
+  startingHead: string | undefined,
+): Promise<Anthropic.Message> {
+  let client = currentClient;
+  let currentVendor = originalVendor;
+  let currentModel = originalModel;
+
+  try {
+    return await callWithRetry(client, params);
+  } catch (originalError) {
+    // If failover is disabled, rethrow immediately (no-op path)
+    if (!llmConfig.autoFailover) {
+    throw originalError;
+    }
+
+    const err = originalError as Error;
+    const classification = classifyLLMError(err, originalVendor as any);
+
+    // Non-retryable errors: auth, budget, parse, unknown
+    // These bypass failover and surface immediately
+    const nonRetryableCategories: Set<string> = new Set(["auth", "budget", "parse", "unknown"]);
+    if (nonRetryableCategories.has(classification.category)) {
+      throw originalError;
+    }
+
+    // Retryable errors: rate-limit, server, network, timeout
+    // Walk the failover chain and try each vendor/model combination
+    let attemptNumber = 1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const failoverResult = getNextFailoverAttempt(attemptNumber, originalVendor as any, llmConfig);
+
+      if (failoverResult.isExhausted) {
+        // Chain exhausted: restore original and rethrow the original error verbatim
+        throw originalError;
+      }
+
+      // Get next vendor/model from failover chain
+      const nextVendor = failoverResult.vendor;
+      const nextModel = failoverResult.model;
+
+      if (!nextVendor || !nextModel) {
+        // Safeguard: shouldn't happen if isExhausted is checked above
+        throw originalError;
+      }
+
+      // Emit failover log line with colored output
+      const shortModel = (str: string) => str.split("/").pop() || str;
+      const logMsg = `[failover] ${currentVendor}/${shortModel(currentModel)} → ${nextVendor}/${shortModel(nextModel)}: ${classification.category}`;
+      stream("Failover", logMsg);
+
+      try {
+        // Recreate client for the new vendor
+        const provider = defaultRegistry.create(nextVendor as any, llmConfig);
+        const apiResources = await initApiResources(
+          provider, config, henchDir, projectDir, store, taskId,
+          testCommand, startingHead,
+        );
+        client = apiResources.client;
+        currentVendor = apiResources.vendor;
+        currentModel = nextModel;
+
+        // Update params with new model
+        const updatedParams = { ...params, model: nextModel };
+
+        // Try the call with the new client/model
+        return await callWithRetry(client, updatedParams);
+      } catch (failoverError) {
+        // This failover attempt failed; continue to next in chain
+        attemptNumber++;
+      }
+    }
+  }
 }
 
 function pruneMessages(messages: Anthropic.MessageParam[]): void {
@@ -396,13 +494,26 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       pruneMessages(messages);
 
-      const response = await callWithRetry(client, {
+      const response = await callWithFailover(
+        client,
+        {
+          model,
+          max_tokens: config.maxTokens,
+          system: systemPrompt,
+          tools: TOOL_DEFINITIONS,
+          messages,
+        },
+        config,
+        vendor,
         model,
-        max_tokens: config.maxTokens,
-        system: systemPrompt,
-        tools: TOOL_DEFINITIONS,
-        messages,
-      });
+        henchDir,
+        llmConfig,
+        projectDir,
+        store,
+        taskId,
+        brief.project.testCommand,
+        startingHead,
+      );
 
       // Track token usage for this turn
       recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, vendor, model);

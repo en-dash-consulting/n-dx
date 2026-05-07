@@ -361,6 +361,10 @@ const DOCUMENTED_POLICIES = [
     rule: "web-shared consumers must import through barrel index, not leaf files",
     enforcedBy: "boundary-check.test.ts → server/client boundary",
   },
+  {
+    rule: ".rex/prd.md is read and written only in the migration helper",
+    enforcedBy: "architecture-policy.test.js → architecture policy: PRD storage invariant (prd.md migration-helper-only)",
+  },
 ];
 
 describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
@@ -370,7 +374,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(19);
+    expect(DOCUMENTED_POLICIES.length).toBe(20);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {
@@ -409,7 +413,8 @@ const CYCLE_EXEMPT_ZONE_TYPES = new Set(["test", "infrastructure"]);
 const CYCLE_EXCEPTIONS = new Map([
   ["incremental", "Small incremental analysis cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
   ["mcp", "Rex MCP tools cluster; cycles with the duplicate-named 'web' zone (first file in rex package) making intra-rex edges appear cross-package to the cycle detector."],
-  ["refresh-throttle-pipeline", "Small viewer refresh-throttle cluster in packages/web/; all observed cycle edges (refresh-throttle-pipeline → web and web → refresh-throttle-pipeline) are intra-packages/web imports, but the multi-package 'web' Louvain zone's first file is in packages/rex so packageFamily('web') resolves to 'rex', making these intra-package edges appear cross-package to the cycle detector."],
+  ["refresh", "Small viewer refresh-throttle cluster in packages/web/; all observed cycle edges (refresh → web and web → refresh) are intra-packages/web imports, but the multi-package 'web' Louvain zone's first file is in packages/rex so packageFamily('web') resolves to 'rex', making these intra-package edges appear cross-package to the cycle detector."],
+  ["refresh-throttle-pipeline", "Louvain renamed the 'refresh' zone to 'refresh-throttle-pipeline'; same packageFamily mismatch root cause — all files are intra-packages/web but the 'web' zone's first file resolves to rex, making the edges appear cross-package."],
   ["rex-core", "Small rex core cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason — both zones are in the rex package."],
   ["rex-recommend", "Small rex recommendation cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
   ["rex-store", "Rex store/persistence cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
@@ -968,8 +973,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 111,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, color/model helpers)",
+    maxExports: 116,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers)",
   },
 ];
 
@@ -1468,5 +1473,159 @@ describe("intra-package dependency direction", () => {
     }
 
     expect(violations).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD storage invariant: prd.md only in migration helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Enforces the PRD storage invariant: `.rex/prd.md` is read and written ONLY
+ * within the legacy migration helper module and its tests. All other code must
+ * use the folder-tree backend via the store abstraction (FileStore, FolderTreeStore).
+ *
+ * The migration helper is the sole location responsible for:
+ * - Reading legacy prd.md, prd.json, and branch-scoped files
+ * - Writing prd.md during one-shot migration operations
+ * - Parsing/serializing Markdown and legacy file formats
+ *
+ * This test locks the invariant against regressions: if a non-migration file
+ * introduces a new `.rex/prd.md` reference, the build fails immediately with
+ * a clear error naming the offending file.
+ *
+ * **Allowed files:** Migration helper and its support modules:
+ *   - packages/rex/src/cli/commands/migrate-to-folder-tree.ts (primary migration command)
+ *   - packages/rex/src/cli/commands/migrate-to-md.ts (JSON → Markdown migration)
+ *   - packages/rex/src/store/prd-md-migration.ts (migration logic)
+ *   - packages/rex/src/cli/commands/constants.ts (prd.md filename constant)
+ *   - Test files for the above modules
+ *
+ * **Disallowed:** Any other file that reads from or writes to `.rex/prd.md`
+ *   - File adapter should use FolderTreeStore, not prd.md
+ *   - Web server should use store abstraction, not parse prd.md directly
+ *   - Core scripts should spawn commands, not hardcode prd.md paths
+ */
+const PRD_MD_MIGRATION_HELPER_FILES = new Set([
+  // Primary migration command — reads prd.md/prd.json, writes folder tree
+  "packages/rex/src/cli/commands/migrate-to-folder-tree.ts",
+  // JSON → Markdown migration — converts prd.json to prd.md format
+  "packages/rex/src/cli/commands/migrate-to-md.ts",
+  // Migration logic — handles conversion between formats
+  "packages/rex/src/store/prd-md-migration.ts",
+  // PRD filename constants — defines PRD_MARKDOWN_FILENAME
+  "packages/rex/src/cli/commands/constants.ts",
+]);
+
+describe("architecture policy: PRD storage invariant (prd.md migration-helper-only)", () => {
+  it("no source files read or write .rex/prd.md outside the migration helper", () => {
+    const files = walk(ROOT);
+    const violations = [];
+
+    // Pattern to match `.rex/prd.md` string literal or path references
+    // Matches: ".rex/prd.md", '.rex/prd.md', \.rex\/prd\.md
+    const prdMdPattern = /\.rex[/\\]prd\.md|"\.rex\/prd\.md"|'\.rex\/prd\.md'/;
+
+    for (const file of files) {
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
+
+      // Allow migration helper files
+      if (PRD_MD_MIGRATION_HELPER_FILES.has(rel)) continue;
+
+      // Allow test files (they test the migration helper)
+      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|[\/\\])tests?[\/\\]/.test(rel)) continue;
+
+      // Allow dist/ output (compiled from allowed source files)
+      if (rel.startsWith("dist/") || rel.includes("/dist/")) continue;
+
+      // Check for prd.md references
+      const content = readFileSync(file, "utf-8");
+      if (prdMdPattern.test(content)) {
+        // Additional check: ensure it's not just in comments or documentation strings
+        // by verifying the reference appears outside of comment blocks
+        const lines = content.split("\n");
+        for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+          const line = lines[lineNum];
+          // Skip lines that are purely comments or block comment markers
+          const trimmed = line.trim();
+          if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed === "/**" || trimmed === "*/") {
+            continue;
+          }
+          if (prdMdPattern.test(line)) {
+            violations.push(`${rel}:${lineNum + 1} — references .rex/prd.md`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "Files outside the migration helper reference .rex/prd.md.",
+          "This breaks the PRD storage invariant: prd.md is legacy and should only",
+          "be read/written during migration. All other code must use the folder-tree",
+          "backend via the store abstraction.",
+          "",
+          "Violations:",
+          ...violations.map((v) => `  - ${v}`),
+          "",
+          "To fix:",
+          "  1. Use the store abstraction (FileStore.loadDocument(), etc.) instead of reading prd.md directly",
+          "  2. Or add the file to PRD_MD_MIGRATION_HELPER_FILES if it is part of the migration pipeline",
+          "     (with a clear justification comment)",
+          "",
+          "See CLAUDE.md 'PRD file layout' and AUDIT-prd-md-calls.md for context.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("PRD_MD_MIGRATION_HELPER_FILES contains no stale entries", () => {
+    const stale = [];
+    for (const rel of PRD_MD_MIGRATION_HELPER_FILES) {
+      const full = join(ROOT, rel);
+      if (!existsSync(full)) {
+        stale.push(rel);
+      }
+    }
+
+    if (stale.length > 0) {
+      expect.fail(
+        [
+          "PRD_MD_MIGRATION_HELPER_FILES contains paths that no longer exist on disk:",
+          "",
+          ...stale.map((s) => `  - ${s}`),
+          "",
+          "Remove stale entries — the file has been deleted or moved.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("PRD_MD_MIGRATION_HELPER_FILES entries actually reference .rex/prd.md", () => {
+    const unused = [];
+    const prdMdPattern = /\.rex[/\\]prd\.md|"\.rex\/prd\.md"|'\.rex\/prd\.md'/;
+
+    for (const rel of PRD_MD_MIGRATION_HELPER_FILES) {
+      const full = join(ROOT, rel);
+      if (!existsSync(full)) continue;
+
+      const content = readFileSync(full, "utf-8");
+      if (!prdMdPattern.test(content)) {
+        unused.push(rel);
+      }
+    }
+
+    if (unused.length > 0) {
+      expect.fail(
+        [
+          "PRD_MD_MIGRATION_HELPER_FILES contains entries that no longer reference .rex/prd.md.",
+          "These files have been cleaned up — remove them from the allow list:",
+          "",
+          ...unused.map((u) => `  - ${u}`),
+        ].join("\n"),
+      );
+    }
   });
 });

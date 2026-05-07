@@ -127,12 +127,12 @@ describe("rex CLI help", () => {
       expect(output).toContain("--pull");
     });
 
-    it("migrate-to-md help explains JSON to markdown migration", () => {
+    it("migrate-to-md help marks command as deprecated and recommends folder-tree", () => {
       showCommandHelp("migrate-to-md");
       const output = logSpy.mock.calls[0][0] as string;
-      expect(output).toContain(".rex/prd.json");
-      expect(output).toContain(".rex/prd.md");
-      expect(output).toContain("same in-memory PRD tree");
+      expect(output).toContain("DEPRECATED");
+      expect(output).toContain("migrate-to-folder-tree");
+      expect(output).toContain("prd_tree");
     });
 
     it("remove help explains epic vs task differences and data loss warning", () => {

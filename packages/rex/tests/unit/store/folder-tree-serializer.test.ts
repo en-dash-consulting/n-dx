@@ -167,9 +167,11 @@ describe("serializeFolderTree: directory structure", () => {
   });
 
   it("creates task directory at depth 3 inside feature", async () => {
-    const task = makeTask("33333333-0000-0000-0000-000000000000", "My Task");
+    // Create two tasks to avoid single-child optimization of the feature
+    const task1 = makeTask("33333333-0000-0000-0000-000000000000", "My Task 1");
+    const task2 = makeTask("44444444-0000-0000-0000-000000000000", "My Task 2");
     const feature = makeFeature("22222222-0000-0000-0000-000000000000", "My Feature", {
-      children: [task],
+      children: [task1, task2],
     });
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "My Epic", {
       children: [feature],
@@ -179,7 +181,7 @@ describe("serializeFolderTree: directory structure", () => {
       testDir,
       slugify(epic.title, epic.id),
       slugify(feature.title, feature.id),
-      slugify(task.title, task.id),
+      slugify(task1.title, task1.id),
     );
     const s = await stat(taskDir);
     expect(s.isDirectory()).toBe(true);
@@ -357,16 +359,24 @@ describe("serializeFolderTree: feature index.md", () => {
 
 describe("serializeFolderTree: task index.md", () => {
   async function readTaskContent(epic: PRDItem, feature: PRDItem, task: PRDItem): Promise<string> {
-    return readFile(
-      join(
+    // With single-child optimization, if feature has one task, the task is placed
+    // directly in the epic's directory. So we check if feature dir exists first.
+    const featureDir = join(testDir, slugify(epic.title, epic.id), slugify(feature.title, feature.id));
+    let taskPath: string;
+    try {
+      await stat(featureDir);
+      // Feature directory exists, task is inside feature
+      taskPath = join(featureDir, slugify(task.title, task.id), titleToFilename(task.title));
+    } catch {
+      // Feature directory doesn't exist (single-child optimization), task is in epic
+      taskPath = join(
         testDir,
         slugify(epic.title, epic.id),
-        slugify(feature.title, feature.id),
         slugify(task.title, task.id),
         titleToFilename(task.title),
-      ),
-      "utf8",
-    );
+      );
+    }
+    return readFile(taskPath, "utf8");
   }
 
   it("writes task frontmatter fields including acceptanceCriteria and loe", async () => {
@@ -375,8 +385,10 @@ describe("serializeFolderTree: task index.md", () => {
       loe: "s",
       description: "Task description.",
     } as Partial<PRDItem>);
+    // Add a second task to prevent single-child optimization
+    const task2 = makeTask("55555555-0000-0000-0000-000000000000", "Other Task");
     const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
-      children: [task],
+      children: [task, task2],
     });
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
     await serializeFolderTree([epic], testDir);
@@ -389,15 +401,27 @@ describe("serializeFolderTree: task index.md", () => {
 
   it("includes ## Children section for task subtasks", async () => {
     const subtask = makeSubtask("44444444-0000-0000-0000-000000000000", "Subtask");
+    // Add a second subtask to prevent single-child optimization of the task
+    const subtask2 = makeSubtask("77777777-0000-0000-0000-000000000000", "Other Subtask");
     const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", {
-      children: [subtask],
+      children: [subtask, subtask2],
     });
+    // Add a second task to prevent single-child optimization of feature
+    const task2 = makeTask("55555555-0000-0000-0000-000000000000", "Other Task");
     const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
-      children: [task],
+      children: [task, task2],
     });
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
     await serializeFolderTree([epic], testDir);
-    const content = await readTaskContent(epic, feature, task);
+    // Feature has 2 children, task has 2 children, so no single-child optimization
+    const taskPath = join(
+      testDir,
+      slugify(epic.title, epic.id),
+      slugify(feature.title, feature.id),
+      slugify(task.title, task.id),
+      titleToFilename(task.title),
+    );
+    const content = await readFile(taskPath, "utf8");
     expect(content).toContain("## Children");
     expect(content).toContain(`| [Subtask](./${slugify(subtask.title, subtask.id)}/index.md) | pending |`);
   });
@@ -411,23 +435,26 @@ describe("serializeFolderTree: subtask directories", () => {
       status: "completed",
       priority: "high",
     });
-    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st] });
+    // Add a second subtask to prevent single-child optimization of task
+    const st2 = makeSubtask("77777777-0000-0000-0000-000000000000", "Other Subtask");
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st, st2] });
+    // Add a second task to prevent single-child optimization of feature
+    const task2 = makeTask("66666666-0000-0000-0000-000000000000", "Other Task");
     const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
-      children: [task],
+      children: [task, task2],
     });
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
     await serializeFolderTree([epic], testDir);
-    const content = await readFile(
-      join(
-        testDir,
-        slugify(epic.title, epic.id),
-        slugify(feature.title, feature.id),
-        slugify(task.title, task.id),
-        slugify(st.title, st.id),
-        titleToFilename(st.title),
-      ),
-      "utf8",
+    // Task has 2 children, so task directory is created
+    const subtaskPath = join(
+      testDir,
+      slugify(epic.title, epic.id),
+      slugify(feature.title, feature.id),
+      slugify(task.title, task.id),
+      slugify(st.title, st.id),
+      titleToFilename(st.title),
     );
+    const content = await readFile(subtaskPath, "utf8");
     expect(content).toContain('id: "44444444-0000-0000-0000-000000000000"');
     expect(content).toContain('level: "subtask"');
     expect(content).toContain('title: "First Subtask"');
@@ -440,23 +467,25 @@ describe("serializeFolderTree: subtask directories", () => {
       description: "Do the thing.",
       acceptanceCriteria: ["AC one", "AC two"],
     });
-    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st] });
+    // Add a second subtask to prevent single-child optimization of task
+    const st2 = makeSubtask("77777777-0000-0000-0000-000000000000", "Other Subtask");
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st, st2] });
+    // Add a second task to prevent single-child optimization of feature
+    const task2 = makeTask("66666666-0000-0000-0000-000000000000", "Other Task");
     const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
-      children: [task],
+      children: [task, task2],
     });
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
     await serializeFolderTree([epic], testDir);
-    const content = await readFile(
-      join(
-        testDir,
-        slugify(epic.title, epic.id),
-        slugify(feature.title, feature.id),
-        slugify(task.title, task.id),
-        slugify(st.title, st.id),
-        titleToFilename(st.title),
-      ),
-      "utf8",
+    const subtaskPath = join(
+      testDir,
+      slugify(epic.title, epic.id),
+      slugify(feature.title, feature.id),
+      slugify(task.title, task.id),
+      slugify(st.title, st.id),
+      titleToFilename(st.title),
     );
+    const content = await readFile(subtaskPath, "utf8");
     expect(content).toContain("Do the thing.");
     expect(content).toContain("acceptanceCriteria:");
     expect(content).toContain('"AC one"');
@@ -465,23 +494,25 @@ describe("serializeFolderTree: subtask directories", () => {
 
   it("omits priority frontmatter when subtask has no priority", async () => {
     const st = makeSubtask("44444444-0000-0000-0000-000000000000", "No-Priority Subtask");
-    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st] });
+    // Add a second subtask to prevent single-child optimization of task
+    const st2 = makeSubtask("77777777-0000-0000-0000-000000000000", "Other Subtask");
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", { children: [st, st2] });
+    // Add a second task to prevent single-child optimization of feature
+    const task2 = makeTask("66666666-0000-0000-0000-000000000000", "Other Task");
     const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
-      children: [task],
+      children: [task, task2],
     });
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
     await serializeFolderTree([epic], testDir);
-    const content = await readFile(
-      join(
-        testDir,
-        slugify(epic.title, epic.id),
-        slugify(feature.title, feature.id),
-        slugify(task.title, task.id),
-        slugify(st.title, st.id),
-        titleToFilename(st.title),
-      ),
-      "utf8",
+    const subtaskPath = join(
+      testDir,
+      slugify(epic.title, epic.id),
+      slugify(feature.title, feature.id),
+      slugify(task.title, task.id),
+      slugify(st.title, st.id),
+      titleToFilename(st.title),
     );
+    const content = await readFile(subtaskPath, "utf8");
     expect(content).toContain('title: "No-Priority Subtask"');
     expect(content).not.toContain("priority:");
   });
@@ -512,9 +543,9 @@ describe("serializeFolderTree: idempotency", () => {
     const r1 = await serializeFolderTree([epic], testDir);
     const r2 = await serializeFolderTree([epic], testDir);
 
-    expect(r1.filesWritten).toBe(2);  // 1 epic title-named file + 1 epic index.md
-    expect(r2.filesWritten).toBeLessThanOrEqual(1);  // May rewrite one file due to formatting differences
-    expect(r2.filesSkipped).toBeGreaterThanOrEqual(1);
+    expect(r1.filesWritten).toBe(1);  // 1 epic title-named file (no index.md for leaf items)
+    expect(r2.filesWritten).toBe(0);  // Second run: file unchanged
+    expect(r2.filesSkipped).toBe(1);  // File skipped due to identical content
   });
 
   it("re-runs after a content change writes exactly the changed file", async () => {
@@ -526,7 +557,7 @@ describe("serializeFolderTree: idempotency", () => {
     const updated = { ...epic, description: "After." };
     const r2 = await serializeFolderTree([updated], testDir);
 
-    expect(r2.filesWritten).toBe(2);  // title-named file + index.md
+    expect(r2.filesWritten).toBe(1);  // Only title-named file (leaf item, no index.md)
     const content = await readFile(
       join(testDir, slugify(epic.title, epic.id), titleToFilename(epic.title)),
       "utf8",
@@ -669,10 +700,14 @@ describe("serializeFolderTree: round-trip with parseFolderTree", () => {
       for (let f = 0; f < 3; f++) {
         const tasks: PRDItem[] = [];
         for (let t = 0; t < 3; t++) {
+          // Add 2 subtasks per task to prevent single-child optimization
           tasks.push(makeTask(nextId(), `Task ${e}-${f}-${t}`, {
             description: "desc",
             acceptanceCriteria: ["AC"],
-            children: [makeSubtask(nextId(), `St ${e}-${f}-${t}`)],
+            children: [
+              makeSubtask(nextId(), `St ${e}-${f}-${t}-1`),
+              makeSubtask(nextId(), `St ${e}-${f}-${t}-2`),
+            ],
           }));
         }
         features.push(makeFeature(nextId(), `Feature ${e}-${f}`, { children: tasks }));
@@ -691,7 +726,7 @@ describe("serializeFolderTree: round-trip with parseFolderTree", () => {
       for (const pf of pe.children!) {
         expect(pf.children).toHaveLength(3);
         for (const pt of pf.children!) {
-          expect(pt.children).toHaveLength(1); // one subtask
+          expect(pt.children).toHaveLength(2); // two subtasks to prevent single-child optimization
         }
       }
     }
@@ -724,8 +759,10 @@ describe("serializeFolderTree: result stats", () => {
     });
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", { children: [feature] });
     const result = await serializeFolderTree([epic], testDir);
-    // 1 epic + 1 feature + 1 task = 3 items; each generates a title-named file + index.md = 6 files
-    expect(result.filesWritten).toBe(6);
+    // 1 epic (has children) + index.md + 1 feature (has children) + index.md + 1 task (leaf) = 4 files
+    // (task is a leaf, so no index.md; feature has 1 child so single-child optimization applies)
+    // Actually: single-child feature skips directory, so: epic.md + epic/index.md + epic/task.md = 3 files
+    expect(result.filesWritten).toBe(3);
     expect(result.filesSkipped).toBe(0);
   });
 
@@ -861,6 +898,149 @@ describe("serializeFolderTree: parent ## Children table updates", () => {
   });
 });
 
+// ── Single-child filesystem optimization ──────────────────────────────────────
+
+describe("serializeFolderTree: single-child filesystem optimization", () => {
+  it("single-child feature skips directory creation, places task directly in epic", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Task");
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+
+    const epicDir = join(testDir, slugify(epic.title, epic.id));
+    const featureSlug = slugify(feature.title, feature.id);
+    const taskSlug = slugify(task.title, task.id);
+
+    // Feature directory should NOT exist (single-child optimization)
+    const epicContents = await readdir(epicDir);
+    expect(epicContents).not.toContain(featureSlug);
+
+    // Task directory should exist directly under epic
+    expect(epicContents).toContain(taskSlug);
+
+    // Task files should have embedded parent metadata
+    const taskIndexPath = join(epicDir, taskSlug, titleToFilename(task.title));
+    const taskContent = await readFile(taskIndexPath, "utf8");
+    expect(taskContent).toContain("__parentId");
+    expect(taskContent).toContain("__parentTitle");
+    expect(taskContent).toContain(feature.id);
+    expect(taskContent).toContain("Feature");
+  });
+
+  it("multi-child feature creates directory as usual, tasks inside", async () => {
+    const task1 = makeTask("t1111111-0000-0000-0000-000000000000", "Task 1");
+    const task2 = makeTask("t2222222-0000-0000-0000-000000000000", "Task 2");
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task1, task2],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+
+    const epicDir = join(testDir, slugify(epic.title, epic.id));
+    const featureDir = join(epicDir, slugify(feature.title, feature.id));
+    const featureContents = await readdir(featureDir);
+
+    // Feature directory MUST exist
+    await expect(stat(featureDir)).resolves.toBeTruthy();
+
+    // Task directories must be inside feature
+    expect(featureContents).toContain(slugify(task1.title, task1.id));
+    expect(featureContents).toContain(slugify(task2.title, task2.id));
+
+    // Tasks should NOT have __parentId (not collapsed)
+    const task1Content = await readFile(
+      join(featureDir, slugify(task1.title, task1.id), titleToFilename(task1.title)),
+      "utf8",
+    );
+    expect(task1Content).not.toContain("__parentId");
+  });
+
+  it("nested single-child at two levels (feature→task) places task directly in epic", async () => {
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Nested Task", {
+      status: "in_progress",
+      priority: "high",
+    });
+    const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+
+    const epicDir = join(testDir, slugify(epic.title, epic.id));
+    const epicContents = await readdir(epicDir);
+
+    // Neither feature nor independent task dir exists at this level
+    expect(epicContents).not.toContain(slugify(feature.title, feature.id));
+
+    // Only task directory exists directly under epic
+    expect(epicContents).toContain(slugify(task.title, task.id));
+
+    // Verify task has multiple levels of parent metadata
+    const taskIndexPath = join(
+      epicDir,
+      slugify(task.title, task.id),
+      titleToFilename(task.title),
+    );
+    const taskContent = await readFile(taskIndexPath, "utf8");
+
+    // Should have direct parent (feature) metadata
+    expect(taskContent).toContain("__parentId:");
+    expect(taskContent).toContain(`"${feature.id}"`);
+    expect(taskContent).toContain("__parentTitle:");
+    expect(taskContent).toContain("Feature");
+    expect(taskContent).toContain("__parentLevel:");
+    expect(taskContent).toContain("feature");
+
+    // Task metadata preserved
+    expect(taskContent).toContain("in_progress");
+    expect(taskContent).toContain("high");
+  });
+
+  it("single-child in isolation produces no parent directory, with metadata embedded", async () => {
+    // Verify that when a feature has one task, the feature directory is skipped
+    // and the task appears directly in the epic with embedded parent metadata
+    const task = makeTask("t1111111-0000-0000-0000-000000000000", "Lone Task");
+    const feature = makeFeature("f1111111-0000-0000-0000-000000000000", "Lone Feature", {
+      children: [task],
+    });
+    const epic = makeEpic("e1111111-0000-0000-0000-000000000000", "Test Epic", {
+      children: [feature],
+    });
+
+    await serializeFolderTree([epic], testDir);
+
+    const epicDir = join(testDir, slugify(epic.title, epic.id));
+    const featureSlug = slugify(feature.title, feature.id);
+    const taskSlug = slugify(task.title, task.id);
+
+    // Feature directory should NOT exist
+    const featureDir = join(epicDir, featureSlug);
+    await expect(stat(featureDir)).rejects.toThrow();
+
+    // Task directory should exist directly under epic
+    const taskDir = join(epicDir, taskSlug);
+    await expect(stat(taskDir)).resolves.toBeTruthy();
+
+    // Task files should contain embedded parent metadata
+    const taskIndex = await readFile(join(taskDir, titleToFilename(task.title)), "utf8");
+    expect(taskIndex).toContain("__parentId");
+    expect(taskIndex).toContain(feature.id);
+    expect(taskIndex).toContain("__parentTitle");
+    expect(taskIndex).toContain("Feature");
+  });
+});
+
 // ── Strict round-trip deep equality ──────────────────────────────────────────
 
 describe("serializeFolderTree: strict round-trip deep equality", () => {
@@ -871,6 +1051,8 @@ describe("serializeFolderTree: strict round-trip deep equality", () => {
       description: "Subtask desc.",
       acceptanceCriteria: ["Must pass"],
     });
+    // Add a second subtask to prevent single-child optimization of task
+    const subtask2 = makeSubtask("88888888-0000-0000-0000-000000000000", "Sub2");
     const task = makeTask("33333333-0000-0000-0000-000000000000", "Task", {
       status: "in_progress",
       priority: "critical",
@@ -878,13 +1060,15 @@ describe("serializeFolderTree: strict round-trip deep equality", () => {
       blockedBy: ["dep-task"],
       acceptanceCriteria: ["Task AC"],
       loe: "s",
-      children: [subtask],
+      children: [subtask, subtask2],
     } as Partial<PRDItem>);
+    // Add a second task to prevent single-child optimization of feature
+    const task2 = makeTask("99999999-0000-0000-0000-000000000000", "Task2");
     const feature = makeFeature("22222222-0000-0000-0000-000000000000", "Feature", {
       status: "pending",
       acceptanceCriteria: ["Feature AC"],
       loe: "m",
-      children: [task],
+      children: [task, task2],
     } as Partial<PRDItem>);
     const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
       status: "in_progress",

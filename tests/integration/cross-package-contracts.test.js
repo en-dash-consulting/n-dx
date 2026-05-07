@@ -176,7 +176,7 @@ describe("hench → rex gateway contract", () => {
     "acknowledgeFinding",
   ];
 
-  const GATEWAY_CONSTANTS = ["SCHEMA_VERSION", "PRD_TREE_DIRNAME"];
+  const GATEWAY_CONSTANTS = ["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "SELF_HEAL_TAG"];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -259,6 +259,8 @@ describe("hench → llm-client gateway contract", () => {
     "resetStaleModel",
     "formatVendorChangeWarning",
     "formatUsage",
+    "classifyLLMError",
+    "getNextFailoverAttempt",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
@@ -560,7 +562,7 @@ describe("gateway export auto-detection", () => {
         "findAutoCompletions", "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
-      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "SELF_HEAL_TAG"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
@@ -602,7 +604,8 @@ describe("gateway export auto-detection", () => {
         "mapErrorReasonToFailureCategory", "mapRunFailureToCategory", "classifyVendorError",
         "failureCategoryLabel", "compileCodexPolicyFlags", "mapSandboxToCodexFlag",
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
-        "toOpenAiToolDef", "toOpenAiToolDefs", "ProviderRegistry", "defaultRegistry"],
+        "toOpenAiToolDef", "toOpenAiToolDefs", "ProviderRegistry", "defaultRegistry",
+        "classifyLLMError", "getNextFailoverAttempt"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES"],
     ]);

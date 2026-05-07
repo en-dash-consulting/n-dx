@@ -59,6 +59,12 @@ export interface LLMConfig {
   claude?: ClaudeConfig;
   /** Codex-specific config (reserved for adapter integration). */
   codex?: CodexConfig;
+  /**
+   * Enable automatic failover on model/vendor errors.
+   * When true, hench retries failed runs on fallback models before surfacing errors.
+   * Default: false (disabled for backward compatibility).
+   */
+  autoFailover?: boolean;
 }
 
 /** Alias that preserves migration ergonomics for downstream packages. */

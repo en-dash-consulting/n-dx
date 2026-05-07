@@ -1,0 +1,26 @@
+---
+id: "620bd7ef-e0f8-4dcf-9df4-b7d1da44f13e"
+level: "task"
+title: "Fix suggestion in viewer-ui-hub: Zone \"Viewer UI Hub\" (viewer-ui-hub) has critical risk (score: 0.63, cohesion: 0"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-19T03:08:25.248Z"
+completedAt: "2026-04-19T03:13:55.185Z"
+resolutionType: "acknowledgment"
+resolutionDetail: "Zone metrics (cohesion 0.38, coupling 0.63) are documented as structurally expected in CLAUDE.md for a UI composition root. Zone has dissolved in current Louvain analysis; files governed via .n-dx.json pins and boundary-check.test.ts enforcement. Prior sessions completed the structural and documentation work. No code change required."
+acceptanceCriteria: []
+description: "- Zone \"Viewer UI Hub\" (viewer-ui-hub) has critical risk (score: 0.63, cohesion: 0.38, coupling: 0.63) — requires refactoring before new feature development"
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-19T03:13:55.222Z"
+__parentDescription: "- Zone \"Viewer UI Hub\" (viewer-ui-hub) has critical risk (score: 0.63, cohesion: 0.38, coupling: 0.63) — requires refactoring before new feature development"
+__parentId: "a1fc3ffa-000f-46fc-b2bf-c5c4b667ef1a"
+__parentLevel: "feature"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-19T03:13:55.222Z"
+__parentStatus: "completed"
+__parentTitle: "Fix suggestion in viewer-ui-hub (1 finding)"
+recommendationMeta: "[object Object]"
+---
