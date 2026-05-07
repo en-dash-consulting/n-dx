@@ -15,6 +15,6 @@ description: "Eliminate unnecessary wrapper directories in the PRD folder tree w
 
 | Title | Status |
 |-------|--------|
-| [Add regression tests for single-child compaction across write path and reshape migration](./add-regression-tests-for-single-7acad3/index.md) | pending |
+| [Add regression tests for single-child compaction across write path and reshape migration](./add-regression-tests-for-single-7acad3/index.md) | completed |
 | [Add single-child detection to PRD folder-tree serializer to skip container directory when parent has exactly one child](./add-single-child-detection-to-2d77d0/index.md) | completed |
 | [Implement single-child compaction migration pass in `ndx reshape` to flatten existing over-wrapped directories](./implement-single-child-f2f520/index.md) | pending |

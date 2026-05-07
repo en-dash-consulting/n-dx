@@ -2,7 +2,7 @@
 id: "7acad3da-6e29-4e52-bed1-121ad63b4fd3"
 level: "task"
 title: "Add regression tests for single-child compaction across write path and reshape migration"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "rex"
@@ -14,9 +14,10 @@ tags:
   - "serializer"
 source: "smart-add"
 startedAt: "2026-05-06T20:06:01.842Z"
-endedAt: "2026-05-06T20:21:01.411Z"
+completedAt: "2026-05-07T00:12:53.625Z"
+endedAt: "2026-05-07T00:12:53.625Z"
 resolutionType: "code-change"
-resolutionDetail: "Added comprehensive regression tests for single-child compaction. Covered: (1) serializer unit tests showing single-child optimization produces flat files with embedded parent metadata, (2) reshape integration tests validating compaction of 3 over-wrapped directories, (3) parser round-trip tests confirming metadata preservation through the full cycle. All 9 new tests pass, 29 existing parser tests still pass."
+resolutionDetail: "Added comprehensive regression tests for single-child compaction. Implemented 9 new tests across two test files: (1) 4 serializer unit tests in folder-tree-serializer.test.ts verifying single-child optimization produces flat files with embedded parent metadata and multi-child preserves normal structure, (2) 2 reshape integration tests in single-child-compaction-regression.test.ts validating compaction of fixture trees with 3 over-wrapped directories and metadata preservation, (3) 3 parser round-trip tests confirming full cycle fidelity. All new tests pass. Existing 29 parser tests unaffected."
 acceptanceCriteria:
   - "Serializer unit test: single-child container produces a flat file, not a subdirectory + index.md"
   - "Serializer unit test: two-child container still produces the existing subdirectory structure"
@@ -33,7 +34,7 @@ description: "Write regression tests covering both surfaces introduced by single
 
 # Add regression tests for single-child compaction across write path and reshape migration
 
-🟠 [pending]
+🟠 [completed]
 
 ## Summary
 
@@ -41,10 +42,10 @@ Write regression tests covering both surfaces introduced by single-child compact
 
 ## Info
 
-- **Status:** pending
+- **Status:** completed
 - **Priority:** high
 - **Tags:** rex, testing, folder-tree, reshape, prd-storage, regression, serializer
 - **Level:** task
 - **Started:** 2026-05-06T20:06:01.842Z
-- **Ended:** 2026-05-06T20:21:01.411Z
-- **Duration:** 14m
+- **Completed:** 2026-05-07T00:12:53.625Z
+- **Duration:** 4h 6m

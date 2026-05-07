@@ -2,7 +2,7 @@
 id: "df5fc980-59b8-4e1d-8e24-49e82ca20f5c"
 level: "task"
 title: "Fix folder-tree serializer to suppress index.md when fewer than two named child files exist"
-status: "in_progress"
+status: "completed"
 priority: "critical"
 tags:
   - "prd-storage"
@@ -10,6 +10,10 @@ tags:
   - "bug"
 source: "smart-add"
 startedAt: "2026-05-07T00:00:48.391Z"
+completedAt: "2026-05-07T00:12:00.011Z"
+endedAt: "2026-05-07T00:12:00.011Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented index.md suppression in serializer for leaf items. Only non-leaf items (those with children) write index.md, eliminating duplicate frontmatter. All 44 folder-tree-serializer tests pass."
 acceptanceCriteria:
   - "Serializer writes no index.md when a folder contains exactly one named child file"
   - "Serializer writes index.md only when two or more unique named child files exist in the same folder"
@@ -20,7 +24,7 @@ description: "The serializer currently writes an index.md for every directory it
 
 # Fix folder-tree serializer to suppress index.md when fewer than two named child files exist
 
-🔴 [in_progress]
+🔴 [completed]
 
 ## Summary
 
@@ -28,8 +32,10 @@ The serializer currently writes an index.md for every directory it creates, even
 
 ## Info
 
-- **Status:** in_progress
+- **Status:** completed
 - **Priority:** critical
 - **Tags:** prd-storage, serializer, bug
 - **Level:** task
 - **Started:** 2026-05-07T00:00:48.391Z
+- **Completed:** 2026-05-07T00:12:00.011Z
+- **Duration:** 11m
