@@ -126,7 +126,7 @@ Guidelines:
 
 Respond with ONLY a valid JSON array of action objects. No explanation, no markdown fences, no commentary — just the JSON.`;
 
-const RESHAPE_FEW_SHOT = `Example output (for reference — do NOT include this in your response):
+export const RESHAPE_FEW_SHOT = `Example output (for reference — do NOT include this in your response):
 [
   {
     "action": "merge",
@@ -143,6 +143,28 @@ const RESHAPE_FEW_SHOT = `Example output (for reference — do NOT include this 
       "acceptanceCriteria": ["Returns 429 with retry-after header", "Implements exponential backoff up to 60s"]
     },
     "reason": "Original description was too vague — added specific retry strategy and verifiable criteria"
+  },
+  {
+    "action": "split",
+    "sourceId": "mno-345",
+    "children": [
+      {
+        "title": "Validate form inputs on submit",
+        "level": "task",
+        "acceptanceCriteria": ["Required fields rejected with clear error", "Email format validated against RFC 5322"]
+      },
+      {
+        "title": "Show inline error messages on validation failure",
+        "level": "task"
+      }
+    ],
+    "reason": "Original task bundled validation logic and error UX — splitting clarifies scope and ownership"
+  },
+  {
+    "action": "reparent",
+    "itemId": "pqr-678",
+    "newParentId": "stu-901",
+    "reason": "Belongs under the auth epic, not the dashboard epic"
   },
   {
     "action": "obsolete",
