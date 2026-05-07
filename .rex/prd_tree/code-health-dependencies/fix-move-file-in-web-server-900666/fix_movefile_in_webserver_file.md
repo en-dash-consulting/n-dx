@@ -1,0 +1,25 @@
+---
+id: "90066670-a9d5-4469-b14b-064cc633c318"
+level: "task"
+title: "Fix move-file in web-server: File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Ser"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-13T20:05:37.693Z"
+completedAt: "2026-04-13T20:09:29.287Z"
+acceptanceCriteria: []
+description: "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone"
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-13T20:09:29.458Z"
+__parentDescription: "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone"
+__parentId: "9d4e78ef-a61b-4b90-9246-69b9b541e0ad"
+__parentLevel: "feature"
+__parentParentId: "0de5be78-d295-4f71-be5d-38594a355240"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-13T20:09:29.458Z"
+__parentStatus: "completed"
+__parentTitle: "Fix move-file in web-server (1 finding)"
+recommendationMeta: "[object Object]"
+---

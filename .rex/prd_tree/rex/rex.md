@@ -13,14 +13,14 @@ description: "PRD management: hierarchical epics/features/tasks/subtasks, smart 
 | Title | Status |
 |-------|--------|
 | [Audit MCP tool schemas against PRDItem fields](./audit-mcp-tool-schemas-against-8fc484/index.md) | completed |
-| [Codex-Compatible PRD Authoring and Proposal Generation](./codex-compatible-prd-authoring-089d9b/index.md) | completed |
 | [Duplicate-aware Proposal Override for rex add](./duplicate-aware-proposal-15572c/index.md) | completed |
 | [Enhanced Rex Recommend Selective PRD Creation](./enhanced-rex-recommend-1d50fb/index.md) | completed |
 | [Fix --mode=fast being ignored when --accept is passed to reorganize](./fix-mode-fast-being-ignored-0f8711/index.md) | completed |
-| [Fix observation in rex (2 findings)](./fix-observation-in-rex-2-findings/index.md) | completed |
 | [Fix observation in rex-recommend (1 finding)](./fix-observation-in-rex-ba206d/index.md) | completed |
 | [Fix observation in rex-core (1 finding)](./fix-observation-in-rex-core-1-finding/index.md) | completed |
+| [Fix observation in rex (2 findings)](./fix-observation-in-rex-2-findings/index.md) | completed |
 | [Fix suggestion in rex (1 finding)](./fix-suggestion-in-rex-1-finding/index.md) | completed |
+| [Codex-Compatible PRD Authoring and Proposal Generation](./codex-compatible-prd-authoring-089d9b/index.md) | completed |
 | [Interactive Workflow Shaping and Requirements Integration](./interactive-workflow-shaping-a19a8b/index.md) | completed |
 | [LoE-Calibrated Proposal Generation in rex add](./loe-calibrated-proposal-8feca9/index.md) | completed |
 | [Move file lock to saveDocument for complete write safety](./move-file-lock-to-savedocument-9fa854/index.md) | completed |

@@ -1,0 +1,26 @@
+---
+id: "811f832e-6640-429b-8423-b6c032837c7d"
+level: "task"
+title: "Fix structural in rex-fix-data-model: Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6);"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-19T02:45:02.865Z"
+completedAt: "2026-04-19T02:47:47.437Z"
+resolutionType: "code-change"
+resolutionDetail: "Finding acknowledged; structural fix was already applied by prior session (test file relocation improved cohesion from 0.4→0.5)."
+acceptanceCriteria: []
+description: "- Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6); per rex-satellite zone policy, any addition that lowers cohesion requires explicit justification"
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-19T02:47:47.477Z"
+__parentDescription: "- Zone sits precisely at the dual-fragility boundary (cohesion 0.4, coupling 0.6); per rex-satellite zone policy, any addition that lowers cohesion requires explicit justification"
+__parentId: "4023370f-31f6-4b8d-af9f-9068504e82bb"
+__parentLevel: "feature"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-19T02:47:47.477Z"
+__parentStatus: "completed"
+__parentTitle: "Fix structural in rex-fix-data-model (1 finding)"
+recommendationMeta: "[object Object]"
+---

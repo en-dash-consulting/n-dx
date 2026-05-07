@@ -25,25 +25,25 @@ Automated recommendations from SourceVision analysis. 21 zone+category groups co
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
 | Between-Run API Quota Status Logging | feature | completed | 2026-04-08 |
-| Between-Run API Quota Status Logging | feature | completed | 2026-04-08 |
 | Centralized Model Resolution and Vendor Visibility Across All LLM Commands | feature | completed | 2026-04-21 |
-| Codex CLI Token Usage Extraction from Run Output | feature | completed | 2026-04-14 |
-| Codex Multi-line Token Count Parsing Fix | feature | completed | 2026-04-14 |
 | Codex Vendor Reliability and Documentation | feature | completed | 2026-02-20 |
 | Consistent Vendor and Model Resolution Across Commands | feature | completed | 2026-04-08 |
-| Dashboard UI for Usage and Duration | feature | completed | 2026-04-23 |
 | Deferred Codex Token Validation at End of Work Run | feature | completed | 2026-04-16 |
 | Deterministic Task Utilization Budget Fallback | feature | completed | 2026-02-22 |
-| Fix move-file in web-server (1 finding) | feature | completed | 2026-04-16 |
+| Codex Multi-line Token Count Parsing Fix | feature | completed | 2026-04-14 |
 | Fix observation in polling (2 findings) | feature | completed | 2026-04-13 |
 | Fix suggestion in token (1 finding) | feature | completed | 2026-04-13 |
 | Fix suggestion in web-2 (1 finding) | feature | completed | 2026-04-13 |
+| Codex CLI Token Usage Extraction from Run Output | feature | completed | 2026-04-14 |
+| Between-Run API Quota Status Logging | feature | completed | 2026-04-08 |
+| Fix move-file in web-server (1 finding) | feature | completed | 2026-04-16 |
 | Init-time LLM Onboarding and Authentication | feature | completed | 2026-02-21 |
 | LLM Client Circular Dependency Resolution | feature | completed | 2026-02-24 |
 | Memory-Aware Polling Loop Management | feature | completed | 2026-02-27 |
 | Model Tier Registry and Weight-Aware Resolution | feature | completed | 2026-04-15 |
 | Per-Command Task Weight Classification and Integration | feature | completed | 2026-04-15 |
 | Polished CLI first-run and re-init experience | feature | completed | 2026-03-24 |
+| Dashboard UI for Usage and Duration | feature | completed | 2026-04-23 |
 | Rex Command Vendor-Model Binding Regression Fix | feature | completed | 2026-04-08 |
 | Robust Claude CLI Discovery for ndx init | feature | completed | 2026-04-10 |
 | Shared LLM Error Classification with Token Exhaustion, Bad Response, and Rate-Limit Diagnostics | feature | completed | 2026-04-21 |

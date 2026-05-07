@@ -1,0 +1,26 @@
+---
+id: "99760deb-ff19-46cf-8460-a302f201338e"
+level: "task"
+title: "Fix structural in e2e-test-infrastructure: Production entry points (assistant-assets/index.js, packages/core/assistant-inte"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-18T15:10:13.973Z"
+completedAt: "2026-04-18T15:15:50.116Z"
+resolutionType: "config-override"
+resolutionDetail: "Added zone pins in .n-dx.json for assistant-assets/index.js, packages/core/assistant-integration.js, claude-integration.js, and codex-integration.js → core zone, separating them from the e2e test zone."
+acceptanceCriteria: []
+description: "- Production entry points (assistant-assets/index.js, packages/core/assistant-integration.js) are grouped into the same zone as test files, suggesting community detection is coupling asset-generation scripts to the test suite via shared import paths."
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-18T15:15:50.152Z"
+__parentDescription: "- Production entry points (assistant-assets/index.js, packages/core/assistant-integration.js) are grouped into the same zone as test files, suggesting community detection is coupling asset-generation scripts to the test suite via shared import paths."
+__parentId: "98d8a394-b9e6-4248-a2f0-4bf288b1f44e"
+__parentLevel: "feature"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-18T15:15:50.152Z"
+__parentStatus: "completed"
+__parentTitle: "Fix structural in e2e-test-infrastructure (1 finding)"
+recommendationMeta: "[object Object]"
+---

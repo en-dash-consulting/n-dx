@@ -1,0 +1,25 @@
+---
+id: "41d979c9-41e8-4b4c-802d-51712f8c4bb3"
+level: "task"
+title: "Fix observation in web-unit: High coupling (0.71) — 3 imports target \"web\""
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-13T21:53:21.171Z"
+completedAt: "2026-04-13T21:57:29.816Z"
+acceptanceCriteria: []
+description: "- High coupling (0.71) — 3 imports target \"web\""
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-13T21:57:29.987Z"
+__parentDescription: "- High coupling (0.71) — 3 imports target \"web\""
+__parentId: "1f995e5a-c5af-4607-94dc-8b35e97220cc"
+__parentLevel: "feature"
+__parentParentId: "0de5be78-d295-4f71-be5d-38594a355240"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-13T21:57:29.987Z"
+__parentStatus: "completed"
+__parentTitle: "Fix observation in web-unit (1 finding)"
+recommendationMeta: "[object Object]"
+---

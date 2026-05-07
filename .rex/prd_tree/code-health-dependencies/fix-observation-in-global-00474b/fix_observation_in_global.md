@@ -1,0 +1,26 @@
+---
+id: "00474be0-22fb-4ea1-802c-f5770696f29a"
+level: "task"
+title: "Fix observation in global: Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider  (+1 more)"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-20T15:40:01.374Z"
+completedAt: "2026-04-20T15:44:55.292Z"
+resolutionType: "code-change"
+resolutionDetail: "Detached hench CLI error handling from prd/llm-gateway by importing foundation error primitives directly from @n-dx/llm-client, and added a boundary test to keep cli/errors.ts out of prd/."
+acceptanceCriteria: []
+description: "- Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-shared\" ↔ \"web-viewer\" (1+11 crossings) — consider extracting shared interface"
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-20T15:45:20.089Z"
+__parentDescription: "- Bidirectional coupling: \"hench\" ↔ \"hench-cli-errors\" (6+5 crossings) — consider extracting shared interface\n- Bidirectional coupling: \"web-shared\" ↔ \"web-viewer\" (1+11 crossings) — consider extracting shared interface"
+__parentId: "b0a511ce-9bfe-47fc-ab6e-1b66d27302d3"
+__parentLevel: "feature"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-20T15:45:20.089Z"
+__parentStatus: "completed"
+__parentTitle: "Fix observation in global (2 findings)"
+recommendationMeta: "[object Object]"
+---

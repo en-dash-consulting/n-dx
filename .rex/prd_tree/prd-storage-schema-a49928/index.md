@@ -28,24 +28,24 @@ PRD persistence model: folder-tree storage, markdown serialization, schema evolu
 | Commit Hash and Author Metadata on PRD Items | feature | completed | 2026-04-30 |
 | Consolidate PRD Files into Single 'prd' File | feature | completed | 2026-04-23 |
 | Cross-PRD Duplicate Detection and Merge-Into-Older Semantics | feature | completed | 2026-04-22 |
-| Eliminate prd.md from Read and Write Paths in ndx add and Related Commands | feature | completed | 2026-05-06 |
 | Epic-Scoped Slug Naming Convention for Folder-Tree Directories | feature | completed | 2026-04-29 |
+| Show Target PRD in ndx add Output | feature | completed | 2026-04-27 |
+| Eliminate prd.md from Read and Write Paths in ndx add and Related Commands | feature | completed | 2026-05-06 |
 | Folder-Based PRD Schema Design and Serialization | feature | completed | 2026-04-27 |
 | Folder-Level index.md Summary Aggregation | feature | completed | 2026-04-30 |
 | Folder Tree Migration, Initialization, and Auto-Trigger | feature | completed | 2026-04-28 |
+| Per-PRD Status Breakdown via --show-individual | feature | completed | 2026-04-27 |
 | JSON Write Path Removal and Markdown-Only Enforcement | feature | completed | 2026-04-29 |
 | Legacy Migration and Multi-File Integration Validation | feature | completed | 2026-04-22 |
 | Markdown Schema Design and Bidirectional Serialization | feature | completed | 2026-04-24 |
 | Migration, Documentation, and Regression Coverage for Folder-Tree-Only Storage | feature | completed | 2026-04-29 |
 | Multi-File PRD Aggregation and Write Routing Layer | feature | completed | 2026-04-22 |
 | Optimize prd_tree Write Performance for Add and Edit Commands | feature | completed | 2026-05-06 |
-| Per-PRD Status Breakdown via --show-individual | feature | completed | 2026-04-27 |
 | PRD File Naming, Discovery, and Branch Resolution | feature | completed | 2026-04-22 |
 | PRD Store Integration with Dual-Write and First-Run Migration | feature | completed | 2026-04-24 |
 | Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location | feature | completed | 2026-05-06 |
 | Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend | feature | completed | 2026-04-29 |
 | Show Target PRD in ndx add Output | feature | completed | 2026-04-30 |
-| Show Target PRD in ndx add Output | feature | completed | 2026-04-27 |
 | Test Suite Updates for Folder-Tree PRD Storage | feature | completed | 2026-04-28 |
 | Title-Based PRD Item File Naming Convention | feature | completed | 2026-04-30 |
 

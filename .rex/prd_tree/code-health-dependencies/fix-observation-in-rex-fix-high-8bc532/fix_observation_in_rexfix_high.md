@@ -1,0 +1,26 @@
+---
+id: "8bc5323c-2e1d-46b0-ad0a-55f8b8d9af99"
+level: "task"
+title: "Fix observation in rex-fix: High coupling (0.6) — 1 imports target \"rex\""
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-18T14:35:35.365Z"
+completedAt: "2026-04-18T14:38:18.402Z"
+resolutionType: "code-change"
+resolutionDetail: "Inlined FixItemStatus union in fix/types.ts, removing the import from ../schema/index.js. The rex-fix zone is now self-contained."
+acceptanceCriteria: []
+description: "- High coupling (0.6) — 1 imports target \"rex\""
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-18T14:38:18.439Z"
+__parentDescription: "- High coupling (0.6) — 1 imports target \"rex\""
+__parentId: "60bb375f-ea39-45cf-b94c-00d18dad49b8"
+__parentLevel: "feature"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-18T14:38:18.439Z"
+__parentStatus: "completed"
+__parentTitle: "Fix observation in rex-fix (1 finding)"
+recommendationMeta: "[object Object]"
+---

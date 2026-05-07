@@ -20,23 +20,23 @@ description: "PRD persistence model: folder-tree storage, markdown serialization
 | [Commit Hash and Author Metadata on PRD Items](./commit-hash-and-author-metadata-78798e/index.md) | completed |
 | [Consolidate PRD Files into Single 'prd' File](./consolidate-prd-files-into-be363d/index.md) | completed |
 | [Cross-PRD Duplicate Detection and Merge-Into-Older Semantics](./cross-prd-duplicate-detection-44c387/index.md) | completed |
-| [Eliminate prd.md from Read and Write Paths in ndx add and Related Commands](./eliminate-prd-md-from-read-and-5ec163/index.md) | completed |
 | [Epic-Scoped Slug Naming Convention for Folder-Tree Directories](./epic-scoped-slug-naming-f9376f/index.md) | completed |
+| [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-e430a1/index.md) | completed |
+| [Eliminate prd.md from Read and Write Paths in ndx add and Related Commands](./eliminate-prd-md-from-read-and-5ec163/index.md) | completed |
 | [Folder-Based PRD Schema Design and Serialization](./folder-based-prd-schema-design-7286f1/index.md) | completed |
 | [Folder-Level index.md Summary Aggregation](./folder-level-index-md-summary-722b72/index.md) | completed |
 | [Folder Tree Migration, Initialization, and Auto-Trigger](./folder-tree-migration-568a1a/index.md) | completed |
+| [Per-PRD Status Breakdown via --show-individual](./per-prd-status-breakdown-via-73fc1e/index.md) | completed |
 | [JSON Write Path Removal and Markdown-Only Enforcement](./json-write-path-removal-and-21a866/index.md) | completed |
 | [Legacy Migration and Multi-File Integration Validation](./legacy-migration-and-multi-file-65020d/index.md) | completed |
 | [Markdown Schema Design and Bidirectional Serialization](./markdown-schema-design-and-6687ab/index.md) | completed |
 | [Migration, Documentation, and Regression Coverage for Folder-Tree-Only Storage](./migration-documentation-and-fcc281/index.md) | completed |
 | [Multi-File PRD Aggregation and Write Routing Layer](./multi-file-prd-aggregation-and-e006db/index.md) | completed |
 | [Optimize prd_tree Write Performance for Add and Edit Commands](./optimize-prd-tree-write-6e8679/index.md) | completed |
-| [Per-PRD Status Breakdown via --show-individual](./per-prd-status-breakdown-via-73fc1e/index.md) | completed |
 | [PRD File Naming, Discovery, and Branch Resolution](./prd-file-naming-discovery-and-f648a5/index.md) | completed |
 | [PRD Store Integration with Dual-Write and First-Run Migration](./prd-store-integration-with-dual-1306e6/index.md) | completed |
 | [Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location](./rename-rex-tree-to-rex-prd-tree-c94d8e/index.md) | completed |
 | [Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend](./retire-prd-md-and-promote-7145d6/index.md) | completed |
 | [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-14ccf2/index.md) | completed |
-| [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-e430a1/index.md) | completed |
 | [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-db58ca/index.md) | completed |
 | [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-1797eb/index.md) | completed |

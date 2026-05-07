@@ -20,21 +20,21 @@ Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an 
 
 | Child | Level | Status | Last Updated |
 |-------|-------|--------|--------------|
+| Feature 3: Rex Scanner Go Support | feature | completed | 2026-03-26 |
 | API vs CLI Invocation Context Detection and Display | feature | completed | 2026-04-20 |
+| Hench Run-Loop Visual Output Refinements | feature | completed | 2026-04-09 |
 | Branch Work System of Record | feature | completed | 2026-02-25 |
 | Commit Approval Bypass for Autonomous Runs | feature | completed | 2026-04-23 |
 | Ctrl-C Interrupt Rollback Prompt Coordination | feature | completed | 2026-04-24 |
 | Enforce Plan-to-Execution Continuity in Hench Runs | feature | completed | 2026-04-30 |
 | Feature 1: Go-Aware Archetype System | feature | completed | 2026-03-26 |
 | Feature 2: Go Server Route Detection | feature | completed | 2026-03-26 |
-| Feature 3: Rex Scanner Go Support | feature | completed | 2026-03-26 |
 | Feature 4: Hench Go Project Support | feature | completed | 2026-03-26 |
 | Fix Inaccurate File-Change Reporting in Run Summary and Dashboard | feature | completed | 2026-04-30 |
 | Graceful Cancellation with Rollback Prompt on Ctrl+C | feature | completed | 2026-04-20 |
 | Hench Process Concurrency Management | feature | completed | 2026-02-26 |
 | Hench Resource Monitoring and User Feedback | feature | completed | 2026-02-26 |
 | Hench Run-Loop Visual Output Refinements | feature | completed | 2026-04-08 |
-| Hench Run-Loop Visual Output Refinements | feature | completed | 2026-04-09 |
 | Hench Run-Loop Visual Output Refinements | feature | completed | 2026-04-09 |
 | Hench Run-Loop Visual Output Refinements | feature | completed | 2026-04-09 |
 | Hench UI Real-time Task Monitoring | feature | completed | 2026-02-18 |

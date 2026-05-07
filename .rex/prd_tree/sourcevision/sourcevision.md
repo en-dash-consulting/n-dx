@@ -18,8 +18,8 @@ description: "Static analysis engine: file inventory, import graph, zone detecti
 | [Background Tab Resource Optimization](./background-tab-resource-optimization/index.md) | completed |
 | [Fix 1: Go Zone Edge Resolution](./fix-1-go-zone-edge-resolution/index.md) | completed |
 | [Fix 2: Mixed-Language Support](./fix-2-mixed-language-support/index.md) | completed |
-| [Fix observation in sourcevision-2 (1 finding)](./fix-observation-in-sourcevision-3f7352/index.md) | completed |
 | [Fix observation in sourcevision-cli (1 finding)](./fix-observation-in-sourcevision-6c79b3/index.md) | completed |
+| [Fix observation in sourcevision-2 (1 finding)](./fix-observation-in-sourcevision-3f7352/index.md) | completed |
 | [Fix suggestion in polling (1 finding)](./fix-suggestion-in-polling-1-finding/index.md) | completed |
 | [Git Credential Helper Opt-In Recovery](./git-credential-helper-opt-in-recovery/index.md) | completed |
 | [Git-Independent PR Markdown Generation](./git-independent-pr-markdown-generation/index.md) | completed |

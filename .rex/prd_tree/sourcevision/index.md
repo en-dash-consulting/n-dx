@@ -30,8 +30,8 @@ Build an evaluation harness in tests/gauntlet/ that captures sourcevision's curr
 | Background Tab Resource Optimization | feature | completed | 2026-02-27 |
 | Fix 1: Go Zone Edge Resolution | feature | completed | 2026-03-26 |
 | Fix 2: Mixed-Language Support | feature | completed | 2026-03-26 |
-| Fix observation in sourcevision-2 (1 finding) | feature | completed | 2026-04-13 |
 | Fix observation in sourcevision-cli (1 finding) | feature | completed | 2026-04-13 |
+| Fix observation in sourcevision-2 (1 finding) | feature | completed | 2026-04-13 |
 | Fix suggestion in polling (1 finding) | feature | completed | 2026-04-13 |
 | Git Credential Helper Opt-In Recovery | feature | completed | 2026-02-23 |
 | Git-Independent PR Markdown Generation | feature | completed | 2026-02-23 |

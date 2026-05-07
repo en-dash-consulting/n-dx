@@ -1,0 +1,25 @@
+---
+id: "0fe2a07e-516e-4bd7-8e77-29c43e0fc7ca"
+level: "task"
+title: "Fix observation in web-2: Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecti (+1 more)"
+status: "completed"
+priority: "high"
+source: "sourcevision"
+startedAt: "2026-04-13T21:49:07.077Z"
+completedAt: "2026-04-13T21:53:18.361Z"
+acceptanceCriteria: []
+description: "- Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.75) — 3 imports target \"web\""
+__parentAcceptanceCriteria: []
+__parentCompletedAt: "2026-04-13T21:53:18.531Z"
+__parentDescription: "- Generic zone name \"Web 2\" — enrichment did not assign a meaningful name reflecting this zone's domain purpose\n- High coupling (0.75) — 3 imports target \"web\""
+__parentId: "2de3bf8b-961a-42ca-aacf-fba4c29fde3a"
+__parentLevel: "feature"
+__parentParentId: "0de5be78-d295-4f71-be5d-38594a355240"
+__parentPriority: "high"
+__parentRecommendationMeta: "[object Object]"
+__parentSource: "sourcevision"
+__parentStartedAt: "2026-04-13T21:53:18.531Z"
+__parentStatus: "completed"
+__parentTitle: "Fix observation in web-2 (2 findings)"
+recommendationMeta: "[object Object]"
+---
