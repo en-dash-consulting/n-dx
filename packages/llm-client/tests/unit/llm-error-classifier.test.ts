@@ -139,6 +139,31 @@ describe("classifyLLMError", () => {
     expect(r.category).toBe("parse");
   });
 
+  it("surfaces [ndx-debug:<path>] sentinel and underlying detail in parse branch", () => {
+    const err = new Error(
+      "LLM response failed schema validation: features.0.tasks: Required [ndx-debug:/tmp/ndx-add-failure-2026-05-07T10-00-00-000Z.txt]",
+    );
+    const r = classifyLLMError(err);
+    expect(r.category).toBe("parse");
+    expect(r.message).toContain("unparseable");
+    expect(r.message).toContain(
+      "Raw response saved to /tmp/ndx-add-failure-2026-05-07T10-00-00-000Z.txt",
+    );
+    expect(r.message).toContain("Underlying error:");
+    expect(r.message).toContain("features.0.tasks: Required");
+    // Sentinel itself must not leak into the surfaced message.
+    expect(r.message).not.toContain("[ndx-debug:");
+    expect(r.suggestion).toContain("Inspect the captured response");
+  });
+
+  it("does not append debug detail when no sentinel is present", () => {
+    const r = classifyLLMError(new Error("Invalid JSON in LLM response"));
+    expect(r.category).toBe("parse");
+    expect(r.message).not.toContain("Raw response saved to");
+    expect(r.message).not.toContain("Underlying error:");
+    expect(r.suggestion).not.toContain("Inspect the captured response");
+  });
+
   // ── network category ──────────────────────────────────────────────
 
   it("classifies ENOTFOUND as network", () => {
