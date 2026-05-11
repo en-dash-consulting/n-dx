@@ -1,5 +1,12 @@
 # @n-dx/sourcevision
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`d512d05`](https://github.com/en-dash-consulting/n-dx/commit/d512d05fe8726aafa635f04b98275dc2520482e4)]:
+  - @n-dx/llm-client@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes

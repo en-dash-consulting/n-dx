@@ -1,5 +1,11 @@
 # @n-dx/llm-client
 
+## 0.4.1
+
+### Patch Changes
+
+- [#201](https://github.com/en-dash-consulting/n-dx/pull/201) [`d512d05`](https://github.com/en-dash-consulting/n-dx/commit/d512d05fe8726aafa635f04b98275dc2520482e4) Thanks [@endash-shal](https://github.com/endash-shal)! - Adding auto-changing llm models for long runs, self-heal improvements and bug fixes.
+
 ## 0.4.0
 
 ### Minor Changes
