@@ -5,6 +5,9 @@ packages:
 # least 7 days old before pnpm will install them. Internal @n-dx/* workspace
 # packages are exempt so cross-workspace installs aren't blocked by their
 # own publish recency.
+minimumReleaseAgeStrict: true
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - '@n-dx/*'
+
+trustPolicy: no-downgrade
