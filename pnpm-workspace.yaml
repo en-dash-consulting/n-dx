@@ -1,2 +1,10 @@
 packages:
   - 'packages/*'
+
+# Supply-chain hardening: require third-party package versions to be at
+# least 7 days old before pnpm will install them. Internal @n-dx/* workspace
+# packages are exempt so cross-workspace installs aren't blocked by their
+# own publish recency.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - '@n-dx/*'
