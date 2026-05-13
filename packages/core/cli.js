@@ -1540,7 +1540,7 @@ async function handleWork(rest) {
     const vendor = readLLMVendor(dir);
     if (!vendor) {
       console.error("Error: No LLM vendor configured for this project.");
-      console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+      console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' or 'ndx config llm.vendor gemini' to configure a vendor.");
       exitWithCleanup(1);
     }
   }
