@@ -7,7 +7,6 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { spawn } from "node:child_process";
 import type {
   ClaudeClient,
   CompletionRequest,
@@ -16,6 +15,7 @@ import type {
 import { ClaudeClientError } from "./types.js";
 import type { GeminiConfig } from "./llm-types.js";
 import { NEWEST_MODELS } from "./config.js";
+import { spawnTool } from "./exec.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
@@ -79,49 +79,51 @@ async function spawnOnce(
     // Adjust these flags if the Gemini CLI uses different subcommands/flags.
     const args = [
       "chat",
-      "--model", request.model || resolveGeminiModel(geminiConfig),
-      "--file", inputPath,
-      "--output", outputPath,
+      "--model",
+      request.model || resolveGeminiModel(geminiConfig),
+      "--file",
+      inputPath,
+      "--output",
+      outputPath,
       ...(request.cliFlags ?? []),
     ];
 
-    await new Promise<void>((resolve, reject) => {
-      const proc = spawn(cliBinary, args, {
-        stdio: ["ignore", "ignore", "pipe"],
-        env: process.env,
-        shell: process.platform === "win32",
-      });
-
-      let stderr = "";
-      proc.stderr.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
-
-      proc.on("error", (err) => {
-        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-          reject(new ClaudeClientError(`Gemini CLI not found: ${cliBinary}`, "not-found", false));
-          return;
-        }
-        reject(new ClaudeClientError(err.message, "unknown", isTransientError(err.message)));
-      });
-
-      proc.on("close", (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-        const detail = stderr.trim() || `gemini exited with code ${code}`;
-        const classified = classifyStderr(detail);
-        reject(new ClaudeClientError(detail, classified.reason, classified.retryable));
-      });
+    const { exitCode, stderr } = await spawnTool(cliBinary, args, {
+      stdio: "pipe",
+      env: process.env,
     });
+
+    if (exitCode !== 0) {
+      const detail = stderr.trim() || `gemini exited with code ${exitCode}`;
+      const classified = classifyStderr(detail);
+      throw new ClaudeClientError(
+        detail,
+        classified.reason,
+        classified.retryable,
+      );
+    }
 
     const text = (await readFile(outputPath, "utf-8")).trim();
     if (text.length === 0) {
-      throw new ClaudeClientError("Gemini CLI produced empty output", "unknown", true);
+      throw new ClaudeClientError(
+        "Gemini CLI produced empty output",
+        "unknown",
+        true,
+      );
     }
 
     return { text };
+  } catch (err) {
+    if (err instanceof ClaudeClientError) throw err;
+    const message = (err as Error).message;
+    if (message.includes("ENOENT")) {
+      throw new ClaudeClientError(
+        `Gemini CLI not found: ${cliBinary}`,
+        "not-found",
+        false,
+      );
+    }
+    throw new ClaudeClientError(message, "unknown", isTransientError(message));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -35,10 +35,11 @@ process.env.CLAUDE_CLI_PATH = "/nonexistent/path/to/claude";
 // ── getSupportedAssistants() ────────────────────────────────────────────────
 
 describe("getSupportedAssistants", () => {
-  it("returns claude and codex", () => {
+  it("returns claude, codex, and gemini", () => {
     const assistants = getSupportedAssistants();
     expect(assistants).toContain("claude");
     expect(assistants).toContain("codex");
+    expect(assistants).toContain("gemini");
   });
 
   it("returns only known vendors", () => {
@@ -99,18 +100,33 @@ describe("setupAssistantIntegrations", () => {
     }
   });
 
+  it("provisions Gemini artifacts when gemini is enabled", () => {
+    const results = setupAssistantIntegrations(tmpDir, { claude: false, codex: false, gemini: true });
+    expect(results.gemini.summary).not.toContain("skipped");
+    expect(results.gemini.detail).toBeDefined();
+    // Gemini writes instructions and skills
+    expect(existsSync(join(tmpDir, "GEMINI.md"))).toBe(true);
+    const skillNames = getSkillNames();
+    for (const name of skillNames) {
+      expect(existsSync(join(tmpDir, ".gemini", "skills", name, "SKILL.md"))).toBe(true);
+    }
+  });
+
   it("provisions both vendors by default", () => {
     const results = setupAssistantIntegrations(tmpDir);
     expect(results.claude.summary).not.toContain("skipped");
     expect(results.claude.skipped).toBe(false);
     expect(results.codex.summary).not.toContain("skipped");
     expect(results.codex.skipped).toBe(false);
+    expect(results.gemini.summary).not.toContain("skipped");
+    expect(results.gemini.skipped).toBe(false);
   });
 
   it("includes label in results for all vendors", () => {
     const results = setupAssistantIntegrations(tmpDir);
     expect(results.claude.label).toBe("Claude Code");
     expect(results.codex.label).toBe("Codex");
+    expect(results.gemini.label).toBe("Gemini CLI");
   });
 
   it("skips Claude when claude: false", () => {
@@ -158,6 +174,13 @@ describe("setupAssistantIntegrations", () => {
     expect(results.codex.summary).toContain(`${serverCount} MCP servers`);
   });
 
+  it("Gemini summary includes GEMINI.md and skill count", () => {
+    const results = setupAssistantIntegrations(tmpDir, { claude: false, codex: false });
+    const skillCount = getSkillNames().length;
+    expect(results.gemini.summary).toContain("GEMINI.md");
+    expect(results.gemini.summary).toContain(`${skillCount} skills`);
+  });
+
   it("detail objects match vendor-specific result shapes", () => {
     const results = setupAssistantIntegrations(tmpDir);
 
@@ -171,6 +194,10 @@ describe("setupAssistantIntegrations", () => {
     expect(results.codex.detail).toHaveProperty("config");
     expect(results.codex.detail).toHaveProperty("skills");
     expect(results.codex.detail).toHaveProperty("agents");
+
+    // Gemini detail
+    expect(results.gemini.detail).toHaveProperty("skills");
+    expect(results.gemini.detail).toHaveProperty("instructions");
   });
 
   it("is idempotent — running twice produces the same result summaries", () => {
@@ -178,6 +205,7 @@ describe("setupAssistantIntegrations", () => {
     const second = setupAssistantIntegrations(tmpDir);
     expect(first.claude.summary).toBe(second.claude.summary);
     expect(first.codex.summary).toBe(second.codex.summary);
+    expect(first.gemini.summary).toBe(second.gemini.summary);
   });
 
   it("failure in one vendor does not block the other", () => {
@@ -202,6 +230,11 @@ describe("assistant-integration.js uses vendor integration modules", () => {
   it("imports setupCodexIntegration from codex-integration.js", () => {
     expect(src).toContain('from "./codex-integration.js"');
     expect(src).toContain("setupCodexIntegration");
+  });
+
+  it("imports setupGeminiIntegration from gemini-integration.js", () => {
+    expect(src).toContain('from "./gemini-integration.js"');
+    expect(src).toContain("setupGeminiIntegration");
   });
 
   it("does not contain inline skill or MCP logic", () => {
@@ -258,18 +291,20 @@ describe("formatInitReport", () => {
     const joined = lines.join("\n");
     expect(joined).toContain("Claude Code");
     expect(joined).toContain("Codex");
+    expect(joined).toContain("Gemini CLI");
   });
 
   it("shows skip flag when vendor is disabled", () => {
-    const results = setupAssistantIntegrations(tmpDir, { codex: false });
+    const results = setupAssistantIntegrations(tmpDir, { codex: false, gemini: false });
     const lines = formatInitReport(results);
     const joined = lines.join("\n");
     expect(joined).toContain("--no-codex");
+    expect(joined).toContain("--no-gemini");
     expect(joined).toContain("skipped");
   });
 
   it("shows artifact summary when vendor is enabled", () => {
-    const results = setupAssistantIntegrations(tmpDir, { claude: true, codex: false });
+    const results = setupAssistantIntegrations(tmpDir, { claude: true, codex: false, gemini: false });
     const lines = formatInitReport(results);
     const joined = lines.join("\n");
     expect(joined).toContain("CLAUDE.md");
@@ -291,7 +326,7 @@ describe("formatInitReport", () => {
   });
 
   it("verbose Claude detail includes CLAUDE.md written, skills, settings, and MCP", () => {
-    const results = setupAssistantIntegrations(tmpDir, { codex: false });
+    const results = setupAssistantIntegrations(tmpDir, { codex: false, gemini: false });
     const lines = formatInitReport(results);
     const joined = lines.join("\n");
     expect(joined).toContain("CLAUDE.md written");
@@ -301,7 +336,7 @@ describe("formatInitReport", () => {
   });
 
   it("verbose Codex detail includes AGENTS.md written, skills, and config", () => {
-    const results = setupAssistantIntegrations(tmpDir, { claude: false });
+    const results = setupAssistantIntegrations(tmpDir, { claude: false, gemini: false });
     const lines = formatInitReport(results);
     const joined = lines.join("\n");
     expect(joined).toContain("AGENTS.md written");
@@ -309,11 +344,20 @@ describe("formatInitReport", () => {
     expect(joined).toMatch(/\.codex\/config\.toml/);
   });
 
-  it("skipped vendors show compact single-line even in verbose mode", () => {
+  it("verbose Gemini detail includes GEMINI.md written and skills", () => {
     const results = setupAssistantIntegrations(tmpDir, { claude: false, codex: false });
+    const lines = formatInitReport(results);
+    const joined = lines.join("\n");
+    expect(joined).toContain("GEMINI.md written");
+    expect(joined).toMatch(/\.gemini\/skills\/.*skill/);
+  });
+
+  it("skipped vendors show compact single-line even in verbose mode", () => {
+    const results = setupAssistantIntegrations(tmpDir, { claude: false, codex: false, gemini: false });
     const lines = formatInitReport(results); // verbose by default
     // 1 header + 1 per skipped vendor (no extra artifact lines)
-    expect(lines.length).toBe(1 + getSupportedAssistants().length);
+    const expectedLength = 1 + getSupportedAssistants().length;
+    expect(lines.length).toBe(expectedLength);
     for (const line of lines.slice(1)) {
       expect(line).toContain("skipped");
     }
@@ -344,6 +388,9 @@ describe("formatInitReport activeVendor de-emphasis", () => {
     expect(joined).not.toContain("AGENTS.md written");
     expect(joined).not.toContain(".agents/skills/");
     expect(joined).not.toContain(".codex/config.toml");
+    // Non-active vendor (Gemini) should NOT have artifact detail lines
+    expect(joined).not.toContain("GEMINI.md written");
+    expect(joined).not.toContain(".gemini/skills/");
   });
 
   it("de-emphasizes Claude when Codex is the active vendor", () => {
@@ -363,11 +410,14 @@ describe("formatInitReport activeVendor de-emphasis", () => {
     const results = setupAssistantIntegrations(tmpDir);
     const lines = formatInitReport(results, { activeVendor: "claude" });
     const joined = lines.join("\n");
-    // Both vendor labels should appear
+    // All vendor labels should appear
     expect(joined).toContain("Claude Code");
     expect(joined).toContain("Codex");
+    expect(joined).toContain("Gemini CLI");
     // Codex summary line should be present (compact form)
     expect(joined).toMatch(/Codex\s+AGENTS\.md/);
+    // Gemini summary line should be present (compact form)
+    expect(joined).toMatch(/Gemini CLI\s+GEMINI\.md/);
   });
 
   it("produces fewer lines than without activeVendor", () => {
@@ -381,9 +431,10 @@ describe("formatInitReport activeVendor de-emphasis", () => {
     const results = setupAssistantIntegrations(tmpDir);
     const lines = formatInitReport(results);
     const joined = lines.join("\n");
-    // Both vendors get verbose detail
+    // All vendors get verbose detail
     expect(joined).toContain("CLAUDE.md written");
     expect(joined).toContain("AGENTS.md written");
+    expect(joined).toContain("GEMINI.md written");
   });
 
   it("still shows error reason on non-active vendor when present", () => {
@@ -612,17 +663,18 @@ describe("cli.js backward-compatible re-init detection", () => {
     expect(src).toContain('"CLAUDE.md"');
   });
 
-  it("detects existing Codex surfaces (.codex, .agents, or AGENTS.md)", () => {
-    expect(src).toContain("codexPresent");
-    expect(src).toContain('".codex"');
-    expect(src).toContain('".agents"');
-    expect(src).toContain('"AGENTS.md"');
+  it("detects existing Gemini surfaces (GEMINI.md or .gemini)", () => {
+    expect(src).toContain("geminiPresent");
+    expect(src).toContain('".gemini"');
+    expect(src).toContain('"GEMINI.md"');
   });
 
   it("narrows assistantEnabled when only one vendor surface exists", () => {
-    // Should disable the absent vendor when only one exists
-    expect(src).toContain("claudePresent && !codexPresent");
-    expect(src).toContain("!claudePresent && codexPresent");
+    // Should disable the absent vendors when only one exists
+    expect(src).toContain("assistantEnabled = {");
+    expect(src).toContain("claude: claudePresent");
+    expect(src).toContain("codex: codexPresent");
+    expect(src).toContain("gemini: geminiPresent");
   });
 });
 
@@ -665,6 +717,10 @@ describe("help.js init help documents all assistant flags", () => {
     expect(src).toContain("--codex-only");
   });
 
+  it("documents --gemini-only flag", () => {
+    expect(src).toContain("--gemini-only");
+  });
+
   it("documents --assistants= flag", () => {
     expect(src).toContain("--assistants=");
   });
@@ -675,5 +731,9 @@ describe("help.js init help documents all assistant flags", () => {
 
   it("documents --no-codex flag", () => {
     expect(src).toContain("--no-codex");
+  });
+
+  it("documents --no-gemini flag", () => {
+    expect(src).toContain("--no-gemini");
   });
 });

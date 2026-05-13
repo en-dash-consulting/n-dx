@@ -1,0 +1,49 @@
+
+> @n-dx/web@0.1.0 dev /Users/drewliverman/CursorProjects/n-dx/n-dx/packages/web
+> node dev.js
+
+[tsc] npm warn Unknown env config "prefer-workspace-packages". This will stop working in the next major version of npm.
+[tsc] npm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm.
+[tsc] npm warn Unknown env config "recursive". This will stop working in the next major version of npm.
+[tsc] npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm.
+[tsc] npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm.
+[tsc] npm warn Unknown env config "link-workspace-packages". This will stop working in the next major version of npm.
+[tsc] npm warn Unknown project config "link-workspace-packages". This will stop working in the next major version of npm.
+[tsc] npm warn Unknown project config "prefer-workspace-packages". This will stop working in the next major version of npm.
+[esbuild] [esbuild] Rebuilt viewer: dist/viewer/index.html
+[esbuild] [esbuild] Initial build complete: dist/viewer/index.html
+[esbuild] [esbuild] Rebuilt landing: dist/landing/index.html
+[esbuild] [esbuild] Initial build complete: dist/landing/index.html
+[esbuild] [esbuild] Watching for changes...
+[esbuild] [esbuild] Rebuilt landing: dist/landing/index.html
+[esbuild] [watch] build finished, watching for changes...
+[esbuild] [esbuild] Rebuilt viewer: dist/viewer/index.html
+[serve] No .sourcevision/ directory found — landing page will be shown at /
+[serve] Run 'ndx init .' to initialize, then 'ndx plan .' to analyze.
+[serve] n-dx dashboard running at http://localhost:3117
+[serve] Serving data from: /Users/drewliverman/CursorProjects/n-dx/n-dx/packages/web/.sourcevision
+[serve] MCP (rex):          http://localhost:3117/mcp/rex
+[serve] MCP (sourcevision): http://localhost:3117/mcp/sourcevision
+[serve] WebSocket available at ws://localhost:3117
+[serve] Dev mode: live reload enabled
+[serve] Claude Code MCP setup:
+[serve]   claude mcp add --transport http rex http://localhost:3117/mcp/rex
+[serve]   claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
+[serve] Press Ctrl+C to stop.
+[tsc] [41m                                                                               [0m
+[tsc] [41m[37m                This is not the tsc command you are looking for                [0m
+[tsc] [41m                                                                               [0m
+[tsc] To get access to the TypeScript compiler, [34mtsc[0m, from the command line either:
+[tsc] - Use [1mnpm install typescript[0m to first add TypeScript to your project [1mbefore[0m using npx
+[tsc] - Use [1myarn[0m to avoid accidentally running code from un-installed packages
+[tsc] exited with code 1
+[serve] [shutdown] graceful shutdown initiated (SIGTERM)
+[serve] [shutdown] step 1/4 — child processes
+[serve] [shutdown] step 2/4 — WebSocket connections
+[serve] [shutdown] WebSocket connections closed
+[serve] [shutdown] step 3/4 — HTTP server
+[serve] [shutdown] HTTP server closed — port 3117 released
+[serve] [shutdown] step 4/4 — port file
+[serve] [shutdown] port file removed
+[serve] [shutdown] verified: all 5 components shut down cleanly
+[serve] [shutdown] complete

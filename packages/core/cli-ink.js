@@ -145,7 +145,7 @@ function Recap({
       <${Text} dimColor>    ${TOOL_NAME} add "feature"    add requirements to the PRD<//>
       <${Text} dimColor>    ${TOOL_NAME} work .           pick up a task and start building<//>
       <${Text}> <//>
-      <${Text} dimColor>  Or open <${Text} color="cyan">claude<//>  or <${Text} color="cyan">codex<//>  and try <${Text} color="cyan">/ndx-status<//>  or <${Text} color="cyan">/ndx-capture<//>  to get started<//>
+      <${Text} dimColor>  Or open <${Text} color="cyan">claude<//>, <${Text} color="cyan">codex<//>, or <${Text} color="cyan">gemini<//> and try <${Text} color="cyan">/ndx-status<//> or <${Text} color="cyan">/ndx-capture<//> to get started<//>
     <//>
   `;
 }
