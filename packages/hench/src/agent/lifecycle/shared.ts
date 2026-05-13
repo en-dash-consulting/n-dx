@@ -1169,7 +1169,7 @@ export async function performCommitPromptIfNeeded(
           if (item) {
             const existing = item.commits ?? [];
             // Check if this commit is already recorded (idempotent)
-            if (!existing.some((c) => c.hash === hash)) {
+            if (!existing.some((c: { hash: string }) => c.hash === hash)) {
               const updatedCommits = [
                 ...existing,
                 { hash, author, authorEmail, timestamp },
