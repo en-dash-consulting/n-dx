@@ -35,6 +35,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-4-6",
   codex: "gpt-5.5",
+  gemini: "gemini-2.0-flash",
 };
 
 /**
@@ -54,6 +55,10 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
   codex: {
     light: "gpt-5.4-mini",
     standard: NEWEST_MODELS.codex,
+  },
+  gemini: {
+    light: "gemini-2.0-flash-lite",
+    standard: NEWEST_MODELS.gemini,
   },
 };
 
@@ -75,10 +80,12 @@ const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
  * Approximate derivation (~4 chars per token):
  *   claude  200K-token window → ~800K chars; cap at 640K (80% utilisation)
  *   codex   128K-token window → ~512K chars; cap at 400K (78% utilisation)
+ *   gemini  1M-token window   → ~4M chars;   cap at 1M   (conservative)
  */
 export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
   claude: 640_000,
   codex: 400_000,
+  gemini: 1_000_000,
 };
 
 /**
@@ -172,6 +179,21 @@ export function resolveVendorModel(
       return normalizeCodexModel(config.codex.model);
     }
     return TIER_MODELS.codex.standard;
+  }
+  if (vendor === "gemini") {
+    if (weight === "light") {
+      if (config?.gemini?.lightModel) {
+        return config.gemini.lightModel;
+      }
+      return TIER_MODELS.gemini.light;
+    }
+    if (config?.model) {
+      return config.model;
+    }
+    if (config?.gemini?.model) {
+      return config.gemini.model;
+    }
+    return TIER_MODELS.gemini.standard;
   }
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).

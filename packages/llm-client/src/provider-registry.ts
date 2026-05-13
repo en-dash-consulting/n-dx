@@ -41,6 +41,7 @@ import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
 import type { LLMConfig } from "./llm-types.js";
 import { createClient } from "./create-client.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
+import { createGeminiCliClient } from "./gemini-cli-provider.js";
 import { createOpenAiApiProvider, resolveOpenAiApiKey } from "./openai-api-provider.js";
 
 // ── Factory type ──────────────────────────────────────────────────────────
@@ -193,6 +194,21 @@ export function createDefaultRegistry(): ProviderRegistry {
       vendor: "codex",
       mode: "cli",
       model: config.codex?.model,
+      capabilities: [],
+    };
+    return {
+      info,
+      complete: (request) => client.complete(request),
+    } satisfies LLMProvider;
+  });
+
+  // Gemini: wrap the CLI client in an LLMProvider adapter.
+  registry.register("gemini", (config) => {
+    const client = createGeminiCliClient({ geminiConfig: config.gemini });
+    const info: ProviderInfo = {
+      vendor: "gemini",
+      mode: "cli",
+      model: config.gemini?.model,
       capabilities: [],
     };
     return {
