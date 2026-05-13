@@ -32,6 +32,8 @@ export function resolveVendorAdapter(vendor: LLMVendor): VendorAdapter {
   switch (vendor) {
     case "codex":
       return codexCliAdapter;
+    case "gemini":
+      return claudeCliAdapter; // Temporary fallback to Claude adapter until Gemini adapter is ready
     case "claude":
     default:
       return claudeCliAdapter;

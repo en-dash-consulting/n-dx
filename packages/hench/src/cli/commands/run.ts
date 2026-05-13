@@ -227,7 +227,7 @@ export async function getEpicScopeInfo(
     // Check if this item is inside the target epic
     const isInEpic =
       item.id === resolvedEpicId ||
-      parents.some((p) => p.id === resolvedEpicId);
+      parents.some((p: any) => p.id === resolvedEpicId);
 
     if (isInEpic && isWorkItem(item.level)) {
       // Deleted items are excluded from all counts
@@ -416,7 +416,7 @@ export async function peekNextTaskPriority(
     const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
     const allActionable = findActionable(doc.items, skipIds, Infinity, tagOptions);
     const epicActionable = allActionable.filter(
-      (e) => epicTaskIds.has(e.item.id) && !excludeTaskIds?.has(e.item.id),
+      (e: any) => epicTaskIds.has(e.item.id) && !excludeTaskIds?.has(e.item.id),
     );
     if (epicActionable.length > 0) {
       const next = epicActionable[0];
@@ -790,12 +790,12 @@ export async function cmdRun(
   // vendor-pinned slot inside `resolveVendorModel`.
   const cliModelOverride =
     flags.model
-    ?? (llmVendor === "claude" ? flags["claude-model"] : flags["codex-model"]);
+    ?? (llmVendor === "claude" ? flags["claude-model"] : llmVendor === "codex" ? flags["codex-model"] : flags["gemini-model"]);
   const configuredModel = resolveVendorModel(llmVendor, llmConfig);
   const resolvedModel = cliModelOverride ? resolveModel(cliModelOverride) : configuredModel;
   const hasConfiguredModel =
     !!llmConfig?.model
-    || (llmVendor === "claude" ? !!llmConfig?.claude?.model : !!llmConfig?.codex?.model);
+    || (llmVendor === "claude" ? !!llmConfig?.claude?.model : llmVendor === "codex" ? !!llmConfig?.codex?.model : !!llmConfig?.gemini?.model);
   const modelSource: "cli-override" | "configured" | "default" = cliModelOverride
     ? "cli-override"
     : hasConfiguredModel
@@ -806,7 +806,7 @@ export async function cmdRun(
   // resolved (either top-level llm.model or vendor-pinned) is incompatible
   // with the active vendor. Picks the same value resolveVendorModel uses.
   const activeConfiguredModel = llmConfig?.model
-    ?? (llmVendor === "claude" ? llmConfig?.claude?.model : llmConfig?.codex?.model);
+    ?? (llmVendor === "claude" ? llmConfig?.claude?.model : llmVendor === "codex" ? llmConfig?.codex?.model : llmConfig?.gemini?.model);
   if (!cliModelOverride && activeConfiguredModel) {
     if (
       llmVendor === "claude" &&
@@ -823,10 +823,19 @@ export async function cmdRun(
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="codex".`,
-        `Either use a Codex/GPT model (e.g., gpt-4o, o1) or switch vendor: 'n-dx config llm.vendor claude'`,
+        `Either use a Codex model (e.g., gpt-5) or switch vendor: 'n-dx config llm.vendor claude'`,
       );
-    }
-  }
+      }
+      if (
+      llmVendor === "gemini" &&
+      !isModelCompatibleWithVendor("gemini", activeConfiguredModel)
+      ) {
+      throw new CLIError(
+        `Configured model "${activeConfiguredModel}" is not compatible with vendor="gemini".`,
+        `Either use a Gemini model (e.g., gemini-2.0-flash) or switch vendor: 'n-dx config llm.vendor claude'`,
+      );
+      }
+      }
 
   // Surface vendor/model at command start for operator visibility.
   // Reads the most recent run artifact (if any) to detect model changes.
@@ -881,9 +890,9 @@ export async function cmdRun(
     tagsFilter = tagsFilter ? [...tagsFilter, SELF_HEAL_TAG] : [SELF_HEAL_TAG];
   }
 
-  if (llmVendor === "codex" && provider === "api" && !dryRun) {
+  if (llmVendor !== "claude" && provider === "api" && !dryRun) {
     throw new CLIError(
-      "Hench API provider is only supported for vendor=claude.",
+      `Hench API provider is only supported for vendor=claude (current vendor: ${llmVendor}).`,
       "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
     );
   }
