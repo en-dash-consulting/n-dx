@@ -227,3 +227,16 @@ After following this guide you'll have:
 - **Interactive Q&A** — MCP tools configured so you can ask Claude Code architecture questions with grounded context
 
 From here, the normal [workflow loop](./workflow) applies: analyze → recommend → work → status → repeat.
+
+## Skills used in this guide
+
+Each skill below maps to a step in this guide. Edit the linked file in your project to customize that step's behavior in your assistant session.
+
+| Skill | Source | Role in this guide |
+|-------|--------|--------------------|
+| `/ndx-zone` | [`.agents/skills/ndx-zone/SKILL.md`](../../.agents/skills/ndx-zone/SKILL.md) | Steps 4–5: deep-dives into zone health metrics and answers import-graph questions interactively |
+| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](../../.agents/skills/ndx-plan/SKILL.md) | Step 6: generates the initial PRD with baseline scanning (marks already-implemented items complete) |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Step 6: shows the initial PRD tree with completion stats and next recommended action |
+| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | Post-onboarding: picks the first task and begins implementation with full codebase context |
+
+Related guides: [Workflow](./workflow) (the ongoing loop after onboarding), [Spec-Driven Development](./spec-driven) (if you have a spec to layer on top of the initial PRD).

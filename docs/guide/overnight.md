@@ -215,3 +215,15 @@ This isn't strictly required — the server self-corrects on reads — but it gi
 - [ ] `hench status .` — check for failed runs
 - [ ] Reset any stuck `in_progress` tasks to `pending`
 - [ ] Restart server if needed: `ndx start stop . && ndx start --background .`
+
+## Skills used in this guide
+
+Each skill below is invoked along the overnight run path. Edit the linked file in your project to customize that step's behavior in your assistant session.
+
+| Skill | Source | Role in this guide |
+|-------|--------|--------------------|
+| `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](../../.agents/skills/ndx-config/SKILL.md) | Before launch: sets `hench.maxTokens`, `hench.maxTurns`, and provider settings |
+| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | The overnight loop: picks tasks, builds briefs, runs tool-use loops, commits results |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Morning review: shows which tasks completed, what failed, and current PRD health |
+
+Related guides: [Workflow](./workflow) (the base loop), [Spec-Driven Development](./spec-driven) (using `--epic` scoping for overnight runs), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (uses overnight as an execution option).

@@ -341,3 +341,17 @@ ndx work --auto --iterations=8 .    # one hour per task estimate → ~8 hours
 ```
 
 When the iterations are done, stop. Review what changed, defer the rest, and decide if another sprint is warranted. A partial cleanup that ships beats a complete cleanup that never finishes.
+
+## Skills used in this guide
+
+Each skill below maps to a step in this guide. Edit the linked file in your project to customize that step's behavior in your assistant session.
+
+| Skill | Source | Role in this guide |
+|-------|--------|--------------------|
+| `/ndx-zone` | [`.agents/skills/ndx-zone/SKILL.md`](../../.agents/skills/ndx-zone/SKILL.md) | Step 2: deep-dives into zone cohesion/coupling scores and cross-zone dependency edges |
+| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](../../.agents/skills/ndx-plan/SKILL.md) | Step 3: translates SourceVision anti-pattern findings into a prioritized remediation PRD |
+| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](../../.agents/skills/ndx-capture/SKILL.md) | Step 4: adds your own tech-debt items as structured tasks with acceptance criteria |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Step 5: validates plan integrity and shows per-epic task counts before execution |
+| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | Step 6: executes cleanup tasks one at a time with test-passing acceptance criteria |
+
+Related guides: [Run While You Sleep](./overnight) (for unattended cleanup runs), [Self-Heal Loop](./self-heal) (ongoing post-cleanup improvement), [Workflow](./workflow) (the base loop).
