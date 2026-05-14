@@ -19,6 +19,8 @@
       var s = localStorage.getItem("sv-theme");
       var t = s || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
       document.documentElement.setAttribute("data-theme", t);
+      var d = localStorage.getItem("ndx.ui.density");
+      document.documentElement.setAttribute("data-density", (d === "small" || d === "large") ? d : "medium");
     })();
   </script>
   <link rel="stylesheet" href="./styles.css">

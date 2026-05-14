@@ -362,6 +362,51 @@
   background: var(--bg-active, var(--bg-hover));
 }
 
+/* ── Density selector: segmented S/M/L control ── */
+.density-selector {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.density-btn {
+  width: 22px;
+  height: 26px;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-normal), color var(--transition-normal);
+  padding: 0;
+  letter-spacing: var(--tracking-wide);
+}
+
+.density-btn:last-child {
+  border-right: none;
+}
+
+.density-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.density-btn--active {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.density-btn:active {
+  background: var(--bg-active);
+}
+
 /* ── Config footer: collapsible config display ── */
 .config-footer {
   flex-shrink: 0;

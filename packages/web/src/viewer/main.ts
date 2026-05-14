@@ -20,6 +20,7 @@ import {
   useNeolithicOverlay,
   createTripleClickDetector,
   initTheme,
+  initDensity,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -42,6 +43,7 @@ if (isDeployedMode()) {
 }
 
 initTheme();
+initDensity();
 bootstrap();
 startPollingRestart({ onDegradationChange, isFeatureDisabled });
 initScrollReveal();
