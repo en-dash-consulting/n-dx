@@ -171,6 +171,80 @@ describe("isReshapeInProgress", () => {
   });
 });
 
+// ── Regression: no hash-suffix creation on duplicate title ───────────────────
+
+describe("no-hash-suffix-creation regression", () => {
+  let tmpDir: string;
+  let rexDir: string;
+
+  beforeEach(async () => {
+    const setup = await setupDir();
+    tmpDir = setup.tmpDir;
+    rexDir = setup.rexDir;
+  });
+
+  afterEach(async () => { await cleanup(tmpDir); });
+
+  it("adds item with exact same title as sibling → merge, not hash-suffix", async () => {
+    const store = await resolveStore(rexDir);
+
+    const epicId = randomUUID();
+    const existingId = randomUUID();
+    await store.addItem({ id: epicId, title: "Auth Epic", level: "epic", status: "pending" });
+    await store.addItem(
+      { id: existingId, title: "Implement Login", level: "feature", status: "pending" },
+      epicId,
+    );
+
+    // Add a second item with the exact same clean title
+    await cmdAdd(tmpDir, "feature", { title: "Implement Login", parent: epicId });
+
+    const doc = await store.loadDocument();
+    const epic = doc.items.find((i) => i.id === epicId);
+    const features = epic!.children?.filter((c) => c.level === "feature") ?? [];
+
+    // Duplicate merged → only one feature remains
+    expect(features).toHaveLength(1);
+
+    // Surviving title must be the clean title (no appended hash/id suffix)
+    const title = features[0].title;
+    expect(title).toBe("Implement Login");
+    // Belt-and-suspenders: no trailing parenthesised or bracketed short-id
+    expect(title).not.toMatch(/\s*[\(\[][a-zA-Z0-9\-]{3,12}[\)\]]\s*$/);
+  });
+
+  it("add path never appends hash suffix for any title collision scenario", async () => {
+    const store = await resolveStore(rexDir);
+
+    const epicId = randomUUID();
+    await store.addItem({ id: epicId, title: "Epic", level: "epic", status: "pending" });
+
+    // Pre-populate several clean features
+    const titles = ["Feature Alpha", "Feature Beta", "Feature Gamma"];
+    for (const title of titles) {
+      await store.addItem({ id: randomUUID(), title, level: "feature", status: "pending" }, epicId);
+    }
+
+    // Re-add each title via cmdAdd (exact duplicates, no descriptions)
+    for (const title of titles) {
+      await cmdAdd(tmpDir, "feature", { title, parent: epicId });
+    }
+
+    const doc = await store.loadDocument();
+    const epic = doc.items.find((i) => i.id === epicId)!;
+    const features = epic.children?.filter((c) => c.level === "feature") ?? [];
+
+    // All duplicates should have been merged — original count preserved
+    expect(features).toHaveLength(titles.length);
+
+    // No title may carry a hash/id suffix
+    for (const f of features) {
+      expect(f.title).not.toMatch(/\s*[\(\[][a-zA-Z0-9\-]{3,12}[\)\]]\s*$/);
+      expect(f.title).not.toMatch(/\s+-\s+[a-f0-9]{6,12}$/i);
+    }
+  });
+});
+
 // ── Integration: scoped pass wired into cmdAdd ─────────────────────────────
 
 describe("cmdAdd scoped consolidation pass", () => {
