@@ -13,12 +13,15 @@
 
 import { join } from "node:path";
 import { readFile, writeFile, unlink } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { findItem } from "../../core/tree.js";
 import { applyReshape } from "../../core/reshape.js";
-import type { ReshapeProposal, MergeAction } from "../../core/reshape.js";
-import type { PRDItem } from "../../schema/index.js";
+import type { ReshapeProposal, MergeAction, GroupAction } from "../../core/reshape.js";
+import type { PRDItem, ItemLevel } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
+import { appendArchiveBatch } from "../../core/archive.js";
+import { captureGitCommitHash } from "../../core/git-utils.js";
 
 // ── Hash-suffix detection ─────────────────────────────────────────────────────
 
@@ -46,19 +49,35 @@ function normalizeForComparison(title: string): string {
 }
 
 /**
+ * Return the container level one step above the given item level, or null
+ * if there is no valid container level (e.g. epics can only live at root).
+ */
+export function getContainerLevel(level: ItemLevel): ItemLevel | null {
+  switch (level) {
+    case "task": return "feature";
+    case "feature": return "epic";
+    case "subtask": return "task";
+    case "epic": return null;
+  }
+}
+
+/**
  * Detect hash-suffix duplicate pairs among siblings.
  *
  * Two siblings are hash-suffix duplicates when their titles, after stripping
  * any trailing "(hash)" / "[hash]" suffix, normalize to the same string.
  *
- * Survivor selection:
- *   1. Prefer the item whose title has no hash suffix (canonical form).
- *   2. If both have hash suffixes, prefer the existing item over the
- *      newly added item (newItemId).
- *   3. If both are existing items with hash suffixes, prefer the first
- *      in sibling order (oldest positionally).
+ * Survivor selection (most children > no-suffix > oldest createdAt > non-new > first):
+ *   1. Prefer the item with the most children.
+ *   2. Among ties, prefer the item whose title has no hash suffix (canonical form).
+ *   3. Among ties, prefer the item with the oldest createdAt timestamp.
+ *   4. Among ties, prefer any existing item over the newly added item (newItemId).
+ *   5. Fall back to first in sibling order.
  *
- * Returns merge proposals: survivor absorbs loser's children and body.
+ * Strategy selection:
+ *   - When ALL items in a group have at least one child AND the group level has a
+ *     valid container level → emit a GroupAction (parent-container strategy).
+ *   - Otherwise → emit MergeActions (merge strategy).
  */
 export function detectHashSuffixDuplicates(
   siblings: PRDItem[],
@@ -77,25 +96,52 @@ export function detectHashSuffixDuplicates(
   }
 
   const proposals: ReshapeProposal[] = [];
-  const processed = new Set<string>();
 
-  for (const [, group] of groups) {
+  for (const [strippedKey, group] of groups) {
     if (group.length < 2) continue;
 
-    // Pick survivor: no-suffix items > existing items > new item
-    const noSuffix = group.filter((g) => stripHashSuffix(g.title) === g.title.trim());
-    let survivor: PRDItem;
+    // Determine strategy: group action when all items have children and level allows
+    const allHaveChildren = group.every((g) => g.children && g.children.length > 0);
+    const containerLevel = group[0].level ? getContainerLevel(group[0].level) : null;
 
-    if (noSuffix.length > 0) {
-      // Prefer the no-suffix form; if multiple, pick first (oldest in sibling order)
-      survivor = noSuffix[0];
-    } else {
-      // All have hash suffixes — prefer any existing item over the new item
-      const existing = group.filter((g) => g.id !== newItemId);
-      survivor = existing.length > 0 ? existing[0] : group[0];
+    if (allHaveChildren && containerLevel !== null) {
+      // Parent-container strategy: create a new container and move all items under it
+      const action: GroupAction = {
+        action: "group",
+        containerId: randomUUID(),
+        containerTitle: strippedKey,
+        containerLevel,
+        itemIds: group.map((g) => g.id),
+        reason: "hash-suffix-distinct-cases-container",
+      };
+      proposals.push({
+        id: `hash-group-${group.map((g) => g.id).join("-")}`,
+        action,
+      });
+      continue;
     }
 
-    const losers = group.filter((g) => g.id !== survivor.id);
+    // Merge strategy: pick survivor, merge losers into it
+
+    // Sort by most children first, then no-suffix, then non-new, then first in sibling order
+    const sorted = [...group].sort((a, b) => {
+      const aChildren = a.children?.length ?? 0;
+      const bChildren = b.children?.length ?? 0;
+      if (bChildren !== aChildren) return bChildren - aChildren; // more children first
+
+      const aNoSuffix = stripHashSuffix(a.title) === a.title.trim() ? 0 : 1;
+      const bNoSuffix = stripHashSuffix(b.title) === b.title.trim() ? 0 : 1;
+      if (aNoSuffix !== bNoSuffix) return aNoSuffix - bNoSuffix; // no-suffix first
+
+      const aNew = a.id === newItemId ? 1 : 0;
+      const bNew = b.id === newItemId ? 1 : 0;
+      return aNew - bNew; // non-new first (positional fallback preserved)
+    });
+
+    const survivor = sorted[0];
+    const losers = sorted.slice(1);
+
+    const processed = new Set<string>();
     for (const loser of losers) {
       const key = `${survivor.id}:${loser.id}`;
       if (processed.has(key)) continue;
@@ -184,6 +230,12 @@ export interface ScopedConsolidationResult {
   mergedCount: number;
   /** Human-readable label for the parent scope (for CLI output). */
   parentLabel: string;
+  /** IDs archived (losers in merge strategy). */
+  archivedIds: string[];
+  /** Strategy applied: "merge" or "parent-container". */
+  strategy: "merge" | "parent-container" | "none";
+  /** Number of children reparented from losers to survivor. */
+  reparentedChildCount: number;
 }
 
 /**
@@ -205,21 +257,29 @@ export async function runScopedConsolidationPass(
   newItemId: string,
   flags: Record<string, string>,
 ): Promise<ScopedConsolidationResult> {
+  const empty = (parentLabel: string): ScopedConsolidationResult => ({
+    mergedCount: 0,
+    parentLabel,
+    archivedIds: [],
+    strategy: "none",
+    reparentedChildCount: 0,
+  });
+
   // --no-reshape opt-out
   if (flags["no-reshape"] === "true") {
-    return { mergedCount: 0, parentLabel: "" };
+    return empty("");
   }
 
   // Skip if a full reshape is running concurrently
   if (await isReshapeInProgress(rexDir)) {
-    return { mergedCount: 0, parentLabel: "" };
+    return empty("");
   }
 
   // Load post-add document state
   const doc = await store.loadDocument();
   const entry = findItem(doc.items, newItemId);
   if (!entry) {
-    return { mergedCount: 0, parentLabel: "" };
+    return empty("");
   }
 
   // Determine sibling cohort
@@ -236,24 +296,66 @@ export async function runScopedConsolidationPass(
   }
 
   if (siblings.length < 2) {
-    return { mergedCount: 0, parentLabel };
+    return empty(parentLabel);
   }
 
   // Detect hash-suffix duplicates among siblings
   const proposals = detectHashSuffixDuplicates(siblings, newItemId);
   if (proposals.length === 0) {
-    return { mergedCount: 0, parentLabel };
+    return empty(parentLabel);
+  }
+
+  // Determine strategy and count reparented children before applying
+  const hasGroup = proposals.some((p) => p.action.action === "group");
+  const strategy: ScopedConsolidationResult["strategy"] = hasGroup ? "parent-container" : "merge";
+
+  let reparentedChildCount = 0;
+  for (const proposal of proposals) {
+    if (proposal.action.action === "merge") {
+      const mergeAction = proposal.action as import("../../core/reshape.js").MergeAction;
+      for (const loserId of mergeAction.mergedIds) {
+        const loserEntry = findItem(doc.items, loserId);
+        reparentedChildCount += loserEntry?.item.children?.length ?? 0;
+      }
+    } else if (proposal.action.action === "group") {
+      const groupAction = proposal.action as import("../../core/reshape.js").GroupAction;
+      for (const itemId of groupAction.itemIds) {
+        const itemEntry = findItem(doc.items, itemId);
+        reparentedChildCount += itemEntry?.item.children?.length ?? 0;
+      }
+    }
   }
 
   // Apply proposals — applyReshape mutates doc.items in place
   const reshapeResult = applyReshape(doc.items, proposals);
   if (reshapeResult.applied.length === 0) {
-    return { mergedCount: 0, parentLabel };
+    return empty(parentLabel);
   }
 
   // Persist
   await store.saveDocument(doc);
   await syncFolderTree(rexDir, store);
+
+  // Archive removed items
+  if (reshapeResult.archivedItems.length > 0) {
+    const dir = join(rexDir, "..");
+    const preReshapeCommit = await captureGitCommitHash(dir);
+    const timestamp = new Date().toISOString();
+    await appendArchiveBatch(rexDir, {
+      timestamp,
+      source: "reshape",
+      items: reshapeResult.archivedItems,
+      count: reshapeResult.archivedItems.length,
+      reason: "hash-suffix consolidation (add path)",
+      mergeAuditTrail: reshapeResult.mergeAuditTrail.map((m) => ({
+        survivorId: m.survivorId,
+        mergedFromIds: m.mergedFromIds,
+        reasoning: m.reasoning,
+        preReshapeCommit,
+        timestamp,
+      })),
+    });
+  }
 
   // Log the consolidation
   await store.appendLog({
@@ -264,11 +366,17 @@ export async function runScopedConsolidationPass(
       mergedCount: reshapeResult.applied.length,
       parentLabel,
       deletedIds: reshapeResult.deletedIds,
+      strategy,
+      reparentedChildCount,
+      archivedIds: reshapeResult.deletedIds,
     }),
   });
 
   return {
     mergedCount: reshapeResult.applied.length,
     parentLabel,
+    archivedIds: reshapeResult.deletedIds,
+    strategy,
+    reparentedChildCount,
   };
 }

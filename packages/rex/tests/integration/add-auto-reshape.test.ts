@@ -25,6 +25,7 @@ import {
   RESHAPE_LOCK_FILENAME,
   encodeReshapeLock,
 } from "../../src/cli/commands/add-reshape.js";
+import { loadArchive, ARCHIVE_FILE } from "../../src/core/archive.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -286,6 +287,80 @@ describe("cmdAdd scoped consolidation pass", () => {
         await unlink(join(rexDir, RESHAPE_LOCK_FILENAME));
       } catch { /* already gone */ }
     }
+  });
+
+  it("prefers survivor with more children over no-suffix survivor with no children", () => {
+    // item-with-children has a hash suffix but has 2 children
+    // item-no-suffix has no hash suffix but has no children
+    // Survivor selection: most children wins first
+    const withChildren = makeItem({
+      id: "with-children",
+      title: "Fix bug (abc123)",
+      children: [makeItem({ title: "Sub A" }), makeItem({ title: "Sub B" })],
+    });
+    const noSuffix = makeItem({ id: "no-suffix", title: "Fix bug" });
+    const proposals = detectHashSuffixDuplicates([withChildren, noSuffix], "no-suffix");
+    expect(proposals).toHaveLength(1);
+    const action = proposals[0].action as { survivorId: string; mergedIds: string[] };
+    expect(action.survivorId).toBe("with-children");
+    expect(action.mergedIds).toContain("no-suffix");
+  });
+
+  it("emits GroupAction when all items in a group have at least one child", () => {
+    const feat1 = makeItem({
+      id: "feat-1",
+      title: "Login (abc)",
+      level: "feature",
+      children: [makeItem({ title: "Subtask A" })],
+    });
+    const feat2 = makeItem({
+      id: "feat-2",
+      title: "Login (def)",
+      level: "feature",
+      children: [makeItem({ title: "Subtask B" })],
+    });
+    const proposals = detectHashSuffixDuplicates([feat1, feat2], "feat-2");
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].action.action).toBe("group");
+  });
+
+  it("emits MergeAction when at least one item has no children", () => {
+    const feat1 = makeItem({
+      id: "feat-1",
+      title: "Login (abc)",
+      level: "feature",
+      children: [makeItem({ title: "Subtask A" })],
+    });
+    // feat2 has no children
+    const feat2 = makeItem({ id: "feat-2", title: "Login (def)", level: "feature" });
+    const proposals = detectHashSuffixDuplicates([feat1, feat2], "feat-2");
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].action.action).toBe("merge");
+  });
+
+  it("writes to archive after scoped consolidation merges items", async () => {
+    const store = await resolveStore(rexDir);
+
+    const epicId = randomUUID();
+    const existingId = randomUUID();
+    await store.addItem({ id: epicId, title: "Epic", level: "epic", status: "pending" });
+    await store.addItem(
+      { id: existingId, title: "Fix bug (abc123)", level: "feature", status: "pending" },
+      epicId,
+    );
+
+    // Add a duplicate
+    await cmdAdd(tmpDir, "feature", {
+      title: "Fix bug (def456)",
+      parent: epicId,
+    });
+
+    // After the consolidation pass, archive should have a batch
+    const archive = await loadArchive(join(rexDir, ARCHIVE_FILE));
+    expect(archive.batches.length).toBeGreaterThan(0);
+    const lastBatch = archive.batches[archive.batches.length - 1];
+    expect(lastBatch.source).toBe("reshape");
+    expect(lastBatch.items.length).toBeGreaterThan(0);
   });
 
   it("scoped pass completes within 500ms on a 100-item sibling subtree", async () => {
