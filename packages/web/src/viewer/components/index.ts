@@ -99,3 +99,18 @@ export { ZoneSlideout } from "./zone-slideout.js";
 // ── Constants ───────────────────────────────────────────────────────
 
 export * from "./constants.js";
+
+// ── Geometric decoration primitives ─────────────────────────────────
+
+export {
+  DecoConcentricArcs,
+  type DecoConcentricArcsProps,
+  DecoDotGrid,
+  type DecoDotGridProps,
+  DecoBorderCircle,
+  type DecoBorderCircleProps,
+  DecoRuledLines,
+  type DecoRuledLinesProps,
+  DecoLargeNumeral,
+  type DecoLargeNumeralProps,
+} from "./decorations.js";

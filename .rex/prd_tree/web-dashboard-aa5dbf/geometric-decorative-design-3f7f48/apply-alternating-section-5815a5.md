@@ -2,7 +2,7 @@
 id: "5815a5e0-5d17-42ef-96c3-c517fd6c8894"
 level: "task"
 title: "Apply alternating section backgrounds and scroll fade-up animations across dashboard views"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "web"
@@ -10,6 +10,10 @@ tags:
   - "animation"
 source: "smart-add"
 startedAt: "2026-05-14T14:28:59.363Z"
+completedAt: "2026-05-14T14:38:44.808Z"
+endedAt: "2026-05-14T14:38:44.808Z"
+resolutionType: "code-change"
+resolutionDetail: "Created decorations.css (alternating backgrounds, geometric decoration pseudo-elements, scroll-reveal CSS) and scroll-reveal.ts (IntersectionObserver + MutationObserver + reduced-motion support). Wired up via main.ts and index.css."
 acceptanceCriteria:
   - "Adjacent top-level sections in the dashboard render with alternating background tones using the design-token palette"
   - "Section headers and major content blocks fade and translate upward into view on scroll using IntersectionObserver"
