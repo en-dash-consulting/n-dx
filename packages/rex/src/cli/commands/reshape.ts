@@ -21,6 +21,7 @@ import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 import { getLLMVendor } from "../../analyze/reason.js";
 import { detectCrossPRDDuplicates } from "./reshape-detect-duplicates.js";
+import { acquireReshapeLock } from "./add-reshape.js";
 import type { PRDItem } from "../../schema/index.js";
 
 export async function cmdReshape(
@@ -28,6 +29,22 @@ export async function cmdReshape(
   flags: Record<string, string>,
 ): Promise<void> {
   const rexDir = join(dir, REX_DIR);
+
+  // Acquire reshape lock so concurrent `add` commands skip their scoped pass.
+  const releaseReshapeLock = await acquireReshapeLock(rexDir);
+
+  try {
+    await _cmdReshapeCore(dir, rexDir, flags);
+  } finally {
+    await releaseReshapeLock();
+  }
+}
+
+async function _cmdReshapeCore(
+  dir: string,
+  rexDir: string,
+  flags: Record<string, string>,
+): Promise<void> {
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
 
