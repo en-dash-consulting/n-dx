@@ -12,6 +12,6 @@ description: "Currently when rex add encounters a conflicting (duplicate) title,
 
 | Title | Status |
 |-------|--------|
-| [Implement LLM-driven rename resolution for conflicting sibling titles](./implement-llm-driven-rename-a063a3.md) | pending |
+| [Implement LLM-driven rename resolution for conflicting sibling titles](./implement-llm-driven-rename-a063a3.md) | completed |
 | [Remove hash-suffix title disambiguation from rex add and reshape write paths](./remove-hash-suffix-title-b5924b.md) | pending |
 | [Route true title-conflict duplicates through existing reshape merge rules](./route-true-title-conflict-95b5c8.md) | pending |

@@ -24,7 +24,10 @@ import type { PRDItem, ItemLevel } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { appendArchiveBatch } from "../../core/archive.js";
+import type { RenameAuditEntry } from "../../core/archive.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
+import { similarity } from "../../analyze/dedupe.js";
+import { proposeSiblingRenames } from "../../analyze/index.js";
 
 // ── Hash-suffix detection ─────────────────────────────────────────────────────
 
@@ -182,6 +185,95 @@ export function detectHashSuffixDuplicates(
   return proposals;
 }
 
+// ── Non-duplicate title collision detection ───────────────────────────────────
+
+/**
+ * Content-similarity threshold below which two same-title siblings are
+ * considered semantically distinct (non-duplicates) and eligible for
+ * LLM rename rather than merge.
+ *
+ * Items with no content (both descriptions empty) are excluded from rename
+ * detection — they are routed to the existing hash-suffix merge path.
+ */
+export const TITLE_COLLISION_DISTINCT_THRESHOLD = 0.5;
+
+/**
+ * A pair of sibling items that share the same normalized title but have
+ * semantically distinct content (content similarity below threshold).
+ * These are candidates for LLM-driven rename rather than merge.
+ */
+export interface SiblingTitleCollisionPair {
+  /** The two colliding siblings (same normalized title, distinct content). */
+  items: [PRDItem, PRDItem];
+  /** The shared normalized title (hash suffix stripped, lowercased). */
+  normalizedTitle: string;
+  /** Content similarity score between the two items (0–1). */
+  contentSimilarity: number;
+}
+
+/**
+ * Build a comparable content string from an item (description + acceptance criteria).
+ */
+function buildItemContentForSimilarity(item: PRDItem): string {
+  const parts: string[] = [];
+  if (item.description?.trim()) parts.push(item.description.trim());
+  if (item.acceptanceCriteria?.length) parts.push(item.acceptanceCriteria.join(" "));
+  return parts.join(" ").trim();
+}
+
+/**
+ * Detect sibling pairs that share a normalized title but have semantically
+ * distinct content (i.e. non-duplicates).
+ *
+ * Only pairwise collisions (exactly 2 siblings with the same title) are
+ * returned. Groups of 3+ same-title items are left to the existing
+ * hash-suffix merge path.
+ *
+ * Items with empty content on either side are excluded — content similarity
+ * requires a signal from at least one description or acceptance criterion
+ * on each side.
+ */
+export function detectNonDuplicateTitleCollisions(
+  siblings: PRDItem[],
+): SiblingTitleCollisionPair[] {
+  if (siblings.length < 2) return [];
+
+  // Group by normalized stripped title
+  const groups = new Map<string, PRDItem[]>();
+  for (const sib of siblings) {
+    const key = normalizeForComparison(sib.title);
+    if (!key) continue;
+    const grp = groups.get(key) ?? [];
+    grp.push(sib);
+    groups.set(key, grp);
+  }
+
+  const result: SiblingTitleCollisionPair[] = [];
+
+  for (const [normalizedTitle, group] of groups) {
+    // Only handle pairwise collisions
+    if (group.length !== 2) continue;
+
+    const [a, b] = group as [PRDItem, PRDItem];
+
+    const contentA = buildItemContentForSimilarity(a);
+    const contentB = buildItemContentForSimilarity(b);
+
+    // Cannot assess distinctness without content on both sides
+    if (!contentA || !contentB) continue;
+
+    const contentSim = similarity(contentA, contentB);
+    if (contentSim >= TITLE_COLLISION_DISTINCT_THRESHOLD) {
+      // High similarity → treat as true duplicate, let merge path handle it
+      continue;
+    }
+
+    result.push({ items: [a, b], normalizedTitle, contentSimilarity: contentSim });
+  }
+
+  return result;
+}
+
 // ── Tree-level duplicate detector ────────────────────────────────────────────
 
 /**
@@ -335,28 +427,38 @@ export async function isReshapeInProgress(rexDir: string): Promise<boolean> {
 export interface ScopedConsolidationResult {
   /** Number of merge proposals applied (0 = no action). */
   mergedCount: number;
+  /** Number of sibling pairs renamed via LLM due to title collision (0 = no renames). */
+  renamedCount: number;
   /** Human-readable label for the parent scope (for CLI output). */
   parentLabel: string;
   /** IDs archived (losers in merge strategy). */
   archivedIds: string[];
-  /** Strategy applied: "merge" or "parent-container". */
-  strategy: "merge" | "parent-container" | "none";
+  /** Strategy applied: "merge", "parent-container", "rename", or "none". */
+  strategy: "merge" | "parent-container" | "rename" | "none";
   /** Number of children reparented from losers to survivor. */
   reparentedChildCount: number;
 }
 
 /**
- * Run a scoped hash-suffix consolidation pass on the siblings of a newly
- * added item.
+ * Run a scoped consolidation pass on the siblings of a newly added item.
+ *
+ * Two resolution paths are attempted in order:
+ *
+ * 1. **LLM rename** — when two siblings share a title but have semantically
+ *    distinct content (similarity below {@link TITLE_COLLISION_DISTINCT_THRESHOLD}),
+ *    the LLM is invoked to propose unique titles for both. If the LLM call
+ *    fails or produces another collision, the error is propagated — there is
+ *    no suffix-append fallback.
+ *
+ * 2. **Hash-suffix merge** — after any renames are applied (or if none were
+ *    needed), siblings whose stripped titles still match are merged via the
+ *    existing reshape pipeline.
  *
  * Skips silently when:
  * - `flags["no-reshape"] === "true"` (user passed `--no-reshape`)
  * - A full `ndx reshape` is detected in progress (reshape.lock present + live PID)
  * - The new item has no siblings
- * - No hash-suffix duplicates are found among siblings
- *
- * When duplicates are found, applies merge proposals in-memory and persists
- * the updated document and folder tree.
+ * - Neither renames nor merges are needed
  */
 export async function runScopedConsolidationPass(
   rexDir: string,
@@ -366,6 +468,7 @@ export async function runScopedConsolidationPass(
 ): Promise<ScopedConsolidationResult> {
   const empty = (parentLabel: string): ScopedConsolidationResult => ({
     mergedCount: 0,
+    renamedCount: 0,
     parentLabel,
     archivedIds: [],
     strategy: "none",
@@ -406,26 +509,150 @@ export async function runScopedConsolidationPass(
     return empty(parentLabel);
   }
 
-  // Detect hash-suffix duplicates among siblings
+  // ── Phase 1: LLM rename for non-duplicate title collisions ──────────────────
+
+  const nonDupCollisions = detectNonDuplicateTitleCollisions(siblings);
+  let renamedCount = 0;
+
+  if (nonDupCollisions.length > 0) {
+    const timestamp = new Date().toISOString();
+    const renameAuditTrail: RenameAuditEntry[] = [];
+
+    for (const collision of nonDupCollisions) {
+      const [itemA, itemB] = collision.items;
+
+      // Throws on LLM failure, parse error, or resulting collision
+      const proposal = await proposeSiblingRenames(itemA, itemB);
+
+      // Validate: new titles must be unique among ALL current siblings
+      const otherTitles = siblings
+        .filter((s) => s.id !== itemA.id && s.id !== itemB.id)
+        .map((s) => s.title.toLowerCase().trim().replace(/\s+/g, " "));
+      const normalA = proposal.titleA.toLowerCase().trim().replace(/\s+/g, " ");
+      const normalB = proposal.titleB.toLowerCase().trim().replace(/\s+/g, " ");
+
+      if (otherTitles.includes(normalA)) {
+        throw new Error(
+          `LLM rename for "${itemA.id}" produced title "${proposal.titleA}" which ` +
+          `collides with another existing sibling. Cannot resolve title collision.`,
+        );
+      }
+      if (otherTitles.includes(normalB)) {
+        throw new Error(
+          `LLM rename for "${itemB.id}" produced title "${proposal.titleB}" which ` +
+          `collides with another existing sibling. Cannot resolve title collision.`,
+        );
+      }
+
+      // Apply renames
+      await store.updateItem(itemA.id, { title: proposal.titleA });
+      await store.updateItem(itemB.id, { title: proposal.titleB });
+      renamedCount++;
+
+      renameAuditTrail.push({
+        itemAId: itemA.id,
+        oldTitleA: itemA.title,
+        newTitleA: proposal.titleA,
+        itemBId: itemB.id,
+        oldTitleB: itemB.title,
+        newTitleB: proposal.titleB,
+        reasoning: proposal.reasoning,
+        timestamp,
+      });
+    }
+
+    // Persist renames and sync folder tree
+    await syncFolderTree(rexDir, store);
+
+    // Archive the rename audit trail
+    await appendArchiveBatch(rexDir, {
+      timestamp,
+      source: "rename",
+      items: [],
+      count: 0,
+      reason: "title-collision rename (add path)",
+      renameAuditTrail,
+    });
+
+    // Log the rename pass
+    await store.appendLog({
+      timestamp,
+      event: "add_reshape_rename",
+      itemId: newItemId,
+      detail: JSON.stringify({
+        renamedCount,
+        parentLabel,
+        renames: renameAuditTrail.map((r) => ({
+          itemAId: r.itemAId,
+          oldTitleA: r.oldTitleA,
+          newTitleA: r.newTitleA,
+          itemBId: r.itemBId,
+          oldTitleB: r.oldTitleB,
+          newTitleB: r.newTitleB,
+        })),
+      }),
+    });
+
+    // If only renames were needed (no merge candidates), return early
+    // Reload siblings to get updated titles for the merge phase check
+    const freshDoc = await store.loadDocument();
+    const freshEntry = findItem(freshDoc.items, newItemId);
+    if (!freshEntry) {
+      return { mergedCount: 0, renamedCount, parentLabel, archivedIds: [], strategy: "rename", reparentedChildCount: 0 };
+    }
+    siblings = freshEntry.parents.length === 0
+      ? freshDoc.items
+      : (freshEntry.parents[freshEntry.parents.length - 1].children ?? []);
+
+    // Check if there are any hash-suffix duplicates remaining after renames
+    const remainingProposals = detectHashSuffixDuplicates(siblings, newItemId);
+    if (remainingProposals.length === 0) {
+      return { mergedCount: 0, renamedCount, parentLabel, archivedIds: [], strategy: "rename", reparentedChildCount: 0 };
+    }
+
+    // Fall through to merge phase with updated siblings and doc
+    const freshDoc2 = await store.loadDocument();
+    return applyMergePhase(rexDir, store, freshDoc2, remainingProposals, newItemId, parentLabel, renamedCount);
+  }
+
+  // ── Phase 2: Hash-suffix merge (no renames needed) ──────────────────────────
+
   const proposals = detectHashSuffixDuplicates(siblings, newItemId);
   if (proposals.length === 0) {
     return empty(parentLabel);
   }
 
+  return applyMergePhase(rexDir, store, doc, proposals, newItemId, parentLabel, 0);
+}
+
+/**
+ * Apply reshape merge proposals and persist the result.
+ * Extracted to avoid duplication between the rename-then-merge path and the
+ * merge-only path in {@link runScopedConsolidationPass}.
+ */
+async function applyMergePhase(
+  rexDir: string,
+  store: PRDStore,
+  doc: Awaited<ReturnType<typeof store.loadDocument>>,
+  proposals: ReshapeProposal[],
+  newItemId: string,
+  parentLabel: string,
+  renamedCount: number,
+): Promise<ScopedConsolidationResult> {
   // Determine strategy and count reparented children before applying
   const hasGroup = proposals.some((p) => p.action.action === "group");
-  const strategy: ScopedConsolidationResult["strategy"] = hasGroup ? "parent-container" : "merge";
+  const mergeStrategy: ScopedConsolidationResult["strategy"] = hasGroup ? "parent-container" : "merge";
 
   let reparentedChildCount = 0;
   for (const proposal of proposals) {
     if (proposal.action.action === "merge") {
-      const mergeAction = proposal.action as import("../../core/reshape.js").MergeAction;
+      const mergeAction = proposal.action as MergeAction;
       for (const loserId of mergeAction.mergedIds) {
         const loserEntry = findItem(doc.items, loserId);
         reparentedChildCount += loserEntry?.item.children?.length ?? 0;
       }
     } else if (proposal.action.action === "group") {
-      const groupAction = proposal.action as import("../../core/reshape.js").GroupAction;
+      const groupAction = proposal.action as GroupAction;
       for (const itemId of groupAction.itemIds) {
         const itemEntry = findItem(doc.items, itemId);
         reparentedChildCount += itemEntry?.item.children?.length ?? 0;
@@ -436,7 +663,7 @@ export async function runScopedConsolidationPass(
   // Apply proposals — applyReshape mutates doc.items in place
   const reshapeResult = applyReshape(doc.items, proposals);
   if (reshapeResult.applied.length === 0) {
-    return empty(parentLabel);
+    return { mergedCount: 0, renamedCount, parentLabel, archivedIds: [], strategy: renamedCount > 0 ? "rename" : "none", reparentedChildCount: 0 };
   }
 
   // Persist
@@ -473,7 +700,7 @@ export async function runScopedConsolidationPass(
       mergedCount: reshapeResult.applied.length,
       parentLabel,
       deletedIds: reshapeResult.deletedIds,
-      strategy,
+      strategy: mergeStrategy,
       reparentedChildCount,
       archivedIds: reshapeResult.deletedIds,
     }),
@@ -481,9 +708,10 @@ export async function runScopedConsolidationPass(
 
   return {
     mergedCount: reshapeResult.applied.length,
+    renamedCount,
     parentLabel,
     archivedIds: reshapeResult.deletedIds,
-    strategy,
+    strategy: mergeStrategy,
     reparentedChildCount,
   };
 }

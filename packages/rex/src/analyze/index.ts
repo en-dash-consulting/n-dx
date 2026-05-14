@@ -95,3 +95,6 @@ export type { ConsolidationGuardResult } from "./consolidation-guard.js";
 export { countProposalTasks, buildConsolidationGuardPrompt, applyConsolidationGuard } from "./consolidation-guard.js";
 
 export type { BatchAcceptanceRecord, GranularityAdjustmentRecord } from "./batch-types.js";
+
+export type { SiblingRenameProposal } from "./rename-resolve.js";
+export { proposeSiblingRenames, buildRenamePrompt } from "./rename-resolve.js";

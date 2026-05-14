@@ -252,6 +252,9 @@ export async function cmdAdd(
     for (const ri of resetItems) {
       info(`  ↺ Reset ${ri.level}: ${ri.title} (was completed)`);
     }
+    if (consolidation.renamedCount > 0) {
+      info(`  Renamed ${consolidation.renamedCount} sibling${consolidation.renamedCount === 1 ? "" : "s"} with title collision under ${consolidation.parentLabel}`);
+    }
     if (consolidation.mergedCount > 0) {
       info(`  Consolidated ${consolidation.mergedCount} duplicate sibling${consolidation.mergedCount === 1 ? "" : "s"} under ${consolidation.parentLabel}`);
     }

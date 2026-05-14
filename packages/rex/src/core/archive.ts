@@ -47,9 +47,33 @@ export interface MergeAuditEntry {
   timestamp: string;
 }
 
+/**
+ * Entry for a title-collision rename recorded in the archive.
+ * Captures the LLM-proposed rename for two siblings that shared a title
+ * but were semantically distinct (not duplicates).
+ */
+export interface RenameAuditEntry {
+  /** ID of the first item renamed. */
+  itemAId: string;
+  /** Original title of the first item. */
+  oldTitleA: string;
+  /** New title assigned to the first item by LLM. */
+  newTitleA: string;
+  /** ID of the second item renamed. */
+  itemBId: string;
+  /** Original title of the second item. */
+  oldTitleB: string;
+  /** New title assigned to the second item by LLM. */
+  newTitleB: string;
+  /** LLM reasoning for the rename choices. */
+  reasoning: string;
+  /** Timestamp of when the rename was applied. */
+  timestamp: string;
+}
+
 export interface ArchiveBatch {
   timestamp: string;
-  source: "prune" | "reshape" | "reorganize";
+  source: "prune" | "reshape" | "reorganize" | "rename";
   items: PRDItem[];
   count: number;
   reason?: string;
@@ -57,6 +81,8 @@ export interface ArchiveBatch {
   actions?: unknown[];
   /** Merge audit trail for reshape operations (if source === 'reshape'). */
   mergeAuditTrail?: MergeAuditEntry[];
+  /** Rename audit trail for title-collision rename operations (if source === 'rename'). */
+  renameAuditTrail?: RenameAuditEntry[];
 }
 
 // ── I/O ──────────────────────────────────────────────────────────────
