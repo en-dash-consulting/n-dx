@@ -44,6 +44,10 @@ ndx init --no-codex .            # skip Codex provisioning
 Running `ndx init` again detects existing assistant surfaces and reuses them. If only Claude artifacts exist, re-init skips Codex (and vice versa) unless you explicitly pass an assistant flag.
 :::
 
+::: tip Add .gitignore entries before your first commit
+`ndx init` only gitignores `.n-dx.local.json` automatically. Add the [recommended ignore patterns](./gitignore) before committing so ephemeral agent runs, caches, and PID files stay out of version control.
+:::
+
 ## Configure Your LLM
 
 ### Claude (recommended)

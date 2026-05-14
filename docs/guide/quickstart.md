@@ -53,6 +53,10 @@ By default both surfaces are provisioned. Use `--claude-only` or `--codex-only` 
 Running `ndx init` again is safe. It detects existing assistant surfaces and reuses them. If only one assistant's artifacts exist, re-init skips the other unless you explicitly request it.
 :::
 
+::: tip Set up .gitignore before your first commit
+`ndx init` only gitignores `.n-dx.local.json` automatically. Before committing anything else, add the [recommended ignore patterns](./gitignore) so ephemeral runs, caches, and PID files stay out of version control.
+:::
+
 ## 3. Add to the PRD
 
 ```sh
@@ -130,3 +134,4 @@ Opens a web dashboard at `http://localhost:3117` with interactive views of your 
 - **Assistant surfaces**: [Getting Started — Assistant Surfaces](./getting-started#assistant-surfaces)
 - **Full command reference**: [Commands](./commands)
 - **Workflow guide**: [Workflow](./workflow)
+- **.gitignore setup**: [.gitignore for ndx projects](./gitignore)

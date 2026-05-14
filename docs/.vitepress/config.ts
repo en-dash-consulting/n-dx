@@ -40,6 +40,7 @@ export default defineConfig({
             { text: "Run While You Sleep", link: "/guide/overnight" },
             { text: "Spec-Driven Development", link: "/guide/spec-driven" },
             { text: "Cleaning Up a Vibe-Coded App", link: "/guide/vibe-cleanup" },
+            { text: ".gitignore Setup", link: "/guide/gitignore" },
             { text: "Troubleshooting", link: "/guide/troubleshooting" },
           ],
         },

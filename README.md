@@ -275,10 +275,38 @@ Codex reads `.codex/config.toml` automatically — no manual registration requir
 | Directory | Owner | Contents |
 |-----------|-------|----------|
 | `.sourcevision/` | sourcevision | `manifest.json`, `inventory.json`, `imports.json`, `zones.json`, `components.json`, `llms.txt`, `CONTEXT.md` |
-| `.rex/` | rex | `tree/` (folder tree), `config.json`, `execution-log.jsonl`, `workflow.md`, `acknowledged-findings.json` |
+| `.rex/` | rex | `prd_tree/` (folder tree), `config.json`, `execution-log.jsonl`, `workflow.md`, `acknowledged-findings.json` |
 | `.hench/` | hench | `config.json`, `runs/` |
 
 > **Legacy PRD migration.** If upgrading from a previous layout using `.rex/prd.md` (flat Markdown) or `.rex/prd.json`, run `rex migrate-to-folder-tree` to convert to the folder tree format. The command optionally deletes the legacy source file after migration. See the [rex README](packages/rex) for details.
+
+## .gitignore Setup
+
+After `ndx init`, add the following block to your `.gitignore` before the first commit — ephemeral agent runs, caches, and PID files should not be tracked:
+
+```gitignore
+# n-dx runtime artifacts — keep .rex/prd_tree/ .rex/config.json .hench/config.json CLAUDE.md AGENTS.md
+.sourcevision/
+.hench/runs/
+.hench/locks/
+.hench-commit-msg.txt
+.rex/.backups/
+.rex/.cache/
+.rex/prd.json.lock
+.rex/pending-proposals.json
+.rex/acknowledged-findings.json
+.rex/execution-log*.jsonl
+.rex/adapters.json
+.rex/n-dx_workflow.md
+.n-dx-web.pid
+.n-dx-web.port
+.run-logs/
+.n-dx.local.json
+*.local.json
+.claude/settings.local.json
+```
+
+Remove `.sourcevision/` if you want to commit the analysis baseline so teammates skip a re-analysis pass. See the [.gitignore reference](https://n-dx.dev/guide/gitignore) for the full explanation of each path and a template file at [`packages/core/assistant-assets/ndx.gitignore`](packages/core/assistant-assets/ndx.gitignore).
 
 ## Security
 
