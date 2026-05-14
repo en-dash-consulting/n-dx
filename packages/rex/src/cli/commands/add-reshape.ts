@@ -1,12 +1,15 @@
 /**
- * Scoped consolidation pass for the add command.
+ * Hash-suffix duplicate detector and scoped consolidation pass for the add command.
  *
  * After inserting a new item, detects hash-suffix duplicate siblings and
  * consolidates them immediately so the PRD never accumulates near-duplicate
  * siblings from repeated `add` calls with slightly different titles.
  *
- * Hash suffix: a short alphanumeric token in parentheses or brackets at the
- * end of a title, e.g. "(abc123)" in "Fix observation in global (abc123)".
+ * Hash suffix patterns stripped by this module:
+ *   - Parenthesized/bracketed short identifier: "(abc123)", "[ABC-1]"
+ *   - Parenthesized/bracketed UUID: "(550e8400-e29b-41d4-a716-446655440000)"
+ *   - Dash UUID tail: " - 550e8400-e29b-41d4-a716-446655440000"
+ *   - Dash short hex tail: " - a1b2c3" (6–12 purely hex chars)
  *
  * @module cli/commands/add-reshape
  */
@@ -14,7 +17,7 @@
 import { join } from "node:path";
 import { readFile, writeFile, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { findItem } from "../../core/tree.js";
+import { findItem, walkTree } from "../../core/tree.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal, MergeAction, GroupAction } from "../../core/reshape.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
@@ -25,19 +28,32 @@ import { captureGitCommitHash } from "../../core/git-utils.js";
 
 // ── Hash-suffix detection ─────────────────────────────────────────────────────
 
+/** Hex UUID pattern: 8-4-4-4-12 lowercase hex segments. */
+const UUID_RE = "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}";
+
 /**
  * Strip trailing hash/ID suffix from a title.
  *
- * Matches patterns like:
- *   "Fix bug (abc123)"   → "Fix bug"
- *   "Fix bug [abc123]"   → "Fix bug"
- *   "Fix bug (ABC-123)"  → "Fix bug"
- *
- * A hash suffix is 3–12 alphanumeric-or-hyphen characters inside
- * parentheses or brackets at the end of the string.
+ * Matched patterns (checked in order, most-specific first):
+ *   "Fix bug (550e8400-e29b-41d4-a716-446655440000)" → "Fix bug"  (bracketed UUID)
+ *   "Fix bug (abc123)"                               → "Fix bug"  (bracketed short id)
+ *   "Fix bug [ABC-123]"                              → "Fix bug"  (bracket variant)
+ *   "Fix bug - 550e8400-e29b-41d4-a716-446655440000" → "Fix bug"  (dash UUID tail)
+ *   "Fix bug - a1b2c3"                               → "Fix bug"  (dash short hex tail)
  */
 export function stripHashSuffix(title: string): string {
-  return title.replace(/\s*[\(\[]\s*[a-zA-Z0-9][a-zA-Z0-9\-]{2,11}\s*[\)\]]\s*$/, "").trim();
+  return (
+    title
+      // 1. Parenthesized/bracketed UUID
+      .replace(new RegExp(`\\s*[\\(\\[]\\s*${UUID_RE}\\s*[\\)\\]]\\s*$`, "i"), "")
+      // 2. Parenthesized/bracketed short alphanumeric-or-hyphen identifier (3–12 chars)
+      .replace(/\s*[\(\[]\s*[a-zA-Z0-9][a-zA-Z0-9\-]{2,11}\s*[\)\]]\s*$/, "")
+      // 3. Dash UUID tail: " - <uuid>"
+      .replace(new RegExp(`\\s+-\\s+${UUID_RE}$`, "i"), "")
+      // 4. Dash short hex tail: " - <6–12 purely hex chars>"
+      .replace(/\s+-\s+[a-f0-9]{6,12}$/i, "")
+      .trim()
+  );
 }
 
 /**
@@ -164,6 +180,97 @@ export function detectHashSuffixDuplicates(
   }
 
   return proposals;
+}
+
+// ── Tree-level duplicate detector ────────────────────────────────────────────
+
+/**
+ * A group of sibling items whose titles reduce to the same normalized form
+ * after stripping trailing hash/ID suffixes.
+ */
+export interface HashSuffixDuplicateGroup {
+  /** Normalized title shared by all members (hash suffix stripped, lowercased). */
+  normalizedTitle: string;
+  /** Parent item ID, or undefined for root-level items. */
+  parentId: string | undefined;
+  /** Parent item title, or undefined for root-level items. */
+  parentTitle: string | undefined;
+  /** Members of this duplicate group. */
+  members: Array<{
+    id: string;
+    title: string;
+    childCount: number;
+  }>;
+  /** Pre-computed reshape proposals for this group (feed into applyReshape). */
+  proposals: ReshapeProposal[];
+}
+
+/**
+ * Walk the full PRD tree and detect hash-suffix duplicate sibling cohorts.
+ *
+ * Groups sibling items (same parent + level) whose titles are identical after
+ * stripping trailing hash/ID suffixes. Returns one entry per group with:
+ *   - parent context (parentId, parentTitle)
+ *   - member IDs, original titles, and child counts
+ *   - normalized canonical title
+ *   - pre-computed reshape proposals (feed into applyReshape)
+ *
+ * Use `groups.flatMap(g => g.proposals)` to feed the reshape pipeline.
+ * Items with genuinely different titles (differences beyond a suffix) are
+ * never grouped — normalizeForComparison must return distinct strings.
+ */
+export function detectHashSuffixDuplicatesInTree(
+  items: PRDItem[],
+): HashSuffixDuplicateGroup[] {
+  // Build cohort map: (parentId:level) → { items[], parent }
+  const cohortMap = new Map<string, { items: PRDItem[]; parent: PRDItem | undefined }>();
+
+  for (const { item, parents } of walkTree(items)) {
+    const parent = parents.length > 0 ? parents[parents.length - 1] : undefined;
+    const parentId = parent?.id ?? "root";
+    const key = `${parentId}:${item.level}`;
+    const entry = cohortMap.get(key) ?? { items: [], parent };
+    entry.items.push(item);
+    cohortMap.set(key, entry);
+  }
+
+  const groups: HashSuffixDuplicateGroup[] = [];
+
+  for (const [, { items: cohort, parent }] of cohortMap) {
+    if (cohort.length < 2) continue;
+
+    // Sub-group members by normalized title
+    const byNormalized = new Map<string, PRDItem[]>();
+    for (const item of cohort) {
+      const key = normalizeForComparison(item.title);
+      if (!key) continue;
+      const grp = byNormalized.get(key) ?? [];
+      grp.push(item);
+      byNormalized.set(key, grp);
+    }
+
+    for (const [normalizedTitle, members] of byNormalized) {
+      if (members.length < 2) continue;
+
+      // Generate proposals for this group using the existing per-cohort detector.
+      // Pass empty string as newItemId — no single "new" item in the tree context.
+      const proposals = detectHashSuffixDuplicates(members, "");
+
+      groups.push({
+        normalizedTitle,
+        parentId: parent?.id,
+        parentTitle: parent?.title,
+        members: members.map((item) => ({
+          id: item.id,
+          title: item.title,
+          childCount: item.children?.length ?? 0,
+        })),
+        proposals,
+      });
+    }
+  }
+
+  return groups;
 }
 
 // ── Reshape in-progress detection ─────────────────────────────────────────────

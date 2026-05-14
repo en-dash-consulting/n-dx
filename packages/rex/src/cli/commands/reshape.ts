@@ -21,33 +21,9 @@ import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 import { getLLMVendor } from "../../analyze/reason.js";
 import { detectCrossPRDDuplicates } from "./reshape-detect-duplicates.js";
-import { acquireReshapeLock, detectHashSuffixDuplicates } from "./add-reshape.js";
-import { walkTree } from "../../core/tree.js";
-import type { PRDItem } from "../../schema/index.js";
+import { acquireReshapeLock, detectHashSuffixDuplicatesInTree } from "./add-reshape.js";
 import type { MergeAction } from "../../core/reshape.js";
-
-/**
- * Walk the full PRD tree and emit hash-suffix duplicate proposals for every
- * sibling cohort (same parent + level) that contains near-duplicate titles.
- */
-function detectHashSuffixDuplicatesInTree(items: PRDItem[]): import("../../core/reshape.js").ReshapeProposal[] {
-  const cohorts = new Map<string, PRDItem[]>();
-  for (const { item, parents } of walkTree(items)) {
-    const parentId = parents.length > 0 ? parents[parents.length - 1].id : "root";
-    const key = `${parentId}:${item.level}`;
-    const cohort = cohorts.get(key) ?? [];
-    cohort.push(item);
-    cohorts.set(key, cohort);
-  }
-
-  const proposals: import("../../core/reshape.js").ReshapeProposal[] = [];
-  for (const [, cohort] of cohorts) {
-    if (cohort.length < 2) continue;
-    // Pass empty string as newItemId — no "new" item in the reshape command context
-    proposals.push(...detectHashSuffixDuplicates(cohort, ""));
-  }
-  return proposals;
-}
+import type { PRDItem } from "../../schema/index.js";
 
 export async function cmdReshape(
   dir: string,
@@ -184,7 +160,8 @@ async function _cmdReshapeCore(
   const duplicateProposals = detectCrossPRDDuplicates(docAfterCompaction.items, fileOwnership);
 
   // Run hash-suffix duplicate detection across all sibling cohorts in the tree
-  const hashSuffixProposals = detectHashSuffixDuplicatesInTree(docAfterCompaction.items);
+  const hashSuffixGroups = detectHashSuffixDuplicatesInTree(docAfterCompaction.items);
+  const hashSuffixProposals = hashSuffixGroups.flatMap((g) => g.proposals);
 
   // Get reshape proposals from LLM
   info("Analyzing PRD structure...");
