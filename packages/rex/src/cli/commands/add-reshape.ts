@@ -232,9 +232,15 @@ function buildItemContentForSimilarity(item: PRDItem): string {
  * Items with empty content on either side are excluded — content similarity
  * requires a signal from at least one description or acceptance criterion
  * on each side.
+ *
+ * @param threshold Content-similarity cut-off. Items with similarity **at or
+ *   above** this value are treated as true duplicates and excluded from the
+ *   result (they are routed to the merge path). Items below are returned as
+ *   rename candidates. Defaults to {@link TITLE_COLLISION_DISTINCT_THRESHOLD}.
  */
 export function detectNonDuplicateTitleCollisions(
   siblings: PRDItem[],
+  threshold = TITLE_COLLISION_DISTINCT_THRESHOLD,
 ): SiblingTitleCollisionPair[] {
   if (siblings.length < 2) return [];
 
@@ -263,7 +269,7 @@ export function detectNonDuplicateTitleCollisions(
     if (!contentA || !contentB) continue;
 
     const contentSim = similarity(contentA, contentB);
-    if (contentSim >= TITLE_COLLISION_DISTINCT_THRESHOLD) {
+    if (contentSim >= threshold) {
       // High similarity → treat as true duplicate, let merge path handle it
       continue;
     }
@@ -511,7 +517,18 @@ export async function runScopedConsolidationPass(
 
   // ── Phase 1: LLM rename for non-duplicate title collisions ──────────────────
 
-  const nonDupCollisions = detectNonDuplicateTitleCollisions(siblings);
+  // Load the configurable threshold (falls back to the hardcoded default when absent)
+  let collisionThreshold = TITLE_COLLISION_DISTINCT_THRESHOLD;
+  try {
+    const config = await store.loadConfig();
+    if (typeof config.titleCollisionSimilarityThreshold === "number") {
+      collisionThreshold = config.titleCollisionSimilarityThreshold;
+    }
+  } catch {
+    // Config unreadable — use default. Do not block the add path.
+  }
+
+  const nonDupCollisions = detectNonDuplicateTitleCollisions(siblings, collisionThreshold);
   let renamedCount = 0;
 
   if (nonDupCollisions.length > 0) {

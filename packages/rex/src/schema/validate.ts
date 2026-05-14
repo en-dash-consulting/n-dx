@@ -145,6 +145,7 @@ export const RexConfigSchema = z
       maxChildrenPerContainer: z.number().int().positive().optional(),
       minChildrenPerContainer: z.number().int().positive().optional(),
     }).optional(),
+    titleCollisionSimilarityThreshold: z.number().min(0).max(1).optional(),
     future: z.record(z.unknown()).optional(),
   })
   .passthrough();
