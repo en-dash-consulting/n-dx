@@ -34,6 +34,7 @@ import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
+import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
   installFetchAdapter();
@@ -43,6 +44,7 @@ if (isDeployedMode()) {
 initTheme();
 bootstrap();
 startPollingRestart({ onDegradationChange, isFeatureDisabled });
+initScrollReveal();
 
 /** Fetch viewer scope from the server config endpoint. */
 async function fetchScope(): Promise<string | null> {

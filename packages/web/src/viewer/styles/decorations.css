@@ -1,0 +1,289 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Geometric decoration system — dot grids, concentric arcs,
+   thin border circles, ruled lines, oversized numerals.
+   CSS / SVG only. No raster images, emoji, gradients, or blobs.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Decoration tokens ─────────────────────────────────────────── */
+:root {
+  --deco-dot-color:    rgba(255, 255, 255, 0.07);
+  --deco-stroke-color: rgba(255, 255, 255, 0.08);
+  --deco-line-color:   rgba(255, 255, 255, 0.05);
+  --deco-num-opacity:  0.04;
+}
+
+[data-theme="light"] {
+  --deco-dot-color:    rgba(0, 23, 105, 0.07);
+  --deco-stroke-color: rgba(0, 23, 105, 0.07);
+  --deco-line-color:   rgba(0, 23, 105, 0.05);
+  --deco-num-opacity:  0.05;
+}
+
+/* ── Alternating section background tones ─────────────────────── */
+[data-theme="dark"] {
+  --section-alt-a: #151829;            /* == --bg-surface */
+  --section-alt-b: #111422;            /* slightly deeper than base bg */
+}
+
+[data-theme="light"] {
+  --section-alt-a: #ffffff;            /* == --bg-surface */
+  --section-alt-b: #f0f2f8;            /* off-white tint */
+}
+
+/* ── Scroll reveal animation ───────────────────────────────────── */
+
+@keyframes _fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Initial hidden state — added by scroll-reveal.ts */
+.section-reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+/* Visible state — added by IntersectionObserver */
+.section-reveal.in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* No animation for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .section-reveal,
+  .section-reveal.in-view {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Degradation mode: ensure sections are visible when animations are suppressed */
+.degradation-no-animations .section-reveal {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Decoration base — position context for pseudo-elements ───── */
+.overview-section,
+.overview-col,
+.rex-dash-header,
+.rex-dash-next,
+.rex-dash-smart-add,
+.rex-dash-epics,
+.rex-dash-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ensure content stays above decorations */
+.overview-section > *,
+.overview-col > *,
+.rex-dash-header > *,
+.rex-dash-next > *,
+.rex-dash-smart-add > *,
+.rex-dash-epics > *,
+.rex-dash-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Overview section alternating backgrounds ─────────────────── */
+
+.overview-section:nth-child(odd) {
+  background: var(--section-alt-a);
+}
+
+.overview-section:nth-child(even) {
+  background: var(--section-alt-b);
+}
+
+/* ── Numeral decoration on overview sections ──────────────────── */
+
+.overview-container {
+  counter-reset: overview-deco;
+}
+
+.overview-section {
+  counter-increment: overview-deco;
+}
+
+.overview-section::after {
+  content: "0" counter(overview-deco);
+  position: absolute;
+  right: 16px;
+  bottom: -2px;
+  font-size: 80px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text);
+  opacity: var(--deco-num-opacity);
+  pointer-events: none;
+  z-index: 0;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Dot grid on overview odd sections ────────────────────────── */
+
+.overview-section:nth-child(odd)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(circle, var(--deco-dot-color) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  background-position: 12px 12px;
+}
+
+/* ── Concentric arc on overview even sections ─────────────────── */
+/* Arc anchored to bottom-right corner */
+
+.overview-section:nth-child(even)::before {
+  content: "";
+  position: absolute;
+  right: -24px;
+  bottom: -24px;
+  width: 140px;
+  height: 140px;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 140' width='140' height='140'%3E%3Cpath d='M140,0 A140,140 0 0,1 0,140' fill='none' stroke='white' stroke-width='1' opacity='0.09'/%3E%3Cpath d='M100,0 A100,100 0 0,1 0,100' fill='none' stroke='white' stroke-width='1' opacity='0.07'/%3E%3Cpath d='M60,0 A60,60 0 0,1 0,60' fill='none' stroke='white' stroke-width='1' opacity='0.05'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+}
+
+[data-theme="light"] .overview-section:nth-child(even)::before {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 140' width='140' height='140'%3E%3Cpath d='M140,0 A140,140 0 0,1 0,140' fill='none' stroke='%23001769' stroke-width='1' opacity='0.07'/%3E%3Cpath d='M100,0 A100,100 0 0,1 0,100' fill='none' stroke='%23001769' stroke-width='1' opacity='0.05'/%3E%3Cpath d='M60,0 A60,60 0 0,1 0,60' fill='none' stroke='%23001769' stroke-width='1' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* ── Overview columns: thin circle on first col ───────────────── */
+
+.overview-col:first-child::before {
+  content: "";
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 1px solid var(--deco-stroke-color);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Rex dashboard header: large numeral ──────────────────────── */
+
+.rex-dash-header::after {
+  content: "01";
+  position: absolute;
+  right: 0;
+  top: -8px;
+  font-size: 96px;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  color: var(--brand-purple);
+  opacity: var(--deco-num-opacity);
+  pointer-events: none;
+  z-index: 0;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Rex dashboard next-task card: dot grid ───────────────────── */
+
+.rex-dash-next::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(circle, var(--deco-dot-color) 1.5px, transparent 1.5px);
+  background-size: 22px 22px;
+  background-position: 8px 8px;
+}
+
+/* ── Rex dashboard epics: concentric arc ──────────────────────── */
+
+.rex-dash-epics::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  bottom: -20px;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' width='120' height='120'%3E%3Cpath d='M120,0 A120,120 0 0,1 0,120' fill='none' stroke='white' stroke-width='1' opacity='0.09'/%3E%3Cpath d='M84,0 A84,84 0 0,1 0,84' fill='none' stroke='white' stroke-width='1' opacity='0.07'/%3E%3Cpath d='M48,0 A48,48 0 0,1 0,48' fill='none' stroke='white' stroke-width='1' opacity='0.05'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+}
+
+[data-theme="light"] .rex-dash-epics::after {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' width='120' height='120'%3E%3Cpath d='M120,0 A120,120 0 0,1 0,120' fill='none' stroke='%23001769' stroke-width='1' opacity='0.07'/%3E%3Cpath d='M84,0 A84,84 0 0,1 0,84' fill='none' stroke='%23001769' stroke-width='1' opacity='0.05'/%3E%3Cpath d='M48,0 A48,48 0 0,1 0,48' fill='none' stroke='%23001769' stroke-width='1' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* ── Rex sidebar panels: ruled line (first) + circle (others) ─── */
+
+/* First panel — horizontal ruled lines */
+.rex-dash-panel:first-child::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 23px,
+    var(--deco-line-color) 23px,
+    var(--deco-line-color) 24px
+  );
+}
+
+/* Second panel — thin circle */
+.rex-dash-panel:nth-child(2)::before {
+  content: "";
+  position: absolute;
+  top: -45px;
+  left: -45px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 1px solid var(--deco-stroke-color);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Third panel — dot grid (alt) */
+.rex-dash-panel:nth-child(3)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(circle, var(--deco-dot-color) 1px, transparent 1px);
+  background-size: 18px 18px;
+  background-position: 5px 5px;
+}
+
+/* Smart-add section: thin circle */
+.rex-dash-smart-add::after {
+  content: "";
+  position: absolute;
+  bottom: -60px;
+  right: -60px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 1px solid var(--deco-stroke-color);
+  pointer-events: none;
+  z-index: 0;
+}
