@@ -73,6 +73,7 @@ export const HenchConfigSchema = z.object({
   rollbackOnFailure: z.boolean().optional(),
   autoCommit: z.boolean().optional(),
   permissionMode: z.enum(["default", "acceptEdits", "bypassPermissions", "plan"]).optional(),
+  commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(300_000),
 });
 
 const RunStatusSchema = z.enum([
