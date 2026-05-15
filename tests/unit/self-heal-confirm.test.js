@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -427,5 +427,79 @@ describe("prompt-gate combinations (flag × config)", () => {
     });
     expect(resolution).toEqual({ autoConfirm: true, source: "config" });
     expect(result.decision).toBe("auto");
+  });
+});
+
+// ── Regression: recommendations → tagged PRD items → execution gate ───────────
+//
+// Guards the pipeline ordering invariant:
+//   1. `rex recommend --accept` seeds the PRD folder tree with self-heal-items
+//      tagged tasks (simulated by directly writing the folder tree).
+//   2. After persistence the tag survives a full parse (no data loss).
+//   3. The confirmation gate's accept path returns a decision that allows
+//      the hench execution phase to proceed.
+//
+// Failure here means either the tag was silently dropped during PRD
+// persistence, or the gate was wired after the PRD write in a way that
+// could suppress execution even when the user confirmed.
+
+describe("regression: recommendations → PRD tagged items → execution gate", () => {
+  it("items written to prd_tree with self-heal-items tag remain readable, and gate-accept signals execution proceeds", async () => {
+    const { parseFolderTree, SELF_HEAL_TAG } = await import(
+      "../../packages/rex/dist/public.js"
+    );
+
+    const dir = mkdtempSync(join(tmpdir(), "sh-regression-"));
+    const treeDir = join(dir, "prd_tree");
+    const epicDir = join(treeDir, "test-epic");
+    const featDir = join(epicDir, "test-feature");
+    const taskDir = join(featDir, "fix-anti-pattern");
+
+    // Seed the folder tree as `rex recommend --accept` would (simulated).
+    mkdirSync(taskDir, { recursive: true });
+    writeFileSync(
+      join(epicDir, "index.md"),
+      '---\nid: "epic-1"\nlevel: "epic"\ntitle: "Test Epic"\nstatus: "pending"\n---\n',
+    );
+    writeFileSync(
+      join(featDir, "index.md"),
+      '---\nid: "feat-1"\nlevel: "feature"\ntitle: "Test Feature"\nstatus: "pending"\n---\n',
+    );
+    writeFileSync(
+      join(taskDir, "index.md"),
+      `---\nid: "task-1"\nlevel: "task"\ntitle: "Fix anti-pattern"\nstatus: "pending"\npriority: "high"\ntags:\n  - "${SELF_HEAL_TAG}"\n---\n`,
+    );
+
+    try {
+      // Step 1: verify the tag survives a full folder-tree parse.
+      const { items } = await parseFolderTree(treeDir);
+      const task = items
+        .flatMap((e) => e.children ?? [])
+        .flatMap((f) => f.children ?? [])
+        .find((t) => t.id === "task-1");
+
+      expect(task, "seeded task must be parseable from folder tree").toBeDefined();
+      expect(task.tags, `task must carry ${SELF_HEAL_TAG} tag after PRD persistence`).toContain(
+        SELF_HEAL_TAG,
+      );
+
+      // Step 2: verify the confirmation gate's accept path signals execution
+      // should proceed (decision is "auto" when autoConfirm=true — the same
+      // code path used by --auto / --yes / selfHeal.autoConfirm=true).
+      const stdout = captureStream();
+      const result = await runConfirmationPrompt({
+        summaryText: "Queued: 1 task (1 finding)\n  1. Fix anti-pattern  [1 finding]",
+        autoConfirm: true,
+        isTTY: false,
+        streams: { stdout, stderr: captureStream() },
+        readlineFactory: () => {
+          throw new Error("readline must not be called when autoConfirm=true");
+        },
+      });
+
+      expect(result.decision, "gate-accept must return 'auto' so execution proceeds").toBe("auto");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

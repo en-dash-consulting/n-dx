@@ -35,7 +35,7 @@
  */
 
 import { spawn, execFileSync } from "child_process";
-import { existsSync, readFileSync, writeFileSync, rmSync } from "fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -1666,6 +1666,31 @@ function runCapture(script, args) {
 }
 
 /**
+ * Count PRD items in the folder tree by walking `.rex/prd_tree/` and tallying
+ * directories that contain an `index.md`. Used by self-heal to report how many
+ * items step 3 (`rex recommend --accept`) wrote to the PRD.
+ */
+function countPrdTreeItems(dir) {
+  try {
+    const treeDir = resolve(dir, ".rex", "prd_tree");
+    if (!existsSync(treeDir)) return 0;
+    let count = 0;
+    const walk = (d) => {
+      for (const entry of readdirSync(d, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const subdir = resolve(d, entry.name);
+        if (existsSync(resolve(subdir, "index.md"))) count++;
+        walk(subdir);
+      }
+    };
+    walk(treeDir);
+    return count;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Read file-level code health metrics for self-heal regression detection.
  * These are zone-independent signals that don't fluctuate with zone reassignment.
  */
@@ -1758,6 +1783,11 @@ async function handleSelfHeal(rest) {
   // Forward model-selection flags into the inner `hench run` so `ndx self-heal --model=opus`
   // (or --claude-model/--codex-model) actually changes which model the agent uses.
   const modelFlags = extractModelFlags(rest);
+
+  // Resolve whether the pre-execution confirmation prompt should be bypassed.
+  // CLI flags (--auto, --yes) win over the project config setting.
+  const configAutoConfirm = readSelfHealAutoConfirm(dir);
+  const autoConfirmResolution = resolveAutoConfirm({ argv: rest, configAutoConfirm });
 
   const shTag = cyan("[self-heal]");
   console.log(`${shTag} starting ${bold(String(iterCount))} iteration${iterCount === 1 ? "" : "s"}${includeStructural ? "" : dim(" (excluding structural findings)")}`);
@@ -1853,8 +1883,18 @@ async function handleSelfHeal(rest) {
       }
     }
 
-    console.log(`\n${shTag} step 3/5: rex recommend --actionable-only --accept`);
+    const acceptStartedAt = new Date();
+    const beforeItemCount = countPrdTreeItems(dir);
+    console.log(`\n${shTag} step 3/5: rex recommend --actionable-only --accept ${dim(`(started ${acceptStartedAt.toISOString()}, tree size ${beforeItemCount ?? "?"})`)}`);
     await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", ...structuralFlag, dir]);
+    const acceptFinishedAt = new Date();
+    const afterItemCount = countPrdTreeItems(dir);
+    if (beforeItemCount !== null && afterItemCount !== null) {
+      const added = afterItemCount - beforeItemCount;
+      const elapsedSec = ((acceptFinishedAt.getTime() - acceptStartedAt.getTime()) / 1000).toFixed(1);
+      const summary = `added ${added} PRD item${added === 1 ? "" : "s"} (tree: ${beforeItemCount} → ${afterItemCount}) in ${elapsedSec}s, finished ${acceptFinishedAt.toISOString()}`;
+      console.log(`${shTag} ${added > 0 ? green(summary) : dim(summary)}`);
+    }
 
     const modelFlagSummary = modelFlags.length > 0 ? ` ${modelFlags.join(" ")}` : "";
     console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal --tags=self-heal${yes ? " --yes" : ""}${modelFlagSummary}`);
