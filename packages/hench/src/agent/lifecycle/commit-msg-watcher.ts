@@ -2,11 +2,12 @@
  * Commit message file watcher with auto-commit timer.
  *
  * When the agent writes `.hench-commit-msg.txt` during a run, this module
- * detects the write and arms a one-shot timer. If the file still has non-empty
- * content when the timer fires, the staged changes are committed and the file
- * is removed. This handles the case where the run terminates abnormally
- * (timeout, crash) after the agent staged its work but before n-dx could
- * process the commit prompt.
+ * detects the write and arms a one-shot timer. On timer expiry the file is
+ * read: if it has non-empty content the staged changes are committed and the
+ * file is removed; if the file is empty or whitespace-only it is deleted
+ * without committing and a distinct log line is emitted. This handles the
+ * case where the run terminates abnormally (timeout, crash) after the agent
+ * staged its work but before n-dx could process the commit prompt.
  *
  * Call `cancel()` to disarm both the watcher and any pending timer — the normal
  * run lifecycle always cancels before calling `performCommitPromptIfNeeded` so
@@ -41,9 +42,11 @@ export interface CommitMsgWatcherOptions {
 /**
  * Start watching for `.hench-commit-msg.txt` in `projectDir`.
  *
- * - Arms a one-shot timer on first detection of the file with non-empty content.
- * - On expiry, reads the file; if still non-empty, runs `git commit -F` and
- *   removes the file.
+ * - Arms a one-shot timer on first detection of the file (even if empty).
+ * - On expiry:
+ *   - Non-empty content → runs `git commit -F` and removes the file.
+ *   - Empty or whitespace-only → deletes the file without committing and
+ *     logs a distinct line so operators know the skip was intentional.
  * - Returns `{ cancel }` for callers to disarm when the run ends normally.
  *
  * When `timeoutMs` is 0 the watcher still runs (tracking the file) but the
@@ -81,17 +84,25 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   async function tryAutoCommit(): Promise<void> {
     if (cancelled) return;
 
+    let fileExists = false;
     let message = "";
     try {
       if (existsSync(msgPath)) {
+        fileExists = true;
         message = readFileSync(msgPath, "utf-8").trim();
       }
     } catch {
       // file gone between exists check and read
     }
 
+    if (!fileExists) {
+      // File was already removed before the timer fired — nothing to do.
+      return;
+    }
+
     if (!message) {
-      // File is gone or empty — nothing to commit.
+      // File exists but is empty or whitespace-only — clean up without committing.
+      detail("Auto-commit: skipped — commit message file was empty or whitespace-only (file removed).");
       try { unlinkSync(msgPath); } catch { /* ignore */ }
       return;
     }
@@ -124,10 +135,9 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
     if (timerArmed || cancelled) return;
     try {
       if (existsSync(msgPath)) {
-        const content = readFileSync(msgPath, "utf-8").trim();
-        if (content) {
-          armTimerOnce();
-        }
+        // Arm the timer as soon as the file appears, regardless of content.
+        // tryAutoCommit() will decide at expiry whether to commit or clean up.
+        armTimerOnce();
       }
     } catch {
       // ignore transient read errors

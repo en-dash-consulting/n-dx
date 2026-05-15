@@ -2,12 +2,17 @@
 id: "95b5c864-f4de-4c66-bfba-3335c8f92b70"
 level: "task"
 title: "Route true title-conflict duplicates through existing reshape merge rules"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "rex"
   - "reshape"
 source: "smart-add"
+startedAt: "2026-05-14T18:44:03.701Z"
+completedAt: "2026-05-14T18:53:44.228Z"
+endedAt: "2026-05-14T18:53:44.228Z"
+resolutionType: "code-change"
+resolutionDetail: "Added configurable titleCollisionSimilarityThreshold to RexConfig/RexConfigSchema. detectNonDuplicateTitleCollisions accepts threshold param; runScopedConsolidationPass reads from config. Integration test covers merge (high-similarity) and rename (low-similarity) routing from cmdAdd."
 acceptanceCriteria:
   - "Title collision triggers a duplicate-likelihood check comparing descriptions and acceptance criteria"
   - "High-similarity items are merged via the existing reshape merge path with pre-merge commit and archive entry"

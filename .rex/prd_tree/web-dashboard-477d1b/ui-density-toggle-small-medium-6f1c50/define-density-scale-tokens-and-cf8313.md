@@ -2,13 +2,16 @@
 id: "cf8313d3-00a7-4747-8e33-408128b6e84f"
 level: "task"
 title: "Define density scale tokens and CSS variables for small/medium/large UI sizing"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "web"
   - "ui"
   - "design-system"
 source: "smart-add"
+startedAt: "2026-05-14T19:09:45.608Z"
+completedAt: "2026-05-14T19:14:09.638Z"
+endedAt: "2026-05-14T19:14:09.638Z"
 acceptanceCriteria:
   - "A `data-density` attribute on the root element with values `small`, `medium`, `large` swaps a single set of CSS variables"
   - "Medium density renders pixel-identical to the current UI in a visual diff of the PRD tree, sidebar, header, and detail panel"
