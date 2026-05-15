@@ -1228,6 +1228,11 @@ const ORCHESTRATOR_HELP_DEFS = {
       "  3. rex recommend --accept              (accept into PRD)\n" +
       "  4. hench run --auto --loop --self-heal (execute with code-change focus)\n" +
       "  5. rex recommend --acknowledge-completed (prevent finding regeneration)\n\n" +
+      "Capture-only mode (--capture-only): runs only steps 1–3 (analyze,\n" +
+      "recommend, persist to PRD) and exits without invoking hench. Use this\n" +
+      "to populate the PRD with tagged self-heal tasks for review or manual\n" +
+      "prioritization before committing to autonomous execution. No LLM vendor\n" +
+      "is required in capture-only mode. The pre-execution prompt is skipped.\n\n" +
       "Tasks are scoped by zone and capped at 3 findings each for actionable\n" +
       "granularity. Self-heal mode instructs the agent to make source code\n" +
       "changes (not documentation) and rejects doc-only completions.\n" +
@@ -1246,11 +1251,13 @@ const ORCHESTRATOR_HELP_DEFS = {
       "per-invocation override.",
     usage: "ndx self-heal [N] [options] [dir]",
     options: [
+      { flag: "--capture-only", description: "Analyze + recommend + persist to PRD, then exit — no hench run. Use to preview or audit findings before autonomous execution." },
       { flag: "--include-structural", description: "Include structural findings (excluded by default)" },
       { flag: "--auto", description: "Skip the pre-execution confirmation prompt (overrides selfHeal.autoConfirm)" },
       { flag: "--yes", description: "Skip the pre-execution prompt AND auto-confirm commits inside the hench loop (overrides selfHeal.autoConfirm)" },
     ],
     examples: [
+      { command: "ndx self-heal --capture-only .", description: "Capture findings into PRD without executing — inspect before committing to a run" },
       { command: "ndx self-heal 3 .", description: "Run 3 improvement iterations (prompts for confirmation)" },
       { command: "ndx self-heal .", description: "Run 1 iteration (default; prompts for confirmation)" },
       { command: "ndx self-heal 5", description: "Run 5 iterations in current directory" },
