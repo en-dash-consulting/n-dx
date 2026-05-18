@@ -135,3 +135,16 @@ Opens a web dashboard at `http://localhost:3117` with interactive views of your 
 - **Full command reference**: [Commands](./commands)
 - **Workflow guide**: [Workflow](./workflow)
 - **.gitignore setup**: [.gitignore for ndx projects](./gitignore)
+
+## Skills installed by `ndx init`
+
+`ndx init` writes workflow skills into your assistant's skill directory. They are available as slash commands in your next Claude Code or Codex session:
+
+| Skill | Role in this guide |
+|-------|--------------------|
+| `/ndx-work` | Step 4: executes PRD tasks with codebase context and workflow discipline |
+| `/ndx-status` | Step 5: shows the PRD tree with per-epic completion stats |
+| `/ndx-capture` | Step 3 alternative: adds freeform ideas as structured PRD items without leaving the chat |
+| `/ndx-feedback` | What's next: files a GitHub issue with your environment details automatically included |
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

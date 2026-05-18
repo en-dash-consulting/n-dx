@@ -117,3 +117,5 @@ Each skill below maps to a step in this loop. Edit the linked file in your proje
 | `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](../../.agents/skills/ndx-reshape/SKILL.md) | Structural cleanup: reparents, merges, and rebalances the PRD tree when hierarchy drifts |
 
 Related guides that share these skills: [Spec-Driven Development](./spec-driven), [Codebase Onboarding](./onboarding), [Run While You Sleep](./overnight), [Self-Heal Loop](./self-heal).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

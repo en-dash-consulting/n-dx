@@ -125,3 +125,7 @@ ndx analyze --lite .
 ```
 
 For the full multi-pass analysis, `--deep` is the default. The first run is slowest; subsequent runs are faster because unchanged files are cached.
+
+---
+
+See the [Skills Reference](./skills) for the workflow slash commands available in your assistant session, including `/ndx-feedback` for filing issues.

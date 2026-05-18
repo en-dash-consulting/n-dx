@@ -355,3 +355,5 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | Step 6: executes cleanup tasks one at a time with test-passing acceptance criteria |
 
 Related guides: [Run While You Sleep](./overnight) (for unattended cleanup runs), [Self-Heal Loop](./self-heal) (ongoing post-cleanup improvement), [Workflow](./workflow) (the base loop).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

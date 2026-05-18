@@ -329,3 +329,5 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 | `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Tracking spec coverage: shows per-epic completion and next recommended task |
 
 Related guides: [Workflow](./workflow) (the core loop this guide extends), [Run While You Sleep](./overnight) (for multi-iteration overnight runs).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

@@ -211,6 +211,10 @@ ndx config --json .                   # JSON output
 
 ---
 
+## Skills Reference
+
+The workflow skills installed by `ndx init` are the assistant-session equivalents of the CLI commands above. For per-skill documentation, trigger conditions, and customization guidance, see the [Skills Reference](./skills).
+
 ::: details Advanced: Direct Tool Access
 For power users, individual tools can be accessed directly:
 

@@ -91,3 +91,4 @@ If you want to commit `.sourcevision/` as a shared analysis baseline, remove tha
 - [Existing Project Onboarding](./existing-project) — full onboarding flow that shows *when* to add the `.gitignore` block (Step 4, before any ndx commit)
 - [PRD Storage Layout](./prd-storage) — why `.rex/prd_tree/` is the only ndx directory that always belongs in git
 - [Getting Started](./getting-started) — initialize ndx and configure your LLM
+- [Skills Reference](./skills) — the skill files `ndx init` writes to `.claude/skills/` and `.agents/skills/` (committed to version control)

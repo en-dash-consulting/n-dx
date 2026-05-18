@@ -208,3 +208,5 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | Post-onboarding: executes the first tasks from the accepted PRD |
 
 Related guides: [Codebase Onboarding](./onboarding) (interactive zone exploration after the baseline is committed), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (heavier remediation when pre-flight findings are extensive), [Change Management](./change-management) (keeping the PRD aligned over time).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

@@ -477,3 +477,5 @@ Each skill below is invoked during the maintenance cycles described in this guid
 | `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](../../.agents/skills/ndx-config/SKILL.md) | Sync setup: configures the external adapter (`rex.adapter`, `rex.adapterUrl`, `rex.adapterAuthToken`) |
 
 Related guides: [Workflow](./workflow) (the normal development loop this guide maintains), [Self-Heal Loop](./self-heal) (automates the analyze → recommend cycle between full maintenance passes).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

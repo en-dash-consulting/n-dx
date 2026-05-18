@@ -130,6 +130,8 @@ Both assistants receive the same set of workflow skills, rendered in their respe
 | `ndx-reshape` | Restructure the PRD tree |
 | `ndx-feedback` | File a GitHub issue with project context |
 
+For descriptions of each skill, trigger conditions, and customization guidance, see the [Skills Reference](./skills).
+
 ## Your First Run
 
 ```sh

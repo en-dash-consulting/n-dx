@@ -222,8 +222,11 @@ Each skill below is invoked along the overnight run path. Edit the linked file i
 
 | Skill | Source | Role in this guide |
 |-------|--------|--------------------|
+| `no-plan-mode` | [`.agents/skills/no-plan-mode/SKILL.md`](../../.agents/skills/no-plan-mode/SKILL.md) | Always active: prevents the agent from stalling in plan-only mode during unattended runs |
 | `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](../../.agents/skills/ndx-config/SKILL.md) | Before launch: sets `hench.maxTokens`, `hench.maxTurns`, and provider settings |
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | The overnight loop: picks tasks, builds briefs, runs tool-use loops, commits results |
 | `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Morning review: shows which tasks completed, what failed, and current PRD health |
 
 Related guides: [Workflow](./workflow) (the base loop), [Spec-Driven Development](./spec-driven) (using `--epic` scoping for overnight runs), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (uses overnight as an execution option).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

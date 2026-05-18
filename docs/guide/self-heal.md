@@ -105,3 +105,5 @@ Each skill below is invoked within each self-heal cycle. Edit the linked file in
 | `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Between cycles: surfaces remaining findings, completed tasks, and next recommended action |
 
 Related guides: [Workflow](./workflow) (self-heal automates the full analyze → recommend → work loop), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (uses self-heal for ongoing post-cleanup improvement).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

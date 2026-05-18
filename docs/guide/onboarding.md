@@ -240,3 +240,5 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | Post-onboarding: picks the first task and begins implementation with full codebase context |
 
 Related guides: [Workflow](./workflow) (the ongoing loop after onboarding), [Spec-Driven Development](./spec-driven) (if you have a spec to layer on top of the initial PRD).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).
