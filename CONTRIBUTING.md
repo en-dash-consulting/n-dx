@@ -19,6 +19,54 @@ contributor needs beyond what a regular user installs.
 
 ---
 
+## What to Focus On
+
+New contributors get the most traction by targeting areas with clear scope and
+quick feedback. Here are three high-leverage starting points:
+
+### 1. Open self-heal items
+
+`ndx self-heal` analyses the codebase and creates tagged PRD tasks from its
+findings. Run it with `--capture-only` to populate the backlog without
+triggering autonomous execution:
+
+```sh
+ndx self-heal --capture-only .
+ndx status .          # inspect the tagged items
+```
+
+Filter to self-heal tasks specifically:
+
+```sh
+rex status --tag self-heal
+```
+
+These tasks are small, well-scoped, and come with built-in acceptance
+criteria — good for a first contribution.
+
+### 2. PRD items tagged `help-wanted`
+
+Items carrying a `help-wanted` tag are ones the core team has identified as
+good contributor targets — they are scoped, described, and unblocked:
+
+```sh
+rex status --tag help-wanted
+ndx start .           # browse and filter in the dashboard
+```
+
+### 3. Documentation gaps
+
+Recent audits have catalogued missing or out-of-date docs:
+
+- `docs/doc-delta-audit.md` — gap inventory from the last audit cycle
+- `docs/cli-ui-gap.md` — CLI/UI discrepancies
+- `docs/config-schema-ui-gap.md` — config schema coverage gaps
+
+If you find a gap not on the list, add it to the PRD with `ndx add "description"
+--tag documentation` so it is tracked.
+
+---
+
 ## Development setup
 
 ### 1. Node.js
@@ -85,6 +133,87 @@ pnpm preflight      # mirrors CI: build → typecheck → docs → test
 `pnpm test` runs both the root-level Vitest suite and each package's own test
 script. See [TESTING.md](TESTING.md) for test-tier conventions (unit /
 integration / e2e).
+
+---
+
+## How To Contribute
+
+### Branch → commit → PR
+
+1. **Create a topic branch** from `main`:
+
+   ```sh
+   git checkout -b feat/your-feature-name
+   ```
+
+2. **Make focused changes.** One logical change per commit.
+
+3. **Run the pre-commit gates** — both must pass before you push:
+
+   ```sh
+   pnpm typecheck      # TypeScript type-check all packages
+   pnpm test           # full test suite
+   ```
+
+   Or run both at once with the preflight alias:
+
+   ```sh
+   pnpm preflight      # build → typecheck → docs → test (mirrors CI)
+   ```
+
+4. **Stage and commit:**
+
+   ```sh
+   git add <files>
+   git commit -m "feat(package): short description of what and why"
+   ```
+
+5. **Run the health gate** before pushing:
+
+   ```sh
+   ndx ci .
+   ```
+
+   This runs `sourcevision analyze`, validates PRD health, and checks zone
+   coupling/cohesion metrics. Fix any gate failures before opening the PR —
+   the same gate runs in CI.
+
+6. **Open a pull request** targeting `main`.
+
+---
+
+### Commit trailers
+
+`ndx work` (the autonomous agent loop) appends machine-readable
+[git trailers](https://git-scm.com/docs/git-interpret-trailers) to every
+commit it creates. Human contributors do not need to write these manually,
+but knowing what they mean helps you navigate the project history:
+
+| Trailer | Meaning |
+|---------|---------|
+| `N-DX-Status: <id> <from> → <to>` | PRD item status transition captured in this commit (e.g. `in_progress → completed`). The dashboard uses this to correlate commits with PRD items. |
+| `N-DX: <vendor>/<model> · run <run-id>` | LLM vendor, model name, and hench run ID that authored the commit. |
+| `N-DX-Item: <url>` | Direct link to the PRD item in the dashboard. |
+
+If you are closing a PRD task with a manual commit, add an `N-DX-Status`
+trailer so the dashboard picks up the transition:
+
+```
+feat(rex): fix duplicate detection edge case
+
+N-DX-Status: <item-id> in_progress → completed
+```
+
+---
+
+### Linking code to PRD items
+
+When hench runs a task it stages `.rex/prd_tree/` changes alongside the code
+in the same commit, so each commit carries both the code delta and the PRD
+status transition atomically. For human contributions to a tracked task,
+follow the same pattern: stage `.rex/prd_tree/` with your code and include
+the `N-DX-Status` trailer. The `ndx status` output and the dashboard both
+reflect the change immediately.
 
 ---
 
