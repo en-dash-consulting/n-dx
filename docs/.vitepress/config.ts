@@ -33,6 +33,7 @@ export default defineConfig({
             { text: "Workflow", link: "/guide/workflow" },
             { text: "Commands", link: "/guide/commands" },
             { text: "Configuration", link: "/guide/configuration" },
+            { text: "Skills Reference", link: "/guide/skills" },
             { text: "MCP Integration", link: "/guide/mcp" },
             { text: "Self-Heal Loop", link: "/guide/self-heal" },
             { text: "PRD Storage Layout", link: "/guide/prd-storage" },
