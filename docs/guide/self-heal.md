@@ -100,9 +100,9 @@ Each skill below is invoked within each self-heal cycle. Edit the linked file in
 
 | Skill | Source | Role in this guide |
 |-------|--------|--------------------|
-| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](../../.agents/skills/ndx-plan/SKILL.md) | Step 2 (Recommend): filters new actionable findings and proposes them as PRD tasks |
-| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | Step 3 (Execute): picks the highest-priority task and runs the tool-use loop to fix it |
-| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Between cycles: surfaces remaining findings, completed tasks, and next recommended action |
+| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Step 2 (Recommend): filters new actionable findings and proposes them as PRD tasks |
+| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Step 3 (Execute): picks the highest-priority task and runs the tool-use loop to fix it |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Between cycles: surfaces remaining findings, completed tasks, and next recommended action |
 
 Related guides: [Workflow](./workflow) (self-heal automates the full analyze → recommend → work loop), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (uses self-heal for ongoing post-cleanup improvement).
 

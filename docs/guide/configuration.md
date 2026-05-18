@@ -171,6 +171,6 @@ See [Getting Started — Assistant Surfaces](./getting-started#assistant-surface
 
 | Skill | Source | Role in this guide |
 |-------|--------|--------------------|
-| `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](../../.agents/skills/ndx-config/SKILL.md) | Interactive view, explanation, and validation of n-dx configuration settings |
+| `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](./skills#ndx-config) | Interactive view, explanation, and validation of n-dx configuration settings |
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

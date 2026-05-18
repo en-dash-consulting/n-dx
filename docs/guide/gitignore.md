@@ -3,7 +3,7 @@
 ndx writes two kinds of files: **durable state** that belongs in version control, and **transient runtime artifacts** that don't. This page explains the difference and provides a copy-pasteable snippet you can drop into any project.
 
 ::: tip Reference template
-A ready-to-use template file lives at [`packages/core/assistant-assets/ndx.gitignore`](../../packages/core/assistant-assets/ndx.gitignore) in the ndx repo. Copy its contents into your project's `.gitignore`.
+A ready-to-use template file lives at [`packages/core/assistant-assets/ndx.gitignore`](https://github.com/en-dash-consulting/n-dx/blob/main/packages/core/assistant-assets/ndx.gitignore) in the ndx repo. Copy its contents into your project's `.gitignore`.
 :::
 
 ## What to commit vs. what to ignore

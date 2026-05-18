@@ -201,11 +201,11 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 
 | Skill | Source | Role in this guide |
 |-------|--------|--------------------|
-| `/ndx-zone` | [`.agents/skills/ndx-zone/SKILL.md`](../../.agents/skills/ndx-zone/SKILL.md) | Step 3: explores zone health metrics from the pre-flight analysis to identify highest-risk areas |
-| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](../../.agents/skills/ndx-plan/SKILL.md) | Step 7: generates the initial PRD interactively, filtered by the findings you triaged in Step 6 |
-| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Step 8: confirms PRD integrity after acceptance and before the first commit |
-| `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](../../.agents/skills/ndx-config/SKILL.md) | LLM setup: sets vendor, API key, model, and CLI path during init |
-| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | Post-onboarding: executes the first tasks from the accepted PRD |
+| `/ndx-zone` | [`.agents/skills/ndx-zone/SKILL.md`](./skills#ndx-zone) | Step 3: explores zone health metrics from the pre-flight analysis to identify highest-risk areas |
+| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Step 7: generates the initial PRD interactively, filtered by the findings you triaged in Step 6 |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Step 8: confirms PRD integrity after acceptance and before the first commit |
+| `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](./skills#ndx-config) | LLM setup: sets vendor, API key, model, and CLI path during init |
+| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Post-onboarding: executes the first tasks from the accepted PRD |
 
 Related guides: [Codebase Onboarding](./onboarding) (interactive zone exploration after the baseline is committed), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (heavier remediation when pre-flight findings are extensive), [Change Management](./change-management) (keeping the PRD aligned over time).
 

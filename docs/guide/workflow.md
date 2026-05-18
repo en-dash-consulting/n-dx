@@ -110,11 +110,11 @@ Each skill below maps to a step in this loop. Edit the linked file in your proje
 
 | Skill | Source | Role in this guide |
 |-------|--------|--------------------|
-| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](../../.agents/skills/ndx-plan/SKILL.md) | Steps 2–4: translates SourceVision findings into PRD proposals and accepts them |
-| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](../../.agents/skills/ndx-capture/SKILL.md) | Step 3: decomposes freeform ideas into structured PRD items with parent placement |
-| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](../../.agents/skills/ndx-work/SKILL.md) | Step 5: picks the next task and drives an LLM tool-use loop to implement it |
-| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](../../.agents/skills/ndx-status/SKILL.md) | Step 7: shows combined PRD completion, zone health, and next recommended action |
-| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](../../.agents/skills/ndx-reshape/SKILL.md) | Structural cleanup: reparents, merges, and rebalances the PRD tree when hierarchy drifts |
+| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Steps 2–4: translates SourceVision findings into PRD proposals and accepts them |
+| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Step 3: decomposes freeform ideas into structured PRD items with parent placement |
+| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Step 5: picks the next task and drives an LLM tool-use loop to implement it |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Step 7: shows combined PRD completion, zone health, and next recommended action |
+| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Structural cleanup: reparents, merges, and rebalances the PRD tree when hierarchy drifts |
 
 Related guides that share these skills: [Spec-Driven Development](./spec-driven), [Codebase Onboarding](./onboarding), [Run While You Sleep](./overnight), [Self-Heal Loop](./self-heal).
 
