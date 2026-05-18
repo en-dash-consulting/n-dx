@@ -3,6 +3,7 @@ import {
   stripHashSuffix,
   detectHashSuffixDuplicates,
   detectHashSuffixDuplicatesInTree,
+  detectConsolidationGroups,
   getContainerLevel,
 } from "../../../../src/cli/commands/add-reshape.js";
 import type { PRDItem } from "../../../../src/schema/index.js";
@@ -307,6 +308,207 @@ describe("detectHashSuffixDuplicatesInTree", () => {
       makeTask("2", "Fix authorization (def456)"),
     ];
     expect(detectHashSuffixDuplicatesInTree(items)).toHaveLength(0);
+  });
+});
+
+// ── detectConsolidationGroups ─────────────────────────────────────────────────
+
+describe("detectConsolidationGroups", () => {
+  // ── no-match cases ──────────────────────────────────────────────────────────
+
+  it("returns empty array for fewer than 2 children", () => {
+    const children = [makeTask("1", "Fix bug (a3f2)")];
+    expect(detectConsolidationGroups(children)).toHaveLength(0);
+  });
+
+  it("returns empty array when all titles are genuinely different", () => {
+    const children = [
+      makeTask("1", "Implement auth"),
+      makeTask("2", "Refactor DB"),
+      makeTask("3", "Fix logging"),
+    ];
+    expect(detectConsolidationGroups(children)).toHaveLength(0);
+  });
+
+  it("skips singletons — one base title with no suffixed sibling", () => {
+    // Only one item normalizes to "fix bug" — not enough for a group
+    const children = [
+      makeTask("1", "Fix bug (a3f2)"),
+      makeTask("2", "Fix database (b91c)"),
+    ];
+    expect(detectConsolidationGroups(children)).toHaveLength(0);
+  });
+
+  it("skips groups where no member has a hash-token suffix (exact duplicates)", () => {
+    // Both items share the same literal title with no suffix
+    const children = [
+      makeTask("1", "Fix bug"),
+      makeTask("2", "Fix bug"),
+    ];
+    expect(detectConsolidationGroups(children)).toHaveLength(0);
+  });
+
+  it("skips groups where the distinguishing suffix is a user-authored word (non-hex)", () => {
+    // "(beta)" contains 't' which is not a hex character
+    const children = [
+      makeTask("1", "Fix bug"),
+      makeTask("2", "Fix bug (beta)"),
+    ];
+    expect(detectConsolidationGroups(children)).toHaveLength(0);
+  });
+
+  it("skips groups where dash suffix contains non-hex letters", () => {
+    // "endpoint" contains non-hex chars → not a hash token
+    const children = [
+      makeTask("1", "Fix API - endpoint"),
+      makeTask("2", "Fix API - handler"),
+    ];
+    expect(detectConsolidationGroups(children)).toHaveLength(0);
+  });
+
+  // ── pure hash siblings ──────────────────────────────────────────────────────
+
+  it("groups two siblings differing only by parenthesized short hex token", () => {
+    const children = [
+      makeTask("1", "Fix observation in global (a3f2)"),
+      makeTask("2", "Fix observation in global (b91c)"),
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].baseTitle).toBe("Fix observation in global");
+    expect(groups[0].members).toHaveLength(2);
+    expect(groups[0].members.map((m) => m.id).sort()).toEqual(["1", "2"]);
+  });
+
+  it("groups two siblings differing only by dash-hex suffix", () => {
+    const children = [
+      makeTask("1", "Fix observation in global - a1b2c3"),
+      makeTask("2", "Fix observation in global - d4e5f6"),
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].baseTitle).toBe("Fix observation in global");
+  });
+
+  it("groups two siblings differing by bracketed UUID", () => {
+    const children = [
+      makeTask("1", "Fix auth (550e8400-e29b-41d4-a716-446655440000)"),
+      makeTask("2", "Fix auth (660f9500-f3ac-52e5-b827-557766551111)"),
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].baseTitle).toBe("Fix auth");
+  });
+
+  // ── three or more members ───────────────────────────────────────────────────
+
+  it("groups three hash-suffixed siblings into one cluster", () => {
+    const children = [
+      makeTask("1", "Fix observation in global"),
+      makeTask("2", "Fix observation in global (a3f2)"),
+      makeTask("3", "Fix observation in global (b91c)"),
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].baseTitle).toBe("Fix observation in global");
+    expect(groups[0].members).toHaveLength(3);
+    expect(groups[0].members.map((m) => m.id).sort()).toEqual(["1", "2", "3"]);
+  });
+
+  it("groups four hash-suffixed siblings", () => {
+    const children = [
+      makeTask("1", "Update schema (a1b2c3)"),
+      makeTask("2", "Update schema (d4e5f6)"),
+      makeTask("3", "Update schema (7890ab)"),
+      makeTask("4", "Update schema (cdef01)"),
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].members).toHaveLength(4);
+  });
+
+  // ── mixed hash + non-hash siblings ─────────────────────────────────────────
+
+  it("groups canonical (no-suffix) item with hash-suffixed siblings", () => {
+    // "Fix bug" is the canonical form; siblings have hash suffixes
+    const children = [
+      makeTask("1", "Fix bug"),
+      makeTask("2", "Fix bug (a3f2)"),
+      makeTask("3", "Fix bug (b91c)"),
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    // Canonical member supplies the base title
+    expect(groups[0].baseTitle).toBe("Fix bug");
+    expect(groups[0].members).toHaveLength(3);
+  });
+
+  it("groups only the hash-suffix cluster when other siblings have distinct titles", () => {
+    const children = [
+      makeTask("1", "Fix bug (a3f2)"),
+      makeTask("2", "Fix bug (b91c)"),
+      makeTask("3", "Refactor DB"),   // unrelated — stays out of any group
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].members).toHaveLength(2);
+    expect(groups[0].members.map((m) => m.id).sort()).toEqual(["1", "2"]);
+  });
+
+  it("produces separate groups for two independent hash-suffix clusters", () => {
+    const children = [
+      makeTask("1", "Fix bug (a3f2)"),
+      makeTask("2", "Fix bug (b91c)"),
+      makeTask("3", "Update schema (1a2b3c)"),
+      makeTask("4", "Update schema (4d5e6f)"),
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(2);
+    const baseTitles = groups.map((g) => g.baseTitle).sort();
+    expect(baseTitles).toEqual(["Fix bug", "Update schema"]);
+  });
+
+  // ── body / description propagation ─────────────────────────────────────────
+
+  it("includes description in members when present", () => {
+    const children: PRDItem[] = [
+      { id: "1", title: "Fix bug (a3f2)", level: "task", status: "pending", description: "Desc A" },
+      { id: "2", title: "Fix bug (b91c)", level: "task", status: "pending", description: "Desc B" },
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    const memberById = Object.fromEntries(groups[0].members.map((m) => [m.id, m]));
+    expect(memberById["1"].description).toBe("Desc A");
+    expect(memberById["2"].description).toBe("Desc B");
+  });
+
+  it("includes acceptanceCriteria in members when present", () => {
+    const children: PRDItem[] = [
+      {
+        id: "1", title: "Fix bug (a3f2)", level: "task", status: "pending",
+        acceptanceCriteria: ["AC1", "AC2"],
+      },
+      {
+        id: "2", title: "Fix bug (b91c)", level: "task", status: "pending",
+        acceptanceCriteria: ["AC3"],
+      },
+    ];
+    const groups = detectConsolidationGroups(children);
+    expect(groups).toHaveLength(1);
+    const memberById = Object.fromEntries(groups[0].members.map((m) => [m.id, m]));
+    expect(memberById["1"].acceptanceCriteria).toEqual(["AC1", "AC2"]);
+    expect(memberById["2"].acceptanceCriteria).toEqual(["AC3"]);
+  });
+
+  it("omits description and acceptanceCriteria keys when not present on the item", () => {
+    const children: PRDItem[] = [
+      { id: "1", title: "Fix bug (a3f2)", level: "task", status: "pending" },
+      { id: "2", title: "Fix bug (b91c)", level: "task", status: "pending" },
+    ];
+    const groups = detectConsolidationGroups(children);
+    const member = groups[0].members[0];
+    expect(Object.prototype.hasOwnProperty.call(member, "description")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(member, "acceptanceCriteria")).toBe(false);
   });
 });
 

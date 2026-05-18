@@ -385,6 +385,117 @@ export function detectHashSuffixDuplicatesInTree(
   return groups;
 }
 
+// ── Consolidation-group detector (reshape pipeline) ───────────────────────────
+
+/**
+ * Test whether a title ends with a machine-generated hash token.
+ *
+ * Stricter than {@link stripHashSuffix}: only accepts tokens composed
+ * entirely of hexadecimal characters (0-9, a-f) or a full UUID. Tokens
+ * containing non-hex letters (g-z) are treated as user-authored words and
+ * return false.
+ */
+function hasHashToken(title: string): boolean {
+  const UUID_HEX = "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}";
+  return (
+    // bracketed UUID
+    new RegExp(`\\s*[\\(\\[]\\s*${UUID_HEX}\\s*[\\)\\]]\\s*$`, "i").test(title) ||
+    // dash UUID tail
+    new RegExp(`\\s+-\\s+${UUID_HEX}$`, "i").test(title) ||
+    // bracketed purely hex token (4–12 chars)
+    /\s*[\(\[]\s*[a-f0-9]{4,12}\s*[\)\]]\s*$/i.test(title) ||
+    // dash purely hex token (6–12 chars)
+    /\s+-\s+[a-f0-9]{6,12}$/i.test(title)
+  );
+}
+
+/**
+ * A member of a {@link ConsolidationGroup}.
+ */
+export interface ConsolidationMember {
+  /** Item ID. */
+  id: string;
+  /** Original title (with hash suffix when present). */
+  title: string;
+  /** Item description, if any. */
+  description?: string;
+  /** Acceptance criteria, if any. */
+  acceptanceCriteria?: string[];
+}
+
+/**
+ * A cluster of two or more sibling items whose titles share the same base
+ * prefix and differ only by a trailing machine-generated hash suffix.
+ *
+ * Provides the full item bodies so that downstream steps (e.g. LLM-driven
+ * rename) can operate on the content without an additional tree traversal.
+ */
+export interface ConsolidationGroup {
+  /** Shared base title after stripping hash suffixes (original casing preserved). */
+  baseTitle: string;
+  /** Two or more members in this consolidation cluster. */
+  members: ConsolidationMember[];
+}
+
+/**
+ * Detect clusters of sibling items whose titles share the same base prefix
+ * and differ only by a trailing machine-generated hash suffix.
+ *
+ * Rules:
+ * - At least two siblings must normalize to the same stripped title for a
+ *   group to be created (singletons are never returned).
+ * - At least one member of the group must carry a hash token suffix (a token
+ *   composed entirely of hex characters or a UUID). Groups where items share
+ *   the same title with no suffix, or where the distinguishing part is a
+ *   user-authored word (containing non-hex letters), are skipped.
+ * - Members without a hash suffix (i.e. the canonical form) are included in
+ *   the group when they share the same normalized base title.
+ *
+ * @param children Direct children of a single parent (or root-level items).
+ */
+export function detectConsolidationGroups(children: PRDItem[]): ConsolidationGroup[] {
+  if (children.length < 2) return [];
+
+  // Group by normalized stripped title
+  const groups = new Map<string, PRDItem[]>();
+  for (const child of children) {
+    const key = normalizeForComparison(child.title);
+    if (!key) continue;
+    const grp = groups.get(key) ?? [];
+    grp.push(child);
+    groups.set(key, grp);
+  }
+
+  const result: ConsolidationGroup[] = [];
+
+  for (const [, group] of groups) {
+    if (group.length < 2) continue;
+
+    // Require at least one member to carry a machine-generated hash token.
+    // This excludes exact-duplicate clusters (no suffix on any member) and
+    // clusters where the distinguishing suffix is a user-authored word.
+    if (!group.some((item) => hasHashToken(item.title))) continue;
+
+    // Use the canonical (suffix-free) member's title for the base title;
+    // fall back to stripping the first member's title.
+    const canonicalMember =
+      group.find((g) => g.title.trim() === stripHashSuffix(g.title)) ?? group[0];
+    const baseTitle = stripHashSuffix(canonicalMember.title).trim();
+
+    result.push({
+      baseTitle,
+      members: group.map((item) => {
+        const member: ConsolidationMember = { id: item.id, title: item.title };
+        if (item.description !== undefined) member.description = item.description;
+        if (item.acceptanceCriteria !== undefined) member.acceptanceCriteria = item.acceptanceCriteria;
+        return member;
+      }),
+    });
+  }
+
+  return result;
+}
+
 // ── Reshape in-progress detection ─────────────────────────────────────────────
 
 /** Name of the lock file written by cmdReshape while it runs. */
