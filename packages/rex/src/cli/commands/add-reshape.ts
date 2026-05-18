@@ -94,6 +94,9 @@ export function getContainerLevel(level: ItemLevel): ItemLevel | null {
  *   5. Fall back to first in sibling order.
  *
  * Strategy selection:
+ *   - When `options.alwaysGroup` is true AND the group level has a valid container
+ *     level → emit a GroupAction (parent-container strategy), regardless of whether
+ *     items have children. Used by the reshape pipeline.
  *   - When ALL items in a group have at least one child AND the group level has a
  *     valid container level → emit a GroupAction (parent-container strategy).
  *   - Otherwise → emit MergeActions (merge strategy).
@@ -101,6 +104,7 @@ export function getContainerLevel(level: ItemLevel): ItemLevel | null {
 export function detectHashSuffixDuplicates(
   siblings: PRDItem[],
   newItemId: string,
+  options: { alwaysGroup?: boolean } = {},
 ): ReshapeProposal[] {
   if (siblings.length < 2) return [];
 
@@ -116,20 +120,28 @@ export function detectHashSuffixDuplicates(
 
   const proposals: ReshapeProposal[] = [];
 
-  for (const [strippedKey, group] of groups) {
+  for (const [, group] of groups) {
     if (group.length < 2) continue;
 
-    // Determine strategy: group action when all items have children and level allows
-    const allHaveChildren = group.every((g) => g.children && g.children.length > 0);
     const containerLevel = group[0].level ? getContainerLevel(group[0].level) : null;
 
-    if (allHaveChildren && containerLevel !== null) {
+    // Use the canonical (suffix-free) member's title when available; otherwise strip
+    // the first member's title. Preserves the original casing for the container title.
+    const canonicalMember =
+      group.find((g) => g.title.trim() === stripHashSuffix(g.title)) ?? group[0];
+    const containerTitle = stripHashSuffix(canonicalMember.title).trim();
+
+    // Determine strategy: group action when alwaysGroup or all items have children
+    const allHaveChildren = group.every((g) => g.children && g.children.length > 0);
+    const useGroup = (options.alwaysGroup === true || allHaveChildren) && containerLevel !== null;
+
+    if (useGroup) {
       // Parent-container strategy: create a new container and move all items under it
       const action: GroupAction = {
         action: "group",
         containerId: randomUUID(),
-        containerTitle: strippedKey,
-        containerLevel,
+        containerTitle,
+        containerLevel: containerLevel!,
         itemIds: group.map((g) => g.id),
         reason: "hash-suffix-distinct-cases-container",
       };
@@ -352,7 +364,9 @@ export function detectHashSuffixDuplicatesInTree(
 
       // Generate proposals for this group using the existing per-cohort detector.
       // Pass empty string as newItemId — no single "new" item in the tree context.
-      const proposals = detectHashSuffixDuplicates(members, "");
+      // alwaysGroup: true so the reshape pipeline always creates parent containers
+      // rather than merging siblings without children.
+      const proposals = detectHashSuffixDuplicates(members, "", { alwaysGroup: true });
 
       groups.push({
         normalizedTitle,

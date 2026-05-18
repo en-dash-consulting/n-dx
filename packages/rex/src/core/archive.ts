@@ -71,6 +71,27 @@ export interface RenameAuditEntry {
   timestamp: string;
 }
 
+/**
+ * Entry for a group operation recorded in the archive.
+ * Captures the parent-container creation for hash-suffix duplicate siblings.
+ */
+export interface GroupAuditEntry {
+  /** ID of the newly created container item. */
+  containerId: string;
+  /** Title of the new container (suffix-stripped shared base title). */
+  containerTitle: string;
+  /** ID of the original common parent, or undefined for root-level items. */
+  originalParentId: string | undefined;
+  /** IDs of items moved under the new container. */
+  movedItemIds: string[];
+  /** Reasoning for grouping. */
+  reasoning: string;
+  /** Pre-reshape git commit hash for rollback support. */
+  preReshapeCommit: string;
+  /** Timestamp when the group was created. */
+  timestamp: string;
+}
+
 export interface ArchiveBatch {
   timestamp: string;
   source: "prune" | "reshape" | "reorganize" | "rename";
@@ -83,6 +104,8 @@ export interface ArchiveBatch {
   mergeAuditTrail?: MergeAuditEntry[];
   /** Rename audit trail for title-collision rename operations (if source === 'rename'). */
   renameAuditTrail?: RenameAuditEntry[];
+  /** Group audit trail for hash-suffix parent-container operations (if source === 'reshape'). */
+  groupAuditTrail?: GroupAuditEntry[];
 }
 
 // ── I/O ──────────────────────────────────────────────────────────────

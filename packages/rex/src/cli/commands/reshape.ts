@@ -5,7 +5,7 @@ import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { ARCHIVE_FILE, loadArchive, trimArchive } from "../../core/archive.js";
-import type { MergeAuditEntry } from "../../core/archive.js";
+import type { MergeAuditEntry, GroupAuditEntry } from "../../core/archive.js";
 import { reasonForReshape, formatReshapeProposal, reasonForBodyMerge } from "../../analyze/reshape-reason.js";
 import { setLLMConfig, setClaudeConfig, resolveConfiguredModel } from "../../analyze/reason.js";
 import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
@@ -268,10 +268,14 @@ async function _cmdReshapeCore(
     }
   }
 
-  // Archive removed items
-  if (reshapeResult.archivedItems.length > 0) {
+  // Archive removed items and record group audit trail
+  const hasArchivedItems = reshapeResult.archivedItems.length > 0;
+  const hasGroupAudit = reshapeResult.groupAuditTrail.length > 0;
+
+  if (hasArchivedItems || hasGroupAudit) {
     const archivePath = join(rexDir, ARCHIVE_FILE);
     const archive = await loadArchive(archivePath);
+    const batchTimestamp = new Date().toISOString();
 
     // Build merge audit trail entries with pre-reshape commit hash
     const mergeAuditTrail: MergeAuditEntry[] = reshapeResult.mergeAuditTrail.map((merge) => ({
@@ -279,17 +283,29 @@ async function _cmdReshapeCore(
       mergedFromIds: merge.mergedFromIds,
       reasoning: merge.reasoning,
       preReshapeCommit,
-      timestamp: new Date().toISOString(),
+      timestamp: batchTimestamp,
+    }));
+
+    // Build group audit trail entries with pre-reshape commit hash
+    const groupAuditTrail: GroupAuditEntry[] = reshapeResult.groupAuditTrail.map((g) => ({
+      containerId: g.containerId,
+      containerTitle: g.containerTitle,
+      originalParentId: g.originalParentId,
+      movedItemIds: g.movedItemIds,
+      reasoning: g.reasoning,
+      preReshapeCommit,
+      timestamp: batchTimestamp,
     }));
 
     archive.batches.push({
-      timestamp: new Date().toISOString(),
+      timestamp: batchTimestamp,
       source: "reshape",
       items: reshapeResult.archivedItems,
       count: reshapeResult.archivedItems.length,
       reason: `Reshape: ${accepted.map((p) => p.action.action).join(", ")}`,
       actions: accepted,
       mergeAuditTrail: mergeAuditTrail.length > 0 ? mergeAuditTrail : undefined,
+      groupAuditTrail: groupAuditTrail.length > 0 ? groupAuditTrail : undefined,
     });
     trimArchive(archive);
     await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");

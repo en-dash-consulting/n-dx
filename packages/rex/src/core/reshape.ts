@@ -111,6 +111,23 @@ export interface MergeAuditRecord {
   reasoning: string;
 }
 
+/**
+ * Single group audit entry recorded when a GroupAction creates a new parent
+ * and reparents hash-suffix duplicate siblings under it.
+ */
+export interface GroupAuditRecord {
+  /** ID of the newly created container item. */
+  containerId: string;
+  /** Title of the new container (suffix-stripped shared base title). */
+  containerTitle: string;
+  /** ID of the original common parent, or undefined for root-level items. */
+  originalParentId: string | undefined;
+  /** IDs of items moved under the new container. */
+  movedItemIds: string[];
+  /** Reasoning for grouping. */
+  reasoning: string;
+}
+
 export interface ReshapeResult {
   applied: ReshapeProposal[];
   /** IDs of items that were removed (for sync deletion tracking). */
@@ -119,6 +136,8 @@ export interface ReshapeResult {
   archivedItems: PRDItem[];
   /** Audit trail of merges performed (for archive recording). */
   mergeAuditTrail: MergeAuditRecord[];
+  /** Audit trail of group operations performed (for archive recording). */
+  groupAuditTrail: GroupAuditRecord[];
   errors: Array<{ proposal: ReshapeProposal; error: string }>;
 }
 
@@ -335,6 +354,15 @@ function applyGroup(
     }
   }
 
+  // Record group operation in audit trail
+  result.groupAuditTrail.push({
+    containerId: action.containerId,
+    containerTitle: action.containerTitle,
+    originalParentId,
+    movedItemIds: action.itemIds,
+    reasoning: action.reason,
+  });
+
   result.applied.push(proposal);
 }
 
@@ -358,6 +386,7 @@ export function applyReshape(
     deletedIds: [],
     archivedItems: [],
     mergeAuditTrail: [],
+    groupAuditTrail: [],
     errors: [],
   };
 
