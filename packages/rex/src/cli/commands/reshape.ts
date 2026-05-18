@@ -22,7 +22,8 @@ import { classifyLLMError } from "../llm-error-classifier.js";
 import { getLLMVendor } from "../../analyze/reason.js";
 import { detectCrossPRDDuplicates } from "./reshape-detect-duplicates.js";
 import { acquireReshapeLock, detectHashSuffixDuplicatesInTree } from "./add-reshape.js";
-import type { MergeAction } from "../../core/reshape.js";
+import { proposeGroupRenames } from "../../analyze/index.js";
+import type { MergeAction, GroupAction } from "../../core/reshape.js";
 import type { PRDItem } from "../../schema/index.js";
 
 export async function cmdReshape(
@@ -268,6 +269,51 @@ async function _cmdReshapeCore(
     }
   }
 
+  // LLM rename pass: for each accepted GroupAction, propose descriptive titles
+  // for the reparented children. Failures degrade gracefully — children keep
+  // their hash-suffixed titles and reshape continues with a warning.
+  for (const proposal of reshapeResult.applied) {
+    if (proposal.action.action === "group") {
+      const groupAction = proposal.action as GroupAction;
+      const containerEntry = findItemInTree(docAfterCompaction.items, groupAction.containerId);
+      if (!containerEntry) continue;
+
+      const children = containerEntry.item.children ?? [];
+      if (children.length < 2) continue;
+
+      const consolidationGroup = {
+        baseTitle: groupAction.containerTitle,
+        members: children.map((child) => ({
+          id: child.id,
+          title: child.title,
+          description: child.description,
+          acceptanceCriteria: child.acceptanceCriteria,
+        })),
+      };
+
+      try {
+        const renameProposal = await proposeGroupRenames(consolidationGroup, resolvedModel);
+        for (const rename of renameProposal.renames) {
+          updateInTree(docAfterCompaction.items, rename.id, { title: rename.newTitle });
+        }
+        if (renameProposal.renames.length > 0) {
+          info(
+            `  [hash-suffix] renamed ${renameProposal.renames.length} children under "${groupAction.containerTitle}"`,
+          );
+        }
+      } catch (err) {
+        const classified = classifyLLMError(
+          err instanceof Error ? err : new Error(String(err)),
+          vendor,
+          `rename children of "${groupAction.containerTitle}"`,
+        );
+        warn(
+          `  Warning: could not rename grouped children for "${groupAction.containerTitle}": ${classified.message}`,
+        );
+      }
+    }
+  }
+
   // Archive removed items and record group audit trail
   const hasArchivedItems = reshapeResult.archivedItems.length > 0;
   const hasGroupAudit = reshapeResult.groupAuditTrail.length > 0;
@@ -367,7 +413,7 @@ async function _cmdReshapeCore(
           `  [hash-suffix] survivor: ${mergeAction.survivorId.slice(0, 8)} (merged: ${mergeAction.mergedIds.map((id) => id.slice(0, 8)).join(", ")}, strategy: merge, reparented: ${reparented} children)`,
         );
       } else if (p.action.action === "group") {
-        const groupAction = p.action as import("../../core/reshape.js").GroupAction;
+        const groupAction = p.action as GroupAction;
         info(
           `  [hash-suffix] container: ${groupAction.containerId.slice(0, 8)} "${groupAction.containerTitle}" (grouped: ${groupAction.itemIds.map((id) => id.slice(0, 8)).join(", ")}, strategy: parent-container)`,
         );

@@ -98,3 +98,6 @@ export type { BatchAcceptanceRecord, GranularityAdjustmentRecord } from "./batch
 
 export type { SiblingRenameProposal } from "./rename-resolve.js";
 export { proposeSiblingRenames, buildRenamePrompt } from "./rename-resolve.js";
+
+export type { GroupRenameMember, GroupRenameInput, GroupRenameEntry, GroupRenameProposal } from "./propose-group-renames.js";
+export { proposeGroupRenames, buildGroupRenamePrompt, shouldSkipMember } from "./propose-group-renames.js";
