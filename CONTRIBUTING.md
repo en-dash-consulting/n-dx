@@ -5,6 +5,15 @@ contributor needs beyond what a regular user installs.
 
 ---
 
+## Prerequisites
+
+- **Node.js ≥ 18** (Node 22 LTS recommended) — use the version in `.nvmrc` (`nvm use` / `fnm use`)
+- **pnpm ≥ 10** — enabled via `corepack enable` (version locked in `package.json`)
+
+See [Platform-specific notes](#platform-specific-notes) for Windows/macOS/Linux setup details.
+
+---
+
 ## End-user prerequisites vs contributor prerequisites
 
 | Requirement | User | Contributor |
@@ -16,6 +25,22 @@ contributor needs beyond what a regular user installs.
 | pnpm workspace bootstrap (`pnpm install`) | – | ✅ |
 | TypeScript compiler (installed via pnpm) | – | ✅ |
 | Xcode Command Line Tools (macOS) | – | see below |
+
+---
+
+## Setup Steps
+
+A one-shot sequence from fresh clone to passing `pnpm build`:
+
+```sh
+git clone https://github.com/en-dash-consulting/n-dx.git
+cd n-dx
+corepack enable && corepack install   # install the exact pnpm version locked in package.json
+pnpm install                           # bootstrap all workspace dependencies
+pnpm build                             # compile all packages (TypeScript → dist/)
+```
+
+That's it — the build output is in each package's `dist/` directory. Run `pnpm test` to confirm everything passes.
 
 ---
 
@@ -133,6 +158,28 @@ pnpm preflight      # mirrors CI: build → typecheck → docs → test
 `pnpm test` runs both the root-level Vitest suite and each package's own test
 script. See [TESTING.md](TESTING.md) for test-tier conventions (unit /
 integration / e2e).
+
+### 6. Testing changes against a real project (dev-link)
+
+`pnpm link` (step 4) registers the build globally once. To iterate on code changes and test
+them inside another project use the **dev-link** skill, which manages the link/unlink cycle:
+
+```sh
+# Inside the n-dx monorepo — after editing code:
+pnpm build --filter @n-dx/core    # rebuild only the CLI package
+
+# In Claude Code (from inside the n-dx repo):
+/dev-link local    # link packages/core globally so `ndx` uses your dev build
+```
+
+Then switch to your target project and run `ndx` commands normally. The global `ndx` binary
+resolves from your local build.
+
+```sh
+/dev-link npm      # when done — restore the published npm version
+```
+
+Run `/dev-link` with no argument to check which version is currently active.
 
 ---
 
