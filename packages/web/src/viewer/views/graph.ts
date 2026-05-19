@@ -48,6 +48,8 @@ const ZONE_EXTERNAL_NODE_W = 124;
 const ZONE_EXTERNAL_NODE_H = 48;
 const ZONE_DIR_NODE_W = 148;
 const ZONE_DIR_NODE_H = 42;
+const ZONE_MAP_NODE_W = 150;
+const ZONE_MAP_NODE_H = 60;
 
 type FocusSource =
   | { kind: "default" }
@@ -58,8 +60,8 @@ type FocusSource =
   | { kind: "cycle"; path: string };
 
 /** Readable basename / package label inside SVG boxes (avoid tiny monospace overflow). */
-function truncateNodeLabel(label: string, kind: NodeKind): string {
-  const max = kind === "package" ? 26 : 22;
+function truncateNodeLabel(label: string, kind: NodeKind, maxOverride?: number): string {
+  const max = maxOverride ?? (kind === "package" ? 26 : 22);
   if (label.length <= max) return label;
   return `${label.slice(0, max - 1)}…`;
 }
@@ -157,7 +159,6 @@ function layoutZoneMapNodes<T extends { id: string; n: number }>(
   h: number,
 ): Array<T & { x: number; y: number; r: number; stats: { in: number; out: number } }> {
   if (!zones.length) return [];
-  const maxFiles = Math.max(...zones.map((z) => z.n), 1);
   const strength = new Map<string, number>();
   for (const zone of zones) strength.set(zone.id, zone.n);
   for (const flow of flows) {
@@ -169,51 +170,66 @@ function layoutZoneMapNodes<T extends { id: string; n: number }>(
   );
   const centerX = w / 2;
   const centerY = h / 2;
-  const rx = w * 0.38;
-  const ry = h * 0.32;
+  // Rectangle half-extents + breathing room — separation works on the actual
+  // rendered box, not a circle, so 150×60 nodes never overlap or clip labels.
+  const halfW = ZONE_MAP_NODE_W / 2;
+  const halfH = ZONE_MAP_NODE_H / 2;
+  const GAP_X = 26;
+  const GAP_Y = 22;
+  // Strongest zone anchors the center as a clear focal point; the rest fan out
+  // on a single ring so the eye starts at the hub instead of a uniform cloud.
+  const ringCount = Math.max(1, ordered.length - 1);
+  const rx = Math.min(w * 0.34, (w / 2 - halfW - 18));
+  const ry = Math.min(h * 0.34, (h / 2 - halfH - 16));
   const placed = ordered.map((zone, i) => {
-    const angle = -Math.PI / 2 + (i / ordered.length) * Math.PI * 2;
-    const pull = 1 - Math.min(0.36, ((strength.get(zone.id) ?? 0) / Math.max(1, maxFiles * 6)) * 0.1);
+    const onRing = i > 0;
+    const angle = -Math.PI / 2 + ((i - 1) / ringCount) * Math.PI * 2;
     return {
       ...zone,
-      x: centerX + Math.cos(angle) * rx * pull,
-      y: centerY + Math.sin(angle) * ry * pull,
+      x: onRing ? centerX + Math.cos(angle) * rx : centerX,
+      y: onRing ? centerY + Math.sin(angle) * ry : centerY,
       r: Math.max(18, Math.min(44, 16 + Math.sqrt(zone.n) * 5)),
       stats: statsFor(zone.id),
     };
   });
-  for (let iter = 0; iter < 42; iter += 1) {
+  for (let iter = 0; iter < 60; iter += 1) {
     for (const flow of flows) {
       const a = placed.find((z) => z.id === flow.fromZone);
       const b = placed.find((z) => z.id === flow.toZone);
       if (!a || !b) continue;
       const dx = b.x - a.x;
       const dy = b.y - a.y;
-      const factor = Math.min(0.015, flow.count / 1200);
+      const factor = Math.min(0.01, flow.count / 1600);
       a.x += dx * factor;
       a.y += dy * factor;
       b.x -= dx * factor;
       b.y -= dy * factor;
     }
+    // Axis-aligned box separation: if two node boxes overlap, push them apart
+    // along whichever axis needs the least correction (keeps the layout tight).
     for (let i = 0; i < placed.length; i += 1) {
       for (let j = i + 1; j < placed.length; j += 1) {
         const a = placed[i];
         const b = placed[j];
-        const dx = b.x - a.x || 0.1;
-        const dy = b.y - a.y || 0.1;
-        const dist = Math.max(1, Math.hypot(dx, dy));
-        const minDist = a.r + b.r + 34;
-        if (dist >= minDist) continue;
-        const push = (minDist - dist) / dist / 2;
-        a.x -= dx * push;
-        a.y -= dy * push;
-        b.x += dx * push;
-        b.y += dy * push;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const overlapX = (halfW * 2 + GAP_X) - Math.abs(dx);
+        const overlapY = (halfH * 2 + GAP_Y) - Math.abs(dy);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        if (overlapX < overlapY) {
+          const shift = (overlapX / 2) * (dx < 0 ? -1 : 1);
+          a.x -= shift;
+          b.x += shift;
+        } else {
+          const shift = (overlapY / 2) * (dy < 0 ? -1 : 1);
+          a.y -= shift;
+          b.y += shift;
+        }
       }
     }
     for (const node of placed) {
-      node.x = clamp(node.x, node.r + 28, w - node.r - 28);
-      node.y = clamp(node.y, node.r + 26, h - node.r - 26);
+      node.x = clamp(node.x, halfW + 18, w - halfW - 18);
+      node.y = clamp(node.y, halfH + 16, h - halfH - 16);
     }
   }
   return placed;
@@ -683,13 +699,17 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
           return groups;
         }, new Map<string, { id: string; dir: string; count: number }>())
     : new Map<string, { id: string; dir: string; count: number }>();
+  // The highest-signal file (already sorted first) anchors the center as the
+  // entry point; everything else fans out around it so the user has a clear
+  // focal node instead of a uniform, overwhelming ring.
+  const activeZoneRingCount = Math.max(1, activeZoneOrderedFiles.length - 1);
   const activeZoneNetworkNodesBase = activeZoneOrderedFiles.map((path, i) => {
-    const angle = -Math.PI / 2 + (i / Math.max(1, activeZoneOrderedFiles.length)) * Math.PI * 2;
+    const angle = -Math.PI / 2 + ((i - 1) / activeZoneRingCount) * Math.PI * 2;
     const ring = activeZoneBoundaryByFile.has(path) ? 0.36 : 0.20;
     return {
       path,
-      x: activeZoneNetworkW / 2 + Math.cos(angle) * activeZoneNetworkW * ring,
-      y: activeZoneNetworkH / 2 + Math.sin(angle) * activeZoneNetworkH * ring * 0.82,
+      x: i === 0 ? activeZoneNetworkW / 2 : activeZoneNetworkW / 2 + Math.cos(angle) * activeZoneNetworkW * ring,
+      y: i === 0 ? activeZoneNetworkH / 2 : activeZoneNetworkH / 2 + Math.sin(angle) * activeZoneNetworkH * ring * 0.82,
       degree: (inDegree.get(path) ?? 0) + (outDegree.get(path) ?? 0),
     };
   });
@@ -1063,7 +1083,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                   h("g", { class: "ig-zone-map-nodes" },
                     ...zoneMapNodes.map((zone) =>
                       {
-                        const labelLines = wrapZoneLabel(zone.name);
+                        const labelLines = wrapZoneLabel(zone.name, 16);
                         return h("g", {
                           key: zone.id,
                           class: `ig-zone-map-node${zoneFilter === zone.id ? " ig-zone-map-node-active" : ""}`,
@@ -1089,13 +1109,13 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           },
                         },
                           h("title", null, zone.name),
-                          h("rect", { x: -58, y: -28, width: 116, height: 56, rx: 16 }),
-                          h("text", { class: "ig-zone-map-name", y: labelLines.length === 1 ? -7 : -13, textAnchor: "middle" },
+                          h("rect", { x: -ZONE_MAP_NODE_W / 2, y: -ZONE_MAP_NODE_H / 2, width: ZONE_MAP_NODE_W, height: ZONE_MAP_NODE_H, rx: 16 }),
+                          h("text", { class: "ig-zone-map-name", y: labelLines.length === 1 ? -3 : -10, textAnchor: "middle" },
                             ...labelLines.map((line, index) =>
-                              h("tspan", { key: `${zone.id}-line-${index}`, x: 0, dy: index === 0 ? 0 : 12 }, line),
+                              h("tspan", { key: `${zone.id}-line-${index}`, x: 0, dy: index === 0 ? 0 : 13 }, line),
                             ),
                           ),
-                          h("text", { class: "ig-zone-map-meta", y: 17, textAnchor: "middle" },
+                          h("text", { class: "ig-zone-map-meta", y: 20, textAnchor: "middle" },
                             `${zone.n} files`,
                           ),
                         );
@@ -1317,7 +1337,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           },
                         },
                           h("rect", { x: -ZONE_DIR_NODE_W / 2, y: -ZONE_DIR_NODE_H / 2, width: ZONE_DIR_NODE_W, height: ZONE_DIR_NODE_H, rx: 12 }),
-                          h("text", { class: "ig-zone-dir-label", x: -ZONE_DIR_NODE_W / 2 + 12, y: -2 }, truncateNodeLabel(node.dir, "file")),
+                          h("text", { class: "ig-zone-dir-label", x: -ZONE_DIR_NODE_W / 2 + 12, y: -2 }, truncateNodeLabel(node.dir, "file", 18)),
                           h("text", { class: "ig-zone-dir-meta", x: -ZONE_DIR_NODE_W / 2 + 12, y: 13 }, `${node.count} more file${node.count === 1 ? "" : "s"}`),
                         ),
                       ),
@@ -1350,9 +1370,9 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                             setStreetViewMode((current) => current === "preview" ? "closed" : current);
                           },
                         },
-                          h("rect", { x: -48, y: -18, width: 96, height: 36, rx: 10 }),
-                          h("text", { class: "ig-zone-external-label", y: -2, textAnchor: "middle" }, truncateNodeLabel(node.name, "package")),
-                          h("text", { class: "ig-zone-external-meta", y: 12, textAnchor: "middle" },
+                          h("rect", { x: -ZONE_EXTERNAL_NODE_W / 2, y: -ZONE_EXTERNAL_NODE_H / 2, width: ZONE_EXTERNAL_NODE_W, height: ZONE_EXTERNAL_NODE_H, rx: 10 }),
+                          h("text", { class: "ig-zone-external-label", y: -3, textAnchor: "middle" }, truncateNodeLabel(node.name, "package", 16)),
+                          h("text", { class: "ig-zone-external-meta", y: 13, textAnchor: "middle" },
                             `${node.fromExternal} from / ${node.toExternal} to`,
                           ),
                         ),

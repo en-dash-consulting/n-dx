@@ -1178,19 +1178,25 @@
   max-height: min(78vh, 760px);
 }
 
-.ig-street-view-preview .ig-controls,
-.ig-street-view-preview .ig-type-toggles,
-.ig-street-view-preview .ig-side,
-.ig-street-view-preview .ig-street-detail,
-.ig-street-view-preview .ig-edge-labels {
+/*
+ * Only the click-driven dialog restyles the underlying layout. Hover-driven
+ * `preview` must NOT reflow the page (it would change document height and jump
+ * the scroll position out from under the cursor); the preview panel is an
+ * absolutely-positioned overlay, so it needs no layout collapse to appear.
+ */
+.ig-street-view-dialog .ig-controls,
+.ig-street-view-dialog .ig-type-toggles,
+.ig-street-view-dialog .ig-side,
+.ig-street-view-dialog .ig-street-detail,
+.ig-street-view-dialog .ig-edge-labels {
   display: none;
 }
 
-.ig-street-view-preview .ig-graph-head {
+.ig-street-view-dialog .ig-graph-head {
   margin-bottom: 6px;
 }
 
-.ig-street-view-preview .ig-svg-wrap {
+.ig-street-view-dialog .ig-svg-wrap {
   min-height: 190px;
   max-height: 260px;
 }
@@ -1873,16 +1879,16 @@
     padding: 8px;
   }
 
-  .ig-street-view-preview .ig-graph-scope {
+  .ig-street-view-dialog .ig-graph-scope {
     display: none;
   }
 
-  .ig-street-view-preview .ig-svg-wrap {
+  .ig-street-view-dialog .ig-svg-wrap {
     min-height: 120px;
     max-height: 160px;
   }
 
-  .ig-street-view-preview .ig-svg-wrap svg {
+  .ig-street-view-dialog .ig-svg-wrap svg {
     min-height: 120px;
   }
 }
@@ -1893,12 +1899,12 @@
     max-height: 210px;
   }
 
-  .ig-street-view-preview .ig-svg-wrap {
+  .ig-street-view-dialog .ig-svg-wrap {
     min-height: 96px;
     max-height: 130px;
   }
 
-  .ig-street-view-preview .ig-svg-wrap svg {
+  .ig-street-view-dialog .ig-svg-wrap svg {
     min-height: 96px;
   }
 }
