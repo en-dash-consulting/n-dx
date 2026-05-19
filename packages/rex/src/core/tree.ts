@@ -32,6 +32,46 @@ export function findItem(
   return null;
 }
 
+/**
+ * Resolve an item by ID or title.
+ *
+ * 1. Tries an exact ID match via `findItem`.
+ * 2. On miss, performs a case-insensitive trimmed title search across all nodes.
+ * 3. If multiple items share the normalized title, returns the first match and
+ *    emits a `console.warn` listing the ambiguous IDs.
+ * 4. Returns `null` when no match is found.
+ *
+ * `findItem` is unchanged and callers holding a canonical ID are unaffected.
+ */
+export function resolveItem(
+  items: PRDItem[],
+  query: string,
+): TreeEntry | null {
+  const byId = findItem(items, query);
+  if (byId !== null) {
+    return byId;
+  }
+
+  const normalized = query.trim().toLowerCase();
+  const matches: TreeEntry[] = [];
+  for (const entry of walkTree(items)) {
+    if (entry.item.title.trim().toLowerCase() === normalized) {
+      matches.push(entry);
+    }
+  }
+
+  if (matches.length === 0) return null;
+
+  if (matches.length > 1) {
+    console.warn(
+      `resolveItem: ${matches.length} items share the title "${query}"; ` +
+        `returning the first match (ids: ${matches.map((e) => e.item.id).join(", ")})`,
+    );
+  }
+
+  return matches[0];
+}
+
 export function getParentChain(items: PRDItem[], id: string): PRDItem[] {
   const entry = findItem(items, id);
   return entry ? entry.parents : [];

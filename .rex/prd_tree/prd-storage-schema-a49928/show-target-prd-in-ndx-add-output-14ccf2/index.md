@@ -14,5 +14,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Add regression tests asserting the 'Added to:' path resolves on disk for all PRD item levels](./add-regression-tests-asserting-0e2b33.md) | completed |
+| [Add regression tests asserting the 'Added to:' path resolves on disk for all PRD item levels](./add-regression-tests-asserting-0e2b33.md) | pending |
 | [Fix ndx add 'Added to:' line to print copy-pasteable folder-tree path of the created item](./fix-ndx-add-added-to-line-to-76bc42.md) | completed |
