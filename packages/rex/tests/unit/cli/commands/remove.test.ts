@@ -363,6 +363,41 @@ describe("cmdRemove", () => {
     });
   });
 
+  // ── Title resolution ────────────────────────────────────────────────
+
+  describe("title resolution", () => {
+    it("removes epic by exact title when UUID is not provided", async () => {
+      writePRD(tmp, makePrd(fullTree()));
+
+      await cmdRemove(tmp, "Epic One", "epic", { yes: "true" });
+
+      const prd = readPRD(tmp);
+      expect(prd.items.length).toBe(1);
+      expect(prd.items[0].id).toBe("e2");
+    });
+
+    it("removes epic by title regardless of casing", async () => {
+      writePRD(tmp, makePrd(fullTree()));
+
+      await cmdRemove(tmp, "epic one", undefined, { yes: "true" });
+
+      const prd = readPRD(tmp);
+      expect(prd.items.length).toBe(1);
+      expect(prd.items[0].id).toBe("e2");
+    });
+
+    it("throws CLIError naming the query when no item matches the title", async () => {
+      writePRD(tmp, makePrd(fullTree()));
+
+      await expect(
+        cmdRemove(tmp, "No Such Epic", "epic", { yes: "true" }),
+      ).rejects.toThrow(CLIError);
+      await expect(
+        cmdRemove(tmp, "No Such Epic", "epic", { yes: "true" }),
+      ).rejects.toThrow(/No Such Epic/);
+    });
+  });
+
   // ── Auto-detection ──────────────────────────────────────────────────
 
   describe("auto-detection", () => {
