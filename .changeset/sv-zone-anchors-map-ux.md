@@ -1,5 +1,5 @@
 ---
-"@n-dx/sourcevision": minor
+"@n-dx/sourcevision": patch
 "@n-dx/web": patch
 ---
 
