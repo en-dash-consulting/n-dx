@@ -39,4 +39,4 @@ description: "PRD persistence model: folder-tree storage, markdown serialization
 | [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-14ccf2/index.md) | completed |
 | [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-e430a1/index.md) | completed |
 | [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-db58ca/index.md) | completed |
-| [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-1797eb/index.md) | pending |
+| [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-1797eb/index.md) | completed |

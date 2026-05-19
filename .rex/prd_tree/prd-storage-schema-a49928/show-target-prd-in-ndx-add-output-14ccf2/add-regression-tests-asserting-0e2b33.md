@@ -2,7 +2,7 @@
 id: "0e2b33cb-8962-4461-8bf6-b9da271a3197"
 level: "task"
 title: "Add regression tests asserting the 'Added to:' path resolves on disk for all PRD item levels"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "test"
@@ -11,9 +11,10 @@ tags:
   - "testing"
 source: "smart-add"
 startedAt: "2026-04-30T20:44:05.457Z"
-endedAt: "2026-04-30T20:50:55.924Z"
+completedAt: "2026-05-19T16:52:56.942Z"
+endedAt: "2026-05-19T16:52:56.942Z"
 resolutionType: "code-change"
-resolutionDetail: "Created comprehensive e2e test suite (cli-add-path-regression.test.ts) with 7 test cases covering all item levels and scenarios. Tests verify 'Added to:' path is workspace-relative, exists on disk, and maintains consistent format. Tests fail as expected pending implementation of the folder-tree path output fix."
+resolutionDetail: "All regression tests already in place and passing. 7 e2e tests in cli-add-path-regression.test.ts cover epic/feature/task/subtask creation, deepest-path assertion, consistent format across levels, and consecutive additions. 6 resolveItem unit tests in tree.test.ts cover ID pass-through, exact title, case-insensitive, multi-match warning, no-match null, and ID short-circuit. MCP get_item title-based tests and cmdUpdate title-resolution tests in mcp.test.ts and update.test.ts. All 195 rex test files pass (4211 tests)."
 acceptanceCriteria:
   - "Test cases cover epic, feature, task, and subtask creation"
   - "Test case covers a single invocation that creates new ancestor containers and asserts the deepest path is printed"
