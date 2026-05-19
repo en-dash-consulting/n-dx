@@ -14,6 +14,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
@@ -44,18 +45,45 @@ const selfHealStatus: SelfHealStatus = {
 
 // ── Binary resolution helpers ─────────────────────────────────────────
 
+/**
+ * Resolve an n-dx CLI: project-local install first, then the package
+ * resolved from THIS server's own module graph (correct for any analyzed
+ * project — the CLIs ship with the running n-dx install), and only then the
+ * monorepo dogfood path (valid solely when analyzing the n-dx repo itself).
+ * The middle step prevents `Cannot find module
+ * '<projectDir>/packages/<pkg>/dist/cli/index.js'` for non-n-dx projects.
+ *
+ * The CLI subpath is resolved directly (e.g. `@n-dx/rex/dist/cli/index.js`):
+ * these packages' `exports["."]` only define an `import` condition, so a bare
+ * CJS `require.resolve("@n-dx/rex")` throws ERR_PACKAGE_PATH_NOT_EXPORTED.
+ * The subpath matches the `"./dist/*"` export and resolves under CJS.
+ */
+function resolveNdxCli(
+  projectDir: string,
+  localBin: string,
+  pkg: string,
+  dogfoodRel: string[],
+): { bin: string; args: string[] } {
+  const local = join(projectDir, "node_modules", ".bin", localBin);
+  if (existsSync(local)) return { bin: local, args: [] };
+  try {
+    const req = createRequire(import.meta.url);
+    const cli = req.resolve(`${pkg}/dist/cli/index.js`);
+    if (existsSync(cli)) return { bin: "node", args: [cli] };
+  } catch {
+    /* fall through to dogfood path */
+  }
+  return { bin: "node", args: [join(projectDir, ...dogfoodRel)] };
+}
+
 function resolveSvBin(ctx: ServerContext): { bin: string; args: string[] } {
-  const bin = join(ctx.projectDir, "node_modules", ".bin", "sourcevision");
-  if (existsSync(bin)) return { bin, args: [] };
-  const fallback = join(ctx.projectDir, "packages", "sourcevision", "dist", "cli", "index.js");
-  return { bin: "node", args: [fallback] };
+  return resolveNdxCli(ctx.projectDir, "sourcevision", "@n-dx/sourcevision",
+    ["packages", "sourcevision", "dist", "cli", "index.js"]);
 }
 
 function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
-  const bin = join(ctx.projectDir, "node_modules", ".bin", "rex");
-  if (existsSync(bin)) return { bin, args: [] };
-  const fallback = join(ctx.projectDir, "packages", "rex", "dist", "cli", "index.js");
-  return { bin: "node", args: [fallback] };
+  return resolveNdxCli(ctx.projectDir, "rex", "@n-dx/rex",
+    ["packages", "rex", "dist", "cli", "index.js"]);
 }
 
 function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {

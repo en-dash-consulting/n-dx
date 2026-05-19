@@ -9,6 +9,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -20,6 +21,41 @@ import {
   type PRDItem,
   isPriority,
 } from "./rex-gateway.js";
+
+/**
+ * Resolve how to invoke the rex CLI for a given analyzed project.
+ *
+ * Resolution order:
+ *  1. Project-local install: `<projectDir>/node_modules/.bin/rex`.
+ *  2. The rex CLI resolved from THIS server's own module graph via the
+ *     `@n-dx/rex/dist/*` subpath export. This is the correct path for any
+ *     normal analyzed project — rex ships with the running n-dx install and
+ *     must NOT be looked up under the analyzed project's directory (doing so
+ *     produced `Cannot find module
+ *     '<projectDir>/packages/rex/dist/cli/index.js'` whenever the dashboard
+ *     pointed at a project that isn't the n-dx monorepo itself).
+ *     NOTE: rex's package `exports["."]` only has an `import` condition, so
+ *     a bare CJS `require.resolve("@n-dx/rex")` throws
+ *     ERR_PACKAGE_PATH_NOT_EXPORTED. We resolve the CLI subpath directly,
+ *     which matches the `"./dist/*"` export and works under CJS.
+ *  3. Monorepo dogfood fallback: `<projectDir>/packages/rex/dist/cli/index.js`
+ *     (only valid when analyzing the n-dx repo itself).
+ */
+function resolveRexCli(projectDir: string): { binPath: string; prefixArgs: string[] } {
+  const localBin = join(projectDir, "node_modules", ".bin", "rex");
+  if (existsSync(localBin)) return { binPath: localBin, prefixArgs: [] };
+  try {
+    const req = createRequire(import.meta.url);
+    const cli = req.resolve("@n-dx/rex/dist/cli/index.js");
+    if (existsSync(cli)) return { binPath: "node", prefixArgs: [cli] };
+  } catch {
+    /* fall through to dogfood path */
+  }
+  return {
+    binPath: "node",
+    prefixArgs: [join(projectDir, "packages", "rex", "dist", "cli", "index.js")],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Edited proposal types
@@ -185,12 +221,9 @@ async function handleAnalyze(
     if (input.lite) args.push("--lite");
     args.push(ctx.projectDir);
 
-    // Find the rex CLI binary
-    const rexBin = join(ctx.projectDir, "node_modules", ".bin", "rex");
-    const rexFallback = join(ctx.projectDir, "packages", "rex", "dist", "cli", "index.js");
-
-    const binPath = existsSync(rexBin) ? rexBin : "node";
-    const binArgs = existsSync(rexBin) ? args : [rexFallback, ...args];
+    // Resolve the rex CLI from this server's own install (see resolveRexCli)
+    const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
+    const binArgs = [...prefixArgs, ...args];
 
     const result = await foundationExec(binPath, binArgs, {
       cwd: ctx.projectDir,
@@ -536,19 +569,28 @@ async function handleSmartAddPreview(
     if (input.parentId) args.push("--parent", input.parentId);
     args.push(ctx.projectDir);
 
-    const rexBin = join(ctx.projectDir, "node_modules", ".bin", "rex");
-    const rexFallback = join(ctx.projectDir, "packages", "rex", "dist", "cli", "index.js");
+    const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
+    const binArgs = [...prefixArgs, ...args];
 
-    const binPath = existsSync(rexBin) ? rexBin : "node";
-    const binArgs = existsSync(rexBin) ? args : [rexFallback, ...args];
-
+    // Smart add does a full LLM round-trip to generate a proposal tree.
+    // With an API key (ANTHROPIC_API_KEY / `n-dx config claude.api_key`) this
+    // takes seconds via the API provider. Without one, llm-client falls back
+    // to spawning the `claude` CLI, which is far slower from a long-running
+    // server process (no warm session) and can blow past the timeout.
+    const SMART_ADD_TIMEOUT_MS = 240_000;
     const cliResult = await foundationExec(binPath, binArgs, {
       cwd: ctx.projectDir,
-      timeout: 60_000,
+      timeout: SMART_ADD_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
+      env: process.env,
     });
 
     if (cliResult.error && !cliResult.stdout.trim()) {
+      if (cliResult.exitCode === null) {
+        throw new Error(
+          `Smart add timed out after ${SMART_ADD_TIMEOUT_MS / 1000}s. This usually means no API key is configured, so it fell back to the slow Claude CLI provider. Set an API key for fast generation: \`n-dx config claude.api_key <key>\` (or export ANTHROPIC_API_KEY before \`ndx start\`), then restart the dashboard.`,
+        );
+      }
       throw new Error(cliResult.stderr || cliResult.error.message);
     }
 
@@ -640,11 +682,8 @@ async function handleBatchImport(
       }
       args.push(ctx.projectDir);
 
-      const rexBin = join(ctx.projectDir, "node_modules", ".bin", "rex");
-      const rexFallback = join(ctx.projectDir, "packages", "rex", "dist", "cli", "index.js");
-
-      const binPath = existsSync(rexBin) ? rexBin : "node";
-      const binArgs = existsSync(rexBin) ? args : [rexFallback, ...args];
+      const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
+      const binArgs = [...prefixArgs, ...args];
 
       const cliResult = await foundationExec(binPath, binArgs, {
         cwd: ctx.projectDir,
