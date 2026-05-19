@@ -12,6 +12,8 @@ import type { ServerContext } from "../../../src/server/types.js";
 import {
   handleMergeGraphRoute,
   clearMergeGraphCaches,
+  clearPrdOriginCache,
+  validateOriginPath,
 } from "../../../src/server/routes-merge-graph.js";
 import {
   MergeGraphCache,
@@ -149,5 +151,167 @@ describe("merge-graph route", () => {
   it("honors ?max= query parameter for bounded payloads", async () => {
     const res = await fetch(`http://localhost:${port}/api/merge-graph?max=10`);
     expect(res.status).toBe(200);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// /api/prd-origin
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("validateOriginPath", () => {
+  it("accepts a slug-chain path", () => {
+    expect(validateOriginPath("epic/feature/task")).toEqual({
+      ok: true,
+      path: "epic/feature/task",
+    });
+  });
+
+  it("rejects empty / missing paths", () => {
+    expect(validateOriginPath(null).ok).toBe(false);
+    expect(validateOriginPath("").ok).toBe(false);
+  });
+
+  it("rejects path traversal markers", () => {
+    expect(validateOriginPath("..").ok).toBe(false);
+    expect(validateOriginPath("foo/..").ok).toBe(false);
+    expect(validateOriginPath("foo/../bar").ok).toBe(false);
+    expect(validateOriginPath("./foo").ok).toBe(false);
+  });
+
+  it("rejects absolute paths and backslashes and NUL", () => {
+    expect(validateOriginPath("/abs").ok).toBe(false);
+    expect(validateOriginPath("foo\\bar").ok).toBe(false);
+    expect(validateOriginPath("foo\0bar").ok).toBe(false);
+  });
+
+  it("rejects empty path segments", () => {
+    expect(validateOriginPath("foo//bar").ok).toBe(false);
+    expect(validateOriginPath("foo/").ok).toBe(false);
+  });
+
+  it("rejects very long paths", () => {
+    expect(validateOriginPath("a".repeat(2049)).ok).toBe(false);
+  });
+});
+
+describe("/api/prd-origin route", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+  let gitCalls: string[][];
+
+  function makeOriginRunner(opts: { result?: string } = {}): GitRunner {
+    return (args: string[]) => {
+      gitCalls.push(args);
+      // The route only invokes git for `log` here; respond with the canned
+      // output. Other args (rev-list, show) are unused on this endpoint.
+      if (args[0] === "log") {
+        return opts.result ?? "";
+      }
+      return "";
+    };
+  }
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "prd-origin-route-"));
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    await writeFile(join(tmpDir, ".rex", "prd.json"), JSON.stringify(prdFixture()));
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    gitCalls = [];
+    clearMergeGraphCaches();
+    clearPrdOriginCache();
+  });
+
+  afterEach(async () => {
+    server.close();
+    clearMergeGraphCaches();
+    clearPrdOriginCache();
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  async function start(runner: GitRunner) {
+    const started = await startRouteTestServer((req, res) =>
+      handleMergeGraphRoute(req, res, ctx, {
+        overrideBuildOptions: { gitRunner: runner },
+      }),
+    );
+    server = started.server;
+    port = started.port;
+  }
+
+  it("returns the parsed origin for a valid path", async () => {
+    const result =
+      `f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1${FS}` +
+      `2026-05-02T10:00:00Z${FS}` +
+      `Hal${FS}` +
+      `hal@example.com${FS}` +
+      `feat: introduce${FS}` +
+      `Co-Authored-By: Claude <noreply@anthropic.com>${RS}`;
+    await start(makeOriginRunner({ result }));
+
+    const res = await fetch(`http://localhost:${port}/api/prd-origin?path=${encodeURIComponent("epic-one/feature-one")}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.origin.shortSha).toBe("f1f1f1f");
+    expect(body.origin.author).toBe("Hal");
+    expect(body.origin.coAuthors).toEqual([
+      { name: "Claude", email: "noreply@anthropic.com" },
+    ]);
+    // Verify the path passed to git is the .rex/prd_tree/<path>/index.md form.
+    const logCall = gitCalls.find((a) => a[0] === "log");
+    expect(logCall?.includes(".rex/prd_tree/epic-one/feature-one/index.md")).toBe(true);
+  });
+
+  it("returns origin: null when git produces no output", async () => {
+    await start(makeOriginRunner({ result: "" }));
+
+    const res = await fetch(`http://localhost:${port}/api/prd-origin?path=foo`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.origin).toBeNull();
+  });
+
+  it("returns 400 for traversal / invalid paths", async () => {
+    await start(makeOriginRunner());
+
+    const cases = ["", "/abs", "..", "foo/../bar", "foo\\bar"];
+    for (const path of cases) {
+      const res = await fetch(`http://localhost:${port}/api/prd-origin?path=${encodeURIComponent(path)}`);
+      expect(res.status, `path=${JSON.stringify(path)} should 400`).toBe(400);
+    }
+    // 400 short-circuits before invoking git.
+    expect(gitCalls).toEqual([]);
+  });
+
+  it("caches subsequent lookups in the LRU (skips re-invoking git)", async () => {
+    const result =
+      `abc${FS}2026-01-01T00:00:00Z${FS}A${FS}a@x${FS}s${FS}${RS}`;
+    await start(makeOriginRunner({ result }));
+
+    const url = `http://localhost:${port}/api/prd-origin?path=foo`;
+    const r1 = await fetch(url);
+    expect(r1.status).toBe(200);
+    const r2 = await fetch(url);
+    expect(r2.status).toBe(200);
+
+    // git invoked exactly once for the same key — second hit is served from
+    // the LRU.
+    const logCalls = gitCalls.filter((a) => a[0] === "log");
+    expect(logCalls.length).toBe(1);
+  });
+
+  it("rejects non-GET methods with 405", async () => {
+    await start(makeOriginRunner());
+
+    const res = await fetch(`http://localhost:${port}/api/prd-origin?path=foo`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(405);
   });
 });

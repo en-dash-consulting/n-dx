@@ -182,6 +182,15 @@ export interface HenchConfig {
    * Claude — Codex ignores the field.
    */
   permissionMode?: PermissionMode;
+  /**
+   * Milliseconds to wait after `.hench-commit-msg.txt` is first detected with
+   * non-empty content before automatically committing staged changes.
+   *
+   * This is a safety net for runs that terminate abnormally (timeout, crash)
+   * after the agent has staged its work but before n-dx processes the commit
+   * prompt. Set to 0 to disable auto-commit entirely. Default: 300000 (5 min).
+   */
+  commitMsgTimeoutMs?: number;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────

@@ -315,3 +315,19 @@ ndx work --auto --iterations=5 .
 ```
 
 Total setup: 15–20 minutes including analysis time.
+
+## Skills used in this guide
+
+Each skill below maps to a step in this guide. Edit the linked file in your project to customize that step's behavior in your assistant session.
+
+| Skill | Source | Role in this guide |
+|-------|--------|--------------------|
+| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Step 2B & 4: runs analysis alongside spec import and generates a unified proposal for review |
+| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Step 3: adds missing spec items as structured PRD entries with correct parent placement |
+| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Step 3 structural cleanup: regroups items when the LLM generates a flat list instead of a hierarchy |
+| `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Step 6: picks the next spec task and executes it autonomously |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Tracking spec coverage: shows per-epic completion and next recommended task |
+
+Related guides: [Workflow](./workflow) (the core loop this guide extends), [Run While You Sleep](./overnight) (for multi-iteration overnight runs).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

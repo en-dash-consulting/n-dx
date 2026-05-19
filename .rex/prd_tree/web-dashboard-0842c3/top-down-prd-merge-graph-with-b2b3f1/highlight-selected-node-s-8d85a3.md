@@ -1,0 +1,25 @@
+---
+id: "8d85a3c0-8091-4e85-b585-424ba86bff49"
+level: "task"
+title: "Highlight selected node's children and show inline PRD front-matter summary"
+status: "completed"
+priority: "high"
+tags:
+  - "web"
+  - "dashboard"
+  - "rex"
+  - "graph"
+source: "smart-add"
+startedAt: "2026-05-08T16:01:13.405Z"
+completedAt: "2026-05-08T16:09:22.116Z"
+endedAt: "2026-05-08T16:09:22.116Z"
+resolutionType: "code-change"
+resolutionDetail: "Selecting a PRD node now highlights its full subtree (root + transitive descendants) plus all merges linked to anything in that subtree, and the detail panel surfaces a concise PRD front-matter summary (title, status, priority, tags) sourced from existing schema fields with em-dash placeholders for empty values."
+acceptanceCriteria:
+  - "Clicking a node visually highlights the node and all descendants (direct and transitive children)"
+  - "Selecting a different node clears the previous highlight and applies the new selection"
+  - "Front-matter summary displays the PRD item title, status, priority, and tags for the selected node"
+  - "Front-matter values are sourced from the existing PRD item schema; no new schema fields introduced"
+  - "Empty/missing front-matter fields render gracefully (omitted or shown as '—') without layout breakage"
+description: "When a node is clicked in the merge graph, visually highlight that node and all of its descendant child nodes (e.g. via color/stroke emphasis or dimming non-descendants) and surface a concise PRD front-matter summary for the selected item — title, status, priority, tags, and any other key frontmatter fields already present on the PRD item — rendered adjacent to the graph (popover, side panel, or inline card per existing dashboard conventions)."
+---

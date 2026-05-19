@@ -54,6 +54,7 @@ const PROJECT_SECTIONS = new Set([
   "web",
   "features",
   "sourcevision",
+  "selfHeal",
 ]);
 
 /**
@@ -571,6 +572,7 @@ function getValidator(pkg, settingPath) {
     if (settingPath === "timeoutMs") return validateTimeoutMs;
     if (settingPath.startsWith("timeouts.")) return validateTimeoutMs;
   }
+  if (pkg === "selfHeal") return SELF_HEAL_VALIDATORS[settingPath] ?? null;
   return null;
 }
 
@@ -1057,6 +1059,21 @@ CLI settings (.n-dx.json):
                                        n-dx config cli.timeouts.analyze 300000
                                        n-dx config cli.timeouts.start 0
 
+Self-heal settings (.n-dx.json):
+  selfHeal.autoConfirm     boolean   Bypass the pre-execution confirmation
+                                    prompt for every 'ndx self-heal' run
+                                    (default: false). When true, the prompt
+                                    is skipped without reading stdin — useful
+                                    for scheduled / CI runs.
+                                    Precedence: --auto and --yes always win
+                                    over this setting (flag=true overrides
+                                    config=false, and flag absence does not
+                                    cancel config=true). When the prompt is
+                                    bypassed via config, self-heal logs
+                                    '(bypassed prompt via selfHeal.autoConfirm
+                                    config)' so the source is auditable.
+                                    Example: n-dx config selfHeal.autoConfirm true
+
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
 
@@ -1135,6 +1152,8 @@ Examples:
                                                Enable token budget display on tasks
   n-dx config language go                      Set primary project language to Go
   n-dx config language auto                    Reset to auto-detection
+  n-dx config selfHeal.autoConfirm true        Bypass the self-heal pre-execution prompt
+  n-dx config selfHeal.autoConfirm false       Re-enable the self-heal pre-execution prompt
   n-dx config --test-connection                Test API key and/or CLI path
   n-dx config --json                           Show all settings as JSON
   n-dx config hench --json                     Show hench settings as JSON

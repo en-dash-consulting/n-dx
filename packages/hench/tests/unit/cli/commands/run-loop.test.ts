@@ -294,3 +294,92 @@ describe("iteration banner placement invariants", () => {
     expect(banner).toBe("=== Iteration 4 ===");
   });
 });
+
+// ── attempt tracking per task within a single run invocation ───────────────
+
+describe("attempt tracking in run loops", () => {
+  it("tracks attempt count per task ID within a run invocation", async () => {
+    const { createAttemptTracker } = await import(
+      "../../../../src/cli/commands/run.js"
+    );
+    const tracker = createAttemptTracker();
+
+    // First attempt of task-1
+    expect(tracker.incrementAndGetCount("task-1")).toBe(1);
+    // Second attempt of task-1
+    expect(tracker.incrementAndGetCount("task-1")).toBe(2);
+    // First attempt of task-2
+    expect(tracker.incrementAndGetCount("task-2")).toBe(1);
+    // Third attempt of task-1
+    expect(tracker.incrementAndGetCount("task-1")).toBe(3);
+    // Second attempt of task-2
+    expect(tracker.incrementAndGetCount("task-2")).toBe(2);
+
+    // Verify counts are persistent
+    expect(tracker.getCount("task-1")).toBe(3);
+    expect(tracker.getCount("task-2")).toBe(2);
+  });
+
+  it("returns 0 for tasks with no attempts yet", async () => {
+    const { createAttemptTracker } = await import(
+      "../../../../src/cli/commands/run.js"
+    );
+    const tracker = createAttemptTracker();
+
+    expect(tracker.getCount("never-attempted")).toBe(0);
+  });
+
+  it("identifies tasks that have reached max attempts (3)", async () => {
+    const { createAttemptTracker } = await import(
+      "../../../../src/cli/commands/run.js"
+    );
+    const tracker = createAttemptTracker();
+
+    expect(tracker.hasReachedMaxAttempts("task-1")).toBe(false);
+
+    tracker.incrementAndGetCount("task-1");
+    expect(tracker.hasReachedMaxAttempts("task-1")).toBe(false);
+
+    tracker.incrementAndGetCount("task-1");
+    expect(tracker.hasReachedMaxAttempts("task-1")).toBe(false);
+
+    tracker.incrementAndGetCount("task-1");
+    expect(tracker.hasReachedMaxAttempts("task-1")).toBe(true);
+  });
+
+  it("resets on new tracker creation (separate run invocation)", async () => {
+    const { createAttemptTracker } = await import(
+      "../../../../src/cli/commands/run.js"
+    );
+    const tracker1 = createAttemptTracker();
+    tracker1.incrementAndGetCount("task-1");
+    tracker1.incrementAndGetCount("task-1");
+
+    // New tracker for a separate run invocation
+    const tracker2 = createAttemptTracker();
+    expect(tracker2.getCount("task-1")).toBe(0);
+  });
+
+  it("integrates with excludeTaskIds after reaching max attempts", async () => {
+    const { createAttemptTracker } = await import(
+      "../../../../src/cli/commands/run.js"
+    );
+    const tracker = createAttemptTracker();
+    const excludeIds = new Set<string>();
+
+    // Simulate three task runs of the same task
+    for (let i = 0; i < 3; i++) {
+      const count = tracker.incrementAndGetCount("task-1");
+      if (tracker.hasReachedMaxAttempts("task-1")) {
+        excludeIds.add("task-1");
+      }
+    }
+
+    expect(excludeIds.has("task-1")).toBe(true);
+    expect(excludeIds.size).toBe(1);
+
+    // A different task should not be excluded
+    tracker.incrementAndGetCount("task-2");
+    expect(excludeIds.has("task-2")).toBe(false);
+  });
+});

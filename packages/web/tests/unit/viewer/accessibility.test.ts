@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { Guide } from "../../../src/viewer/components/guide.js";
 import { SidebarThemeToggle } from "../../../src/viewer/components/theme-toggle.js";
+import { SidebarDensitySelector, initDensity } from "../../../src/viewer/components/density-selector.js";
 import { StatusFilter, defaultStatusFilter } from "../../../src/viewer/views/status-filter.js";
 import { PRDTree } from "../../../src/viewer/components/prd-tree/prd-tree.js";
 import type { PRDDocumentData } from "../../../src/viewer/components/prd-tree/types.js";
@@ -139,6 +140,86 @@ describe("ThemeToggle accessibility", () => {
     const btn = root.querySelector(".sidebar-control-btn");
     expect(btn?.getAttribute("aria-label")).toBeTruthy();
     expect(btn?.getAttribute("aria-label")).toContain("Switch to");
+  });
+});
+
+// ── DensitySelector Accessibility ───────────────────────────────────
+
+describe("DensitySelector accessibility", () => {
+  let root: HTMLDivElement;
+
+  beforeEach(() => {
+    document.documentElement.setAttribute("data-density", "medium");
+    localStorage.removeItem("ndx.ui.density");
+  });
+
+  afterEach(() => {
+    if (root) render(null, root);
+    if (root?.parentNode) root.parentNode.removeChild(root);
+  });
+
+  it("container has role=group and aria-label", () => {
+    root = renderToDiv(h(SidebarDensitySelector, null));
+    const group = root.querySelector(".density-selector");
+    expect(group?.getAttribute("role")).toBe("group");
+    expect(group?.getAttribute("aria-label")).toBe("UI density");
+  });
+
+  it("renders three buttons (S, M, L)", () => {
+    root = renderToDiv(h(SidebarDensitySelector, null));
+    const btns = root.querySelectorAll(".density-btn");
+    expect(btns.length).toBe(3);
+    const labels = Array.from(btns).map((b) => b.textContent);
+    expect(labels).toEqual(["S", "M", "L"]);
+  });
+
+  it("each button has aria-pressed and aria-label", () => {
+    root = renderToDiv(h(SidebarDensitySelector, null));
+    const btns = root.querySelectorAll<HTMLElement>(".density-btn");
+    btns.forEach((btn) => {
+      expect(["true", "false"]).toContain(btn.getAttribute("aria-pressed"));
+      expect(btn.getAttribute("aria-label")).toBeTruthy();
+    });
+  });
+
+  it("medium is active by default", () => {
+    root = renderToDiv(h(SidebarDensitySelector, null));
+    const btns = root.querySelectorAll<HTMLElement>(".density-btn");
+    // index 1 = M
+    expect(btns[1].getAttribute("aria-pressed")).toBe("true");
+    expect(btns[1].classList.contains("density-btn--active")).toBe(true);
+    expect(btns[0].getAttribute("aria-pressed")).toBe("false");
+    expect(btns[2].getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("clicking an option updates aria-pressed and data-density", async () => {
+    root = renderToDiv(h(SidebarDensitySelector, null));
+    const btns = root.querySelectorAll<HTMLElement>(".density-btn");
+    btns[0].click(); // S
+    await flush();
+    expect(document.documentElement.getAttribute("data-density")).toBe("small");
+    expect(btns[0].getAttribute("aria-pressed")).toBe("true");
+    expect(btns[1].getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("selection persists to localStorage", async () => {
+    root = renderToDiv(h(SidebarDensitySelector, null));
+    const btns = root.querySelectorAll<HTMLElement>(".density-btn");
+    btns[2].click(); // L
+    await flush();
+    expect(localStorage.getItem("ndx.ui.density")).toBe("large");
+  });
+
+  it("initDensity defaults to medium when no key stored", () => {
+    initDensity();
+    expect(document.documentElement.getAttribute("data-density")).toBe("medium");
+  });
+
+  it("initDensity restores stored value", () => {
+    localStorage.setItem("ndx.ui.density", "small");
+    initDensity();
+    expect(document.documentElement.getAttribute("data-density")).toBe("small");
+    localStorage.removeItem("ndx.ui.density");
   });
 });
 

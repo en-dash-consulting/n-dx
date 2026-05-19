@@ -1,15 +1,17 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { resolveStore } from "../../store/index.js";
+import { resolveStore, FileStore } from "../../store/index.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { ARCHIVE_FILE, loadArchive, trimArchive } from "../../core/archive.js";
-import { reasonForReshape, formatReshapeProposal } from "../../analyze/reshape-reason.js";
+import type { MergeAuditEntry, GroupAuditEntry } from "../../core/archive.js";
+import { reasonForReshape, formatReshapeProposal, reasonForBodyMerge } from "../../analyze/reshape-reason.js";
 import { setLLMConfig, setClaudeConfig, resolveConfiguredModel } from "../../analyze/reason.js";
 import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
 import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
 import { snapshotPRDTree, pruneBackups } from "../../core/backup-snapshots.js";
+import { captureGitCommitHash } from "../../core/git-utils.js";
 import { printVendorModelHeader } from "@n-dx/llm-client";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
@@ -18,6 +20,10 @@ import { formatTokenUsage } from "./analyze.js";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 import { getLLMVendor } from "../../analyze/reason.js";
+import { detectCrossPRDDuplicates } from "./reshape-detect-duplicates.js";
+import { acquireReshapeLock, detectHashSuffixDuplicatesInTree } from "./add-reshape.js";
+import { proposeGroupRenames } from "../../analyze/index.js";
+import type { MergeAction, GroupAction } from "../../core/reshape.js";
 import type { PRDItem } from "../../schema/index.js";
 
 export async function cmdReshape(
@@ -25,6 +31,22 @@ export async function cmdReshape(
   flags: Record<string, string>,
 ): Promise<void> {
   const rexDir = join(dir, REX_DIR);
+
+  // Acquire reshape lock so concurrent `add` commands skip their scoped pass.
+  const releaseReshapeLock = await acquireReshapeLock(rexDir);
+
+  try {
+    await _cmdReshapeCore(dir, rexDir, flags);
+  } finally {
+    await releaseReshapeLock();
+  }
+}
+
+async function _cmdReshapeCore(
+  dir: string,
+  rexDir: string,
+  flags: Record<string, string>,
+): Promise<void> {
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
 
@@ -90,6 +112,11 @@ export async function cmdReshape(
 
   const docAfterCompaction = canonicalDoc;
 
+  // Load file ownership map for cross-file duplicate detection (FileStore feature)
+  const fileOwnership = store instanceof FileStore
+    ? await store.loadFileOwnership()
+    : new Map();
+
   // Load LLM config
   const llmConfig = await loadLLMConfig(rexDir);
   setLLMConfig(llmConfig);
@@ -130,6 +157,13 @@ export async function cmdReshape(
     }
   }
 
+  // Run cross-PRD duplicate detection pass
+  const duplicateProposals = detectCrossPRDDuplicates(docAfterCompaction.items, fileOwnership);
+
+  // Run hash-suffix duplicate detection across all sibling cohorts in the tree
+  const hashSuffixGroups = detectHashSuffixDuplicatesInTree(docAfterCompaction.items);
+  const hashSuffixProposals = hashSuffixGroups.flatMap((g) => g.proposals);
+
   // Get reshape proposals from LLM
   info("Analyzing PRD structure...");
   let proposals: ReshapeProposal[];
@@ -143,13 +177,16 @@ export async function cmdReshape(
     throw new CLIError(classified.message, classified.suggestion);
   }
 
+  // Combine proposals: cross-PRD duplicates, hash-suffix duplicates, then LLM proposals
+  const allProposals = [...duplicateProposals, ...hashSuffixProposals, ...proposals];
+
   // Show token usage
   const usageLine = formatTokenUsage(tokenUsage);
   if (usageLine) {
     info(`Token usage: ${usageLine}`);
   }
 
-  if (proposals.length === 0) {
+  if (allProposals.length === 0) {
     result("No reshape proposals — PRD structure looks good.");
     return;
   }
@@ -164,7 +201,7 @@ export async function cmdReshape(
   if (flags.format === "json") {
     result(JSON.stringify({
       dryRun,
-      proposals: proposals.map((p) => ({
+      proposals: allProposals.map((p) => ({
         id: p.id,
         ...p.action,
       })),
@@ -174,14 +211,14 @@ export async function cmdReshape(
   }
 
   if (dryRun) {
-    result(`\n${proposals.length} proposal${proposals.length === 1 ? "" : "s"} (dry run — no changes made).`);
+    result(`\n${allProposals.length} proposal${allProposals.length === 1 ? "" : "s"} (dry run — no changes made).`);
     return;
   }
 
   // Determine which proposals to apply
   let accepted: ReshapeProposal[];
   if (accept) {
-    accepted = proposals;
+    accepted = allProposals;
   } else if (process.stdin.isTTY) {
     accepted = await interactiveReview(proposals, docAfterCompaction.items);
   } else {
@@ -194,6 +231,9 @@ export async function cmdReshape(
     return;
   }
 
+  // Capture pre-reshape commit hash for rollback support
+  const preReshapeCommit = await captureGitCommitHash(dir);
+
   // Apply accepted proposals
   const reshapeResult = applyReshape(docAfterCompaction.items, accepted);
 
@@ -202,24 +242,123 @@ export async function cmdReshape(
     info(`  Warning: ${err.error}`);
   }
 
-  // Archive removed items
-  if (reshapeResult.archivedItems.length > 0) {
+  // LLM body merge: for each accepted hash-suffix MergeAction, generate a merged description
+  const { findItem: findItemInTree, updateInTree } = await import("../../core/tree.js");
+  for (const proposal of reshapeResult.applied) {
+    if (
+      proposal.action.action === "merge" &&
+      (proposal.action as MergeAction).reason === "hash-suffix-duplicate-sibling"
+    ) {
+      const mergeAction = proposal.action as MergeAction;
+      // Collect original items (survivor + losers, which are now archived)
+      const survivorEntry = findItemInTree(docAfterCompaction.items, mergeAction.survivorId);
+      const loserItems = reshapeResult.archivedItems.filter((item) =>
+        mergeAction.mergedIds.includes(item.id),
+      );
+      if (survivorEntry && loserItems.length > 0) {
+        const group = [survivorEntry.item, ...loserItems];
+        try {
+          const bodyMerge = await reasonForBodyMerge(group, resolvedModel);
+          updateInTree(docAfterCompaction.items, mergeAction.survivorId, {
+            description: bodyMerge.description,
+          });
+        } catch {
+          // Body merge is best-effort; don't fail the reshape command
+        }
+      }
+    }
+  }
+
+  // LLM rename pass: for each accepted GroupAction, propose descriptive titles
+  // for the reparented children. Failures degrade gracefully — children keep
+  // their hash-suffixed titles and reshape continues with a warning.
+  for (const proposal of reshapeResult.applied) {
+    if (proposal.action.action === "group") {
+      const groupAction = proposal.action as GroupAction;
+      const containerEntry = findItemInTree(docAfterCompaction.items, groupAction.containerId);
+      if (!containerEntry) continue;
+
+      const children = containerEntry.item.children ?? [];
+      if (children.length < 2) continue;
+
+      const consolidationGroup = {
+        baseTitle: groupAction.containerTitle,
+        members: children.map((child) => ({
+          id: child.id,
+          title: child.title,
+          description: child.description,
+          acceptanceCriteria: child.acceptanceCriteria,
+        })),
+      };
+
+      try {
+        const renameProposal = await proposeGroupRenames(consolidationGroup, resolvedModel);
+        for (const rename of renameProposal.renames) {
+          updateInTree(docAfterCompaction.items, rename.id, { title: rename.newTitle });
+        }
+        if (renameProposal.renames.length > 0) {
+          info(
+            `  [hash-suffix] renamed ${renameProposal.renames.length} children under "${groupAction.containerTitle}"`,
+          );
+        }
+      } catch (err) {
+        const classified = classifyLLMError(
+          err instanceof Error ? err : new Error(String(err)),
+          vendor,
+          `rename children of "${groupAction.containerTitle}"`,
+        );
+        warn(
+          `  Warning: could not rename grouped children for "${groupAction.containerTitle}": ${classified.message}`,
+        );
+      }
+    }
+  }
+
+  // Archive removed items and record group audit trail
+  const hasArchivedItems = reshapeResult.archivedItems.length > 0;
+  const hasGroupAudit = reshapeResult.groupAuditTrail.length > 0;
+
+  if (hasArchivedItems || hasGroupAudit) {
     const archivePath = join(rexDir, ARCHIVE_FILE);
     const archive = await loadArchive(archivePath);
+    const batchTimestamp = new Date().toISOString();
+
+    // Build merge audit trail entries with pre-reshape commit hash
+    const mergeAuditTrail: MergeAuditEntry[] = reshapeResult.mergeAuditTrail.map((merge) => ({
+      survivorId: merge.survivorId,
+      mergedFromIds: merge.mergedFromIds,
+      reasoning: merge.reasoning,
+      preReshapeCommit,
+      timestamp: batchTimestamp,
+    }));
+
+    // Build group audit trail entries with pre-reshape commit hash
+    const groupAuditTrail: GroupAuditEntry[] = reshapeResult.groupAuditTrail.map((g) => ({
+      containerId: g.containerId,
+      containerTitle: g.containerTitle,
+      originalParentId: g.originalParentId,
+      movedItemIds: g.movedItemIds,
+      reasoning: g.reasoning,
+      preReshapeCommit,
+      timestamp: batchTimestamp,
+    }));
+
     archive.batches.push({
-      timestamp: new Date().toISOString(),
+      timestamp: batchTimestamp,
       source: "reshape",
       items: reshapeResult.archivedItems,
       count: reshapeResult.archivedItems.length,
       reason: `Reshape: ${accepted.map((p) => p.action.action).join(", ")}`,
       actions: accepted,
+      mergeAuditTrail: mergeAuditTrail.length > 0 ? mergeAuditTrail : undefined,
+      groupAuditTrail: groupAuditTrail.length > 0 ? groupAuditTrail : undefined,
     });
     trimArchive(archive);
     await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
   }
 
-  // Save document
-  await store.saveDocument(doc);
+  // Save document (use docAfterCompaction which holds the mutated items)
+  await store.saveDocument(docAfterCompaction);
 
   // Log the reshape and migrations
   await store.appendLog({
@@ -245,6 +384,8 @@ export async function cmdReshape(
       applied: reshapeResult.applied.length,
       deletedIds: reshapeResult.deletedIds,
       archivedCount: reshapeResult.archivedItems.length,
+      preReshapeCommit,
+      mergeAuditTrail: reshapeResult.mergeAuditTrail,
       errors: reshapeResult.errors.map((e) => e.error),
     }, null, 2));
   } else {
@@ -254,6 +395,36 @@ export async function cmdReshape(
     }
     if (reshapeResult.errors.length > 0) {
       info(`  ${reshapeResult.errors.length} error${reshapeResult.errors.length === 1 ? "" : "s"} (see above).`);
+    }
+
+    // Per-group summary for hash-suffix proposals
+    const appliedHashSuffix = reshapeResult.applied.filter(
+      (p) =>
+        (p.action.action === "merge" && (p.action as MergeAction).reason === "hash-suffix-duplicate-sibling") ||
+        p.action.action === "group",
+    );
+    for (const p of appliedHashSuffix) {
+      if (p.action.action === "merge") {
+        const mergeAction = p.action as MergeAction;
+        const reparented = reshapeResult.archivedItems
+          .filter((item) => mergeAction.mergedIds.includes(item.id))
+          .reduce((sum, item) => sum + (item.children?.length ?? 0), 0);
+        info(
+          `  [hash-suffix] survivor: ${mergeAction.survivorId.slice(0, 8)} (merged: ${mergeAction.mergedIds.map((id) => id.slice(0, 8)).join(", ")}, strategy: merge, reparented: ${reparented} children)`,
+        );
+      } else if (p.action.action === "group") {
+        const groupAction = p.action as GroupAction;
+        info(
+          `  [hash-suffix] container: ${groupAction.containerId.slice(0, 8)} "${groupAction.containerTitle}" (grouped: ${groupAction.itemIds.map((id) => id.slice(0, 8)).join(", ")}, strategy: parent-container)`,
+        );
+      }
+    }
+
+    // Show rollback information if there were merges
+    if (reshapeResult.mergeAuditTrail.length > 0) {
+      if (preReshapeCommit !== "no-git") {
+        info(`\nTo rollback: git reset --hard ${preReshapeCommit}`);
+      }
     }
   }
 }

@@ -1,13 +1,18 @@
 /**
  * Merge-graph API route — serves the PRD ↔ git-merge context graph.
  *
- *   GET /api/merge-graph            → full graph (nodes + edges + stats)
+ *   GET /api/merge-graph             → full graph (nodes + edges + stats)
  *   GET /api/merge-graph/fingerprint → just the cache fingerprint
+ *   GET /api/prd-origin?path=…       → introducing-commit for one PRD item
  *
  * The graph is content-addressed via {@link MergeGraphFingerprint}; the cached
  * payload is held in a module-scoped {@link MergeGraphCache} instance keyed on
  * project directory. Successive requests within the same fingerprint return
  * in ~O(few stat calls).
+ *
+ * The `/api/prd-origin` lookups are cached separately via a small per-process
+ * LRU keyed on `<projectDir>|<path>` so repeated clicks on the same node
+ * don't re-spawn `git log`.
  *
  * @module web/server/routes-merge-graph
  */
@@ -19,9 +24,11 @@ import {
   MergeGraphCache,
   computeFingerprint,
   createGitRunner,
+  resolveItemOrigin,
   DEFAULT_MAX_MERGES,
   type BuildMergeGraphOptions,
   type MergeGraph,
+  type PrdOrigin,
 } from "./merge-history.js";
 import { join } from "node:path";
 
@@ -43,6 +50,70 @@ function getCache(projectDir: string): MergeGraphCache {
 /** Test hook — clear all cached graphs. */
 export function clearMergeGraphCaches(): void {
   caches.clear();
+  originLru.clear();
+}
+
+// ── PRD origin LRU ───────────────────────────────────────────────────────────
+//
+// `git log --diff-filter=A --follow` is fast (typically tens of ms) but not
+// free, and the user can click the same node repeatedly. A bounded LRU keyed
+// on `<projectDir>|<treePath>` caches results within the process. Sentinel
+// `null` is also cached so we don't re-shell-out for items with no commit
+// history (newly-created PRD items).
+
+const ORIGIN_LRU_CAP = 256;
+type OriginCacheValue = PrdOrigin | null;
+const originLru = new Map<string, OriginCacheValue>();
+
+function originLruGet(key: string): OriginCacheValue | undefined {
+  if (!originLru.has(key)) return undefined;
+  const v = originLru.get(key) as OriginCacheValue;
+  // Re-insert to mark as most-recently-used.
+  originLru.delete(key);
+  originLru.set(key, v);
+  return v;
+}
+
+function originLruSet(key: string, value: OriginCacheValue): void {
+  if (originLru.has(key)) originLru.delete(key);
+  originLru.set(key, value);
+  while (originLru.size > ORIGIN_LRU_CAP) {
+    const firstKey = originLru.keys().next().value;
+    if (firstKey === undefined) break;
+    originLru.delete(firstKey);
+  }
+}
+
+/** Test hook — flush the per-process origin LRU. */
+export function clearPrdOriginCache(): void {
+  originLru.clear();
+}
+
+/**
+ * Validate the `path` query parameter for the `/api/prd-origin` route.
+ *
+ * Accepts a slug-chain produced by `flattenPrdItems` — slashes are allowed
+ * because the chain is `<epic>/<feature>/<task>`, but path-traversal markers,
+ * absolute paths, backslashes (Windows separators leaking through), and
+ * NUL bytes are rejected. Empty strings are rejected too — the route requires
+ * a real item.
+ *
+ * Returns the cleaned path on success or a string error message on failure.
+ */
+export function validateOriginPath(raw: string | null): { ok: true; path: string } | { ok: false; reason: string } {
+  if (!raw) return { ok: false, reason: "missing path" };
+  if (raw.length > 2048) return { ok: false, reason: "path too long" };
+  if (raw.includes("\0")) return { ok: false, reason: "path contains NUL" };
+  if (raw.includes("\\")) return { ok: false, reason: "path contains backslash" };
+  if (raw.startsWith("/")) return { ok: false, reason: "path must be relative" };
+  // Reject `..` segments — split by `/` so we don't false-flag `foo..bar` slugs.
+  const segments = raw.split("/");
+  for (const seg of segments) {
+    if (seg === "" || seg === "." || seg === "..") {
+      return { ok: false, reason: "path contains traversal or empty segment" };
+    }
+  }
+  return { ok: true, path: raw };
 }
 
 function parseMaxMerges(url: string): number {
@@ -65,8 +136,8 @@ export interface HandleMergeGraphOptions {
 }
 
 /**
- * Handle requests under `/api/merge-graph`. Returns true when the request was
- * handled, false otherwise.
+ * Handle requests under `/api/merge-graph` and the sibling `/api/prd-origin`.
+ * Returns true when the request was handled, false otherwise.
  */
 export function handleMergeGraphRoute(
   req: IncomingMessage,
@@ -77,13 +148,46 @@ export function handleMergeGraphRoute(
   const url = req.url || "/";
   const method = req.method || "GET";
 
-  if (!url.startsWith("/api/merge-graph")) return false;
+  const isMergeGraph = url.startsWith("/api/merge-graph");
+  const isPrdOrigin = url.startsWith("/api/prd-origin");
+  if (!isMergeGraph && !isPrdOrigin) return false;
 
   const qIdx = url.indexOf("?");
   const pathOnly = qIdx === -1 ? url : url.slice(0, qIdx);
 
   if (method !== "GET") {
     errorResponse(res, 405, "Method not allowed");
+    return true;
+  }
+
+  // ── /api/prd-origin ────────────────────────────────────────────────────────
+  if (pathOnly === "/api/prd-origin") {
+    const params = qIdx === -1 ? new URLSearchParams() : new URLSearchParams(url.slice(qIdx));
+    const validation = validateOriginPath(params.get("path"));
+    if (!validation.ok) {
+      errorResponse(res, 400, validation.reason);
+      return true;
+    }
+
+    const cacheKey = `${ctx.projectDir}|${validation.path}`;
+    const cached = originLruGet(cacheKey);
+    if (cached !== undefined) {
+      jsonResponse(res, 200, { origin: cached });
+      return true;
+    }
+
+    const relPath = `.rex/prd_tree/${validation.path}/index.md`;
+    const runner =
+      opts.overrideBuildOptions?.gitRunner ?? createGitRunner(ctx.projectDir);
+    let origin: PrdOrigin | null;
+    try {
+      origin = resolveItemOrigin(runner, relPath);
+    } catch (err) {
+      errorResponse(res, 500, (err as Error).message);
+      return true;
+    }
+    originLruSet(cacheKey, origin);
+    jsonResponse(res, 200, { origin });
     return true;
   }
 

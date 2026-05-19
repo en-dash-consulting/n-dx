@@ -26,6 +26,8 @@ export interface MergeAction {
   /** Optional updated description for the survivor. */
   description?: string;
   reason: string;
+  /** Detailed merge reasoning for audit trail: which fields taken from where. */
+  mergeReasoning?: string;
 }
 
 export interface UpdateAction {
@@ -69,12 +71,28 @@ export interface SplitAction {
   reason: string;
 }
 
+export interface GroupAction {
+  action: "group";
+  /** ID to use for the new container item. */
+  containerId: string;
+  /** Title of the new container (the stripped/normalized title). */
+  containerTitle: string;
+  /** Level of the container item (one level above grouped items). */
+  containerLevel: string;
+  /** IDs of items to move under the container, in order. */
+  itemIds: string[];
+  /** Optional per-item title overrides (specific scope names). */
+  renamedTitles?: Record<string, string>;
+  reason: string;
+}
+
 export type ReshapeAction =
   | MergeAction
   | UpdateAction
   | ReparentAction
   | ObsoleteAction
-  | SplitAction;
+  | SplitAction
+  | GroupAction;
 
 export interface ReshapeProposal {
   /** Unique ID for this proposal (generated during parsing). */
@@ -84,12 +102,42 @@ export interface ReshapeProposal {
 
 // ── Apply result ──
 
+/**
+ * Single merge audit entry recorded during a reshape operation.
+ */
+export interface MergeAuditRecord {
+  survivorId: string;
+  mergedFromIds: string[];
+  reasoning: string;
+}
+
+/**
+ * Single group audit entry recorded when a GroupAction creates a new parent
+ * and reparents hash-suffix duplicate siblings under it.
+ */
+export interface GroupAuditRecord {
+  /** ID of the newly created container item. */
+  containerId: string;
+  /** Title of the new container (suffix-stripped shared base title). */
+  containerTitle: string;
+  /** ID of the original common parent, or undefined for root-level items. */
+  originalParentId: string | undefined;
+  /** IDs of items moved under the new container. */
+  movedItemIds: string[];
+  /** Reasoning for grouping. */
+  reasoning: string;
+}
+
 export interface ReshapeResult {
   applied: ReshapeProposal[];
   /** IDs of items that were removed (for sync deletion tracking). */
   deletedIds: string[];
   /** Items that were archived (for archive persistence). */
   archivedItems: PRDItem[];
+  /** Audit trail of merges performed (for archive recording). */
+  mergeAuditTrail: MergeAuditRecord[];
+  /** Audit trail of group operations performed (for archive recording). */
+  groupAuditTrail: GroupAuditRecord[];
   errors: Array<{ proposal: ReshapeProposal; error: string }>;
 }
 
@@ -139,6 +187,13 @@ function applyMerge(
       result.deletedIds.push(mergedId);
     }
   }
+
+  // Record merge in audit trail
+  result.mergeAuditTrail.push({
+    survivorId: action.survivorId,
+    mergedFromIds: action.mergedIds,
+    reasoning: action.mergeReasoning || action.reason || "merge",
+  });
 
   result.applied.push(proposal);
 }
@@ -244,6 +299,73 @@ function applySplit(
   result.applied.push(proposal);
 }
 
+function applyGroup(
+  items: PRDItem[],
+  action: GroupAction,
+  result: ReshapeResult,
+  proposal: ReshapeProposal,
+): void {
+  // Verify all itemIds exist
+  for (const id of action.itemIds) {
+    if (!findItem(items, id)) {
+      result.errors.push({ proposal, error: `Group item "${id}" not found.` });
+      return;
+    }
+  }
+
+  if (action.itemIds.length === 0) {
+    result.errors.push({ proposal, error: "GroupAction has no itemIds." });
+    return;
+  }
+
+  // Find the parent of the first item (all should be siblings)
+  const firstEntry = findItem(items, action.itemIds[0])!;
+  const originalParentId = firstEntry.parents.length > 0
+    ? firstEntry.parents[firstEntry.parents.length - 1].id
+    : undefined;
+
+  // Create a new container PRDItem
+  const container: PRDItem = {
+    id: action.containerId,
+    title: action.containerTitle,
+    level: action.containerLevel as PRDItem["level"],
+    status: "pending",
+  };
+
+  // Insert container under the original parent; fall back to root on mismatch
+  if (originalParentId) {
+    const inserted = insertChild(items, originalParentId, container);
+    if (!inserted) {
+      items.push(container);
+    }
+  } else {
+    items.push(container);
+  }
+
+  // Apply renamed titles and move each item under the container
+  for (const id of action.itemIds) {
+    if (action.renamedTitles?.[id]) {
+      updateInTree(items, id, { title: action.renamedTitles[id] });
+    }
+    try {
+      moveItem(items, id, action.containerId);
+    } catch (err) {
+      result.errors.push({ proposal, error: `Failed to move "${id}" under container: ${(err as Error).message}` });
+    }
+  }
+
+  // Record group operation in audit trail
+  result.groupAuditTrail.push({
+    containerId: action.containerId,
+    containerTitle: action.containerTitle,
+    originalParentId,
+    movedItemIds: action.itemIds,
+    reasoning: action.reason,
+  });
+
+  result.applied.push(proposal);
+}
+
 /**
  * Apply a set of accepted reshape proposals to the PRD tree.
  *
@@ -263,6 +385,8 @@ export function applyReshape(
     applied: [],
     deletedIds: [],
     archivedItems: [],
+    mergeAuditTrail: [],
+    groupAuditTrail: [],
     errors: [],
   };
 
@@ -282,6 +406,9 @@ export function applyReshape(
         break;
       case "split":
         applySplit(items, proposal.action, result, proposal);
+        break;
+      case "group":
+        applyGroup(items, proposal.action, result, proposal);
         break;
     }
   }

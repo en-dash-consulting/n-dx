@@ -15,6 +15,8 @@ import {
   mapNameStatus,
   parseNameStatusOutput,
   parseMergeLogOutput,
+  parseCoAuthorTrailers,
+  resolveItemOrigin,
   summarizeFiles,
   flattenPrdItems,
   correlateHenchRunsToMerges,
@@ -217,6 +219,118 @@ describe("parseMergeLogOutput", () => {
 
   it("returns an empty list for empty input", () => {
     expect(parseMergeLogOutput("")).toEqual([]);
+  });
+});
+
+describe("parseCoAuthorTrailers", () => {
+  it("returns [] for empty body", () => {
+    expect(parseCoAuthorTrailers("")).toEqual([]);
+  });
+
+  it("extracts a single Co-Authored-By trailer", () => {
+    const body = "Some commit body\n\nCo-Authored-By: Hal Forester <hal@example.com>";
+    expect(parseCoAuthorTrailers(body)).toEqual([
+      { name: "Hal Forester", email: "hal@example.com" },
+    ]);
+  });
+
+  it("extracts multiple trailers in source order", () => {
+    const body = [
+      "Big commit",
+      "",
+      "Co-Authored-By: Alice <alice@example.com>",
+      "Co-Authored-By: Bob B. <bob@bob.example>",
+      "Co-Authored-By: Claude <noreply@anthropic.com>",
+    ].join("\n");
+    expect(parseCoAuthorTrailers(body)).toEqual([
+      { name: "Alice", email: "alice@example.com" },
+      { name: "Bob B.", email: "bob@bob.example" },
+      { name: "Claude", email: "noreply@anthropic.com" },
+    ]);
+  });
+
+  it("is case-insensitive on the trailer key (matches git's relaxed parsing)", () => {
+    const body = "co-authored-by: Lower Case <lc@example.com>";
+    expect(parseCoAuthorTrailers(body)).toEqual([
+      { name: "Lower Case", email: "lc@example.com" },
+    ]);
+  });
+
+  it("trims surrounding whitespace from name and email", () => {
+    const body = "Co-Authored-By:   Spaced Name   <  whitespace@example.com  >";
+    expect(parseCoAuthorTrailers(body)).toEqual([
+      { name: "Spaced Name", email: "whitespace@example.com" },
+    ]);
+  });
+
+  it("ignores non-trailer lines that mention Co-Authored-By prose", () => {
+    // The regex anchors to start-of-line so freeform mentions in the body
+    // can't accidentally show up as a trailer.
+    const body = "We are Co-Authored-By: nobody, really.\nNot a trailer.";
+    expect(parseCoAuthorTrailers(body)).toEqual([]);
+  });
+});
+
+describe("resolveItemOrigin", () => {
+  it("parses the introducing commit from a single-record git log", () => {
+    const fakeStdout =
+      `f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1${FS}` +
+      `2026-05-02T10:00:00Z${FS}` +
+      `Hal${FS}` +
+      `hal@example.com${FS}` +
+      `feat: introduce Task Two${FS}` +
+      `Body line\n\nCo-Authored-By: Claude <noreply@anthropic.com>${RS}`;
+    const runner: GitRunner = () => fakeStdout;
+    const origin = resolveItemOrigin(runner, ".rex/prd_tree/x/index.md");
+    expect(origin).toEqual({
+      sha: "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+      shortSha: "f1f1f1f",
+      createdAt: "2026-05-02T10:00:00Z",
+      author: "Hal",
+      authorEmail: "hal@example.com",
+      coAuthors: [{ name: "Claude", email: "noreply@anthropic.com" }],
+      subject: "feat: introduce Task Two",
+    });
+  });
+
+  it("returns null when git produces no output (untracked path)", () => {
+    const runner: GitRunner = () => "";
+    expect(resolveItemOrigin(runner, ".rex/prd_tree/missing/index.md")).toBeNull();
+  });
+
+  it("captures multiple Co-Authored-By trailers", () => {
+    const fakeStdout =
+      `abc${FS}2026-01-01T00:00:00Z${FS}Author${FS}a@x${FS}subject${FS}` +
+      `Co-Authored-By: A <a@x>\nCo-Authored-By: B <b@y>${RS}`;
+    const runner: GitRunner = () => fakeStdout;
+    const origin = resolveItemOrigin(runner, ".rex/prd_tree/x/index.md");
+    expect(origin?.coAuthors).toEqual([
+      { name: "A", email: "a@x" },
+      { name: "B", email: "b@y" },
+    ]);
+  });
+
+  it("handles a body that is empty (no co-author trailers)", () => {
+    const fakeStdout =
+      `abc${FS}2026-01-01T00:00:00Z${FS}Author${FS}a@x${FS}subject${FS}${RS}`;
+    const runner: GitRunner = () => fakeStdout;
+    const origin = resolveItemOrigin(runner, ".rex/prd_tree/x/index.md");
+    expect(origin?.coAuthors).toEqual([]);
+    expect(origin?.subject).toBe("subject");
+  });
+
+  it("forwards the path to the git runner with --diff-filter=A --follow", () => {
+    const captured: string[][] = [];
+    const runner: GitRunner = (args) => {
+      captured.push(args);
+      return "";
+    };
+    resolveItemOrigin(runner, ".rex/prd_tree/foo/bar/index.md");
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toContain("--diff-filter=A");
+    expect(captured[0]).toContain("--follow");
+    expect(captured[0]).toContain("-1");
+    expect(captured[0]).toContain(".rex/prd_tree/foo/bar/index.md");
   });
 });
 

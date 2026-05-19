@@ -11,7 +11,9 @@ import {
   filterCompleted,
   filterDeleted,
   formatStats,
+  renderAsciiTree,
 } from "../../../../src/cli/commands/status.js";
+import { resetColorCache } from "@n-dx/llm-client";
 import { CLIError } from "../../../../src/cli/errors.js";
 import type { PRDDocument, PRDItem } from "../../../../src/schema/index.js";
 import type { CoverageMap } from "../../../../src/cli/commands/status.js";
@@ -1223,6 +1225,86 @@ describe("renderTree with coverage", () => {
     const lines = renderTree(items);
     expect(lines[0]).toContain("Simple task");
     expect(lines[0]).not.toContain("covered");
+  });
+});
+
+describe("renderAsciiTree", () => {
+  const ORIGINAL_NO_COLOR = process.env.NO_COLOR;
+  const ORIGINAL_FORCE_COLOR = process.env.FORCE_COLOR;
+
+  afterEach(() => {
+    if (ORIGINAL_NO_COLOR === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = ORIGINAL_NO_COLOR;
+    if (ORIGINAL_FORCE_COLOR === undefined) delete process.env.FORCE_COLOR;
+    else process.env.FORCE_COLOR = ORIGINAL_FORCE_COLOR;
+    resetColorCache();
+  });
+
+  const FIXTURE: PRDItem[] = [
+    {
+      id: "e1",
+      title: "Auth System",
+      level: "epic",
+      status: "in_progress",
+      children: [
+        {
+          id: "f1",
+          title: "OAuth Flow",
+          level: "feature",
+          status: "in_progress",
+          children: [
+            { id: "t1", title: "Token Exchange", level: "task", status: "completed" },
+            { id: "t2", title: "Refresh Logic", level: "task", status: "pending" },
+          ],
+        },
+        { id: "f2", title: "Session Store", level: "feature", status: "pending" },
+      ],
+    },
+    { id: "e2", title: "Dashboard", level: "epic", status: "pending" },
+  ];
+
+  it("draws Unix-tree connectors for the full hierarchy", () => {
+    process.env.NO_COLOR = "1";
+    delete process.env.FORCE_COLOR;
+    resetColorCache();
+
+    const lines = renderAsciiTree(FIXTURE);
+
+    expect(lines).toEqual([
+      "├── Auth System",
+      "│   ├── OAuth Flow",
+      "│   │   ├── Token Exchange",
+      "│   │   └── Refresh Logic",
+      "│   └── Session Store",
+      "└── Dashboard",
+    ]);
+  });
+
+  it("colors completed green and in-progress yellow; leaves others bare", () => {
+    delete process.env.NO_COLOR;
+    process.env.FORCE_COLOR = "1";
+    resetColorCache();
+
+    const lines = renderAsciiTree(FIXTURE);
+
+    const completed = lines.find((l) => l.includes("Token Exchange"))!;
+    const inProgress = lines.find((l) => l.includes("Auth System"))!;
+    const pending = lines.find((l) => l.includes("Dashboard"))!;
+
+    // ANSI green = \x1b[32m, yellow = \x1b[33m
+    expect(completed).toContain("\x1b[32m");
+    expect(completed).toContain("Token Exchange");
+    expect(inProgress).toContain("\x1b[33m");
+    expect(inProgress).toContain("Auth System");
+    expect(pending).not.toContain("\x1b[32m");
+    expect(pending).not.toContain("\x1b[33m");
+    expect(pending).toContain("Dashboard");
+  });
+
+  it("renders empty input as no lines", () => {
+    process.env.NO_COLOR = "1";
+    resetColorCache();
+    expect(renderAsciiTree([])).toEqual([]);
   });
 });
 

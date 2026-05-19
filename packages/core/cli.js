@@ -35,12 +35,19 @@
  */
 
 import { spawn, execFileSync } from "child_process";
-import { existsSync, readFileSync, writeFileSync, rmSync } from "fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
 import { runConfig, loadProjectConfig, repairProjectConfig } from "./config.js";
+import {
+  parseRecommendationsJson,
+  formatQueuedTaskSummary,
+  readSelfHealAutoConfirm,
+  resolveAutoConfirm,
+  runConfirmationPrompt,
+} from "./self-heal-confirm.js";
 import { resolveCommandTimeout, withCommandTimeout } from "./cli-timeout.js";
 import { runCI } from "./ci.js";
 import {
@@ -386,6 +393,23 @@ async function flushAndExit(code = 0) {
 
 function run(script, args) {
   const scriptPath = isAbsolute(script) ? script : resolve(MONOREPO_ROOT, script);
+
+  // Build-artifact guard: when the resolved script is a packages/*/dist/* path
+  // (monorepo dev mode) and the file is missing, dist was wiped or never built.
+  // Surface an actionable error instead of letting Node throw MODULE_NOT_FOUND.
+  if (
+    scriptPath.startsWith(MONOREPO_ROOT) &&
+    /[/\\]packages[/\\][^/\\]+[/\\]dist[/\\]/.test(scriptPath) &&
+    !existsSync(scriptPath)
+  ) {
+    const rel = scriptPath.slice(MONOREPO_ROOT.length + 1);
+    console.error(`${red("Error:")} Build artifact missing: ${rel}`);
+    console.error(
+      "Hint: Run 'pnpm install' (or 'pnpm build') from the repo root to rebuild package dist directories.",
+    );
+    return Promise.resolve(1);
+  }
+
   return new Promise((res) => {
     const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
@@ -1694,6 +1718,31 @@ function runCapture(script, args) {
 }
 
 /**
+ * Count PRD items in the folder tree by walking `.rex/prd_tree/` and tallying
+ * directories that contain an `index.md`. Used by self-heal to report how many
+ * items step 3 (`rex recommend --accept`) wrote to the PRD.
+ */
+function countPrdTreeItems(dir) {
+  try {
+    const treeDir = resolve(dir, ".rex", "prd_tree");
+    if (!existsSync(treeDir)) return 0;
+    let count = 0;
+    const walk = (d) => {
+      for (const entry of readdirSync(d, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const subdir = resolve(d, entry.name);
+        if (existsSync(resolve(subdir, "index.md"))) count++;
+        walk(subdir);
+      }
+    };
+    walk(treeDir);
+    return count;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Read file-level code health metrics for self-heal regression detection.
  * These are zone-independent signals that don't fluctuate with zone reassignment.
  */
@@ -1762,19 +1811,26 @@ async function handleSelfHeal(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex", ".hench", ".sourcevision"]);
 
+  // --capture-only: run analyze + recommend + persist to PRD, then exit without
+  // invoking hench. Useful as a pure PRD-population / audit step.
+  const captureOnly = rest.includes("--capture-only");
+
   const vendor = readLLMVendor(dir);
-  if (!vendor) {
+  if (!vendor && !captureOnly) {
     console.error("Error: No LLM vendor configured for this project.");
     console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
     exitWithCleanup(1);
   }
 
   // Parse iteration count from positional args (e.g. `ndx self-heal 3 .` or `ndx self-heal . 3`)
+  // Capture-only mode is a single-pass capture; N is ignored.
   const positionals = rest.filter((a) => !a.startsWith("-"));
-  const iterCount = positionals.reduce((found, arg) => {
-    const n = parseInt(arg, 10);
-    return !isNaN(n) && n > 0 ? n : found;
-  }, 1);
+  const iterCount = captureOnly
+    ? 1
+    : positionals.reduce((found, arg) => {
+        const n = parseInt(arg, 10);
+        return !isNaN(n) && n > 0 ? n : found;
+      }, 1);
 
   // --include-structural opts in to structural findings; excluded by default
   const includeStructural = rest.includes("--include-structural");
@@ -1787,8 +1843,18 @@ async function handleSelfHeal(rest) {
   // (or --claude-model/--codex-model) actually changes which model the agent uses.
   const modelFlags = extractModelFlags(rest);
 
+  // Resolve whether the pre-execution confirmation prompt should be bypassed.
+  // CLI flags (--auto, --yes) win over the project config setting.
+  // In capture-only mode the prompt is skipped entirely (no hench run risk).
+  const configAutoConfirm = readSelfHealAutoConfirm(dir);
+  const autoConfirmResolution = resolveAutoConfirm({ argv: rest, configAutoConfirm });
+
   const shTag = cyan("[self-heal]");
-  console.log(`${shTag} starting ${bold(String(iterCount))} iteration${iterCount === 1 ? "" : "s"}${includeStructural ? "" : dim(" (excluding structural findings)")}`);
+  if (captureOnly) {
+    console.log(`${shTag} ${bold("capture-only")} — analyze → recommend → persist to PRD (no hench run)${includeStructural ? "" : dim(" (excluding structural findings)")}`);
+  } else {
+    console.log(`${shTag} starting ${bold(String(iterCount))} iteration${iterCount === 1 ? "" : "s"}${includeStructural ? "" : dim(" (excluding structural findings)")}`);
+  }
 
   // Mark every child process spawned by this command so that newly-created
   // PRD items (via rex recommend --accept, hench MCP add_item, etc.) receive
@@ -1800,51 +1866,110 @@ async function handleSelfHeal(rest) {
   let prevFindingCount = Infinity;
   let baselineHealth = readCodeHealthMetrics(dir);
 
+  // In capture-only mode iterCount is always 1, so the loop runs exactly once.
   for (let i = 1; i <= iterCount; i++) {
-    console.log(`\n${shTag} ${bold(`── iteration ${i}/${iterCount} ──`)}\n`);
+    if (!captureOnly) {
+      console.log(`\n${shTag} ${bold(`── iteration ${i}/${iterCount} ──`)}\n`);
+    }
 
-    console.log(`${shTag} step 1/5: sourcevision analyze --deep --full`);
+    const stepTotal = captureOnly ? 3 : 5;
+
+    console.log(`${shTag} step 1/${stepTotal}: sourcevision analyze --deep --full`);
     await runOrDie(tools.sourcevision, ["analyze", "--deep", "--full", dir]);
 
-    // Regression guard: compare file-level code health metrics to baseline
-    const currentHealth = readCodeHealthMetrics(dir);
-    if (baselineHealth && currentHealth && i > 1) {
-      const circularDelta = currentHealth.circularDeps - baselineHealth.circularDeps;
-      const codeFindingDelta = currentHealth.codeFindingCount - baselineHealth.codeFindingCount;
-      const totalBefore = baselineHealth.circularDeps + baselineHealth.codeFindingCount + baselineHealth.unusedExports;
-      const totalAfter = currentHealth.circularDeps + currentHealth.codeFindingCount + currentHealth.unusedExports;
+    if (!captureOnly) {
+      // Regression guard: compare file-level code health metrics to baseline
+      const currentHealth = readCodeHealthMetrics(dir);
+      if (baselineHealth && currentHealth && i > 1) {
+        const circularDelta = currentHealth.circularDeps - baselineHealth.circularDeps;
+        const totalBefore = baselineHealth.circularDeps + baselineHealth.codeFindingCount + baselineHealth.unusedExports;
+        const totalAfter = currentHealth.circularDeps + currentHealth.codeFindingCount + currentHealth.unusedExports;
 
-      if (circularDelta > 0) {
-        console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
-        console.log(`  circular deps: ${baselineHealth.circularDeps} → ${currentHealth.circularDeps} (+${circularDelta})`);
-        console.log(`  code findings: ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
-        console.log(`  ${red("Aborting self-heal — new circular dependencies introduced.")}`);
-        break;
+        if (circularDelta > 0) {
+          console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
+          console.log(`  circular deps: ${baselineHealth.circularDeps} → ${currentHealth.circularDeps} (+${circularDelta})`);
+          console.log(`  code findings: ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
+          console.log(`  ${red("Aborting self-heal — new circular dependencies introduced.")}`);
+          break;
+        }
+
+        if (totalAfter > totalBefore) {
+          console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
+          console.log(`  code health issues: ${totalBefore} → ${totalAfter} (+${totalAfter - totalBefore})`);
+          console.log(`    circular deps:  ${baselineHealth.circularDeps} → ${currentHealth.circularDeps}`);
+          console.log(`    code findings:  ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
+          console.log(`    unused exports: ${baselineHealth.unusedExports} → ${currentHealth.unusedExports}`);
+          console.log(`  ${red("Aborting self-heal — code health degraded instead of improving.")}`);
+          break;
+        }
+
+        // Log zone metrics for information (not used as termination signals)
+        const zoneInfo = readZoneMetrics(dir);
+        const zoneStr = zoneInfo ? `, zones: ${zoneInfo.zoneCount} (cohesion ${zoneInfo.weightedCohesion})` : "";
+        console.log(`${shTag} code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
       }
-
-      if (totalAfter > totalBefore) {
-        console.log(`\n${shTag} ${red(`REGRESSION DETECTED after iteration ${i}:`)}`);
-        console.log(`  code health issues: ${totalBefore} → ${totalAfter} (+${totalAfter - totalBefore})`);
-        console.log(`    circular deps:  ${baselineHealth.circularDeps} → ${currentHealth.circularDeps}`);
-        console.log(`    code findings:  ${baselineHealth.codeFindingCount} → ${currentHealth.codeFindingCount}`);
-        console.log(`    unused exports: ${baselineHealth.unusedExports} → ${currentHealth.unusedExports}`);
-        console.log(`  ${red("Aborting self-heal — code health degraded instead of improving.")}`);
-        break;
-      }
-
-      // Log zone metrics for information (not used as termination signals)
-      const zoneInfo = readZoneMetrics(dir);
-      const zoneStr = zoneInfo ? `, zones: ${zoneInfo.zoneCount} (cohesion ${zoneInfo.weightedCohesion})` : "";
-      console.log(`${shTag} code health: ${totalBefore} → ${totalAfter} issues (circular: ${currentHealth.circularDeps}, findings: ${currentHealth.codeFindingCount}, unused: ${currentHealth.unusedExports})${zoneStr}`);
+      // Update baseline for next iteration
+      if (currentHealth) baselineHealth = currentHealth;
     }
-    // Update baseline for next iteration
-    if (currentHealth) baselineHealth = currentHealth;
 
-    console.log(`\n${shTag} step 2/5: rex recommend --actionable-only`);
+    console.log(`\n${shTag} step 2/${stepTotal}: rex recommend --actionable-only`);
     await runOrDie(tools.rex, ["recommend", "--actionable-only", ...structuralFlag, dir]);
 
-    console.log(`\n${shTag} step 3/5: rex recommend --actionable-only --accept`);
+    // Pre-execution approval gate (iteration 1 only, skipped in capture-only mode):
+    // print the queued task list and require user confirmation before any PRD
+    // write or hench run. Declining exits non-zero before step 3 so the PRD
+    // remains unmodified.
+    if (!captureOnly && i === 1) {
+      const { code: jsonCode, stdout: jsonOut } = await runCapture(
+        tools.rex,
+        ["recommend", "--actionable-only", ...structuralFlag, "--format=json", dir],
+      );
+      const summary = jsonCode === 0
+        ? parseRecommendationsJson(jsonOut)
+        : { tasks: [], totalFindings: 0 };
+      const summaryText = formatQueuedTaskSummary({
+        summary,
+        currentIteration: 1,
+        totalIterations: iterCount,
+      });
+
+      console.log(`\n${shTag} ${bold("pre-execution confirmation")}`);
+      const decision = await runConfirmationPrompt({
+        summaryText,
+        autoConfirm: autoConfirmResolution.autoConfirm,
+        isTTY: Boolean(process.stdin && process.stdin.isTTY),
+      });
+
+      if (decision.decision === "no-tty") {
+        // runConfirmationPrompt already wrote the explanatory message to stderr.
+        exitWithCleanup(1);
+      }
+      if (decision.decision === "decline") {
+        console.log(`\n${shTag} ${yellow("cancelled by user — no PRD writes or hench runs performed.")}`);
+        exitWithCleanup(1);
+      }
+      if (decision.decision === "auto" && autoConfirmResolution.source === "config") {
+        console.log(`${shTag} ${dim("(bypassed prompt via selfHeal.autoConfirm config)")}`);
+      }
+    }
+
+    const acceptStartedAt = new Date();
+    const beforeItemCount = countPrdTreeItems(dir);
+    console.log(`\n${shTag} step 3/${stepTotal}: rex recommend --actionable-only --accept ${dim(`(started ${acceptStartedAt.toISOString()}, tree size ${beforeItemCount ?? "?"})`)}`);
     await runOrDie(tools.rex, ["recommend", "--actionable-only", "--accept", ...structuralFlag, dir]);
+    const acceptFinishedAt = new Date();
+    const afterItemCount = countPrdTreeItems(dir);
+    if (beforeItemCount !== null && afterItemCount !== null) {
+      const added = afterItemCount - beforeItemCount;
+      const elapsedSec = ((acceptFinishedAt.getTime() - acceptStartedAt.getTime()) / 1000).toFixed(1);
+      const summary = `added ${added} PRD item${added === 1 ? "" : "s"} (tree: ${beforeItemCount} → ${afterItemCount}) in ${elapsedSec}s, finished ${acceptFinishedAt.toISOString()}`;
+      console.log(`${shTag} ${added > 0 ? green(summary) : dim(summary)}`);
+    }
+
+    // Capture-only: steps 1–3 complete. Exit without running hench or acknowledging.
+    if (captureOnly) {
+      continue; // iterCount === 1, so the loop ends here
+    }
 
     const modelFlagSummary = modelFlags.length > 0 ? ` ${modelFlags.join(" ")}` : "";
     console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal --tags=self-heal${yes ? " --yes" : ""}${modelFlagSummary}`);
@@ -1882,7 +2007,11 @@ async function handleSelfHeal(rest) {
     process.env.NDX_SELF_HEAL = prevSelfHealEnv;
   }
 
-  console.log(`\n${shTag} ${green("completed")}`);
+  if (captureOnly) {
+    console.log(`\n${shTag} ${green("capture complete")} — recommendations written to PRD as tagged items`);
+  } else {
+    console.log(`\n${shTag} ${green("completed")}`);
+  }
   exitWithCleanup(0);
 }
 

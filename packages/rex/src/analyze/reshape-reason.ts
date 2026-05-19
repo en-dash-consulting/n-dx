@@ -362,6 +362,50 @@ function wrapAction(action: ReshapeAction): ReshapeProposal {
   };
 }
 
+// ── Body merge ──
+
+export interface BodyMergeResult {
+  description: string;
+  tokenUsage: AnalyzeTokenUsage;
+}
+
+/**
+ * Use LLM to generate a merged description for a group of hash-suffix duplicate items.
+ * Returns a generic description that covers the combined scope of all items.
+ */
+export async function reasonForBodyMerge(
+  group: PRDItem[],
+  model?: string,
+): Promise<BodyMergeResult> {
+  const tokenUsage = emptyAnalyzeTokenUsage();
+
+  const itemSummary = group
+    .map((item, i) => {
+      const lines = [`${i + 1}. Title: ${item.title}`];
+      if (item.description) lines.push(`   Description: ${item.description}`);
+      return lines.join("\n");
+    })
+    .join("\n\n");
+
+  const prompt = [
+    "You are a product manager merging duplicate PRD items that refer to the same feature or task.",
+    "Given the following items (with titles and descriptions), write a single combined description",
+    "that covers the full scope of all items. The description should be concise, clear, and complete.",
+    "Return only the plain-text description — no JSON, no markdown, no labels.",
+    "",
+    "## Items to merge",
+    itemSummary,
+  ].join("\n");
+
+  const llmResult = await spawnClaude(prompt, model);
+  accumulateTokenUsage(tokenUsage, llmResult.tokenUsage);
+
+  return {
+    description: llmResult.text.trim(),
+    tokenUsage,
+  };
+}
+
 // ── Display helpers ──
 
 /**

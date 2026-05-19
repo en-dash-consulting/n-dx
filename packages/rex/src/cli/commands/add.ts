@@ -19,6 +19,7 @@ import { CLIError } from "../errors.js";
 import { info, result, warn } from "../output.js";
 import { emitMigrationNotification } from "../migration-notification.js";
 import { getFolderTreePath } from "../folder-tree-path.js";
+import { runScopedConsolidationPass } from "./add-reshape.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../../schema/index.js";
 
 export async function cmdAdd(
@@ -226,6 +227,10 @@ export async function cmdAdd(
   // Persist the updated tree to the folder structure.
   await syncFolderTree(rexDir, store);
 
+  // Run scoped hash-suffix consolidation pass on siblings of the new item.
+  // Skipped when --no-reshape is set or a full ndx reshape is in progress.
+  const consolidation = await runScopedConsolidationPass(rexDir, store, id, flags);
+
   // Compute the folder-tree path where the item was written.
   const updatedDoc = await store.loadDocument();
   const folderTreePath = getFolderTreePath(updatedDoc.items, id);
@@ -246,6 +251,12 @@ export async function cmdAdd(
     result(`  ID: ${id}`);
     for (const ri of resetItems) {
       info(`  ↺ Reset ${ri.level}: ${ri.title} (was completed)`);
+    }
+    if (consolidation.renamedCount > 0) {
+      info(`  Renamed ${consolidation.renamedCount} sibling${consolidation.renamedCount === 1 ? "" : "s"} with title collision under ${consolidation.parentLabel}`);
+    }
+    if (consolidation.mergedCount > 0) {
+      info(`  Consolidated ${consolidation.mergedCount} duplicate sibling${consolidation.mergedCount === 1 ? "" : "s"} under ${consolidation.parentLabel}`);
     }
   }
 }

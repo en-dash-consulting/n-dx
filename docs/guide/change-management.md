@@ -463,3 +463,19 @@ Once your PRD is healthy:
 - **Schedule a recurring maintenance task** with `ndx schedule` to remind yourself to prune monthly
 - **Set up `ndx sync`** if your team uses an external system for backlog management
 - **Use `ndx self-heal`** for ongoing improvement between full maintenance cycles
+
+## Skills used in this guide
+
+Each skill below is invoked during the maintenance cycles described in this guide. Edit the linked file in your project to customize that step's behavior in your assistant session.
+
+| Skill | Source | Role in this guide |
+|-------|--------|--------------------|
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Weekly cycle: detects drift — completed work not yet marked, stale epics, orphaned tasks |
+| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Monthly cycle: re-analyzes the codebase and proposes items for persistent or newly surfaced findings |
+| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Quarterly: restructures a drifted PRD — regroups epics, adjusts levels, merges overlapping items |
+| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Throughout: adds newly surfaced requirements to the right place in the PRD hierarchy |
+| `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](./skills#ndx-config) | Sync setup: configures the external adapter (`rex.adapter`, `rex.adapterUrl`, `rex.adapterAuthToken`) |
+
+Related guides: [Workflow](./workflow) (the normal development loop this guide maintains), [Self-Heal Loop](./self-heal) (automates the analyze → recommend cycle between full maintenance passes).
+
+For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

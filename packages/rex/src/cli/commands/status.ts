@@ -12,6 +12,8 @@ import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
 import { groupByFacet, getFacetValue } from "../../core/facets.js";
 import { walkTree } from "../../core/tree.js";
+import { green, yellow } from "@n-dx/llm-client";
+import { filterDeleted } from "./status-shared.js";
 import {
   buildCoverageMap,
   renderJsonOutput,
@@ -39,6 +41,34 @@ export {
 export type { CoverageMap } from "./status-shared.js";
 
 const VALID_FORMATS = ["json", "tree"] as const;
+
+function colorByStatus(title: string, status: PRDItem["status"]): string {
+  switch (status) {
+    case "completed":
+      return green(title);
+    case "in_progress":
+      return yellow(title);
+    default:
+      return title;
+  }
+}
+
+export function renderAsciiTree(items: PRDItem[]): string[] {
+  const lines: string[] = [];
+  const walk = (nodes: PRDItem[], prefix: string): void => {
+    nodes.forEach((node, idx) => {
+      const isLast = idx === nodes.length - 1;
+      const connector = isLast ? "└── " : "├── ";
+      const childPrefix = isLast ? "    " : "│   ";
+      lines.push(prefix + connector + colorByStatus(node.title, node.status));
+      if (node.children && node.children.length > 0) {
+        walk(node.children, prefix + childPrefix);
+      }
+    });
+  };
+  walk(items, "");
+  return lines;
+}
 
 /** Render items grouped by a facet key. */
 function renderGroupedByFacet(items: PRDItem[], facetKey: string): string[] {
@@ -89,6 +119,7 @@ export async function cmdStatus(
   const groupBy = flags["group-by"];
   const showStaleOnly = flags.stale === "true";
   const showIndividual = flags["show-individual"] === "true";
+  const useAsciiTree = flags.tree === "true";
 
   if (format && !VALID_FORMATS.includes(format as (typeof VALID_FORMATS)[number])) {
     throw new CLIError(
@@ -143,6 +174,21 @@ export async function cmdStatus(
       dir,
       tokenFilter,
     });
+    return;
+  }
+
+  // --tree: Unix-tree-style ASCII rendering with status-colored titles.
+  // Takes precedence over --group-by, --show-individual, and --stale.
+  if (useAsciiTree) {
+    result(`PRD: ${doc.title}`);
+    result("");
+    if (doc.items.length === 0) {
+      result("  No items yet.");
+      return;
+    }
+    for (const line of renderAsciiTree(filterDeleted(doc.items))) {
+      result(line);
+    }
     return;
   }
 

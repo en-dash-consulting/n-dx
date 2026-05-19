@@ -134,7 +134,7 @@ describe("finalizeRun PRD task reset on failure", () => {
     }
   });
 
-  it("does not reset task when run completes successfully", async () => {
+  it("updates task to completed when run completes successfully", async () => {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
     const { store, updatedStatus } = buildMockStore("in_progress");
 
@@ -148,7 +148,8 @@ describe("finalizeRun PRD task reset on failure", () => {
       skipFullTestGate: true,
     });
 
-    expect(updatedStatus()).toBe("in_progress");
+    // Task should be marked as completed immediately after test gate passes
+    expect(updatedStatus()).toBe("completed");
   });
 
   it("does not reset task already moved to pending by a failure handler", async () => {

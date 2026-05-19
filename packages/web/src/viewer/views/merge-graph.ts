@@ -3,15 +3,23 @@
  *
  * Renders PRD items and git merge commits as a connected graph so users can
  * see which code changes were shipped against which planned work. PRD items
- * form a hierarchical tree (left side). Merge nodes cluster on the right side,
- * linked to the PRD items they implemented.
+ * use a compact, indented folder-tree layout — each visible node sits on its
+ * own row, horizontally indented by depth — visually echoing the on-disk
+ * `.rex/prd_tree/` hierarchy. Merge commits cluster in a column to the right
+ * of the deepest visible PRD indent.
+ *
+ * View mode: defaults to "Full tree" (every PRD item from every depth is
+ * rendered) so the graph is representative of the whole `.rex/prd_tree/`
+ * folder. An "Epics only" mode in the header trims the tree to just the
+ * top-level rows for a high-level overview.
  *
  * Interactions:
  * - Pan: mouse drag or two-finger drag on the canvas
  * - Zoom: Ctrl+scroll or pinch
+ * - Click a PRD node: select it (highlight subtree, recenter the canvas on
+ *   the node, open detail panel with front-matter + introducing-commit info)
  * - Click a merge node: show file-change list in the detail panel
- * - Click a PRD node: highlight all merge nodes linked to it
- * - Toolbar: zoom in/out/fit, filter by status and date range
+ * - Toolbar: zoom in/out/fit, view-mode toggle, filter by status and date range
  *
  * @module web/viewer/views/merge-graph
  */
@@ -20,7 +28,6 @@ import { h, Fragment } from "preact";
 import { useState, useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import { usePanZoom } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
-import { TaskDetail } from "../components/prd-tree/task-detail.js";
 import type { PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
 
@@ -59,6 +66,15 @@ interface PrdNode {
   parentId?: string;
   priority?: string;
   shape?: string;
+  /**
+   * Folder-tree slug chain for this item (`<epic>/<feature>/<task>`).
+   *
+   * Mirrors the on-disk path under `.rex/prd_tree/`. The graph hierarchy and
+   * sibling order are driven by this path, so the context graph echoes the
+   * dashboard's folder-tree view by construction. Click-through still uses
+   * `id` — `treePath` is purely a positional/identity hint.
+   */
+  treePath?: string;
 }
 
 interface MergeNode {
@@ -84,6 +100,32 @@ interface MergeNode {
   files: FileChange[];
 }
 
+/**
+ * Introducing-commit metadata for a PRD item. Mirrors the server-side
+ * `PrdOrigin` type from `merge-history.ts`. Resolved lazily on click via
+ * `/api/prd-origin?path=<treePath>`.
+ */
+interface PrdOrigin {
+  sha: string;
+  shortSha: string;
+  createdAt: string;
+  author: string;
+  authorEmail: string;
+  coAuthors: Array<{ name: string; email: string }>;
+  subject: string;
+}
+
+/**
+ * Per-item origin lookup state. `"none"` means git knows the file but has no
+ * commit history (shouldn't normally happen — kept for completeness). `null`
+ * inside the success branch means git returned no introducing commit (item
+ * isn't tracked yet).
+ */
+type OriginEntry =
+  | { kind: "loading" }
+  | { kind: "ready"; origin: PrdOrigin | null }
+  | { kind: "error"; message: string };
+
 interface MergeGraph {
   generatedAt: string;
   nodes: Array<PrdNode | MergeNode>;
@@ -97,10 +139,19 @@ interface MergeGraph {
 }
 
 // ── Layout constants ─────────────────────────────────────────────────────────
+//
+// Compact folder-tree layout:
+//   y = sequential row index × ROW_H (DFS pre-order; each visible node owns a
+//       single row so the rhythm matches the dashboard's PRD tree view)
+//   x = depth × INDENT_W (each level indents by a fixed amount, just like a
+//       file tree)
+//
+// Merge nodes cluster in a column to the right of the deepest visible PRD x.
 
-const COL_W = 200;   // horizontal spacing per PRD level
-const ROW_H = 44;    // vertical spacing between nodes
-const MERGE_X_GAP = COL_W * 1.5; // gap between last PRD column and merge column
+const ROW_H = 22;        // vertical rhythm: tight, one row per visible PRD node
+const INDENT_W = 22;     // horizontal indent per depth level (folder-tree style)
+const MERGE_ROW_H = 22;  // matches PRD row height so adjacent rails align
+const MERGE_X_GAP = 80;  // gap between rightmost PRD x and merge column
 
 // ── Status and level config ──────────────────────────────────────────────────
 
@@ -113,12 +164,26 @@ const STATUS_COLOR: Record<string, string> = {
   deferred:    "var(--brand-purple)",
 };
 
+// Node fill is encoded by the folder-tree shape, not status. Each shape gets a
+// distinct hue so the on-disk layout class (leaf vs leaf-children vs
+// folder-children) reads at a glance. Status is conveyed by the glyph prefix
+// in the label (see `shortStatus`) and by the front-matter summary panel.
+const SHAPE_COLOR: Record<string, string> = {
+  circle:    "var(--text-muted)",
+  diamond:   "var(--accent)",
+  square:    "var(--green)",
+  trapezoid: "var(--brand-orange)",
+  triangle:  "var(--brand-rose)",
+};
+
 const LEVEL_DEPTH: Record<string, number> = {
   epic: 0, feature: 1, task: 2, subtask: 3,
 };
 
+// Reduced node radii so the compact layout doesn't crowd. Values are tuned so
+// each node fits comfortably inside the ROW_H rhythm with room for stroke.
 const LEVEL_RADIUS: Record<string, number> = {
-  epic: 13, feature: 10, task: 7, subtask: 5,
+  epic: 7, feature: 6, task: 5, subtask: 4,
 };
 
 // ── Layout computation ────────────────────────────────────────────────────────
@@ -156,6 +221,8 @@ interface Layout {
   nodes: LayoutNode[];
   edges: LayoutEdge[];
   fitVB: { x: number; y: number; w: number; h: number };
+  /** Depth in tree levels of the deepest visible PRD node (0 if none). */
+  maxDepth: number;
 }
 
 function computeLayout(
@@ -170,7 +237,7 @@ function computeLayout(
     (n): n is MergeNode => n.kind === "merge" && visibleMergeIds.has(n.id),
   );
 
-  // ── Build parent→children map ────────────────────────────────────────────
+  // ── Build parent→children map (preserve graph order within each parent) ──
   const childrenMap = new Map<string | null, PrdNode[]>();
   childrenMap.set(null, []);
 
@@ -181,32 +248,28 @@ function computeLayout(
     childrenMap.set(parentKey, arr);
   }
 
-  // ── DFS traversal to assign y positions ─────────────────────────────────
-  const positions = new Map<string, { x: number; y: number }>();
+  // ── DFS pre-order traversal: each visible node claims one row ────────────
+  // Compact folder-tree layout — y advances monotonically as we walk the tree
+  // depth-first, so parents always sit above their children and siblings
+  // stack vertically. x is the indent depth for the node's level (epic=0,
+  // feature=1, …). This mirrors the on-disk `.rex/prd_tree/` rendering used
+  // elsewhere in the dashboard.
+  const positions = new Map<string, { x: number; y: number; depth: number }>();
   let yCounter = 0;
+  let maxDepth = 0;
 
   function traverse(nodeId: string): void {
     const node = prdNodes.find((p) => p.id === nodeId);
     if (!node) return;
-    const kids = childrenMap.get(nodeId) ?? [];
-
-    if (kids.length === 0) {
-      positions.set(nodeId, {
-        x: (LEVEL_DEPTH[node.level] ?? 3) * COL_W + COL_W / 2,
-        y: yCounter * ROW_H,
-      });
-      yCounter++;
-      return;
-    }
-
-    const startY = yCounter;
-    for (const kid of kids) traverse(kid.id);
-    const endY = yCounter - 1;
-
+    const depth = LEVEL_DEPTH[node.level] ?? 3;
+    if (depth > maxDepth) maxDepth = depth;
     positions.set(nodeId, {
-      x: (LEVEL_DEPTH[node.level] ?? 3) * COL_W + COL_W / 2,
-      y: ((startY + endY) / 2) * ROW_H,
+      x: depth * INDENT_W,
+      y: yCounter * ROW_H,
+      depth,
     });
+    yCounter++;
+    for (const kid of childrenMap.get(nodeId) ?? []) traverse(kid.id);
   }
 
   for (const root of childrenMap.get(null) ?? []) {
@@ -222,7 +285,12 @@ function computeLayout(
     }
   }
 
-  // ── Build tree edges ─────────────────────────────────────────────────────
+  // ── Build tree edges (parent rail → child elbow) ─────────────────────────
+  // Folder-tree connector: a vertical rail drops from the parent's column
+  // (`parentX`) down to the child's row, then a short horizontal elbow
+  // reaches across the child's indent into the child's node. The path is
+  // emitted as straight `M..L..L..` segments by the renderer so the rails
+  // stay crisp at small sizes.
   const layoutEdges: LayoutEdge[] = [];
   for (const n of prdNodes) {
     if (n.parentId && visiblePrdIds.has(n.parentId)) {
@@ -239,11 +307,14 @@ function computeLayout(
   }
 
   // ── Position merge nodes ─────────────────────────────────────────────────
-  // x = one column to the right of the deepest PRD level
-  const maxLevelDepth = prdNodes.length > 0
-    ? Math.max(...prdNodes.map((n) => LEVEL_DEPTH[n.level] ?? 3))
-    : 3;
-  const mergeX = (maxLevelDepth + 1) * COL_W + COL_W / 2 + MERGE_X_GAP;
+  // Merges sit in a column to the right of the rightmost PRD x. Each merge's
+  // y is anchored to the average y of its linked PRD targets (which sink to
+  // the deepest visible level), with collision avoidance to keep them from
+  // stacking on top of one another.
+  const maxPrdX = prdNodes.length > 0
+    ? Math.max(...prdNodes.map((n) => positions.get(n.id)?.x ?? 0))
+    : 0;
+  const mergeX = maxPrdX + MERGE_X_GAP;
 
   // Edges from this view (filtered)
   const visibleEdges = graph.edges.filter(
@@ -273,17 +344,17 @@ function computeLayout(
   const mergePositions = new Map<string, { x: number; y: number }>();
   let lastY = -Infinity;
   for (const mn of linkedMerges) {
-    let y = mergeIdealY.get(mn.id) ?? lastY + ROW_H;
-    if (y < lastY + ROW_H) y = lastY + ROW_H;
+    let y = mergeIdealY.get(mn.id) ?? lastY + MERGE_ROW_H;
+    if (y < lastY + MERGE_ROW_H) y = lastY + MERGE_ROW_H;
     lastY = y;
     mergePositions.set(mn.id, { x: mergeX, y });
   }
 
   // Unlinked merges cluster below linked ones
-  let unlinkedY = lastY === -Infinity ? 0 : lastY + ROW_H * 2;
+  let unlinkedY = lastY === -Infinity ? 0 : lastY + MERGE_ROW_H * 2;
   for (const mn of unlinkedMerges) {
     mergePositions.set(mn.id, { x: mergeX, y: unlinkedY });
-    unlinkedY += ROW_H;
+    unlinkedY += MERGE_ROW_H;
   }
 
   for (const mn of mergeNodes) {
@@ -315,19 +386,25 @@ function computeLayout(
       nodes: layoutNodes,
       edges: layoutEdges,
       fitVB: { x: -50, y: -50, w: 900, h: 600 },
+      maxDepth,
     };
   }
   const xs = layoutNodes.map((n) => n.x);
   const ys = layoutNodes.map((n) => n.y);
-  const pad = COL_W * 0.7;
-  const minX = Math.min(...xs) - pad;
-  const minY = Math.min(...ys) - pad;
-  const maxX = Math.max(...xs) + pad;
-  const maxY = Math.max(...ys) + pad;
+  // Generous right padding leaves room for the inline labels that sit to the
+  // right of each shape. Top/bottom padding scales with the tighter rhythm.
+  const padLeft = INDENT_W * 1.2;
+  const padRight = INDENT_W * 12;
+  const padY = ROW_H * 1.2;
+  const minX = Math.min(...xs) - padLeft;
+  const minY = Math.min(...ys) - padY;
+  const maxX = Math.max(...xs) + padRight;
+  const maxY = Math.max(...ys) + padY;
   return {
     nodes: layoutNodes,
     edges: layoutEdges,
-    fitVB: { x: minX, y: minY, w: Math.max(maxX - minX, 400), h: Math.max(maxY - minY, 300) },
+    fitVB: { x: minX, y: minY, w: Math.max(maxX - minX, 400), h: Math.max(maxY - minY, 200) },
+    maxDepth,
   };
 }
 
@@ -463,23 +540,206 @@ function statusClass(s: FileChangeStatus): string {
   return "";
 }
 
+// ── Subtree helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Collect a PRD node's id plus the ids of every transitive descendant.
+ *
+ * Walks the parent->child relationship encoded in `graph.nodes` (each PRD
+ * node carries its `parentId`), returning a set that includes the root.
+ * Used to highlight an entire subtree on click.
+ */
+export function collectPrdSubtreeIds(graph: MergeGraph, rootId: string): Set<string> {
+  const childrenByParent = new Map<string, string[]>();
+  for (const n of graph.nodes) {
+    if (n.kind !== "prd" || !n.parentId) continue;
+    const arr = childrenByParent.get(n.parentId) ?? [];
+    arr.push(n.id);
+    childrenByParent.set(n.parentId, arr);
+  }
+
+  const result = new Set<string>([rootId]);
+  const queue = [rootId];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const child of childrenByParent.get(cur) ?? []) {
+      if (!result.has(child)) {
+        result.add(child);
+        queue.push(child);
+      }
+    }
+  }
+  return result;
+}
+
 // ── Detail panel ─────────────────────────────────────────────────────────────
 
 type SelectedNode =
   | { kind: "prd"; node: PrdNode; linkedMergeIds: string[] }
   | { kind: "merge"; node: MergeNode };
 
+const EMPTY_FIELD = "—"; // em dash
+
+/**
+ * Concise PRD front-matter summary card.
+ *
+ * Surfaces only the front-matter fields already present on a PRD item
+ * (title, status, priority, tags, level, branch). Missing/empty fields
+ * render as an em dash instead of being silently omitted, so users can
+ * tell "no value" apart from "field unsupported". Keeps to existing
+ * dashboard styling — no new schema is introduced.
+ *
+ * The origin section beneath the front-matter dl reports the introducing
+ * git commit for the PRD item — surfaces the SHA (with copy affordance),
+ * timestamp, author, and any `Co-Authored-By:` trailers. Loaded lazily by
+ * the parent view on click; this component renders the loading / ready /
+ * error / "no commit history" states uniformly.
+ */
+function PrdFrontMatterSummary({ item, fallback, level, origin, onClose }: {
+  item: PRDItemData | null;
+  fallback: { title: string; status: string; priority?: string };
+  level: string;
+  origin: OriginEntry | undefined;
+  onClose: () => void;
+}) {
+  const title = (item?.title ?? fallback.title).trim() || EMPTY_FIELD;
+  const status = item?.status ?? fallback.status;
+  const priority = item?.priority ?? fallback.priority;
+  const tags = item?.tags ?? [];
+
+  return h("div", { class: "mg-detail mg-detail-prd" },
+    h("div", { class: "mg-detail-header" },
+      h("span", { class: "mg-detail-title" }, level.toUpperCase()),
+      h("button", {
+        class: "mg-detail-close",
+        onClick: onClose,
+        "aria-label": "Close",
+      }, "×"),
+    ),
+    h("p", { class: "mg-detail-subject" }, title),
+    h("dl", { class: "mg-frontmatter" },
+      h("dt", null, "Status"),
+      h("dd", null,
+        h("span", {
+          class: "mg-frontmatter-status",
+          style: { color: STATUS_COLOR[status] ?? "inherit" },
+        }, status ? status.replace(/_/g, " ") : EMPTY_FIELD),
+      ),
+      h("dt", null, "Priority"),
+      h("dd", null, priority ? priority : EMPTY_FIELD),
+      h("dt", null, "Tags"),
+      h("dd", null,
+        tags.length === 0
+          ? h("span", { class: "mg-frontmatter-empty" }, EMPTY_FIELD)
+          : h("span", { class: "mg-frontmatter-tags" },
+              tags.map((t) =>
+                h("span", { key: t, class: "mg-frontmatter-tag" }, t),
+              ),
+            ),
+      ),
+    ),
+    h(PrdOriginSection, { origin }),
+  );
+}
+
+/**
+ * Origin (introducing-commit) section of the PRD detail panel.
+ *
+ * Renders four exclusive states keyed off the lazy lookup result:
+ *   - undefined / loading : single "Loading…" line
+ *   - ready, origin null  : "No commit history" (item not yet tracked in git)
+ *   - ready, origin set   : SHA (with copy button), timestamp, author + co-authors, subject
+ *   - error               : inline error message; never blocks the rest of the card
+ */
+function PrdOriginSection({ origin }: { origin: OriginEntry | undefined }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
+  if (!origin || origin.kind === "loading") {
+    return h("div", { class: "mg-origin mg-origin-loading" },
+      h("span", { class: "mg-origin-label" }, "Origin"),
+      h("span", { class: "mg-origin-status" }, "Loading…"),
+    );
+  }
+  if (origin.kind === "error") {
+    return h("div", { class: "mg-origin mg-origin-error" },
+      h("span", { class: "mg-origin-label" }, "Origin"),
+      h("span", { class: "mg-origin-status" }, "Lookup failed"),
+      h("span", { class: "mg-origin-error-detail", title: origin.message }, origin.message),
+    );
+  }
+  if (origin.origin === null) {
+    return h("div", { class: "mg-origin mg-origin-none" },
+      h("span", { class: "mg-origin-label" }, "Origin"),
+      h("span", { class: "mg-origin-status" }, "No commit history"),
+    );
+  }
+
+  const o = origin.origin;
+  const handleCopy = async () => {
+    const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+    if (!clip || typeof clip.writeText !== "function") {
+      console.warn("Clipboard API unavailable; cannot copy commit hash.");
+      return;
+    }
+    try {
+      await clip.writeText(o.sha);
+      setCopied(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.warn("Failed to copy commit hash:", err);
+    }
+  };
+
+  const coNames = o.coAuthors.map((c) => c.name).filter(Boolean).join(", ");
+  return h("div", { class: "mg-origin" },
+    h("span", { class: "mg-origin-label" }, "Origin"),
+    h("div", { class: "mg-origin-row" },
+      h("code", {
+        class: "mg-origin-sha",
+        title: o.sha,
+      }, o.shortSha),
+      h("button", {
+        type: "button",
+        class: `mg-origin-copy${copied ? " copied" : ""}`,
+        title: copied ? "Copied!" : "Copy full commit hash",
+        "aria-label": "Copy full commit hash",
+        "data-full-sha": o.sha,
+        onClick: handleCopy,
+      }, copied ? "✓" : "⧉"),
+      h("time", {
+        class: "mg-origin-time",
+        dateTime: o.createdAt,
+        title: o.createdAt,
+      }, formatMergeTimestamp(o.createdAt)),
+    ),
+    h("div", { class: "mg-origin-authors" },
+      h("span", { class: "mg-origin-author", title: o.authorEmail || EMPTY_FIELD },
+        o.author || EMPTY_FIELD),
+      coNames
+        ? h("span", { class: "mg-origin-coauthors", title: "Co-authors" },
+            ` · co-authored: ${coNames}`)
+        : null,
+    ),
+    o.subject
+      ? h("p", { class: "mg-origin-subject" }, o.subject)
+      : null,
+  );
+}
+
 /**
  * Custom detail panel for merge graph.
- * For PRD nodes, renders the full TaskDetail component (from tasks view).
- * For merge nodes, renders a custom summary.
- *
- * TaskDetail callbacks are stubbed to prevent errors when users interact,
- * but the merge-graph view doesn't support editing features.
+ * For PRD nodes, renders a concise front-matter summary card.
+ * For merge nodes, renders a custom file-change summary.
  */
-function DetailPanelContent({ selection, prdData, onClose }: {
+function DetailPanelContent({ selection, prdData, origin, onClose }: {
   selection: SelectedNode;
   prdData?: PRDItemData[] | null;
+  origin: OriginEntry | undefined;
   onClose: () => void;
 }) {
   if (selection.kind === "merge") {
@@ -523,49 +783,163 @@ function DetailPanelContent({ selection, prdData, onClose }: {
     );
   }
 
-  // For PRD nodes, render the full TaskDetail component
+  // PRD node: concise front-matter summary, sourced from PRD item when available.
   const pn = selection.node;
-  if (prdData) {
-    const item = findItemById(prdData, pn.id);
-    if (item) {
-      // Stub callbacks for TaskDetail (read-only mode in merge-graph context)
-      return h(TaskDetail, {
-        item,
-        allItems: prdData,
-        showTokenBudget: false,
-        // Stub callbacks to allow rendering without errors
-        // (editing is not supported in the merge-graph context)
-        onUpdate: undefined,
-        onNavigateToItem: undefined,
-        onExecuteTask: undefined,
-        onPrdChanged: undefined,
-        onAddChild: undefined,
-        onRemove: undefined,
-        navigateTo: undefined,
-      });
+  const item = prdData ? findItemById(prdData, pn.id) : null;
+  return h(PrdFrontMatterSummary, {
+    item,
+    fallback: { title: pn.title, status: pn.status, priority: pn.priority },
+    level: pn.level,
+    origin,
+    onClose,
+  });
+}
+
+// ── Merge metadata panel ──────────────────────────────────────────────────────
+
+/**
+ * Format an ISO timestamp for display in the metadata panel.
+ *
+ * Falls back to the raw string if the date is unparseable so the panel still
+ * surfaces something useful for diagnostics rather than rendering "Invalid Date".
+ */
+function formatMergeTimestamp(iso: string): string {
+  if (!iso) return EMPTY_FIELD;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
+/**
+ * Resolve the merge nodes whose metadata should appear in the metadata panel
+ * for the current selection. PRD selections fan out to every linked merge
+ * (most-recent-first); merge selections show a single row.
+ *
+ * Pulls exclusively from `graph.nodes` — the same merge-history pipeline that
+ * powers the graph itself. No additional fetches are introduced.
+ */
+export function resolveMergeMetaForSelection(
+  graph: MergeGraph | null,
+  selection: SelectedNode | null,
+): MergeNode[] {
+  if (!graph || !selection) return [];
+  if (selection.kind === "merge") return [selection.node];
+  if (selection.linkedMergeIds.length === 0) return [];
+  const wanted = new Set(selection.linkedMergeIds);
+  return graph.nodes
+    .filter((n): n is MergeNode => n.kind === "merge" && wanted.has(n.id))
+    .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt));
+}
+
+/**
+ * One row of merge metadata: timestamp, short SHA with copy affordance, author.
+ *
+ * The copy button writes the *full* SHA to the clipboard while the rendered
+ * label stays in short form. Failure (no clipboard API, permission denied) is
+ * logged and ignored — the panel itself stays usable.
+ */
+function MergeMetaRow({ merge }: { merge: MergeNode }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+    if (!clip || typeof clip.writeText !== "function") {
+      console.warn("Clipboard API unavailable; cannot copy commit hash.");
+      return;
     }
+    try {
+      await clip.writeText(merge.sha);
+      setCopied(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.warn("Failed to copy commit hash:", err);
+    }
+  }, [merge.sha]);
+
+  return h("div", { class: "mg-meta-row" },
+    h("time", {
+      class: "mg-meta-time",
+      dateTime: merge.mergedAt,
+      title: merge.mergedAt,
+    }, formatMergeTimestamp(merge.mergedAt)),
+    h("span", { class: "mg-meta-sha" },
+      h("code", { class: "mg-meta-sha-text", title: merge.sha }, merge.shortSha),
+      h("button", {
+        type: "button",
+        class: `mg-meta-copy${copied ? " copied" : ""}`,
+        title: copied ? "Copied!" : "Copy full commit hash",
+        "aria-label": "Copy full commit hash",
+        "data-full-sha": merge.sha,
+        onClick: handleCopy,
+      }, copied ? "✓" : "⧉"),
+    ),
+    h("span", { class: "mg-meta-author", title: merge.author || EMPTY_FIELD },
+      merge.author || EMPTY_FIELD),
+  );
+}
+
+/**
+ * Panel above the graph surfacing git merge metadata for the current selection.
+ *
+ * States:
+ *   • no selection           → instructional empty state
+ *   • PRD with no merges     → "No merge recorded" state
+ *   • PRD with linked merges → one row per merge (most recent first)
+ *   • merge node selected    → single row for that merge
+ */
+function MergeMetaPanel({ graph, selection }: {
+  graph: MergeGraph | null;
+  selection: SelectedNode | null;
+}) {
+  const merges = resolveMergeMetaForSelection(graph, selection);
+
+  if (!selection) {
+    return h("div", {
+      class: "mg-meta-panel mg-meta-empty",
+      role: "status",
+      "aria-live": "polite",
+    },
+      h("span", { class: "mg-meta-label" }, "Merge metadata"),
+      h("span", { class: "mg-meta-instruction" },
+        "Select a node to view its merge timestamp, commit hash, and author.",
+      ),
+    );
   }
 
-  // Fallback: minimal PRD detail
-  return h("div", { class: "mg-detail" },
-    h("div", { class: "mg-detail-header" },
-      h("span", { class: "mg-detail-title" }, pn.level.toUpperCase()),
-      h("button", {
-        class: "mg-detail-close",
-        onClick: onClose,
-        "aria-label": "Close",
-      }, "×"),
+  if (merges.length === 0) {
+    const ctx = selection.kind === "prd"
+      ? `${selection.node.level}: ${selection.node.title}`
+      : "";
+    return h("div", {
+      class: "mg-meta-panel mg-meta-no-merge",
+      role: "status",
+      "aria-live": "polite",
+    },
+      h("span", { class: "mg-meta-label" }, "Merge metadata"),
+      h("span", { class: "mg-meta-status" }, "No merge recorded"),
+      ctx ? h("span", { class: "mg-meta-context", title: ctx }, ctx) : null,
+    );
+  }
+
+  return h("div", {
+    class: "mg-meta-panel",
+    role: "region",
+    "aria-label": "Git merge metadata for selected node",
+  },
+    h("span", { class: "mg-meta-label" },
+      merges.length > 1 ? `Merge metadata (${merges.length})` : "Merge metadata",
     ),
-    h("p", { class: "mg-detail-subject" }, pn.title),
-    h("div", { class: "mg-detail-meta" },
-      h("span", { style: { color: STATUS_COLOR[pn.status] ?? "inherit" } }, pn.status.replace("_", " ")),
-      pn.priority ? h("span", null, ` · ${pn.priority}`) : null,
+    h("div", { class: "mg-meta-rows" },
+      merges.map((m) => h(MergeMetaRow, { key: m.id, merge: m })),
     ),
-    selection.linkedMergeIds.length > 0
-      ? h("div", { class: "mg-detail-links" },
-          h("p", { class: "mg-detail-links-label" }, `${selection.linkedMergeIds.length} linked merge${selection.linkedMergeIds.length !== 1 ? "s" : ""}`),
-        )
-      : h("p", { class: "mg-detail-empty" }, "No linked merges."),
   );
 }
 
@@ -607,7 +981,17 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
+  // "full-tree" renders every PRD item from .rex/prd_tree/ at every depth —
+  // the default so the graph mirrors the on-disk layout. "epics-only" trims
+  // to the top-level epic rows for a higher-level overview.
+  const [viewMode, setViewMode] = useState<"full-tree" | "epics-only">("full-tree");
+  // Per-item PRD origin lookup cache. Populated lazily on PRD click via
+  // `/api/prd-origin`; keyed by PRD item id.
+  const [originByItemId, setOriginByItemId] = useState<Map<string, OriginEntry>>(
+    () => new Map(),
+  );
   const abortRef = useRef<AbortController | null>(null);
+  const originAbortRef = useRef<AbortController | null>(null);
 
   // ── Fetch graph ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -662,25 +1046,15 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
     return graph.nodes.filter((n): n is PrdNode => n.kind === "prd" && n.level === "epic");
   }, [graph]);
 
+  // Filter pass: which PRD/merge ids survive epic+status+date filters and the
+  // view-mode toggle. Full-tree mode renders every depth; epics-only restricts
+  // to top-level rows. There is no further expansion gate downstream — the
+  // result of this memo is what the layout sees.
   const { visiblePrdIds, visibleMergeIds } = useMemo(() => {
     if (!graph) return { visiblePrdIds: new Set<string>(), visibleMergeIds: new Set<string>() };
 
     const prdNodes = graph.nodes.filter((n): n is PrdNode => n.kind === "prd");
     const mergeNodes = graph.nodes.filter((n): n is MergeNode => n.kind === "merge");
-
-    // Build ancestor map (id -> set of ancestor ids including self)
-    const parentMap = new Map<string, string | undefined>();
-    for (const n of prdNodes) parentMap.set(n.id, n.parentId);
-
-    function getAncestors(id: string): Set<string> {
-      const result = new Set<string>();
-      let cur: string | undefined = id;
-      while (cur) {
-        result.add(cur);
-        cur = parentMap.get(cur);
-      }
-      return result;
-    }
 
     // Build subtree sets for each epic
     const epicSubtrees = new Map<string, Set<string>>();
@@ -711,6 +1085,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
 
     const prdSet = new Set<string>();
     for (const n of prdNodes) {
+      if (viewMode === "epics-only" && n.level !== "epic") continue;
       if (!epicFilter(n.id)) continue;
       if (!filters.statuses.has(n.status)) continue;
       prdSet.add(n.id);
@@ -728,7 +1103,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
     }
 
     return { visiblePrdIds: prdSet, visibleMergeIds: mergeSet };
-  }, [graph, epics, filters]);
+  }, [graph, epics, filters, viewMode]);
 
   // ── Compute layout ─────────────────────────────────────────────────────────
   const layout = useMemo(() => {
@@ -759,17 +1134,102 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
   const {
     viewBox, panning, svgRef,
     handleWheel, startPan, movePan, endPan,
-    handleZoomIn, handleZoomOut, handleFit,
+    handleZoomIn, handleZoomOut, handleFit, recenter,
   } = usePanZoom(fitVB);
+
+  // ── Position lookup for recenter on click ──────────────────────────────────
+  // The layout already places every visible node at a known (x,y); pulling
+  // those into a map gives O(1) lookup from the click handler so we can pan
+  // the viewport to follow the user's selection.
+  const positionByNodeId = useMemo(() => {
+    const map = new Map<string, { x: number; y: number }>();
+    if (!layout) return map;
+    for (const ln of layout.nodes) {
+      map.set(ln.id, { x: ln.x, y: ln.y });
+    }
+    return map;
+  }, [layout]);
+
+  // ── Origin lookup ──────────────────────────────────────────────────────────
+  // Per-item lazy fetch of `/api/prd-origin?path=<treePath>`. The request is
+  // skipped when we already hold a non-loading entry for that id; the result
+  // (a `PrdOrigin` or null for "not yet committed") is written into
+  // `originByItemId` and surfaced through `DetailPanelContent`.
+  const ensureOrigin = useCallback((node: PrdNode) => {
+    if (!node.treePath) {
+      setOriginByItemId((prev) => {
+        if (prev.get(node.id)?.kind === "ready") return prev;
+        const next = new Map(prev);
+        next.set(node.id, { kind: "ready", origin: null });
+        return next;
+      });
+      return;
+    }
+
+    const existing = originByItemId.get(node.id);
+    if (existing && existing.kind !== "error") return;
+
+    originAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    originAbortRef.current = ctrl;
+
+    setOriginByItemId((prev) => {
+      const next = new Map(prev);
+      next.set(node.id, { kind: "loading" });
+      return next;
+    });
+
+    fetch(`/api/prd-origin?path=${encodeURIComponent(node.treePath)}`, { signal: ctrl.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        return r.json() as Promise<{ origin: PrdOrigin | null }>;
+      })
+      .then((data) => {
+        setOriginByItemId((prev) => {
+          const next = new Map(prev);
+          next.set(node.id, { kind: "ready", origin: data.origin });
+          return next;
+        });
+      })
+      .catch((err: Error) => {
+        if (err.name === "AbortError") return;
+        setOriginByItemId((prev) => {
+          const next = new Map(prev);
+          next.set(node.id, { kind: "error", message: err.message });
+          return next;
+        });
+      });
+  }, [originByItemId]);
 
   // ── Node click handlers ────────────────────────────────────────────────────
   const handlePrdClick = useCallback((node: PrdNode) => {
     if (!graph) return;
-    const linkedEdges = graph.edges.filter((e) => e.to === node.id && visibleMergeIds.has(e.from));
-    const linkedMergeIds = linkedEdges.map((e) => e.from);
+    // Highlight the selected node's full subtree (direct + transitive
+    // descendants) plus every merge linked to anything in that subtree.
+    // Selecting a different node always builds a fresh highlight set,
+    // so the previous selection is implicitly cleared.
+    const subtreeIds = collectPrdSubtreeIds(graph, node.id);
+    const subtreeMergeIds = graph.edges
+      .filter((e) => subtreeIds.has(e.to) && visibleMergeIds.has(e.from))
+      .map((e) => e.from);
+    const linkedMergeIds = graph.edges
+      .filter((e) => e.to === node.id && visibleMergeIds.has(e.from))
+      .map((e) => e.from);
     setSelected({ kind: "prd", node, linkedMergeIds });
-    setHighlightIds(new Set([node.id, ...linkedMergeIds]));
-  }, [graph, visibleMergeIds]);
+    setHighlightIds(new Set([...subtreeIds, ...subtreeMergeIds]));
+
+    // Recenter the canvas on the clicked node so the user's focus follows
+    // the selection — the merge-metadata and detail panels grow above /
+    // below the SVG, which would otherwise push the clicked node out of
+    // view.
+    const pos = positionByNodeId.get(node.id);
+    if (pos) recenter(pos);
+
+    // Kick off (or reuse) the lazy origin lookup for this item. The detail
+    // panel reads `originByItemId.get(node.id)` to render loading / ready /
+    // error / "no commit history" states.
+    ensureOrigin(node);
+  }, [graph, visibleMergeIds, positionByNodeId, recenter, ensureOrigin]);
 
   const handleMergeClick = useCallback((node: MergeNode) => {
     if (!graph) return;
@@ -777,7 +1237,9 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
     const linkedPrdIds = linkedEdges.map((e) => e.to);
     setSelected({ kind: "merge", node });
     setHighlightIds(new Set([node.id, ...linkedPrdIds]));
-  }, [graph, visiblePrdIds]);
+    const pos = positionByNodeId.get(node.id);
+    if (pos) recenter(pos);
+  }, [graph, visiblePrdIds, positionByNodeId, recenter]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (loading) {
@@ -821,6 +1283,27 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
               title: "Back to Tasks",
             }, "☑ Tasks")
           : null,
+        // View-mode toggle: full PRD tree (default) vs epic-only summary.
+        // Two segmented buttons styled with the existing filter chip pattern
+        // so the visual language stays consistent with the filter bar below.
+        h("div", {
+          class: "mg-view-toggle",
+          role: "group",
+          "aria-label": "View mode",
+        },
+          h("button", {
+            class: `mg-chip${viewMode === "full-tree" ? " active" : ""}`,
+            "aria-pressed": viewMode === "full-tree" ? "true" : "false",
+            title: "Show every PRD item (epic → feature → task → subtask)",
+            onClick: () => setViewMode("full-tree"),
+          }, "Full tree"),
+          h("button", {
+            class: `mg-chip${viewMode === "epics-only" ? " active" : ""}`,
+            "aria-pressed": viewMode === "epics-only" ? "true" : "false",
+            title: "Show only top-level epics",
+            onClick: () => setViewMode("epics-only"),
+          }, "Epics only"),
+        ),
         h("button", {
           class: `mg-filter-btn${showFilters ? " active" : ""}`,
           onClick: () => setShowFilters((v) => !v),
@@ -918,6 +1401,9 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
         ? h("div", { class: "mg-notice" }, "No merge commits could be linked to PRD items yet. Merges are shown separately on the right.")
         : null,
 
+    // ── Merge metadata panel (above the graph) ───────────────────────────────
+    h(MergeMetaPanel, { graph, selection: selected }),
+
     // ── Main canvas ──────────────────────────────────────────────────────────
     h("div", { class: "mg-canvas" },
       // Zoom controls
@@ -1009,17 +1495,20 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
               : false;
 
             if (edge.kind === "tree") {
-              // Elbow connector: horizontal then vertical
-              const midX = (edge.x1 + edge.x2) / 2;
+              // Folder-tree connector: vertical rail aligned with the parent's
+              // x, dropping past the child's row, then a horizontal elbow
+              // reaching into the child. Mirrors the indent rail used by the
+              // dashboard's PRD tree view.
               return h("path", {
                 key: edge.id,
                 class: `mg-edge-tree${isHighlighted ? " highlighted" : ""}`,
-                d: `M${edge.x1},${edge.y1} C${midX},${edge.y1} ${midX},${edge.y2} ${edge.x2},${edge.y2}`,
+                d: `M${edge.x1},${edge.y1} L${edge.x1},${edge.y2} L${edge.x2},${edge.y2}`,
                 fill: "none",
               });
             }
 
-            // Merge link: straight line
+            // Merge link: horizontal-leaning bezier from the merge column to
+            // its linked PRD node.
             const stroke = attributionStroke(edge.attribution);
             const midX = (edge.x1 + edge.x2) / 2;
             return h("path", {
@@ -1040,13 +1529,14 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
             .map((ln) => {
               const n = ln.node;
               const r = LEVEL_RADIUS[n.level] ?? 6;
-              const fill = STATUS_COLOR[n.status] ?? "var(--text-muted)";
+              const fill = SHAPE_COLOR[n.shape ?? "circle"] ?? "var(--text-muted)";
               const isHighlighted = hasHighlight ? highlightIds.has(n.id) : true;
               const isSelected = selected?.kind === "prd" && selected.node.id === n.id;
               return h("g", {
                 key: n.id,
                 class: `mg-node mg-prd-node${isSelected ? " selected" : ""}`,
                 transform: `translate(${ln.x},${ln.y})`,
+                "data-prd-id": n.id,
                 onClick: (e: MouseEvent) => { e.stopPropagation(); handlePrdClick(n); },
                 role: "button",
                 tabIndex: 0,
@@ -1057,13 +1547,19 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
                 style: { opacity: isHighlighted ? 1 : 0.2 },
               },
                 ...renderNodeShape(n.shape, r, fill, isSelected),
+                // Label sits to the right of the shape on the same row — the
+                // compact folder-tree rhythm renders one indented line per
+                // node. Status is encoded by the glyph prefix
+                // (`shortStatus(n.status)`); shape encodes structural class.
                 h("text", {
                   x: r + 6,
-                  y: 4,
-                  class: "mg-label",
-                  "font-size": n.level === "epic" ? 11 : 9,
+                  y: 0,
+                  class: "mg-label mg-prd-label",
+                  "text-anchor": "start",
+                  "dominant-baseline": "middle",
+                  "font-size": n.level === "epic" ? 11 : 10,
                   "font-weight": n.level === "epic" ? 600 : 400,
-                }, shortStatus(n.status) + " " + (n.title.length > 28 ? n.title.slice(0, 26) + "…" : n.title)),
+                }, shortStatus(n.status) + " " + (n.title.length > 48 ? n.title.slice(0, 46) + "…" : n.title)),
               );
             }),
         ),
@@ -1077,7 +1573,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
               const isHighlighted = hasHighlight ? highlightIds.has(n.id) : true;
               const isSelected = selected?.kind === "merge" && selected.node.id === n.id;
               const fill = ln.linked ? "var(--brand-purple)" : "var(--text-muted)";
-              const sz = 8; // half-size of diamond
+              const sz = 6; // half-size of diamond — sized to match PRD radii
               return h("g", {
                 key: n.id,
                 class: `mg-node mg-merge-node${isSelected ? " selected" : ""}`,
@@ -1109,44 +1605,42 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
                 }),
                 h("text", {
                   x: sz + 6,
-                  y: 4,
+                  y: 0,
                   class: "mg-label mg-merge-label",
+                  "text-anchor": "start",
+                  "dominant-baseline": "middle",
                   "font-size": 9,
-                }, n.shortSha + " " + (n.subject.length > 24 ? n.subject.slice(0, 22) + "…" : n.subject)),
+                }, n.shortSha + " " + (n.subject.length > 32 ? n.subject.slice(0, 30) + "…" : n.subject)),
               );
             }),
         ),
 
-        // ── Column labels ────────────────────────────────────────────────────
-        visiblePrdIds.size > 0
+        // ── Column header for the merges column ──────────────────────────────
+        // In the compact folder-tree layout level identity is encoded by the
+        // node's shape and indent depth, so per-row level labels are
+        // redundant. We keep a single "MERGES" header above the merge column
+        // to anchor the right-hand stack visually.
+        visiblePrdIds.size > 0 && mergesColX(layout) !== null
           ? h("g", { class: "mg-col-labels", "pointer-events": "none" },
-              Object.entries(LEVEL_DEPTH).map(([level, depth]) => {
-                const x = depth * COL_W + COL_W / 2;
-                const y = viewBox.y + 16;
-                return h("text", {
-                  key: level,
-                  x, y,
-                  class: "mg-col-label",
-                  "font-size": 10,
-                  "text-anchor": "middle",
-                }, level.toUpperCase());
-              }),
-              mergesColX(layout) !== null
-                ? h("text", {
-                    x: mergesColX(layout)!,
-                    y: viewBox.y + 16,
-                    class: "mg-col-label",
-                    "font-size": 10,
-                    "text-anchor": "middle",
-                  }, "MERGES")
-                : null,
+              h("text", {
+                x: mergesColX(layout)!,
+                y: viewBox.y + 14,
+                class: "mg-col-label",
+                "font-size": 10,
+                "text-anchor": "middle",
+              }, "MERGES"),
             )
           : null,
       ),
 
       // ── Detail panel ───────────────────────────────────────────────────────
       selected
-        ? h(DetailPanelContent, { selection: selected, prdData, onClose: clearSelection })
+        ? h(DetailPanelContent, {
+            selection: selected,
+            prdData,
+            origin: selected.kind === "prd" ? originByItemId.get(selected.node.id) : undefined,
+            onClose: clearSelection,
+          })
         : null,
     ),
   );

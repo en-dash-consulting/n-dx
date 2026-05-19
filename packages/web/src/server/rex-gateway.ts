@@ -114,3 +114,11 @@ export { serializeDocument, parseDocument } from "@n-dx/rex";
 
 // ---- Rex folder-tree parser (used by prd-io cache) --------------------------
 export { parseFolderTree } from "@n-dx/rex";
+
+// ---- Rex folder-tree slug resolver (used by merge-history graph builder) ----
+// `resolveSiblingSlugs` is the canonical way to determine the on-disk slug for
+// each PRDItem at a given level, accounting for collisions and short-id
+// suffixes. The merge-history graph builder uses it to label PRD nodes with
+// their folder-tree path so the context-graph hierarchy mirrors `.rex/prd_tree/`
+// without re-walking the directory.
+export { resolveSiblingSlugs } from "@n-dx/rex";

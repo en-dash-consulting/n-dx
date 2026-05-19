@@ -58,6 +58,11 @@ export function collectEpicTaskIds(items: PRDItem[], epicId: string): Set<string
 // Task status validation
 // ---------------------------------------------------------------------------
 
+/** Shared predicate: check if a task is completed. */
+export function isCompletedTask(item: PRDItem): boolean {
+  return item.status === "completed";
+}
+
 /** Statuses that cannot be worked on. */
 const NON_ACTIONABLE_STATUSES = new Set(["completed", "deferred", "blocked"]);
 
@@ -160,6 +165,16 @@ export async function assembleTaskBrief(
     if (!entry) {
       throw new Error(`Task not found: ${taskId}`);
     }
+    // Check for completed tasks specifically
+    if (isCompletedTask(entry.item)) {
+      throw new TaskNotActionableError(
+        taskId,
+        "completed",
+        buildSuggestion("completed", taskId),
+        entry.item.title,
+      );
+    }
+    // Check for other non-actionable statuses
     if (NON_ACTIONABLE_STATUSES.has(entry.item.status)) {
       throw new TaskNotActionableError(
         taskId,

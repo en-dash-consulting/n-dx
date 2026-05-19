@@ -135,6 +135,12 @@ export function buildSystemPrompt(
   lines.push("- If validation/build fails, fix it before committing — never commit broken code.");
   lines.push("- If you're stuck after 3 attempts at the same problem, log what you tried and move on.\n");
 
+  if (isCli) {
+    lines.push("## Plan Mode Invariant");
+    lines.push("Do not enter plan mode. Do not call ExitPlanMode. Do not produce plan-only responses.");
+    lines.push("If you have a plan, execute it. If uncertain, read the codebase and proceed with the most consistent approach.\n");
+  }
+
   if (!isCli) {
     lines.push("## Tool Notes");
     lines.push("- File paths are relative to the project root.");

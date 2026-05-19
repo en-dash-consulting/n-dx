@@ -1,0 +1,26 @@
+---
+id: "c60d547f-0106-4dda-af1c-56db695ae9f6"
+level: "task"
+title: "Consolidate hash-suffixed duplicates with child reassignment and body merge"
+status: "completed"
+priority: "high"
+tags:
+  - "rex"
+  - "reshape"
+  - "prd"
+source: "smart-add"
+startedAt: "2026-05-14T13:36:50.853Z"
+completedAt: "2026-05-14T14:01:53.104Z"
+endedAt: "2026-05-14T14:01:53.104Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented GroupAction for parent-container strategy, updated survivor selection (children > no-suffix > createdAt > non-new), added reasonForBodyMerge for LLM-driven description merge, wired hash-suffix detection into cmdReshape with per-group CLI output, added archive recording in runScopedConsolidationPass. 6 files changed, 11 new tests, 4112 passing."
+acceptanceCriteria:
+  - "Merge strategy reparents all descendant items from older duplicates to the survivor with zero data loss"
+  - "Body/description of the surviving item is rewritten to describe the combined generic case (LLM-driven, using configured reshape model)"
+  - "Parent-container strategy creates a new container with the normalized title and moves duplicates under it with specific renamed titles"
+  - "Survivor selection prefers the item with existing children; ties broken by oldest creation timestamp"
+  - "All writes go through the folder-tree serializer to `.rex/prd_tree/`; no JSON write paths touched"
+  - "Pre-reshape commit hash and merge audit (old IDs, reasoning, strategy chosen) are recorded in `.rex/archive.json` consistent with existing reshape audit pattern"
+  - "CLI output prints a per-group summary line: survivor ID, merged IDs, strategy, reparented child count"
+description: "Apply three consolidation strategies to detected duplicate groups: (1) merge into a single canonical item — reparent all children of older duplicates to the survivor and rewrite the body/description to cover the combined generic case; (2) when items represent distinct concrete cases, create a new parent container, move each duplicate under it, and rename each child to reflect its specific scope; (3) when only one group member has children, prefer that as the survivor. All operations must write only to `.rex/prd_tree/` and record reasoning + old IDs in the existing reshape archive audit trail."
+---
