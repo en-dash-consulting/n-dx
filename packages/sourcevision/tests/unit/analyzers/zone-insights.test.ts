@@ -377,12 +377,14 @@ describe("analyzeZones structureChanged", () => {
       makeEdge("src/a/x.ts", "src/a/z.ts"),
     ]);
 
-    // Simulate a previousZones at pass 3 with a different structure hash
+    // Simulate a legacy previousZones (no inputFingerprint) at pass 3 with a
+    // different structure hash, exercising the structureHash fallback path.
     const firstResult = await analyzeZones(inventory, imports, { enrich: false });
     const previousZones: Zones = {
       ...firstResult.zones,
       enrichmentPass: 3,
       structureHash: "different-hash-to-force-reset",
+      inputFingerprint: undefined,
     };
 
     // Run with same data but previousZones has wrong structureHash
@@ -414,6 +416,7 @@ describe("analyzeZones structureChanged", () => {
       ...firstResult.zones,
       enrichmentPass: 5,
       structureHash: "different-hash-to-force-reset",
+      inputFingerprint: undefined,
     };
 
     const onReset = vi.fn();
@@ -453,6 +456,43 @@ describe("analyzeZones structureChanged", () => {
 
     expect(onReset).not.toHaveBeenCalled();
     expect(result.zones.lastReset).toBeUndefined();
+  });
+
+  it("reuses prior structure and does not reset when inputs are unchanged even if structureHash differs", async () => {
+    const inventory = makeInventory([
+      makeFileEntry("src/a/x.ts"),
+      makeFileEntry("src/a/y.ts"),
+      makeFileEntry("src/a/z.ts"),
+    ]);
+    const imports = makeImports([
+      makeEdge("src/a/x.ts", "src/a/y.ts"),
+      makeEdge("src/a/y.ts", "src/a/z.ts"),
+      makeEdge("src/a/x.ts", "src/a/z.ts"),
+    ]);
+
+    const { zones: firstRun } = await analyzeZones(inventory, imports, { enrich: false });
+    expect(firstRun.inputFingerprint).toBeTruthy();
+
+    // Simulate a non-deterministic Louvain re-partition: structureHash is stale
+    // but the analysis inputs (file hashes + config) are byte-identical. The
+    // fingerprint match must short-circuit the reset.
+    const previousZones: Zones = {
+      ...firstRun,
+      enrichmentPass: 4,
+      structureHash: "stale-nondeterministic-louvain-hash",
+    };
+
+    const onReset = vi.fn();
+    const result = await analyzeZones(inventory, imports, {
+      enrich: false,
+      previousZones,
+      onReset,
+    });
+
+    expect(result.structureChanged).toBe(false);
+    expect(onReset).not.toHaveBeenCalled();
+    expect(result.zones.lastReset).toBeUndefined();
+    expect(result.zones.inputFingerprint).toBe(firstRun.inputFingerprint);
   });
 
   it("does not call onReset on first run (no previousZones)", async () => {

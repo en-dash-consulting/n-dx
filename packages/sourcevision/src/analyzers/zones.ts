@@ -704,9 +704,21 @@ export function assignByProximity(
  * pinned target zone. Files whose target zone doesn't exist are skipped.
  * This runs after Louvain detection and proximity assignment.
  */
+/**
+ * A configured zone pin that could not be applied this run.
+ * `target-zone-absent` is the important one: the pin's target zone did not
+ * form (Louvain non-determinism), so the file silently fell back elsewhere.
+ */
+export interface ZonePinSkip {
+  file: string;
+  targetZoneId: string;
+  reason: "target-zone-absent" | "file-unzoned";
+}
+
 export function applyZonePins(
   zones: Zone[],
   pins: Record<string, string>,
+  skipped?: ZonePinSkip[],
 ): Zone[] {
   // Build file → source zone index
   const fileToZoneIdx = new Map<string, number>();
@@ -727,7 +739,16 @@ export function applyZonePins(
   for (const [file, targetZoneId] of Object.entries(pins)) {
     const sourceIdx = fileToZoneIdx.get(file);
     const targetIdx = zoneIdToIdx.get(targetZoneId);
-    if (sourceIdx === undefined || targetIdx === undefined) continue;
+    if (targetIdx === undefined) {
+      // The pin's target zone did not form this run — the file is NOT moved
+      // and silently lands wherever Louvain put it. Surface this.
+      skipped?.push({ file, targetZoneId, reason: "target-zone-absent" });
+      continue;
+    }
+    if (sourceIdx === undefined) {
+      skipped?.push({ file, targetZoneId, reason: "file-unzoned" });
+      continue;
+    }
     if (sourceIdx === targetIdx) continue; // already in target zone
     moves.push([file, sourceIdx, targetIdx]);
   }
@@ -745,6 +766,157 @@ export function applyZonePins(
 
   // Remove zones that became empty
   return result.filter((z) => z.files.length > 0);
+}
+
+// ── Declared zone anchors (issue #210, Part 2) ───────────────────────────────
+
+/**
+ * A config-declared zone that is forced to exist from a file glob, regardless
+ * of what Louvain produced. This gives single-target pin consolidations a
+ * stable anchor so they are deterministic across runs.
+ * Configured in `.n-dx.json` under `sourcevision.zones.anchors`.
+ */
+export interface ZoneAnchor {
+  id: string;
+  name: string;
+  include: string[];
+  exclude?: string[];
+}
+
+/** Minimal, dependency-free path-glob → anchored RegExp (`**`, `*`, `?`). */
+function globToRegExp(glob: string): RegExp {
+  let re = "";
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === "*") {
+      if (glob[i + 1] === "*") {
+        re += ".*";
+        i++;
+        if (glob[i + 1] === "/") i++; // consume `**/` as "any depth incl. none"
+      } else {
+        re += "[^/]*";
+      }
+    } else if (c === "?") {
+      re += "[^/]";
+    } else if ("\\^$.|+()[]{}".includes(c)) {
+      re += `\\${c}`;
+    } else {
+      re += c;
+    }
+  }
+  return new RegExp(`^${re}$`);
+}
+
+function matchesAnyGlob(path: string, globs: readonly RegExp[]): boolean {
+  return globs.some((g) => g.test(path));
+}
+
+/**
+ * Resolve which scope files each anchor claims. Anchors are evaluated in
+ * declared order; the first anchor whose include matches (and exclude does
+ * not) wins a file. Returns ordered file lists plus anchors that matched
+ * nothing (surfaced as a warning).
+ */
+function matchAnchorFiles(
+  scopeFiles: readonly string[],
+  anchors: readonly ZoneAnchor[],
+): { byAnchor: Map<string, string[]>; emptyAnchors: ZoneAnchor[] } {
+  const compiled = anchors.map((a) => ({
+    anchor: a,
+    include: a.include.map(globToRegExp),
+    exclude: (a.exclude ?? []).map(globToRegExp),
+  }));
+  const byAnchor = new Map<string, string[]>();
+  for (const { anchor } of compiled) byAnchor.set(anchor.id, []);
+  for (const file of scopeFiles) {
+    for (const { anchor, include, exclude } of compiled) {
+      if (matchesAnyGlob(file, include) && !matchesAnyGlob(file, exclude)) {
+        byAnchor.get(anchor.id)!.push(file);
+        break;
+      }
+    }
+  }
+  for (const files of byAnchor.values()) files.sort();
+  const emptyAnchors = compiled
+    .filter(({ anchor }) => byAnchor.get(anchor.id)!.length === 0)
+    .map(({ anchor }) => anchor);
+  return { byAnchor, emptyAnchors };
+}
+
+/**
+ * Force declared anchors to exist as zones: carve their files out of whatever
+ * zone Louvain/enrichment placed them in and reconstitute a zone with the
+ * anchor's id/name. Applied after enrichment and before zone pins so that pins
+ * targeting an anchor id always resolve deterministically.
+ */
+function assertAnchorZones(
+  zones: Zone[],
+  anchors: readonly ZoneAnchor[],
+  scopeFiles: readonly string[],
+  imports: Imports,
+): { zones: Zone[]; emptyAnchors: ZoneAnchor[] } {
+  if (anchors.length === 0) return { zones, emptyAnchors: [] };
+  const { byAnchor, emptyAnchors } = matchAnchorFiles(scopeFiles, anchors);
+  const anchorIds = new Set(anchors.map((a) => a.id));
+
+  // Glob-matched files are governed by the anchor's glob.
+  const globAnchored = new Set<string>();
+  for (const files of byAnchor.values()) for (const f of files) globAnchored.add(f);
+
+  // A pre-existing zone sharing an anchor's id (e.g. a file already pinned to
+  // that id by the pipeline) folds its non-glob files INTO the anchor — the
+  // user pinned to that id meaning the anchor. Build each anchor's final set.
+  const anchorFiles = new Map<string, string[]>();
+  for (const anchor of anchors) {
+    const base = byAnchor.get(anchor.id) ?? [];
+    const sameId = zones.find((z) => z.id === anchor.id);
+    const folded = (sameId?.files ?? []).filter((f) => !globAnchored.has(f));
+    anchorFiles.set(anchor.id, [...new Set([...base, ...folded])].sort());
+  }
+  const anchored = new Set<string>(globAnchored);
+  for (const files of anchorFiles.values()) for (const f of files) anchored.add(f);
+
+  // Remove anchored files from other zones; drop any zone whose id collides
+  // with an anchor (its files were folded above) and zones that empty out.
+  const stripped = zones
+    .map((z) => ({ ...z, files: z.files.filter((f) => !anchored.has(f)) }))
+    .filter((z) => z.files.length > 0 && !anchorIds.has(z.id));
+
+  // Cohesion/coupling straight from import edges (no undirected graph here).
+  const metricsFor = (memberSet: Set<string>): { cohesion: number; coupling: number } => {
+    let internal = 0;
+    let total = 0;
+    for (const e of imports.edges) {
+      if (!memberSet.has(e.from)) continue;
+      total++;
+      if (memberSet.has(e.to)) internal++;
+    }
+    if (total === 0) return { cohesion: memberSet.size <= 1 ? 1 : 0, coupling: 0 };
+    return {
+      cohesion: Math.round((internal / total) * 100) / 100,
+      coupling: Math.round(((total - internal) / total) * 100) / 100,
+    };
+  };
+
+  const anchorZones: Zone[] = [];
+  for (const anchor of anchors) {
+    const files = anchorFiles.get(anchor.id) ?? [];
+    if (files.length === 0) continue;
+    const memberSet = new Set(files);
+    const { cohesion, coupling } = metricsFor(memberSet);
+    const prev = zones.find((z) => z.id === anchor.id);
+    anchorZones.push({
+      id: anchor.id,
+      name: anchor.name,
+      description: prev?.description ?? `Declared zone anchor (${files.length} files).`,
+      files,
+      entryPoints: computeEntryPoints(memberSet, imports),
+      cohesion,
+      coupling,
+    });
+  }
+
+  return { zones: [...stripped, ...anchorZones], emptyAnchors };
 }
 
 // ── Recursive subdivision ────────────────────────────────────────────────────
@@ -824,6 +996,40 @@ export function computeStructureHash(zones: Zone[]): string {
     .sort()
     .join("\0");
   return createHash("sha256").update(data).digest("hex").slice(0, 16);
+}
+
+/**
+ * Hash the analysis inputs that determine the Louvain partition, independent
+ * of the partition itself. Same file contents + same zone config → same
+ * fingerprint → safe to reuse the previous zone structure and skip the
+ * non-deterministic Louvain re-run that would otherwise reset enrichmentPass.
+ */
+export function computeInputFingerprint(
+  inventory: Inventory,
+  zonePins?: Record<string, string>,
+  smallZoneMergeThreshold?: number,
+  maxZonePercent?: number,
+  zoneAnchors?: readonly ZoneAnchor[],
+): string {
+  const fileData = inventory.files
+    .map((f) => `${f.path}\0${f.hash}`)
+    .sort()
+    .join("\n");
+  const pinData = Object.entries(zonePins ?? {})
+    .map(([k, v]) => `${k}=${v}`)
+    .sort()
+    .join("\n");
+  const anchorData = (zoneAnchors ?? [])
+    .map((a) =>
+      `${a.id}|${a.name}|${[...a.include].sort().join(",")}|${[...(a.exclude ?? [])].sort().join(",")}`,
+    )
+    .sort()
+    .join("\n");
+  const cfg = `mt=${smallZoneMergeThreshold ?? ""}\0mzp=${maxZonePercent ?? ""}`;
+  return createHash("sha256")
+    .update(`${fileData}\0\0${pinData}\0\0${anchorData}\0\0${cfg}`)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 /**
@@ -2201,6 +2407,82 @@ function dedupeZonesById(zones: Zone[]): Zone[] {
   return out;
 }
 
+// ── Helper: skipped-pin findings ─────────────────────────────────────────────
+
+/**
+ * Turn un-appliable zone pins into visible warnings. The dominant case is
+ * `target-zone-absent`: the pin's target zone did not form in this Louvain
+ * run, so the pinned files silently fell back elsewhere — previously this was
+ * only detectable by diffing `zones.json` (see issue #210).
+ */
+function computeSkippedPinFindings(skipped: ZonePinSkip[]): Finding[] {
+  if (skipped.length === 0) return [];
+  const findings: Finding[] = [];
+
+  const absentByZone = new Map<string, string[]>();
+  const unzoned: ZonePinSkip[] = [];
+  for (const s of skipped) {
+    if (s.reason === "target-zone-absent") {
+      const list = absentByZone.get(s.targetZoneId) ?? [];
+      list.push(s.file);
+      absentByZone.set(s.targetZoneId, list);
+    } else {
+      unzoned.push(s);
+    }
+  }
+
+  for (const [zoneId, files] of [...absentByZone.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const sorted = [...files].sort();
+    const shown = sorted.slice(0, 8).join(", ");
+    const more = sorted.length > 8 ? `, +${sorted.length - 8} more` : "";
+    findings.push({
+      type: "anti-pattern",
+      pass: 0,
+      scope: "global",
+      severity: "warning",
+      category: "structural",
+      text:
+        `Zone pin target "${zoneId}" did not form this analysis run — ` +
+        `${sorted.length} pin(s) skipped and those files fell back to their Louvain zone. ` +
+        `Single-target consolidations to "${zoneId}" are non-deterministic until it is a stable anchor. ` +
+        `Skipped: ${shown}${more}.`,
+      related: [zoneId, ...sorted],
+    });
+  }
+
+  for (const s of unzoned.sort((a, b) => a.file.localeCompare(b.file))) {
+    findings.push({
+      type: "anti-pattern",
+      pass: 0,
+      scope: "global",
+      severity: "info",
+      category: "structural",
+      text: `Zone pin for "${s.file}" → "${s.targetZoneId}" skipped: the file is not present in any detected zone (out of scope or unzoned).`,
+      related: [s.file, s.targetZoneId],
+    });
+  }
+
+  return findings;
+}
+
+/** Warn when a declared anchor's globs matched zero files. */
+function computeEmptyAnchorFindings(emptyAnchors: readonly ZoneAnchor[]): Finding[] {
+  return [...emptyAnchors]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((a) => ({
+      type: "anti-pattern" as const,
+      pass: 0,
+      scope: "global",
+      severity: "warning" as const,
+      category: "structural" as const,
+      text:
+        `Declared zone anchor "${a.id}" matched no files (include: ${a.include.join(", ")}). ` +
+        `The anchor zone will not exist, so pins targeting "${a.id}" will be skipped — ` +
+        `fix the glob or remove the anchor.`,
+      related: [a.id],
+    }));
+}
+
 // ── Helper: move recommendations ─────────────────────────────────────────────
 
 /** Detect pin divergence and import-neighbor move recommendations. */
@@ -2291,6 +2573,7 @@ function buildAnalyzeZonesResult(opts: {
   allFindings: Finding[];
   enrichmentPass: number;
   structureHash: string;
+  inputFingerprint: string;
   remappedContentHashes: Record<string, string>;
   previousZones: Zones | undefined;
   structureChanged: boolean;
@@ -2299,7 +2582,7 @@ function buildAnalyzeZonesResult(opts: {
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
-    enrichmentPass, structureHash, remappedContentHashes,
+    enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability,
   } = opts;
 
@@ -2322,6 +2605,7 @@ function buildAnalyzeZonesResult(opts: {
       enrichmentPass: enrichmentPass > 0 ? displayPass : undefined,
       ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
       structureHash,
+      inputFingerprint,
       zoneContentHashes: remappedContentHashes,
       ...(lastReset ? { lastReset } : {}),
       ...(stability ? { stability } : {}),
@@ -2365,6 +2649,12 @@ export async function analyzeZones(
      */
     smallZoneMergeThreshold?: number;
     /**
+     * Declared zone anchors: zones forced to exist from a file glob so that
+     * single-target pin consolidations are deterministic across runs.
+     * Configured in `.n-dx.json` under `sourcevision.zones.anchors`.
+     */
+    zoneAnchors?: ZoneAnchor[];
+    /**
      * Skip Louvain zone detection and reuse the zone structure from previousZones.
      * Used by --full enrichment passes to avoid non-deterministic re-partitioning.
      */
@@ -2386,7 +2676,26 @@ export async function analyzeZones(
   let structureHash: string;
   let structureChanged: boolean;
 
-  if (options?.reuseStructure && previousZones) {
+  const inputFingerprint = computeInputFingerprint(
+    inventory,
+    options?.zonePins,
+    options?.smallZoneMergeThreshold,
+    options?.maxZonePercent,
+    options?.zoneAnchors,
+  );
+
+  // Reuse the previous zone partition when the caller explicitly asks for it
+  // (--full enrichment passes) OR when the analysis inputs are byte-identical
+  // to the previous run. The latter prevents non-deterministic Louvain from
+  // re-partitioning — and thus resetting enrichmentPass to 1 — on a no-op
+  // re-analyze where no code or zone config changed.
+  const inputsUnchanged =
+    !!previousZones?.zones?.length &&
+    !!previousZones.structureHash &&
+    previousZones.inputFingerprint === inputFingerprint;
+  const reuseStructure = (options?.reuseStructure ?? false) || inputsUnchanged;
+
+  if (reuseStructure && previousZones) {
     // Reuse existing zone structure — skip Louvain to avoid non-deterministic
     // re-partitioning that resets enrichmentPass on every --full iteration.
     expandedZones = previousZones.zones.map((z) => ({ ...z }));
@@ -2463,10 +2772,17 @@ export async function analyzeZones(
     zoneContentHashes, expandedZones, finalZones,
   );
 
+  // ── Force declared anchor zones to exist (before pins resolve) ──
+  const { zones: anchoredZones, emptyAnchors } =
+    options?.zoneAnchors && options.zoneAnchors.length > 0
+      ? assertAnchorZones(finalZones, options.zoneAnchors, scopeFiles, imports)
+      : { zones: finalZones, emptyAnchors: [] as ZoneAnchor[] };
+
   // ── Apply zone pins (post-enrichment) ──
+  const skippedPins: ZonePinSkip[] = [];
   const pinnedFinalZones = options?.zonePins && Object.keys(options.zonePins).length > 0
-    ? applyZonePins(finalZones, options.zonePins)
-    : finalZones;
+    ? applyZonePins(anchoredZones, options.zonePins, skippedPins)
+    : anchoredZones;
 
   // ── Promote sub-analyses and build crossings ──
   const { allZones, promotedCrossings } =
@@ -2487,6 +2803,8 @@ export async function analyzeZones(
   );
   structural.findings.push(
     ...computeMoveFindings(pinnedFinalZones, crossings, imports.edges, options?.zonePins ?? {}),
+    ...computeSkippedPinFindings(skippedPins),
+    ...computeEmptyAnchorFindings(emptyAnchors),
   );
 
   // ── Merge insights ──
@@ -2518,7 +2836,7 @@ export async function analyzeZones(
   // ── Build result ──
   return buildAnalyzeZonesResult({
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
-    enrichmentPass, structureHash, remappedContentHashes,
+    enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability,
   });
 }

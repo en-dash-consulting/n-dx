@@ -24,6 +24,7 @@ import {
   enrichClassificationsWithLLM,
   mergeClassificationResults,
   analyzeZones,
+  type ZoneAnchor,
   analyzeComponents,
   analyzeCallGraph,
   computeZoneCallStats,
@@ -310,9 +311,22 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     const smallZoneMergeThreshold = typeof zonesConfig?.mergeThreshold === "number"
       ? zonesConfig.mergeThreshold
       : undefined;
+    // Validate `sourcevision.zones.anchors` at this trust boundary (JSON config).
+    const rawAnchors = Array.isArray(zonesConfig?.anchors) ? zonesConfig.anchors : [];
+    const zoneAnchors: ZoneAnchor[] = rawAnchors.flatMap((a: unknown): ZoneAnchor[] => {
+      if (!a || typeof a !== "object") return [];
+      const o = a as Record<string, unknown>;
+      const include = Array.isArray(o.include) ? o.include.filter((g): g is string => typeof g === "string") : [];
+      if (typeof o.id !== "string" || typeof o.name !== "string" || include.length === 0) return [];
+      const exclude = Array.isArray(o.exclude) ? o.exclude.filter((g): g is string => typeof g === "string") : [];
+      return [{ id: o.id, name: o.name, include, ...(exclude.length ? { exclude } : {}) }];
+    });
     const pinCount = Object.keys(zonePins).length;
     if (pinCount > 0) {
       info(`  ${dim(`Applying ${pinCount} zone pin(s) from .n-dx.json`)}`);
+    }
+    if (zoneAnchors.length > 0) {
+      info(`  ${dim(`Declaring ${zoneAnchors.length} zone anchor(s) from .n-dx.json`)}`);
     }
     if (smallZoneMergeThreshold !== undefined) {
       info(`  ${dim(`Using zone merge threshold ${smallZoneMergeThreshold} from .n-dx.json`)}`);
@@ -321,6 +335,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     let zonesResult = await analyzeZones(inventory, importsData, {
       enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset, hints,
       zonePins: pinCount > 0 ? zonePins : undefined,
+      zoneAnchors: zoneAnchors.length > 0 ? zoneAnchors : undefined,
       smallZoneMergeThreshold,
     });
     let zones = zonesResult.zones;
@@ -341,6 +356,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
         zonesResult = await analyzeZones(inventory, importsData, {
           enrich: true, previousZones: zones, perZone, subAnalyses, fileArchetypes, onReset, hints,
           zonePins: Object.keys(zonePins).length > 0 ? zonePins : undefined,
+          zoneAnchors: zoneAnchors.length > 0 ? zoneAnchors : undefined,
           smallZoneMergeThreshold,
           reuseStructure: true,
         });

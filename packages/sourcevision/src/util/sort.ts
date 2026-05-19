@@ -125,6 +125,7 @@ export function sortZonesData(zones: Zones): Zones {
     ...(zones.enrichmentPass != null ? { enrichmentPass: zones.enrichmentPass } : {}),
     ...(zones.metaEvaluationCount != null ? { metaEvaluationCount: zones.metaEvaluationCount } : {}),
     ...(zones.structureHash ? { structureHash: zones.structureHash } : {}),
+    ...(zones.inputFingerprint ? { inputFingerprint: zones.inputFingerprint } : {}),
     ...(zones.zoneContentHashes ? { zoneContentHashes: zones.zoneContentHashes } : {}),
     ...(zones.lastReset ? { lastReset: zones.lastReset } : {}),
     ...(zones.stability ? { stability: zones.stability } : {}),
