@@ -369,6 +369,53 @@ describe("Rex MCP server factory", () => {
     await server2.close();
   });
 
+  it("get_item resolves by title when the id argument is an item title", async () => {
+    const server = await createRexMcpServer(tmpDir);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    // Seed a known epic
+    const addResult = await client.callTool({
+      name: "add_item",
+      arguments: { title: "My Special Epic", level: "epic" },
+    });
+    const { id } = JSON.parse((addResult.content as Array<{ text: string }>)[0].text);
+
+    // Resolve by title
+    const byTitle = await client.callTool({
+      name: "get_item",
+      arguments: { id: "My Special Epic" },
+    });
+    expect(byTitle.isError).toBeFalsy();
+    const parsed = JSON.parse((byTitle.content as Array<{ text: string }>)[0].text);
+    expect(parsed.item.id).toBe(id);
+    expect(parsed.item.title).toBe("My Special Epic");
+
+    await client.close();
+    await server.close();
+  });
+
+  it("get_item returns error naming the query when title does not match any item", async () => {
+    const server = await createRexMcpServer(tmpDir);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const result = await client.callTool({
+      name: "get_item",
+      arguments: { id: "Nonexistent Item Title" },
+    });
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ text: string }>)[0].text;
+    expect(text).toContain("Nonexistent Item Title");
+
+    await client.close();
+    await server.close();
+  });
+
   it("startMcpServer is exported for backward compatibility", () => {
     // startMcpServer should be a function (we can't fully test stdio without a process)
     expect(typeof startMcpServer).toBe("function");
