@@ -827,6 +827,33 @@ export function computeStructureHash(zones: Zone[]): string {
 }
 
 /**
+ * Hash the analysis inputs that determine the Louvain partition, independent
+ * of the partition itself. Same file contents + same zone config → same
+ * fingerprint → safe to reuse the previous zone structure and skip the
+ * non-deterministic Louvain re-run that would otherwise reset enrichmentPass.
+ */
+export function computeInputFingerprint(
+  inventory: Inventory,
+  zonePins?: Record<string, string>,
+  smallZoneMergeThreshold?: number,
+  maxZonePercent?: number,
+): string {
+  const fileData = inventory.files
+    .map((f) => `${f.path}\0${f.hash}`)
+    .sort()
+    .join("\n");
+  const pinData = Object.entries(zonePins ?? {})
+    .map(([k, v]) => `${k}=${v}`)
+    .sort()
+    .join("\n");
+  const cfg = `mt=${smallZoneMergeThreshold ?? ""}\0mzp=${maxZonePercent ?? ""}`;
+  return createHash("sha256")
+    .update(`${fileData}\0\0${pinData}\0\0${cfg}`)
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/**
  * Hash a zone's file contents for change detection between runs.
  * Uses inventory content hashes (already computed) so we detect code changes
  * even when the zone structure (file membership) stays the same.
@@ -2291,6 +2318,7 @@ function buildAnalyzeZonesResult(opts: {
   allFindings: Finding[];
   enrichmentPass: number;
   structureHash: string;
+  inputFingerprint: string;
   remappedContentHashes: Record<string, string>;
   previousZones: Zones | undefined;
   structureChanged: boolean;
@@ -2299,7 +2327,7 @@ function buildAnalyzeZonesResult(opts: {
 }): AnalyzeZonesResult {
   const {
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
-    enrichmentPass, structureHash, remappedContentHashes,
+    enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability,
   } = opts;
 
@@ -2322,6 +2350,7 @@ function buildAnalyzeZonesResult(opts: {
       enrichmentPass: enrichmentPass > 0 ? displayPass : undefined,
       ...(metaEvaluationCount ? { metaEvaluationCount } : {}),
       structureHash,
+      inputFingerprint,
       zoneContentHashes: remappedContentHashes,
       ...(lastReset ? { lastReset } : {}),
       ...(stability ? { stability } : {}),
@@ -2386,7 +2415,25 @@ export async function analyzeZones(
   let structureHash: string;
   let structureChanged: boolean;
 
-  if (options?.reuseStructure && previousZones) {
+  const inputFingerprint = computeInputFingerprint(
+    inventory,
+    options?.zonePins,
+    options?.smallZoneMergeThreshold,
+    options?.maxZonePercent,
+  );
+
+  // Reuse the previous zone partition when the caller explicitly asks for it
+  // (--full enrichment passes) OR when the analysis inputs are byte-identical
+  // to the previous run. The latter prevents non-deterministic Louvain from
+  // re-partitioning — and thus resetting enrichmentPass to 1 — on a no-op
+  // re-analyze where no code or zone config changed.
+  const inputsUnchanged =
+    !!previousZones?.zones?.length &&
+    !!previousZones.structureHash &&
+    previousZones.inputFingerprint === inputFingerprint;
+  const reuseStructure = (options?.reuseStructure ?? false) || inputsUnchanged;
+
+  if (reuseStructure && previousZones) {
     // Reuse existing zone structure — skip Louvain to avoid non-deterministic
     // re-partitioning that resets enrichmentPass on every --full iteration.
     expandedZones = previousZones.zones.map((z) => ({ ...z }));
@@ -2518,7 +2565,7 @@ export async function analyzeZones(
   // ── Build result ──
   return buildAnalyzeZonesResult({
     allZones, crossings, unzoned, allGlobalInsights, allFindings,
-    enrichmentPass, structureHash, remappedContentHashes,
+    enrichmentPass, structureHash, inputFingerprint, remappedContentHashes,
     previousZones, structureChanged, enrichTokenUsage, stability,
   });
 }

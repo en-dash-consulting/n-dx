@@ -300,6 +300,13 @@ export interface Zones {
   metaEvaluationCount?: number;
   /** Hash of structural zone groupings for change detection */
   structureHash?: string;
+  /**
+   * Partition-independent fingerprint of analysis inputs (sorted file
+   * path+hash pairs plus zone config). When this matches the previous run,
+   * the prior zone partition is reused instead of re-running non-deterministic
+   * Louvain, which would otherwise reset enrichmentPass on every no-op run.
+   */
+  inputFingerprint?: string;
   /** Per-zone content hashes for detecting code changes within stable zones */
   zoneContentHashes?: Record<string, string>;
   /** Records the last pass reset: { from: previousPass, to: currentPass } */
