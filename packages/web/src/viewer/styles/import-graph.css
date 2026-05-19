@@ -574,6 +574,8 @@
   width: 100%;
   min-width: 520px;
   min-height: 220px;
+  touch-action: none;
+  cursor: grab;
 }
 
 .ig-zone-network-bg {
@@ -630,6 +632,27 @@
 .ig-zone-network-boundary-pin {
   fill: var(--orange);
   opacity: 0.74;
+  pointer-events: none;
+}
+
+/* "Click to open" hint shown on a hovered node while the street view is
+   pinned open — hover no longer hijacks the dialog, so this tells the user
+   the node is still openable via click. */
+.ig-zone-network-hint {
+  pointer-events: none;
+}
+
+.ig-zone-network-hint-pill {
+  fill: color-mix(in srgb, var(--purple, var(--accent)) 90%, var(--bg-surface));
+  stroke: color-mix(in srgb, var(--purple, var(--accent)) 60%, var(--border));
+  stroke-width: 1;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.22));
+}
+
+.ig-zone-network-hint-text {
+  fill: #fff;
+  font-size: 9px;
+  font-weight: 760;
   pointer-events: none;
 }
 
@@ -1194,9 +1217,40 @@
   transform: translateY(0) scale(1);
 }
 
-.ig-street-view-dialog .ig-graph-column {
-  width: min(880px, 78%);
-  max-height: min(78vh, 760px);
+.ig-graph-shell.ig-street-view-dialog .ig-graph-column {
+  /* Large focused modal — bounded so it isn't edge-to-edge on big monitors,
+     but big on small screens. Flex column so the graph fills the space.
+     Extra specificity so the responsive .ig-graph-column rules can't shrink it. */
+  position: fixed;
+  inset: 4vh 5vw;
+  top: 4vh;
+  left: 5vw;
+  right: 5vw;
+  bottom: 4vh;
+  width: auto;
+  height: auto;
+  max-width: 1500px;
+  max-height: 1000px;
+  margin: auto;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* The graph fills the modal instead of being capped at a tiny strip. */
+.ig-graph-shell.ig-street-view-dialog .ig-svg-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  height: auto;
+}
+
+.ig-graph-shell.ig-street-view-dialog .ig-svg-wrap svg {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 /*
@@ -1404,6 +1458,8 @@
   display: block;
   width: 100%;
   min-height: 220px;
+  touch-action: none;
+  cursor: grab;
   border-radius: 14px;
   border: 1px solid var(--border);
   background:
@@ -1924,29 +1980,11 @@
   .ig-street-view-dialog .ig-graph-scope {
     display: none;
   }
-
-  .ig-street-view-dialog .ig-svg-wrap {
-    min-height: 120px;
-    max-height: 160px;
-  }
-
-  .ig-street-view-dialog .ig-svg-wrap svg {
-    min-height: 120px;
-  }
 }
 
 @media (max-width: 640px) {
   .ig-street-view-preview .ig-graph-column {
     width: min(230px, 58vw);
     max-height: 210px;
-  }
-
-  .ig-street-view-dialog .ig-svg-wrap {
-    min-height: 96px;
-    max-height: 130px;
-  }
-
-  .ig-street-view-dialog .ig-svg-wrap svg {
-    min-height: 96px;
   }
 }

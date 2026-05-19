@@ -181,6 +181,43 @@ function wheelViewport(view: Viewport, event: WheelEvent): Viewport {
   return panViewport(view, -event.deltaX, -event.deltaY);
 }
 
+// Bounded zoom for the Codebase/Zone maps — not an infinite canvas.
+const MAP_ZOOM_MIN = 0.8;
+const MAP_ZOOM_MAX = 4;
+
+/** Clamp zoom and keep the content from drifting fully off the canvas. */
+function clampMapView(view: Viewport, vbW: number, vbH: number): Viewport {
+  const k = clamp(view.k, MAP_ZOOM_MIN, MAP_ZOOM_MAX);
+  const x = clamp(view.x, vbW * 0.2 - k * vbW, vbW * 0.8);
+  const y = clamp(view.y, vbH * 0.2 - k * vbH, vbH * 0.8);
+  return { x, y, k };
+}
+
+/**
+ * Zoom `view` to absolute scale `kTarget` while keeping the point under the
+ * cursor/pinch focus fixed on screen. `cx,cy` are client coords; the SVG's
+ * screen CTM maps them into user space (handles viewBox + preserveAspectRatio).
+ */
+function zoomMapToFocal(
+  view: Viewport,
+  kTarget: number,
+  cx: number,
+  cy: number,
+  svg: SVGSVGElement,
+): Viewport {
+  const vb = svg.viewBox.baseVal;
+  const kNew = clamp(kTarget, MAP_ZOOM_MIN, MAP_ZOOM_MAX);
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return clampMapView({ ...view, k: kNew }, vb.width, vb.height);
+  const loc = new DOMPoint(cx, cy).matrixTransform(ctm.inverse());
+  const scale = kNew / view.k;
+  return clampMapView(
+    { x: loc.x - scale * (loc.x - view.x), y: loc.y - scale * (loc.y - view.y), k: kNew },
+    vb.width,
+    vb.height,
+  );
+}
+
 function offsetFromDrag(dx: number, dy: number, view: Viewport): Point {
   return { x: dx / view.k, y: dy / view.k };
 }
@@ -377,6 +414,32 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
       setZoneFilter(selectedZone);
     }
   }, [selectedZone, zones]);
+
+  // Escape is a hierarchical "back": first close the File Street View modal;
+  // if it isn't open, deselect the zone and scroll back up to the map.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (streetViewMode === "dialog") {
+        setStreetViewMode("closed");
+        setHoverPreviewFile(null);
+        return;
+      }
+      if (zoneFilter) {
+        setZoneFilter("");
+        setFocusSource({ kind: "default" });
+        setCodebaseMapExpanded(false);
+        setHoverPreviewFile(null);
+        requestAnimationFrame(() => {
+          const scroller = pageRef.current?.closest(".main") as HTMLElement | null;
+          if (scroller) scroller.scrollTo({ top: 0, behavior: "smooth" });
+          else heroRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+        });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [streetViewMode, zoneFilter]);
 
   const subgraph = useMemo(() => {
     if (!imports || !focusFile || mode !== "file") return null;
@@ -577,15 +640,70 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
 
   const endDrag = useCallback(() => setDragState(null), []);
 
+  // ── Canvas zoom: wheel (trackpad pinch === ctrl/meta wheel) + touch pinch ──
+  const pinchRef = useRef<{ surface: SurfaceKind; startDist: number; startK: number } | null>(null);
+
+  const touchDistance = (touches: TouchList): number =>
+    touches.length < 2
+      ? 0
+      : Math.hypot(
+          touches[0].clientX - touches[1].clientX,
+          touches[0].clientY - touches[1].clientY,
+        );
+
+  const touchMidpoint = (touches: TouchList): { x: number; y: number } => ({
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2,
+  });
+
+  const handleSurfaceWheel = useCallback((surface: SurfaceKind, event: WheelEvent) => {
+    event.preventDefault();
+    const svg = event.currentTarget as SVGSVGElement;
+    const cx = event.clientX;
+    const cy = event.clientY;
+    if (event.ctrlKey || event.metaKey) {
+      // Trackpad pinch / explicit zoom — anchor at the cursor.
+      const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+      updateSurfaceView(surface, (view) => zoomMapToFocal(view, view.k * factor, cx, cy, svg));
+    } else {
+      const vb = svg.viewBox.baseVal;
+      updateSurfaceView(surface, (view) =>
+        clampMapView(panViewport(view, -event.deltaX, -event.deltaY), vb.width, vb.height),
+      );
+    }
+  }, [updateSurfaceView]);
+
+  const beginPinch = useCallback((surface: SurfaceKind, event: TouchEvent) => {
+    if (event.touches.length !== 2) return;
+    event.preventDefault();
+    pinchRef.current = { surface, startDist: touchDistance(event.touches) || 1, startK: viewFor(surface).k };
+  }, [viewFor]);
+
+  const movePinch = useCallback((event: TouchEvent) => {
+    const p = pinchRef.current;
+    if (!p || event.touches.length !== 2) return;
+    event.preventDefault();
+    const svg = event.currentTarget as SVGSVGElement;
+    const mid = touchMidpoint(event.touches);
+    const ratio = touchDistance(event.touches) / p.startDist;
+    updateSurfaceView(p.surface, (view) => zoomMapToFocal(view, p.startK * ratio, mid.x, mid.y, svg));
+  }, [updateSurfaceView]);
+
+  const endPinch = useCallback(() => { pinchRef.current = null; }, []);
+
   const openHoverPreview = useCallback((path: string, side: "left" | "right" = "right") => {
     if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
     setHoverPreviewFile(path);
     setHoverPreviewSide(side);
+    // When the street view is pinned open (dialog), hovering another node must
+    // NOT hijack it. Only highlight the hovered node + show the "click to open"
+    // hint; the selected file stays in the street view until the user clicks.
+    if (streetViewMode === "dialog") return;
     setMode("file");
     setFocusFile(path);
     setFocusSource({ kind: "file", path });
-    setStreetViewMode((current) => current === "dialog" ? current : "preview");
-  }, []);
+    setStreetViewMode("preview");
+  }, [streetViewMode]);
 
   const closeHoverPreview = useCallback((path: string) => {
     if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
@@ -1078,6 +1196,9 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     ref: pageRef,
     class: "ig-page",
     onWheelCapture: (event: WheelEvent) => {
+      // ctrl/meta wheel is a pinch-zoom gesture on a map — never treat it as a
+      // scroll that expands/collapses the codebase map.
+      if (event.ctrlKey || event.metaKey) return;
       const scrollParent = pageRef.current?.closest(".main") as HTMLElement | null;
       const scrollTop = scrollParent?.scrollTop ?? window.scrollY;
       if (
@@ -1143,9 +1264,14 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
               h("svg", {
                 viewBox: `0 0 ${zoneMapW} ${zoneMapH}`,
                 role: "img",
+                onPointerDown: (event: PointerEvent) => beginPan("codebase", event),
                 onPointerMove: handlePointerMove,
                 onPointerUp: endDrag,
                 onPointerLeave: endDrag,
+                onWheel: (event: WheelEvent) => handleSurfaceWheel("codebase", event),
+                onTouchStart: (event: TouchEvent) => beginPinch("codebase", event),
+                onTouchMove: movePinch,
+                onTouchEnd: endPinch,
               },
                 h("defs", null,
                   h("marker", {
@@ -1299,9 +1425,14 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                   viewBox: `0 0 ${activeZoneNetworkW} ${activeZoneNetworkH}`,
                   role: "img",
                   "aria-label": `${activeZone.name} dependency zone map`,
+                  onPointerDown: (event: PointerEvent) => beginPan("zone", event),
                   onPointerMove: handlePointerMove,
                   onPointerUp: endDrag,
                   onPointerLeave: endDrag,
+                  onWheel: (event: WheelEvent) => handleSurfaceWheel("zone", event),
+                  onTouchStart: (event: TouchEvent) => beginPinch("zone", event),
+                  onTouchMove: movePinch,
+                  onTouchEnd: endPinch,
                 },
                   h("defs", null,
                     h("marker", {
@@ -1412,6 +1543,12 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                               h("tspan", { key: `${node.path}-line-${index}`, x: -ZONE_FILE_NODE_W / 2 + 16, dy: index === 0 ? 0 : 13, ...fitToBox(line, 11, ZONE_FILE_NODE_W - 32) }, line),
                             ),
                           ),
+                          streetViewMode === "dialog" && hoverPreviewFile === node.path && activeZoneFocusNode !== node.path
+                            ? h("g", { class: "ig-zone-network-hint", "pointer-events": "none" },
+                                h("rect", { class: "ig-zone-network-hint-pill", x: -54, y: -ZONE_FILE_NODE_H / 2 - 24, width: 108, height: 18, rx: 9 }),
+                                h("text", { class: "ig-zone-network-hint-text", x: 0, y: -ZONE_FILE_NODE_H / 2 - 15, textAnchor: "middle", "dominant-baseline": "central" }, "Click to open ↗"),
+                              )
+                            : null,
                         );
                       }),
                     ),
