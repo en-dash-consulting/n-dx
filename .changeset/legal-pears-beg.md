@@ -1,8 +1,8 @@
 ---
-"@n-dx/hench": minor
-"@n-dx/core": minor
-"@n-dx/rex": minor
-"@n-dx/web": minor
+"@n-dx/hench": patch
+"@n-dx/core": patch
+"@n-dx/rex": patch
+"@n-dx/web": patch
 ---
 
 Rework the PRD context graph, harden the hench run loop, and add LLM auto-failover.
