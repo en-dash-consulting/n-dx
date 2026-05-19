@@ -671,18 +671,39 @@
   stroke-width: 2;
 }
 
-.ig-zone-external-label {
-  fill: var(--text);
-  font-size: 10px;
-  font-weight: 800;
+/* External-domain node label — flex-centered HTML in a <foreignObject>. */
+.ig-zone-ext-card {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 10px;
+  text-align: center;
+  overflow: hidden;
   pointer-events: none;
 }
 
-.ig-zone-external-meta {
-  fill: var(--text-dim);
+.ig-zone-ext-card-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.12;
+}
+
+.ig-zone-ext-card-meta {
+  color: var(--text-dim);
   font-size: 8px;
   font-weight: 750;
-  pointer-events: none;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .ig-zone-dir-node {
@@ -1438,19 +1459,40 @@
   stroke-width: 2.4;
 }
 
-.ig-zone-map-name {
-  fill: var(--text);
-  font-size: 10.5px;
-  font-weight: 820;
-  line-height: 1;
+/* Codebase Map node label — HTML inside <foreignObject>, flex-centered so the
+   text block is always perfectly centered regardless of SVG scaling. */
+.ig-zone-map-card {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 12px;
+  text-align: center;
+  overflow: hidden;
   pointer-events: none;
 }
 
-.ig-zone-map-meta {
-  fill: var(--text-dim);
+.ig-zone-map-card-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 10.5px;
+  font-weight: 820;
+  line-height: 1.15;
+}
+
+.ig-zone-map-card-meta {
+  color: var(--text-dim);
   font-size: 8.5px;
   font-weight: 720;
-  pointer-events: none;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .ig-card-head {

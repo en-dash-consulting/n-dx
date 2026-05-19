@@ -66,6 +66,30 @@ function truncateNodeLabel(label: string, kind: NodeKind, maxOverride?: number):
   return `${label.slice(0, max - 1)}…`;
 }
 
+/**
+ * Approx rendered width of an SVG label, em-based. Biased slightly high so we
+ * err toward condensing rather than letting a glyph spill past the box edge.
+ */
+function estTextWidth(text: string, fontPx: number, mono = false): number {
+  return text.length * fontPx * (mono ? 0.6 : 0.62);
+}
+
+/**
+ * SVG attrs that guarantee `text` fits within `maxWidth`. When the natural
+ * width already fits, returns {} (render at natural size, no distortion).
+ * Otherwise clamps via `textLength` + `spacingAndGlyphs` so the glyphs
+ * condense to fit the box exactly — never overflows, never truncates.
+ */
+function fitToBox(
+  text: string,
+  fontPx: number,
+  maxWidth: number,
+  mono = false,
+): { textLength?: number; lengthAdjust?: "spacingAndGlyphs" } {
+  if (!text || estTextWidth(text, fontPx, mono) <= maxWidth) return {};
+  return { textLength: Math.max(8, Math.round(maxWidth)), lengthAdjust: "spacingAndGlyphs" };
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -84,23 +108,33 @@ function workingDirectory(path: string): string {
   return parts.slice(0, -1).join("/");
 }
 
-function wrapZoneLabel(label: string, maxLineLength = 13): string[] {
-  const normalized = label.replace(/[-_/]+/g, " ").replace(/\s+/g, " ").trim();
-  const words = normalized ? normalized.split(" ") : [label];
-  const lines: string[] = [];
-  for (const word of words) {
-    const current = lines[lines.length - 1] ?? "";
-    if (!current) {
-      lines.push(word);
-    } else if (`${current} ${word}`.length <= maxLineLength) {
-      lines[lines.length - 1] = `${current} ${word}`;
-    } else if (lines.length < 2) {
-      lines.push(word);
-    } else {
-      lines[1] = `${lines[1]} ${word}`;
-    }
+/**
+ * Coarse clustering key for a path: the package name under `packages/`, else
+ * the first one or two leading directory segments. Used to group zones/files
+ * into labelled clusters on the maps.
+ */
+function pathGroupKey(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  if (parts.length === 0) return "(root)";
+  const pkgIdx = parts.indexOf("packages");
+  if (pkgIdx >= 0 && parts.length > pkgIdx + 1) return parts[pkgIdx + 1];
+  if (parts.length === 1) return "(root)";
+  return parts.slice(0, Math.min(2, parts.length - 1)).join("/");
+}
+
+/** Dominant {@link pathGroupKey} across a set of files (most frequent wins). */
+function dominantGroup(files: readonly string[]): string {
+  const counts = new Map<string, number>();
+  for (const f of files) {
+    const k = pathGroupKey(f);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
   }
-  return lines.slice(0, 2).map((line) => line.length > maxLineLength + 2 ? `${line.slice(0, maxLineLength + 1)}…` : line);
+  let best = "";
+  let bestN = -1;
+  for (const [k, n] of counts) {
+    if (n > bestN || (n === bestN && k.localeCompare(best) < 0)) { best = k; bestN = n; }
+  }
+  return best || "(root)";
 }
 
 function wrapFileLabel(fileName: string): string[] {
@@ -118,7 +152,7 @@ function wrapFileLabel(fileName: string): string[] {
   }
   if (lines.length === 1) return [`${lines[0]}${extension}`];
   lines[1] = `${lines[1]}${extension}`;
-  return lines.map((line) => line.length > 22 ? `${line.slice(0, 21)}…` : line);
+  return lines.map((line) => line.length > 34 ? `${line.slice(0, 33)}…` : line);
 }
 
 type Viewport = { x: number; y: number; k: number };
@@ -151,88 +185,118 @@ function offsetFromDrag(dx: number, dy: number, view: Viewport): Point {
   return { x: dx / view.k, y: dy / view.k };
 }
 
-function layoutZoneMapNodes<T extends { id: string; n: number }>(
+/**
+ * Deterministic grouped grid/shelf pack for the Codebase Map.
+ *
+ * Zones are grouped by package/area, each group laid out as a compact grid
+ * block, and the blocks shelf-packed left→right (wrapping to new rows). Cells
+ * are fixed-size so nodes **cannot** overlap — no force simulation. Returns
+ * the content size so the caller can size the SVG viewBox to fit.
+ */
+function layoutZoneMapNodes<T extends { id: string; n: number; group?: string }>(
   zones: T[],
   flows: { fromZone: string; toZone: string; count: number }[],
   statsFor: (id: string) => { in: number; out: number },
   w: number,
-  h: number,
-): Array<T & { x: number; y: number; r: number; stats: { in: number; out: number } }> {
-  if (!zones.length) return [];
+): {
+  nodes: Array<T & { x: number; y: number; r: number; stats: { in: number; out: number } }>;
+  width: number;
+  height: number;
+} {
+  if (!zones.length) return { nodes: [], width: w, height: 220 };
+
+  // Importance = file count + cross-zone traffic; orders groups and members.
   const strength = new Map<string, number>();
-  for (const zone of zones) strength.set(zone.id, zone.n);
-  for (const flow of flows) {
-    strength.set(flow.fromZone, (strength.get(flow.fromZone) ?? 0) + flow.count * 2);
-    strength.set(flow.toZone, (strength.get(flow.toZone) ?? 0) + flow.count * 2);
+  for (const z of zones) strength.set(z.id, z.n);
+  for (const f of flows) {
+    strength.set(f.fromZone, (strength.get(f.fromZone) ?? 0) + f.count * 2);
+    strength.set(f.toZone, (strength.get(f.toZone) ?? 0) + f.count * 2);
   }
-  const ordered = [...zones].sort((a, b) =>
-    (strength.get(b.id) ?? 0) - (strength.get(a.id) ?? 0) || a.id.localeCompare(b.id),
-  );
-  const centerX = w / 2;
-  const centerY = h / 2;
-  // Rectangle half-extents + breathing room — separation works on the actual
-  // rendered box, not a circle, so 150×60 nodes never overlap or clip labels.
-  const halfW = ZONE_MAP_NODE_W / 2;
-  const halfH = ZONE_MAP_NODE_H / 2;
-  const GAP_X = 26;
-  const GAP_Y = 22;
-  // Strongest zone anchors the center as a clear focal point; the rest fan out
-  // on a single ring so the eye starts at the hub instead of a uniform cloud.
-  const ringCount = Math.max(1, ordered.length - 1);
-  const rx = Math.min(w * 0.34, (w / 2 - halfW - 18));
-  const ry = Math.min(h * 0.34, (h / 2 - halfH - 16));
-  const placed = ordered.map((zone, i) => {
-    const onRing = i > 0;
-    const angle = -Math.PI / 2 + ((i - 1) / ringCount) * Math.PI * 2;
+  const groupOf = (z: T): string => z.group ?? z.id;
+
+  const groups = new Map<string, T[]>();
+  for (const z of zones) {
+    const g = groupOf(z);
+    const arr = groups.get(g);
+    if (arr) arr.push(z);
+    else groups.set(g, [z]);
+  }
+  for (const arr of groups.values()) {
+    arr.sort((a, b) => (strength.get(b.id) ?? 0) - (strength.get(a.id) ?? 0) || a.id.localeCompare(b.id));
+  }
+  const groupSum = (k: string) => groups.get(k)!.reduce((s, z) => s + (strength.get(z.id) ?? 0), 0);
+  const groupKeys = [...groups.keys()].sort((a, b) => groupSum(b) - groupSum(a) || a.localeCompare(b));
+
+  const W = ZONE_MAP_NODE_W;
+  const H = ZONE_MAP_NODE_H;
+  const CELL_GX = 22; // gap between zones inside a group
+  const CELL_GY = 24;
+  const GROUP_GX = 56; // gap between group blocks on a shelf
+  const GROUP_GY = 72; // gap between shelf rows
+  const MARGIN = 30;
+  const avail = Math.max(W, w - 2 * MARGIN);
+  const maxCols = Math.max(1, Math.floor((avail + CELL_GX) / (W + CELL_GX)));
+
+  interface Block { key: string; zones: T[]; cols: number; bw: number; bh: number }
+  const blocks: Block[] = groupKeys.map((key) => {
+    const zs = groups.get(key)!;
+    const count = zs.length;
+    const cols = Math.min(count, maxCols, Math.max(1, Math.round(Math.sqrt(count * 1.6))));
+    const rows = Math.ceil(count / cols);
     return {
-      ...zone,
-      x: onRing ? centerX + Math.cos(angle) * rx : centerX,
-      y: onRing ? centerY + Math.sin(angle) * ry : centerY,
-      r: Math.max(18, Math.min(44, 16 + Math.sqrt(zone.n) * 5)),
-      stats: statsFor(zone.id),
+      key,
+      zones: zs,
+      cols,
+      bw: cols * W + (cols - 1) * CELL_GX,
+      bh: rows * H + (rows - 1) * CELL_GY,
     };
   });
-  for (let iter = 0; iter < 60; iter += 1) {
-    for (const flow of flows) {
-      const a = placed.find((z) => z.id === flow.fromZone);
-      const b = placed.find((z) => z.id === flow.toZone);
-      if (!a || !b) continue;
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const factor = Math.min(0.01, flow.count / 1600);
-      a.x += dx * factor;
-      a.y += dy * factor;
-      b.x -= dx * factor;
-      b.y -= dy * factor;
+
+  interface Shelf { items: Block[]; width: number; height: number }
+  const shelves: Shelf[] = [];
+  let cur: Shelf = { items: [], width: 0, height: 0 };
+  for (const b of blocks) {
+    const addW = (cur.items.length ? GROUP_GX : 0) + b.bw;
+    if (cur.items.length && cur.width + addW > avail) {
+      shelves.push(cur);
+      cur = { items: [], width: 0, height: 0 };
     }
-    // Axis-aligned box separation: if two node boxes overlap, push them apart
-    // along whichever axis needs the least correction (keeps the layout tight).
-    for (let i = 0; i < placed.length; i += 1) {
-      for (let j = i + 1; j < placed.length; j += 1) {
-        const a = placed[i];
-        const b = placed[j];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const overlapX = (halfW * 2 + GAP_X) - Math.abs(dx);
-        const overlapY = (halfH * 2 + GAP_Y) - Math.abs(dy);
-        if (overlapX <= 0 || overlapY <= 0) continue;
-        if (overlapX < overlapY) {
-          const shift = (overlapX / 2) * (dx < 0 ? -1 : 1);
-          a.x -= shift;
-          b.x += shift;
-        } else {
-          const shift = (overlapY / 2) * (dy < 0 ? -1 : 1);
-          a.y -= shift;
-          b.y += shift;
-        }
-      }
-    }
-    for (const node of placed) {
-      node.x = clamp(node.x, halfW + 18, w - halfW - 18);
-      node.y = clamp(node.y, halfH + 16, h - halfH - 16);
-    }
+    cur.width += (cur.items.length ? GROUP_GX : 0) + b.bw;
+    cur.height = Math.max(cur.height, b.bh);
+    cur.items.push(b);
   }
-  return placed;
+  if (cur.items.length) shelves.push(cur);
+
+  const contentW = Math.max(W, ...shelves.map((s) => s.width));
+  const contentH = shelves.reduce((s, sh) => s + sh.height, 0) + Math.max(0, shelves.length - 1) * GROUP_GY;
+  const width = Math.max(w, contentW + 2 * MARGIN);
+  const height = Math.max(220, contentH + 2 * MARGIN);
+
+  const nodes: Array<T & { x: number; y: number; r: number; stats: { in: number; out: number } }> = [];
+  let y0 = MARGIN;
+  for (const sh of shelves) {
+    let x0 = (width - sh.width) / 2; // center the shelf
+    for (const b of sh.items) {
+      const by = y0 + (sh.height - b.bh) / 2; // center block within shelf
+      b.zones.forEach((z, idx) => {
+        const c = idx % b.cols;
+        const r = Math.floor(idx / b.cols);
+        const inRow = Math.min(b.cols, b.zones.length - r * b.cols);
+        const rowW = inRow * W + (inRow - 1) * CELL_GX;
+        const rx0 = x0 + (b.bw - rowW) / 2; // center a partial last row
+        nodes.push({
+          ...z,
+          x: rx0 + c * (W + CELL_GX) + W / 2,
+          y: by + r * (H + CELL_GY) + H / 2,
+          r: Math.max(18, Math.min(44, 16 + Math.sqrt(z.n) * 5)),
+          stats: statsFor(z.id),
+        });
+      });
+      x0 += b.bw + GROUP_GX;
+    }
+    y0 += sh.height + GROUP_GY;
+  }
+  return { nodes, width, height };
 }
 
 export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphProps) {
@@ -422,7 +486,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   const zoneCards = useMemo(() => {
     if (!zones) return [];
     return [...zones.zones]
-      .map((z) => ({ id: z.id, name: z.name, n: z.files.length }))
+      .map((z) => ({ id: z.id, name: z.name, n: z.files.length, group: dominantGroup(z.files) }))
       .sort((a, b) => b.n - a.n);
   }, [zones]);
 
@@ -699,17 +763,48 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
           return groups;
         }, new Map<string, { id: string; dir: string; count: number }>())
     : new Map<string, { id: string; dir: string; count: number }>();
-  // The highest-signal file (already sorted first) anchors the center as the
-  // entry point; everything else fans out around it so the user has a clear
-  // focal node instead of a uniform, overwhelming ring.
-  const activeZoneRingCount = Math.max(1, activeZoneOrderedFiles.length - 1);
+  // Seed files in directory clusters: the highest-signal file anchors the
+  // centre as the entry point, and every other file starts near its
+  // subdirectory's anchor so the network resolves into readable groups
+  // instead of one uniform ring. The existing physics pass below refines it.
+  const azFileGroup = (p: string) => workingDirectory(p);
+  const azGroupSignal = new Map<string, number>();
+  for (const p of activeZoneOrderedFiles) {
+    azGroupSignal.set(azFileGroup(p), (azGroupSignal.get(azFileGroup(p)) ?? 0) + 1 + ((inDegree.get(p) ?? 0) + (outDegree.get(p) ?? 0)));
+  }
+  const azGroupOrder = [...azGroupSignal.keys()].sort(
+    (a, b) => (azGroupSignal.get(b) ?? 0) - (azGroupSignal.get(a) ?? 0) || a.localeCompare(b),
+  );
+  const azGroupAnchor = new Map<string, { x: number; y: number }>();
+  azGroupOrder.forEach((g, gi) => {
+    const ring = Math.max(1, azGroupOrder.length);
+    const angle = -Math.PI / 2 + (gi / ring) * Math.PI * 2;
+    const spread = azGroupOrder.length === 1 ? 0 : 0.30;
+    azGroupAnchor.set(g, {
+      x: activeZoneNetworkW / 2 + Math.cos(angle) * activeZoneNetworkW * spread,
+      y: activeZoneNetworkH / 2 + Math.sin(angle) * activeZoneNetworkH * spread * 0.78,
+    });
+  });
+  const azGroupSeed = new Map<string, number>();
   const activeZoneNetworkNodesBase = activeZoneOrderedFiles.map((path, i) => {
-    const angle = -Math.PI / 2 + ((i - 1) / activeZoneRingCount) * Math.PI * 2;
-    const ring = activeZoneBoundaryByFile.has(path) ? 0.36 : 0.20;
+    if (i === 0) {
+      return {
+        path,
+        x: activeZoneNetworkW / 2,
+        y: activeZoneNetworkH / 2,
+        degree: (inDegree.get(path) ?? 0) + (outDegree.get(path) ?? 0),
+      };
+    }
+    const g = azFileGroup(path);
+    const anchor = azGroupAnchor.get(g) ?? { x: activeZoneNetworkW / 2, y: activeZoneNetworkH / 2 };
+    const k = azGroupSeed.get(g) ?? 0;
+    azGroupSeed.set(g, k + 1);
+    const a = k * 2.399;
+    const rad = 14 + k * 22;
     return {
       path,
-      x: i === 0 ? activeZoneNetworkW / 2 : activeZoneNetworkW / 2 + Math.cos(angle) * activeZoneNetworkW * ring,
-      y: i === 0 ? activeZoneNetworkH / 2 : activeZoneNetworkH / 2 + Math.sin(angle) * activeZoneNetworkH * ring * 0.82,
+      x: anchor.x + Math.cos(a) * rad,
+      y: anchor.y + Math.sin(a) * rad * 0.72,
       degree: (inDegree.get(path) ?? 0) + (outDegree.get(path) ?? 0),
     };
   });
@@ -883,16 +978,16 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     to.in += flow.count;
     zoneBoundaryStats.set(flow.toZone, to);
   }
-  const zoneMapW = 920;
-  const zoneMapH = 360;
-  const zoneMapZones = zoneCards.slice(0, 10);
-  const zoneMapNodes = layoutZoneMapNodes(
+  const zoneMapZones = zoneCards.slice(0, 12);
+  const zoneMapLayout = layoutZoneMapNodes(
     zoneMapZones,
     zoneFlows,
     (id) => zoneBoundaryStats.get(id) ?? { in: 0, out: 0 },
-    zoneMapW,
-    zoneMapH,
-  ).map((zone) => {
+    920,
+  );
+  const zoneMapW = zoneMapLayout.width;
+  const zoneMapH = zoneMapLayout.height;
+  const zoneMapNodes = zoneMapLayout.nodes.map((zone) => {
     const offset = zoneNodeOffsets[zone.id] ?? { x: 0, y: 0 };
     return { ...zone, x: zone.x + offset.x, y: zone.y + offset.y };
   });
@@ -1083,7 +1178,6 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                   h("g", { class: "ig-zone-map-nodes" },
                     ...zoneMapNodes.map((zone) =>
                       {
-                        const labelLines = wrapZoneLabel(zone.name, 16);
                         return h("g", {
                           key: zone.id,
                           class: `ig-zone-map-node${zoneFilter === zone.id ? " ig-zone-map-node-active" : ""}`,
@@ -1110,13 +1204,17 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                         },
                           h("title", null, zone.name),
                           h("rect", { x: -ZONE_MAP_NODE_W / 2, y: -ZONE_MAP_NODE_H / 2, width: ZONE_MAP_NODE_W, height: ZONE_MAP_NODE_H, rx: 16 }),
-                          h("text", { class: "ig-zone-map-name", y: labelLines.length === 1 ? -3 : -10, textAnchor: "middle" },
-                            ...labelLines.map((line, index) =>
-                              h("tspan", { key: `${zone.id}-line-${index}`, x: 0, dy: index === 0 ? 0 : 13 }, line),
+                          h("foreignObject", {
+                            x: -ZONE_MAP_NODE_W / 2,
+                            y: -ZONE_MAP_NODE_H / 2,
+                            width: ZONE_MAP_NODE_W,
+                            height: ZONE_MAP_NODE_H,
+                            "pointer-events": "none",
+                          },
+                            h("div", { xmlns: "http://www.w3.org/1999/xhtml", class: "ig-zone-map-card" },
+                              h("div", { class: "ig-zone-map-card-name" }, zone.name),
+                              h("div", { class: "ig-zone-map-card-meta" }, `${zone.n} files`),
                             ),
-                          ),
-                          h("text", { class: "ig-zone-map-meta", y: 20, textAnchor: "middle" },
-                            `${zone.n} files`,
                           ),
                         );
                       }
@@ -1308,10 +1406,10 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           activeZoneBoundaryByFile.has(node.path)
                             ? h("circle", { class: "ig-zone-network-boundary-pin", cx: -ZONE_FILE_NODE_W / 2 + 10, cy: -ZONE_FILE_NODE_H / 2 + 10, r: 3.5 })
                             : null,
-                          h("text", { class: "ig-zone-network-dir", x: -ZONE_FILE_NODE_W / 2 + 16, y: -10 }, parentContext(node.path)),
+                          h("text", { class: "ig-zone-network-dir", x: -ZONE_FILE_NODE_W / 2 + 16, y: -10, ...fitToBox(parentContext(node.path), 9, ZONE_FILE_NODE_W - 32) }, parentContext(node.path)),
                           h("text", { class: "ig-zone-network-label", x: -ZONE_FILE_NODE_W / 2 + 16, y: fileLabelLines.length === 1 ? 12 : 5 },
                             ...fileLabelLines.map((line, index) =>
-                              h("tspan", { key: `${node.path}-line-${index}`, x: -ZONE_FILE_NODE_W / 2 + 16, dy: index === 0 ? 0 : 13 }, line),
+                              h("tspan", { key: `${node.path}-line-${index}`, x: -ZONE_FILE_NODE_W / 2 + 16, dy: index === 0 ? 0 : 13, ...fitToBox(line, 11, ZONE_FILE_NODE_W - 32) }, line),
                             ),
                           ),
                         );
@@ -1337,8 +1435,8 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           },
                         },
                           h("rect", { x: -ZONE_DIR_NODE_W / 2, y: -ZONE_DIR_NODE_H / 2, width: ZONE_DIR_NODE_W, height: ZONE_DIR_NODE_H, rx: 12 }),
-                          h("text", { class: "ig-zone-dir-label", x: -ZONE_DIR_NODE_W / 2 + 12, y: -2 }, truncateNodeLabel(node.dir, "file", 18)),
-                          h("text", { class: "ig-zone-dir-meta", x: -ZONE_DIR_NODE_W / 2 + 12, y: 13 }, `${node.count} more file${node.count === 1 ? "" : "s"}`),
+                          h("text", { class: "ig-zone-dir-label", x: -ZONE_DIR_NODE_W / 2 + 12, y: -2, ...fitToBox(truncateNodeLabel(node.dir, "file", 30), 9, ZONE_DIR_NODE_W - 24, true) }, truncateNodeLabel(node.dir, "file", 30)),
+                          h("text", { class: "ig-zone-dir-meta", x: -ZONE_DIR_NODE_W / 2 + 12, y: 13, ...fitToBox(`${node.count} more file${node.count === 1 ? "" : "s"}`, 8, ZONE_DIR_NODE_W - 24) }, `${node.count} more file${node.count === 1 ? "" : "s"}`),
                         ),
                       ),
                     ),
@@ -1371,9 +1469,17 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           },
                         },
                           h("rect", { x: -ZONE_EXTERNAL_NODE_W / 2, y: -ZONE_EXTERNAL_NODE_H / 2, width: ZONE_EXTERNAL_NODE_W, height: ZONE_EXTERNAL_NODE_H, rx: 10 }),
-                          h("text", { class: "ig-zone-external-label", y: -3, textAnchor: "middle" }, truncateNodeLabel(node.name, "package", 16)),
-                          h("text", { class: "ig-zone-external-meta", y: 13, textAnchor: "middle" },
-                            `${node.fromExternal} from / ${node.toExternal} to`,
+                          h("foreignObject", {
+                            x: -ZONE_EXTERNAL_NODE_W / 2,
+                            y: -ZONE_EXTERNAL_NODE_H / 2,
+                            width: ZONE_EXTERNAL_NODE_W,
+                            height: ZONE_EXTERNAL_NODE_H,
+                            "pointer-events": "none",
+                          },
+                            h("div", { xmlns: "http://www.w3.org/1999/xhtml", class: "ig-zone-ext-card" },
+                              h("div", { class: "ig-zone-ext-card-name" }, node.name),
+                              h("div", { class: "ig-zone-ext-card-meta" }, `${node.fromExternal} from / ${node.toExternal} to`),
+                            ),
                           ),
                         ),
                       ),
@@ -1546,13 +1652,14 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                   },
                     h("rect", { width: w, height: hgt, rx: 8, ry: 8 }),
                     n.kind === "file" && contextText
-                      ? h("text", { class: "ig-node-context", x: 12, y: 18 }, contextText)
+                      ? h("text", { class: "ig-node-context", x: 12, y: 18, ...fitToBox(contextText, 10, w - 24, true) }, contextText)
                       : null,
                     h("text", {
                       class: "ig-node-label",
                       x: 12,
                       y: n.kind === "file" && contextText ? 37 : hgt / 2,
                       "dominant-baseline": n.kind === "file" && contextText ? undefined : "middle",
+                      ...fitToBox(labelText, 14, w - 24),
                     }, labelText),
                   );
                 }),
