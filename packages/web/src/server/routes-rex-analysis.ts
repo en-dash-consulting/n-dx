@@ -573,10 +573,10 @@ async function handleSmartAddPreview(
     const binArgs = [...prefixArgs, ...args];
 
     // Smart add does a full LLM round-trip to generate a proposal tree.
-    // With an API key (ANTHROPIC_API_KEY / `n-dx config claude.api_key`) this
-    // takes seconds via the API provider. Without one, llm-client falls back
-    // to spawning the `claude` CLI, which is far slower from a long-running
-    // server process (no warm session) and can blow past the timeout.
+    // The Claude CLI provider (no API key needed) normally returns in well
+    // under a minute; a timeout here means the spawned `claude` process
+    // itself stalled in the server context (e.g. token refresh with no TTY,
+    // or a different PATH/env than your shell) — not a missing API key.
     const SMART_ADD_TIMEOUT_MS = 240_000;
     const cliResult = await foundationExec(binPath, binArgs, {
       cwd: ctx.projectDir,
@@ -588,7 +588,13 @@ async function handleSmartAddPreview(
     if (cliResult.error && !cliResult.stdout.trim()) {
       if (cliResult.exitCode === null) {
         throw new Error(
-          `Smart add timed out after ${SMART_ADD_TIMEOUT_MS / 1000}s. This usually means no API key is configured, so it fell back to the slow Claude CLI provider. Set an API key for fast generation: \`n-dx config claude.api_key <key>\` (or export ANTHROPIC_API_KEY before \`ndx start\`), then restart the dashboard.`,
+          `Smart add timed out after ${SMART_ADD_TIMEOUT_MS / 1000}s — the LLM call never returned. ` +
+            `The Claude CLI provider is in use (this is normal without an API key). ` +
+            `Verify the CLI works from the environment that launched the dashboard: ` +
+            `\`time claude -p "hi"\`. If that hangs, the \`claude\` CLI isn't usable there ` +
+            `(re-auth with \`claude\`, or run \`ndx start\` from a shell where it works). ` +
+            `An API key (\`n-dx config claude.api_key\`) is an optional faster path, not required.` +
+            (cliResult.stderr.trim() ? `\n\nstderr:\n${cliResult.stderr.trim()}` : ""),
         );
       }
       throw new Error(cliResult.stderr || cliResult.error.message);
