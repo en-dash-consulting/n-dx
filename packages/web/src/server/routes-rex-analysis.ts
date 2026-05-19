@@ -582,12 +582,23 @@ async function handleSmartAddPreview(
     // itself stalled in the server context (e.g. token refresh with no TTY,
     // or a different PATH/env than your shell) — not a missing API key.
     const SMART_ADD_TIMEOUT_MS = 240_000;
+    const startedAt = Date.now();
+    console.log(`[smart-add-preview] spawn`, { binPath, binArgs, cwd: ctx.projectDir });
     const cliResult = await foundationExec(binPath, binArgs, {
       cwd: ctx.projectDir,
       timeout: SMART_ADD_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
       env: process.env,
     });
+    const elapsedMs = Date.now() - startedAt;
+    console.log(`[smart-add-preview] finished in ${elapsedMs}ms`, {
+      exitCode: cliResult.exitCode,
+      stdoutBytes: cliResult.stdout.length,
+      stderrBytes: cliResult.stderr.length,
+    });
+    if (cliResult.stderr.trim()) {
+      console.log(`[smart-add-preview] stderr:\n${cliResult.stderr.trim()}`);
+    }
 
     if (cliResult.error && !cliResult.stdout.trim()) {
       if (cliResult.exitCode === null) {

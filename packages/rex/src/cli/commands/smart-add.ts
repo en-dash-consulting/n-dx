@@ -1793,7 +1793,12 @@ export async function cmdSmartAdd(
   const model = fast
     ? (await resolveLightSmartAddModel(dir)) ?? (await resolveSmartAddModel(dir, flags.model))
     : await resolveSmartAddModel(dir, flags.model);
+  process.stderr.write(
+    `[smart-add] fast=${fast} model=${model ?? "(default)"} isJson=${input.isJson} parentId=${input.parentId ?? "(none)"}\n`,
+  );
   const { existing, parentLevel, itemFileMap } = await loadSmartAddContext(dir, input.parentId);
+  const genStart = Date.now();
+  process.stderr.write(`[smart-add] generate: starting\n`);
   const proposals = await generateSmartAddProposals({
     dir,
     existing,
@@ -1803,6 +1808,7 @@ export async function cmdSmartAdd(
     filePaths: input.filePaths,
     isJson: input.isJson,
   });
+  process.stderr.write(`[smart-add] generate: done in ${Date.now() - genStart}ms, proposals=${proposals.length}\n`);
 
   if (proposals.length === 0) {
     emitNoSmartAddProposals(input.isJson);
@@ -1824,11 +1830,14 @@ export async function cmdSmartAdd(
   // Post-processing consolidation guard: reduce over-granular LLM output
   let consolidatedProposals = proposals;
   {
+    const guardStart = Date.now();
+    process.stderr.write(`[smart-add] consolidation guard: starting\n`);
     const guardResult = await applyConsolidationGuard(
       consolidatedProposals,
       loeConfig,
       model,
     );
+    process.stderr.write(`[smart-add] consolidation guard: done in ${Date.now() - guardStart}ms, triggered=${guardResult.triggered}\n`);
 
     if (guardResult.triggered) {
       consolidatedProposals = guardResult.proposals;
