@@ -40,6 +40,7 @@ export type { InventoryResult } from "../analyzers/inventory.js";
 export { analyzeImports } from "../analyzers/imports.js";
 export { analyzeClassifications, enrichClassificationsWithLLM, mergeClassificationResults } from "../analyzers/classify.js";
 export { analyzeZones } from "../analyzers/zones.js";
+export type { ZoneAnchor, ZonePinSkip } from "../analyzers/zones.js";
 export { analyzeComponents } from "../analyzers/components.js";
 export { analyzeCallGraph, computeZoneCallStats } from "../analyzers/callgraph.js";
 export { generateCallGraphFindings } from "../analyzers/callgraph-findings.js";
