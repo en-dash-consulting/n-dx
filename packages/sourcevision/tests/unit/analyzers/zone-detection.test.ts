@@ -17,6 +17,7 @@ import {
   assignByProximity,
   applyZonePins,
   SUBDIVISION_THRESHOLD,
+  type ZonePinSkip,
 } from "../../../src/analyzers/zones.js";
 import type { Zone, ImportEdge } from "../../../src/schema/index.js";
 import {
@@ -1091,6 +1092,28 @@ describe("applyZonePins", () => {
   it("is a no-op when file is already in target zone", () => {
     const result = applyZonePins(baseZones, { "src/viewer/main.ts": "viewer" });
     expect(result.find((z) => z.id === "viewer")!.files).toHaveLength(2);
+  });
+
+  it("reports target-zone-absent when the pin's target zone did not form", () => {
+    const skipped: ZonePinSkip[] = [];
+    applyZonePins(baseZones, { "src/a.ts": "nonexistent" }, skipped);
+    expect(skipped).toEqual([
+      { file: "src/a.ts", targetZoneId: "nonexistent", reason: "target-zone-absent" },
+    ]);
+  });
+
+  it("reports file-unzoned when the pinned file is not in any zone", () => {
+    const skipped: ZonePinSkip[] = [];
+    applyZonePins(baseZones, { "missing.ts": "viewer" }, skipped);
+    expect(skipped).toEqual([
+      { file: "missing.ts", targetZoneId: "viewer", reason: "file-unzoned" },
+    ]);
+  });
+
+  it("records no skips when every pin applies", () => {
+    const skipped: ZonePinSkip[] = [];
+    applyZonePins(baseZones, { "src/a.ts": "viewer" }, skipped);
+    expect(skipped).toHaveLength(0);
   });
 });
 

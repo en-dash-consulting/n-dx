@@ -704,9 +704,21 @@ export function assignByProximity(
  * pinned target zone. Files whose target zone doesn't exist are skipped.
  * This runs after Louvain detection and proximity assignment.
  */
+/**
+ * A configured zone pin that could not be applied this run.
+ * `target-zone-absent` is the important one: the pin's target zone did not
+ * form (Louvain non-determinism), so the file silently fell back elsewhere.
+ */
+export interface ZonePinSkip {
+  file: string;
+  targetZoneId: string;
+  reason: "target-zone-absent" | "file-unzoned";
+}
+
 export function applyZonePins(
   zones: Zone[],
   pins: Record<string, string>,
+  skipped?: ZonePinSkip[],
 ): Zone[] {
   // Build file → source zone index
   const fileToZoneIdx = new Map<string, number>();
@@ -727,7 +739,16 @@ export function applyZonePins(
   for (const [file, targetZoneId] of Object.entries(pins)) {
     const sourceIdx = fileToZoneIdx.get(file);
     const targetIdx = zoneIdToIdx.get(targetZoneId);
-    if (sourceIdx === undefined || targetIdx === undefined) continue;
+    if (targetIdx === undefined) {
+      // The pin's target zone did not form this run — the file is NOT moved
+      // and silently lands wherever Louvain put it. Surface this.
+      skipped?.push({ file, targetZoneId, reason: "target-zone-absent" });
+      continue;
+    }
+    if (sourceIdx === undefined) {
+      skipped?.push({ file, targetZoneId, reason: "file-unzoned" });
+      continue;
+    }
     if (sourceIdx === targetIdx) continue; // already in target zone
     moves.push([file, sourceIdx, targetIdx]);
   }
@@ -2228,6 +2249,64 @@ function dedupeZonesById(zones: Zone[]): Zone[] {
   return out;
 }
 
+// ── Helper: skipped-pin findings ─────────────────────────────────────────────
+
+/**
+ * Turn un-appliable zone pins into visible warnings. The dominant case is
+ * `target-zone-absent`: the pin's target zone did not form in this Louvain
+ * run, so the pinned files silently fell back elsewhere — previously this was
+ * only detectable by diffing `zones.json` (see issue #210).
+ */
+function computeSkippedPinFindings(skipped: ZonePinSkip[]): Finding[] {
+  if (skipped.length === 0) return [];
+  const findings: Finding[] = [];
+
+  const absentByZone = new Map<string, string[]>();
+  const unzoned: ZonePinSkip[] = [];
+  for (const s of skipped) {
+    if (s.reason === "target-zone-absent") {
+      const list = absentByZone.get(s.targetZoneId) ?? [];
+      list.push(s.file);
+      absentByZone.set(s.targetZoneId, list);
+    } else {
+      unzoned.push(s);
+    }
+  }
+
+  for (const [zoneId, files] of [...absentByZone.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const sorted = [...files].sort();
+    const shown = sorted.slice(0, 8).join(", ");
+    const more = sorted.length > 8 ? `, +${sorted.length - 8} more` : "";
+    findings.push({
+      type: "anti-pattern",
+      pass: 0,
+      scope: "global",
+      severity: "warning",
+      category: "structural",
+      text:
+        `Zone pin target "${zoneId}" did not form this analysis run — ` +
+        `${sorted.length} pin(s) skipped and those files fell back to their Louvain zone. ` +
+        `Single-target consolidations to "${zoneId}" are non-deterministic until it is a stable anchor. ` +
+        `Skipped: ${shown}${more}.`,
+      related: [zoneId, ...sorted],
+    });
+  }
+
+  for (const s of unzoned.sort((a, b) => a.file.localeCompare(b.file))) {
+    findings.push({
+      type: "anti-pattern",
+      pass: 0,
+      scope: "global",
+      severity: "info",
+      category: "structural",
+      text: `Zone pin for "${s.file}" → "${s.targetZoneId}" skipped: the file is not present in any detected zone (out of scope or unzoned).`,
+      related: [s.file, s.targetZoneId],
+    });
+  }
+
+  return findings;
+}
+
 // ── Helper: move recommendations ─────────────────────────────────────────────
 
 /** Detect pin divergence and import-neighbor move recommendations. */
@@ -2511,8 +2590,9 @@ export async function analyzeZones(
   );
 
   // ── Apply zone pins (post-enrichment) ──
+  const skippedPins: ZonePinSkip[] = [];
   const pinnedFinalZones = options?.zonePins && Object.keys(options.zonePins).length > 0
-    ? applyZonePins(finalZones, options.zonePins)
+    ? applyZonePins(finalZones, options.zonePins, skippedPins)
     : finalZones;
 
   // ── Promote sub-analyses and build crossings ──
@@ -2534,6 +2614,7 @@ export async function analyzeZones(
   );
   structural.findings.push(
     ...computeMoveFindings(pinnedFinalZones, crossings, imports.edges, options?.zonePins ?? {}),
+    ...computeSkippedPinFindings(skippedPins),
   );
 
   // ── Merge insights ──
