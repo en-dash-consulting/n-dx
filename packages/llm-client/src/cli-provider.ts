@@ -122,6 +122,10 @@ function spawnOnce(
     // nested inside an interactive Claude Code session (e.g. when the web
     // server is launched from within Claude Code).
     const { CLAUDECODE: _, ...cleanEnv } = process.env;
+    const spawnStart = Date.now();
+    process.stderr.write(
+      `[cli-provider] spawn claude ${cliBinary} model=${request.model} promptBytes=${request.prompt.length}\n`,
+    );
     const proc = spawn(cliBinary, args, {
       stdio: ["pipe", "pipe", "pipe"],
       shell: process.platform === "win32",
@@ -134,11 +138,31 @@ function spawnOnce(
     let stdout = "";
     let stderr = "";
 
+    // Per-call timeout — caps any single claude invocation so a stalled
+    // process surfaces as a clear, actionable error rather than 240s of
+    // silence (the outer foundationExec timeout).
+    const PER_CALL_TIMEOUT_MS = 90_000;
+    const killTimer = setTimeout(() => {
+      process.stderr.write(
+        `[cli-provider] claude hung past ${PER_CALL_TIMEOUT_MS / 1000}s — killing (stdout=${stdout.length}B, stderr=${stderr.length}B)\n`,
+      );
+      proc.kill("SIGTERM");
+      setTimeout(() => proc.kill("SIGKILL"), 2000).unref();
+    }, PER_CALL_TIMEOUT_MS);
+    killTimer.unref();
+
     proc.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString();
     });
     proc.stderr.on("data", (chunk: Buffer) => {
       stderr += chunk.toString();
+    });
+
+    proc.on("close", () => {
+      clearTimeout(killTimer);
+      process.stderr.write(
+        `[cli-provider] claude exited in ${Date.now() - spawnStart}ms (stdout=${stdout.length}B, stderr=${stderr.length}B)\n`,
+      );
     });
 
     proc.on("error", (err) => {

@@ -12,6 +12,10 @@ import { join } from "node:path";
 
 suppressKnownDeprecations();
 
+if (process.env.NDX_TRACE_SPAWN || process.argv.includes("add")) {
+  process.stderr.write(`[rex] cli/index.js loaded argv=${JSON.stringify(process.argv.slice(2))}\n`);
+}
+
 /** Post-write health warning — lazy-loaded to avoid startup cost. */
 async function postWriteHealthWarning(dir: string, isJson: boolean): Promise<void> {
   try {

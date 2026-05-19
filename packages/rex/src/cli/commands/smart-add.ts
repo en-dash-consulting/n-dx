@@ -1772,6 +1772,7 @@ export async function cmdSmartAdd(
   flags: Record<string, string>,
   multiFlags: Record<string, string[]> = {},
 ): Promise<void> {
+  process.stderr.write(`[smart-add] cmdSmartAdd entered dir=${dir} flags=${JSON.stringify(flags)}\n`);
   const input = parseSmartAddInput(descriptions, flags, multiFlags);
 
   if (!(await hasRexDir(dir))) {
