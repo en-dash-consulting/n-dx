@@ -41,6 +41,25 @@ describe("buildSystemPrompt", () => {
     expect(prompt).not.toContain("Test command:");
   });
 
+  // ── Plan Mode Invariant regression ──────────────────────────────────────────
+  // These tests are the canary: if the no-plan-mode rule is ever removed from
+  // buildSystemPrompt, the first test will fail. Do not skip or weaken them.
+  describe("plan mode invariant", () => {
+    it("cli provider system prompt includes no-plan-mode section", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), provider: "cli" as const };
+      const prompt = buildSystemPrompt(project, config);
+      expect(prompt).toContain("Plan Mode Invariant");
+      expect(prompt).toContain("ExitPlanMode");
+      expect(prompt).toContain("plan-only responses");
+    });
+
+    it("plan-mode section absent from api provider (different interaction model)", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), provider: "api" as const };
+      const prompt = buildSystemPrompt(project, config);
+      expect(prompt).not.toContain("Plan Mode Invariant");
+    });
+  });
+
   describe("cli provider", () => {
     it("omits rex tools from workflow", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), provider: "cli" as const };

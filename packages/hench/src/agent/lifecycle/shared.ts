@@ -909,6 +909,49 @@ async function countStagedFiles(projectDir: string): Promise<number> {
 }
 
 /**
+ * Update the PRD task status to "completed" immediately after success is
+ * determined (after test gate passes). This ensures the status is persisted
+ * to disk before the next iteration begins task selection.
+ *
+ * Returns true if the status was updated, false if already completed.
+ * Idempotent: calling multiple times is safe.
+ *
+ * Exported for testing and for use by finalizeRun (before commit).
+ */
+export async function updateCompletedTaskStatus(
+  store: PRDStore,
+  taskId: string,
+  run: RunRecord,
+): Promise<boolean> {
+  if (!taskId) return false;
+  if (run.status !== "completed") return false;
+
+  try {
+    // Check current status to avoid redundant updates
+    const existingItem = await store.getItem(taskId);
+    if (existingItem?.status === "completed") {
+      // Already completed — no-op
+      return false;
+    }
+
+    // Update PRD status to "completed"
+    await toolRexUpdateStatus(store, taskId, { status: "completed" });
+
+    // Log the completion event
+    await toolRexAppendLog(store, taskId, {
+      event: "task_completed",
+      detail: run.summary,
+    });
+
+    return true;
+  } catch (err) {
+    // Best-effort: log failure but don't fail the run
+    detail(`Warning: early PRD status update failed: ${(err as Error).message}`);
+    return false;
+  }
+}
+
+/**
  * When the agent wrote a pending commit message, show it to the user and
  * prompt them to approve the commit. Runs `git commit -F <file>` on accept,
  * deletes the sentinel on both accept and decline.
@@ -997,6 +1040,7 @@ export async function performCommitPromptIfNeeded(
 
   // Update PRD status and stage the change before committing.
   // This ensures the status transition and code changes are in the same commit.
+  // Skip if the status was already updated early (by updateCompletedTaskStatus).
   let oldStatus: string | undefined;
   let newStatus: string | undefined;
   if (store && taskId && run.status === "completed") {
@@ -1005,15 +1049,20 @@ export async function performCommitPromptIfNeeded(
       const existingItem = await store.getItem(taskId);
       oldStatus = existingItem?.status;
 
-      // Update PRD status to "completed"
-      await toolRexUpdateStatus(store, taskId, { status: "completed" });
-      newStatus = "completed";
+      // Skip the status update if already completed (idempotent)
+      if (oldStatus !== "completed") {
+        // Update PRD status to "completed"
+        await toolRexUpdateStatus(store, taskId, { status: "completed" });
+        newStatus = "completed";
 
-      // Log the completion event
-      await toolRexAppendLog(store, taskId, {
-        event: "task_completed",
-        detail: run.summary,
-      });
+        // Log the completion event
+        await toolRexAppendLog(store, taskId, {
+          event: "task_completed",
+          detail: run.summary,
+        });
+      } else {
+        newStatus = "completed"; // For trailer logic below
+      }
 
       // Stage the PRD store after the status update so code and task state
       // land in the same commit. Prefer the current folder-tree store, with a
@@ -1430,6 +1479,16 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       info("\nTest gate max attempts reached");
       run.status = "failed";
       run.error = "Test gate max retry attempts exceeded";
+    }
+  }
+
+  // Update PRD status to "completed" immediately after test gate passes.
+  // This ensures status is persisted to disk before the next iteration's
+  // task selection, preventing re-selection of just-completed tasks.
+  if (opts.store && run.taskId && run.status === "completed") {
+    const updated = await updateCompletedTaskStatus(opts.store, run.taskId, run);
+    if (updated) {
+      detail("Marked task as completed in PRD (before commit)");
     }
   }
 

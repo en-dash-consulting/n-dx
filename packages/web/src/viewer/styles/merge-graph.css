@@ -168,6 +168,114 @@
   border-color: var(--border-strong);
 }
 
+/* ── Merge metadata panel (above graph) ──────────────────────────────────── */
+
+.mg-meta-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.mg-meta-label {
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  white-space: nowrap;
+}
+
+.mg-meta-instruction {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.mg-meta-status {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.mg-meta-context {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.mg-meta-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  flex: 1;
+  min-width: 0;
+}
+
+.mg-meta-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.mg-meta-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mg-meta-sha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.mg-meta-sha-text {
+  font-family: monospace;
+  color: var(--text);
+  background: var(--bg-hover);
+  padding: 1px var(--space-1-5);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.mg-meta-copy {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 var(--space-1-5);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mg-meta-copy:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.mg-meta-copy.copied {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.mg-meta-author {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
 /* ── Notice banner ─────────────────────────────────────────────────────────── */
 
 .mg-notice {
@@ -278,6 +386,21 @@
 
 .mg-node { cursor: pointer; }
 
+/*
+ * Fade-in animation for newly-mounted nodes. When a parent is expanded the
+ * children render fresh, picking up this animation; collapsing simply
+ * unmounts them. Animation only applies to entrance — no exit transition is
+ * needed for the spec's "smooth transition" requirement.
+ */
+@keyframes mg-node-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.mg-prd-node, .mg-merge-node {
+  animation: mg-node-enter 220ms ease-out;
+}
+
 .mg-node.selected .mg-circle,
 .mg-node.selected .mg-diamond,
 .mg-node.selected .mg-square,
@@ -287,10 +410,17 @@
   filter: drop-shadow(0 0 4px currentColor);
 }
 
+/*
+ * Inline labels next to each node. The compact folder-tree layout places
+ * labels to the right of the shape on the same row, mirroring the dashboard
+ * tree view's "shape + title" rhythm. Letter-spacing is tightened slightly
+ * so longer titles still fit in a single row.
+ */
 .mg-label {
-  fill: var(--text-dim);
+  fill: var(--text);
   pointer-events: none;
   dominant-baseline: middle;
+  letter-spacing: -0.2px;
 }
 
 .mg-merge-label {
@@ -302,15 +432,22 @@
   letter-spacing: 0.08em;
 }
 
+/*
+ * Folder-tree connector rails. Drawn as straight L-shaped paths (no curves)
+ * so the indent guides read crisply at small sizes. Slightly heavier when a
+ * subtree is highlighted, but never so dark that they compete with nodes.
+ */
 .mg-edge-tree {
   stroke: var(--border);
   stroke-width: 1px;
-  stroke-opacity: 0.5;
+  stroke-opacity: 0.55;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
   pointer-events: none;
 }
 
 .mg-edge-tree.highlighted {
-  stroke-opacity: 0.9;
+  stroke-opacity: 0.95;
   stroke: var(--border-strong);
 }
 
@@ -425,6 +562,155 @@
   font-size: var(--font-sm);
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* ── PRD front-matter summary ─────────────────────────────────────────────── */
+
+.mg-frontmatter {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  margin: 0;
+  font-size: var(--font-xs);
+  align-items: baseline;
+}
+
+.mg-frontmatter dt {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  font-weight: var(--weight-semibold);
+}
+
+.mg-frontmatter dd {
+  margin: 0;
+  color: var(--text-dim);
+  word-break: break-word;
+  min-width: 0;
+}
+
+.mg-frontmatter-status {
+  text-transform: capitalize;
+}
+
+.mg-frontmatter-empty {
+  color: var(--text-muted);
+}
+
+.mg-frontmatter-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.mg-frontmatter-tag {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+}
+
+/* ── PRD origin (introducing-commit metadata) ─────────────────────────────── */
+
+.mg-origin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px dashed var(--border);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+.mg-origin-label {
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--text-muted);
+  font-weight: var(--weight-semibold);
+}
+
+.mg-origin-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.mg-origin-sha {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-xs);
+  background: var(--bg-hover);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.mg-origin-copy {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-xs);
+  padding: 1px 6px;
+  line-height: 1;
+}
+
+.mg-origin-copy:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.mg-origin-copy.copied {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.mg-origin-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mg-origin-authors {
+  color: var(--text-dim);
+}
+
+.mg-origin-author {
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.mg-origin-coauthors {
+  color: var(--text-muted);
+}
+
+.mg-origin-subject {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-style: italic;
+  word-break: break-word;
+}
+
+.mg-origin-status {
+  color: var(--text-muted);
+}
+
+.mg-origin-error-detail {
+  color: var(--brand-rose);
+  font-size: var(--font-xs);
+}
+
+/* ── View-mode toggle ─────────────────────────────────────────────────────── */
+
+.mg-view-toggle {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
 }
 
 /* ── File list ────────────────────────────────────────────────────────────── */

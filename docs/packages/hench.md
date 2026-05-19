@@ -69,6 +69,16 @@ ndx config hench.maxTurns 30 .        # max tool-use turns per task
 ndx config hench.maxTokens 100000 .   # token budget per task
 ```
 
+## Run Loop Invariants
+
+The multi-iteration run loop (`--auto`, `--loop`, `--iterations=N`) enforces three invariants that prevent wasted work. Any contributor modifying the loop logic should verify all three are preserved. See [`docs/contributing/run-loop-invariants.md`](../contributing/run-loop-invariants.md) for the full reference including concrete correct vs. incorrect examples and the exact code paths.
+
+**I1 — No completed-task re-pick.** `collectCompletedIds()` is called before every `runOne()` call; completed IDs are merged into `combinedExcludedIds` and forwarded to `findNextTask()`. A task that reached `completed` status is never selected again.
+
+**I2 — Force advancement at three attempts.** `createAttemptTracker()` counts per-task runs within one invocation. At `MAX_TASK_ATTEMPTS = 3` the task is added to `forcedExclusionIds` and skipped for the rest of the run. Code: `run.ts:38–70` (tracker) and `run.ts:1206–1213` / `run.ts:1352–1358` (enforcement).
+
+**I3 — Status transition before next selection.** `finalizeRun()` calls `updateCompletedTaskStatus()` (success) or `handleRunFailure()` (failure) before returning to the outer loop. The PRD write is synchronous with `runOne()`, so the next `collectCompletedIds()` call always sees the updated status.
+
 ## Stuck Detection
 
 If a task fails repeatedly (default threshold: 3 consecutive failures including completion rejections), stuck detection kicks in and moves to the next task. This prevents infinite loops on unfixable tasks.

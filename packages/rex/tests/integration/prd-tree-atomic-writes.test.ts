@@ -182,30 +182,30 @@ describe("prd_tree atomic writes and crash-safety", () => {
 
   describe("file-locking: concurrent writers are serialized", () => {
     it("second writer waits for first writer to release lock", async () => {
-      let firstWriteStarted = false;
-      let secondWriteBlocked = false;
       const operations: string[] = [];
 
-      // Patch the store to track operation timing
+      // Patch the store to track operation timing at lock boundaries
       const originalAddItem = store.addItem.bind(store);
+      let firstStarted = false;
 
       // First writer acquires lock
       const firstPromise = (async () => {
+        firstStarted = true;
         operations.push("first-start");
-        firstWriteStarted = true;
         const item = makeItem("test-1", "First Item");
         await originalAddItem(item);
         operations.push("first-end");
+        // Simulate some work delay to ensure lock is held a bit longer
+        await new Promise((r) => setTimeout(r, 50));
       })();
 
-      // Give first writer a moment to start
-      await new Promise((r) => setTimeout(r, 50));
-      expect(firstWriteStarted).toBe(true);
+      // Give first writer a moment to actually start
+      await new Promise((r) => setTimeout(r, 10));
+      expect(firstStarted).toBe(true);
 
       // Second writer should wait for lock
       const secondPromise = (async () => {
         operations.push("second-start");
-        secondWriteBlocked = true;
         const item = makeItem("test-2", "Second Item");
         await originalAddItem(item);
         operations.push("second-end");
@@ -214,7 +214,8 @@ describe("prd_tree atomic writes and crash-safety", () => {
       // Wait for both to complete
       await Promise.all([firstPromise, secondPromise]);
 
-      // Verify serialization: first write must complete before second writes
+      // Verify serialization: first write must complete before second starts.
+      // With proper locking: ["first-start", "first-end", "second-start", "second-end"]
       const firstEndIdx = operations.indexOf("first-end");
       const secondStartIdx = operations.indexOf("second-start");
       expect(firstEndIdx).toBeLessThan(secondStartIdx);

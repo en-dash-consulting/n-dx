@@ -134,3 +134,7 @@ claude mcp remove sourcevision
 claude mcp add --transport http rex http://localhost:3117/mcp/rex
 claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
 ```
+
+---
+
+See the [Skills Reference](./skills) for the workflow slash commands installed alongside MCP by `ndx init`.

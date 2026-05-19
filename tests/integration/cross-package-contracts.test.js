@@ -364,6 +364,7 @@ describe("web → rex gateway contract", () => {
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
     "parseFolderTree",
+    "resolveSiblingSlugs",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -642,7 +643,7 @@ describe("gateway export auto-detection", () => {
         "isRequirementCategory", "isValidationType", "isRootLevel", "isWorkItem",
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
-        "parseFolderTree",
+        "parseFolderTree", "resolveSiblingSlugs",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "CHILD_LEVEL"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME"],

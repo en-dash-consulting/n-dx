@@ -211,11 +211,11 @@ describe("self-heal tag scoping — integration", () => {
     expect(tagged).toBeDefined();
     expect(untagged).toBeDefined();
 
-    // The tagged task was selected and started (in_progress) by the iteration.
-    // In a non-git test environment the status does not advance to completed
-    // (commit staging and the commit-prompt gate are skipped), so in_progress
-    // is the correct expectation here.
-    expect(tagged!.status).toBe("in_progress");
+    // The tagged task was selected and completed by the iteration.
+    // updateCompletedTaskStatus marks the task completed immediately after the
+    // test gate passes (before commit), so the status is "completed" even in a
+    // non-git test environment where the commit step is skipped.
+    expect(tagged!.status).toBe("completed");
 
     // The untagged task must be completely untouched.
     expect(untagged!.status).toBe("pending");
@@ -223,7 +223,7 @@ describe("self-heal tag scoping — integration", () => {
 
   // ── SC-2: Tagged task is the one that advances ─────────────────────────────
 
-  it("advances only the tagged task to in_progress, not the higher-priority untagged task", async () => {
+  it("advances only the tagged task, not the higher-priority untagged task", async () => {
     // This test is a regression guard: before the fix, the untagged critical
     // task could be selected because priority was evaluated before tag filter.
     const mockSpawn = vi.fn();

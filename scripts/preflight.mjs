@@ -7,17 +7,19 @@
  *   pnpm preflight
  *
  * Steps (in order):
- *   1. pnpm build
- *   2. pnpm typecheck
- *   3. pnpm docs:build
- *   4. pnpm pr-check
- *   5. pnpm test
- *   6. changeset presence check
+ *   1. pnpm security:obfuscation
+ *   2. pnpm build
+ *   3. pnpm typecheck
+ *   4. pnpm docs:build
+ *   5. pnpm pr-check
+ *   6. pnpm test
+ *   7. changeset presence check
  */
 
 import { spawnTool } from "../packages/llm-client/dist/public.js";
 
 const steps = [
+  { name: "obfuscated-code", cmd: "pnpm security:obfuscation" },
   { name: "build",     cmd: "pnpm build" },
   { name: "typecheck", cmd: "pnpm typecheck" },
   { name: "docs",      cmd: "pnpm docs:build" },

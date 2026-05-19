@@ -1,0 +1,27 @@
+---
+id: "9708b8c6-a5ff-4e63-a05d-a3f38700f049"
+level: "task"
+title: "Auto-trigger reshape consolidation pass after ndx add and rex add"
+status: "completed"
+priority: "high"
+tags:
+  - "rex"
+  - "reshape"
+  - "prd"
+  - "cli"
+source: "smart-add"
+startedAt: "2026-05-14T13:13:35.418Z"
+completedAt: "2026-05-14T13:36:32.152Z"
+endedAt: "2026-05-14T13:36:32.152Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented scoped hash-suffix consolidation pass in add-reshape.ts; wired into add.ts and reshape.ts; 20 tests all pass."
+acceptanceCriteria:
+  - "After every successful `ndx add` / `rex add` insertion, a scoped consolidation pass runs on the parent subtree of the new item"
+  - "Scoped pass only invokes the hash-suffix detector + consolidation strategies; it does not run other reshape passes (single-child compaction, etc.)"
+  - "Pass writes to `.rex/prd_tree/` only and is skipped when concurrency detection sees an in-flight `ndx reshape`"
+  - "CLI output shows a one-line note when consolidation merged items during add (e.g. 'Consolidated 2 duplicate sibling(s) under <parent>'); silent when no action taken"
+  - "`ndx add --no-reshape` flag bypasses the auto-pass for users who want raw add behavior"
+  - "Add-time latency increase stays under 500ms on a 100-item PRD subtree (measured by integration test)"
+  - "Integration test asserts that adding an item with a title matching an existing sibling's hash-stripped title triggers consolidation"
+description: "Wire a lightweight reshape consolidation pass into the `ndx add` and `rex add` write paths so newly added items are immediately checked for hash-suffix duplicate siblings and consolidated before the command returns. The pass must be scoped to the parent of the newly added item (not a full-tree reshape) to keep add-time latency low, and must respect the existing concurrency contract — refusing to run if a full `ndx reshape` is in progress."
+---

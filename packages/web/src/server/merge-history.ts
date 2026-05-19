@@ -34,6 +34,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
 import type { PRDDocument, PRDItem } from "./rex-gateway.js";
+import { resolveSiblingSlugs } from "./rex-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -105,6 +106,29 @@ export interface MergeNode {
     total: number;
   };
   files: FileChange[];
+}
+
+/**
+ * Introducing-commit metadata for a single PRD item — the commit that first
+ * added the item's `index.md` to the repo, plus its author and any
+ * `Co-Authored-By:` trailers from the commit body.
+ *
+ * Resolved on-demand via {@link resolveItemOrigin}; surfaced through the
+ * `/api/prd-origin` route and rendered in the context-graph detail panel.
+ */
+export interface PrdOrigin {
+  sha: string;
+  shortSha: string;
+  /** Committer ISO date (`%cI`) — when the introducing commit landed. */
+  createdAt: string;
+  /** Primary author display name (`%an`). */
+  author: string;
+  /** Primary author email (`%ae`). */
+  authorEmail: string;
+  /** Parsed `Co-Authored-By: Name <email>` trailers from `%b`. */
+  coAuthors: Array<{ name: string; email: string }>;
+  /** Subject line (`%s`) of the introducing commit. */
+  subject: string;
 }
 
 /** Fingerprint used for incremental cache invalidation. */
@@ -695,6 +719,74 @@ export function listMergeCommits(
     `--pretty=format:${format}`,
   ]);
   return parseMergeLogOutput(stdout);
+}
+
+/** Regex for `Co-Authored-By:` trailers in commit bodies. */
+const COAUTHOR_RE = /^Co-Authored-By:\s*([^<]+?)\s*<([^>]+)>\s*$/gim;
+
+/**
+ * Parse `Co-Authored-By: Name <email>` trailers from a commit body. Multiple
+ * trailers are returned in source order; whitespace around the name and email
+ * is trimmed. Names that resolve to empty after trimming are still kept (with
+ * the email) so the caller can decide how to display them.
+ */
+export function parseCoAuthorTrailers(
+  body: string,
+): Array<{ name: string; email: string }> {
+  if (!body) return [];
+  const out: Array<{ name: string; email: string }> = [];
+  // Reset the regex's lastIndex — `g` regexes are stateful between calls.
+  COAUTHOR_RE.lastIndex = 0;
+  for (const m of body.matchAll(COAUTHOR_RE)) {
+    out.push({ name: m[1].trim(), email: m[2].trim() });
+  }
+  return out;
+}
+
+/**
+ * Resolve the introducing commit for a single tracked path.
+ *
+ * Runs `git log --diff-filter=A --follow -1 -- <relPath>`, which returns the
+ * commit that first added `relPath` to the repo (following renames). Returns
+ * `null` when git produces no output — typically because the path isn't yet
+ * tracked (e.g. a PRD item created in the working tree but never committed).
+ *
+ * Errors from the runner (non-git directory, etc.) propagate to the caller so
+ * the route handler can surface a 500. Pure / runner-injected so tests don't
+ * need a real git repository.
+ */
+export function resolveItemOrigin(
+  runner: GitRunner,
+  relPath: string,
+): PrdOrigin | null {
+  const format = `%H${FS}%cI${FS}%an${FS}%ae${FS}%s${FS}%b${RS}`;
+  const stdout = runner([
+    "log",
+    "--diff-filter=A",
+    "--follow",
+    "-1",
+    `--pretty=format:${format}`,
+    "--",
+    relPath,
+  ]);
+  if (!stdout) return null;
+  // Single-record format (one commit max), but split on RS to be tolerant of
+  // a trailing record separator from the format string.
+  const record = stdout.split(RS)[0]?.trim();
+  if (!record) return null;
+  const fields = record.split(FS);
+  if (fields.length < 5) return null;
+  const [sha, createdAt, author, authorEmail, subject, body = ""] = fields;
+  if (!sha) return null;
+  return {
+    sha,
+    shortSha: sha.slice(0, 7),
+    createdAt,
+    author,
+    authorEmail,
+    coAuthors: parseCoAuthorTrailers(body),
+    subject,
+  };
 }
 
 /**

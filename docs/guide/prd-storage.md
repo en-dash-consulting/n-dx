@@ -181,3 +181,4 @@ detects and merges them back into their parent folder.
   `packages/rex/src/store/folder-tree-parser.ts`
 - Migration source: `packages/rex/src/core/folder-per-task-migration.ts`
 - Backup source: `packages/rex/src/core/backup-snapshots.ts`
+- Workflow skills for interacting with the PRD: [Skills Reference](./skills)

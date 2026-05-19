@@ -67,6 +67,8 @@ import { EventAccumulator } from "./event-accumulator.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
+import { startCommitMsgWatcher } from "./commit-msg-watcher.js";
+import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
 
 // ── normalizeCodexResponse ────────────────────────────────────────────────
 
@@ -1193,6 +1195,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // subprocess doesn't appear stale to the web dashboard during long tool calls.
   const heartbeat = startHeartbeat(henchDir, run);
 
+  // Start the commit-message watcher. If the agent writes `.hench-commit-msg.txt`
+  // and the run terminates before the normal commit-prompt flow can process it
+  // (timeout, crash), the timer fires and auto-commits the staged changes.
+  // The watcher is cancelled before finalizeRun so the two paths cannot race.
+  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 300_000;
+  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({ projectDir, timeoutMs: commitMsgTimeoutMs });
+
   // Prompt section diagnostics — captured on first attempt, stored on run record.
   let promptSectionDiagnostics: PromptSectionDiagnostic[] | undefined;
 
@@ -1360,6 +1369,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // Stop heartbeat before finalization
   heartbeat.stop();
+
+  // Cancel the commit-message watcher and any pending auto-commit timer.
+  // Must happen before finalizeRun so the watcher cannot race with
+  // performCommitPromptIfNeeded (which owns the normal commit path).
+  commitWatcher.cancel();
 
   // Attach accumulated events to the run record when the event pipeline is active.
   // This enables post-hoc debugging via `hench show --events <run-id>`.

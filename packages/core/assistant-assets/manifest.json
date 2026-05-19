@@ -1,5 +1,8 @@
 {
   "skills": {
+    "no-plan-mode": {
+      "description": "Prevent plan-mode stalls in autonomous hench agent runs"
+    },
     "ndx-plan": {
       "description": "Analyze the codebase and propose PRD updates"
     },

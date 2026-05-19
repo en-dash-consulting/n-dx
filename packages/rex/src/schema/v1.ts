@@ -376,6 +376,18 @@ export interface RexConfig {
   facets?: Record<string, FacetDefinition>;
   /** Structural health thresholds — warn when PRD shape degrades. */
   structureHealth?: StructureHealthThresholds;
+  /**
+   * Content-similarity threshold for title-collision routing during `rex add`.
+   *
+   * When two siblings share the same normalized title, their descriptions and
+   * acceptance criteria are compared. If the similarity score is **at or above**
+   * this threshold the items are treated as true duplicates and merged via the
+   * reshape merge path. If the score is **below** the threshold they are treated
+   * as semantically distinct and routed to the LLM rename path.
+   *
+   * Range: 0–1 (inclusive). Default: 0.5.
+   */
+  titleCollisionSimilarityThreshold?: number;
   future?: Record<string, unknown>;
   [key: string]: unknown;
 }

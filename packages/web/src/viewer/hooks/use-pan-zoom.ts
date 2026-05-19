@@ -7,7 +7,7 @@
  * - Programmatic zoom-in, zoom-out, and fit-to-content controls
  */
 
-import { useState, useCallback, useRef, useEffect } from "preact/hooks";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "preact/hooks";
 import type { RefObject } from "preact";
 
 export interface ViewBox {
@@ -28,6 +28,11 @@ export interface PanZoomState {
   handleZoomIn: () => void;
   handleZoomOut: () => void;
   handleFit: () => void;
+  /**
+   * Translate the viewport so `point` (in SVG user-space coords) sits at the
+   * center. Zoom level is preserved — only x/y of the viewBox change.
+   */
+  recenter: (point: { x: number; y: number }) => void;
 }
 
 /**
@@ -41,7 +46,30 @@ export function usePanZoom(fitVB: ViewBox): PanZoomState {
   const panStart = useRef<{ x: number; y: number; vbx: number; vby: number } | null>(null);
   const [viewBox, setViewBox] = useState<ViewBox>(fitVB);
 
-  useEffect(() => {
+  // Auto-fit when the underlying graph content meaningfully shifts. The
+  // caller produces a fresh `fitVB` object on most renders (memo deps churn,
+  // unrelated state updates), so reference equality alone would clobber any
+  // user pan, zoom, or recenter on every commit. Compare by value to detect
+  // genuine bound changes only.
+  //
+  // useLayoutEffect (vs useEffect) runs synchronously after commit, so the
+  // initial fit lands BEFORE a click event interleaved by a test or fast
+  // user can fire `recenter`. With deferred useEffect, `recenter` would
+  // sometimes run on the previous fit, then get overwritten by the
+  // post-commit auto-fit.
+  const lastFitVBRef = useRef<ViewBox | null>(null);
+  useLayoutEffect(() => {
+    const prev = lastFitVBRef.current;
+    if (
+      prev !== null &&
+      prev.x === fitVB.x &&
+      prev.y === fitVB.y &&
+      prev.w === fitVB.w &&
+      prev.h === fitVB.h
+    ) {
+      return;
+    }
+    lastFitVBRef.current = fitVB;
     setViewBox(fitVB);
   }, [fitVB]);
 
@@ -131,6 +159,14 @@ export function usePanZoom(fitVB: ViewBox): PanZoomState {
     setViewBox(fitVB);
   }, [fitVB]);
 
+  const recenter = useCallback((point: { x: number; y: number }) => {
+    setViewBox((vb) => ({
+      ...vb,
+      x: point.x - vb.w / 2,
+      y: point.y - vb.h / 2,
+    }));
+  }, []);
+
   return {
     viewBox,
     panning,
@@ -142,5 +178,6 @@ export function usePanZoom(fitVB: ViewBox): PanZoomState {
     handleZoomIn,
     handleZoomOut,
     handleFit,
+    recenter,
   };
 }

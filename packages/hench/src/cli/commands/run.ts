@@ -27,6 +27,49 @@ import { checkQuotaRemaining, formatQuotaLog } from "../../quota/index.js";
 import { formatTokenReport } from "../token-logging.js";
 
 // ---------------------------------------------------------------------------
+// Attempt tracking (per-task within a single run invocation)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tracks attempt count per task ID within a single run invocation.
+ * After 3 attempts of the same task, the task is forced to be excluded
+ * from subsequent selection in the same run.
+ */
+export interface AttemptTracker {
+  /** Increment and return the new count for the given task ID. */
+  incrementAndGetCount(taskId: string): number;
+  /** Get the current count for a task ID (0 if never attempted). */
+  getCount(taskId: string): number;
+  /** Check if a task has reached the maximum of 3 attempts. */
+  hasReachedMaxAttempts(taskId: string): boolean;
+}
+
+const MAX_TASK_ATTEMPTS = 3;
+
+/**
+ * Create an attempt tracker for a single run invocation.
+ * Counter resets between separate `ndx run` invocations.
+ */
+export function createAttemptTracker(): AttemptTracker {
+  const counts = new Map<string, number>();
+
+  return {
+    incrementAndGetCount(taskId: string): number {
+      const current = counts.get(taskId) ?? 0;
+      const newCount = current + 1;
+      counts.set(taskId, newCount);
+      return newCount;
+    },
+    getCount(taskId: string): number {
+      return counts.get(taskId) ?? 0;
+    },
+    hasReachedMaxAttempts(taskId: string): boolean {
+      return (counts.get(taskId) ?? 0) >= MAX_TASK_ATTEMPTS;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Schema compatibility
 // ---------------------------------------------------------------------------
 
@@ -589,7 +632,7 @@ async function runOne(
   autonomous?: boolean,
   runNumber?: number,
   permissionMode?: PermissionMode,
-): Promise<{ status: string; taskTitle: string }> {
+): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
   await assertSchemaCompatibility(store);
@@ -701,7 +744,7 @@ async function runOne(
     output(`\n${red("Error:")} ${run.error}`);
   }
 
-  return { status: run.status, taskTitle: run.taskTitle };
+  return { status: run.status, taskTitle: run.taskTitle, selectedTaskId: run.taskId };
 }
 
 // ---------------------------------------------------------------------------
@@ -1116,6 +1159,11 @@ async function runIterations(
   autonomous?: boolean,
   permissionMode?: PermissionMode,
 ): Promise<void> {
+  // Track attempt counts per task ID within this run invocation
+  const attemptTracker = createAttemptTracker();
+  // Tasks excluded from selection due to reaching 3 attempts
+  const forcedExclusionIds = new Set<string>();
+
   for (let i = 0; i < iterations; i++) {
     // Banner between iterations: printed before iteration i+1 starts,
     // i.e. after iteration i's commit and run summary have been rendered.
@@ -1130,14 +1178,19 @@ async function runIterations(
       ? await loadStuckTaskIds(henchDir, maxFailedAttempts)
       : undefined;
 
-      const { status } = await runOne(
+    // Combine stuck tasks with tasks that reached max attempts
+    const combinedExcludedIds = stuckIds
+      ? new Set([...stuckIds, ...forcedExclusionIds])
+      : forcedExclusionIds;
+
+    const { status, selectedTaskId } = await runOne(
       dir, henchDir, rexDir, provider,
       // Only use the explicit taskId for the first iteration;
       // subsequent iterations autoselect the next task
       i === 0 ? taskId : undefined,
       dryRun, model, spawnModel, maxTurns, tokenBudget,
       review,
-      stuckIds,
+      combinedExcludedIds,
       epicId,
       tags,
       undefined,
@@ -1148,6 +1201,17 @@ async function runIterations(
       undefined,
       permissionMode,
     );
+
+    // Track attempt count for the selected task
+    if (selectedTaskId) {
+      const attemptCount = attemptTracker.incrementAndGetCount(selectedTaskId);
+      if (attemptCount >= 3 && !forcedExclusionIds.has(selectedTaskId)) {
+        forcedExclusionIds.add(selectedTaskId);
+        // Note: taskTitle would be in the original runOne result, not in status
+        // We could enhance this later, but for now we just log the taskId
+        info(`\n${colorWarn(`Forced advancement: task "${selectedTaskId}" has reached 3 attempts in this run. Excluding from next iteration.`)}`);
+      }
+    }
 
     // Emit quota log line(s) at the inter-run boundary.
     await emitQuotaLog();
@@ -1214,6 +1278,10 @@ async function runLoop(
   let completed = 0;
   // Tracks per-task outcomes when a tag filter is active (e.g. self-heal mode).
   const taggedCompletedItems: CompletedItem[] = [];
+  // Track attempt counts per task ID within this run invocation
+  const attemptTracker = createAttemptTracker();
+  // Tasks excluded from selection due to reaching 3 attempts
+  const forcedExclusionIds = new Set<string>();
 
   try {
     const scope = epicId ? "epic tasks" : "all tasks";
@@ -1248,11 +1316,15 @@ async function runLoop(
         // Resolve scheduling priority from task metadata before enqueuing.
         // This lets high-priority tasks bypass normal queue position.
         const effectiveTaskId = completed === 1 ? taskId : undefined;
+        // Combine stuck tasks with tasks that reached max attempts
+        const combinedExcludedIds = stuckIds
+          ? new Set([...stuckIds, ...forcedExclusionIds])
+          : forcedExclusionIds;
         let schedulingPriority: TaskPriority = "medium";
         if (queue) {
           const store = await resolveStore(rexDir);
           schedulingPriority = await peekNextTaskPriority(
-            store, effectiveTaskId, priorityOverride, stuckIds, epicId, tags,
+            store, effectiveTaskId, priorityOverride, combinedExcludedIds, epicId, tags,
           );
           await queue.acquire(effectiveTaskId ?? "auto", schedulingPriority);
         }
@@ -1264,7 +1336,7 @@ async function runLoop(
             effectiveTaskId,
             dryRun, model, spawnModel, maxTurns, tokenBudget,
             review,
-            stuckIds,
+            combinedExcludedIds,
             epicId,
             tags,
             undefined,
@@ -1276,6 +1348,16 @@ async function runLoop(
             permissionMode,
           );
           status = result.status;
+
+          // Track attempt count for the selected task
+          if (result.selectedTaskId) {
+            const attemptCount = attemptTracker.incrementAndGetCount(result.selectedTaskId);
+            if (attemptCount >= 3 && !forcedExclusionIds.has(result.selectedTaskId)) {
+              forcedExclusionIds.add(result.selectedTaskId);
+              info(`\n${colorWarn(`Forced advancement: task "${result.taskTitle}" has reached 3 attempts in this run. Excluding from next selection.`)}`);
+            }
+          }
+
           if (tags?.length) {
             taggedCompletedItems.push({ title: result.taskTitle, status: result.status });
           }

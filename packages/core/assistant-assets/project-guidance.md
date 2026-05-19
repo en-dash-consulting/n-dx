@@ -108,6 +108,8 @@ ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, -
                           # Autonomous runs (--auto/--loop/--epic-by-epic) default to
                           # acceptEdits so the spawned Claude session won't stall in plan
                           # mode. Override with --permission-mode or hench.permissionMode.
+                          # The no-plan-mode rule is embedded in the hench system prompt
+                          # for all CLI-provider runs (see /no-plan-mode skill).
 ndx self-heal [N] [dir]   # iterative improvement loop (analyze → recommend → execute; --yes for unattended)
 ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
 ndx status [dir]          # rex status (pass --format=json)

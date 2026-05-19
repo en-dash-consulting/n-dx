@@ -41,6 +41,7 @@ export { ConfigFooter } from "./config-footer.js";
 export { ElapsedTime } from "./elapsed-time.js";
 export { updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT } from "./favicon.js";
 export { SidebarThemeToggle, initTheme } from "./theme-toggle.js";
+export { SidebarDensitySelector, initDensity } from "./density-selector.js";
 export { NdxLogoPng, ProductLogoPng, BrandedHeader } from "./logos.js";
 export { PollingSuspensionIndicator } from "./polling-suspension-indicator.js";
 export { RefreshQueueStatus } from "./refresh-queue-status.js";
@@ -99,3 +100,18 @@ export { ZoneSlideout } from "./zone-slideout.js";
 // ── Constants ───────────────────────────────────────────────────────
 
 export * from "./constants.js";
+
+// ── Geometric decoration primitives ─────────────────────────────────
+
+export {
+  DecoConcentricArcs,
+  type DecoConcentricArcsProps,
+  DecoDotGrid,
+  type DecoDotGridProps,
+  DecoBorderCircle,
+  type DecoBorderCircleProps,
+  DecoRuledLines,
+  type DecoRuledLinesProps,
+  DecoLargeNumeral,
+  type DecoLargeNumeralProps,
+} from "./decorations.js";
