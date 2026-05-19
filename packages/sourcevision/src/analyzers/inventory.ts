@@ -19,7 +19,11 @@ import type { LanguageConfig } from "../language/index.js";
 /** Always-skipped directories regardless of language config. */
 const BASE_SKIP_DIRS: ReadonlySet<string> = new Set([
   ".git",
+  // n-dx tooling state, not user source — exclude from the inventory entirely
+  // so generated PRD markdown / logs don't skew the Overview language stats.
   PROJECT_DIRS.SOURCEVISION,
+  PROJECT_DIRS.REX,
+  PROJECT_DIRS.HENCH,
 ]);
 
 // ── Language detection ───────────────────────────────────────────────────────
