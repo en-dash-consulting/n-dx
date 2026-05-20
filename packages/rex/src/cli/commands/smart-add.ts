@@ -1307,30 +1307,27 @@ async function loadSmartAddContext(
   return { existing, parentLevel, itemFileMap };
 }
 
-/** A proposed container confidently maps to an existing epic/feature. */
-function isConfidentContainerMatch(
+/**
+ * A proposed container should reuse an existing one if the dedup scorer
+ * already considers them a match (`match.duplicate`). That scorer combines
+ * exact-title, semantic title-contains, and blended title+content similarity
+ * with a 0.7 threshold — already calibrated for "this is the same thing,"
+ * so trust it here rather than imposing an extra-strict 0.85 gate that
+ * silently dropped real content-overlap matches and let duplicates through.
+ */
+function isContainerMatch(
   match: ProposalDuplicateMatch,
   kind: "epic" | "feature",
 ): boolean {
-  if (!match.duplicate || !match.matchedItem || match.matchedItem.level !== kind) {
-    return false;
-  }
-  // Title-based matches are reliable; for blended matches require a high score
-  // so we never fold a genuinely new epic into an unrelated existing one.
-  return (
-    match.reason === "exact_title" ||
-    match.reason === "semantic_title" ||
-    match.score >= 0.85
-  );
+  return !!match.duplicate && !!match.matchedItem && match.matchedItem.level === kind;
 }
 
 /**
- * Auto-fill `existingId` on proposed epics/features that confidently match an
- * existing PRD container, so `n-dx add` nests the new task under the existing
- * epic/feature instead of creating a duplicate epic. The LLM is supposed to
- * set `existingId` itself but is unreliable; this is the deterministic
- * fallback. Conservative by design: respects an `existingId` the LLM already
- * set, and only acts on high-confidence container matches.
+ * Auto-fill `existingId` on proposed epics/features that match an existing
+ * PRD container, so `n-dx add` nests the new task under the existing
+ * epic/feature instead of creating a duplicate. The LLM is supposed to set
+ * `existingId` itself but is unreliable; this is the deterministic fallback.
+ * Respects an `existingId` the LLM already set.
  */
 export function applySmartPlacement(proposals: Proposal[], existing: PRDItem[]): void {
   if (existing.length === 0) return;
@@ -1340,8 +1337,12 @@ export function applySmartPlacement(proposals: Proposal[], existing: PRDItem[]):
         { key: "epic", kind: "epic", title: p.epic.title, description: p.epic.description },
         existing,
       );
-      if (isConfidentContainerMatch(match, "epic")) {
+      if (isContainerMatch(match, "epic")) {
         p.epic.existingId = match.matchedItem!.id;
+        process.stderr.write(
+          `[smart-add] place epic "${p.epic.title}" -> existing "${match.matchedItem!.title}" ` +
+            `(reason=${match.reason} score=${match.score.toFixed(2)})\n`,
+        );
       }
     }
     for (const feature of p.features) {
@@ -1350,8 +1351,12 @@ export function applySmartPlacement(proposals: Proposal[], existing: PRDItem[]):
         { key: "feature", kind: "feature", title: feature.title, description: feature.description },
         existing,
       );
-      if (isConfidentContainerMatch(match, "feature")) {
+      if (isContainerMatch(match, "feature")) {
         feature.existingId = match.matchedItem!.id;
+        process.stderr.write(
+          `[smart-add] place feature "${feature.title}" -> existing "${match.matchedItem!.title}" ` +
+            `(reason=${match.reason} score=${match.score.toFixed(2)})\n`,
+        );
       }
     }
   }
