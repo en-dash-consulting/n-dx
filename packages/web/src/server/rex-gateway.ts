@@ -28,7 +28,7 @@ export { ensureLegacyPrdMigrated } from "@n-dx/rex";
 export type { LegacyPrdMigrationResult } from "@n-dx/rex";
 
 // ---- Rex folder-tree storage path -------------------------------------------
-export { PRD_TREE_DIRNAME, resolveStore } from "@n-dx/rex";
+export { PRD_TREE_DIRNAME, resolveStore, cascadeParentReset } from "@n-dx/rex";
 export type { PRDStore } from "@n-dx/rex";
 
 // ---- Rex schema version contract --------------------------------------------

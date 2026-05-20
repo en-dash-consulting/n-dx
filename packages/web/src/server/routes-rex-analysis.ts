@@ -23,6 +23,7 @@ import {
   isPriority,
   resolveStore,
   collectAllIds,
+  cascadeParentReset,
 } from "./rex-gateway.js";
 
 /**
@@ -471,6 +472,10 @@ async function handleAcceptEditedProposals(
     // matched container instead of creating a duplicate.
     const store = await resolveStore(ctx.rexDir);
     const knownIds = new Set(collectAllIds((await store.loadDocument()).items));
+    // Parents whose status may need reverting from `completed` to `pending`
+    // after we nest a new task underneath them. Deduped so we only cascade
+    // each branch once at the end.
+    const parentsToCascade = new Set<string>();
     let addedCount = 0;
     const selectedProposals = input.proposals.filter((p) => p.selected);
 
@@ -538,8 +543,18 @@ async function handleAcceptEditedProposals(
           if (t.tags?.length) taskItem.tags = t.tags;
           await store.addItem(taskItem, featureId);
           knownIds.add(taskId);
+          parentsToCascade.add(featureId);
           addedCount++;
         }
+      }
+    }
+
+    // Reset any completed feature/epic in the chain back to `pending` now
+    // that they have a new in-progress task underneath them.
+    for (const parentId of parentsToCascade) {
+      const { resetItems } = await cascadeParentReset(store, parentId);
+      for (const item of resetItems) {
+        console.log(`[accept-edited] reset ${item.level} id=${item.id} title="${item.title}" -> pending`);
       }
     }
 
