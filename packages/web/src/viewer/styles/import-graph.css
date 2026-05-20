@@ -1218,21 +1218,20 @@
 }
 
 .ig-graph-shell.ig-street-view-dialog .ig-graph-column {
-  /* Large focused modal — bounded so it isn't edge-to-edge on big monitors,
-     but big on small screens. Flex column so the graph fills the space.
-     Extra specificity so the responsive .ig-graph-column rules can't shrink it. */
-  position: fixed;
-  inset: 4vh 5vw;
-  top: 4vh;
-  left: 5vw;
-  right: 5vw;
-  bottom: 4vh;
+  /* Confined to the Zone Map panel rather than a viewport-level modal.
+     Absolute within .ig-main fills the same area the Zone Map occupies.
+     Flex column so the graph fills the space. */
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
   width: auto;
   height: auto;
-  max-width: 1500px;
-  max-height: 1000px;
-  margin: auto;
-  z-index: 60;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1262,10 +1261,11 @@
 .ig-street-view-dialog .ig-controls,
 .ig-street-view-dialog .ig-type-toggles,
 .ig-street-view-dialog .ig-side,
-.ig-street-view-dialog .ig-street-detail,
-.ig-street-view-dialog .ig-edge-labels {
+.ig-street-view-dialog .ig-street-detail {
   display: none;
 }
+/* Edge labels (cross-zone connector annotations) stay visible in the dialog —
+   the user needs to see what goes where at full size, not just on hover. */
 
 .ig-street-view-dialog .ig-graph-head {
   margin-bottom: 6px;
