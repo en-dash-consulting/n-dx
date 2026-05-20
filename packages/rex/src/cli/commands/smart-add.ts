@@ -1385,6 +1385,11 @@ export function applySmartPlacement(proposals: Proposal[], existing: PRDItem[]):
         );
         continue;
       }
+      // Only auto-match a feature when its epic is also being nested into an
+      // existing one — otherwise we'd attach the new feature's tasks under a
+      // feature that lives in a DIFFERENT existing epic, leaving the
+      // proposal's epic orphaned.
+      if (!p.epic.existingId) continue;
       const match = matchProposalNodeToPRD(
         { key: "feature", kind: "feature", title: feature.title, description: feature.description },
         existing,
