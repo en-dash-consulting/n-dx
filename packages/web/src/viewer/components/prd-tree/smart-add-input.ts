@@ -201,12 +201,19 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
 
     setAccepting(true);
     try {
-      // Build the payload in the edited-proposals format (all selected)
+      // Build the payload in the edited-proposals format (all selected).
+      // Forward `existingId` from smart-placement so the server nests the new
+      // work under the matched epic/feature instead of duplicating it.
       const payload = proposals.map((p) => ({
-        epic: { title: p.epic.title, description: p.epic.description },
+        epic: {
+          title: p.epic.title,
+          description: p.epic.description,
+          ...(p.epic.existingId ? { existingId: p.epic.existingId } : {}),
+        },
         features: p.features.map((f) => ({
           title: f.title,
           description: f.description,
+          ...(f.existingId ? { existingId: f.existingId } : {}),
           tasks: f.tasks.map((t) => ({
             title: t.title,
             description: t.description,

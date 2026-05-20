@@ -22,6 +22,7 @@ import {
   type PRDItem,
   isPriority,
   resolveStore,
+  collectAllIds,
 } from "./rex-gateway.js";
 
 /**
@@ -76,12 +77,14 @@ interface EditedProposalTask {
 interface EditedProposalFeature {
   title: string;
   description?: string;
+  /** If set, nest tasks under this existing feature instead of creating a new one. */
+  existingId?: string;
   tasks: EditedProposalTask[];
   selected: boolean;
 }
 
 interface EditedProposal {
-  epic: { title: string; description?: string };
+  epic: { title: string; description?: string; existingId?: string };
   features: EditedProposalFeature[];
   selected: boolean;
 }
@@ -463,40 +466,52 @@ async function handleAcceptEditedProposals(
     }
 
     // Write through the rex store so items land in the folder tree
-    // (.rex/prd_tree/), the authoritative source per CLAUDE.md. The legacy
-    // savePRD/insertChild path only updated prd.md + the ephemeral cache —
-    // the folder-tree watcher then refreshed the cache from the unchanged
-    // tree, so accepted items appeared to vanish.
+    // (.rex/prd_tree/), the authoritative source per CLAUDE.md. Respect
+    // `existingId` on epic/feature so smart-placement nests under the
+    // matched container instead of creating a duplicate.
     const store = await resolveStore(ctx.rexDir);
+    const knownIds = new Set(collectAllIds((await store.loadDocument()).items));
     let addedCount = 0;
     const selectedProposals = input.proposals.filter((p) => p.selected);
 
     for (const p of selectedProposals) {
-      const epicId = randomUUID();
-      const epicItem: PRDItem = {
-        id: epicId,
-        title: p.epic.title.trim(),
-        level: "epic",
-        status: "pending",
-        source: "web-proposal-editor",
-      };
-      if (p.epic.description?.trim()) epicItem.description = p.epic.description.trim();
-      await store.addItem(epicItem);
-      addedCount++;
-
-      for (const f of p.features) {
-        if (!f.selected) continue;
-        const featureId = randomUUID();
-        const featureItem: PRDItem = {
-          id: featureId,
-          title: f.title.trim(),
-          level: "feature",
+      let epicId: string;
+      if (p.epic.existingId && knownIds.has(p.epic.existingId)) {
+        epicId = p.epic.existingId;
+      } else {
+        epicId = randomUUID();
+        const epicItem: PRDItem = {
+          id: epicId,
+          title: p.epic.title.trim(),
+          level: "epic",
           status: "pending",
           source: "web-proposal-editor",
         };
-        if (f.description?.trim()) featureItem.description = f.description.trim();
-        await store.addItem(featureItem, epicId);
+        if (p.epic.description?.trim()) epicItem.description = p.epic.description.trim();
+        await store.addItem(epicItem);
+        knownIds.add(epicId);
         addedCount++;
+      }
+
+      for (const f of p.features) {
+        if (!f.selected) continue;
+        let featureId: string;
+        if (f.existingId && knownIds.has(f.existingId)) {
+          featureId = f.existingId;
+        } else {
+          featureId = randomUUID();
+          const featureItem: PRDItem = {
+            id: featureId,
+            title: f.title.trim(),
+            level: "feature",
+            status: "pending",
+            source: "web-proposal-editor",
+          };
+          if (f.description?.trim()) featureItem.description = f.description.trim();
+          await store.addItem(featureItem, epicId);
+          knownIds.add(featureId);
+          addedCount++;
+        }
 
         for (const t of f.tasks) {
           if (!t.selected) continue;
@@ -513,6 +528,7 @@ async function handleAcceptEditedProposals(
           if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
           if (t.tags?.length) taskItem.tags = t.tags;
           await store.addItem(taskItem, featureId);
+          knownIds.add(taskId);
           addedCount++;
         }
       }
