@@ -15,11 +15,13 @@ import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { insertChild, loadPRD, savePRD, appendLog } from "./routes-rex/rex-route-helpers.js";
+import { loadPRD, appendLog } from "./routes-rex/rex-route-helpers.js";
+import { refreshPRDCache } from "./prd-io.js";
 
 import {
   type PRDItem,
   isPriority,
+  resolveStore,
 } from "./rex-gateway.js";
 
 /**
@@ -335,6 +337,10 @@ async function handleAcceptProposals(
       return true;
     }
 
+    // See handleAcceptEditedProposals: write through the rex store so items
+    // land in the folder tree (the authoritative source per CLAUDE.md), not
+    // the legacy prd.md that the watcher overwrites.
+    const store = await resolveStore(ctx.rexDir);
     let addedCount = 0;
 
     for (const p of toAccept) {
@@ -347,7 +353,7 @@ async function handleAcceptProposals(
         source: p.epic.source,
       };
       if (p.epic.description) epicItem.description = p.epic.description;
-      doc.items.push(epicItem);
+      await store.addItem(epicItem);
       addedCount++;
 
       for (const f of p.features) {
@@ -360,7 +366,7 @@ async function handleAcceptProposals(
           source: f.source,
         };
         if (f.description) featureItem.description = f.description;
-        insertChild(doc.items, epicId, featureItem);
+        await store.addItem(featureItem, epicId);
         addedCount++;
 
         for (const t of f.tasks) {
@@ -376,13 +382,15 @@ async function handleAcceptProposals(
           if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
           if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
           if (t.tags) taskItem.tags = t.tags;
-          insertChild(doc.items, featureId, taskItem);
+          await store.addItem(taskItem, featureId);
           addedCount++;
         }
       }
     }
 
-    savePRD(ctx, doc);
+    // Refresh the cache from the store so the dashboard sees the new items
+    // immediately (see handleAcceptEditedProposals for context).
+    refreshPRDCache(ctx.rexDir, await store.loadDocument());
 
     // Remove accepted proposals from pending (keep remaining)
     if (input.indices && input.indices.length < allProposals.length) {
@@ -454,6 +462,12 @@ async function handleAcceptEditedProposals(
       return true;
     }
 
+    // Write through the rex store so items land in the folder tree
+    // (.rex/prd_tree/), the authoritative source per CLAUDE.md. The legacy
+    // savePRD/insertChild path only updated prd.md + the ephemeral cache —
+    // the folder-tree watcher then refreshed the cache from the unchanged
+    // tree, so accepted items appeared to vanish.
+    const store = await resolveStore(ctx.rexDir);
     let addedCount = 0;
     const selectedProposals = input.proposals.filter((p) => p.selected);
 
@@ -467,7 +481,7 @@ async function handleAcceptEditedProposals(
         source: "web-proposal-editor",
       };
       if (p.epic.description?.trim()) epicItem.description = p.epic.description.trim();
-      doc.items.push(epicItem);
+      await store.addItem(epicItem);
       addedCount++;
 
       for (const f of p.features) {
@@ -481,7 +495,7 @@ async function handleAcceptEditedProposals(
           source: "web-proposal-editor",
         };
         if (f.description?.trim()) featureItem.description = f.description.trim();
-        insertChild(doc.items, epicId, featureItem);
+        await store.addItem(featureItem, epicId);
         addedCount++;
 
         for (const t of f.tasks) {
@@ -498,7 +512,7 @@ async function handleAcceptEditedProposals(
           if (t.acceptanceCriteria?.length) taskItem.acceptanceCriteria = t.acceptanceCriteria;
           if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
           if (t.tags?.length) taskItem.tags = t.tags;
-          insertChild(doc.items, featureId, taskItem);
+          await store.addItem(taskItem, featureId);
           addedCount++;
         }
       }
@@ -509,7 +523,10 @@ async function handleAcceptEditedProposals(
       return true;
     }
 
-    savePRD(ctx, doc);
+    // Refresh the cache from the store so the next GET /api/rex/prd in the
+    // same tick sees the new items (the folder-tree watcher would catch up
+    // eventually, but we want immediate visibility for the dashboard).
+    refreshPRDCache(ctx.rexDir, await store.loadDocument());
 
     // Clear pending proposals file
     const pendingPath = join(ctx.rexDir, "pending-proposals.json");

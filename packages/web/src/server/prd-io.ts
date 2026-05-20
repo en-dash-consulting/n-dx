@@ -179,6 +179,23 @@ export function prdPath(rexDir: string): string {
 }
 
 /**
+ * Refresh ONLY the ephemeral cache (`.rex/.cache/prd.json`) — does NOT write
+ * `prd.md`. Use this when something has already written to the authoritative
+ * folder tree (`.rex/prd_tree/`) and we want the in-process `loadPRDSync`
+ * fast path to see the change immediately, without waiting for the
+ * folder-tree watcher.
+ */
+export function refreshPRDCache(rexDir: string, doc: PRDDocument): void {
+  try {
+    const cacheDir = join(rexDir, PRD_CACHE_DIR);
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(join(cacheDir, PRD_CACHE_JSON), JSON.stringify(doc, null, 2) + "\n", "utf-8");
+  } catch {
+    // Cache write failure is non-fatal — the watcher will refresh it eventually.
+  }
+}
+
+/**
  * Return the latest modification time across `prd.md` and companion files (ms).
  * Returns 0 if no PRD files exist. Used by the data watcher for live-reload polling.
  */
