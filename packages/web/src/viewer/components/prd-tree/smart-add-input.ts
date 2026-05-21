@@ -217,6 +217,9 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
           tasks: f.tasks.map((t) => ({
             title: t.title,
             description: t.description,
+            ...(t.acceptanceCriteria && t.acceptanceCriteria.length > 0
+              ? { acceptanceCriteria: t.acceptanceCriteria }
+              : {}),
             priority: t.priority,
             tags: t.tags,
             selected: true,
