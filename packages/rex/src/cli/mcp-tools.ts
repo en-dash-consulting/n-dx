@@ -8,7 +8,7 @@
 
 import { randomUUID } from "node:crypto";
 import { SCHEMA_VERSION } from "../schema/index.js";
-import { findItem } from "../core/tree.js";
+import { findItem, resolveItem } from "../core/tree.js";
 import { computeStats } from "../core/stats.js";
 import { deleteItem, cleanBlockedByRefs } from "../core/delete.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../core/next-task.js";
@@ -392,7 +392,7 @@ export async function handleGetItem(
 ): Promise<McpResult> {
   try {
     const doc = await store.loadDocument();
-    const entry = findItem(doc.items, args.id);
+    const entry = resolveItem(doc.items, args.id);
     if (!entry) {
       return textResult(`Item "${args.id}" not found. Use get_prd_status to see available items.`, true);
     }
