@@ -5971,14 +5971,56 @@
 /* ── Completion Timeline ───────────────────────────────────────────── */
 
 .completion-timeline {
-  /* Bounded footer in the Tasks view flex column: it can't squeeze the task
-     list above it, and scrolls internally if the history is long. */
+  /* Collapsible footer in the Tasks view flex column. Collapsed by default so
+     the task tree above owns the viewport; the body scrolls internally when
+     expanded and never squeezes the tree below a usable height. */
   flex: none;
-  max-height: 32vh;
-  overflow-y: auto;
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
   border-top: 1px solid var(--border);
-  padding-top: var(--space-3);
+}
+
+.timeline-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-1);
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+}
+
+.timeline-toggle:hover {
+  color: var(--text);
+}
+
+.timeline-toggle-chevron {
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: var(--font-xs);
+}
+
+.timeline-toggle-chevron.open {
+  transform: rotate(90deg);
+}
+
+.timeline-toggle-count {
+  margin-left: auto;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  border-radius: 10px;
+  padding: 0 var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+}
+
+.timeline-body {
+  max-height: 28vh;
+  overflow-y: auto;
+  padding-bottom: var(--space-2);
 }
 
 .timeline-range-bar {

@@ -78,6 +78,9 @@ export interface CompletionTimelineProps {
 
 export function CompletionTimeline({ items }: CompletionTimelineProps) {
   const [rangeDays, setRangeDays] = useState(7);
+  // Collapsed by default \u2014 the task tree is the primary surface; this is a
+  // secondary activity feed the user opts into.
+  const [collapsed, setCollapsed] = useState(true);
   const allEntries = useMemo(() => buildTimeline(items), [items]);
 
   const filtered = useMemo(() => {
@@ -96,35 +99,50 @@ export function CompletionTimeline({ items }: CompletionTimelineProps) {
     return groups;
   }, [filtered]);
 
-  return h("div", { class: "completion-timeline" },
-    // Range presets
-    h("div", { class: "timeline-range-bar" },
-      RANGE_PRESETS.map((preset) =>
-        h("button", {
-          key: preset.label,
-          class: `timeline-range-btn${rangeDays === preset.days ? " active" : ""}`,
-          onClick: () => setRangeDays(preset.days),
-        }, preset.label),
-      ),
-      h("span", { class: "timeline-count" }, `${filtered.length} items`),
+  return h("div", { class: `completion-timeline${collapsed ? " collapsed" : ""}` },
+    // Collapsible header \u2014 keeps the footer to a single row when closed.
+    h("button", {
+      class: "timeline-toggle",
+      onClick: () => setCollapsed((c) => !c),
+      "aria-expanded": String(!collapsed),
+      title: collapsed ? "Show recent activity" : "Hide recent activity",
+    },
+      h("span", { class: `timeline-toggle-chevron${collapsed ? "" : " open"}` }, "\u25B8"),
+      h("span", { class: "timeline-toggle-label" }, "Recent activity"),
+      h("span", { class: "timeline-toggle-count" }, `${allEntries.length}`),
     ),
-    // Grouped entries
-    filtered.length === 0
-      ? h("div", { class: "timeline-empty" }, "No completions in this range.")
-      : Array.from(grouped.entries()).map(([day, entries]) =>
-          h("div", { key: day, class: "timeline-day-group" },
-            h("div", { class: "timeline-day-header" }, day),
-            entries.map((entry) =>
-              h("div", { key: entry.id, class: "timeline-entry" },
-                h("span", { class: `timeline-level timeline-level-${entry.level}` }, LEVEL_ICONS[entry.level] || "\u25CF"),
-                h("span", { class: "timeline-title" }, entry.title),
-                entry.parentChain.length > 0
-                  ? h("span", { class: "timeline-breadcrumb" }, entry.parentChain.join(" \u203A "))
-                  : null,
-                h("span", { class: "timeline-time" }, formatTime(entry.completedAt)),
-              ),
+    collapsed
+      ? null
+      : h("div", { class: "timeline-body" },
+          // Range presets
+          h("div", { class: "timeline-range-bar" },
+            RANGE_PRESETS.map((preset) =>
+              h("button", {
+                key: preset.label,
+                class: `timeline-range-btn${rangeDays === preset.days ? " active" : ""}`,
+                onClick: () => setRangeDays(preset.days),
+              }, preset.label),
             ),
+            h("span", { class: "timeline-count" }, `${filtered.length} items`),
           ),
+          // Grouped entries
+          filtered.length === 0
+            ? h("div", { class: "timeline-empty" }, "No completions in this range.")
+            : Array.from(grouped.entries()).map(([day, entries]) =>
+                h("div", { key: day, class: "timeline-day-group" },
+                  h("div", { class: "timeline-day-header" }, day),
+                  entries.map((entry) =>
+                    h("div", { key: entry.id, class: "timeline-entry" },
+                      h("span", { class: `timeline-level timeline-level-${entry.level}` }, LEVEL_ICONS[entry.level] || "\u25CF"),
+                      h("span", { class: "timeline-title" }, entry.title),
+                      entry.parentChain.length > 0
+                        ? h("span", { class: "timeline-breadcrumb" }, entry.parentChain.join(" \u203A "))
+                        : null,
+                      h("span", { class: "timeline-time" }, formatTime(entry.completedAt)),
+                    ),
+                  ),
+                ),
+              ),
         ),
   );
 }
