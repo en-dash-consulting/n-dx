@@ -161,6 +161,9 @@ export function attachDuplicateReasonsToProposals(
         title: proposal.epic.title,
         source: proposal.epic.source,
         description: proposal.epic.description,
+        // Preserve existingId so smart-placement carries through to JSON
+        // output and the web accept handler can nest under the matched epic.
+        ...(proposal.epic.existingId ? { existingId: proposal.epic.existingId } : {}),
         ...(epicReason ? { duplicateReason: epicReason } : {}),
       },
       features: proposal.features.map((feature, fIdx) => {
@@ -171,6 +174,7 @@ export function attachDuplicateReasonsToProposals(
           title: feature.title,
           source: feature.source,
           description: feature.description,
+          ...(feature.existingId ? { existingId: feature.existingId } : {}),
           ...(featureReason ? { duplicateReason: featureReason } : {}),
           tasks: feature.tasks.map((task, tIdx) => {
             const taskKey = `p${pIdx}:task:${fIdx}:${tIdx}`;

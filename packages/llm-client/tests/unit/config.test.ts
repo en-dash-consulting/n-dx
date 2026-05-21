@@ -60,13 +60,13 @@ describe("loadClaudeConfig", () => {
       JSON.stringify({
         claude: {
           model: "claude-sonnet-4-6",
-          lightModel: "claude-haiku-4-20250414",
+          lightModel: "claude-haiku-4-5",
         },
       }),
     );
 
     const config = await loadClaudeConfig(tmpDir);
-    expect(config.lightModel).toBe("claude-haiku-4-20250414");
+    expect(config.lightModel).toBe("claude-haiku-4-5");
     expect(config.model).toBe("claude-sonnet-4-6");
   });
 
@@ -267,7 +267,7 @@ describe("TIER_MODELS", () => {
   });
 
   it("claude.light maps to haiku", () => {
-    expect(TIER_MODELS.claude.light).toBe("claude-haiku-4-20250414");
+    expect(TIER_MODELS.claude.light).toBe("claude-haiku-4-5");
   });
 
   it("codex.light maps to gpt-5.4-mini", () => {
@@ -367,15 +367,15 @@ describe("resolveVendorModel", () => {
     it("expands claude alias when using light tier", () => {
       // Light tier for Claude should not need alias expansion (it's a full model ID)
       // but verify the resolver path still works correctly
-      expect(resolveVendorModel("claude", {}, "light")).toBe("claude-haiku-4-20250414");
+      expect(resolveVendorModel("claude", {}, "light")).toBe("claude-haiku-4-5");
     });
   });
 
   // Per-tier config override tests (lightModel)
   describe("with lightModel config override", () => {
     it("uses lightModel for claude when weight is 'light' and lightModel is set", () => {
-      const config = { claude: { lightModel: "claude-haiku-4-20250414" } };
-      expect(resolveVendorModel("claude", config, "light")).toBe("claude-haiku-4-20250414");
+      const config = { claude: { lightModel: "claude-haiku-4-5" } };
+      expect(resolveVendorModel("claude", config, "light")).toBe("claude-haiku-4-5");
     });
 
     it("uses lightModel for codex when weight is 'light' and lightModel is set", () => {
@@ -392,7 +392,7 @@ describe("resolveVendorModel", () => {
     });
 
     it("lightModel is ignored when weight is 'standard' for claude", () => {
-      const config = { claude: { lightModel: "claude-haiku-4-20250414" } };
+      const config = { claude: { lightModel: "claude-haiku-4-5" } };
       expect(resolveVendorModel("claude", config, "standard")).toBe(NEWEST_MODELS.claude);
     });
 
@@ -403,7 +403,7 @@ describe("resolveVendorModel", () => {
 
     it("expands claude alias in lightModel config", () => {
       const config = { claude: { lightModel: "haiku" } };
-      expect(resolveVendorModel("claude", config, "light")).toBe("claude-haiku-4-20250414");
+      expect(resolveVendorModel("claude", config, "light")).toBe("claude-haiku-4-5");
     });
 
     it("lightModel takes precedence over TIER_MODELS.light for claude", () => {

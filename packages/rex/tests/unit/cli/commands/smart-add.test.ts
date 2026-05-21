@@ -10,9 +10,11 @@ import {
   remapDuplicateMatchesForSelectedProposals,
   formatQualityWarnings,
   classifySmartAddError,
+  applySmartPlacement,
 } from "../../../../src/cli/commands/smart-add.js";
 import type { Proposal, QualityIssue } from "../../../../src/analyze/index.js";
 import type { ProposalDuplicateMatch } from "../../../../src/cli/commands/smart-add-duplicates.js";
+import type { PRDItem } from "../../../../src/schema/index.js";
 
 const singleProposal: Proposal = {
   epic: { title: "User Authentication", source: "smart-add" },
@@ -670,5 +672,92 @@ describe("classifySmartAddError", () => {
 
     const r2 = classifySmartAddError(new Error("unauthorized request: check credentials"), "description");
     expect(r2.message).toContain("Authentication failed");
+  });
+});
+
+describe("applySmartPlacement", () => {
+  const existing: PRDItem[] = [
+    {
+      id: "epic-auth",
+      title: "User Authentication",
+      level: "epic",
+      status: "in_progress",
+      children: [
+        {
+          id: "feature-oauth",
+          title: "OAuth Integration",
+          level: "feature",
+          status: "pending",
+          children: [],
+        },
+      ],
+    },
+  ];
+
+  it("nests under an existing epic instead of creating a duplicate", () => {
+    const proposals: Proposal[] = [
+      {
+        epic: { title: "User Authentication", source: "smart-add" },
+        features: [
+          {
+            title: "OAuth Integration",
+            source: "smart-add",
+            tasks: [{ title: "Add Apple sign-in", source: "smart-add", sourceFile: "" }],
+          },
+        ],
+      },
+    ];
+
+    applySmartPlacement(proposals, existing);
+
+    expect(proposals[0].epic.existingId).toBe("epic-auth");
+    expect(proposals[0].features[0].existingId).toBe("feature-oauth");
+  });
+
+  it("does not touch a genuinely new epic", () => {
+    const proposals: Proposal[] = [
+      {
+        epic: { title: "Billing & Invoicing", source: "smart-add" },
+        features: [
+          {
+            title: "Stripe webhooks",
+            source: "smart-add",
+            tasks: [{ title: "Handle invoice.paid", source: "smart-add", sourceFile: "" }],
+          },
+        ],
+      },
+    ];
+
+    applySmartPlacement(proposals, existing);
+
+    expect(proposals[0].epic.existingId).toBeUndefined();
+    expect(proposals[0].features[0].existingId).toBeUndefined();
+  });
+
+  it("respects a valid existingId the LLM already set", () => {
+    const proposals: Proposal[] = [
+      {
+        epic: { title: "User Authentication", source: "smart-add", existingId: "epic-auth" },
+        features: [],
+      },
+    ];
+
+    applySmartPlacement(proposals, existing);
+
+    expect(proposals[0].epic.existingId).toBe("epic-auth");
+  });
+
+  it("discards an LLM-hallucinated existingId that doesn't exist in the PRD", () => {
+    const proposals: Proposal[] = [
+      {
+        epic: { title: "User Authentication", source: "smart-add", existingId: "epic-hallucinated" },
+        features: [],
+      },
+    ];
+
+    applySmartPlacement(proposals, existing);
+
+    // Hallucinated id discarded; matcher then finds the real "User Authentication" epic by exact title.
+    expect(proposals[0].epic.existingId).toBe("epic-auth");
   });
 });

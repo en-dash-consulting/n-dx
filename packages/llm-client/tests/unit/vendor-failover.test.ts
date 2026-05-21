@@ -58,7 +58,7 @@ describe("getNextFailoverAttempt", () => {
     // Codex starts at gpt-5.5 (standard tier), failover chain is:
     // 1. gpt-5.4-mini (codex light)
     // 2. claude-sonnet-4-6 (claude standard)
-    // 3. claude-haiku-4-20250414 (claude light)
+    // 3. claude-haiku-4-5 (claude light)
     // 4+ exhausted
 
     it("returns codex light on first failover attempt", () => {

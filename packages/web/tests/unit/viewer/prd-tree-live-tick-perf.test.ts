@@ -99,10 +99,11 @@ describe("PRDTree live tick at scale", () => {
       }), root);
     });
 
-    // Confirm the tree actually rendered running rows (otherwise the
-    // measurement would be vacuous).
-    const runningCells = root.querySelectorAll(".prd-duration-cell-running");
-    expect(runningCells.length).toBeGreaterThan(0);
+    // Confirm the tree actually rendered in-progress rows (otherwise the
+    // measurement would be vacuous). The duration cell now lives in the
+    // detail flyout, so check the status indicator instead.
+    const runningRows = root.querySelectorAll(".prd-status-in-progress");
+    expect(runningRows.length).toBeGreaterThan(0);
 
     // A second render with a fresh doc reference simulates the tick's
     // effect: a prop identity change in the tree that the virtual-scroll

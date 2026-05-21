@@ -16,7 +16,7 @@ describe("vendor-model-reset", () => {
         expect(isModelCompatibleWithVendor("claude", "claude-opus-4-20250514")).toBe(
           true,
         );
-        expect(isModelCompatibleWithVendor("claude", "claude-haiku-4-20250414")).toBe(
+        expect(isModelCompatibleWithVendor("claude", "claude-haiku-4-5")).toBe(
           true,
         );
       });

@@ -685,8 +685,13 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     event.preventDefault();
     const svg = event.currentTarget as SVGSVGElement;
     const mid = touchMidpoint(event.touches);
-    const ratio = touchDistance(event.touches) / p.startDist;
-    updateSurfaceView(p.surface, (view) => zoomMapToFocal(view, p.startK * ratio, mid.x, mid.y, svg));
+    // Dampen the pinch: trackpad finger-spread covers a big distance ratio
+    // for a small physical gesture, so applying it raw makes zoom whippy.
+    // Math.pow(ratio, 0.6) turns a 2× spread into ~1.52× zoom while keeping
+    // the gesture symmetric (1/ratio for pinch-in maps cleanly).
+    const rawRatio = touchDistance(event.touches) / p.startDist;
+    const dampenedRatio = Math.pow(rawRatio, 0.6);
+    updateSurfaceView(p.surface, (view) => zoomMapToFocal(view, p.startK * dampenedRatio, mid.x, mid.y, svg));
   }, [updateSurfaceView]);
 
   const endPinch = useCallback(() => { pinchRef.current = null; }, []);
@@ -1154,24 +1159,42 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
 
   if (mode === "file" && subgraph) {
     const { edges } = subgraph;
-    for (const e of edges) {
+    // Stagger each edge's vertical bend so parallel routes between the same
+    // columns don't stack on the same x — much clearer "what goes to what".
+    // Group by target so siblings ending at the same node fan out cleanly.
+    const targetIndex = new Map<string, number[]>();
+    for (let i = 0; i < edges.length; i++) {
+      const t = edges[i].to;
+      const list = targetIndex.get(t) ?? [];
+      list.push(i);
+      targetIndex.set(t, list);
+    }
+    const edgeShift = new Map<number, number>();
+    for (const [, idxs] of targetIndex) {
+      const n = idxs.length;
+      idxs.forEach((idx, k) => {
+        edgeShift.set(idx, (k - (n - 1) / 2) * 10);
+      });
+    }
+    edges.forEach((e, i) => {
       const a = visualPosMap.get(e.from);
       const b = visualPosMap.get(e.to);
-      if (!a || !b) continue;
+      if (!a || !b) return;
       const wFrom = nodeHalfWidth(kindOf(e.from));
       const wTo = nodeHalfWidth(kindOf(e.to));
       const fromZone = fileToZoneId(e.from, zones);
       const toZone = fileToZoneId(e.to, zones);
       const cross = isCrossZoneEdge(e.from, e.to, zones);
+      const shift = edgeShift.get(i) ?? 0;
       edgePaths.push({
         key: `${e.from}->${e.to}:${e.type}`,
-        d: elbowPath(a.x + wFrom, a.y, b.x - wTo, b.y),
+        d: elbowPath(a.x + wFrom, a.y, b.x - wTo, b.y, shift),
         cross,
         label: cross && zones && fromZone && toZone ? `${zoneDisplayName(zones, fromZone)} -> ${zoneDisplayName(zones, toZone)}` : undefined,
-        labelX: (a.x + b.x) / 2,
+        labelX: (a.x + b.x) / 2 + shift,
         labelY: (a.y + b.y) / 2 - 8,
       });
-    }
+    });
   } else if (mode === "package" && packageSubgraph && focusPackage) {
     const pkgId = `pkg:${focusPackage}`;
     const pkgPos = visualPosMap.get(pkgId);

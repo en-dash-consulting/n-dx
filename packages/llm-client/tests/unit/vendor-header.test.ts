@@ -117,12 +117,12 @@ describe("printVendorModelHeader", () => {
     const config: LLMConfig = { vendor: "claude" };
     // lastModel is an older model — different from current NEWEST_MODELS.claude
     printVendorModelHeader("claude", config, {
-      lastModel: "claude-haiku-4-20250414",
+      lastModel: "claude-haiku-4-5",
     });
     expect(errorSpy).toHaveBeenCalledOnce();
     const warning = errorSpy.mock.calls[0][0] as string;
     expect(warning).toContain("model changed since last run");
-    expect(warning).toContain("claude-haiku-4-20250414");
+    expect(warning).toContain("claude-haiku-4-5");
     expect(warning).toContain(NEWEST_MODELS.claude);
   });
 
@@ -264,7 +264,7 @@ describe("printVendorModelHeader", () => {
     it("renders '(light tier, configured)' when tier is light and lightModel is configured", () => {
       const config: LLMConfig = {
         vendor: "claude",
-        claude: { lightModel: "claude-haiku-4-20250414" },
+        claude: { lightModel: "claude-haiku-4-5" },
       };
       printVendorModelHeader("claude", config, {
         resolvedModel: TIER_MODELS.claude.light,

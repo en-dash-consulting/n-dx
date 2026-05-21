@@ -76,7 +76,11 @@ export function exec(
   const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
 
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (error, stdout, stderr) => {
+    const child = execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (
+      error,
+      stdout,
+      stderr,
+    ) => {
       const isTimeout = error
         ? (error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT" ||
           (error as { killed?: boolean }).killed === true
@@ -96,6 +100,11 @@ export function exec(
         error: error as Error | null,
       });
     });
+    // Close the child's stdin immediately. `execFile` pipes stdio by default
+    // but the parent never writes anything — leaving stdin open makes any
+    // child that reads from stdin (e.g. `rex add` calling readStdin() in a
+    // non-TTY) hang forever waiting for an EOF that will never arrive.
+    child.stdin?.end();
   });
 }
 
