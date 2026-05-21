@@ -34,6 +34,7 @@ const MACHINE_LOCAL_KEYS = new Set([
   "claude.cli_path",
   "llm.claude.cli_path",
   "llm.codex.cli_path",
+  "llm.gemini.cli_path",
 ]);
 
 const PACKAGES = {
@@ -590,9 +591,9 @@ const CLAUDE_VALIDATORS = {
  * Validate llm.vendor.
  */
 function validateLLMVendor(value) {
-  if (value !== "claude" && value !== "codex") {
+  if (value !== "claude" && value !== "codex" && value !== "gemini") {
     throw new Error(
-      `Invalid vendor "${value}". Expected one of: claude, codex.`,
+      `Invalid vendor "${value}". Expected one of: claude, codex, gemini.`,
     );
   }
 }
@@ -620,6 +621,9 @@ const LLM_VALIDATORS = {
   "codex.cli_path": validateCodexCliPath,
   "codex.api_endpoint": validateApiEndpoint,
   "codex.model": validateModel,
+  "gemini.cli_path": validateCliPath,
+  "gemini.api_endpoint": validateApiEndpoint,
+  "gemini.model": validateModel,
   autoFailover: validateAutoFailover,
 };
 
@@ -633,6 +637,14 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
     return {
       binary,
       args: ["exec", "--skip-git-repo-check", "Reply with exactly: ok"],
+    };
+  }
+
+  if (vendor === "gemini") {
+    const binary = llmConfig?.gemini?.cli_path || "gemini";
+    return {
+      binary,
+      args: ["chat", "Reply with exactly: ok"],
     };
   }
 
@@ -981,6 +993,15 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     When set, commands that explicitly opt into the
                                     light tier use this model.
                                     Falls back to gpt-5.4-mini if not set.
+  llm.gemini.cli_path      string    Gemini CLI path (optional; validated executable)
+                                    Stored in .n-dx.local.json.
+  llm.gemini.api_key       string    Gemini API key (optional)
+  llm.gemini.api_endpoint  string    Gemini API endpoint (optional; validated URL)
+  llm.gemini.model         string    Gemini default model (optional)
+  llm.gemini.lightModel    string    Gemini model for light-weight tasks (optional)
+                                    When set, commands that explicitly opt into the
+                                    light tier use this model.
+                                    Falls back to gemini-2.0-flash-lite if not set.
   llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
                                     When true, hench retries failed runs on fallback models
                                     before surfacing the original error. Disabled by default

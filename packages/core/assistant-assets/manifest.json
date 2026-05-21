@@ -102,6 +102,13 @@
       "skillWrapper": "yaml-frontmatter",
       "toolPrefix": null,
       "instructionFile": "AGENTS.md"
+    },
+    "gemini": {
+      "skillDir": ".gemini/skills",
+      "skillFile": "SKILL.md",
+      "skillWrapper": "yaml-frontmatter",
+      "toolPrefix": null,
+      "instructionFile": "GEMINI.md"
     }
   }
 }

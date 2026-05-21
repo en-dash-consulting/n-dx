@@ -75,8 +75,8 @@ export async function toolRexUpdateStatus(
         detail,
       });
       const failedReqs = reqSummary.results
-        .filter((r) => !r.passed)
-        .map((r) => `  - ${r.requirementTitle}: ${r.reason}`)
+        .filter((r: any) => !r.passed)
+        .map((r: any) => `  - ${r.requirementTitle}: ${r.reason}`)
         .join("\n");
       return `[REQUIREMENTS_FAILED] Cannot mark task as completed. ` +
         `${reqSummary.failed} of ${reqSummary.total} automated requirements failed:\n` +

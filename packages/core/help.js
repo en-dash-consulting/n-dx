@@ -711,20 +711,23 @@ export function formatToolHelp(tool) {
 const ORCHESTRATOR_HELP_DEFS = {
   init: {
     summary: "initialize all tools",
-    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude or codex) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude, codex, or gemini) unless --provider is given.\nProvisions assistant surfaces for Claude, Codex, and Gemini unless limited\nby --no-claude, --no-codex, --no-gemini, --claude-only, --codex-only, --gemini-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
     usage: "ndx init [options] [dir]",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
-      { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude or codex (skips interactive prompt)" },
+      { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude, codex, or gemini (skips interactive prompt)" },
       { flag: "--model=<id>", description: "Model ID to persist (used with --provider)" },
       { flag: "--claude-model=<id>", description: "Claude model ID (implies --provider=claude)" },
       { flag: "--codex-model=<id>", description: "Codex model ID (implies --provider=codex)" },
+      { flag: "--gemini-model=<id>", description: "Gemini model ID (implies --provider=gemini)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
       { flag: "--no-claude", description: "Skip Claude Code integration (no CLAUDE.md, .claude/ modifications)" },
       { flag: "--no-codex", description: "Skip Codex integration (no AGENTS.md, .agents/, .codex/ modifications)" },
-      { flag: "--claude-only", description: "Provision only Claude Code surfaces (equivalent to --no-codex)" },
-      { flag: "--codex-only", description: "Provision only Codex surfaces (equivalent to --no-claude)" },
-      { flag: "--assistants=<list>", description: "Comma-separated list of assistants to provision (e.g. --assistants=claude,codex)" },
+      { flag: "--no-gemini", description: "Skip Gemini CLI integration (no GEMINI.md, .gemini/ modifications)" },
+      { flag: "--claude-only", description: "Provision only Claude Code surfaces (equivalent to --no-codex --no-gemini)" },
+      { flag: "--codex-only", description: "Provision only Codex surfaces (equivalent to --no-claude --no-gemini)" },
+      { flag: "--gemini-only", description: "Provision only Gemini CLI surfaces (equivalent to --no-claude --no-codex)" },
+      { flag: "--assistants=<list>", description: "Comma-separated list of assistants to provision (e.g. --assistants=claude,gemini)" },
     ],
     examples: [
       { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },

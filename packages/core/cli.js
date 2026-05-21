@@ -487,7 +487,12 @@ function extractInitCodexModel(args) {
 }
 
 function stripInitVendorModelFlags(args) {
-  return args.filter((a) => !a.startsWith("--claude-model=") && !a.startsWith("--codex-model="));
+  return args.filter(
+    (a) =>
+      !a.startsWith("--claude-model=") &&
+      !a.startsWith("--codex-model=") &&
+      !a.startsWith("--gemini-model="),
+  );
 }
 
 /**
@@ -507,7 +512,14 @@ function extractAssistantsFlag(args) {
 }
 
 /** All assistant-selection flags that should be stripped before passing to sub-inits. */
-const ASSISTANT_FLAGS = ["--no-claude", "--no-codex", "--claude-only", "--codex-only"];
+const ASSISTANT_FLAGS = [
+  "--no-claude",
+  "--no-codex",
+  "--no-gemini",
+  "--claude-only",
+  "--codex-only",
+  "--gemini-only",
+];
 
 function stripAssistantFlags(args) {
   return args.filter((a) => !ASSISTANT_FLAGS.includes(a) && !a.startsWith("--assistants="));
@@ -527,10 +539,10 @@ function hasExplicitAssistantFlags(args) {
 /**
  * Resolve which assistants are enabled from the init CLI flags.
  *
- * Priority: --assistants= > --claude-only / --codex-only > --no-claude / --no-codex > default (both)
+ * Priority: --assistants= > --claude-only / --codex-only / --gemini-only > --no-claude / --no-codex / --no-gemini > default (all)
  *
  * @param {string[]} rest  Raw CLI args after the command name
- * @returns {{ claude: boolean, codex: boolean }}
+ * @returns {{ claude: boolean, codex: boolean, gemini: boolean }}
  */
 function resolveAssistantFlags(rest) {
   // --assistants= takes highest priority
@@ -539,17 +551,26 @@ function resolveAssistantFlags(rest) {
     return {
       claude: assistantsSet.has("claude"),
       codex: assistantsSet.has("codex"),
+      gemini: assistantsSet.has("gemini"),
     };
   }
 
   // Exclusive convenience flags
-  if (rest.includes("--claude-only")) return { claude: true, codex: false };
-  if (rest.includes("--codex-only")) return { claude: false, codex: true };
+  if (rest.includes("--claude-only")) {
+    return { claude: true, codex: false, gemini: false };
+  }
+  if (rest.includes("--codex-only")) {
+    return { claude: false, codex: true, gemini: false };
+  }
+  if (rest.includes("--gemini-only")) {
+    return { claude: false, codex: false, gemini: true };
+  }
 
   // Individual skip flags
   return {
     claude: !rest.includes("--no-claude"),
     codex: !rest.includes("--no-codex"),
+    gemini: !rest.includes("--no-gemini"),
   };
 }
 
@@ -912,25 +933,44 @@ function parseInitFlagSet(rest) {
   if (assistantsSet) {
     const invalid = [...assistantsSet].filter((v) => !SUPPORTED_PROVIDERS.includes(v));
     if (invalid.length > 0) {
-      console.error(`Error: Unknown assistant${invalid.length > 1 ? "s" : ""}: ${invalid.join(", ")}. Expected: claude, codex.`);
+      console.error(`Error: Unknown assistant${invalid.length > 1 ? "s" : ""}: ${invalid.join(", ")}. Expected: claude, codex, gemini.`);
       process.exit(1);
     }
   }
 
+  const geminiModelFromFlag = extractFlag(rest, "--gemini-model");
+
   // Resolve effective provider:
   // A lone vendor-specific flag implies the provider (e.g. --claude-model=X → provider=claude).
-  // When both vendor-specific flags are present, --provider is required to set the active vendor.
+  // When multiple vendor-specific flags are present, --provider is required to set the active vendor.
+  const hasMultipleVendorFlags =
+    (claudeModelFromFlag ? 1 : 0) +
+    (codexModelFromFlag ? 1 : 0) +
+    (geminiModelFromFlag ? 1 : 0) > 1;
+
   const effectiveProvider = providerFromFlag
-    || (claudeModelFromFlag && !codexModelFromFlag ? "claude"
-      : codexModelFromFlag && !claudeModelFromFlag ? "codex"
-        : undefined);
+    || (!hasMultipleVendorFlags
+      ? (claudeModelFromFlag ? "claude"
+        : codexModelFromFlag ? "codex"
+          : geminiModelFromFlag ? "gemini"
+            : undefined)
+      : undefined);
 
   // The active model is the --model flag, or the vendor-specific flag matching the active provider.
   const effectiveModel = modelFromFlag
     || (effectiveProvider === "claude" ? claudeModelFromFlag : undefined)
-    || (effectiveProvider === "codex" ? codexModelFromFlag : undefined);
+    || (effectiveProvider === "codex" ? codexModelFromFlag : undefined)
+    || (effectiveProvider === "gemini" ? geminiModelFromFlag : undefined);
 
-  return { providerFromFlag, modelFromFlag, claudeModelFromFlag, codexModelFromFlag, effectiveProvider, effectiveModel };
+  return {
+    providerFromFlag,
+    modelFromFlag,
+    claudeModelFromFlag,
+    codexModelFromFlag,
+    geminiModelFromFlag,
+    effectiveProvider,
+    effectiveModel,
+  };
 }
 
 /**
@@ -973,20 +1013,28 @@ async function repairInitConfig(dir, quiet) {
  *
  * @param {string[]} rest  Raw CLI args
  * @param {string} dir  Project directory
- * @returns {{ claude: boolean, codex: boolean }}
+ * @returns {{ claude: boolean, codex: boolean, gemini: boolean }}
  */
 function resolveInitAssistants(rest, dir) {
   let assistantEnabled = resolveAssistantFlags(rest);
 
   if (!hasExplicitAssistantFlags(rest)) {
     const claudePresent = existsSync(join(dir, ".claude")) || existsSync(join(dir, "CLAUDE.md"));
-    const codexPresent = existsSync(join(dir, ".codex")) || existsSync(join(dir, ".agents")) || existsSync(join(dir, "AGENTS.md"));
+    const codexPresent =
+      existsSync(join(dir, ".codex")) ||
+      existsSync(join(dir, ".agents")) ||
+      existsSync(join(dir, "AGENTS.md"));
+    const geminiPresent = existsSync(join(dir, ".gemini")) || existsSync(join(dir, "GEMINI.md"));
 
-    // When a prior init provisioned only one vendor, keep only that one enabled.
-    if (claudePresent && !codexPresent) {
-      assistantEnabled = { claude: true, codex: false };
-    } else if (!claudePresent && codexPresent) {
-      assistantEnabled = { claude: false, codex: true };
+    const hasAny = claudePresent || codexPresent || geminiPresent;
+
+    // When prior init(s) provisioned some vendors, keep only those enabled.
+    if (hasAny) {
+      assistantEnabled = {
+        claude: claudePresent,
+        codex: codexPresent,
+        gemini: geminiPresent,
+      };
     }
   }
 
@@ -1005,12 +1053,12 @@ function resolveInitAssistants(rest, dir) {
  * @param {string|undefined} effectiveProvider
  * @param {string|undefined} effectiveModel
  * @param {boolean} quiet
- * @param {{ providerFromFlag?: string, claudeModelFromFlag?: string, codexModelFromFlag?: string }} vendorFlags
+ * @param {{ providerFromFlag?: string, claudeModelFromFlag?: string, codexModelFromFlag?: string, geminiModelFromFlag?: string }} vendorFlags
  * @returns {Promise<{ selectedProvider: string|undefined, selection: object,
  *   llmSkipped: boolean, providerSource: string, modelSource: string }>}
  */
 async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, vendorFlags = {}) {
-  const { providerFromFlag, claudeModelFromFlag, codexModelFromFlag } = vendorFlags;
+  const { providerFromFlag, claudeModelFromFlag, codexModelFromFlag, geminiModelFromFlag } = vendorFlags;
 
   const existingVendor = readLLMVendor(dir);
   const existingModel = readLLMModel(dir, effectiveProvider || existingVendor);
@@ -1157,14 +1205,17 @@ async function handleInit(rest) {
 
   const assistantEnabled = resolveInitAssistants(rest, dir);
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
-    providerFromFlag, claudeModelFromFlag, codexModelFromFlag,
+    providerFromFlag,
+    claudeModelFromFlag,
+    codexModelFromFlag,
+    geminiModelFromFlag,
   });
   const { selectedProvider, selection, llmSkipped, providerSource, modelSource } = llmResult;
 
   // When no provider is available and it wasn't a user cancellation (e.g.
   // non-TTY with no flags or config), exit with a clear message.
   if (!selectedProvider && !llmSkipped) {
-    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
+    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex', 'claude', or 'gemini'.");
     exitWithCleanup(1);
   }
 
@@ -1193,6 +1244,7 @@ async function handleInit(rest) {
         assistantEnabled,
         claudeModelFromFlag,
         codexModelFromFlag,
+        geminiModelFromFlag,
         llmSkipped,
         tools,
         runInitCapture,
@@ -1564,7 +1616,7 @@ async function handleWork(rest) {
     const vendor = readLLMVendor(dir);
     if (!vendor) {
       console.error("Error: No LLM vendor configured for this project.");
-      console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+      console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' or 'ndx config llm.vendor gemini' to configure a vendor.");
       exitWithCleanup(1);
     }
   }

@@ -14,6 +14,7 @@
 
 import { setupClaudeIntegration } from "./claude-integration.js";
 import { setupCodexIntegration } from "./codex-integration.js";
+import { setupGeminiIntegration } from "./gemini-integration.js";
 
 // ── Vendor registry ──────────────────────────────────────────────────────────
 
@@ -37,6 +38,13 @@ const VENDOR_REGISTRY = {
     setup: setupCodexIntegration,
     summarize: (r) =>
       `AGENTS.md, ${r.skills.written} skills, ${r.config.serverCount} MCP servers`,
+  },
+  gemini: {
+    label: "Gemini CLI",
+    skipFlag: "--no-gemini",
+    setup: setupGeminiIntegration,
+    summarize: (r) =>
+      `GEMINI.md, ${r.skills.written} skills`,
   },
 };
 
@@ -203,6 +211,15 @@ function formatVendorArtifacts(vendor, detail) {
     }
     if (detail.config?.written) {
       lines.push(`.codex/config.toml — ${detail.config.serverCount} MCP server${detail.config.serverCount === 1 ? "" : "s"} (stdio)`);
+    }
+  }
+
+  if (vendor === "gemini") {
+    if (detail.instructions?.written) {
+      lines.push("GEMINI.md written");
+    }
+    if (detail.skills) {
+      lines.push(`.gemini/skills/ — ${detail.skills.written} skill${detail.skills.written === 1 ? "" : "s"}`);
     }
   }
 

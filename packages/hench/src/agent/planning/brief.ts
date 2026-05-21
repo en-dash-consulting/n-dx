@@ -44,7 +44,7 @@ export function collectEpicTaskIds(items: PRDItem[], epicId: string): Set<string
     // Check if this item is inside the target epic
     const isInEpic =
       item.id === epicId ||
-      parents.some((p) => p.id === epicId);
+      parents.some((p: PRDItem) => p.id === epicId);
 
     if (isInEpic && isWorkItem(item.level)) {
       ids.add(item.id);
@@ -199,7 +199,7 @@ export async function assembleTaskBrief(
 
       // Filter to tasks within the epic and not in excludeIds
       const epicActionable = allActionable.filter(
-        (e) => epicTaskIds.has(e.item.id) && !excludeIds?.has(e.item.id),
+        (e: any) => epicTaskIds.has(e.item.id) && !excludeIds?.has(e.item.id),
       );
 
       if (epicActionable.length === 0) {
@@ -234,7 +234,7 @@ export async function assembleTaskBrief(
 
   // Collect requirements (own + inherited from parent chain)
   const tracedReqs = collectRequirements(doc.items, entry.item.id);
-  const requirements: TaskBriefRequirement[] = tracedReqs.map((tr) => ({
+  const requirements: TaskBriefRequirement[] = tracedReqs.map((tr: any) => ({
     id: tr.requirement.id,
     title: tr.requirement.title,
     category: tr.requirement.category,
@@ -250,7 +250,7 @@ export async function assembleTaskBrief(
     requirements,
     project,
     workflow,
-    recentLog: recentLog.map((e) => ({
+    recentLog: recentLog.map((e: any) => ({
       timestamp: e.timestamp,
       event: e.event,
       detail: e.detail,
@@ -282,7 +282,7 @@ export async function getActionableTasks(
     title: e.item.title,
     level: e.item.level,
     priority: e.item.priority ?? "medium",
-    parentChain: e.parents.map((p) => p.title).join(" > "),
+    parentChain: e.parents.map((p: any) => p.title).join(" > "),
   }));
 }
 

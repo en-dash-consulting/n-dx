@@ -51,6 +51,22 @@ export interface CodexConfig {
   lightModel?: string;
 }
 
+/** Optional Gemini-specific config section in `.n-dx.json`. */
+export interface GeminiConfig {
+  /** Path to Gemini CLI binary. Defaults to `gemini`. */
+  cli_path?: string;
+  /** API key used by future Gemini API providers. */
+  api_key?: string;
+  /** Optional custom API endpoint. */
+  api_endpoint?: string;
+  /** Default model for Gemini requests. */
+  model?: string;
+  /**
+   * Model override for the 'light' task weight tier.
+   */
+  lightModel?: string;
+}
+
 /** Vendor-neutral config shape loaded from `.n-dx.json`. */
 export interface LLMConfig {
   /** Default vendor selected by the project. */
@@ -66,6 +82,8 @@ export interface LLMConfig {
   claude?: ClaudeConfig;
   /** Codex-specific config (reserved for adapter integration). */
   codex?: CodexConfig;
+  /** Gemini-specific config. */
+  gemini?: GeminiConfig;
   /**
    * Enable automatic failover on model/vendor errors.
    * When true, hench retries failed runs on fallback models before surfacing errors.

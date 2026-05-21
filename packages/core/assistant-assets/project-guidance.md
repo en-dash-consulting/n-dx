@@ -80,9 +80,10 @@ pnpm typecheck      # typecheck all packages
 |------|------|----------------|
 | `AGENTS.md` | **Canonical shared guidance surface.** Read by Codex and any future assistants. Contains project docs, workflow, skill inventory, and MCP tool reference derived from the asset manifest. | `project-guidance.md` (filtered) + manifest-derived sections + `codex-troubleshooting.md` |
 | `CLAUDE.md` | **Claude-facing bridge.** Read by Claude Code on startup. Imports the same shared guidance plus Claude-specific deep sections (zone governance, gateway details, concurrency contract). | `project-guidance.md` + `claude-addendum.md` |
+| `GEMINI.md` | **Gemini-facing bridge.** Read by Gemini-based agents. Imports the shared guidance. | `project-guidance.md` |
 | `.codex/config.toml` | **Codex MCP configuration.** Auto-read by Codex — no manual registration required. | Manifest MCP server descriptors |
 
-**Design invariant:** Both `AGENTS.md` and `CLAUDE.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
+**Design invariant:** `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
 
 Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
 
@@ -95,8 +96,8 @@ Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
 
 ```sh
 ndx init [dir]            # sourcevision init → rex init → hench init + LLM model selection
-                          #   --provider=claude|codex  --model=<id>
-                          #   --claude-model=<id>  --codex-model=<id>
+                          #   --provider=claude|codex|gemini  --model=<id>
+                          #   --claude-model=<id>  --codex-model=<id>  --gemini-model=<id>
 ndx analyze [dir]         # sourcevision analyze (--deep, --full, --lite)
 ndx recommend [dir]       # rex recommend (--accept, --actionable-only, --acknowledge)
 ndx add "description"     # smart-add PRD items from freeform descriptions
@@ -106,7 +107,7 @@ ndx plan --accept [dir]   # ...then accept proposals into PRD
 ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, --yes,
                           #   --permission-mode=<default|acceptEdits|bypassPermissions|plan>, etc.)
                           # Autonomous runs (--auto/--loop/--epic-by-epic) default to
-                          # acceptEdits so the spawned Claude session won't stall in plan
+                          # acceptEdits so the spawned Claude/Gemini session won't stall in plan
                           # mode. Override with --permission-mode or hench.permissionMode.
                           # The no-plan-mode rule is embedded in the hench system prompt
                           # for all CLI-provider runs (see /no-plan-mode skill).
@@ -253,7 +254,7 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
 | `.hench/config.json` | Hench agent configuration (model, max turns) |
 | `.hench/runs/` | Run history and transcripts |
-| `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
+| `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model, llm.gemini.model) |
 | `.n-dx-web.pid` | Background web server PID file (auto-managed) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
 | `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
