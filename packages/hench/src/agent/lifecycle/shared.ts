@@ -51,7 +51,7 @@ import { validateTaskCompletion } from "./task-completion-gate.js";
  * token to prevent silent drift.
  */
 export function buildCoAuthoredByTrailerLine(): string {
-  return "Co-Authored-By: ndx <NDX_EMAIL_PLACEHOLDER>";
+  return "Co-Authored-By: ndx <n-dx@endash.us>";
 }
 
 // ---------------------------------------------------------------------------
