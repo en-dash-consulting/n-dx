@@ -1994,3 +1994,269 @@
     max-width: 140px;
   }
 }
+
+/* ── System status drawer ──────────────────────────────────────────────
+   Operational diagnostics (concurrency, memory, sockets, throttle) live in a
+   collapsed <details> so the run history stays the primary content. */
+.hench-system-status {
+  margin-top: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--bg-surface);
+}
+
+.hench-system-status[open] {
+  background: var(--bg);
+}
+
+.hench-system-status-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+}
+
+.hench-system-status-summary::-webkit-details-marker {
+  display: none;
+}
+
+.hench-system-status-summary:hover {
+  color: var(--text);
+}
+
+.hench-system-status-chevron {
+  display: inline-block;
+  font-size: var(--font-xs);
+  transition: transform var(--transition-normal);
+}
+
+.hench-system-status[open] .hench-system-status-chevron {
+  transform: rotate(90deg);
+}
+
+.hench-system-status-label {
+  color: var(--text);
+}
+
+.hench-system-status-hint {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-normal);
+}
+
+.hench-system-status-body {
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+/* The nested panels already have their own margins; trim the last gap. */
+.hench-system-status-body > *:last-child {
+  margin-bottom: 0;
+}
+
+/* ── WebSocket health panel ─────────────────────────────────────────────
+   Matches the concurrency/memory card aesthetic (was previously unstyled). */
+.ws-health-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.ws-health-panel-degraded {
+  border-color: color-mix(in srgb, var(--orange) 30%, var(--border));
+  background: color-mix(in srgb, var(--orange) 3%, var(--bg-surface));
+}
+
+.ws-health-panel-unhealthy {
+  border-color: color-mix(in srgb, var(--red) 35%, var(--border));
+  background: color-mix(in srgb, var(--red) 4%, var(--bg-surface));
+}
+
+.ws-health-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.ws-health-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ws-health-icon {
+  font-size: var(--font-md);
+}
+
+.ws-health-icon-healthy { color: var(--green); }
+.ws-health-icon-degraded { color: var(--orange); }
+.ws-health-icon-unhealthy {
+  color: var(--red);
+  animation: concurrency-pulse 1.5s ease-in-out infinite;
+}
+
+.ws-health-title {
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.ws-health-badge {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  padding: 1px var(--space-2);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+  color: var(--green);
+}
+
+.ws-health-badge-degraded {
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--orange);
+}
+
+.ws-health-badge-unhealthy {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: var(--red);
+}
+
+.ws-health-connection-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-health-count-value {
+  font-size: var(--font-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.ws-health-count-label {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+/* Progress bars (connections, cleanup success) */
+.ws-health-bar-container {
+  margin-bottom: var(--space-3);
+}
+
+.ws-health-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  margin-bottom: var(--space-1);
+}
+
+.ws-health-bar-detail {
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-health-bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.ws-health-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width var(--transition-normal);
+}
+
+.ws-health-bar-healthy { background: var(--green); }
+.ws-health-bar-degraded { background: var(--orange); }
+.ws-health-bar-unhealthy { background: var(--red); }
+
+/* Cleanup breakdown */
+.ws-health-cleanup-breakdown {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg-hover);
+}
+
+.ws-health-cleanup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-1);
+}
+
+.ws-health-cleanup-title {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.ws-health-cleanup-recent {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+.ws-health-cleanup-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  padding: 1px 0;
+}
+
+.ws-health-cleanup-row-warn .ws-health-cleanup-reason {
+  color: var(--orange);
+}
+
+.ws-health-cleanup-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stats row */
+.ws-health-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: var(--space-3);
+}
+
+.ws-health-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ws-health-stat-value {
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-health-stat-label {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+/* Broadcast failure alert */
+.ws-health-failure-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  color: var(--red);
+  font-size: var(--font-xs);
+}
