@@ -183,11 +183,12 @@ export function FacetFilter({
               class: `prd-facet-chip prd-facet-status${isActive ? " active" : ""} ${sf.cssClass}`,
               onClick: () => toggleStatus(sf.status),
               title: `${isActive ? "Hide" : "Show"} ${sf.label.toLowerCase()} items`,
+              "aria-label": `${sf.label} (${isActive ? "shown" : "hidden"})`,
               "aria-pressed": String(isActive),
               type: "button",
             },
+            // Icon-only pill — label is available via title / aria-label.
             h("span", { class: "prd-facet-chip-icon" }, sf.icon),
-            h("span", { class: "prd-facet-chip-label" }, sf.label),
           );
         }),
       ),

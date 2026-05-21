@@ -218,8 +218,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   }
 
   return h(
-    Fragment,
-    null,
+    "div",
+    { class: "prd-view" },
 
     // Branded header
     h("div", { class: "view-header" },

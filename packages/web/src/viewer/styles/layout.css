@@ -514,6 +514,18 @@
   padding: var(--space-6);
 }
 
+/* Fill variant — the view owns a single internal scroll region (Tasks view).
+   The main column stops being the scroller and becomes a height-bounded flex
+   column so the view's own scroll area fills the remaining space. */
+.main--fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.main--fill > .page-context-bar {
+  flex: none;
+}
+
 /* Detail panel */
 .detail-panel {
   width: var(--panel-w);

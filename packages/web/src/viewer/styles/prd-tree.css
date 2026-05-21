@@ -2,14 +2,20 @@
 
 .prd-tree-container {
   padding: 0 var(--space-1);
+  /* Flex column so the tree fills the Tasks view's single scroll region. */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Header with title and toolbar */
 .prd-header {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-2);
   flex-wrap: wrap;
   gap: var(--space-2);
 }
@@ -43,7 +49,27 @@
 
 /* Summary bar */
 .prd-summary {
-  margin-bottom: var(--space-5);
+  flex: none;
+  margin-bottom: var(--space-3);
+}
+
+/* Tasks view shell — single internal scroll region.
+   Controls + summary stay pinned; only .prd-tree-virtual scrolls. */
+.prd-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.prd-view > .view-header,
+.prd-view > .prd-filter-bar {
+  flex: none;
+}
+/* PRDTree fills the remaining height below the controls. */
+.prd-view > .prd-tree-container {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .prd-summary-bar {
@@ -103,21 +129,19 @@
 .prd-status-dot.prd-status-failing { background: var(--red); opacity: 0.7; }
 .prd-status-dot.prd-status-deferred { background: var(--orange); opacity: 0.5; }
 
-/* Sticky filter bar — consolidated above the tree, persists on scroll */
+/* Control bar — two stacked rows (search/actions, then status+tag filters)
+   pinned above the single scroll region. No longer position:sticky: it's a
+   flex:none row in the Tasks view's flex column, so it stays put while only
+   the tree scrolls. */
 .prd-filter-bar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   background: var(--bg);
-  padding: var(--space-2) 0 var(--space-3);
-  margin-bottom: var(--space-2);
-  /* Subtle bottom edge when floating over scrolled content */
-  border-bottom: 1px solid transparent;
-}
-
-/* Show bottom border only when filter bar is sticky (scrolled past) */
-.prd-filter-bar:not(:first-child) {
-  transition: border-color 0.15s;
+  padding: 0 0 var(--space-3);
+  margin-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border);
 }
 
 /* Status filter */
@@ -377,8 +401,11 @@
    Only items within the viewport plus a buffer zone are rendered; spacer
    elements before/after maintain total scroll height. */
 .prd-tree-virtual {
-  min-height: 120px;
-  max-height: 70vh;
+  /* Single scroll region: fill the remaining height of the Tasks view's flex
+     column rather than being a nested 70vh scroller competing with the page
+     scroll (which felt "weird"). The view pins its controls above this. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   /* Smooth scroll for virtual scroll index-based navigation */
   scroll-behavior: smooth;
@@ -5590,7 +5617,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
 }
 
 .prd-search-input {
@@ -5696,11 +5722,13 @@
 
 /* ── Facet filter chips ─────────────────────────────────────────────── */
 
+/* Single wrapping row: status pills + tag filters + clear, all inline. */
 .prd-facet-filter {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1-5);
-  margin-top: var(--space-1);
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
 }
 
 .prd-facet-row {
@@ -5717,7 +5745,6 @@
   letter-spacing: 0.5px;
   color: var(--text-dim);
   flex-shrink: 0;
-  min-width: 48px;
 }
 
 .prd-facet-chips {
@@ -5797,6 +5824,15 @@
 
 .prd-facet-chip-icon {
   font-size: var(--font-xs);
+}
+
+/* Icon-only status pills — compact, legible glyph. */
+.prd-facet-status {
+  padding: 3px var(--space-2);
+}
+.prd-facet-status .prd-facet-chip-icon {
+  font-size: var(--font-sm);
+  line-height: 1;
 }
 
 .prd-facet-chip-label {
@@ -5935,9 +5971,14 @@
 /* ── Completion Timeline ───────────────────────────────────────────── */
 
 .completion-timeline {
-  margin-top: var(--space-6);
+  /* Bounded footer in the Tasks view flex column: it can't squeeze the task
+     list above it, and scrolls internally if the history is long. */
+  flex: none;
+  max-height: 32vh;
+  overflow-y: auto;
+  margin-top: var(--space-3);
   border-top: 1px solid var(--border);
-  padding-top: var(--space-4);
+  padding-top: var(--space-3);
 }
 
 .timeline-range-bar {
