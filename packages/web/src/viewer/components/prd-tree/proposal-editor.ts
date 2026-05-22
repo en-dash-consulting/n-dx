@@ -52,6 +52,8 @@ interface EditableTask {
   description: string;
   priority: string;
   tags: string;
+  /** Carried verbatim from the proposal; not inline-editable in the UI. */
+  acceptanceCriteria: string[];
   selected: boolean;
 }
 
@@ -104,6 +106,7 @@ function toEditable(proposals: RawProposal[]): EditableProposal[] {
         description: t.description ?? "",
         priority: t.priority ?? "",
         tags: (t.tags ?? []).join(", "),
+        acceptanceCriteria: t.acceptanceCriteria ?? [],
         selected: true,
       })),
     })),
@@ -303,6 +306,7 @@ export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }
             tasks: f.tasks.map((t) => ({
               title: t.title,
               description: t.description || undefined,
+              acceptanceCriteria: t.acceptanceCriteria.length > 0 ? t.acceptanceCriteria : undefined,
               priority: t.priority || undefined,
               tags: t.tags ? t.tags.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
               selected: t.selected,

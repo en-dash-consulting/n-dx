@@ -26,7 +26,7 @@ import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js"
 import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.js";
 import { BrandedHeader } from "../components/index.js";
 import { CompletionTimeline } from "../components/prd-tree/completion-timeline.js";
-import type { PRDDocumentData } from "../components/prd-tree/index.js";
+import type { PRDDocumentData, ItemStatus } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";
 import {
   useToast,
@@ -84,20 +84,35 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   });
 
   // ── Status filter (persists across view switches) ────────────
-  const { activeStatuses, setActiveStatuses } = usePersistentFilter();
+  const { activeStatuses, setActiveStatuses, hadPersistedSelection } = usePersistentFilter();
 
-  // ── Smart expand depth: collapsed when no active work ────────
-  const hasActiveWork = useMemo(() => {
-    if (!data) return false;
-    function check(items: any[]): boolean {
+  // ── Per-status counts (recursive) for the status filter dropdown ──
+  const statusCounts = useMemo(() => {
+    const counts = Object.fromEntries(ALL_STATUSES.map((s) => [s, 0])) as Record<ItemStatus, number>;
+    if (!data) return counts;
+    function walk(items: any[]): void {
       for (const item of items) {
-        if (item.status === "pending" || item.status === "in_progress" || item.status === "blocked") return true;
-        if (item.children && check(item.children)) return true;
+        if (item.status in counts) counts[item.status as ItemStatus]++;
+        if (item.children) walk(item.children);
       }
-      return false;
     }
-    return check(data.items);
+    walk(data.items);
+    return counts;
   }, [data]);
+
+  // ── Smart default: on a fresh load, show only pending when any pending
+  //    tasks exist; otherwise show everything. Skipped once the user has a
+  //    persisted selection so view switches don't clobber their choice. ──
+  const smartDefaultAppliedRef = useRef(false);
+  useEffect(() => {
+    if (smartDefaultAppliedRef.current || hadPersistedSelection || !data) return;
+    smartDefaultAppliedRef.current = true;
+    setActiveStatuses(
+      statusCounts.pending > 0
+        ? new Set<ItemStatus>(["pending"])
+        : new Set<ItemStatus>(ALL_STATUSES),
+    );
+  }, [data, hadPersistedSelection, statusCounts, setActiveStatuses]);
 
   // ── Inline tree search ──────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -218,8 +233,8 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   }
 
   return h(
-    Fragment,
-    null,
+    "div",
+    { class: "prd-view" },
 
     // Branded header
     h("div", { class: "view-header" },
@@ -319,21 +334,22 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
         availableTags,
         activeTags,
         activeStatuses,
+        statusCounts,
         onTagsChange: setActiveTags,
         onStatusesChange: setActiveStatuses,
         onClearAll: () => { clearFacets(); setActiveStatuses(new Set(ALL_STATUSES)); },
       }),
     ),
 
-    // PRD tree (key forces remount when expand strategy changes)
+    // PRD tree — starts fully collapsed; the user expands what they need.
     h(PRDTree, {
-      key: `prd-${hasActiveWork ? "active" : "done"}`,
+      key: "prd",
       document: data,
       taskUsageById,
       rollupById,
       weeklyBudget,
       showTokenBudget,
-      defaultExpandDepth: hasActiveWork ? 2 : 0,
+      defaultExpandDepth: 0,
       onSelectItem: actions.handleSelectItem,
       selectedItemId: actions.selectedItemId,
       bulkSelectedIds: actions.bulkSelectedIds,

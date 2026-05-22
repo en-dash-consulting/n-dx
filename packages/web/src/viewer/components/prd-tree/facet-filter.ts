@@ -32,6 +32,7 @@ const STATUS_FACETS: { status: ItemStatus; label: string; icon: string; cssClass
   { status: "failing",     label: "Failing",     icon: "\u26A0", cssClass: "prd-status-failing" },
   { status: "blocked",     label: "Blocked",     icon: "\u2298", cssClass: "prd-status-blocked" },
   { status: "deferred",    label: "Deferred",    icon: "\u25CC", cssClass: "prd-status-deferred" },
+  { status: "deleted",     label: "Deleted",     icon: "\u2715", cssClass: "prd-status-deleted" },
 ];
 
 /** Max suggestions shown in the typeahead dropdown. */
@@ -46,6 +47,8 @@ export interface FacetFilterProps {
   activeTags: Set<string>;
   /** Currently selected status facets. */
   activeStatuses: Set<ItemStatus>;
+  /** Per-status item counts across the whole PRD. */
+  statusCounts: Record<ItemStatus, number>;
   /** Called when the set of active tags changes. */
   onTagsChange: (tags: Set<string>) => void;
   /** Called when the set of active statuses changes. */
@@ -58,11 +61,57 @@ export function FacetFilter({
   availableTags,
   activeTags,
   activeStatuses,
+  statusCounts,
   onTagsChange,
   onStatusesChange,
   onClearAll,
 }: FacetFilterProps) {
   const hasActiveFacets = activeTags.size > 0 || activeStatuses.size > 0;
+
+  // ── Status dropdown state ────────────────────────────────────────────
+  const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!statusOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) {
+        setStatusOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [statusOpen]);
+
+  // Statuses present in the PRD (count > 0), plus any currently-active ones so
+  // the user can always see and toggle their current selection.
+  const presentStatuses = STATUS_FACETS.filter(
+    (sf) => statusCounts[sf.status] > 0 || activeStatuses.has(sf.status),
+  );
+  const allPresentSet = new Set<ItemStatus>(
+    STATUS_FACETS.filter((sf) => statusCounts[sf.status] > 0).map((sf) => sf.status),
+  );
+
+  const toggleStatus = (status: ItemStatus) => {
+    const next = new Set(activeStatuses);
+    if (next.has(status)) next.delete(status);
+    else next.add(status);
+    onStatusesChange(next);
+  };
+
+  // Trigger-button summary label.
+  const isAllPresent =
+    allPresentSet.size > 0 &&
+    activeStatuses.size === allPresentSet.size &&
+    [...allPresentSet].every((s) => activeStatuses.has(s));
+  const isPendingOnly = activeStatuses.size === 1 && activeStatuses.has("pending");
+  const statusSummary = isAllPresent
+    ? "All statuses"
+    : isPendingOnly
+      ? "Pending only"
+      : activeStatuses.size === 0
+        ? "None"
+        : `${activeStatuses.size} selected`;
 
   // ── Tag typeahead state ──────────────────────────────────────────────
   const [tagQuery, setTagQuery] = useState("");
@@ -124,19 +173,6 @@ export function FacetFilter({
     [activeTags, onTagsChange],
   );
 
-  const toggleStatus = useCallback(
-    (status: ItemStatus) => {
-      const next = new Set(activeStatuses);
-      if (next.has(status)) {
-        next.delete(status);
-      } else {
-        next.add(status);
-      }
-      onStatusesChange(next);
-    },
-    [activeStatuses, onStatusesChange],
-  );
-
   const onInputKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "ArrowDown") {
@@ -173,23 +209,63 @@ export function FacetFilter({
       h("span", { class: "prd-facet-label" }, "Status:"),
       h(
         "div",
-        { class: "prd-facet-chips", role: "toolbar", "aria-label": "Status filters" },
-        STATUS_FACETS.map((sf) => {
-          const isActive = activeStatuses.has(sf.status);
-          return h(
-            "button",
-            {
-              key: sf.status,
-              class: `prd-facet-chip prd-facet-status${isActive ? " active" : ""} ${sf.cssClass}`,
-              onClick: () => toggleStatus(sf.status),
-              title: `${isActive ? "Hide" : "Show"} ${sf.label.toLowerCase()} items`,
-              "aria-pressed": String(isActive),
-              type: "button",
-            },
-            h("span", { class: "prd-facet-chip-icon" }, sf.icon),
-            h("span", { class: "prd-facet-chip-label" }, sf.label),
-          );
-        }),
+        { class: "prd-status-dropdown", ref: statusRef },
+        // Trigger button
+        h(
+          "button",
+          {
+            class: `prd-status-dropdown-trigger${statusOpen ? " open" : ""}`,
+            onClick: () => setStatusOpen((o) => !o),
+            "aria-haspopup": "true",
+            "aria-expanded": String(statusOpen),
+            type: "button",
+          },
+          h("span", { class: "prd-status-dropdown-summary" }, statusSummary),
+          h("span", { class: "prd-status-dropdown-caret", "aria-hidden": "true" }, "▾"),
+        ),
+        // Popover
+        statusOpen
+          ? h(
+              "div",
+              { class: "prd-status-menu", role: "menu" },
+              // Quick actions
+              h(
+                "div",
+                { class: "prd-status-menu-actions" },
+                h("button", {
+                  class: "prd-status-menu-action",
+                  onClick: () => onStatusesChange(new Set(allPresentSet)),
+                  type: "button",
+                }, "View all"),
+                h("button", {
+                  class: "prd-status-menu-action",
+                  onClick: () => onStatusesChange(new Set<ItemStatus>(["pending"])),
+                  disabled: statusCounts.pending === 0,
+                  type: "button",
+                }, "Pending only"),
+              ),
+              // Status checklist
+              ...presentStatuses.map((sf) => {
+                const isActive = activeStatuses.has(sf.status);
+                return h(
+                  "button",
+                  {
+                    key: sf.status,
+                    class: `prd-status-menu-item${isActive ? " active" : ""}`,
+                    onClick: () => toggleStatus(sf.status),
+                    role: "menuitemcheckbox",
+                    "aria-checked": String(isActive),
+                    type: "button",
+                  },
+                  h("span", { class: `prd-status-menu-check${isActive ? " checked" : ""}` },
+                    isActive ? "✓" : ""),
+                  h("span", { class: `prd-status-menu-icon ${sf.cssClass}` }, sf.icon),
+                  h("span", { class: "prd-status-menu-label" }, sf.label),
+                  h("span", { class: "prd-status-menu-count" }, String(statusCounts[sf.status] ?? 0)),
+                );
+              }),
+            )
+          : null,
       ),
     ),
 
