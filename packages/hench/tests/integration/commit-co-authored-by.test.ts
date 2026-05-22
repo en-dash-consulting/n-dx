@@ -147,7 +147,7 @@ describe("Co-Authored-By trailer — autonomous path (--auto/--loop)", () => {
 
     expect(await getHeadSubject(projectDir)).toBe("feat: autonomous commit");
     const body = await getHeadCommitBody(projectDir);
-    expect(body).toContain("Co-Authored-By: ndx <n-dx@endash.us>");
+    expect(body).toContain("Co-Authored-By: En Dash's n-dx <n-dx@endash.us>");
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
 
@@ -178,7 +178,7 @@ describe("Co-Authored-By trailer — autonomous path (--auto/--loop)", () => {
     // Assert the literal placeholder token — must NOT be substituted at source time.
     expect(body).toContain("n-dx@endash.us");
     // And the full trailer line must match exactly.
-    expect(body).toMatch(/Co-Authored-By: ndx <n-dx@endash.us>/);
+    expect(body).toMatch(/Co-Authored-By: En Dash's n-dx <n-dx@endash.us>/);
   });
 });
 
@@ -237,7 +237,7 @@ describe("Co-Authored-By trailer — interactive path (--yes)", () => {
 
     expect(await getHeadSubject(projectDir)).toBe("feat: yes-approved commit");
     const body = await getHeadCommitBody(projectDir);
-    expect(body).toContain("Co-Authored-By: ndx <n-dx@endash.us>");
+    expect(body).toContain("Co-Authored-By: En Dash's n-dx <n-dx@endash.us>");
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
 
@@ -281,7 +281,7 @@ describe("Co-Authored-By trailer — interactive path (--yes)", () => {
 
       // The HEAD commit (initial) must not contain the Co-Authored-By trailer.
       const body = await getHeadCommitBody(projectDir);
-      expect(body).not.toContain("Co-Authored-By: ndx <n-dx@endash.us>");
+      expect(body).not.toContain("Co-Authored-By: En Dash's n-dx <n-dx@endash.us>");
     } finally {
       vi.doUnmock("node:readline");
       vi.resetModules();
@@ -351,7 +351,7 @@ describe("Co-Authored-By trailer — rollback path", () => {
     // HEAD is still the initial commit and must NOT contain Co-Authored-By.
     expect(await getHeadSubject(projectDir)).toBe("initial");
     const body = await getHeadCommitBody(projectDir);
-    expect(body).not.toContain("Co-Authored-By: ndx <n-dx@endash.us>");
+    expect(body).not.toContain("Co-Authored-By: En Dash's n-dx <n-dx@endash.us>");
   });
 
   it("autoCommit=true path skips performCommitPromptIfNeeded entirely — no double-trailer", async () => {

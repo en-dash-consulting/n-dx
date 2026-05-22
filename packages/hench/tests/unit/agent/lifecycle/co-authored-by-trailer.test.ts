@@ -14,7 +14,7 @@ import { buildCoAuthoredByTrailerLine } from "../../../../src/agent/lifecycle/sh
 describe("buildCoAuthoredByTrailerLine", () => {
   it("returns the exact Co-Authored-By trailer with n-dx@endash.us token", () => {
     expect(buildCoAuthoredByTrailerLine()).toBe(
-      "Co-Authored-By: ndx <n-dx@endash.us>",
+      "Co-Authored-By: En Dash's n-dx <n-dx@endash.us>",
     );
   });
 
@@ -32,6 +32,6 @@ describe("buildCoAuthoredByTrailerLine", () => {
 
   it("uses 'ndx' as the co-author name", () => {
     const trailer = buildCoAuthoredByTrailerLine();
-    expect(trailer).toContain("Co-Authored-By: ndx ");
+    expect(trailer).toContain("Co-Authored-By: En Dash's n-dx ");
   });
 });
