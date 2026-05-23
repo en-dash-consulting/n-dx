@@ -31,6 +31,7 @@ import type {
   Finding,
   AnalyzeTokenUsage,
   SubAnalysisRef,
+  ProjectProfile,
 } from "../schema/index.js";
 import type { SubAnalysis } from "./workspace.js";
 import {
@@ -1814,6 +1815,7 @@ async function applyEnrichment(
   fileArchetypes?: Map<string, string | null>,
   currentContentHashes?: Record<string, string>,
   hints?: string,
+  projectProfile?: ProjectProfile,
 ): Promise<EnrichmentResult> {
   let finalZones = expandedZones;
   let aiZoneInsights = new Map<string, string[]>();
@@ -1856,7 +1858,7 @@ async function applyEnrichment(
     } else {
       const result = await enrichZonesWithAI(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes,
-        currentContentHashes, hints,
+        currentContentHashes, hints, projectProfile,
       );
       finalZones = result.zones;
       aiZoneInsights = result.newZoneInsights;
@@ -2659,6 +2661,12 @@ export async function analyzeZones(
      * Used by --full enrichment passes to avoid non-deterministic re-partitioning.
      */
     reuseStructure?: boolean;
+    /**
+     * Detected project profile (frameworks, release infra, import-graph quality).
+     * Forwarded to the AI enrichment prompt so the LLM can suppress
+     * recommendations that contradict the project's actual shape.
+     */
+    projectProfile?: ProjectProfile;
   }
 ): Promise<AnalyzeZonesResult> {
   const enrich = options?.enrich ?? true;
@@ -2757,7 +2765,7 @@ export async function analyzeZones(
   // ── AI enrichment or preserve previous ──
   const enrichResult = await applyEnrichment(
     expandedZones, imports, inventory, validPrevious, enrich, perZone, options?.fileArchetypes,
-    zoneContentHashes, options?.hints,
+    zoneContentHashes, options?.hints, options?.projectProfile,
   );
   const { finalZones: enrichedZones, aiZoneInsights, aiGlobalInsights, aiFindings,
     enrichmentPass, metaUpdatedFindings, enrichTokenUsage } = enrichResult;

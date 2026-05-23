@@ -54,6 +54,7 @@ import type {
 } from "../sourcevision-core.js";
 import { info } from "../output.js";
 import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
+import { buildProjectProfile } from "../../analyzers/project-profile.js";
 
 // ── Shared context passed between phases ─────────────────────────────
 
@@ -332,11 +333,22 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
       info(`  ${dim(`Using zone merge threshold ${smallZoneMergeThreshold} from .n-dx.json`)}`);
     }
 
+    // Detect the project profile (frameworks, release infra, import-graph
+    // quality) and persist it now so it is available to the enrichment prompt
+    // AND to downstream consumers (CONTEXT.md, dashboards) for the rest of
+    // this analyze run. Writing in the output stage as well is idempotent.
+    const projectProfile = buildProjectProfile(ctx.absDir, inventory, importsData);
+    writeFileSync(
+      join(ctx.svDir, DATA_FILES.projectProfile),
+      toCanonicalJSON(projectProfile),
+    );
+
     let zonesResult = await analyzeZones(inventory, importsData, {
       enrich, previousZones, perZone, subAnalyses, fileArchetypes, onReset, hints,
       zonePins: pinCount > 0 ? zonePins : undefined,
       zoneAnchors: zoneAnchors.length > 0 ? zoneAnchors : undefined,
       smallZoneMergeThreshold,
+      projectProfile,
     });
     let zones = zonesResult.zones;
     if (zonesResult.tokenUsage) {
@@ -359,6 +371,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
           zoneAnchors: zoneAnchors.length > 0 ? zoneAnchors : undefined,
           smallZoneMergeThreshold,
           reuseStructure: true,
+          projectProfile,
         });
         zones = zonesResult.zones;
         if (zonesResult.tokenUsage) {

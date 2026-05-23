@@ -12,6 +12,7 @@ import type {
   Zones,
   Finding,
   AnalyzeTokenUsage,
+  ProjectProfile,
 } from "../schema/index.js";
 
 import {
@@ -154,6 +155,7 @@ export async function enrichBatch(
   enrichedNames?: Map<string, string>,
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
+  projectProfile?: ProjectProfile,
 ): Promise<BatchResult | null | { authError: true }> {
   const isFirstPass = passNumber === 1;
   const batchFiles = batchZones.reduce((sum, z) => sum + z.files.length, 0);
@@ -196,8 +198,8 @@ export async function enrichBatch(
       .join("\n");
 
     const prompt = isFirstPass
-      ? buildFirstPassPrompt(batchZones, config, otherContext, priorNames, crossingLines, globalPromptNote, passConfig, fileArchetypes, hints)
-      : buildLaterPassPrompt(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes, hints);
+      ? buildFirstPassPrompt(batchZones, config, otherContext, priorNames, crossingLines, globalPromptNote, passConfig, fileArchetypes, hints, projectProfile)
+      : buildLaterPassPrompt(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes, hints, projectProfile);
 
     const promptLevel = config.maxFiles >= 8 ? "full" : config.maxFiles > 0 ? "compact" : "minimal";
     const spinner = startSpinner(
@@ -320,6 +322,92 @@ interface AttemptConfig {
   maxCrossings: number;
 }
 
+/**
+ * Render a "Project shape" section for the LLM prompt that grounds the model
+ * in the repo's actual ecosystem. The model uses this to suppress
+ * recommendations that don't fit (e.g. don't recommend MVVM coordinators on a
+ * SwiftUI app, don't propose a VERSION file when release-please is wired,
+ * don't make structural calls when the import graph is absent/sparse).
+ */
+function formatProjectShape(p: ProjectProfile): string {
+  const lines: string[] = [];
+
+  const langLine = p.languages.length > 1
+    ? `${p.primaryLanguage} (also: ${p.languages.slice(1).join(", ")})`
+    : p.primaryLanguage;
+  lines.push(`Primary language: ${langLine}`);
+
+  if (p.frameworks.length > 0) {
+    lines.push(`Frameworks: ${p.frameworks.join(", ")}`);
+  }
+  if (p.releaseInfrastructure.length > 0) {
+    const kinds = p.releaseInfrastructure.map((r) => `${r.kind} (${r.evidence})`).join(", ");
+    lines.push(`Release infrastructure already present: ${kinds}`);
+  }
+  if (p.buildSurfaces.length > 0) {
+    lines.push(`Build surfaces: ${p.buildSurfaces.map((s) => s.path).join(", ")}`);
+  }
+  if (p.ciSurfaces.length > 0) {
+    lines.push(`CI surfaces: ${p.ciSurfaces.map((s) => s.path).join(", ")}`);
+  }
+  lines.push(`Import graph quality: ${p.importGraphQuality}`);
+
+  // Per-shape anti-recommendations the LLM should respect.
+  const guards: string[] = [];
+
+  if (p.importGraphQuality !== "rich") {
+    guards.push(
+      "Zones in this codebase were assembled from file-tree proximity (no usable import graph). " +
+      "DO NOT emit structural findings about zone boundaries, coupling, or refactor placement. " +
+      "Structural claims require a real import graph to be meaningful — focus instead on code-level " +
+      "observations grounded in the file contents themselves.",
+    );
+  }
+
+  if (p.releaseInfrastructure.length > 0) {
+    const kinds = p.releaseInfrastructure.map((r) => r.kind).join(", ");
+    guards.push(
+      `Version management is already handled by: ${kinds}. ` +
+      `DO NOT recommend introducing a VERSION file, a version constant, or a new release scheme — ` +
+      `that would create a competing source of truth.`,
+    );
+  }
+
+  const hasSwiftUI = p.frameworks.includes("swiftui");
+  if (hasSwiftUI) {
+    guards.push(
+      "This is a SwiftUI codebase. DO NOT recommend MVVM coordinator/view-model patterns transplanted " +
+      "from React/TS — SwiftUI's idiomatic state model is @State/@StateObject/@EnvironmentObject. " +
+      "DO NOT recommend introducing service protocols solely for testability; that is a Java/TS-era reflex " +
+      "and is rarely appropriate for an idiomatic SwiftUI app.",
+    );
+  }
+
+  if (
+    p.primaryLanguage !== "typescript" &&
+    p.primaryLanguage !== "javascript" &&
+    p.primaryLanguage !== "tsx" &&
+    p.primaryLanguage !== "jsx"
+  ) {
+    guards.push(
+      `This is a ${p.primaryLanguage} project, not TypeScript/JavaScript. ` +
+      `DO NOT propose JS/TS framework recommendations (e.g. Combine .replaceError/.catch on a sink whose ` +
+      `Failure is Never; React patterns; npm workflows). Code-level recommendations MUST be idiomatic for ${p.primaryLanguage}.`,
+    );
+  }
+
+  guards.push(
+    "Any finding that begins with a conditional like \"If X then Y\" is a hypothesis. " +
+    "Either confirm the hypothesis from the file contents you can see and rewrite it as a fact, or omit it.",
+  );
+
+  let block = `\nProject shape:\n${lines.map((l) => `  - ${l}`).join("\n")}`;
+  if (guards.length > 0) {
+    block += `\n\nHard constraints derived from the project shape:\n${guards.map((g) => `  - ${g}`).join("\n")}`;
+  }
+  return block + "\n";
+}
+
 function buildFirstPassPrompt(
   batchZones: Zone[],
   config: AttemptConfig,
@@ -330,7 +418,9 @@ function buildFirstPassPrompt(
   passConfig: PassConfig,
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
+  projectProfile?: ProjectProfile,
 ): string {
+  const projectShape = projectProfile ? formatProjectShape(projectProfile) : "";
   if (config.maxFiles > 0) {
     const zoneList = batchZones
       .map((z) => {
@@ -348,7 +438,7 @@ function buildFirstPassPrompt(
     return `Analyze this codebase's zone structure. Each zone groups related files discovered by import-graph community detection.
 
 ${passConfig.focus}
-
+${projectShape}
 Zones:
 ${zoneList}
 ${otherContext}
@@ -383,7 +473,7 @@ Return exactly ${batchZones.length} zone entries. Use finding types: ${passConfi
     .join("\n");
 
   return `Name these code zones. Each groups files by import structure.
-
+${projectShape}
 Zones:
 ${zoneList}
 ${otherContext}
@@ -405,7 +495,9 @@ function buildLaterPassPrompt(
   globalPromptNote: string,
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
+  projectProfile?: ProjectProfile,
 ): string {
+  const projectShape = projectProfile ? formatProjectShape(projectProfile) : "";
   const prevZones = previousZones?.zones ?? [];
   const prevGlobal = previousZones?.insights ?? [];
 
@@ -426,7 +518,7 @@ function buildLaterPassPrompt(
       .join("\n");
 
     return `You previously analyzed this codebase. Here is the current state:
-
+${projectShape}
 Zones:
 ${zoneContext}
 ${otherContext}

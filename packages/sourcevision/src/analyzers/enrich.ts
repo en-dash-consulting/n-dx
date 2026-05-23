@@ -36,6 +36,7 @@ import type {
   ZoneCrossing,
   Zones,
   FindingType,
+  ProjectProfile,
 } from "../schema/index.js";
 
 import {
@@ -72,6 +73,7 @@ export async function enrichZonesWithAI(
   fileArchetypes?: Map<string, string | null>,
   currentContentHashes?: Record<string, string>,
   hints?: string,
+  projectProfile?: ProjectProfile,
 ): Promise<EnrichResult> {
   const prevEnrichPass = previousZones?.enrichmentPass ?? 0;
   const passNumber = prevEnrichPass + 1;
@@ -190,7 +192,7 @@ export async function enrichZonesWithAI(
       const result = await enrichBatch(
         batches[bi], zones, sortedCrossingsArr,
         passNumber, passConfig, previousZones, bi, batches.length,
-        enrichedNames, fileArchetypes, hints,
+        enrichedNames, fileArchetypes, hints, projectProfile,
       );
       if (result && "authError" in result) {
         authFailed = true;
