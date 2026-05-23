@@ -95,6 +95,32 @@ export function classifyFinding(text: string): FindingCategory | undefined {
 // ── Finding extraction ───────────────────────────────────────────────────────
 
 /**
+ * True when a finding's text is phrased as a hypothesis the model never
+ * actually confirmed. These leak through despite the prompt guard
+ * (`prompt: "DO NOT surface 'if X then Y' findings"`) and are filtered here as
+ * a defensive backstop. We're deliberately strict — a finding that starts
+ * with "If…" is the model admitting it didn't probe.
+ */
+function isSpeculativeFinding(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  const head = t.slice(0, 120).toLowerCase();
+  // Leading conditional / hedging phrases.
+  const leaders = [
+    /^if\s+/,
+    /^when\s+(?:this|these|that|those)\s+/,
+    /^(should|might|may|could|potentially|possibly|perhaps)\s+/,
+    /^it\s+(may|might|could|appears|seems)\s+/,
+  ];
+  for (const re of leaders) {
+    if (re.test(head)) return true;
+  }
+  // Conditional clauses near the front that signal "I didn't verify".
+  if (/(^|\s)(if\s+(?:this|these|those|that)\s)/.test(head)) return true;
+  return false;
+}
+
+/**
  * Extract findings from AI response. Handles both new `findings` format
  * and legacy `insights` strings. Falls back to converting insights to findings.
  */
@@ -108,9 +134,14 @@ export function extractFindings(
   const validTypes: FindingType[] = ["observation", "pattern", "relationship", "anti-pattern", "suggestion"];
   const validSeverities = ["info", "warning", "critical"];
   const validCategories: FindingCategory[] = ["structural", "code", "documentation"];
+  let speculativeDropped = 0;
 
   const parseFinding = (f: any, fallbackScope: string) => {
     if (f && typeof f === "object" && typeof f.text === "string") {
+      if (isSpeculativeFinding(f.text)) {
+        speculativeDropped++;
+        return;
+      }
       const type: FindingType = validTypes.includes(f.type) ? f.type : defaultType;
       const explicitCategory: FindingCategory | undefined = validCategories.includes(f.category) ? f.category : undefined;
       const category = explicitCategory ?? classifyFinding(f.text);
@@ -181,6 +212,12 @@ export function extractFindings(
         }
       }
     }
+  }
+
+  if (speculativeDropped > 0) {
+    console.log(
+      `  [enrich] dropped ${speculativeDropped} speculative finding(s) (text began with "if X then…" or similar hedge)`,
+    );
   }
 
   return findings;

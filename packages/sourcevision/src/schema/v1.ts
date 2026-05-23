@@ -736,6 +736,14 @@ export interface SourcevisionOutput {
 
 export interface ProjectProfile {
   schemaVersion: string;
+  /**
+   * Absolute project root. In-memory consumers (LLM prompt builders, finding
+   * filters) use this to resolve project-relative file paths for content
+   * probes (header excerpts, snippet anchors). Not persisted: stripped when
+   * the profile is serialized to `.sourcevision/project-profile.json` so the
+   * on-disk artifact stays portable across machines.
+   */
+  projectDir?: string;
   /** Resolved primary language (lowercase, e.g. "typescript", "swift"). */
   primaryLanguage: string;
   /** All detected languages, primary-first. */

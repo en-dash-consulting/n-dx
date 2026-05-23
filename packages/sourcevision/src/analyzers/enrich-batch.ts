@@ -5,7 +5,8 @@
  * Also handles meta-evaluation (pass 5+) which uses a single prompt.
  */
 
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
 import type {
   Zone,
   ZoneCrossing,
@@ -323,6 +324,89 @@ interface AttemptConfig {
 }
 
 /**
+ * Lines a leading-comment prefix is allowed to start with. Covers the
+ * documentation conventions of TS/JS/Swift/Rust/Python/Go/HTML/MD comment-only
+ * lines. A blank line is treated as part of the header so we don't truncate
+ * paragraph breaks inside a doc block.
+ */
+const COMMENT_PREFIXES = ["///", "//!", "//", "/**", "/*", "*", "*/", "#", "#!", "--", "<!--"];
+
+/**
+ * Extract the leading comment block of a file — i.e. the docstring the file's
+ * author wrote at the top to explain what it does. We stop at the first
+ * non-comment non-blank line and cap the output so we never blow the prompt.
+ *
+ * Returns `null` when the file has no leading comment block, so callers can
+ * skip emitting an empty header entry.
+ */
+function extractFileHeader(absPath: string, maxLines = 40, maxChars = 800): string | null {
+  if (!existsSync(absPath)) return null;
+  let content: string;
+  try {
+    content = readFileSync(absPath, "utf-8");
+  } catch {
+    return null;
+  }
+  const lines = content.split("\n", maxLines + 5);
+  const kept: string[] = [];
+  for (let i = 0; i < Math.min(lines.length, maxLines); i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    // Skip a shebang on line 1.
+    if (i === 0 && trimmed.startsWith("#!")) {
+      kept.push(raw);
+      continue;
+    }
+    if (trimmed === "") {
+      // A blank line is acceptable as long as we've started a header — stop
+      // once we see a non-comment after that.
+      if (kept.length === 0) continue;
+      kept.push(raw);
+      continue;
+    }
+    if (!COMMENT_PREFIXES.some((p) => trimmed.startsWith(p))) {
+      break;
+    }
+    kept.push(raw);
+  }
+  // Trim trailing blanks.
+  while (kept.length > 0 && kept[kept.length - 1].trim() === "") kept.pop();
+  if (kept.length < 2) return null; // single-line headers are usually license/copyright, not useful context.
+  let joined = kept.join("\n");
+  if (joined.length > maxChars) joined = joined.slice(0, maxChars) + "\n  // …";
+  return joined;
+}
+
+/**
+ * Render a "File headers" section for the prompt — leading doc comments for
+ * the files in this batch. Bounds the total bytes so a giant batch can't
+ * inflate the prompt. Returns an empty string when no usable headers exist
+ * (so the prompt stays compact for projects without doc comments).
+ */
+function formatFileHeaders(
+  files: string[],
+  projectDir: string,
+  budgetBytes = 6000,
+): string {
+  const entries: string[] = [];
+  let used = 0;
+  for (const rel of files) {
+    if (used > budgetBytes) {
+      entries.push(`  - … (file-header budget exhausted; ${files.length - entries.length} files truncated)`);
+      break;
+    }
+    const header = extractFileHeader(join(projectDir, rel));
+    if (!header) continue;
+    const indented = header.split("\n").map((l) => `      ${l}`).join("\n");
+    const block = `  - ${rel}:\n${indented}`;
+    used += block.length;
+    entries.push(block);
+  }
+  if (entries.length === 0) return "";
+  return `\nFile headers (leading doc comments — treat these as authoritative about each file's purpose; DO NOT call a documented file "undocumented"):\n${entries.join("\n")}\n`;
+}
+
+/**
  * Render a "Project shape" section for the LLM prompt that grounds the model
  * in the repo's actual ecosystem. The model uses this to suppress
  * recommendations that don't fit (e.g. don't recommend MVVM coordinators on a
@@ -422,12 +506,16 @@ function buildFirstPassPrompt(
 ): string {
   const projectShape = projectProfile ? formatProjectShape(projectProfile) : "";
   if (config.maxFiles > 0) {
+    const sampledFiles: string[] = [];
     const zoneList = batchZones
       .map((z) => {
         const filesSample =
           z.files.length > config.maxFiles + 2
             ? [...z.files.slice(0, config.maxFiles), `... and ${z.files.length - config.maxFiles} more`]
             : z.files;
+        for (const f of filesSample) {
+          if (!f.startsWith("...") && !sampledFiles.includes(f)) sampledFiles.push(f);
+        }
         const entryLine = config.maxFiles >= 8
           ? `\n  entryPoints: ${z.entryPoints.map((f) => `"${f}"`).join(", ") || "none"}`
           : "";
@@ -435,12 +523,19 @@ function buildFirstPassPrompt(
       })
       .join("\n");
 
+    // Only include file-header excerpts on the full prompt; compact retries
+    // (config.maxFiles < 8) drop them to stay under context budgets.
+    const fileHeaders = projectProfile?.projectDir && config.maxFiles >= 8
+      ? formatFileHeaders(sampledFiles, projectProfile.projectDir)
+      : "";
+
     return `Analyze this codebase's zone structure. Each zone groups related files discovered by import-graph community detection.
 
 ${passConfig.focus}
 ${projectShape}
 Zones:
 ${zoneList}
+${fileHeaders}
 ${otherContext}
 ${priorNames}${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
 Cross-zone imports:

@@ -37,6 +37,7 @@ export function buildProjectProfile(
 
   return {
     schemaVersion: SCHEMA_VERSION,
+    projectDir,
     primaryLanguage,
     languages,
     frameworks,
@@ -45,6 +46,16 @@ export function buildProjectProfile(
     ciSurfaces,
     importGraphQuality,
   };
+}
+
+/**
+ * Return a profile suitable for serializing to `.sourcevision/project-profile.json`.
+ * Strips machine-specific paths (`projectDir`) so the on-disk file is portable.
+ */
+export function stripProjectProfileForDisk(p: ProjectProfile): Omit<ProjectProfile, "projectDir"> {
+  const { projectDir: _ignore, ...rest } = p;
+  void _ignore;
+  return rest;
 }
 
 // ── Languages ────────────────────────────────────────────────────────────────

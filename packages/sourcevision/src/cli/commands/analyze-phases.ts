@@ -54,7 +54,7 @@ import type {
 } from "../sourcevision-core.js";
 import { info } from "../output.js";
 import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
-import { buildProjectProfile } from "../../analyzers/project-profile.js";
+import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 
 // ── Shared context passed between phases ─────────────────────────────
 
@@ -340,7 +340,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     const projectProfile = buildProjectProfile(ctx.absDir, inventory, importsData);
     writeFileSync(
       join(ctx.svDir, DATA_FILES.projectProfile),
-      toCanonicalJSON(projectProfile),
+      toCanonicalJSON(stripProjectProfileForDisk(projectProfile)),
     );
 
     let zonesResult = await analyzeZones(inventory, importsData, {

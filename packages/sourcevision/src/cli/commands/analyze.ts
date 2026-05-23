@@ -37,7 +37,7 @@ import {
 } from "./analyze-phases.js";
 import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
-import { buildProjectProfile } from "../../analyzers/project-profile.js";
+import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 
 type PhaseFilter =
   | { type: "all" }
@@ -387,7 +387,7 @@ function generateOutputFiles(ctx: AnalyzeContext): void {
     const projectProfile = buildProjectProfile(ctx.absDir, inventory, importsData);
     writeFileSync(
       join(ctx.svDir, DATA_FILES.projectProfile),
-      toCanonicalJSON(projectProfile),
+      toCanonicalJSON(stripProjectProfileForDisk(projectProfile)),
     );
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
