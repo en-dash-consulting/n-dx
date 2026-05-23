@@ -12,8 +12,11 @@ import {
   loadAcknowledged,
   saveAcknowledged,
   acknowledgeFinding,
+  unacknowledgeFinding,
+  resolveAckHash,
   isAcknowledged,
   isAcknowledgedFuzzy,
+  ACK_REASON_CATEGORIES,
 } from "../../analyze/acknowledge.js";
 import {
   createItemsFromRecommendations,
@@ -339,36 +342,139 @@ interface AcknowledgeContext {
   findings: Finding[];
 }
 
+/**
+ * Resolve one ack/unack token to a target Finding (or null when no match).
+ * Accepts either a 1-based numeric index into the currently-visible findings
+ * list OR a stable finding-hash prefix (4+ hex chars). The hash form is
+ * preferred because indices renumber after each acknowledgement.
+ */
+function resolveFindingToken(
+  token: string,
+  findings: Finding[],
+): Finding | { error: string } | null {
+  const t = token.trim();
+  if (/^\d+$/.test(t)) {
+    const idx = parseInt(t, 10);
+    if (idx < 1 || idx > findings.length) {
+      return { error: `Index ${idx} out of range (1-${findings.length}).` };
+    }
+    return findings[idx - 1];
+  }
+  if (!/^[0-9a-f]{4,}$/i.test(t)) {
+    return { error: `"${token}" is neither a 1-based index nor a hash prefix (4+ hex chars).` };
+  }
+  const lc = t.toLowerCase();
+  const matches = findings.filter((f) => f.hash.startsWith(lc));
+  if (matches.length === 0) {
+    return { error: `No finding matches hash prefix "${token}". Hashes are shown as [xxxxxx] next to each finding.` };
+  }
+  if (matches.length > 1) {
+    return { error: `Hash prefix "${token}" is ambiguous (${matches.length} matches). Provide more characters.` };
+  }
+  return matches[0];
+}
+
+/**
+ * Validate a --reason value. Free-form is permitted (so users aren't gated by
+ * the canonical list) but unknown reasons get a one-line hint so people
+ * discover the canonical vocabulary the analyzer will mine later.
+ */
+function normalizeReason(input: string | undefined, fallback: string): string {
+  const v = (input ?? "").trim();
+  if (!v) return fallback;
+  const known = ACK_REASON_CATEGORIES as readonly string[];
+  if (!known.includes(v)) {
+    info(`  (--reason "${v}" is free-form; canonical reasons: ${known.join(", ")})`);
+  }
+  return v;
+}
+
 async function handleAcknowledge(
   flag: string,
   ctx: AcknowledgeContext,
+  reasonFlag?: string,
 ): Promise<void> {
   const { rexDir, ackStore, findings } = ctx;
+  const reason = normalizeReason(reasonFlag, "acknowledged");
 
   if (flag === "all") {
     let updated = ackStore;
     for (const f of findings) {
-      updated = acknowledgeFinding(updated, f.hash, f.message, "acknowledged", "user", f.type, f.scope);
+      updated = acknowledgeFinding(updated, f.hash, f.message, reason, "user", f.type, f.scope);
     }
     await saveAcknowledged(rexDir, updated);
-    result(`Acknowledged all ${findings.length} findings.`);
+    result(`Acknowledged all ${findings.length} findings (reason: ${reason}).`);
     return;
   }
 
-  const indices = flag.split(",").map((s) => parseInt(s.trim(), 10));
+  const tokens = flag.split(",").map((s) => s.trim()).filter(Boolean);
   let updated = ackStore;
   const acked: string[] = [];
-  for (const idx of indices) {
-    const f = findings[idx - 1]; // 1-based index
-    if (!f) {
-      console.error(`Finding index ${idx} out of range (1-${findings.length}).`);
+  for (const token of tokens) {
+    const resolved = resolveFindingToken(token, findings);
+    if (!resolved) continue;
+    if ("error" in resolved) {
+      console.error(resolved.error);
       continue;
     }
-    updated = acknowledgeFinding(updated, f.hash, f.message, "acknowledged", "user", f.type, f.scope);
-    acked.push(`${idx}. ${f.message.slice(0, 60)}`);
+    const f = resolved;
+    updated = acknowledgeFinding(updated, f.hash, f.message, reason, "user", f.type, f.scope);
+    acked.push(`[${f.hash.slice(0, 6)}] ${f.message.slice(0, 60)}`);
   }
   await saveAcknowledged(rexDir, updated);
   for (const a of acked) result(`Acknowledged: ${a}`);
+  if (acked.length > 0) result(`(reason: ${reason})`);
+}
+
+/**
+ * Remove acknowledgements. Tokens may be either a hash prefix that matches a
+ * record in the ack store, or a 1-based index into the currently-visible
+ * findings (which the user would typically only see with --show-all).
+ */
+async function handleUnacknowledge(
+  flag: string,
+  ctx: AcknowledgeContext,
+): Promise<void> {
+  const { rexDir, ackStore, findings } = ctx;
+  const tokens = flag.split(",").map((s) => s.trim()).filter(Boolean);
+  let updated = ackStore;
+  const removed: string[] = [];
+  for (const token of tokens) {
+    // Index path — resolve via current findings list (works with --show-all).
+    if (/^\d+$/.test(token)) {
+      const resolved = resolveFindingToken(token, findings);
+      if (resolved && !("error" in resolved)) {
+        if (isAcknowledged(updated, resolved.hash)) {
+          updated = unacknowledgeFinding(updated, resolved.hash);
+          removed.push(`[${resolved.hash.slice(0, 6)}] ${resolved.message.slice(0, 60)}`);
+        } else {
+          console.error(`Finding [${resolved.hash.slice(0, 6)}] is not currently acknowledged.`);
+        }
+      } else if (resolved && "error" in resolved) {
+        console.error(resolved.error);
+      }
+      continue;
+    }
+    // Hash path — resolve against the ack store directly, so users can undo
+    // acks even when the underlying finding no longer surfaces.
+    try {
+      const fullHash = resolveAckHash(updated, token);
+      if (!fullHash) {
+        console.error(`No acknowledgement matches hash prefix "${token}".`);
+        continue;
+      }
+      const acked = updated.findings.find((f) => f.hash === fullHash);
+      updated = unacknowledgeFinding(updated, fullHash);
+      removed.push(`[${fullHash.slice(0, 6)}] ${(acked?.text ?? "").slice(0, 60)}`);
+    } catch (err) {
+      console.error((err as Error).message);
+    }
+  }
+  await saveAcknowledged(rexDir, updated);
+  for (const r of removed) result(`Unacknowledged: ${r}`);
+  if (removed.length === 0) {
+    result("No acknowledgements removed.");
+  }
 }
 
 // ── Display recommendations ─────────────────────────────────────────────
@@ -399,7 +505,10 @@ function displayRecommendations(
       for (const line of task.description.split("\n")) {
         const finding = findings.find((f) => line.includes(f.message));
         const ackMarker = showAll && finding && isAcknowledged(ackStore, finding.hash) ? " (acknowledged)" : "";
-        info(`       ${line.replace(/^- /, "")}${ackMarker}`);
+        // Show the stable 6-char hash so users can ack/unack by ID without
+        // having to count positional indices (which renumber after each ack).
+        const hashPrefix = finding ? `[${finding.hash.slice(0, 6)}] ` : "";
+        info(`       ${hashPrefix}${line.replace(/^- /, "")}${ackMarker}`);
       }
     }
     info("");
@@ -622,7 +731,15 @@ export async function cmdRecommend(
     const findings = showAll
       ? allFindings
       : allFindings.filter((f) => !isAcknowledgedFuzzy(ackStore, { hash: f.hash, type: f.type, scope: f.scope ?? "global", text: f.message }));
-    await handleAcknowledge(flags.acknowledge, { rexDir, ackStore, findings });
+    await handleAcknowledge(flags.acknowledge, { rexDir, ackStore, findings }, flags.reason);
+    return;
+  }
+
+  // Handle --unacknowledge flag — undo prior acknowledgements by hash or index.
+  if (flags.unacknowledge) {
+    // For unack we always want every finding visible so index/hash resolution
+    // matches what the user sees with --show-all.
+    await handleUnacknowledge(flags.unacknowledge, { rexDir, ackStore, findings: allFindings });
     return;
   }
 
@@ -730,6 +847,9 @@ export async function cmdRecommend(
     await acceptRecommendations(rexDir, flags.accept, recommendations, flags);
   } else {
     info("Run with --accept to add all recommendations to the PRD.");
-    info("Run with --acknowledge=1,2 to acknowledge specific findings.");
+    info("Acknowledge findings by stable hash (preferred — survives renumbering):");
+    info("  rex recommend --acknowledge=a3f5d8,b91c42 --reason=over-engineered");
+    info("Indices still work but renumber after each ack: --acknowledge=1,2");
+    info("Undo with --unacknowledge=<hash|index>.");
   }
 }

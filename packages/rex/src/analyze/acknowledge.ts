@@ -88,6 +88,52 @@ export function isAcknowledged(store: AcknowledgedStore, hash: string): boolean 
   return store.findings.some((f) => f.hash === hash);
 }
 
+/**
+ * Remove an acknowledgement by hash. Pure — returns a new store. If no
+ * acknowledgement matched the hash the returned store is unchanged.
+ */
+export function unacknowledgeFinding(
+  store: AcknowledgedStore,
+  hash: string,
+): AcknowledgedStore {
+  return {
+    ...store,
+    findings: store.findings.filter((f) => f.hash !== hash),
+  };
+}
+
+/**
+ * Resolve a user-supplied token to a full acknowledged-finding hash. Accepts
+ * the full 12-char hash or any unique 4+ character prefix. Returns `null` if
+ * no match exists; throws if the prefix is ambiguous.
+ */
+export function resolveAckHash(store: AcknowledgedStore, token: string): string | null {
+  const t = token.trim().toLowerCase();
+  if (!t) return null;
+  const matches = store.findings.filter((f) => f.hash.startsWith(t));
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    throw new Error(
+      `Ambiguous ack hash "${token}" — matches ${matches.length} acknowledgements. Provide more characters.`,
+    );
+  }
+  return matches[0].hash;
+}
+
+/**
+ * Canonical acknowledgement-reason categories. Free-form values are also
+ * accepted; the canonical set just gives the CLI a discoverable vocabulary
+ * the analyzer can mine later to tune output.
+ */
+export const ACK_REASON_CATEGORIES = [
+  "tool-artifact",
+  "already-done",
+  "doesnt-apply",
+  "over-engineered",
+  "speculative",
+] as const;
+export type AckReasonCategory = typeof ACK_REASON_CATEGORIES[number];
+
 // ── Fuzzy matching ────────────────────────────────────────────────────
 
 function normalizeText(text: string): string {
