@@ -1,5 +1,5 @@
 ---
-"sourcevision": minor
+"sourcevision": patch
 ---
 
 Add a Swift import + symbol-reference resolver so sourcevision produces a real
