@@ -193,7 +193,7 @@ export {
 // ---- Core: tree utilities ---------------------------------------------------
 
 export {
-  findItem, walkTree, collectAllIds,
+  findItem, resolveItem, walkTree, collectAllIds,
   insertChild, updateInTree, removeFromTree,
 } from "./core/tree.js";
 export type { TreeEntry } from "./core/tree.js";

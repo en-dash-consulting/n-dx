@@ -412,6 +412,37 @@ describe("cmdUpdate", () => {
     });
   });
 
+  // --- Title resolution ---
+
+  describe("title resolution", () => {
+    it("resolves item by exact title (case-insensitive) when ID is not a UUID", async () => {
+      await expect(
+        cmdUpdate(tmp, "Test item", { status: "in_progress" }),
+      ).resolves.toBeUndefined();
+
+      const doc = readPRD(tmp);
+      expect(doc.items[0].status).toBe("in_progress");
+    });
+
+    it("resolves item by title regardless of input casing", async () => {
+      await expect(
+        cmdUpdate(tmp, "TEST ITEM", { status: "in_progress" }),
+      ).resolves.toBeUndefined();
+
+      const doc = readPRD(tmp);
+      expect(doc.items[0].status).toBe("in_progress");
+    });
+
+    it("throws CLIError naming the query when no item matches the title", async () => {
+      await expect(
+        cmdUpdate(tmp, "Nonexistent Title", { status: "completed" }),
+      ).rejects.toThrow(CLIError);
+      await expect(
+        cmdUpdate(tmp, "Nonexistent Title", { status: "completed" }),
+      ).rejects.toThrow(/Nonexistent Title/);
+    });
+  });
+
   // --- Folder tree persistence ---
 
   describe("folder tree persistence", () => {

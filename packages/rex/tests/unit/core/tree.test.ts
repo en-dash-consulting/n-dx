@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   walkTree,
   findItem,
+  resolveItem,
   insertChild,
   updateInTree,
   removeFromTree,
@@ -221,6 +222,65 @@ describe("getParentChain", () => {
 
   it("returns empty for unknown id", () => {
     expect(getParentChain(sampleTree, "nope")).toEqual([]);
+  });
+});
+
+describe("resolveItem", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("returns same result as findItem when passed a valid UUID", () => {
+    const result = resolveItem(sampleTree, "t1");
+    expect(result).toEqual(findItem(sampleTree, "t1"));
+    expect(result!.item.title).toBe("Task 1");
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("finds item by exact title (case-insensitive)", () => {
+    const result = resolveItem(sampleTree, "EPIC 1");
+    expect(result).not.toBeNull();
+    expect(result!.item.id).toBe("e1");
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("finds nested item by title", () => {
+    const result = resolveItem(sampleTree, "Task 2");
+    expect(result).not.toBeNull();
+    expect(result!.item.id).toBe("t2");
+    expect(result!.parents.map((p) => p.id)).toEqual(["e1", "f1"]);
+  });
+
+  it("returns first match and warns when multiple items share a normalized title", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "e1", title: "Duplicate", level: "epic" }),
+      makeItem({ id: "e2", title: "duplicate", level: "epic" }),
+    ];
+    const result = resolveItem(items, "Duplicate");
+    expect(result).not.toBeNull();
+    expect(result!.item.id).toBe("e1");
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0][0]).toContain("e1");
+    expect(warnSpy.mock.calls[0][0]).toContain("e2");
+  });
+
+  it("returns null when query matches neither ID nor title", () => {
+    const result = resolveItem(sampleTree, "does-not-exist");
+    expect(result).toBeNull();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("title match does not fire when ID lookup succeeds (no double-lookup noise)", () => {
+    // 'e1' is a valid ID; resolveItem must short-circuit after findItem succeeds
+    const result = resolveItem(sampleTree, "e1");
+    expect(result!.item.id).toBe("e1");
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 
