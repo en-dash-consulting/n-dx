@@ -1,5 +1,27 @@
 # @n-dx/llm-client
 
+## 0.4.2
+
+### Patch Changes
+
+- [#216](https://github.com/en-dash-consulting/n-dx/pull/216) [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a) Thanks [@dnaniel](https://github.com/dnaniel)! - Close the child's stdin immediately when calling `exec()`. `execFile`
+  pipes stdio by default, but `exec` never writes to the child's stdin —
+  leaving it open caused any spawned process that reads stdin (e.g.
+  `rex add`'s `readStdin()` in non-TTY mode) to hang forever waiting for
+  an EOF that would never arrive. This was the root cause of the
+  dashboard Quick Add timing out at 240 s with zero output from a
+  daemonized `ndx start`.
+
+- [#216](https://github.com/en-dash-consulting/n-dx/pull/216) [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a) Thanks [@dnaniel](https://github.com/dnaniel)! - Correct the haiku model id. `TIER_MODELS.claude.light` and
+  `MODEL_ALIASES.haiku` referenced `claude-haiku-4-20250414`, which doesn't
+  exist — the API returns 404, but the Claude CLI provider hangs silently
+  on the bad id instead of erroring. That caused dashboard Quick Add (which
+  forces the light tier via `--fast`) to time out at 240 s with zero
+  output. Updated to the dateless alias `claude-haiku-4-5` (matching the
+  existing pattern used for `opus`/`sonnet`); it resolves to the latest
+  Haiku 4.5 release without pinning to a snapshot that will eventually be
+  deprecated.
+
 ## 0.4.1
 
 ### Patch Changes
