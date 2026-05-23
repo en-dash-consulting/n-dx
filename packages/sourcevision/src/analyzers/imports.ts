@@ -19,6 +19,7 @@ import { sortImports } from "../util/sort.js";
 import { detectCirculars } from "../util/merge.js";
 import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
+import { buildSwiftImportGraph } from "./swift-imports.js";
 import { readManifest } from "./manifest.js";
 import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/index.js";
 import type { LanguageConfig } from "../language/index.js";
@@ -27,6 +28,7 @@ import type { LanguageConfig } from "../language/index.js";
 
 const JS_TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const GO_EXTENSION = ".go";
+const SWIFT_EXTENSION = ".swift";
 const PROBE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
 
 // ── AST extraction ───────────────────────────────────────────────────────────
@@ -532,6 +534,49 @@ async function processGoFiles(
   }
 }
 
+/**
+ * Parse Swift files: extract `import X` (external modules) and infer
+ * file→file edges from symbol references. Same-module file relationships are
+ * implicit in Swift (no `import` between sibling files), so symbol references
+ * are the only way to reconstruct an internal graph short of a full compiler
+ * frontend. The result is heuristic but produces a usable graph for Louvain.
+ */
+async function processSwiftFiles(
+  files: Inventory["files"],
+  targetDir: string,
+  edgeMap: Map<string, ImportEdge>,
+  externalMap: Map<string, ExternalImport>,
+): Promise<void> {
+  if (files.length === 0) return;
+  const result = await buildSwiftImportGraph(files, targetDir);
+
+  for (const edge of result.edges) {
+    const key = `${edge.from}\0${edge.to}\0${edge.type}`;
+    const existing = edgeMap.get(key);
+    if (existing) {
+      edgeMap.set(key, {
+        ...existing,
+        symbols: Array.from(new Set([...existing.symbols, ...edge.symbols])),
+      });
+    } else {
+      edgeMap.set(key, edge);
+    }
+  }
+
+  for (const ext of result.external) {
+    const existing = externalMap.get(ext.package);
+    if (existing) {
+      externalMap.set(ext.package, {
+        package: ext.package,
+        importedBy: Array.from(new Set([...existing.importedBy, ...ext.importedBy])),
+        symbols: Array.from(new Set([...existing.symbols, ...ext.symbols])),
+      });
+    } else {
+      externalMap.set(ext.package, { ...ext });
+    }
+  }
+}
+
 /** Compute ImportsSummary statistics from collected edges and external packages. */
 function buildImportSummary(edges: ImportEdge[], external: ExternalImport[]): ImportsSummary {
   // Exclude type-only imports from mostImported: they don't create runtime
@@ -609,12 +654,14 @@ export async function analyzeImports(
     return true;
   });
 
-  // Partition into JS/TS and Go to prevent cross-language contamination
+  // Partition into JS/TS, Go, and Swift to prevent cross-language contamination
   const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
   const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
+  const swiftParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === SWIFT_EXTENSION);
 
   await processJsTsFiles(jsTsFiles, targetDir, resolver, edgeMap, externalMap);
   await processGoFiles(goParseableFiles, targetDir, goModulePath, edgeMap, externalMap);
+  await processSwiftFiles(swiftParseableFiles, targetDir, edgeMap, externalMap);
 
   // Incremental cleanup: remove packages whose importers were all changed
   if (canIncremental) {
