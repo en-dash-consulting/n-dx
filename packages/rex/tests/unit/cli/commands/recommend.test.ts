@@ -73,6 +73,7 @@ describe("cmdRecommend --accept indexed selection", () => {
   let tmpDir: string;
   let cmdRecommend: typeof import("../../../../src/cli/commands/recommend.js")["cmdRecommend"];
   let parseSelectionIndices: typeof import("../../../../src/cli/commands/recommend.js")["parseSelectionIndices"];
+  let parseHashAcceptSelector: typeof import("../../../../src/cli/commands/recommend.js")["parseHashAcceptSelector"];
 
   beforeEach(async () => {
     vi.resetModules();
@@ -88,7 +89,7 @@ describe("cmdRecommend --accept indexed selection", () => {
       setQuiet: () => {},
       isQuiet: () => false,
     }));
-    ({ cmdRecommend, parseSelectionIndices } = await import("../../../../src/cli/commands/recommend.js"));
+    ({ cmdRecommend, parseSelectionIndices, parseHashAcceptSelector } = await import("../../../../src/cli/commands/recommend.js"));
 
     tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-test-"));
     await writeFixtureProject(tmpDir);
@@ -705,6 +706,45 @@ describe("cmdRecommend --accept indexed selection", () => {
       await cmdRecommend(tmpDir, { accept: "=." });
       const items = await readPrdItems(tmpDir);
       expect(items).toHaveLength(0);
+    });
+  });
+
+  // ── parseHashAcceptSelector ─────────────────────────────────────────
+  describe("parseHashAcceptSelector", () => {
+    it("returns null when the selector is not a hashes mode", () => {
+      expect(parseHashAcceptSelector("=1,2,3")).toBeNull();
+      expect(parseHashAcceptSelector("=all")).toBeNull();
+      expect(parseHashAcceptSelector("true")).toBeNull();
+    });
+
+    it("parses =hashes:h1,h2,h3 and returns the prefixes", () => {
+      expect(parseHashAcceptSelector("=hashes:a3f5d8,b91c42,deadbe"))
+        .toEqual(["a3f5d8", "b91c42", "deadbe"]);
+    });
+
+    it("accepts bare hashes:… without leading =", () => {
+      expect(parseHashAcceptSelector("hashes:abcd,ef01"))
+        .toEqual(["abcd", "ef01"]);
+    });
+
+    it("accepts mixed whitespace and commas", () => {
+      expect(parseHashAcceptSelector("=hashes: abcd , ef01 \tba9c"))
+        .toEqual(["abcd", "ef01", "ba9c"]);
+    });
+
+    it("throws when an entry is not a valid hash prefix", () => {
+      expect(() => parseHashAcceptSelector("=hashes:abcd,zzz"))
+        .toThrowError(/Invalid finding hash "zzz"/i);
+    });
+
+    it("throws when no tokens are provided", () => {
+      expect(() => parseHashAcceptSelector("=hashes:"))
+        .toThrowError(/Expected '=hashes:<hash>/i);
+    });
+
+    it("throws when a single token is too short (<4 hex chars)", () => {
+      expect(() => parseHashAcceptSelector("=hashes:ab"))
+        .toThrowError(/Invalid finding hash "ab"/i);
     });
   });
 });

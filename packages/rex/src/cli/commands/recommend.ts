@@ -101,6 +101,39 @@ function checkRangeSyntax(token: string, context: "full" | "token"): void {
   );
 }
 
+/**
+ * Detect and parse `--accept=hashes:h1,h2,h3` partial-accept mode. Returns
+ * the hash-prefix tokens when the flag uses the hashes selector, or `null`
+ * when it doesn't (so the caller falls back to the index-based selector).
+ *
+ * Accepts both `=hashes:…` and bare `hashes:…` so users don't have to think
+ * about the leading `=` they would otherwise need for numeric selectors.
+ */
+export function parseHashAcceptSelector(flag: string): string[] | null {
+  let body = flag.trim();
+  if (body.startsWith("=")) body = body.slice(1);
+  const PREFIX = "hashes:";
+  if (!body.toLowerCase().startsWith(PREFIX)) return null;
+  const rest = body.slice(PREFIX.length);
+  const tokens = rest
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (tokens.length === 0) {
+    throw selectorFormatError(
+      "Invalid --accept hashes selector. Expected '=hashes:<hash>[,<hash>,...]'.",
+    );
+  }
+  for (const t of tokens) {
+    if (!/^[0-9a-f]{4,}$/i.test(t)) {
+      throw selectorFormatError(
+        `Invalid finding hash "${t}" in --accept. Hashes are 4+ hex chars (see [xxxxxx] in 'rex recommend' output).`,
+      );
+    }
+  }
+  return tokens;
+}
+
 export function parseSelectionIndices(input: string, total: number): number[] {
   const raw = input.trim();
   if (!raw.startsWith("=")) {
@@ -805,6 +838,29 @@ export async function cmdRecommend(
     structuralSkipped = before - filteredFindings.length;
   }
 
+  // --accept=hashes:h1,h2 partial-accept mode: filter the finding list down to
+  // just the selected hashes BEFORE grouping into recommendations, then
+  // implicitly switch the selector to =all so every regenerated recommendation
+  // is created. Lets the user cherry-pick a subset of findings inside what
+  // would otherwise be an all-or-nothing recommendation group.
+  if (flags.accept) {
+    const hashTokens = parseHashAcceptSelector(flags.accept);
+    if (hashTokens) {
+      const normalized = hashTokens.map((t) => t.toLowerCase());
+      const matched = filteredFindings.filter((f) =>
+        normalized.some((h) => f.hash.startsWith(h)),
+      );
+      const unmatched = normalized.filter(
+        (h) => !filteredFindings.some((f) => f.hash.startsWith(h)),
+      );
+      for (const h of unmatched) {
+        console.error(`No finding matches hash prefix "${h}".`);
+      }
+      filteredFindings = matched;
+      flags = { ...flags, accept: "=all" };
+    }
+  }
+
   if (filteredFindings.length === 0) {
     result("No findings to recommend.");
     if (acknowledgedCount > 0) {
@@ -847,7 +903,9 @@ export async function cmdRecommend(
     await acceptRecommendations(rexDir, flags.accept, recommendations, flags);
   } else {
     info("Run with --accept to add all recommendations to the PRD.");
-    info("Acknowledge findings by stable hash (preferred — survives renumbering):");
+    info("Cherry-pick by finding hash (partial accept within a group):");
+    info("  rex recommend --accept=hashes:a3f5d8,b91c42");
+    info("Acknowledge findings by stable hash (survives renumbering):");
     info("  rex recommend --acknowledge=a3f5d8,b91c42 --reason=over-engineered");
     info("Indices still work but renumber after each ack: --acknowledge=1,2");
     info("Undo with --unacknowledge=<hash|index>.");
