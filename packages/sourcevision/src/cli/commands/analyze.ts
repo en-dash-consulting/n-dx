@@ -37,6 +37,7 @@ import {
 } from "./analyze-phases.js";
 import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
+import { buildProjectProfile } from "../../analyzers/project-profile.js";
 
 type PhaseFilter =
   | { type: "all" }
@@ -378,6 +379,16 @@ function generateOutputFiles(ctx: AnalyzeContext): void {
 
       writeFileSync(join(ctx.svDir, DATA_FILES.zones), toCanonicalJSON(zonesData));
     }
+
+    // Project profile — primary language, frameworks, release/build/CI surfaces
+    // and import-graph quality. Written before CONTEXT.md / llms.txt so they
+    // can reference it on a future pass; consumed by the finding LLM prompt
+    // to suppress recommendations that contradict the detected project shape.
+    const projectProfile = buildProjectProfile(ctx.absDir, inventory, importsData);
+    writeFileSync(
+      join(ctx.svDir, DATA_FILES.projectProfile),
+      toCanonicalJSON(projectProfile),
+    );
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
     writeFileSync(join(ctx.svDir, SUPPLEMENTARY_FILES[0]), llmsTxt);

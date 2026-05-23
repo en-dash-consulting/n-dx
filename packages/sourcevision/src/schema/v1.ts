@@ -155,6 +155,20 @@ export type FindingType = "observation" | "pattern" | "relationship" | "anti-pat
 /** Category distinguishes what kind of issue a finding describes. */
 export type FindingCategory = "structural" | "code" | "documentation";
 
+/**
+ * Concrete code anchor for a finding — file:line(:symbol) coordinates that
+ * point at the evidence the finding is making a claim about. Findings without
+ * anchors are unverified hypotheses; consumers should mark or filter them.
+ */
+export interface FindingAnchor {
+  /** Project-relative file path. */
+  file: string;
+  /** Inclusive [start, end] line range (1-indexed). */
+  lineRange?: [number, number];
+  /** Optional symbol identifier (function/class/type name) within the file. */
+  symbol?: string;
+}
+
 export interface Finding {
   type: FindingType;
   /** Which pass produced this finding */
@@ -167,6 +181,18 @@ export interface Finding {
   related?: string[];
   /** Category: structural (zone boundary opinions), code (real bugs/duplication), documentation (naming/conventions) */
   category?: FindingCategory;
+  /**
+   * Concrete anchors (file/line/symbol) supporting this finding. Empty or
+   * absent ⇒ the finding is an unverified hypothesis. The finding pipeline
+   * may drop or annotate such findings depending on configured strictness.
+   */
+  anchors?: FindingAnchor[];
+  /**
+   * Confidence in the finding itself (0–1). Distinct from zone.confidence —
+   * a low-confidence finding may originate from a high-confidence zone but
+   * still be speculative.
+   */
+  confidence?: number;
 }
 
 /** Reason a file-move is recommended. */
@@ -227,7 +253,24 @@ export interface Zone {
    * cohesion/coupling scores from influencing architectural decisions.
    */
   detectionQuality?: "genuine" | "artifact" | "residual";
+  /**
+   * What evidence backed this zone's membership. A zone derived from a strong
+   * import graph (`imports`) is far more trustworthy than one assembled from
+   * file-tree proximity (`proximity`) when no imports were resolvable —
+   * downstream consumers (LLM prompt, dashboards, CI) MUST gate or annotate
+   * findings derived from proximity-only zones.
+   */
+  evidenceSources?: ZoneEvidenceSource[];
+  /**
+   * Overall confidence in this zone (0–1). Combines cohesion with evidence
+   * source quality: proximity-only zones cap at ~0.3 regardless of cohesion,
+   * since cohesion is meaningless without real edges.
+   */
+  confidence?: number;
 }
+
+/** Where this zone's membership evidence came from. */
+export type ZoneEvidenceSource = "imports" | "proximity" | "declared" | "pinned";
 
 // ── Risk Metrics ────────────────────────────────────────────────────────────
 
@@ -679,4 +722,59 @@ export interface SourcevisionOutput {
   zones: Zones;
   components?: Components;
   callGraph?: CallGraph;
+  projectProfile?: ProjectProfile;
+}
+
+// ── Project profile ─────────────────────────────────────────────────────────
+//
+// First-class project shape detected once during analyze and consumed by every
+// downstream layer (findings prompt, CONTEXT.md, dashboards). Captures facts
+// the LLM cannot reliably infer from a file inventory alone: which frameworks
+// are in use, what release plumbing already exists, where builds and CI live.
+// Findings that contradict the profile (e.g. recommending a VERSION file when
+// releasePlease is true) are filtered before they reach the user.
+
+export interface ProjectProfile {
+  schemaVersion: string;
+  /** Resolved primary language (lowercase, e.g. "typescript", "swift"). */
+  primaryLanguage: string;
+  /** All detected languages, primary-first. */
+  languages: string[];
+  /**
+   * Detected frameworks/runtime ecosystems. Examples: "swiftui", "appkit",
+   * "react", "preact", "nextjs", "express", "rails", "django", "fastify".
+   * Used by the finding prompt to suppress idiomatically-wrong recommendations.
+   */
+  frameworks: string[];
+  /** Detected release/version-management infrastructure. */
+  releaseInfrastructure: ReleaseInfrastructure[];
+  /** Detected build entry points (Makefile, build.sh, Package.swift, etc.). */
+  buildSurfaces: ProjectSurface[];
+  /** Detected CI surfaces (GitHub Actions, GitLab CI, Bitbucket Pipelines). */
+  ciSurfaces: ProjectSurface[];
+  /** Quality of the import graph that backed zone detection. */
+  importGraphQuality: "rich" | "sparse" | "absent";
+}
+
+/** A release-versioning system detected in the repo. */
+export interface ReleaseInfrastructure {
+  /** Kind of release tooling. */
+  kind:
+    | "release-please"
+    | "changesets"
+    | "package.json"
+    | "cargo"
+    | "pyproject"
+    | "git-tag"
+    | "version-file";
+  /** Project-relative path that proves this kind is in use. */
+  evidence: string;
+}
+
+/** A build or CI surface detected in the repo. */
+export interface ProjectSurface {
+  /** Project-relative path. */
+  path: string;
+  /** What this surface is (free-form label, e.g. "Makefile", "GitHub Actions"). */
+  kind: string;
 }
