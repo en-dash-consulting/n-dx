@@ -496,7 +496,18 @@
 }
 
 .ig-zone-minimap .ig-zone-network svg {
-  min-height: clamp(500px, 62vh, 760px);
+  /* The per-zone map's viewBox is 980×640 (~1.53:1). Without an aspect-ratio
+     hint the SVG stretches to container width and then, via preserveAspectRatio
+     "meet", inflates its height proportionally — on a wide screen (~1700px)
+     that's >1100px and the map alone eats the viewport. Pin the aspect ratio
+     so the SVG sizes to its viewBox shape, then cap the height so it never
+     dominates the page regardless of how wide the container gets. */
+  width: 100%;
+  height: auto;
+  aspect-ratio: 980 / 640;
+  max-height: min(60vh, 680px);
+  min-height: 360px;
+  margin: 0 auto;
 }
 
 .ig-zone-overview-empty {

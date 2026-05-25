@@ -441,6 +441,23 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     return () => window.removeEventListener("keydown", onKey);
   }, [streetViewMode, zoneFilter]);
 
+  // Click outside the File Street View shell closes it, mirroring the Escape
+  // shortcut. The dialog already fills the main content area, so anywhere
+  // outside graphPanelRef (sidebar, breadcrumb bar, detail panel) is "outside".
+  useEffect(() => {
+    if (streetViewMode !== "dialog") return;
+    const onDown = (event: MouseEvent) => {
+      const panel = graphPanelRef.current;
+      if (!panel) return;
+      const target = event.target as Node | null;
+      if (target && panel.contains(target)) return;
+      setStreetViewMode("closed");
+      setHoverPreviewFile(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [streetViewMode]);
+
   const subgraph = useMemo(() => {
     if (!imports || !focusFile || mode !== "file") return null;
     let ball = expandNeighborhood(focusFile, imports, DEFAULT_DEPTH);
@@ -1176,6 +1193,34 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
         edgeShift.set(idx, (k - (n - 1) / 2) * 10);
       });
     }
+
+    // Cross-zone label deduplication. Without this, three edges from
+    // UI Overlays → App-Core Bridge each carry the identical
+    // "UI Overlays -> App-Core Bridge" string and stack on top of each
+    // other in the diagram. Group by zone pair, pick one representative
+    // edge per group, and emit a single "(×N)" label at the average
+    // midpoint of the bundle.
+    const crossPairFirstIdx = new Map<string, number>();
+    const crossPairCount = new Map<string, number>();
+    const crossPairCentroid = new Map<string, { x: number; y: number; n: number }>();
+    edges.forEach((e, i) => {
+      if (!zones || !isCrossZoneEdge(e.from, e.to, zones)) return;
+      const fz = fileToZoneId(e.from, zones);
+      const tz = fileToZoneId(e.to, zones);
+      if (!fz || !tz) return;
+      const a = visualPosMap.get(e.from);
+      const b = visualPosMap.get(e.to);
+      if (!a || !b) return;
+      const key = `${fz}|${tz}`;
+      crossPairCount.set(key, (crossPairCount.get(key) ?? 0) + 1);
+      if (!crossPairFirstIdx.has(key)) crossPairFirstIdx.set(key, i);
+      const cur = crossPairCentroid.get(key) ?? { x: 0, y: 0, n: 0 };
+      cur.x += (a.x + b.x) / 2;
+      cur.y += (a.y + b.y) / 2;
+      cur.n += 1;
+      crossPairCentroid.set(key, cur);
+    });
+
     edges.forEach((e, i) => {
       const a = visualPosMap.get(e.from);
       const b = visualPosMap.get(e.to);
@@ -1186,13 +1231,32 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
       const toZone = fileToZoneId(e.to, zones);
       const cross = isCrossZoneEdge(e.from, e.to, zones);
       const shift = edgeShift.get(i) ?? 0;
+      const pairKey = cross && fromZone && toZone ? `${fromZone}|${toZone}` : null;
+      const isRep = pairKey !== null && crossPairFirstIdx.get(pairKey) === i;
+      const count = pairKey ? crossPairCount.get(pairKey) ?? 1 : 1;
+      const centroid = pairKey ? crossPairCentroid.get(pairKey) : null;
+      let labelX: number | undefined = (a.x + b.x) / 2 + shift;
+      let labelY: number | undefined = (a.y + b.y) / 2 - 8;
+      let label: string | undefined;
+      if (isRep && zones && fromZone && toZone) {
+        label = `${zoneDisplayName(zones, fromZone)} → ${zoneDisplayName(zones, toZone)}${count > 1 ? ` ×${count}` : ""}`;
+        if (centroid && centroid.n > 0) {
+          labelX = centroid.x / centroid.n;
+          labelY = centroid.y / centroid.n - 8;
+        }
+      } else if (cross) {
+        // Edges in a duplicated cross-zone group still get a position but no
+        // label string — keeps the existing structure for any consumer that
+        // expects labelX/labelY pairs on every cross edge.
+        label = undefined;
+      }
       edgePaths.push({
         key: `${e.from}->${e.to}:${e.type}`,
         d: elbowPath(a.x + wFrom, a.y, b.x - wTo, b.y, shift),
         cross,
-        label: cross && zones && fromZone && toZone ? `${zoneDisplayName(zones, fromZone)} -> ${zoneDisplayName(zones, toZone)}` : undefined,
-        labelX: (a.x + b.x) / 2 + shift,
-        labelY: (a.y + b.y) / 2 - 8,
+        label,
+        labelX,
+        labelY,
       });
     });
   } else if (mode === "package" && packageSubgraph && focusPackage) {
