@@ -1516,24 +1516,69 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
         h("p", { class: "ig-kicker" }, activeZoneName ? "Map of Zone:" : "Map"),
         h("h2", { class: "ig-page-title" }, activeZoneName ? activeZoneName : "Codebase import map"),
       ),
-      h("div", { class: "ig-atlas-metrics", role: "list" },
-        h("div", { class: "ig-metric-tile", role: "listitem" },
-          h("span", { class: "ig-metric-value" }, fileCount.toLocaleString()),
-          h("span", { class: "ig-metric-label" }, "files"),
-        ),
-        h("div", { class: "ig-metric-tile", role: "listitem" },
-          h("span", { class: "ig-metric-value" }, summary.totalEdges.toLocaleString()),
-          h("span", { class: "ig-metric-label" }, "imports"),
-        ),
-        h("div", { class: "ig-metric-tile", role: "listitem" },
-          h("span", { class: "ig-metric-value" }, summary.totalExternal.toLocaleString()),
-          h("span", { class: "ig-metric-label" }, "packages"),
-        ),
-        h("div", { class: "ig-metric-tile", role: "listitem" },
-          h("span", { class: "ig-metric-value" }, zones ? zones.zones.length.toLocaleString() : "—"),
-          h("span", { class: "ig-metric-label" }, "zones"),
-        ),
-      ),
+      (() => {
+        if (activeZone && activeZoneFiles) {
+          // ── Per-zone metrics ──
+          // When a zone is selected, swap the project-total tiles for
+          // zone-scoped numbers so the hero stops misrepresenting "I'm zoomed
+          // into UI Overlays but the headline is still 102 project files".
+          // The neighbor-zone count covers both inbound and outbound
+          // partners; the package count is external imports touched by any
+          // file in this zone.
+          const zonePackages = imports
+            ? imports.external.filter((ext) => ext.importedBy.some((p) => activeZoneFiles.has(p))).length
+            : 0;
+          const neighborZoneIds = new Set<string>();
+          if (zones) {
+            for (const edge of imports?.edges ?? []) {
+              const fromIn = activeZoneFiles.has(edge.from);
+              const toIn = activeZoneFiles.has(edge.to);
+              if (fromIn === toIn) continue;
+              const otherFile = fromIn ? edge.to : edge.from;
+              const otherZone = fileToZoneId(otherFile, zones);
+              if (otherZone && otherZone !== activeZone.id) neighborZoneIds.add(otherZone);
+            }
+          }
+          return h("div", { class: "ig-atlas-metrics ig-atlas-metrics-zone", role: "list" },
+            h("div", { class: "ig-metric-tile", role: "listitem" },
+              h("span", { class: "ig-metric-value" },
+                `${activeZone.files.length.toLocaleString()}/${fileCount.toLocaleString()}`,
+              ),
+              h("span", { class: "ig-metric-label" }, "zone files"),
+            ),
+            h("div", { class: "ig-metric-tile", role: "listitem" },
+              h("span", { class: "ig-metric-value" }, activeZoneInternalEdges.toLocaleString()),
+              h("span", { class: "ig-metric-label" }, "internal imports"),
+            ),
+            h("div", { class: "ig-metric-tile", role: "listitem" },
+              h("span", { class: "ig-metric-value" }, zonePackages.toLocaleString()),
+              h("span", { class: "ig-metric-label" }, "packages used"),
+            ),
+            h("div", { class: "ig-metric-tile", role: "listitem" },
+              h("span", { class: "ig-metric-value" }, neighborZoneIds.size.toLocaleString()),
+              h("span", { class: "ig-metric-label" }, "neighbor zones"),
+            ),
+          );
+        }
+        return h("div", { class: "ig-atlas-metrics", role: "list" },
+          h("div", { class: "ig-metric-tile", role: "listitem" },
+            h("span", { class: "ig-metric-value" }, fileCount.toLocaleString()),
+            h("span", { class: "ig-metric-label" }, "files"),
+          ),
+          h("div", { class: "ig-metric-tile", role: "listitem" },
+            h("span", { class: "ig-metric-value" }, summary.totalEdges.toLocaleString()),
+            h("span", { class: "ig-metric-label" }, "imports"),
+          ),
+          h("div", { class: "ig-metric-tile", role: "listitem" },
+            h("span", { class: "ig-metric-value" }, summary.totalExternal.toLocaleString()),
+            h("span", { class: "ig-metric-label" }, "packages"),
+          ),
+          h("div", { class: "ig-metric-tile", role: "listitem" },
+            h("span", { class: "ig-metric-value" }, zones ? zones.zones.length.toLocaleString() : "—"),
+            h("span", { class: "ig-metric-label" }, "zones"),
+          ),
+        );
+      })(),
       activeZoneName
         ? null
         : h("div", { class: "ig-atlas-footer" },
