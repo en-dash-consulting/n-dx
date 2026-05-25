@@ -1172,17 +1172,20 @@
   gap: 10px;
 }
 
-/* Wide-screen side-by-side: on viewports with the room for it AND when a
-   zone is active, dock the side panel (current selection + shortcuts) to
-   the right of the Zone Map instead of stacking it underneath. The street-
-   view dialog rule below already hides .ig-side, so this only kicks in when
-   the user is exploring without the modal open. */
+/* Wide-screen side-by-side: dock the side panel (current selection +
+   shortcuts) to the right of the map column instead of stacking it
+   underneath. The street-view dialog rule further below already hides
+   .ig-side, so this only kicks in when the user is exploring without the
+   modal open. Applies to ANY .ig-graph-shell so the layout is consistent
+   between the codebase-map view and the per-zone view. */
 @media (min-width: 1280px) {
-  .ig-graph-shell-zone {
+  .ig-graph-shell {
     position: relative;
     flex-direction: row;
     align-items: stretch;
-    /* Make room for the floating "Showing key routes…" pseudo-pill so it
+  }
+  .ig-graph-shell-zone {
+    /* Room for the floating "Showing key routes…" ::before pill so it
        doesn't get stretched as a flex row item. */
     padding-top: 44px;
   }
@@ -1192,23 +1195,72 @@
     left: 12px;
     z-index: 1;
   }
-  .ig-graph-shell-zone .ig-main {
+  .ig-graph-shell .ig-main {
     flex: 1 1 0;
     min-width: 0;
   }
-  .ig-graph-shell-zone .ig-side {
+  .ig-graph-shell .ig-side {
     flex: 0 0 320px;
     max-width: 360px;
     grid-column: auto;
     grid-template-columns: 1fr;
     align-self: stretch;
+    overflow: auto;
   }
 }
 @media (min-width: 1600px) {
-  .ig-graph-shell-zone .ig-side {
+  .ig-graph-shell .ig-side {
     flex-basis: 360px;
     max-width: 400px;
   }
+}
+
+/* ── Edge hover spotlight ──────────────────────────────────────────────────
+   The street view's many overlapping routes are hard to trace by eye, so
+   pointer hover spotlights one connection at a time. Each edge is wrapped in
+   an .ig-edge-group with an invisible .ig-edge-hit path beneath the visible
+   one for forgiving hover targeting; the visible path goes opaque/dim based
+   on whether it's the hovered edge, touches the hovered node, or neither. */
+.ig-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.ig-edge-group .ig-edge {
+  pointer-events: none;
+  transition: opacity 0.12s ease, stroke 0.12s ease, stroke-width 0.12s ease;
+}
+.ig-edge.ig-edge-dim {
+  opacity: 0.18;
+}
+.ig-edge.ig-edge-active {
+  opacity: 1;
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+.ig-edge.ig-edge-active.ig-edge-cross {
+  stroke: color-mix(in srgb, var(--accent) 60%, var(--orange));
+}
+
+.ig-edge-label {
+  transition: opacity 0.12s ease;
+}
+.ig-edge-label.ig-edge-label-active {
+  opacity: 1;
+  font-weight: 700;
+}
+
+/* Node spotlight — matches the edge logic so the visual story stays whole. */
+.ig-node.ig-node-dim {
+  opacity: 0.28;
+  transition: opacity 0.12s ease;
+}
+.ig-node.ig-node-related rect,
+.ig-node.ig-node-hover rect {
+  stroke: var(--accent);
+  stroke-width: 2;
 }
 
 .ig-graph-shell .ig-panel-desc,

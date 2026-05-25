@@ -137,8 +137,11 @@ describe("Graph (Import Graph view)", () => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("Driven by zone: Zone B");
     });
     expect(root.querySelector(".ig-codebase-mini")?.textContent).toContain("Zone B");
-    expect(root.querySelector(".ig-zone-overview")?.textContent).toContain("Zone B");
-    expect(root.querySelector(".ig-zone-overview-kicker")?.textContent).toContain("Zone map");
+    // The per-zone "Map of Zone" header is now the page-level atlas hero —
+    // the redundant in-panel header was removed and the active zone name
+    // lives in the hero h2 above. The .ig-zone-overview-kicker selector is
+    // gone with the header; if you need it back, restore the per-zone head.
+    expect(root.querySelector(".ig-atlas-hero")?.textContent).toContain("Zone B");
     expect(root.textContent).toContain("Map of Zone:");
     expect(root.textContent).not.toContain("Filtered to Zone B");
     expect(onSelect).not.toHaveBeenCalled();
@@ -163,7 +166,8 @@ describe("Graph (Import Graph view)", () => {
     root.querySelector(".ig-page")?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -20 }));
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-codebase-morph")?.className).toContain("ig-codebase-morph-full");
-      expect(root.querySelector(".ig-zone-overview")?.textContent).toContain("Zone A");
+      // Zone name lives in the atlas hero now, not the in-panel header.
+      expect(root.querySelector(".ig-atlas-hero")?.textContent).toContain("Zone A");
     });
     root.querySelector(".ig-page")?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 20 }));
     await vi.waitFor(() => {
@@ -226,9 +230,13 @@ describe("Graph (Import Graph view)", () => {
     (root.querySelector(".ig-zone-network-node") as SVGGElement).dispatchEvent(new Event("pointerenter", { bubbles: true }));
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-zone-network-edge-external path")).not.toBeNull();
+      // Zone B appears here as an external-zone label inside the zone SVG —
+      // this assertion is about the OTHER zone surfacing on hover, not the
+      // active zone (which is Zone A and lives in the atlas hero h2).
       expect(root.querySelector(".ig-zone-overview")?.textContent).toContain("Zone B");
       expect(root.querySelector(".ig-graph-scope")?.textContent).toContain("cross-boundary");
-      expect(root.querySelector(".ig-edge-labels")?.textContent).toContain("Zone A -> Zone B");
+      // Edge labels now use a Unicode arrow.
+      expect(root.querySelector(".ig-edge-labels")?.textContent).toContain("Zone A → Zone B");
     });
   });
 

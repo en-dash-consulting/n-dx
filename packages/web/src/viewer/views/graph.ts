@@ -363,6 +363,12 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [focusHistory, setFocusHistory] = useState<string[]>([]);
   const [focusHistoryIndex, setFocusHistoryIndex] = useState(-1);
+  // Hover-to-spotlight state for the File Street View graph. Hovering an
+  // edge highlights it + its endpoints; hovering a node highlights every
+  // edge touching it. Lets the user trace "what connects to what" when many
+  // routes cross visually.
+  const [hoverEdgeKey, setHoverEdgeKey] = useState<string | null>(null);
+  const [hoverGraphNode, setHoverGraphNode] = useState<string | null>(null);
 
   useEffect(() => () => {
     if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
@@ -1163,7 +1169,20 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   const canGoBack = focusHistoryIndex > 0;
   const canGoForward = focusHistoryIndex >= 0 && focusHistoryIndex < focusHistory.length - 1;
 
-  const edgePaths: { d: string; cross: boolean; key: string; label?: string; labelX?: number; labelY?: number }[] = [];
+  const edgePaths: {
+    d: string;
+    cross: boolean;
+    key: string;
+    label?: string;
+    labelX?: number;
+    labelY?: number;
+    /** Source endpoint id (file path or pkg:NAME) — used for hover spotlight. */
+    fromId?: string;
+    /** Target endpoint id — used for hover spotlight. */
+    toId?: string;
+    /** Cross-zone pair label, if any — surfaced on hover even for non-rep edges. */
+    pairLabel?: string;
+  }[] = [];
   const kindOf = (id: string): NodeKind => nodeKindById.get(id) ?? "file";
 
   const svgW = svgDims.w;
@@ -1238,17 +1257,15 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
       let labelX: number | undefined = (a.x + b.x) / 2 + shift;
       let labelY: number | undefined = (a.y + b.y) / 2 - 8;
       let label: string | undefined;
-      if (isRep && zones && fromZone && toZone) {
-        label = `${zoneDisplayName(zones, fromZone)} → ${zoneDisplayName(zones, toZone)}${count > 1 ? ` ×${count}` : ""}`;
+      const pairLabel = cross && zones && fromZone && toZone
+        ? `${zoneDisplayName(zones, fromZone)} → ${zoneDisplayName(zones, toZone)}${count > 1 ? ` ×${count}` : ""}`
+        : undefined;
+      if (isRep && pairLabel) {
+        label = pairLabel;
         if (centroid && centroid.n > 0) {
           labelX = centroid.x / centroid.n;
           labelY = centroid.y / centroid.n - 8;
         }
-      } else if (cross) {
-        // Edges in a duplicated cross-zone group still get a position but no
-        // label string — keeps the existing structure for any consumer that
-        // expects labelX/labelY pairs on every cross edge.
-        label = undefined;
       }
       edgePaths.push({
         key: `${e.from}->${e.to}:${e.type}`,
@@ -1257,6 +1274,9 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
         label,
         labelX,
         labelY,
+        fromId: e.from,
+        toId: e.to,
+        pairLabel,
       });
     });
   } else if (mode === "package" && packageSubgraph && focusPackage) {
@@ -1272,12 +1292,43 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
           key: `${f}->${pkgId}`,
           d: elbowPath(fp.x + wFile, fp.y, pkgPos.x - wPkg, pkgPos.y),
           cross: false,
+          fromId: f,
+          toId: pkgId,
         });
       }
     }
   }
   const graphEdgeCount = edgePaths.length;
   const graphCrossEdgeCount = edgePaths.filter((edge) => edge.cross).length;
+
+  // ── Hover spotlight: derive which edges/nodes to highlight or dim based on
+  // the current hoverEdgeKey / hoverGraphNode. Hovering an edge spotlights
+  // that single edge + its two endpoints; hovering a node spotlights every
+  // edge touching that node + the connected nodes. Other edges/nodes go to
+  // a muted state so the spotlighted set reads clearly through the visual
+  // crossings. Computed inline so it's always in sync with the edgePaths /
+  // hover state pair without an additional memo.
+  const hoverActive = hoverEdgeKey !== null || hoverGraphNode !== null;
+  const activeEdgeKeys = new Set<string>();
+  const highlightedNodeIds = new Set<string>();
+  if (hoverGraphNode) {
+    highlightedNodeIds.add(hoverGraphNode);
+    for (const ep of edgePaths) {
+      if (ep.fromId === hoverGraphNode || ep.toId === hoverGraphNode) {
+        activeEdgeKeys.add(ep.key);
+        if (ep.fromId) highlightedNodeIds.add(ep.fromId);
+        if (ep.toId) highlightedNodeIds.add(ep.toId);
+      }
+    }
+  }
+  if (hoverEdgeKey) {
+    activeEdgeKeys.add(hoverEdgeKey);
+    const hovered = edgePaths.find((ep) => ep.key === hoverEdgeKey);
+    if (hovered) {
+      if (hovered.fromId) highlightedNodeIds.add(hovered.fromId);
+      if (hovered.toId) highlightedNodeIds.add(hovered.toId);
+    }
+  }
 
   return h("div", {
     ref: pageRef,
@@ -1336,7 +1387,9 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
               }),
             ),
             h("span", { class: "ig-mini-current" },
-              activeZone ? `${activeZone.name} · ${activeZoneInbound} in / ${activeZoneOutbound} out` : "All zones",
+              activeZone
+                ? `${activeZone.name} · ${activeZone.files.length}${inventory ? `/${inventory.files.length}` : ""} files · ${activeZoneInternalEdges} internal · ${activeZoneInbound} in / ${activeZoneOutbound} out`
+                : "All zones",
             ),
           ),
         h("div", { class: `ig-scope-card${activeZone ? " ig-scope-card-filtered" : ""}` },
@@ -1496,25 +1549,10 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
       h("section", { class: "ig-zone-overview ig-zone-minimap", "aria-label": activeZone ? `${activeZone.name} zone map` : "Zone map" },
         activeZone
           ? [
-              h("div", { class: "ig-zone-overview-head", key: "head" },
-                h("div", null,
-                  h("span", { class: "ig-zone-overview-kicker" }, "Zone map"),
-                  h("h3", null, activeZone.name),
-                ),
-                h("div", { class: "ig-zone-overview-stats" },
-                  // Show this zone's share of the project as X/Y so the user
-                  // can read both "how big is this zone" and "how big is the
-                  // codebase" at a glance, instead of just an unanchored
-                  // file count.
-                  h("span", null,
-                    inventory
-                      ? `${activeZone.files.length} / ${inventory.files.length} files`
-                      : `${activeZone.files.length} files`,
-                  ),
-                  h("span", null, `${activeZoneInternalEdges} internal imports`),
-                  h("span", null, `${activeZoneInbound} in / ${activeZoneOutbound} out`),
-                ),
-              ),
+              // Per-zone header removed: the zone name + file/import/in-out
+              // stats live in the scope-card up in the codebase-map section,
+              // so this view goes straight to the SVG to maximize map real
+              // estate and remove the redundancy.
               h("div", { class: "ig-zone-network", key: "network" },
                 h("svg", {
                   viewBox: `0 0 ${activeZoneNetworkW} ${activeZoneNetworkH}`,
@@ -1824,24 +1862,64 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
             ),
             h("g", { transform: `translate(${depView.x} ${depView.y}) scale(${depView.k})` },
               h("g", { class: "ig-edges" },
-                ...edgePaths.map((ep) =>
-                  h("path", {
+                ...edgePaths.map((ep) => {
+                  const isActive = activeEdgeKeys.has(ep.key);
+                  const dimmed = hoverActive && !isActive;
+                  const cls =
+                    `ig-edge${ep.cross ? " ig-edge-cross" : ""}` +
+                    (isActive ? " ig-edge-active" : "") +
+                    (dimmed ? " ig-edge-dim" : "");
+                  return h("g", {
                     key: ep.key,
-                    class: `ig-edge${ep.cross ? " ig-edge-cross" : ""}`,
-                    d: ep.d,
-                    "marker-end": "url(#ig-arrow)",
-                  }),
-                ),
+                    class: "ig-edge-group",
+                    onMouseEnter: () => setHoverEdgeKey(ep.key),
+                    onMouseLeave: () => setHoverEdgeKey((k) => (k === ep.key ? null : k)),
+                  },
+                    // Invisible wide hit target — makes the thin visible line
+                    // forgiving to hover with a mouse. Pointer events are
+                    // captured here; the visible path below stays
+                    // pointer-events:none via CSS so it doesn't steal hover.
+                    h("path", { class: "ig-edge-hit", d: ep.d }),
+                    h("path", {
+                      class: cls,
+                      d: ep.d,
+                      "marker-end": "url(#ig-arrow)",
+                    }),
+                  );
+                }),
               ),
               h("g", { class: "ig-edge-labels" },
-                ...edgePaths.filter((ep) => ep.label && ep.labelX !== undefined && ep.labelY !== undefined).map((ep) =>
-                  h("text", {
-                    key: `label-${ep.key}`,
-                    x: ep.labelX,
-                    y: ep.labelY,
-                    textAnchor: "middle",
-                  }, ep.label),
-                ),
+                ...edgePaths
+                  .filter((ep) => {
+                    if (ep.labelX === undefined || ep.labelY === undefined) return false;
+                    if (hoverEdgeKey) {
+                      // While hovering an edge, surface only THAT edge's
+                      // pair label — the others get out of the way so the
+                      // hovered connection reads cleanly.
+                      return ep.key === hoverEdgeKey && (ep.pairLabel ?? ep.label);
+                    }
+                    if (hoverGraphNode) {
+                      // While hovering a node, surface labels for every
+                      // edge touching it (rep or not), so the user sees
+                      // what each connection is.
+                      return activeEdgeKeys.has(ep.key) && (ep.pairLabel ?? ep.label);
+                    }
+                    // Default: representative cross-zone labels only.
+                    return Boolean(ep.label);
+                  })
+                  .map((ep) => {
+                    // When hovering, prefer the per-edge centroid (i.e. the
+                    // hovered edge's own midpoint) so the label sits over the
+                    // line the user is actually pointing at.
+                    const hovered = hoverEdgeKey === ep.key || (hoverGraphNode && activeEdgeKeys.has(ep.key));
+                    return h("text", {
+                      key: `label-${ep.key}`,
+                      class: `ig-edge-label${hovered ? " ig-edge-label-active" : ""}`,
+                      x: ep.labelX,
+                      y: ep.labelY,
+                      textAnchor: "middle",
+                    }, ep.pairLabel ?? ep.label);
+                  }),
               ),
               h("g", { class: "ig-nodes" },
                 ...(layoutNodes ?? []).map((n) => {
@@ -1857,11 +1935,22 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                         : n.label;
                   const labelText = truncateNodeLabel(n.label, n.kind);
                   const contextText = n.kind === "file" ? truncateNodeLabel(parentContext(n.id), "file") : "";
+                  const isHovered = hoverGraphNode === n.id;
+                  const isHighlighted = highlightedNodeIds.has(n.id);
+                  const isDimmed = hoverActive && !isHighlighted;
                   return h("g", {
                     key: n.id,
-                    class: `ig-node ig-node-${n.kind}${isCenter ? " ig-node-center" : ""}${isSel ? " ig-node-selected" : ""}`,
+                    class:
+                      `ig-node ig-node-${n.kind}` +
+                      (isCenter ? " ig-node-center" : "") +
+                      (isSel ? " ig-node-selected" : "") +
+                      (isHovered ? " ig-node-hover" : "") +
+                      (isHighlighted && !isHovered ? " ig-node-related" : "") +
+                      (isDimmed ? " ig-node-dim" : ""),
                     transform: `translate(${pos.x - w / 2},${pos.y - hgt / 2})`,
                     title: tip,
+                    onMouseEnter: () => setHoverGraphNode(n.id),
+                    onMouseLeave: () => setHoverGraphNode((cur) => (cur === n.id ? null : cur)),
                     onPointerDown: (ev: PointerEvent) => {
                       ev.stopPropagation();
                       (ev.currentTarget as Element).setPointerCapture?.(ev.pointerId);
