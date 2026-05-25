@@ -180,37 +180,39 @@ export async function enrichZonesWithAI(
     console.log(`  [enrich] Processing ${zonesToEnrich.length} zones in ${batches.length} batches of up to ${ZONES_PER_BATCH}`);
   }
 
-  // 5. Process batches sequentially, feeding enriched names forward
-  const allBatchResults: BatchResult[] = [];
-  const enrichedNames = new Map<string, string>();
-  let authFailed = false;
-
-  for (let bi = 0; bi < batches.length; bi++) {
-    if (authFailed) break;
-
-    try {
-      const result = await enrichBatch(
-        batches[bi], zones, sortedCrossingsArr,
+  // 5. Process batches in parallel. The previous sequential loop fed an
+  //    `enrichedNames` map forward to dedupe zone names between batches —
+  //    that was only a HINT to the LLM, not a correctness requirement. We
+  //    fix any name collisions post-hoc in mergeZonesByName / dedupe steps,
+  //    so the parallel speedup (≈2× per pass with 2 batches, more for big
+  //    repos) is worth losing the cross-batch naming hint. Each batch is
+  //    still an independent LLM call. If ANY batch reports an auth error
+  //    we short-circuit the whole pass (no point sending another call to a
+  //    broken token).
+  const settled = await Promise.allSettled(
+    batches.map((batch, bi) =>
+      enrichBatch(
+        batch, zones, sortedCrossingsArr,
         passNumber, passConfig, previousZones, bi, batches.length,
-        enrichedNames, fileArchetypes, hints, projectProfile,
-      );
-      if (result && "authError" in result) {
-        authFailed = true;
-      } else if (result) {
-        allBatchResults.push(result);
+        new Map<string, string>(), fileArchetypes, hints, projectProfile,
+      ),
+    ),
+  );
 
-        // Track enriched names so subsequent batches can avoid duplicates
-        if (isFirstPass && Array.isArray(result.parsed.zones)) {
-          for (const z of result.parsed.zones) {
-            if (z?.algorithmicId && typeof z.name === "string") {
-              enrichedNames.set(z.algorithmicId, z.name);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error(`  [enrich] batch ${bi + 1} rejected:`, err instanceof Error ? err.message : err);
+  const allBatchResults: BatchResult[] = [];
+  let authFailed = false;
+  for (let bi = 0; bi < settled.length; bi++) {
+    const s = settled[bi];
+    if (s.status === "rejected") {
+      console.error(`  [enrich] batch ${bi + 1} rejected:`, s.reason instanceof Error ? s.reason.message : s.reason);
+      continue;
     }
+    const result = s.value;
+    if (result && "authError" in result) {
+      authFailed = true;
+      continue;
+    }
+    if (result) allBatchResults.push(result);
   }
 
   if (allBatchResults.length === 0) {

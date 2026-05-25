@@ -339,7 +339,7 @@ const COMMENT_PREFIXES = ["///", "//!", "//", "/**", "/*", "*", "*/", "#", "#!",
  * Returns `null` when the file has no leading comment block, so callers can
  * skip emitting an empty header entry.
  */
-function extractFileHeader(absPath: string, maxLines = 40, maxChars = 800): string | null {
+function extractFileHeader(absPath: string, maxLines = 25, maxChars = 400): string | null {
   if (!existsSync(absPath)) return null;
   let content: string;
   try {
@@ -386,7 +386,7 @@ function extractFileHeader(absPath: string, maxLines = 40, maxChars = 800): stri
 function formatFileHeaders(
   files: string[],
   projectDir: string,
-  budgetBytes = 6000,
+  budgetBytes = 2500,
 ): string {
   const entries: string[] = [];
   let used = 0;

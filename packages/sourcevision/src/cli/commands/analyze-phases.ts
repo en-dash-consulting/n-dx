@@ -357,12 +357,23 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     const outPath = join(ctx.svDir, DATA_FILES.zones);
     writeFileSync(outPath, toCanonicalJSON(zones));
 
-    // --full: run remaining enrichment passes up to 4
+    // --full: run remaining enrichment passes up to 4. We stop early when a
+    // pass produces no observable change to zone identity or findings —
+    // continuing past convergence costs ~1 LLM call per zone batch per pass
+    // and contributes nothing. The fingerprint covers zone id, zone name,
+    // findings count, and insight count: if a pass touches any of those it
+    // counts as productive, otherwise we bail.
     if (ctx.fullMode && enrich) {
       const targetPass = 4;
       const currentPass = zones.enrichmentPass ?? 0;
       const passesNeeded = targetPass - currentPass;
 
+      const fingerprint = (z: typeof zones): string => {
+        const names = z.zones.map((zo) => `${zo.id}:${zo.name}`).sort().join("|");
+        return `${names} f=${z.findings?.length ?? 0} i=${z.insights?.length ?? 0}`;
+      };
+
+      let prevFingerprint = fingerprint(zones);
       for (let p = 0; p < passesNeeded; p++) {
         info(`\n${bold(cyan("[phase 4]"))} Enrichment pass ${currentPass + p + 2}...`);
         zonesResult = await analyzeZones(inventory, importsData, {
@@ -378,6 +389,13 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
           accumulateFromAggregate(ctx.tokenUsage, zonesResult.tokenUsage);
         }
         writeFileSync(outPath, toCanonicalJSON(zones));
+
+        const nextFingerprint = fingerprint(zones);
+        if (nextFingerprint === prevFingerprint) {
+          info(`  ${dim(`Pass converged (no zone or finding changes) — skipping remaining ${passesNeeded - p - 1} pass(es)`)}`);
+          break;
+        }
+        prevFingerprint = nextFingerprint;
       }
     }
 

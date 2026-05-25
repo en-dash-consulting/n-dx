@@ -13,7 +13,12 @@ import type {
 
 // ── Batch mode constants ─────────────────────────────────────────────────────
 
-export const ZONES_PER_BATCH = 5;
+// Most small-to-medium projects produce 5–10 zones, so 7 lets the typical
+// case run in a single batch instead of two — combined with parallel batch
+// execution upstream, this halves enrichment wall-clock on those projects.
+// Set conservatively below the prompt-context ceiling so the full-prompt
+// attempt still fits comfortably with file headers + project shape.
+export const ZONES_PER_BATCH = 7;
 export const MAX_CONCURRENT_BATCHES = 1;
 
 // ── Per-zone mode constants ──────────────────────────────────────────────────

@@ -150,8 +150,15 @@ function spawnOnce(
 
     // Per-call timeout — caps any single claude invocation so a stalled
     // process surfaces as a clear, actionable error rather than 240s of
-    // silence (the outer foundationExec timeout).
-    const PER_CALL_TIMEOUT_MS = 90_000;
+    // silence (the outer foundationExec timeout). Configurable via
+    // NDX_CLAUDE_PER_CALL_TIMEOUT_MS so users with slower networks /
+    // larger prompts can extend it without code changes. Defaults bumped
+    // to 120s — 90s killed many legitimate-but-slow first-byte
+    // completions on full-prompt enrichment (claude buffers stdout fully
+    // so partial progress isn't visible).
+    const envTimeout = Number(process.env.NDX_CLAUDE_PER_CALL_TIMEOUT_MS);
+    const PER_CALL_TIMEOUT_MS =
+      Number.isFinite(envTimeout) && envTimeout >= 10_000 ? envTimeout : 120_000;
     const killTimer = setTimeout(() => {
       // Always log — a hung CLI being force-killed is an exceptional event,
       // not per-call noise.
