@@ -1178,15 +1178,20 @@
    .ig-side, so this only kicks in when the user is exploring without the
    modal open. Applies to ANY .ig-graph-shell so the layout is consistent
    between the codebase-map view and the per-zone view. */
+/* Side-by-side: .ig-side is a child of .ig-main (sibling of .ig-zone-overview),
+   NOT a direct child of .ig-graph-shell — so the layout grid lives on
+   .ig-main. Wide screens get a 2-column grid: zone overview on the left,
+   Current Selection docked on the right. !important defends against the
+   base `.ig-graph-shell .ig-main { grid-template-columns: 1fr }` rule and
+   the base `.ig-graph-shell .ig-side { grid-column: 1/-1 }` rule that would
+   otherwise force the side panel to span full width. */
 @media (min-width: 1100px) {
   .ig-graph-shell {
     position: relative;
-    flex-direction: row !important;
-    align-items: stretch;
   }
   .ig-graph-shell-zone {
     /* Room for the floating "Showing key routes…" ::before pill so it
-       doesn't get stretched as a flex row item. */
+       doesn't sit on top of the map content. */
     padding-top: 44px;
   }
   .ig-graph-shell-zone::before {
@@ -1196,22 +1201,21 @@
     z-index: 1;
   }
   .ig-graph-shell .ig-main {
-    flex: 1 1 0 !important;
-    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) 320px !important;
+    grid-auto-flow: column;
   }
-  .ig-graph-shell .ig-side {
-    flex: 0 0 320px !important;
-    max-width: 360px;
-    grid-column: auto;
-    grid-template-columns: 1fr;
+  .ig-graph-shell .ig-main .ig-side {
+    grid-column: 2 / 3 !important;
+    grid-row: 1 / -1;
     align-self: stretch;
     overflow: auto;
+    max-height: 100%;
+    grid-template-columns: 1fr;
   }
 }
 @media (min-width: 1600px) {
-  .ig-graph-shell .ig-side {
-    flex-basis: 380px !important;
-    max-width: 420px;
+  .ig-graph-shell .ig-main {
+    grid-template-columns: minmax(0, 1fr) 380px !important;
   }
 }
 
