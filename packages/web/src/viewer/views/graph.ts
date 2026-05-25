@@ -1502,7 +1502,15 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                   h("h3", null, activeZone.name),
                 ),
                 h("div", { class: "ig-zone-overview-stats" },
-                  h("span", null, `${activeZone.files.length} files`),
+                  // Show this zone's share of the project as X/Y so the user
+                  // can read both "how big is this zone" and "how big is the
+                  // codebase" at a glance, instead of just an unanchored
+                  // file count.
+                  h("span", null,
+                    inventory
+                      ? `${activeZone.files.length} / ${inventory.files.length} files`
+                      : `${activeZone.files.length} files`,
+                  ),
                   h("span", null, `${activeZoneInternalEdges} internal imports`),
                   h("span", null, `${activeZoneInbound} in / ${activeZoneOutbound} out`),
                 ),

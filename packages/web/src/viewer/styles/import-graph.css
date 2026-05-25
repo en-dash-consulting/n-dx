@@ -1172,6 +1172,45 @@
   gap: 10px;
 }
 
+/* Wide-screen side-by-side: on viewports with the room for it AND when a
+   zone is active, dock the side panel (current selection + shortcuts) to
+   the right of the Zone Map instead of stacking it underneath. The street-
+   view dialog rule below already hides .ig-side, so this only kicks in when
+   the user is exploring without the modal open. */
+@media (min-width: 1280px) {
+  .ig-graph-shell-zone {
+    position: relative;
+    flex-direction: row;
+    align-items: stretch;
+    /* Make room for the floating "Showing key routes…" pseudo-pill so it
+       doesn't get stretched as a flex row item. */
+    padding-top: 44px;
+  }
+  .ig-graph-shell-zone::before {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 1;
+  }
+  .ig-graph-shell-zone .ig-main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .ig-graph-shell-zone .ig-side {
+    flex: 0 0 320px;
+    max-width: 360px;
+    grid-column: auto;
+    grid-template-columns: 1fr;
+    align-self: stretch;
+  }
+}
+@media (min-width: 1600px) {
+  .ig-graph-shell-zone .ig-side {
+    flex-basis: 360px;
+    max-width: 400px;
+  }
+}
+
 .ig-graph-shell .ig-panel-desc,
 .ig-graph-shell .ig-callout {
   display: none;
