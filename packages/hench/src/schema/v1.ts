@@ -12,7 +12,7 @@ export const HENCH_SCHEMA_VERSION = "hench/v1";
  * Supported project languages for language-aware guard configuration.
  * "auto" triggers detection during `hench init`.
  */
-export type ProjectLanguage = "typescript" | "javascript" | "go";
+export type ProjectLanguage = "typescript" | "javascript" | "go" | "swift";
 
 /**
  * Configurable subset of policy limits (all optional, defaults applied at runtime).
@@ -224,11 +224,43 @@ const GO_GUARD_DEFAULTS: GuardConfig = {
 };
 
 /**
+ * Guard defaults for Swift projects (SwiftPM / Xcode).
+ *
+ * `swift` covers `swift build`, `swift test`, `swift package …`. `make` is
+ * included because Swift app codebases very commonly wrap their full build +
+ * test + lint gate in a Makefile target (e.g. `make validate`). `xcodebuild`
+ * + `xcrun` cover Xcode-driven builds and CLI tools. `.build/` (SPM build
+ * cache) and `DerivedData/` (Xcode build cache) are blocked so the agent
+ * can't pollute or trip on them.
+ */
+const SWIFT_GUARD_DEFAULTS: GuardConfig = {
+  blockedPaths: [
+    `${PROJECT_DIRS.HENCH}/**`,
+    `${PROJECT_DIRS.REX}/**`,
+    ".git/**",
+    ".build/**",
+    "DerivedData/**",
+    "Pods/**",
+    "Carthage/**",
+  ],
+  allowedCommands: ["swift", "make", "xcodebuild", "xcrun", "git"],
+  commandTimeout: 60000,           // Swift builds are slower than `go test` — 60s.
+  maxFileSize: 1048576,
+  spawnTimeout: 600000,            // 10 minutes — Xcode builds can run long.
+  maxConcurrentProcesses: 3,
+  allowedGitSubcommands: [
+    "status", "add", "commit", "diff", "log",
+    "branch", "checkout", "stash", "show", "rev-parse",
+  ],
+};
+
+/**
  * Returns the language-appropriate guard defaults.
  * Falls back to JS/TS defaults for unknown languages.
  */
 export function guardDefaultsForLanguage(language?: ProjectLanguage): GuardConfig {
   if (language === "go") return { ...GO_GUARD_DEFAULTS };
+  if (language === "swift") return { ...SWIFT_GUARD_DEFAULTS };
   return { ...JS_TS_GUARD_DEFAULTS };
 }
 

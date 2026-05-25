@@ -10,7 +10,7 @@
  * User-supplied commands are persisted to .hench/config.json for future runs.
  */
 
-import { readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 // ---------------------------------------------------------------------------
@@ -58,32 +58,98 @@ async function loadProjectConfig(projectDir: string): Promise<string | undefined
 // Auto-detection from package.json
 // ---------------------------------------------------------------------------
 
+/** True when the file at `path` exists. */
+async function fileExists(path: string): Promise<boolean> {
+  try { await access(path); return true; } catch { return false; }
+}
+
 /**
- * Auto-detect test command from package.json scripts.
- * Checks for "test" or "test:all" scripts (in that order).
+ * True when a Makefile in projectDir defines a `validate` target. A Makefile
+ * `validate` target is a strong signal that the project author has wrapped
+ * their full gate (build + tests + lint + custom checks) behind a single
+ * command — much more reliable than running `swift test` / `cargo test` in
+ * isolation. We accept either GNU Makefile (uppercase M) or "makefile".
+ */
+async function makefileHasValidateTarget(projectDir: string): Promise<boolean> {
+  for (const name of ["Makefile", "makefile", "GNUmakefile"]) {
+    try {
+      const content = await readFile(join(projectDir, name), "utf-8");
+      // Match a target line "validate:" at column 1 (Makefile targets always
+      // start in column 1 — anything indented is a recipe line).
+      if (/^validate\s*:/m.test(content)) return true;
+    } catch {
+      // Try the next filename.
+    }
+  }
+  return false;
+}
+
+/** True when any top-level dir ends in .xcodeproj or .xcworkspace. */
+async function hasXcodeProjectMarker(projectDir: string): Promise<boolean> {
+  try {
+    const entries = await readdir(projectDir, { withFileTypes: true });
+    return entries.some(
+      (e) => e.isDirectory() && (e.name.endsWith(".xcodeproj") || e.name.endsWith(".xcworkspace")),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Auto-detect a full-suite test command from the project shape. Tries, in
+ * order:
+ *
+ * 1. A Makefile `validate` target — this is the canonical "full gate" wrapper
+ *    in many projects (Swift, Go, mixed). If present, prefer it over the
+ *    raw language toolchain so the agent runs the project's actual gate.
+ * 2. `package.json` test:all → npm run test:all.
+ * 3. `package.json` test → npm run test.
+ * 4. `Package.swift` or `.xcodeproj/.xcworkspace` → swift test.
+ * 5. `Cargo.toml` → cargo test.
+ * 6. `go.mod` → go test ./....
+ * 7. `pyproject.toml` or `requirements.txt` → pytest.
+ *
+ * Returns undefined when no signal matches; the resolver then prompts or
+ * surfaces a clear "configure a test command" error.
  */
 async function autoDetectTestCommand(projectDir: string): Promise<string | undefined> {
+  // 1. Makefile `validate` target — strong project-author intent signal.
+  if (await makefileHasValidateTarget(projectDir)) {
+    return "make validate";
+  }
+
+  // 2-3. package.json scripts (existing behaviour, unchanged ordering).
   try {
     const packagePath = join(projectDir, "package.json");
     const content = await readFile(packagePath, "utf-8");
     const pkg = JSON.parse(content) as Record<string, unknown>;
     const scripts = pkg.scripts as Record<string, string> | undefined;
-
-    if (!scripts) return undefined;
-
-    // Prefer "test:all" over "test" for comprehensive suite
-    if (scripts["test:all"]) {
-      return `npm run test:all`;
-    }
-
-    if (scripts["test"]) {
-      return `npm run test`;
-    }
-
-    return undefined;
+    if (scripts?.["test:all"]) return "npm run test:all";
+    if (scripts?.["test"]) return "npm run test";
   } catch {
-    return undefined;
+    // No package.json — continue.
   }
+
+  // 4. Swift project.
+  if (await fileExists(join(projectDir, "Package.swift"))) return "swift test";
+  if (await hasXcodeProjectMarker(projectDir)) return "swift test";
+
+  // 5. Rust.
+  if (await fileExists(join(projectDir, "Cargo.toml"))) return "cargo test";
+
+  // 6. Go.
+  if (await fileExists(join(projectDir, "go.mod"))) return "go test ./...";
+
+  // 7. Python (pyproject or requirements).
+  if (
+    (await fileExists(join(projectDir, "pyproject.toml"))) ||
+    (await fileExists(join(projectDir, "requirements.txt")))
+  ) {
+    return "pytest";
+  }
+
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------

@@ -344,4 +344,69 @@ describe("resolveTestCommand", () => {
       }
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Language- and project-shape auto-detection
+  // ---------------------------------------------------------------------------
+
+  describe("language-aware auto-detect", () => {
+    it("prefers a Makefile validate target over the language toolchain", async () => {
+      // A Swift project that ALSO has Makefile validate — the Makefile wins.
+      await writeFile(join(projectDir, "Package.swift"), "// swift-package");
+      await writeFile(
+        join(projectDir, "Makefile"),
+        "all:\n\techo hi\nvalidate:\n\tswift test\n\tscripts/check.sh\n",
+      );
+      const result = await resolveTestCommand({ projectDir, henchDir });
+      expect(result.command).toBe("make validate");
+      expect(result.source).toBe("auto-detect");
+    });
+
+    it("uses 'swift test' for a Package.swift project without Makefile validate", async () => {
+      await writeFile(join(projectDir, "Package.swift"), "// swift-package");
+      const result = await resolveTestCommand({ projectDir, henchDir });
+      expect(result.command).toBe("swift test");
+      expect(result.source).toBe("auto-detect");
+    });
+
+    it("uses 'swift test' for an Xcode project (.xcodeproj directory)", async () => {
+      await mkdir(join(projectDir, "MyApp.xcodeproj"));
+      const result = await resolveTestCommand({ projectDir, henchDir });
+      expect(result.command).toBe("swift test");
+      expect(result.source).toBe("auto-detect");
+    });
+
+    it("uses 'cargo test' for a Cargo.toml project", async () => {
+      await writeFile(join(projectDir, "Cargo.toml"), '[package]\nname = "x"\nversion = "0.1.0"\n');
+      const result = await resolveTestCommand({ projectDir, henchDir });
+      expect(result.command).toBe("cargo test");
+      expect(result.source).toBe("auto-detect");
+    });
+
+    it("uses 'go test ./...' for a go.mod project (when no package.json wins first)", async () => {
+      await writeFile(join(projectDir, "go.mod"), "module example.com/x\n");
+      const result = await resolveTestCommand({ projectDir, henchDir });
+      expect(result.command).toBe("go test ./...");
+      expect(result.source).toBe("auto-detect");
+    });
+
+    it("uses 'pytest' for a pyproject.toml project", async () => {
+      await writeFile(join(projectDir, "pyproject.toml"), "[project]\nname = 'x'\n");
+      const result = await resolveTestCommand({ projectDir, henchDir });
+      expect(result.command).toBe("pytest");
+      expect(result.source).toBe("auto-detect");
+    });
+
+    it("does NOT mistake an indented 'validate:' line inside a recipe for a target", async () => {
+      // Recipe lines start with a tab and are NOT targets. The detector is
+      // strict about column 1 to avoid this false positive.
+      await writeFile(join(projectDir, "Package.swift"), "// swift-package");
+      await writeFile(
+        join(projectDir, "Makefile"),
+        "all:\n\techo \"  validate: not a target\"\n",
+      );
+      const result = await resolveTestCommand({ projectDir, henchDir });
+      expect(result.command).toBe("swift test");
+    });
+  });
 });
