@@ -8,8 +8,7 @@
  * @module store/file-lock
  */
 
-import { writeFile, readFile, unlink, stat } from "node:fs/promises";
-
+import {writeFile, readFile, unlink} from "node:fs/promises";
 // ── Constants ────────────────────────────────────────────────────────
 
 /** Maximum age of a lock file before it's considered stale (30 seconds). */

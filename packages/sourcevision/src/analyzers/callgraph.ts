@@ -21,7 +21,6 @@ import type {
   ImportEdge,
 } from "../schema/index.js";
 import { sortCallGraph } from "../util/sort.js";
-import { toPosix } from "../util/paths.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 

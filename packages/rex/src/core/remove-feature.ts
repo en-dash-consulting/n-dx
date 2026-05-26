@@ -1,8 +1,7 @@
 import type { PRDItem } from "../schema/index.js";
 import { getLevelLabel } from "../schema/index.js";
 import { findItem, walkTree } from "./tree.js";
-import { deleteItem, cleanBlockedByRefs } from "./delete.js";
-import { extractSyncMeta } from "./sync.js";
+import {deleteItem} from "./delete.js";import { extractSyncMeta } from "./sync.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

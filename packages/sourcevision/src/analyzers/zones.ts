@@ -57,7 +57,6 @@ import {
 } from "./louvain.js";
 import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
-import type { EnrichResult, PerZoneEnrichResult } from "./enrich.js";
 import { deduplicateFindings, enforceSeverityRules } from "./enrich-parsing.js";
 import { detectPinDivergence, detectImportNeighborMoves } from "./move-recommendations.js";
 import type { MoveContext } from "./move-recommendations.js";

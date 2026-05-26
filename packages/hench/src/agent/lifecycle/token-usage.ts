@@ -15,7 +15,6 @@
  * Claude's diagnostic-aware parsers.
  */
 
-import type { TokenUsage } from "../../schema/index.js";
 import type { TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping, AggregateTokenUsage } from "../../prd/llm-gateway.js";
 import {
   parseApiTokenUsage as parseTokenUsage,

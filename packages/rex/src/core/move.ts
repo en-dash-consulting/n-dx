@@ -11,8 +11,7 @@
 
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { LEVEL_HIERARCHY } from "../schema/index.js";
-import { findItem, removeFromTree, insertChild, walkTree } from "./tree.js";
-
+import {findItem, removeFromTree, insertChild} from "./tree.js";
 export interface MoveResult {
   item: PRDItem;
   previousParentId: string | null;

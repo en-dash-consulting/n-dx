@@ -9,8 +9,7 @@
  * - Codex vs Claude token comparison
  */
 
-import type { RunRecord, TurnTokenUsage } from "../schema/index.js";
-
+import type {RunRecord} from "../schema/index.js";
 /**
  * Validation result for a run's token reporting.
  */

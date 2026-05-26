@@ -5,7 +5,6 @@
  * to the patterns used throughout the route modules.
  */
 
-import type { ServerResponse } from "node:http";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "../types.js";

@@ -1,9 +1,9 @@
 /**
  * CLI output control — supports --quiet mode for scripting.
  *
- * Core primitives (setQuiet, isQuiet, info, result) are shared from
- * @n-dx/llm-client. Rex-specific extensions (warn, startSpinner)
- * are defined here and use the shared isQuiet() state.
+ * Core primitives (setQuiet, isQuiet, info, result, warn) are shared from
+ * @n-dx/llm-client. Rex-specific extension (startSpinner) is defined
+ * here and uses the shared isQuiet() state.
  *
  * In quiet mode, only essential output is emitted:
  * - JSON output (--format=json)
@@ -14,18 +14,10 @@
  */
 
 // Re-export shared foundation primitives.
-export { setQuiet, isQuiet, info, result } from "@n-dx/llm-client";
+export { setQuiet, isQuiet, info, result, warn } from "@n-dx/llm-client";
 
 import ora from "ora";
 import { isQuiet, info } from "@n-dx/llm-client";
-
-/**
- * Print warning output. Suppressed in quiet mode.
- * Use for quality issues, deprecation notices, non-fatal problems.
- */
-export function warn(...args: unknown[]): void {
-  if (!isQuiet()) console.error(...args);
-}
 
 // ── Progress spinner ──────────────────────────────────────────────────
 

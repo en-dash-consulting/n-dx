@@ -24,11 +24,9 @@
 
 import { spawn } from "node:child_process";
 import type { PRDStore } from "../../prd/rex-gateway.js";
-import type { HenchConfig, PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage } from "../../schema/index.js";
-import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
-import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
-import { checkTokenBudget } from "./token-budget.js";
-import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
+import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import { toolRexAppendLog } from "../../tools/rex.js";
+import {checkTokenBudget} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { section, subsection, stream, info } from "../../types/output.js";

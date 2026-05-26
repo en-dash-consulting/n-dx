@@ -17,8 +17,6 @@ import {
   getLevelPlural,
 } from "../schema/index.js";
 import { walkTree } from "./tree.js";
-import { isFullyCompleted, countSubtree } from "./prune.js";
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface HealthDimensions {

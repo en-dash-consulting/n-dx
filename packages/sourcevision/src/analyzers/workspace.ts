@@ -7,8 +7,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, dirname } from "node:path";
-import type {
+import {join, relative} from "node:path";import type {
   Manifest,
   Inventory,
   Imports,

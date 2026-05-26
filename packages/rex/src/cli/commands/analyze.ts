@@ -35,8 +35,7 @@ import {
   applyConsolidationGuard,
 } from "../../analyze/index.js";
 import type { ScanResult, Proposal } from "../../analyze/index.js";
-import type { PRDItem, PRDDocument, AnalyzeTokenUsage, LoEConfig } from "../../schema/index.js";
-import { LOE_DEFAULTS } from "../../schema/index.js";
+import type {PRDItem, AnalyzeTokenUsage, LoEConfig} from "../../schema/index.js";import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import { printVendorModelHeader, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";

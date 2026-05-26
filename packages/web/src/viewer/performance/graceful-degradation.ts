@@ -17,8 +17,7 @@
  */
 
 import type { MemoryLevel, MemorySnapshot } from "./memory-monitor.js";
-import { onSnapshot, getCurrentLevel, getLatestSnapshot } from "./memory-monitor.js";
-
+import {onSnapshot, getLatestSnapshot} from "./memory-monitor.js";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /**

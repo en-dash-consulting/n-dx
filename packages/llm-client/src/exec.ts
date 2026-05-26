@@ -173,6 +173,31 @@ export function getCurrentBranch(cwd: string): string | undefined {
 }
 
 /**
+ * Characters unsafe for filenames or confusing in branch-to-path mapping.
+ * Covers path separators, shell metacharacters, Windows-illegal chars,
+ * and git reflog/caret notation.
+ */
+const UNSAFE_BRANCH_CHARS = /[/\\:*?"<>|@{}\s~^]/g;
+
+/**
+ * Sanitize a git branch name for use in filenames.
+ *
+ * - Replaces slashes, special characters, and whitespace with hyphens
+ * - Collapses consecutive hyphens
+ * - Trims leading/trailing hyphens
+ * - Lowercases for consistency
+ *
+ * Dots are preserved (common in release branches like `release/v1.2.3`).
+ */
+export function sanitizeBranchName(branch: string): string {
+  return branch
+    .replace(UNSAFE_BRANCH_CHARS, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+}
+
+/**
  * Synchronous helper — check whether an executable is on PATH.
  *
  * Uses `which` to locate the binary. Returns true if found, false otherwise.

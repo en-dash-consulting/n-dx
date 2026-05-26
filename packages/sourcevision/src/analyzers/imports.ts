@@ -5,8 +5,7 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { join, dirname, relative, extname, resolve } from "node:path";
-import ts from "typescript";
+import {join, dirname, extname, resolve} from "node:path";import ts from "typescript";
 import type {
   ImportEdge,
   ImportType,

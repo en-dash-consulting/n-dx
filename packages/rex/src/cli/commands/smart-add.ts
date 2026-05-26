@@ -31,8 +31,7 @@ import {
   applyConsolidationGuard,
 } from "../../analyze/index.js";
 import type { Proposal, QualityIssue } from "../../analyze/index.js";
-import { CHILD_LEVEL, PRIORITY_ORDER, LOE_DEFAULTS } from "../../schema/index.js";
-import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
+import {PRIORITY_ORDER, LOE_DEFAULTS} from "../../schema/index.js";import type { PRDItem, ItemLevel, DuplicateOverrideMarker, LoEConfig } from "../../schema/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import { hashPRD } from "../../core/pending-cache.js";
 import {

@@ -12,8 +12,7 @@ import { validateDAG } from "../../core/dag.js";
 import { findItem, resolveItem } from "../../core/tree.js";
 import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
 import { VALID_STATUSES, VALID_PRIORITIES, isItemStatus, isPriority } from "../../schema/index.js";
-import type { PRDItem, ItemStatus, Priority } from "../../schema/index.js";
-
+import type {PRDItem, ItemStatus} from "../../schema/index.js";
 export async function cmdUpdate(
   dir: string,
   id: string,

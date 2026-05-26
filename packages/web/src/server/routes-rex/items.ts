@@ -30,7 +30,6 @@ import {
 } from "../rex-gateway.js";
 
 // Re-import parentIdOf from rex-route-helpers for merge handler
-import { parentIdOf } from "./rex-route-helpers.js";
 
 /** Item CRUD routes: add, get, patch, bulk update, merge. */
 export function routeItems(

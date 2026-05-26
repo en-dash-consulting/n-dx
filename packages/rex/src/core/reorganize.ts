@@ -25,8 +25,7 @@ import {
   getLevelLabel,
   getLevelPlural,
 } from "../schema/index.js";
-import { walkTree, findItem } from "./tree.js";
-import { findEpiclessFeatures } from "./structural.js";
+import {walkTree} from "./tree.js";import { findEpiclessFeatures } from "./structural.js";
 
 import { similarity } from "../analyze/dedupe.js";
 

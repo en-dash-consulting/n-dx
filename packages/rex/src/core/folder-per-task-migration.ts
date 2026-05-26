@@ -16,10 +16,9 @@
  * @module core/folder-per-task-migration
  */
 
-import { readdir, readFile, writeFile, rm, rename, stat, mkdir } from "node:fs/promises";
+import { readdir, readFile, rm, rename, stat, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseFrontmatter, type ParseWarning } from "../store/folder-tree-parser.js";
-import { titleToFilename } from "../store/title-to-filename.js";
 
 /**
  * Result of running the folder-per-task structural migration.

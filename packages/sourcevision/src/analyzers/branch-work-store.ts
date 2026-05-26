@@ -24,31 +24,11 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { PROJECT_DIRS } from "@n-dx/llm-client";
+import { PROJECT_DIRS, sanitizeBranchName } from "@n-dx/llm-client";
 import { BranchWorkRecordSchema } from "../schema/validate.js";
 import type { BranchWorkRecord } from "../schema/v1.js";
 
-// ---------------------------------------------------------------------------
-// Branch name sanitization
-// ---------------------------------------------------------------------------
-
-/**
- * Sanitize a branch name for use in a filename.
- *
- * Replaces characters that are problematic in filenames (slashes, `@`, spaces,
- * colons, tildes, carets, question marks, asterisks, brackets) with dashes,
- * collapses consecutive dashes, and trims leading/trailing dashes.
- *
- * @example
- * sanitizeBranchName("feature/add-auth")  // → "feature-add-auth"
- * sanitizeBranchName("release/v2.0@rc1")  // → "release-v2.0-rc1"
- */
-export function sanitizeBranchName(branch: string): string {
-  return branch
-    .replace(/[/@:~^?*[\]\\]/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+export { sanitizeBranchName };
 
 // ---------------------------------------------------------------------------
 // Path helpers

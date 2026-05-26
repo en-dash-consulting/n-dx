@@ -8,14 +8,12 @@
  * 4. Report results per-task, per-criterion.
  */
 
-import { readdir, stat } from "node:fs/promises";
-import { join, basename, extname, relative } from "node:path";
+import { readdir } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { PROJECT_DIRS, exec as foundationExec } from "@n-dx/llm-client";
-import type { ExecResult } from "@n-dx/llm-client";
 import { walkTree } from "./tree.js";
-import { extractKeywords, scoreMatch, STOP_WORDS } from "./keywords.js";
-import type { PRDItem } from "../schema/index.js";
-
+import { extractKeywords, scoreMatch } from "./keywords.js";
+import type {PRDItem} from "../schema/index.js";
 // Re-export for backward compatibility
 export { extractKeywords, scoreMatch };
 

@@ -21,8 +21,7 @@ import {
   getWorkspaceStatus,
   toPosix,
 } from "../sourcevision-core.js";
-import type { WorkspaceConfig, WorkspaceMember } from "../sourcevision-core.js";
-
+import type {WorkspaceMember} from "../sourcevision-core.js";
 // ── Flag parsing ────────────────────────────────────────────────────────────
 
 interface WorkspaceFlags {
