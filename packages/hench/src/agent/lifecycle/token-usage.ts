@@ -16,13 +16,15 @@
  */
 
 import type { TokenUsage } from "../../schema/index.js";
-import type { TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping } from "../../prd/llm-gateway.js";
+import type { TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping, AggregateTokenUsage } from "../../prd/llm-gateway.js";
 import {
   parseApiTokenUsage as parseTokenUsage,
   parseApiTokenUsageWithDiagnostic as parseTokenUsageWithDiagnostic,
   parseStreamTokenUsage,
   parseStreamTokenUsageWithDiagnostic,
   mapCodexUsageToTokenUsage,
+  accumulateTokenUsage,
+  emptyAggregateTokenUsage,
 } from "../../prd/llm-gateway.js";
 
 // Re-export parsing functions from the canonical source (@n-dx/llm-client).
@@ -34,50 +36,17 @@ export {
   parseStreamTokenUsage,
   parseStreamTokenUsageWithDiagnostic,
   mapCodexUsageToTokenUsage,
+  // Token accumulation (canonical implementation moved to @n-dx/llm-client)
+  accumulateTokenUsage,
+  emptyAggregateTokenUsage,
 };
 
-// Re-export diagnostic types for consumers within hench.
-export type { TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping };
+// Re-export diagnostic and accumulation types for consumers within hench.
+export type { TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping, AggregateTokenUsage };
 
 // ── Aggregate token usage ──
-
-/** Aggregated token usage across multiple API calls. */
-export interface AggregateTokenUsage {
-  calls: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreationInputTokens?: number;
-  cacheReadInputTokens?: number;
-}
-
-/** Create an empty AggregateTokenUsage accumulator. */
-export function emptyAggregateTokenUsage(): AggregateTokenUsage {
-  return { calls: 0, inputTokens: 0, outputTokens: 0 };
-}
-
-/**
- * Accumulate a single call's token usage into the aggregate.
- *
- * Always increments the call count, even when `usage` is undefined
- * (e.g. when the API response omitted usage data).
- */
-export function accumulateTokenUsage(
-  aggregate: AggregateTokenUsage,
-  usage?: TokenUsage,
-): void {
-  aggregate.calls++;
-  if (!usage) return;
-  aggregate.inputTokens += usage.input;
-  aggregate.outputTokens += usage.output;
-  if (usage.cacheCreationInput) {
-    aggregate.cacheCreationInputTokens =
-      (aggregate.cacheCreationInputTokens ?? 0) + usage.cacheCreationInput;
-  }
-  if (usage.cacheReadInput) {
-    aggregate.cacheReadInputTokens =
-      (aggregate.cacheReadInputTokens ?? 0) + usage.cacheReadInput;
-  }
-}
+// Accumulation functions re-exported from @n-dx/llm-client — the canonical
+// implementation used by both hench and rex.
 
 /**
  * Format aggregate token usage for display.

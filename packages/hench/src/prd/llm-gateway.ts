@@ -105,13 +105,20 @@ export {
   ProcessLimitError,
 } from "@n-dx/llm-client";
 
-// ---- Token usage parsing ----------------------------------------------------
+// ---- Token usage parsing and accumulation ----------------------------------
 export {
   parseApiTokenUsage,
   parseApiTokenUsageWithDiagnostic,
   parseStreamTokenUsage,
   parseStreamTokenUsageWithDiagnostic,
   mapCodexUsageToTokenUsage,
+  accumulateTokenUsage,
+  emptyAggregateTokenUsage,
+} from "@n-dx/llm-client";
+
+export type {
+  TokenParseResult,
+  AggregateTokenUsage,
 } from "@n-dx/llm-client";
 
 // ---- Model resolution & failover chains ------------------------------------
@@ -191,7 +198,6 @@ export type {
   FailureCategory,
   TokenDiagnosticStatus,
   RuntimeDiagnostics,
-  TokenParseResult,
   CodexTokenMapping,
   ToolDefinition,
   ToolInputSchema,

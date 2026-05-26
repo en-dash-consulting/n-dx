@@ -26,6 +26,7 @@ import { CollapsibleSection } from "../components/data-display/collapsible-secti
 import type { ActiveRun } from "../components/index.js";
 import { usePolling } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
+import { fmtDuration } from "../utils/format.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -97,20 +98,6 @@ function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
-}
-
-function fmtDuration(start: string, end?: string): string {
-  if (!end) return "running…";
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  if (ms < 0) return "—";
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  const remainSecs = secs % 60;
-  if (mins < 60) return `${mins}m ${remainSecs}s`;
-  const hours = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hours}h ${remainMins}m`;
 }
 
 function fmtTimestamp(iso: string): string {

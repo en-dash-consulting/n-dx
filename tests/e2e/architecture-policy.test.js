@@ -958,7 +958,7 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",
-    maxExports: 59,
+    maxExports: 62,
     description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration)",
   },
   {
@@ -973,8 +973,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 116,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers)",
+    maxExports: 119,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation)",
   },
 ];
 

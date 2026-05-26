@@ -286,3 +286,52 @@ export function mapCodexUsageToTokenUsage(raw: unknown): CodexTokenMapping {
     diagnosticStatus: hasUsageFields ? "complete" : "unavailable",
   };
 }
+
+// ── Token accumulation ────────────────────────────────────────────────────
+
+/**
+ * Aggregated token usage across multiple API calls.
+ *
+ * Used by domain and execution layers to accumulate usage data from
+ * multiple parsing calls without redundant implementations.
+ */
+export interface AggregateTokenUsage {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+}
+
+/**
+ * Create an empty AggregateTokenUsage accumulator.
+ *
+ * Used as the initial value for accumulation loops.
+ */
+export function emptyAggregateTokenUsage(): AggregateTokenUsage {
+  return { calls: 0, inputTokens: 0, outputTokens: 0 };
+}
+
+/**
+ * Accumulate a single call's token usage into the aggregate.
+ *
+ * Always increments the call count, even when `usage` is undefined
+ * (e.g. when the API response omitted usage data).
+ */
+export function accumulateTokenUsage(
+  aggregate: AggregateTokenUsage,
+  usage?: TokenUsage,
+): void {
+  aggregate.calls++;
+  if (!usage) return;
+  aggregate.inputTokens += usage.input;
+  aggregate.outputTokens += usage.output;
+  if (usage.cacheCreationInput) {
+    aggregate.cacheCreationInputTokens =
+      (aggregate.cacheCreationInputTokens ?? 0) + usage.cacheCreationInput;
+  }
+  if (usage.cacheReadInput) {
+    aggregate.cacheReadInputTokens =
+      (aggregate.cacheReadInputTokens ?? 0) + usage.cacheReadInput;
+  }
+}

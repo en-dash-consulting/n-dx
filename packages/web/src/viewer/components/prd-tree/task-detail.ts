@@ -11,6 +11,7 @@ import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, ItemLevel, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import type { NavigateTo } from "../../types.js";
 import { formatTimestamp } from "./compute.js";
+import { formatTokenCount, fmtDuration } from "../../utils/format.js";
 import { findItemById } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
@@ -66,12 +67,6 @@ const PRIORITY_OPTIONS: Array<{ value: Priority; label: string }> = [
 ];
 
 // Level labels now provided by getLevelLabel() from ./levels.ts
-
-function formatTokenCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
 
 // ── Sub-components ───────────────────────────────────────────────────
 
@@ -1289,20 +1284,6 @@ function runTotalTokens(r: RunEntry): number {
     + (r.tokenUsage.output ?? 0)
     + (r.tokenUsage.cacheCreationInput ?? 0)
     + (r.tokenUsage.cacheReadInput ?? 0);
-}
-
-function fmtDuration(start: string, end?: string): string {
-  if (!end) return "running\u2026";
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  if (ms < 0) return "\u2014";
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  const remainSecs = secs % 60;
-  if (mins < 60) return `${mins}m ${remainSecs}s`;
-  const hours = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hours}h ${remainMins}m`;
 }
 
 function fmtRelativeTime(iso: string): string {
