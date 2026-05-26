@@ -13,4 +13,4 @@ description: "Audit production TypeScript files for patterns that are demonstrab
 | Title | Status |
 |-------|--------|
 | [Remove redundant type assertions and unnecessary intermediate variables in production TypeScript](./remove-redundant-type-8901a4.md) | completed |
-| [Replace verbose manual patterns with existing utility functions already present in the codebase](./replace-verbose-manual-patterns-583bf0.md) | pending |
+| [Replace verbose manual patterns with existing utility functions already present in the codebase](./replace-verbose-manual-patterns-583bf0.md) | in_progress |

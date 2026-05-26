@@ -5,6 +5,7 @@ import { PROJECT_DIRS } from "@n-dx/llm-client";
 import { resolveStore } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
+import { parseIntList } from "../parse-utils.js";
 import { info, result } from "../output.js";
 import type { ItemLevel } from "../../schema/index.js";
 import {
@@ -441,6 +442,7 @@ async function handleAcknowledge(
   }
 
   const tokens = flag.split(",").map((s) => s.trim()).filter(Boolean);
+  const indices = parseIntList(flag);
   let updated = ackStore;
   const acked: string[] = [];
   for (const token of tokens) {

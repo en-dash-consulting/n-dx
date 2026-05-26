@@ -15,6 +15,7 @@ import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { appendArchiveBatch } from "../../core/archive.js";
 import { REX_DIR } from "./constants.js";
+import { parseIntList } from "../parse-utils.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
@@ -140,7 +141,7 @@ function selectStructuralProposals(
   }
 
   // --accept=1,3 — parse comma-separated IDs
-  const ids = acceptFlag.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+  const ids = parseIntList(acceptFlag);
   if (ids.length === 0) {
     throw new CLIError(
       "Invalid --accept value.",
@@ -209,7 +210,7 @@ function selectLlmProposals(
     return reshapeProposals;
   }
   if (acceptLlmFlag) {
-    const indices = acceptLlmFlag.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+    const indices = parseIntList(acceptLlmFlag);
     const selected = indices
       .map((i) => reshapeProposals[i - 1])
       .filter((p): p is ReshapeProposal => p !== undefined);

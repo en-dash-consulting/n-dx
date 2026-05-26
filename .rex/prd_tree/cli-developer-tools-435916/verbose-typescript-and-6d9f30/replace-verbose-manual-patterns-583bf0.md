@@ -2,13 +2,14 @@
 id: "583bf032-c437-4c65-a571-3cb0ce056b8d"
 level: "task"
 title: "Replace verbose manual patterns with existing utility functions already present in the codebase"
-status: "pending"
+status: "in_progress"
 priority: "low"
 tags:
   - "refactor"
   - "deduplication"
   - "simplification"
 source: "smart-add"
+startedAt: "2026-05-26T02:32:21.008Z"
 acceptanceCriteria:
   - "No production call site manually implements logic that is already provided by an existing utility function in the same codebase"
   - "All replacements use the existing utility directly without wrapping"

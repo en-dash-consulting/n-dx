@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
 import { REX_DIR } from "./constants.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
+import { parseCsvList } from "../parse-utils.js";
 import { CLIError, requireRexDir } from "../errors.js";
 import { info, result } from "../output.js";
 import { emitMigrationNotification } from "../migration-notification.js";
@@ -125,7 +126,7 @@ export async function cmdUpdate(
       // Clear dependencies
       updates.blockedBy = undefined;
     } else {
-      updates.blockedBy = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      updates.blockedBy = parseCsvList(raw);
     }
   }
 
