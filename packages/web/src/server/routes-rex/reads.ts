@@ -9,7 +9,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse } from "../response-utils.js";
-import { loadPRD, findNextTask, collectCompletedIds } from "./rex-route-helpers.js";
+import { loadPRDSync } from "../prd-io.js";
+import { findNextTask, collectCompletedIds } from "./rex-route-helpers.js";
 
 import {
   computeStats,
@@ -25,7 +26,7 @@ export function routePrdReads(
 ): boolean {
   // GET /api/rex/prd — full PRD document
   if (path === "prd" && method === "GET") {
-    const doc = loadPRD(ctx);
+    const doc = loadPRDSync(ctx.rexDir);
     if (!doc) {
       errorResponse(res, 404, "No PRD data found");
       return true;
@@ -36,7 +37,7 @@ export function routePrdReads(
 
   // GET /api/rex/stats — tree stats
   if (path === "stats" && method === "GET") {
-    const doc = loadPRD(ctx);
+    const doc = loadPRDSync(ctx.rexDir);
     if (!doc) {
       errorResponse(res, 404, "No PRD data found");
       return true;
@@ -54,7 +55,7 @@ export function routePrdReads(
 
   // GET /api/rex/dashboard — dashboard data (overall + per-epic + next task + priority distribution)
   if (path === "dashboard" && method === "GET") {
-    const doc = loadPRD(ctx);
+    const doc = loadPRDSync(ctx.rexDir);
     if (!doc) {
       errorResponse(res, 404, "No PRD data found");
       return true;
@@ -81,7 +82,7 @@ export function routePrdReads(
 
   // GET /api/rex/next — next actionable task
   if (path === "next" && method === "GET") {
-    const doc = loadPRD(ctx);
+    const doc = loadPRDSync(ctx.rexDir);
     if (!doc) {
       errorResponse(res, 404, "No PRD data found");
       return true;

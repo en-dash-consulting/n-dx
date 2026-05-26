@@ -38,14 +38,6 @@ export function findItemById(items: PRDItem[], id: string): PRDItem | null {
   return entry ? entry.item : null;
 }
 
-/**
- * Insert a child under a parent. Skips rex's hierarchy validation since the
- * web API validates level separately and some batch-import paths construct
- * items with the correct level pre-set.
- */
-export function insertChild(items: PRDItem[], parentId: string, child: PRDItem): boolean {
-  return rexInsertChild(items, parentId, child);
-}
 
 /**
  * Update an item in the tree, automatically applying timestamp transitions
@@ -77,15 +69,6 @@ export function findNextTask(items: PRDItem[], completedIds: Set<string>): PRDIt
   return entry ? entry.item : null;
 }
 
-/** Load and parse prd.json. Returns null if not found. */
-export function loadPRD(ctx: ServerContext): PRDDocument | null {
-  return loadPRDSync(ctx.rexDir);
-}
-
-/** Save prd.json. */
-export function savePRD(ctx: ServerContext, doc: PRDDocument): void {
-  savePRDSync(ctx.rexDir, doc);
-}
 
 /** Extract the parent ID from a TreeEntry's parent chain. */
 export function parentIdOf(entry: TreeEntry): string | null {

@@ -12,7 +12,8 @@ import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-cli
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, loadPRD, appendLog } from "./rex-route-helpers.js";
+import { findItemById, appendLog } from "./rex-route-helpers.js";
+import { loadPRDSync } from "../prd-io.js";
 
 import {
   computeStats,
@@ -104,7 +105,7 @@ function getExecutionStatusPayload() {
 
 /** Refresh epic task counts from the PRD on disk. */
 function refreshEpicProgress(ctx: ServerContext): void {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) return;
   for (const ep of executionState.epics) {
     const epicItem = findItemById(doc.items, ep.id);
@@ -270,7 +271,7 @@ async function handleStartEpicByEpic(
     return true;
   }
 
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;

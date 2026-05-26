@@ -15,8 +15,8 @@ import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { loadPRD, appendLog } from "./routes-rex/rex-route-helpers.js";
-import { refreshPRDCache } from "./prd-io.js";
+import { appendLog } from "./routes-rex/rex-route-helpers.js";
+import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
 
 import {
   type PRDItem,
@@ -293,7 +293,7 @@ async function handleAcceptProposals(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -436,7 +436,7 @@ async function handleAcceptEditedProposals(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -701,7 +701,7 @@ async function handleBatchImport(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;

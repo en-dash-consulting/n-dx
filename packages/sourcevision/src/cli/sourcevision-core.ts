@@ -8,11 +8,12 @@
 export { SV_DIR, TOOL_VERSION } from "../constants.js";
 export { DATA_FILES, SUPPLEMENTARY_FILES } from "../schema/data-files.js";
 export {
-  validateManifest,
-  validateInventory,
-  validateImports,
-  validateZones,
-  validateComponents,
+  validate,
+  ManifestSchema,
+  InventorySchema,
+  ImportsSchema,
+  ZonesSchema,
+  ComponentsSchema,
 } from "../schema/index.js";
 export type {
   AnalyzeTokenUsage,

@@ -10,9 +10,11 @@ import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
-  findItemById, insertChild, updateInTree, loadPRD, savePRD,
+  findItemById, updateInTree,
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
+import { loadPRDSync, savePRDSync } from "../prd-io.js";
+import { insertChild as rexInsertChild } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -77,7 +79,7 @@ export function routeItems(
 
     // GET /api/rex/items/:id — single item
     if (method === "GET") {
-      const doc = loadPRD(ctx);
+      const doc = loadPRDSync(ctx.rexDir);
       if (!doc) {
         errorResponse(res, 404, "No PRD data found");
         return true;
@@ -113,7 +115,7 @@ async function handleItemPatch(
   itemId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -128,7 +130,7 @@ async function handleItemPatch(
       return true;
     }
 
-    savePRD(ctx, doc);
+    savePRDSync(ctx.rexDir, doc);
 
     // Broadcast change to connected WebSocket clients
     if (broadcast) {
@@ -154,7 +156,7 @@ function handleItemDelete(
   itemId: string,
   broadcast?: WebSocketBroadcaster,
 ): boolean {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -174,7 +176,7 @@ function handleItemDelete(
     return true;
   }
 
-  savePRD(ctx, doc);
+  savePRDSync(ctx.rexDir, doc);
 
   // Append log entry
   const logPath = join(ctx.rexDir, "execution-log.jsonl");
@@ -218,7 +220,7 @@ async function handleItemAdd(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -307,12 +309,12 @@ async function handleItemAdd(
     }
 
     if (parentId) {
-      insertChild(doc.items, parentId, item);
+      rexInsertChild(doc.items, parentId, item);
     } else {
       doc.items.push(item);
     }
 
-    savePRD(ctx, doc);
+    savePRDSync(ctx.rexDir, doc);
 
     // Log the addition
     appendLog(ctx, {
@@ -343,7 +345,7 @@ async function handleBulkUpdate(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -382,7 +384,7 @@ async function handleBulkUpdate(
       }
     }
 
-    savePRD(ctx, doc);
+    savePRDSync(ctx.rexDir, doc);
 
     // Log the bulk update
     const successCount = results.filter((r) => r.ok).length;
@@ -413,7 +415,7 @@ async function handleItemMerge(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -458,7 +460,7 @@ async function handleItemMerge(
 
     // Execute merge
     const result = mergeItems(doc.items, input.sourceIds, input.targetId, options);
-    savePRD(ctx, doc);
+    savePRDSync(ctx.rexDir, doc);
 
     // Log the merge
     appendLog(ctx, {

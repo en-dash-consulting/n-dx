@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { loadPRD, savePRD } from "./rex-route-helpers.js";
+import { loadPRDSync, savePRDSync } from "../prd-io.js";
 
 import {
   computeHealthScore,
@@ -24,7 +24,7 @@ export function routeHealthReorganize(
 ): boolean | Promise<boolean> {
   // GET /api/rex/health — structure health score
   if (path === "health" && method === "GET") {
-    const doc = loadPRD(ctx);
+    const doc = loadPRDSync(ctx.rexDir);
     if (!doc) {
       errorResponse(res, 404, "No PRD data found");
       return true;
@@ -38,7 +38,7 @@ export function routeHealthReorganize(
   // Query params: mode=fast|full (default: full)
   if (path === "reorganize" && method === "GET") {
     return (async () => {
-      const doc = loadPRD(ctx);
+      const doc = loadPRDSync(ctx.rexDir);
       if (!doc) {
         errorResponse(res, 404, "No PRD data found");
         return true;
@@ -88,7 +88,7 @@ export function routeHealthReorganize(
   // Body: { proposalIds?: number[], llmProposalIds?: string[] }
   if (path === "reorganize/apply" && method === "POST") {
     return (async () => {
-      const doc = loadPRD(ctx);
+      const doc = loadPRDSync(ctx.rexDir);
       if (!doc) {
         errorResponse(res, 404, "No PRD data found");
         return true;
@@ -143,7 +143,7 @@ export function routeHealthReorganize(
 
       const totalApplied = structuralApplied + llmApplied;
       if (totalApplied > 0) {
-        savePRD(ctx, doc);
+        savePRDSync(ctx.rexDir, doc);
         if (broadcast) broadcast({ type: "rex:prd-changed", source: "reorganize" });
       }
       jsonResponse(res, 200, {

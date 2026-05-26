@@ -173,10 +173,6 @@ export function savePRDSync(rexDir: string, doc: PRDDocument): void {
   }
 }
 
-/** Resolve the path to `prd.md` in the given rex directory. */
-export function prdPath(rexDir: string): string {
-  return prdMdPath(rexDir);
-}
 
 /**
  * Refresh ONLY the ephemeral cache (`.rex/.cache/prd.json`) — does NOT write
