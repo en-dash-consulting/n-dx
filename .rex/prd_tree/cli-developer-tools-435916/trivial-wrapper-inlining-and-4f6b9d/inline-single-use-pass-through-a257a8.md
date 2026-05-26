@@ -2,13 +2,14 @@
 id: "a257a82d-7d40-4bd7-92f9-f5dd73bacab5"
 level: "task"
 title: "Inline single-use pass-through wrapper functions in production source files"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "refactor"
   - "simplification"
   - "cleanup"
 source: "smart-add"
+startedAt: "2026-05-26T02:04:26.042Z"
 acceptanceCriteria:
   - "No production function exists whose sole body is a single delegating call to another function with no transformation"
   - "Each inlining is confirmed to preserve identical runtime behavior via test suite"
