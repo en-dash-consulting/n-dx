@@ -10,8 +10,9 @@ import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
 import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import { toPosix } from "../util/paths.js";
-import { detectLanguage as detectProjectLanguage, typescriptConfig } from "../language/index.js";
-import type { LanguageConfig } from "../language/index.js";
+import { detectLanguage as detectProjectLanguage } from "../language/detect.js";
+import { typescriptConfig } from "../language/typescript.js";
+import type { LanguageConfig } from "../language/registry.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
 

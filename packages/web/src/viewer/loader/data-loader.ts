@@ -11,7 +11,6 @@
 import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../external.js";
 import { DATA_FILES } from "../external.js";
 import {
-  migrateData,
   validate,
   ManifestSchema,
   InventorySchema,
@@ -19,7 +18,8 @@ import {
   ZonesSchema,
   ComponentsSchema,
   CallGraphSchema,
-} from "./schema/index.js";
+} from "./schema/validate.js";
+import { migrateData } from "./schema/compat.js";
 import type { LoadedData } from "../types.js";
 import { registerPoller, unregisterPoller } from "../polling/index.js";
 

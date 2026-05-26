@@ -254,7 +254,7 @@ async function persistTestCommand(
     config.fullTestCommand = command;
 
     // Write back with canonical formatting
-    const { toCanonicalJSON } = await import("../store/json.js");
+    const { toCanonicalJSON } = await import("../prd/llm-gateway.js");
     await writeFileSync(configPath, toCanonicalJSON(config), "utf-8");
   } catch (err) {
     // Best-effort — don't fail the run if we can't persist

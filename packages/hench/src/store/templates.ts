@@ -9,7 +9,7 @@
 import { join } from "node:path";
 import { readFile, writeFile, access } from "node:fs/promises";
 import { BUILT_IN_TEMPLATES } from "../schema/templates.js";
-import { toCanonicalJSON } from "./json.js";
+import { toCanonicalJSON } from "../prd/llm-gateway.js";
 import type { WorkflowTemplate, TemplateConfigOverlay } from "../schema/templates.js";
 import type { HenchConfig } from "../schema/v1.js";
 

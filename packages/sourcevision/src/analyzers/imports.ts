@@ -20,8 +20,8 @@ import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { buildSwiftImportGraph } from "./swift-imports.js";
 import { readManifest } from "./manifest.js";
-import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/index.js";
-import type { LanguageConfig } from "../language/index.js";
+import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
+import type { LanguageConfig } from "../language/registry.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 

@@ -12,5 +12,5 @@ description: "Identify production functions whose entire body delegates to exact
 
 | Title | Status |
 |-------|--------|
-| [Inline single-use pass-through wrapper functions in production source files](./inline-single-use-pass-through-a257a8.md) | in_progress |
-| [Remove single-symbol re-export modules and collapse intermediate barrel indirection](./remove-single-symbol-re-export-40834f.md) | pending |
+| [Inline single-use pass-through wrapper functions in production source files](./inline-single-use-pass-through-a257a8.md) | completed |
+| [Remove single-symbol re-export modules and collapse intermediate barrel indirection](./remove-single-symbol-re-export-40834f.md) | in_progress |

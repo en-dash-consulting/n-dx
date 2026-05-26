@@ -155,7 +155,7 @@ describe("API loop task failure handling", () => {
     });
 
     // Mock dispatchTool to avoid real tool execution
-    const toolsModule = await import("../../../src/agent/tools.js");
+    const toolsModule = await import("../../../src/tools/dispatch.js");
     vi.spyOn(toolsModule, "dispatchTool").mockResolvedValue("ok");
 
     const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
