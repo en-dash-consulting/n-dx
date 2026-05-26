@@ -1,23 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { toolRexUpdateStatus, toolRexAppendLog, toolRexAddSubtask } from "../../../src/tools/rex.js";
-
-function mockStore() {
-  return {
-    updateItem: vi.fn().mockResolvedValue(undefined),
-    appendLog: vi.fn().mockResolvedValue(undefined),
-    addItem: vi.fn().mockResolvedValue(undefined),
-    loadDocument: vi.fn(),
-    saveDocument: vi.fn(),
-    getItem: vi.fn(),
-    removeItem: vi.fn(),
-    loadConfig: vi.fn(),
-    saveConfig: vi.fn(),
-    readLog: vi.fn(),
-    loadWorkflow: vi.fn(),
-    saveWorkflow: vi.fn(),
-    capabilities: vi.fn(),
-  };
-}
+import { mockStore } from "../../helpers/index.js";
 
 describe("toolRexUpdateStatus", () => {
   it("updates task status and sets timestamps", async () => {

@@ -1,41 +1,12 @@
 import { describe, it, expect } from "vitest";
-import type { PRDItem, PRDStore } from "@n-dx/rex";
+import type { PRDItem } from "@n-dx/rex";
 import {
   getOrderedEpics,
   printEpicByEpicSummary,
   type EpicRunSummary,
   type EpicScopeInfo,
 } from "../../../../src/cli/commands/run.js";
-
-// ---------------------------------------------------------------------------
-// Mock store helper
-// ---------------------------------------------------------------------------
-
-function mockStore(items: PRDItem[]): PRDStore {
-  return {
-    loadDocument: async () => ({
-      schema: "rex/v1",
-      title: "Test",
-      items,
-    }),
-    loadConfig: async () => ({
-      schema: "rex/v1",
-      project: "test",
-      adapter: "file",
-    }),
-    loadWorkflow: async () => "",
-    readLog: async () => [],
-    saveDocument: async () => {},
-    saveConfig: async () => {},
-    getItem: async () => null,
-    addItem: async () => {},
-    updateItem: async () => {},
-    removeItem: async () => {},
-    appendLog: async () => {},
-    saveWorkflow: async () => {},
-    capabilities: () => ({ adapter: "file", supportsTransactions: false, supportsWatch: false }),
-  };
-}
+import { mockStoreWithDefaults } from "../../../helpers/index.js";
 
 // ---------------------------------------------------------------------------
 // getOrderedEpics
@@ -46,7 +17,7 @@ describe("getOrderedEpics", () => {
     const items: PRDItem[] = [
       { id: "task-1", title: "Orphan Task", level: "task", status: "pending" },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
     const result = await getOrderedEpics(store);
     expect(result).toEqual([]);
   });
@@ -73,7 +44,7 @@ describe("getOrderedEpics", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
     const result = await getOrderedEpics(store);
 
     expect(result).toHaveLength(2);
@@ -116,7 +87,7 @@ describe("getOrderedEpics", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
     const result = await getOrderedEpics(store);
 
     expect(result).toHaveLength(2);
@@ -155,7 +126,7 @@ describe("getOrderedEpics", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
     const result = await getOrderedEpics(store);
 
     expect(result).toHaveLength(1);
@@ -177,7 +148,7 @@ describe("getOrderedEpics", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
     const result = await getOrderedEpics(store);
 
     expect(result).toHaveLength(1);

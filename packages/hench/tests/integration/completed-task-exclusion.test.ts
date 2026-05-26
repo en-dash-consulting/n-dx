@@ -9,43 +9,14 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { PRDItem, PRDStore } from "@n-dx/rex";
+import type { PRDItem } from "@n-dx/rex";
 import {
   assembleTaskBrief,
   TaskNotActionableError,
   collectEpicTaskIds,
   isCompletedTask,
 } from "../../src/agent/planning/brief.js";
-
-// ---------------------------------------------------------------------------
-// Mock store for testing
-// ---------------------------------------------------------------------------
-
-function mockStore(items: PRDItem[]): PRDStore {
-  return {
-    loadDocument: async () => ({
-      schema: "rex/v1",
-      title: "Test",
-      items,
-    }),
-    loadConfig: async () => ({
-      schema: "rex/v1",
-      project: "test",
-      adapter: "file",
-    }),
-    loadWorkflow: async () => "",
-    readLog: async () => [],
-    saveDocument: async () => {},
-    saveConfig: async () => {},
-    getItem: async () => null,
-    addItem: async () => {},
-    updateItem: async () => {},
-    removeItem: async () => {},
-    appendLog: async () => {},
-    saveWorkflow: async () => {},
-    capabilities: () => ({ adapter: "file", supportsTransactions: false, supportsWatch: false }),
-  };
-}
+import { mockStoreWithDefaults } from "../helpers/index.js";
 
 // ---------------------------------------------------------------------------
 // Shared predicate tests
@@ -127,7 +98,7 @@ describe("assembleTaskBrief — explicit --task targeting completed task", () =>
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(assembleTaskBrief(store, "done-1")).rejects.toThrow(TaskNotActionableError);
   });
@@ -141,7 +112,7 @@ describe("assembleTaskBrief — explicit --task targeting completed task", () =>
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     try {
       await assembleTaskBrief(store, "done-2");
@@ -163,7 +134,7 @@ describe("assembleTaskBrief — explicit --task targeting completed task", () =>
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     try {
       await assembleTaskBrief(store, "done-3");
@@ -183,7 +154,7 @@ describe("assembleTaskBrief — explicit --task targeting completed task", () =>
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     try {
       await assembleTaskBrief(store, "done-4");
@@ -215,7 +186,7 @@ describe("assembleTaskBrief — auto-selection skips completed tasks", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store);
     expect(taskId).toBe("pending-task");
@@ -242,7 +213,7 @@ describe("assembleTaskBrief — auto-selection skips completed tasks", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store);
     expect(taskId).toBe("pending-1");
@@ -263,7 +234,7 @@ describe("assembleTaskBrief — auto-selection skips completed tasks", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store);
     expect(taskId).toBe("wip-task");
@@ -284,7 +255,7 @@ describe("assembleTaskBrief — auto-selection skips completed tasks", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(assembleTaskBrief(store)).rejects.toThrow(
       "No actionable tasks found in PRD",
@@ -320,7 +291,7 @@ describe("assembleTaskBrief — epic-filtered selection skips completed tasks", 
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store, undefined, {
       epicId: "epic-auth",
@@ -351,7 +322,7 @@ describe("assembleTaskBrief — epic-filtered selection skips completed tasks", 
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(
       assembleTaskBrief(store, undefined, { epicId: "epic-api" }),
@@ -387,7 +358,7 @@ describe("assembleTaskBrief — epic-filtered selection skips completed tasks", 
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId, brief } = await assembleTaskBrief(store, undefined, {
       epicId: "epic-web",
@@ -433,7 +404,7 @@ describe("assembleTaskBrief — subtask completed filtering", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store);
     expect(taskId).toBe("subtask-pending");
@@ -466,7 +437,7 @@ describe("assembleTaskBrief — mixed completed and other non-actionable statuse
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store);
     expect(taskId).toBe("pending-task");
@@ -487,7 +458,7 @@ describe("assembleTaskBrief — mixed completed and other non-actionable statuse
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(assembleTaskBrief(store)).rejects.toThrow(
       "No actionable tasks found in PRD",

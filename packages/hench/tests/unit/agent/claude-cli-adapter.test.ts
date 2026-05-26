@@ -40,26 +40,7 @@ import {
   FULL_ACCESS_POLICY,
   CROSS_VENDOR_ERROR_FIXTURES,
 } from "../../fixtures/cross-vendor-runtime.js";
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function createStandardEnvelope(): PromptEnvelope {
-  return createPromptEnvelope([
-    { name: "system", content: "You are Hench, an autonomous AI agent." },
-    { name: "workflow", content: "Follow TDD: red → green → refactor." },
-    { name: "brief", content: "Fix the authentication bug in src/auth.ts." },
-    { name: "files", content: "src/auth.ts — existing auth module." },
-    { name: "validation", content: "Run `npm test` and `npm run typecheck`." },
-    { name: "completion", content: "Done when all tests pass and types check." },
-  ]);
-}
-
-function createMinimalEnvelope(): PromptEnvelope {
-  return createPromptEnvelope([
-    { name: "system", content: "You are Hench." },
-    { name: "brief", content: "Fix the bug." },
-  ]);
-}
+import { createStandardEnvelope, createMinimalEnvelope } from "../../helpers/index.js";
 
 // ── 1. VendorAdapter interface compliance ────────────────────────────────
 

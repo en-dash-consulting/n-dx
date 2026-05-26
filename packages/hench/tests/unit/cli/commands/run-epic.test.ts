@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { PRDItem, PRDStore } from "@n-dx/rex";
+import type { PRDItem } from "@n-dx/rex";
 import {
   listEpics,
   findEpicByIdOrTitle,
@@ -9,36 +9,7 @@ import {
   type EpicScopeInfo,
 } from "../../../../src/cli/commands/run.js";
 import { EpicNotFoundError } from "../../../../src/cli/errors.js";
-
-// ---------------------------------------------------------------------------
-// Mock store helper
-// ---------------------------------------------------------------------------
-
-function mockStore(items: PRDItem[]): PRDStore {
-  return {
-    loadDocument: async () => ({
-      schema: "rex/v1",
-      title: "Test",
-      items,
-    }),
-    loadConfig: async () => ({
-      schema: "rex/v1",
-      project: "test",
-      adapter: "file",
-    }),
-    loadWorkflow: async () => "",
-    readLog: async () => [],
-    saveDocument: async () => {},
-    saveConfig: async () => {},
-    getItem: async () => null,
-    addItem: async () => {},
-    updateItem: async () => {},
-    removeItem: async () => {},
-    appendLog: async () => {},
-    saveWorkflow: async () => {},
-    capabilities: () => ({ adapter: "file", supportsTransactions: false, supportsWatch: false }),
-  };
-}
+import { mockStoreWithDefaults } from "../../../helpers/index.js";
 
 // ---------------------------------------------------------------------------
 // listEpics
@@ -157,24 +128,24 @@ describe("resolveEpicFlag", () => {
   ];
 
   it("resolves valid epic by ID", async () => {
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
     const result = await resolveEpicFlag(store, "epic-auth");
     expect(result).toEqual({ id: "epic-auth", title: "Authentication" });
   });
 
   it("resolves valid epic by title", async () => {
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
     const result = await resolveEpicFlag(store, "Dashboard");
     expect(result).toEqual({ id: "epic-dashboard", title: "Dashboard" });
   });
 
   it("throws EpicNotFoundError for non-existent epic", async () => {
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
     await expect(resolveEpicFlag(store, "nonexistent")).rejects.toThrow(EpicNotFoundError);
   });
 
   it("includes available epics in EpicNotFoundError", async () => {
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     try {
       await resolveEpicFlag(store, "nonexistent");
@@ -190,7 +161,7 @@ describe("resolveEpicFlag", () => {
   });
 
   it("shows 'no epics found' when PRD has no epics", async () => {
-    const store = mockStore([
+    const store = mockStoreWithDefaults([
       { id: "task-1", title: "Task", level: "task", status: "pending" },
     ]);
 
@@ -367,7 +338,7 @@ describe("getEpicScopeInfo", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const info = await getEpicScopeInfo(store, "epic-1");
     expect(info).toEqual({
@@ -396,7 +367,7 @@ describe("getEpicScopeInfo", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const info = await getEpicScopeInfo(store, "epic-1");
     expect(info.totalTasks).toBe(4);
@@ -419,7 +390,7 @@ describe("getEpicScopeInfo", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const info = await getEpicScopeInfo(store, "epic-1");
     expect(info.totalTasks).toBe(2);
@@ -442,7 +413,7 @@ describe("getEpicScopeInfo", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const info = await getEpicScopeInfo(store, "epic-1");
     expect(info.totalTasks).toBe(2);
@@ -481,7 +452,7 @@ describe("getEpicScopeInfo", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const info = await getEpicScopeInfo(store, "epic-1");
     // Counts: task-1 (completed), task-2 (pending), subtask-1 (pending)
@@ -496,7 +467,7 @@ describe("getEpicScopeInfo", () => {
     const items: PRDItem[] = [
       { id: "epic-1", title: "Empty Epic", level: "epic", status: "pending" },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const info = await getEpicScopeInfo(store, "epic-1");
     expect(info.totalTasks).toBe(0);
@@ -519,7 +490,7 @@ describe("getEpicScopeInfo", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const info = await getEpicScopeInfo(store, "epic-1");
     expect(info.totalTasks).toBe(2);

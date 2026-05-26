@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { toolRexUpdateStatus } from "../../../src/tools/rex.js";
+import { mockStore } from "../../helpers/index.js";
 
 /**
  * Tests that toolRexUpdateStatus integrates completion validation
@@ -15,33 +16,6 @@ import { validateCompletion, formatValidationResult } from "../../../src/validat
 
 const mockValidate = vi.mocked(validateCompletion);
 const mockFormat = vi.mocked(formatValidationResult);
-
-function mockStore() {
-  return {
-    updateItem: vi.fn().mockResolvedValue(undefined),
-    appendLog: vi.fn().mockResolvedValue(undefined),
-    addItem: vi.fn().mockResolvedValue(undefined),
-    loadDocument: vi.fn().mockResolvedValue({
-      schema: "rex/v1",
-      title: "Test",
-      items: [],
-    }),
-    saveDocument: vi.fn(),
-    getItem: vi.fn().mockResolvedValue({
-      id: "task-1",
-      title: "Test task",
-      status: "in_progress",
-      level: "task",
-    }),
-    removeItem: vi.fn(),
-    loadConfig: vi.fn(),
-    saveConfig: vi.fn(),
-    readLog: vi.fn(),
-    loadWorkflow: vi.fn(),
-    saveWorkflow: vi.fn(),
-    capabilities: vi.fn(),
-  };
-}
 
 beforeEach(() => {
   vi.clearAllMocks();
