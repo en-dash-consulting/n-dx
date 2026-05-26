@@ -2,7 +2,7 @@
 id: "40834f3a-3416-4a89-86f8-345c49cca586"
 level: "task"
 title: "Remove single-symbol re-export modules and collapse intermediate barrel indirection"
-status: "in_progress"
+status: "completed"
 priority: "medium"
 tags:
   - "refactor"
@@ -10,6 +10,10 @@ tags:
   - "cleanup"
 source: "smart-add"
 startedAt: "2026-05-26T02:12:24.122Z"
+completedAt: "2026-05-26T02:24:15.123Z"
+endedAt: "2026-05-26T02:24:15.123Z"
+resolutionType: "code-change"
+resolutionDetail: "Removed 7 single-symbol/pass-through re-export and intermediate barrel files. Updated 10 consumers to import directly from source modules. 68 net lines deleted with zero circular dependencies."
 acceptanceCriteria:
   - "No module file exists whose entire content is a single re-export of one symbol from one other file"
   - "All barrel files that were removed have their consumers updated to import from the canonical source location"

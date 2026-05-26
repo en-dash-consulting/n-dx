@@ -10,5 +10,5 @@ source: "smart-add"
 
 | Title | Status |
 |-------|--------|
-| [Trivial Wrapper Inlining and Pass-Through Abstraction Elimination](./trivial-wrapper-inlining-and-4f6b9d/index.md) | pending |
+| [Trivial Wrapper Inlining and Pass-Through Abstraction Elimination](./trivial-wrapper-inlining-and-4f6b9d/index.md) | completed |
 | [Verbose TypeScript and Boilerplate Pattern Simplification](./verbose-typescript-and-6d9f30/index.md) | pending |

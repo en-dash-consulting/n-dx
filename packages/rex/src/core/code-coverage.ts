@@ -114,9 +114,10 @@ export function crossReferenceChanges(
     }
   }
 
-  const uncoveredChanges: UncoveredChange[] = normalizedChanges
-    .filter((f) => !coveredFiles.has(f))
-    .map((file) => ({ file }));
-
-  return { affectedTasks, uncoveredChanges };
+  return {
+    affectedTasks,
+    uncoveredChanges: normalizedChanges
+      .filter((f) => !coveredFiles.has(f))
+      .map((file) => ({ file })),
+  };
 }

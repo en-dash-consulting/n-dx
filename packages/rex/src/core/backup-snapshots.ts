@@ -187,8 +187,7 @@ export async function pruneBackups(rexDir: string, retentionCap: number = 10): P
  */
 async function dirExists(path: string): Promise<boolean> {
   try {
-    const s = await stat(path);
-    return s.isDirectory();
+    return (await stat(path)).isDirectory();
   } catch {
     return false;
   }
@@ -199,8 +198,7 @@ async function dirExists(path: string): Promise<boolean> {
  */
 async function isDirEmpty(path: string): Promise<boolean> {
   try {
-    const entries = await readdir(path);
-    return entries.length === 0;
+    return (await readdir(path)).length === 0;
   } catch {
     return true;
   }

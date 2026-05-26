@@ -219,8 +219,7 @@ async function promptForTestCommand(): Promise<string | undefined> {
 Test command: `;
 
     rl.question(prompt, (input: string) => {
-      const trimmed = input.trim();
-      finish(trimmed || undefined);
+      finish(input.trim() || undefined);
     });
   });
 }
