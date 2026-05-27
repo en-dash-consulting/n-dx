@@ -1408,6 +1408,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     store,
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
+    commitWatcher,
   });
 
   return { run };

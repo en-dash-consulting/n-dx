@@ -2,9 +2,9 @@
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
 level: "epic"
 title: "Hench"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-03-26T15:22:13.999Z"
+endedAt: "2026-05-26T14:07:04.696Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
 ---
 
@@ -13,6 +13,7 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | Title | Status |
 |-------|--------|
 | [API vs CLI Invocation Context Detection and Display](./api-vs-cli-invocation-context-28bd8b/index.md) | completed |
+| [Auto-Commit Timer-Expiry Stall Recovery in --loop/--yes Mode](./auto-commit-timer-expiry-stall-97d722/index.md) | pending |
 | [Branch Work System of Record](./branch-work-system-of-record/index.md) | completed |
 | [Commit Approval Bypass for Autonomous Runs](./commit-approval-bypass-for-3ca4d0/index.md) | completed |
 | [Ctrl-C Interrupt Rollback Prompt Coordination](./ctrl-c-interrupt-rollback-469c79/index.md) | completed |
@@ -30,6 +31,7 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Hench Run-Loop Visual Output Refinements](./hench-run-loop-visual-output-f505bb/index.md) | completed |
 | [Hench Run-Loop Visual Output Refinements](./hench-run-loop-visual-output-f5ccc9/index.md) | completed |
 | [Hench UI Real-time Task Monitoring](./hench-ui-real-time-task-monitoring/index.md) | completed |
+| [Loop Consecutive-Failure Auto-Cancellation](./loop-consecutive-failure-auto-29e95b/index.md) | completed |
 | [Mandatory Pre-Commit Full Test Suite Gate](./mandatory-pre-commit-full-test-dde6d1/index.md) | completed |
 | [Reliable work loop](./reliable-work-loop/index.md) | completed |
 | [Rex Run Rolling Log Display and Persistent Log Files](./rex-run-rolling-log-display-and-8f175c/index.md) | completed |

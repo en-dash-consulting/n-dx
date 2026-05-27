@@ -28,6 +28,11 @@ const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
 export interface CommitMsgWatcher {
   /** Cancel the watcher and any pending timer. No-op if already cancelled. */
   cancel(): void;
+  /**
+   * Check if the timer fired and successfully auto-committed changes.
+   * Returns true only if tryAutoCommit() ran and completed a git commit.
+   */
+  didAutoCommit(): boolean;
 }
 
 export interface CommitMsgWatcherOptions {
@@ -60,6 +65,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   let timerArmed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watcherClosed = false;
+  let autoCommitted = false;
 
   function closeWatcher(): void {
     if (!watcherClosed) {
@@ -113,6 +119,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
         timeout: 30_000,
       });
       detail("Auto-commit: committed staged changes (timer expiry).");
+      autoCommitted = true;
     } catch (err) {
       detail(`Auto-commit failed: ${(err as Error).message}`);
     } finally {
@@ -161,5 +168,8 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
     watcher.unref();
   }
 
-  return { cancel };
+  return {
+    cancel,
+    didAutoCommit: () => autoCommitted,
+  };
 }

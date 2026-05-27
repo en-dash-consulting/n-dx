@@ -1,0 +1,20 @@
+---
+id: "e5c37f4c-363c-4d0c-97a1-d110d89c6b8a"
+level: "task"
+title: "Fix hench loop to treat timer-expiry auto-commit as a successful commit and advance to next task"
+status: "pending"
+priority: "critical"
+tags:
+  - "hench"
+  - "loop"
+  - "auto-commit"
+  - "bug"
+source: "smart-add"
+acceptanceCriteria:
+  - "Running ndx work --yes (or --loop/--auto) no longer stalls after 'Auto-commit: committed staged changes (timer expiry)' is emitted"
+  - "The loop advances to the next PRD task after the timer-expiry commit without requiring manual input"
+  - "If changes are already committed when the loop checks, the loop does not attempt a second commit — it advances directly"
+  - "Existing commit-approval bypass behavior (--auto/--loop bypassing the normal commit message prompt) is unaffected"
+  - "Regression test added that simulates a timer-expiry auto-commit in --yes mode and asserts the loop continues"
+description: "Apply the fix identified in diagnosis: ensure the hench run loop recognises a timer-expiry auto-commit event as a completed, successful commit so it advances to the next task without stalling. If changes are already staged and committed when the loop resumes, the loop should detect the committed state and skip any redundant commit step rather than waiting for an approval that --yes would normally provide."
+---
