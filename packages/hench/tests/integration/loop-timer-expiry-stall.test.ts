@@ -1,104 +1,213 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { promisify } from "node:util";
+import { exec as execCb } from "node:child_process";
+
+const execAsync = promisify(execCb);
 
 /**
- * Integration test to diagnose the timer-expiry auto-commit stall in --loop mode.
+ * Integration test for timer-expiry auto-commit in --yes mode.
  *
- * The issue: When hench runs with --yes/--auto/--loop, if a timer-expiry
- * auto-commit fires ('Auto-commit: committed staged changes (timer expiry)'),
- * the loop can stall instead of advancing to the next task.
- *
- * This test simulates the scenario and captures where the stall occurs:
- * - Is it a missing acknowledgment?
- * - An unhandled promise?
- * - A state machine gap?
- * - An unexpected prompt waiting for input?
+ * Simulates the scenario: when hench runs with --yes/--auto/--loop, a timer-expiry
+ * auto-commit should not stall the loop. The performCommitPromptIfNeeded function
+ * must recognize that the auto-commit already happened (via didAutoCommit()) and
+ * return early without waiting for a prompt.
  */
 
-describe("Timer-expiry auto-commit stall diagnosis", () => {
-  it("identifies the exact stall point when timer fires in --loop mode", async () => {
+describe("Timer-expiry auto-commit in --yes mode", () => {
+  let projectDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-stall-test-"));
+    // Set up a minimal git repo
+    await execAsync("git init", { cwd: projectDir });
+    await execAsync("git config user.email test@test.com", { cwd: projectDir });
+    await execAsync("git config user.name Test", { cwd: projectDir });
+    // Initial commit so HEAD exists
+    await writeFile(join(projectDir, "file.txt"), "initial\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("recognizes timer-expiry auto-commit when performCommitPromptIfNeeded is called", async () => {
     /**
-     * TODO: Set up a minimal hench loop scenario where:
-     * 1. A task completes with staged changes
+     * Simulates the flow:
+     * 1. Agent completes with staged changes
      * 2. Agent writes .hench-commit-msg.txt
-     * 3. Timer is set but run hasn't reached performCommitPromptIfNeeded yet
-     * 4. Timer fires and auto-commits
-     * 5. Trace where the loop stalls (if it does)
+     * 3. Timer fires before performCommitPromptIfNeeded is called
+     * 4. performCommitPromptIfNeeded detects didAutoCommit() == true
+     * 5. Function returns early without prompting
      *
-     * The diagnosis should reveal:
-     * - File location where execution blocks
-     * - Line number of the blocking call
-     * - Whether it's a promise, prompt, or state transition
-     * - Reproducible steps to trigger the stall
+     * This test verifies the watcher -> performCommitPromptIfNeeded integration
+     * so the loop doesn't stall on the commit gate.
      */
 
-    // Placeholder: Test will be implemented with stall reproduction steps
-    expect(true).toBe(true);
+    const { startCommitMsgWatcher } = await import(
+      "../../src/agent/lifecycle/commit-msg-watcher.js"
+    );
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    // Simulate agent work: stage a change
+    await writeFile(join(projectDir, "file.txt"), "modified\n", "utf-8");
+    await execAsync("git add file.txt", { cwd: projectDir });
+
+    // Simulate agent writing commit message FIRST, then start watcher
+    // This ensures the watcher sees the file immediately and arms the timer
+    await writeFile(
+      join(projectDir, ".hench-commit-msg.txt"),
+      "feat: update file",
+      "utf-8",
+    );
+
+    // Start the watcher with a short timeout
+    const commitWatcher = startCommitMsgWatcher({ projectDir, timeoutMs: 150 });
+
+    // Wait for timer to fire and auto-commit
+    // Timer fires at 150ms, add 200ms buffer to ensure it completes
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // Verify the auto-commit happened
+    expect(commitWatcher.didAutoCommit()).toBe(true);
+
+    // Verify staged count is 0 (because timer already committed)
+    const { execStdout } = await import("../../src/process/exec.js");
+    const stagedOutput = await execStdout("git", ["diff", "--cached", "--name-only"], {
+      cwd: projectDir,
+      timeout: 10_000,
+    });
+    expect(stagedOutput.trim()).toBe(""); // No staged files — already committed
+
+    // Call performCommitPromptIfNeeded with yes=true (simulating --yes mode)
+    // This should recognize the auto-commit and return early without stalling
+    const mockRun = {
+      status: "completed",
+      id: "test-run-1",
+      taskTitle: "Test",
+      taskId: "test-task-1",
+      vendor: "test",
+      model: "test",
+      turns: 1,
+      toolCalls: [],
+      tokenUsage: { input: 0, output: 0 },
+      turnTokenUsage: [],
+    };
+
+    // This should complete quickly without waiting for a prompt
+    let completed = false;
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("performCommitPromptIfNeeded timed out")), 5000)
+    );
+    const call = (async () => {
+      await performCommitPromptIfNeeded(
+        mockRun,
+        projectDir,
+        false, // autoCommit
+        true, // yes (simulating --yes mode)
+        false, // autonomous
+        undefined, // store
+        undefined, // taskId
+        commitWatcher,
+      );
+      completed = true;
+    })();
+
+    // Wait for either completion or timeout
+    await Promise.race([call, timeout]);
+
+    // Verify the call completed (loop didn't stall)
+    expect(completed).toBe(true);
   });
 
-  it("documents the promise chain that doesn't resolve after timer fires", async () => {
+  it("does not create a duplicate commit when timer already committed", async () => {
     /**
-     * Trace the promise chain:
-     * 1. cliLoop spawns agent
-     * 2. Agent completes
-     * 3. Timer fires (async, not awaited)
-     * 4. ???? - Something doesn't resolve
-     *
-     * Questions to answer:
-     * - Is tryAutoCommit().catch() swallowing a thrown error?
-     * - Is there a missing await somewhere?
-     * - Is there a prompt that's checking for stdin?
+     * Ensures that if the timer fires and commits, and later
+     * performCommitPromptIfNeeded is called, a second commit is not created.
+     * This tests the "advances directly" behavior from acceptance criteria.
      */
 
-    expect(true).toBe(true);
-  });
+    const { startCommitMsgWatcher } = await import(
+      "../../src/agent/lifecycle/commit-msg-watcher.js"
+    );
+    const { performCommitPromptIfNeeded } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
 
-  it("checks if the stall is in the commit watcher's unhandled promise", async () => {
-    /**
-     * The tryAutoCommit promise is fired at line 129 of commit-msg-watcher.ts:
-     *   tryAutoCommit().catch(() => { /* swallow — never block the process */ });
-     *
-     * If tryAutoCommit() throws and the catch is executed,
-     * or if it never resolves, that wouldn't block the process.
-     * But what if the error happens after the catch?
-     *
-     * Or what if the issue is that the timer callback itself
-     * (line 128-130) is not being invoked properly?
-     */
+    // Simulate agent work
+    await writeFile(join(projectDir, "file.txt"), "changed\n", "utf-8");
+    await execAsync("git add file.txt", { cwd: projectDir });
 
-    expect(true).toBe(true);
-  });
+    const commitWatcher = startCommitMsgWatcher({ projectDir, timeoutMs: 150 });
 
-  it("checks if there's a missing flag or state update needed to recognize timer-expiry", async () => {
-    /**
-     * When the timer fires and auto-commits, the only signal is a detail() log.
-     * The run record itself doesn't get updated to indicate "auto-committed".
-     *
-     * Maybe the loop needs a state flag like:
-     * - run.autoCommitted: boolean
-     * - Or run.commitSource: 'prompt' | 'timer-expiry'
-     *
-     * And then performCommitPromptIfNeeded or runOne needs to check
-     * this flag and acknowledge it somehow?
-     */
+    // Simulate commit message
+    await writeFile(
+      join(projectDir, ".hench-commit-msg.txt"),
+      "feat: change file",
+      "utf-8",
+    );
 
-    expect(true).toBe(true);
-  });
+    // Wait for timer
+    await new Promise((resolve) => setTimeout(resolve, 350));
 
-  it("verifies whether the CLI loop is waiting for a prompt that never comes", async () => {
-    /**
-     * In run.ts, the loop code at line 1338 does:
-     *   const result = await runOne(...)
-     *   status = result.status
-     *
-     * What if runOne is waiting for something that never completes
-     * when the timer fires and auto-commits?
-     *
-     * Possible blocking points:
-     * - performCommitPromptIfNeeded calling promptCommitConfirm?
-     * - A promise that never resolves?
-     * - A race condition where the file is deleted while being read?
-     */
+    // Get the current HEAD
+    const { execStdout } = await import("../../src/process/exec.js");
+    const headBeforeCall = await execStdout(
+      "git",
+      ["log", "-1", "--pretty=%H"],
+      { cwd: projectDir, timeout: 10_000 }
+    );
+    const countBeforeCall = (
+      await execStdout("git", ["log", "--oneline"], { cwd: projectDir, timeout: 10_000 })
+    )
+      .split("\n")
+      .filter((l) => l.trim()).length;
 
-    expect(true).toBe(true);
+    const mockRun = {
+      status: "completed",
+      id: "test-run-2",
+      taskTitle: "Test",
+      taskId: "test-task-2",
+      vendor: "test",
+      model: "test",
+      turns: 1,
+      toolCalls: [],
+      tokenUsage: { input: 0, output: 0 },
+      turnTokenUsage: [],
+    };
+
+    // Call performCommitPromptIfNeeded
+    await performCommitPromptIfNeeded(
+      mockRun,
+      projectDir,
+      false,
+      true,
+      false,
+      undefined,
+      undefined,
+      commitWatcher,
+    );
+
+    // Verify no additional commit was created
+    const headAfterCall = await execStdout(
+      "git",
+      ["log", "-1", "--pretty=%H"],
+      { cwd: projectDir, timeout: 10_000 }
+    );
+    const countAfterCall = (
+      await execStdout("git", ["log", "--oneline"], { cwd: projectDir, timeout: 10_000 })
+    )
+      .split("\n")
+      .filter((l) => l.trim()).length;
+
+    expect(headBeforeCall).toEqual(headAfterCall); // Same HEAD
+    expect(countBeforeCall).toBe(countAfterCall); // Same number of commits
   });
 });
