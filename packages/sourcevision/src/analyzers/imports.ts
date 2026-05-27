@@ -445,6 +445,51 @@ async function reExtractUnchangedExternals(
 }
 
 /** Parse JS/TS files and append edges and external imports to the provided maps. */
+/**
+ * Tokenize a JS/TS source file and count occurrences of each identifier-like
+ * token. Used to weight import edges by *actual usage* rather than just the
+ * import-statement binding list — a hub file that gets touched 30 times by a
+ * consumer is structurally more coupled than one mentioned once. This is a
+ * crude tokenizer (doesn't strip comments/strings); for the rare cases where
+ * an imported name shows up inside a string literal the noise washes out
+ * against the edge-weight cap applied below.
+ */
+function countIdentifierOccurrences(src: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  const tokenRe = /[A-Za-z_$][A-Za-z0-9_$]*/g;
+  let m: RegExpExecArray | null;
+  while ((m = tokenRe.exec(src)) !== null) {
+    counts.set(m[0], (counts.get(m[0]) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** Cap a single edge's weight contribution so one hot connection can't
+ *  dominate Louvain — mirrors the Swift resolver's policy. */
+const JS_TS_EDGE_WEIGHT_CAP = 10;
+
+/**
+ * Compute the reference-count weight contribution of a single import's
+ * bindings. Subtracts 1 from each named symbol's count to discount the
+ * import statement's own mention of the name (it always appears once).
+ * Wildcard imports (`*`) and the synthetic `default` binding fall back to
+ * a baseline weight of 1 since we don't have a local alias for them.
+ */
+function importWeight(symbols: readonly string[], counts: Map<string, number>): number {
+  if (symbols.length === 0) return 1;
+  let total = 0;
+  let countedAny = false;
+  for (const s of symbols) {
+    if (s === "*" || s === "default") continue; // baseline elsewhere
+    const occ = counts.get(s);
+    if (occ === undefined) continue;
+    countedAny = true;
+    total += Math.max(0, occ - 1); // -1 for the import statement itself
+  }
+  if (!countedAny) return 1; // wildcards / unparseable bindings → baseline
+  return Math.max(1, total);
+}
+
 async function processJsTsFiles(
   files: Inventory["files"],
   targetDir: string,
@@ -460,17 +505,34 @@ async function processJsTsFiles(
       continue; // skip unreadable files
     }
 
+    const tokenCounts = countIdentifierOccurrences(sourceText);
+
     for (const raw of extractImports(sourceText, file.path)) {
       if (raw.specifier.startsWith("node:")) continue;
 
       const resolved = resolver.resolve(raw.specifier, file.path);
       if (resolved) {
+        const addWeight = Math.min(importWeight(raw.symbols, tokenCounts), JS_TS_EDGE_WEIGHT_CAP);
         const key = `${file.path}\0${resolved}\0${raw.type}`;
         const existing = edgeMap.get(key);
         if (existing) {
-          edgeMap.set(key, { ...existing, symbols: Array.from(new Set([...existing.symbols, ...raw.symbols])) });
+          const merged = Math.min(
+            (existing.weight ?? Math.max(existing.symbols.length, 1)) + addWeight,
+            JS_TS_EDGE_WEIGHT_CAP,
+          );
+          edgeMap.set(key, {
+            ...existing,
+            symbols: Array.from(new Set([...existing.symbols, ...raw.symbols])),
+            weight: merged,
+          });
         } else {
-          edgeMap.set(key, { from: file.path, to: resolved, type: raw.type, symbols: [...raw.symbols] });
+          edgeMap.set(key, {
+            from: file.path,
+            to: resolved,
+            type: raw.type,
+            symbols: [...raw.symbols],
+            weight: addWeight,
+          });
         }
       } else if (!raw.specifier.startsWith(".")) {
         // External package
