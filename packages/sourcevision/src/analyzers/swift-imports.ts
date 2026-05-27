@@ -163,20 +163,26 @@ export function extractSwiftDeclarations(src: string): string[] {
 // own declarations avoids self-loops.
 
 /**
- * Find which of `symbols` are referenced in `src`. Caller is expected to
- * pre-strip the file's own declarations so a file that declares Foo and uses
- * it elsewhere doesn't self-loop.
+ * Find which of `symbols` are referenced in `src`, returning a per-symbol
+ * occurrence count. The count drives edge-weight downstream: a file that
+ * touches `AppEnvironment` twenty times is structurally more coupled to it
+ * than a file that mentions it once. Caller is expected to pre-strip the
+ * file's own declarations so a file that declares Foo and uses it elsewhere
+ * doesn't self-loop.
  */
-export function findSymbolReferences(src: string, symbols: ReadonlySet<string>): Set<string> {
+export function findSymbolReferences(
+  src: string,
+  symbols: ReadonlySet<string>,
+): Map<string, number> {
   const cleaned = stripCommentsAndStrings(src);
-  const hits = new Set<string>();
+  const hits = new Map<string, number>();
   if (symbols.size === 0) return hits;
-  // Tokenize identifiers and lookup. Tokenizer is cheap and avoids the
-  // RegExp-per-symbol pathology.
   const tokenRe = /[A-Z][A-Za-z0-9_]*/g;
   let m: RegExpExecArray | null;
   while ((m = tokenRe.exec(cleaned)) !== null) {
-    if (symbols.has(m[0])) hits.add(m[0]);
+    if (symbols.has(m[0])) {
+      hits.set(m[0], (hits.get(m[0]) ?? 0) + 1);
+    }
   }
   return hits;
 }
@@ -245,7 +251,7 @@ export async function buildSwiftImportGraph(
       : new Set([...allSymbols].filter((s) => !own.has(s)));
 
     const refs = findSymbolReferences(src, candidates);
-    for (const sym of refs) {
+    for (const [sym, count] of refs) {
       const declaringFiles = declIndex.get(sym);
       if (!declaringFiles) continue;
       for (const to of declaringFiles) {
@@ -253,18 +259,36 @@ export async function buildSwiftImportGraph(
         const key = `${path}\0${to}\0static`;
         const existing = edgeMap.get(key);
         if (existing) {
-          if (!existing.symbols.includes(sym)) {
-            edgeMap.set(key, { ...existing, symbols: [...existing.symbols, sym] });
-          }
+          const nextSymbols = existing.symbols.includes(sym)
+            ? existing.symbols
+            : [...existing.symbols, sym];
+          edgeMap.set(key, {
+            ...existing,
+            symbols: nextSymbols,
+            weight: (existing.weight ?? 0) + count,
+          });
         } else {
           edgeMap.set(key, {
             from: path,
             to,
             type: "static" as ImportType,
             symbols: [sym],
+            weight: count,
           });
         }
       }
+    }
+  }
+
+  // Cap each edge's weight so a single very-hot connection can't dominate
+  // Louvain. AppEnvironment-style composition-root files often have a few
+  // call-sites that reference them ~50 times — that should still beat a
+  // one-mention edge but not by 50×, or it pulls the file into whichever
+  // cluster has the highest single reference count.
+  const EDGE_WEIGHT_CAP = 10;
+  for (const [key, edge] of edgeMap) {
+    if (edge.weight !== undefined && edge.weight > EDGE_WEIGHT_CAP) {
+      edgeMap.set(key, { ...edge, weight: EDGE_WEIGHT_CAP });
     }
   }
 

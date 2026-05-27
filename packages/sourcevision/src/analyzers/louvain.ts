@@ -71,7 +71,12 @@ export function buildUndirectedGraph(edges: ImportEdge[]): UndirectedGraph {
   }
 
   for (const edge of edges) {
-    const weight = Math.max(edge.symbols.length, 1);
+    // Prefer the resolver-supplied weight when present (encodes raw
+    // reference count, capped to prevent hub-dominance). Fall back to
+    // the legacy "number of unique symbols" proxy when no weight is set
+    // — that path is still hit by TS/JS edges where the resolver only
+    // records unique symbols, not occurrence counts.
+    const weight = Math.max(edge.weight ?? edge.symbols.length, 1);
     addEdge(edge.from, edge.to, weight);
   }
 

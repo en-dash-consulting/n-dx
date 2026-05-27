@@ -78,7 +78,7 @@ struct Real {}
 // ── findSymbolReferences ─────────────────────────────────────────────────────
 
 describe("findSymbolReferences", () => {
-  it("finds references and ignores comment / string mentions", () => {
+  it("counts references and ignores comment / string mentions", () => {
     const src = `
 // uses SchedulerEngine
 let s = "SchedulerEngine"
@@ -86,12 +86,22 @@ let engine = SchedulerEngine()
 let mode: MenuMode = .normal
 `;
     const refs = findSymbolReferences(src, new Set(["SchedulerEngine", "MenuMode", "Unused"]));
-    expect(refs).toEqual(new Set(["SchedulerEngine", "MenuMode"]));
+    expect(refs).toEqual(new Map([["SchedulerEngine", 1], ["MenuMode", 1]]));
+  });
+
+  it("returns the occurrence count when a symbol is used repeatedly", () => {
+    const src = `
+let a = AppEnvironment()
+let b = AppEnvironment.shared
+let c = AppEnvironment()
+`;
+    const refs = findSymbolReferences(src, new Set(["AppEnvironment"]));
+    expect(refs.get("AppEnvironment")).toBe(3);
   });
 
   it("returns empty when no symbols match", () => {
     const src = `let x = 1\nclass Foo {}`;
-    expect(findSymbolReferences(src, new Set(["Bar"]))).toEqual(new Set());
+    expect(findSymbolReferences(src, new Set(["Bar"]))).toEqual(new Map());
   });
 });
 
@@ -123,12 +133,13 @@ describe("buildSwiftImportGraph", () => {
       dir,
     );
 
-    // AppEnvironment uses Store → edge.
+    // AppEnvironment uses Store → edge with weight 1 (single reference).
     expect(result.edges).toContainEqual({
       from: "App/AppEnvironment.swift",
       to: "App/Store.swift",
       type: "static",
       symbols: ["Store"],
+      weight: 1,
     });
 
     // MenuContent uses AppEnvironment AND Store → two edges.
@@ -152,5 +163,54 @@ describe("buildSwiftImportGraph", () => {
     );
     expect(result.edges).toEqual([]);
     expect(result.external).toEqual([]);
+  });
+
+  it("edge weight reflects total references across symbols (capped at 10)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sv-swift-"));
+    // AppEnvironment declares one type. The consumer references it 4 times.
+    writeFileSync(
+      join(dir, "AppEnvironment.swift"),
+      `class AppEnvironment {}\n`,
+    );
+    writeFileSync(
+      join(dir, "Consumer.swift"),
+      `
+let a = AppEnvironment()
+let b = AppEnvironment.shared
+func make() -> AppEnvironment { AppEnvironment() }
+`,
+    );
+
+    const result = await buildSwiftImportGraph(
+      [{ path: "AppEnvironment.swift" }, { path: "Consumer.swift" }],
+      dir,
+    );
+
+    const edge = result.edges.find(
+      (e) => e.from === "Consumer.swift" && e.to === "AppEnvironment.swift",
+    );
+    expect(edge).toBeDefined();
+    expect(edge!.weight).toBe(4);
+  });
+
+  it("caps edge weight to prevent a single hot edge from dominating zoning", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sv-swift-"));
+    writeFileSync(
+      join(dir, "AppEnvironment.swift"),
+      `class AppEnvironment {}\n`,
+    );
+    // 30 references — should be capped at 10.
+    const consumerBody = Array.from({ length: 30 }, (_, i) => `let x${i} = AppEnvironment()`).join("\n");
+    writeFileSync(join(dir, "Consumer.swift"), consumerBody + "\n");
+
+    const result = await buildSwiftImportGraph(
+      [{ path: "AppEnvironment.swift" }, { path: "Consumer.swift" }],
+      dir,
+    );
+
+    const edge = result.edges.find(
+      (e) => e.from === "Consumer.swift" && e.to === "AppEnvironment.swift",
+    );
+    expect(edge!.weight).toBe(10);
   });
 });

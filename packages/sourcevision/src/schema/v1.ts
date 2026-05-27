@@ -121,6 +121,14 @@ export interface ImportEdge {
   to: string;
   type: ImportType;
   symbols: string[];
+  /**
+   * Edge weight for community-detection. When set, Louvain uses this directly
+   * instead of `symbols.length`. Lets a resolver express "this edge is heavy"
+   * (e.g. a Swift file that references a target symbol 20 times) vs. a casual
+   * one-line mention. Capped per-resolver to prevent a single hot edge from
+   * dominating the zoning result.
+   */
+  weight?: number;
 }
 
 export interface ExternalImport {
