@@ -41,6 +41,17 @@ function resolveModel(override?: string): string {
 }
 
 /**
+ * Resolve the configured "light" tier model for the active vendor. Used by
+ * enrichment to send naming-dominant pass 1 prompts to a cheaper/faster
+ * model (Haiku for Claude) while keeping analytical pass 2+ on the
+ * standard tier. Respects `claude.lightModel` / `codex.lightModel`
+ * overrides in `.n-dx.json` so users can pin a specific cheap model.
+ */
+export function resolveLightModel(): string {
+  return resolveVendorModel(resolveVendor(), _llmConfig ?? {}, "light");
+}
+
+/**
  * Set the module-level LLM configuration.
  * Call this at CLI entry points before any LLM operations.
  * Resets the cached client so the next call creates a fresh one.

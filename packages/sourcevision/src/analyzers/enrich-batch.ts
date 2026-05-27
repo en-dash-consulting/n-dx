@@ -21,7 +21,7 @@ import {
   buildMetaPrompt,
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
-import { callClaude, ClaudeClientError } from "./claude-client.js";
+import { callClaude, resolveLightModel, ClaudeClientError } from "./claude-client.js";
 import { tryParseJSON, extractFindings, formatFileLabel, findPrevZone } from "./enrich-parsing.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
@@ -209,7 +209,13 @@ export async function enrichBatch(
 
     let callText: string;
     try {
-      const callResult = await callClaude(prompt);
+      // Pass 1 is naming-dominant ("LLM zone naming + initial observations"
+      // per enrich-config.ts) — Haiku does this accurately and ~3× faster
+      // than Sonnet. Pass 2+ is analytical (cross-zone relationships,
+      // anti-patterns, suggestions) and stays on the standard model so
+      // finding quality doesn't regress.
+      const callModel = passNumber === 1 ? resolveLightModel() : undefined;
+      const callResult = await callClaude(prompt, callModel);
       accumulateTokenUsage(batchTokenUsage, callResult.tokenUsage);
       callText = callResult.text;
     } catch (err) {

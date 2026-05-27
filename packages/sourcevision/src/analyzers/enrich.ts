@@ -130,15 +130,34 @@ export async function enrichZonesWithAI(
     };
   }
 
+  // 2a. Structural-zone bypass. A zone whose files are entirely non-source
+  //     (build scripts, assets, docs, config) has nothing for the LLM to
+  //     analyze — the zone description is the file list paraphrased and the
+  //     name comes from the directory. Templating these saves a meaningful
+  //     fraction of LLM cost on a typical repo (gotobed: 4 of 9 zones).
+  const templatedZones: Zone[] = [];
+  const llmCandidates: Zone[] = [];
+  const inventoryByPath = new Map(inventory.files.map((f) => [f.path, f]));
+  for (const zone of zones) {
+    if (isStructuralZone(zone, inventoryByPath)) {
+      templatedZones.push(applyStructuralTemplate(zone, inventoryByPath));
+    } else {
+      llmCandidates.push(zone);
+    }
+  }
+  if (templatedZones.length > 0) {
+    console.log(`  [enrich] ${templatedZones.length} structural zone(s) templated without LLM (build/asset/docs/config only)`);
+  }
+
   // 2. Per-zone content filtering: identify changed vs unchanged zones
   //    Only applies when we have previous data and per-zone content hashes.
   //    Unchanged zones preserve previous enrichment; only changed zones go to LLM.
-  let zonesToEnrich = zones;
+  let zonesToEnrich = llmCandidates;
   let unchangedZones: Zone[] = [];
 
   if (currentContentHashes && previousZones?.zoneContentHashes && prevEnrichPass > 0) {
     const changed: Zone[] = [];
-    for (const zone of zones) {
+    for (const zone of llmCandidates) {
       if (currentContentHashes[zone.id] !== previousZones.zoneContentHashes[zone.id]) {
         changed.push(zone);
       } else {
@@ -156,7 +175,7 @@ export async function enrichZonesWithAI(
       }
     }
     if (changed.length > 0 && unchangedZones.length > 0) {
-      console.log(`  [enrich] ${changed.length}/${zones.length} zones changed — skipping ${unchangedZones.length} unchanged`);
+      console.log(`  [enrich] ${changed.length}/${llmCandidates.length} zones changed — skipping ${unchangedZones.length} unchanged`);
       zonesToEnrich = changed;
     }
   }
@@ -218,22 +237,117 @@ export async function enrichZonesWithAI(
   if (allBatchResults.length === 0) {
     if (authFailed) {
       // auth error already logged upstream
-    } else if (batches.length === 0 && unchangedZones.length > 0) {
-      // All zones preserved from previous enrichment — return them
-      return { ...empty, zones: unchangedZones, pass: prevEnrichPass };
+    } else if (batches.length === 0 && (unchangedZones.length > 0 || templatedZones.length > 0)) {
+      // No LLM work to do — everything preserved or templated.
+      return { ...empty, zones: [...unchangedZones, ...templatedZones], pass: prevEnrichPass };
     } else if (batches.length > 0) {
       console.warn("  [enrich] All batches failed — using algorithmic names");
+    }
+    if (templatedZones.length > 0) {
+      return { ...empty, zones: templatedZones, pass: prevEnrichPass };
     }
     return empty;
   }
 
-  // 6. Aggregate and apply results, merging unchanged zones back in
+  // 6. Aggregate and apply results, merging unchanged + templated zones back in
   const agg = aggregateBatchResults(allBatchResults);
   const result = applyEnrichResults(zonesToEnrich, agg, passNumber, passConfig, previousZones);
   if (unchangedZones.length > 0) {
     result.zones = [...result.zones, ...unchangedZones];
   }
+  if (templatedZones.length > 0) {
+    result.zones = [...result.zones, ...templatedZones];
+  }
   return result;
+}
+
+// ── Structural-zone templating ───────────────────────────────────────────────
+
+/**
+ * A zone is "structural" if none of its files are source code — entirely
+ * build scripts / assets / docs / config / generated / other. There's nothing
+ * for the LLM to architecturally analyze; the zone description is the file
+ * list paraphrased and the name comes from the directory shape. Templating
+ * these saves a meaningful chunk of LLM cost.
+ */
+function isStructuralZone(
+  zone: Zone,
+  inventoryByPath: Map<string, { role: string }>,
+): boolean {
+  for (const f of zone.files) {
+    const entry = inventoryByPath.get(f);
+    if (entry?.role === "source") return false;
+  }
+  return zone.files.length > 0;
+}
+
+function applyStructuralTemplate(
+  zone: Zone,
+  inventoryByPath: Map<string, { role: string }>,
+): Zone {
+  // Tally roles. Whatever role dominates picks the noun.
+  const roleCounts = new Map<string, number>();
+  for (const f of zone.files) {
+    const r = inventoryByPath.get(f)?.role ?? "other";
+    roleCounts.set(r, (roleCounts.get(r) ?? 0) + 1);
+  }
+  const dominantRole = [...roleCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "other";
+
+  // Identify a top-level directory (the part before the first slash). All
+  // files at the repo root collapse to "root".
+  const topDirs = new Map<string, number>();
+  for (const f of zone.files) {
+    const slash = f.indexOf("/");
+    const top = slash === -1 ? "root" : f.slice(0, slash);
+    topDirs.set(top, (topDirs.get(top) ?? 0) + 1);
+  }
+  const topDir = [...topDirs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+
+  const titleCaseDir = topDir === "root"
+    ? "Project Root"
+    : topDir.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  let name: string;
+  let descriptor: string;
+  switch (dominantRole) {
+    case "build":
+      name = topDir === "scripts" ? "Build & CI Scripts" : `${titleCaseDir} Scripts`;
+      descriptor = "Build, packaging, and CI scripts";
+      break;
+    case "asset":
+      name = topDir === "root" ? "Project Assets" : `${titleCaseDir} Assets`;
+      descriptor = "Bundle assets and resources";
+      break;
+    case "docs":
+      name = topDir === "docs" ? "Documentation Site" : `${titleCaseDir} Documentation`;
+      descriptor = "Documentation and static-site assets";
+      break;
+    case "config":
+      name = topDir === "root" ? "Project Root" : `${titleCaseDir} Config`;
+      descriptor = "Project configuration and manifest files";
+      break;
+    case "generated":
+      name = `${titleCaseDir} Generated`;
+      descriptor = "Machine-generated artifacts";
+      break;
+    default:
+      name = titleCaseDir || zone.name || zone.id;
+      descriptor = `Non-source files in ${topDir || "the project"}`;
+  }
+
+  // Short description that names a few representative files.
+  const sample = zone.files.slice(0, 3).map((f) => {
+    const idx = f.lastIndexOf("/");
+    return idx === -1 ? f : f.slice(idx + 1);
+  });
+  const more = zone.files.length > 3 ? ` (+${zone.files.length - 3} more)` : "";
+  const description = `${descriptor}: ${sample.join(", ")}${more}`;
+
+  return {
+    ...zone,
+    name,
+    description,
+  };
 }
 
 // ── Result application (private) ─────────────────────────────────────────────

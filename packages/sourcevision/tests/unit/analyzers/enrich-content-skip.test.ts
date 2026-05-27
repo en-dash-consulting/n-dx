@@ -19,6 +19,7 @@ vi.mock("../../../src/analyzers/claude-client.js", async () => {
     setClaudeConfig: vi.fn(),
     getAuthMode: vi.fn(),
     DEFAULT_MODEL: "claude-sonnet-4-6",
+    resolveLightModel: vi.fn(() => "claude-haiku-4-5"),
   };
 });
 
