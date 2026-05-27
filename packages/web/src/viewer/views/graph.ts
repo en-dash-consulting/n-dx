@@ -172,15 +172,6 @@ function panViewport(view: Viewport, dx: number, dy: number): Viewport {
   return { ...view, x: view.x + dx, y: view.y + dy };
 }
 
-function zoomViewport(view: Viewport, deltaY: number): Viewport {
-  return { ...view, k: clamp(view.k * (deltaY < 0 ? 1.12 : 0.88), 0.55, 2.6) };
-}
-
-function wheelViewport(view: Viewport, event: WheelEvent): Viewport {
-  if (event.ctrlKey || event.metaKey) return zoomViewport(view, event.deltaY);
-  return panViewport(view, -event.deltaX, -event.deltaY);
-}
-
 // Bounded zoom for the Codebase/Zone maps — not an infinite canvas.
 const MAP_ZOOM_MIN = 0.8;
 const MAP_ZOOM_MAX = 4;
@@ -686,7 +677,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     const cy = event.clientY;
     if (event.ctrlKey || event.metaKey) {
       // Trackpad pinch / explicit zoom — anchor at the cursor.
-      const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+      const factor = event.deltaY < 0 ? 1.03 : 1 / 1.03;
       updateSurfaceView(surface, (view) => zoomMapToFocal(view, view.k * factor, cx, cy, svg));
     } else {
       const vb = svg.viewBox.baseVal;
@@ -1841,6 +1832,20 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
           h("div", { class: "ig-graph-title-block" },
             h("span", { class: "ig-graph-head-label" },
               streetViewMode === "dialog" ? "File street view" : "Dependency preview",
+              // Surface the focused file path inline next to the header so
+              // the user always knows what they're inspecting without
+              // hunting for the highlighted node.
+              streetViewMode === "dialog" && mode === "file" && focusFile
+                ? h("span", { class: "ig-graph-head-path", title: focusFile },
+                    " · ",
+                    h("code", null, focusFile),
+                  )
+                : streetViewMode === "dialog" && mode === "package" && focusPackage
+                  ? h("span", { class: "ig-graph-head-path", title: focusPackage },
+                      " · ",
+                      h("code", null, focusPackage),
+                    )
+                  : null,
             ),
             h("p", { class: "ig-graph-scope" },
               `${graphNodeCount} nodes · ${graphEdgeCount} imports shown · ${graphCrossEdgeCount} cross-boundary · ${graphScopeLabel}`,
@@ -1882,18 +1887,11 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
             onPointerMove: handlePointerMove,
             onPointerUp: endDrag,
             onPointerLeave: endDrag,
-            onWheel: (event: WheelEvent) => {
-              event.preventDefault();
-              setDepView((view) => wheelViewport(view, event));
-            },
+            onWheel: (event: WheelEvent) => handleSurfaceWheel("dep", event),
+            onTouchStart: (event: TouchEvent) => beginPinch("dep", event),
+            onTouchMove: movePinch,
+            onTouchEnd: endPinch,
           },
-            h("rect", {
-              class: "ig-svg-bg",
-              x: 0,
-              y: 0,
-              width: svgW,
-              height: svgH,
-            }),
             h("defs", null,
               h("marker", {
                 id: "ig-arrow",

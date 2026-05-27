@@ -308,6 +308,23 @@
   color: var(--text-muted, var(--text-dim));
 }
 
+/* File path inline next to the FILE STREET VIEW kicker. Reset the
+   uppercase/tracking from the parent so the path stays readable, and
+   render it as monospaced text the same way file paths look elsewhere. */
+.ig-graph-head-path {
+  color: var(--text);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.ig-graph-head-path code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  background: color-mix(in srgb, var(--bg-hover) 38%, transparent);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
 .ig-graph-scope {
   margin: 3px 0 0;
   color: var(--text-dim);
