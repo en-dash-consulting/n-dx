@@ -142,6 +142,7 @@ describe("PRDTree", () => {
     const root = renderToDiv(h(PRDTree, {
       document: sampleDoc,
       defaultExpandDepth: 3,
+      showTokenBudget: true,
       taskUsageById: {
         "task-2": { totalTokens: 1234, runCount: 2 },
       },
@@ -177,7 +178,7 @@ describe("PRDTree", () => {
     expect(badge?.getAttribute("data-utilization-reason")).toBe("missing_budget");
   });
 
-  it("hides budget info on token badges when showTokenBudget is false", () => {
+  it("hides the entire token usage cell when showTokenBudget is false", () => {
     const root = renderToDiv(h(PRDTree, {
       document: sampleDoc,
       defaultExpandDepth: 3,
@@ -187,17 +188,19 @@ describe("PRDTree", () => {
         "task-2": { totalTokens: 1234, runCount: 2 },
       },
     }));
-    // Token count still visible
-    expect(root.textContent).toContain("1,234 tokens");
-    // Budget percentage should NOT appear
-    expect(root.textContent).not.toContain("| 2%");
-    // No utilization-reason data attribute
-    const badge = root.querySelector(".prd-token-badge");
-    expect(badge?.getAttribute("data-utilization-reason")).toBeNull();
+    // Whole cell is gated on the feature flag now — no token text, no badge,
+    // no empty-dash placeholder.
+    expect(root.textContent).not.toContain("1,234 tokens");
+    expect(root.querySelector(".prd-token-badge")).toBeNull();
+    expect(root.querySelector(".prd-usage-cell")).toBeNull();
   });
 
   it("renders empty-dash usage cells for rows with no runs (never `0 tokens`)", () => {
-    const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      showTokenBudget: true,
+    }));
     // "No runs yet" must not read as zero work — empty cells render as `—`.
     expect(root.textContent).not.toContain("0 tokens");
     // Active-work filter hides `task-1` (completed). `task-2` (in_progress)
@@ -208,20 +211,6 @@ describe("PRDTree", () => {
     // Nothing in those cells has the active token-badge class.
     const badges = root.querySelectorAll(".prd-token-badge");
     expect(badges.length).toBe(0);
-  });
-
-  it("shows token badge when showTokenBudget is false and usage is non-zero", () => {
-    const root = renderToDiv(h(PRDTree, {
-      document: sampleDoc,
-      defaultExpandDepth: 3,
-      showTokenBudget: false,
-      taskUsageById: {
-        "task-2": { totalTokens: 5000, runCount: 1 },
-      },
-    }));
-    const badge = root.querySelector(".prd-token-badge");
-    expect(badge).not.toBeNull();
-    expect(badge?.textContent).toBe("5,000 tokens");
   });
 
   it("shows token badge when showTokenBudget is true and usage is non-zero", () => {
@@ -241,12 +230,15 @@ describe("PRDTree", () => {
   });
 
   it("renders per-item rollup with self vs. descendant breakdown", () => {
+    // Use an epic (container, not a work item) so the rollup breakdown
+    // branch fires — the work-item budget-chip variant intentionally omits
+    // the self/descendant annotation for compactness on leaf rows.
     const root = renderToDiv(h(PRDTree, {
       document: sampleDoc,
       defaultExpandDepth: 3,
+      showTokenBudget: true,
       rollupById: {
-        // task-2 has children (subtasks) so its rollup includes descendants.
-        "task-2": {
+        "epic-1": {
           self: { totalTokens: 1000, runCount: 1 },
           descendants: { totalTokens: 9000, runCount: 3 },
           total: { totalTokens: 10_000, runCount: 4 },
@@ -258,7 +250,7 @@ describe("PRDTree", () => {
     expect(root.textContent).toContain("(1,000 self)");
   });
 
-  it("renders duration cell for completed tasks with startedAt/completedAt", () => {
+  it("does not render a duration cell on the tree row (duration lives in the detail flyout)", () => {
     const doc: PRDDocumentData = {
       schema: "rex/v1",
       title: "Duration sample",
@@ -268,34 +260,17 @@ describe("PRDTree", () => {
         status: "completed",
         level: "task",
         startedAt: "2026-01-01T00:00:00.000Z",
-        completedAt: "2026-01-01T00:04:10.000Z", // 4m 10s
+        completedAt: "2026-01-01T00:04:10.000Z",
       }],
     };
-    const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 1 }));
-    // Completed filter hides completed items; force-include by passing
-    // activeStatuses with all statuses.
-    const root2 = renderToDiv(h(PRDTree, {
+    const root = renderToDiv(h(PRDTree, {
       document: doc,
       defaultExpandDepth: 1,
       activeStatuses: new Set(["completed", "in_progress", "pending"]),
     }));
-    expect(root2.textContent).toContain("4m 10s");
-    // Smoke-check the first render doesn't explode
-    expect(root).toBeDefined();
-  });
-
-  it("renders empty-dash duration for tasks that have never started", () => {
-    const doc: PRDDocumentData = {
-      schema: "rex/v1",
-      title: "Never started",
-      items: [{
-        id: "t", title: "Pending", status: "pending", level: "task",
-      }],
-    };
-    const root = renderToDiv(h(PRDTree, { document: doc, defaultExpandDepth: 1 }));
-    const empty = root.querySelector(".prd-duration-cell-empty");
-    expect(empty).not.toBeNull();
-    expect(empty?.textContent).toBe("—");
+    expect(root.querySelector(".prd-duration-cell")).toBeNull();
+    expect(root.querySelector(".prd-duration-cell-empty")).toBeNull();
+    expect(root.textContent).not.toContain("4m 10s");
   });
 
   it("renders tree role for accessibility", () => {

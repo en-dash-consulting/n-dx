@@ -995,18 +995,6 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
     // Active tasks panel — shown at top when there are running tasks
     h(ActiveTasksPanel, { runs: activeRuns, navigateTo }),
 
-    // Concurrency status — shows process count, limits, and utilization
-    h(ConcurrencyPanel, null),
-
-    // Memory and resource health — system memory, per-task memory, health indicators
-    h(MemoryPanel, null),
-
-    // WebSocket connection health — active connections, cleanup metrics, broadcast stats
-    h(WsHealthPanel, null),
-
-    // Throttle controls — manual concurrency adjustment, pause/resume, emergency stop
-    h(ThrottleControlsPanel, null),
-
     // Aggregate metrics
     h(RunMetrics, { runs }),
 
@@ -1071,6 +1059,22 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       filteredRuns.length === 0
         ? h("div", { class: "hench-no-results" }, "No runs match the selected filter.")
         : null,
+    ),
+
+    // System status — operational diagnostics tucked into a collapsed drawer so
+    // the run history stays the focus. Expand to inspect live infrastructure.
+    h("details", { class: "hench-system-status" },
+      h("summary", { class: "hench-system-status-summary" },
+        h("span", { class: "hench-system-status-chevron", "aria-hidden": "true" }, "▸"),
+        h("span", { class: "hench-system-status-label" }, "System status"),
+        h("span", { class: "hench-system-status-hint" }, "concurrency · memory · sockets · throttle"),
+      ),
+      h("div", { class: "hench-system-status-body" },
+        h(ConcurrencyPanel, null),
+        h(MemoryPanel, null),
+        h(WsHealthPanel, null),
+        h(ThrottleControlsPanel, null),
+      ),
     ),
   );
 }

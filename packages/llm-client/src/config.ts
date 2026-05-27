@@ -49,7 +49,7 @@ export const NEWEST_MODELS: Record<LLMVendor, string> = {
  */
 export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
   claude: {
-    light: "claude-haiku-4-20250414",
+    light: "claude-haiku-4-5",
     standard: NEWEST_MODELS.claude,
   },
   codex: {
@@ -95,7 +95,7 @@ export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
 const MODEL_ALIASES: Record<string, string> = {
   sonnet: NEWEST_MODELS.claude,
   opus: "claude-opus-4-7",
-  haiku: "claude-haiku-4-20250414",
+  haiku: "claude-haiku-4-5",
 };
 
 /**

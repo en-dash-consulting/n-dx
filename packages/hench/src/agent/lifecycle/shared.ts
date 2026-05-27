@@ -41,6 +41,20 @@ import { loadLLMConfig } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 
 // ---------------------------------------------------------------------------
+// Co-authorship trailer
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the Co-Authored-By trailer line appended to all hench-generated
+ * commits. The placeholder token is literal: the n-dx publishing pipeline
+ * substitutes it for the real ndx email address. Tests assert the exact
+ * token to prevent silent drift.
+ */
+export function buildCoAuthoredByTrailerLine(): string {
+  return "Co-Authored-By: En Dash's n-dx <n-dx@endash.us>";
+}
+
+// ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
 
@@ -1164,6 +1178,18 @@ export async function performCommitPromptIfNeeded(
       // Best-effort: if trailer append fails, proceed with commit anyway
       detail(`Warning: could not add item permalink trailer: ${(err as Error).message}`);
     }
+  }
+
+  // Append Co-Authored-By trailer for GitHub co-authorship attribution.
+  // This makes the commit appear in GitHub's contribution graph and audit logs
+  // under the ndx co-author identity.
+  try {
+    const { writeFileSync } = await import("node:fs");
+    const currentMessage = readFileSync(msgPath, "utf-8");
+    const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
+    writeFileSync(msgPath, currentMessage + separator + buildCoAuthoredByTrailerLine(), "utf-8");
+  } catch (err) {
+    detail(`Warning: could not add co-authorship trailer: ${(err as Error).message}`);
   }
 
   try {

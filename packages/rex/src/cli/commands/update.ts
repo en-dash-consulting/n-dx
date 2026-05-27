@@ -9,7 +9,7 @@ import { validateTransition } from "../../core/transitions.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { findAutoCompletions } from "../../core/parent-completion.js";
 import { validateDAG } from "../../core/dag.js";
-import { findItem } from "../../core/tree.js";
+import { findItem, resolveItem } from "../../core/tree.js";
 import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
 import { VALID_STATUSES, VALID_PRIORITIES, isItemStatus, isPriority } from "../../schema/index.js";
 import type { PRDItem, ItemStatus, Priority } from "../../schema/index.js";
@@ -36,13 +36,16 @@ export async function cmdUpdate(
   // Emit migration notification to CLI and execution log
   await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));
 
-  const existing = await store.getItem(id);
-  if (!existing) {
+  const initDoc = await store.loadDocument();
+  const resolvedEntry = resolveItem(initDoc.items, id);
+  if (!resolvedEntry) {
     throw new CLIError(
       `Item "${id}" not found.`,
       "Check the ID with 'rex status' and try again.",
     );
   }
+  const existing = resolvedEntry.item;
+  const resolvedId = resolvedEntry.item.id;
 
   const updates: Partial<PRDItem> = {};
 
@@ -71,14 +74,14 @@ export async function cmdUpdate(
     // Handle deletion: remove item and children from tree
     if (flags.status === "deleted") {
       const doc = await store.loadDocument();
-      const deletedIds = deleteItem(doc.items, id);
+      const deletedIds = deleteItem(doc.items, resolvedId);
       cleanBlockedByRefs(doc.items, new Set(deletedIds));
       await store.saveDocument(doc);
 
       await store.appendLog({
         timestamp: new Date().toISOString(),
         event: "item_deleted",
-        itemId: id,
+        itemId: resolvedId,
         detail: `Deleted ${existing.level}: ${existing.title} (${deletedIds.length} item(s) removed)`,
       });
 
@@ -139,7 +142,7 @@ export async function cmdUpdate(
     const doc = await store.loadDocument();
     // Simulate the update to validate the resulting DAG
     const simItems = JSON.parse(JSON.stringify(doc.items)) as PRDItem[];
-    const simEntry = findItem(simItems, id);
+    const simEntry = findItem(simItems, resolvedId);
     if (simEntry) {
       simEntry.item.blockedBy = updates.blockedBy;
     }
@@ -152,13 +155,13 @@ export async function cmdUpdate(
     }
   }
 
-  await store.updateItem(id, updates, { applyAttribution: true, projectDir: dir });
+  await store.updateItem(resolvedId, updates, { applyAttribution: true, projectDir: dir });
 
   // Log the update
   await store.appendLog({
     timestamp: new Date().toISOString(),
     event: "item_updated",
-    itemId: id,
+    itemId: resolvedId,
     detail: `Updated: ${Object.keys(updates).join(", ")}`,
   });
 
@@ -169,7 +172,7 @@ export async function cmdUpdate(
     (updates.status === "completed" || updates.status === "deferred")
   ) {
     const doc = await store.loadDocument();
-    const { completedItems } = findAutoCompletions(doc.items, id);
+    const { completedItems } = findAutoCompletions(doc.items, resolvedId);
 
     for (const item of completedItems) {
       const parentItem = await store.getItem(item.id);
@@ -197,7 +200,7 @@ export async function cmdUpdate(
   await syncFolderTree(rexDir, store);
 
   if (flags.format === "json") {
-    const updated = await store.getItem(id);
+    const updated = await store.getItem(resolvedId);
     result(JSON.stringify({ ...updated, autoCompleted }, null, 2));
   } else {
     result(`Updated ${existing.level}: ${existing.title}`);

@@ -171,10 +171,12 @@ function StartButton({ taskId, onStarted }: { taskId: string; onStarted: () => v
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/rex/items/${taskId}`, {
-        method: "PATCH",
+      // Launch an autonomous hench run for this task. The agent sets the task
+      // to in_progress itself; the dashboard reflects progress via WebSocket.
+      const res = await fetch("/api/hench/execute", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "in_progress" }),
+        body: JSON.stringify({ taskId }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
@@ -194,7 +196,7 @@ function StartButton({ taskId, onStarted }: { taskId: string; onStarted: () => v
       class: "rex-dash-start-btn",
       onClick: handleStart,
       disabled: loading,
-      "aria-label": "Start this task",
+      "aria-label": "Run this task with the agent",
     }, loading ? "Starting…" : "Start Task"),
     error
       ? h("div", { class: "rex-dash-start-error", role: "alert" }, error)

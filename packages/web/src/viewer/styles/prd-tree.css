@@ -2,14 +2,20 @@
 
 .prd-tree-container {
   padding: 0 var(--space-1);
+  /* Flex column so the tree fills the Tasks view's single scroll region. */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Header with title and toolbar */
 .prd-header {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-2);
   flex-wrap: wrap;
   gap: var(--space-2);
 }
@@ -43,7 +49,27 @@
 
 /* Summary bar */
 .prd-summary {
-  margin-bottom: var(--space-5);
+  flex: none;
+  margin-bottom: var(--space-3);
+}
+
+/* Tasks view shell — single internal scroll region.
+   Controls + summary stay pinned; only .prd-tree-virtual scrolls. */
+.prd-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.prd-view > .view-header,
+.prd-view > .prd-filter-bar {
+  flex: none;
+}
+/* PRDTree fills the remaining height below the controls. */
+.prd-view > .prd-tree-container {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .prd-summary-bar {
@@ -103,21 +129,19 @@
 .prd-status-dot.prd-status-failing { background: var(--red); opacity: 0.7; }
 .prd-status-dot.prd-status-deferred { background: var(--orange); opacity: 0.5; }
 
-/* Sticky filter bar — consolidated above the tree, persists on scroll */
+/* Control bar — two stacked rows (search/actions, then status+tag filters)
+   pinned above the single scroll region. No longer position:sticky: it's a
+   flex:none row in the Tasks view's flex column, so it stays put while only
+   the tree scrolls. */
 .prd-filter-bar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   background: var(--bg);
-  padding: var(--space-2) 0 var(--space-3);
-  margin-bottom: var(--space-2);
-  /* Subtle bottom edge when floating over scrolled content */
-  border-bottom: 1px solid transparent;
-}
-
-/* Show bottom border only when filter bar is sticky (scrolled past) */
-.prd-filter-bar:not(:first-child) {
-  transition: border-color 0.15s;
+  padding: 0 0 var(--space-3);
+  margin-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border);
 }
 
 /* Status filter */
@@ -377,8 +401,11 @@
    Only items within the viewport plus a buffer zone are rendered; spacer
    elements before/after maintain total scroll height. */
 .prd-tree-virtual {
-  min-height: 120px;
-  max-height: 70vh;
+  /* Single scroll region: fill the remaining height of the Tasks view's flex
+     column rather than being a nested 70vh scroller competing with the page
+     scroll (which felt "weird"). The view pins its controls above this. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   /* Smooth scroll for virtual scroll index-based navigation */
   scroll-behavior: smooth;
@@ -5590,7 +5617,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
 }
 
 .prd-search-input {
@@ -5696,11 +5722,13 @@
 
 /* ── Facet filter chips ─────────────────────────────────────────────── */
 
+/* Single wrapping row: status pills + tag filters + clear, all inline. */
 .prd-facet-filter {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1-5);
-  margin-top: var(--space-1);
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
 }
 
 .prd-facet-row {
@@ -5717,7 +5745,6 @@
   letter-spacing: 0.5px;
   color: var(--text-dim);
   flex-shrink: 0;
-  min-width: 48px;
 }
 
 .prd-facet-chips {
@@ -5798,6 +5825,128 @@
 .prd-facet-chip-icon {
   font-size: var(--font-xs);
 }
+
+/* ── Status multi-select dropdown ──────────────────────────────────────── */
+.prd-status-dropdown {
+  position: relative;
+}
+
+.prd-status-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 140px;
+  justify-content: space-between;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: var(--font-xs);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.prd-status-dropdown-trigger:hover,
+.prd-status-dropdown-trigger.open {
+  border-color: var(--accent);
+}
+
+.prd-status-dropdown-caret {
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+}
+
+.prd-status-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 220px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.18));
+}
+
+.prd-status-menu-actions {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-1);
+}
+
+.prd-status-menu-action {
+  flex: 1;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.prd-status-menu-action:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.prd-status-menu-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.prd-status-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--text);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.prd-status-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.prd-status-menu-check {
+  width: 14px;
+  text-align: center;
+  color: var(--accent);
+  font-size: var(--font-xs);
+}
+
+.prd-status-menu-icon {
+  width: 16px;
+  text-align: center;
+}
+
+.prd-status-menu-label {
+  flex: 1;
+}
+
+.prd-status-menu-count {
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.prd-status-menu-item:not(.active) .prd-status-menu-label {
+  color: var(--text-dim);
+}
+
+.prd-status-deleted { color: var(--text-dim); opacity: 0.5; }
 
 .prd-facet-chip-label {
   font-size: var(--font-xs);
@@ -5935,9 +6084,56 @@
 /* ── Completion Timeline ───────────────────────────────────────────── */
 
 .completion-timeline {
-  margin-top: var(--space-6);
+  /* Collapsible footer in the Tasks view flex column. Collapsed by default so
+     the task tree above owns the viewport; the body scrolls internally when
+     expanded and never squeezes the tree below a usable height. */
+  flex: none;
+  margin-top: var(--space-2);
   border-top: 1px solid var(--border);
-  padding-top: var(--space-4);
+}
+
+.timeline-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-1);
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+}
+
+.timeline-toggle:hover {
+  color: var(--text);
+}
+
+.timeline-toggle-chevron {
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: var(--font-xs);
+}
+
+.timeline-toggle-chevron.open {
+  transform: rotate(90deg);
+}
+
+.timeline-toggle-count {
+  margin-left: auto;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  border-radius: 10px;
+  padding: 0 var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+}
+
+.timeline-body {
+  max-height: 28vh;
+  overflow-y: auto;
+  padding-bottom: var(--space-2);
 }
 
 .timeline-range-bar {

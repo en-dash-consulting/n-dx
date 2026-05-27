@@ -60,7 +60,7 @@ describe("loadLLMConfig", () => {
         llm: {
           claude: {
             model: "claude-sonnet-4-6",
-            lightModel: "claude-haiku-4-20250414",
+            lightModel: "claude-haiku-4-5",
           },
         },
       }, null, 2),
@@ -69,7 +69,7 @@ describe("loadLLMConfig", () => {
 
     const cfg = await loadLLMConfig(tmpDir);
     expect(cfg.claude?.model).toBe("claude-sonnet-4-6");
-    expect(cfg.claude?.lightModel).toBe("claude-haiku-4-20250414");
+    expect(cfg.claude?.lightModel).toBe("claude-haiku-4-5");
   });
 
   it("reads lightModel from llm.codex section", async () => {

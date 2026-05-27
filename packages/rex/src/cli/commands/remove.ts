@@ -6,7 +6,7 @@ import {
   preCheckFeatureDeletion,
   removeFeature,
 } from "../../core/remove-feature.js";
-import { findItem } from "../../core/tree.js";
+import { resolveItem } from "../../core/tree.js";
 import { countSubtree } from "../../core/prune.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { REX_DIR } from "./constants.js";
@@ -65,8 +65,8 @@ export async function cmdRemove(
   const store = await resolveStore(rexDir);
   const doc = await store.loadDocument();
 
-  // Resolve the item and validate
-  const entry = findItem(doc.items, id);
+  // Resolve the item and validate (accepts UUID or exact title)
+  const entry = resolveItem(doc.items, id);
   if (!entry) {
     throw new CLIError(
       `Item "${id}" not found.`,
@@ -123,7 +123,7 @@ export async function cmdRemove(
 
   // Execute the removal
   if (isRootLevel(item.level)) {
-    const epicResult = removeEpic(doc.items, id);
+    const epicResult = removeEpic(doc.items, item.id);
     if (!epicResult.ok) {
       throw new CLIError(epicResult.error!, "Check the ID with 'rex status' and try again.");
     }
@@ -133,7 +133,7 @@ export async function cmdRemove(
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "epic_removed",
-      itemId: id,
+      itemId: item.id,
       detail: epicResult.detail,
     });
 
@@ -141,7 +141,7 @@ export async function cmdRemove(
 
     if (flags.format === "json") {
       result(JSON.stringify({
-        removed: { id, title: item.title, level: item.level },
+        removed: { id: item.id, title: item.title, level: item.level },
         deletedIds: epicResult.deletedIds,
         deletedCount: epicResult.deletedIds.length,
       }, null, 2));
@@ -150,7 +150,7 @@ export async function cmdRemove(
     }
   } else if (item.level === "feature") {
     // Feature removal with integrity pre-checks
-    const preCheck = preCheckFeatureDeletion(doc.items, id);
+    const preCheck = preCheckFeatureDeletion(doc.items, item.id);
 
     // Show integrity warnings in interactive mode
     if (needsConfirmation && !preCheck.safe) {
@@ -170,7 +170,7 @@ export async function cmdRemove(
       info("");
     }
 
-    const featureResult = removeFeature(doc.items, id);
+    const featureResult = removeFeature(doc.items, item.id);
     if (!featureResult.ok) {
       throw new CLIError(featureResult.error!, "Check the ID with 'rex status' and try again.");
     }
@@ -180,7 +180,7 @@ export async function cmdRemove(
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "feature_removed",
-      itemId: id,
+      itemId: item.id,
       detail: featureResult.detail,
     });
 
@@ -188,7 +188,7 @@ export async function cmdRemove(
 
     if (flags.format === "json") {
       result(JSON.stringify({
-        removed: { id, title: item.title, level: item.level },
+        removed: { id: item.id, title: item.title, level: item.level },
         deletedIds: featureResult.deletedIds,
         deletedCount: featureResult.deletedIds.length,
         cleanedRefs: featureResult.cleanedRefs,
@@ -207,7 +207,7 @@ export async function cmdRemove(
     }
   } else {
     // task
-    const taskResult = removeTask(doc.items, id);
+    const taskResult = removeTask(doc.items, item.id);
     if (!taskResult.ok) {
       throw new CLIError(taskResult.error!, "Check the ID with 'rex status' and try again.");
     }
@@ -241,7 +241,7 @@ export async function cmdRemove(
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "task_removed",
-      itemId: id,
+      itemId: item.id,
       detail: taskResult.detail,
     });
 
@@ -249,7 +249,7 @@ export async function cmdRemove(
 
     if (flags.format === "json") {
       result(JSON.stringify({
-        removed: { id, title: item.title, level: item.level },
+        removed: { id: item.id, title: item.title, level: item.level },
         deletedIds: taskResult.deletedIds,
         deletedCount: taskResult.deletedIds.length,
         autoCompleted,

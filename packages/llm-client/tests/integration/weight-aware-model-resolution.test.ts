@@ -45,7 +45,7 @@ describe("weight-aware model resolution chain", () => {
       const config = await loadLLMConfig(tmpDir);
       const model = resolveVendorModel("claude", config, "light");
       expect(model).toBe(TIER_MODELS.claude.light);
-      expect(model).toBe("claude-haiku-4-20250414");
+      expect(model).toBe("claude-haiku-4-5");
     });
 
     it("returns codex light model when weight is light and no config", async () => {
@@ -61,13 +61,13 @@ describe("weight-aware model resolution chain", () => {
         JSON.stringify({
           llm: {
             vendor: "claude",
-            claude: { lightModel: "claude-haiku-4-20250414" },
+            claude: { lightModel: "claude-haiku-4-5" },
           },
         }),
       );
       const config = await loadLLMConfig(tmpDir);
       const model = resolveVendorModel("claude", config, "light");
-      expect(model).toBe("claude-haiku-4-20250414");
+      expect(model).toBe("claude-haiku-4-5");
     });
 
     it("uses lightModel from config when weight is light for codex", async () => {
@@ -155,7 +155,7 @@ describe("weight-aware model resolution chain", () => {
         JSON.stringify({
           llm: {
             vendor: "claude",
-            claude: { lightModel: "claude-haiku-4-20250414" },
+            claude: { lightModel: "claude-haiku-4-5" },
           },
         }),
       );
@@ -209,7 +209,7 @@ describe("weight-aware model resolution chain", () => {
 
     it("explicit model string overrides tier-based selection for standard weight", () => {
       // Simulates: CLI flag --model=haiku passed to a standard-tier command
-      const explicitModel = "claude-haiku-4-20250414";
+      const explicitModel = "claude-haiku-4-5";
       const config: LLMConfig = { claude: { model: "claude-opus-4-20250514" } };
       // When caller has explicit model, they use it directly
       expect(explicitModel).not.toBe(resolveVendorModel("claude", config, "standard"));
@@ -270,19 +270,19 @@ describe("weight-aware model resolution chain", () => {
           // Legacy format: claude at top level instead of under llm
           claude: {
             model: "claude-opus-4-20250514",
-            lightModel: "claude-haiku-4-20250414",
+            lightModel: "claude-haiku-4-5",
           },
         }),
       );
       const config = await loadLLMConfig(tmpDir);
       expect(config.claude?.model).toBe("claude-opus-4-20250514");
-      expect(config.claude?.lightModel).toBe("claude-haiku-4-20250414");
+      expect(config.claude?.lightModel).toBe("claude-haiku-4-5");
 
       const standardModel = resolveVendorModel("claude", config, "standard");
       expect(standardModel).toBe("claude-opus-4-20250514");
 
       const lightModel = resolveVendorModel("claude", config, "light");
-      expect(lightModel).toBe("claude-haiku-4-20250414");
+      expect(lightModel).toBe("claude-haiku-4-5");
     });
 
     it("llm.claude takes precedence over legacy top-level claude", async () => {

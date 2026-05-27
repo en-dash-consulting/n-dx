@@ -179,7 +179,9 @@ function App({ scope }: { scope: string | null }) {
     h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope }),
     h("main", {
       id: "main-content",
-      class: "main",
+      // The Tasks (prd) view manages its own internal scroll region, so the
+      // main column becomes a non-scrolling flex container for it.
+      class: `main${view === "prd" ? " main--fill" : ""}`,
       role: "main",
       "aria-label": "Main content",
       onClick: handleTripleClick,

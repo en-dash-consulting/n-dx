@@ -23,7 +23,7 @@ export interface ProposalEditorProps {
 
 /** Raw proposal shape from the analyze endpoint. */
 export interface RawProposal {
-  epic: { title: string; source: string; description?: string };
+  epic: { title: string; source: string; description?: string; existingId?: string };
   features: RawProposalFeature[];
 }
 
@@ -31,6 +31,8 @@ interface RawProposalFeature {
   title: string;
   source: string;
   description?: string;
+  /** If present, accept-edited nests new tasks under this existing feature. */
+  existingId?: string;
   tasks: RawProposalTask[];
 }
 
@@ -50,6 +52,8 @@ interface EditableTask {
   description: string;
   priority: string;
   tags: string;
+  /** Carried verbatim from the proposal; not inline-editable in the UI. */
+  acceptanceCriteria: string[];
   selected: boolean;
 }
 
@@ -57,6 +61,8 @@ interface EditableTask {
 interface EditableFeature {
   title: string;
   description: string;
+  /** Carried from RawProposal for smart-placement nesting on accept. */
+  existingId?: string;
   tasks: EditableTask[];
   selected: boolean;
   expanded: boolean;
@@ -66,6 +72,8 @@ interface EditableFeature {
 interface EditableProposal {
   epicTitle: string;
   epicDescription: string;
+  /** Carried from RawProposal for smart-placement nesting on accept. */
+  epicExistingId?: string;
   features: EditableFeature[];
   selected: boolean;
   expanded: boolean;
@@ -84,11 +92,13 @@ function toEditable(proposals: RawProposal[]): EditableProposal[] {
   return proposals.map((p) => ({
     epicTitle: p.epic.title,
     epicDescription: p.epic.description ?? "",
+    ...(p.epic.existingId ? { epicExistingId: p.epic.existingId } : {}),
     selected: true,
     expanded: true,
     features: p.features.map((f) => ({
       title: f.title,
       description: f.description ?? "",
+      ...(f.existingId ? { existingId: f.existingId } : {}),
       selected: true,
       expanded: false,
       tasks: f.tasks.map((t) => ({
@@ -96,6 +106,7 @@ function toEditable(proposals: RawProposal[]): EditableProposal[] {
         description: t.description ?? "",
         priority: t.priority ?? "",
         tags: (t.tags ?? []).join(", "),
+        acceptanceCriteria: t.acceptanceCriteria ?? [],
         selected: true,
       })),
     })),
@@ -283,13 +294,19 @@ export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }
     try {
       const payload = proposals
         .map((p) => ({
-          epic: { title: p.epicTitle, description: p.epicDescription || undefined },
+          epic: {
+            title: p.epicTitle,
+            description: p.epicDescription || undefined,
+            ...(p.epicExistingId ? { existingId: p.epicExistingId } : {}),
+          },
           features: p.features.map((f) => ({
             title: f.title,
             description: f.description || undefined,
+            ...(f.existingId ? { existingId: f.existingId } : {}),
             tasks: f.tasks.map((t) => ({
               title: t.title,
               description: t.description || undefined,
+              acceptanceCriteria: t.acceptanceCriteria.length > 0 ? t.acceptanceCriteria : undefined,
               priority: t.priority || undefined,
               tags: t.tags ? t.tags.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
               selected: t.selected,

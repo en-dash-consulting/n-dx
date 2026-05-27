@@ -8,7 +8,7 @@
  * The hook returns the current state and a setter, mirroring useState.
  */
 
-import { useState, useCallback } from "preact/hooks";
+import { useState, useCallback, useRef } from "preact/hooks";
 import type { ItemStatus } from "../components/prd-tree/types.js";
 import { defaultStatusFilter } from "../views/status-filter.js";
 
@@ -32,6 +32,12 @@ export interface PersistentFilterState {
   activeStatuses: Set<ItemStatus>;
   /** Update the active statuses (also persists across remounts). */
   setActiveStatuses: (statuses: Set<ItemStatus>) => void;
+  /**
+   * True when a selection was already persisted before this mount (i.e. the
+   * user has interacted, or a smart default was applied earlier this page
+   * session). Lets callers apply a data-derived default only on a fresh load.
+   */
+  hadPersistedSelection: boolean;
 }
 
 /**
@@ -42,6 +48,11 @@ export interface PersistentFilterState {
  * the last selection.
  */
 export function usePersistentFilter(): PersistentFilterState {
+  // Capture, once, whether a selection was already persisted when this
+  // component first mounted. A fresh page load resets the module variable to
+  // null, so this is false on load and true after any prior selection.
+  const hadPersistedSelection = useRef(persistedStatuses !== null).current;
+
   const [activeStatuses, setActiveStatusesLocal] = useState<Set<ItemStatus>>(
     getPersistedStatuses,
   );
@@ -51,5 +62,5 @@ export function usePersistentFilter(): PersistentFilterState {
     setActiveStatusesLocal(statuses);
   }, []);
 
-  return { activeStatuses, setActiveStatuses };
+  return { activeStatuses, setActiveStatuses, hadPersistedSelection };
 }

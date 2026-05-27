@@ -205,6 +205,9 @@ interface UsageCellArgs {
 
 function renderUsageCell(args: UsageCellArgs) {
   const { item, usageRollup, usage, showTokenBudget, utilization } = args;
+  // The whole cell is gated on the showTokenBudget feature flag — when
+  // budgets aren't active, the column is just noise on every row.
+  if (!showTokenBudget) return null;
 
   // Prefer the server-emitted rollup (works for every level). Fall back
   // to the flat self-only taskUsage entry when the rollup isn't present
@@ -389,6 +392,13 @@ interface NodeRowProps {
   searchQuery?: string;
   /** Whether this node directly matches the search query. */
   isSearchMatch?: boolean;
+  /**
+   * Render the level badge as a "section header" above this row. True only
+   * for the first item in each contiguous group of same-level siblings, so
+   * the badge labels the indentation level once instead of repeating on
+   * every row.
+   */
+  showLevelLabel?: boolean;
 }
 
 /**
@@ -422,6 +432,7 @@ class NodeRow extends Component<NodeRowProps> {
     if (p.canInlineAdd !== nextProps.canInlineAdd) return true;
     if (p.canDelete !== nextProps.canDelete) return true;
     if (p.showTokenBudget !== nextProps.showTokenBudget) return true;
+    if (p.showLevelLabel !== nextProps.showLevelLabel) return true;
     // taskUsage / usageRollup are objects — reference check
     // (new object ⇒ re-render)
     if (p.taskUsage !== nextProps.taskUsage) return true;
@@ -437,7 +448,7 @@ class NodeRow extends Component<NodeRowProps> {
   }
 
   render() {
-    const { item, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch } = this.props;
+    const { item, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel } = this.props;
     const children = item.children ?? [];
     const stats = hasChildren ? computeBranchStats(children) : null;
     const ratio = stats ? completionRatio(stats) : 0;
@@ -485,8 +496,12 @@ class NodeRow extends Component<NodeRowProps> {
       ),
       // Status icon
       h(StatusIndicator, { status: item.status }),
-      // Level badge
-      h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level]),
+      // Level badge — only on the first item of each contiguous same-level
+      // sibling group, so the indentation level reads as a section header
+      // instead of a repeating badge on every row.
+      showLevelLabel
+        ? h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level])
+        : null,
       // Branch badge (only when attribution is present)
       item.branch
         ? h(BranchBadge, { branch: item.branch, sourceFile: item.sourceFile })
@@ -514,15 +529,10 @@ class NodeRow extends Component<NodeRowProps> {
       item.tags && item.tags.length > 0
         ? h(TagList, { tags: item.tags })
         : null,
-      // Token usage column — rollup-aware; renders `—` when no runs
-      // have touched this item or its subtree so empty rows don't read
-      // as "zero work" (per brief).
+      // Token usage column — only when the showTokenBudget feature flag
+      // is enabled. Duration + timestamps live in the detail flyout, not
+      // on every row.
       renderUsageCell({ item, usageRollup, usage, showTokenBudget, utilization }),
-      // Duration column — live-updating for in-progress rows, static
-      // for terminal rows, `—` when no work has been recorded yet.
-      renderDurationCell({ item, usageRollup, hasChildren, tickMs }),
-      // Timestamp
-      h(TimestampSuffix, { item }),
       // ── Inline action group (hover-reveal) ──────────────────────────
       // Unified action row: [+Add] [✎Edit] [↕Status] [✕Delete]
       // All buttons use delegated click handling on the tree container.
@@ -1058,10 +1068,14 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
           })
         : null,
       // Visible items — flat rendering from virtual scroll
-      virtualScroll.visibleNodes.map((node: FlatNode) => {
+      virtualScroll.visibleNodes.map((node: FlatNode, idx: number) => {
         const { item, depth, isExpanded, hasChildren } = node;
         const isInlineAddActive = inlineAddParentId === item.id;
         const isHL = highlightedItemId === item.id;
+        // First item of each contiguous same-level group gets the level
+        // badge as a section header; subsequent rows omit it.
+        const prev = idx > 0 ? virtualScroll.visibleNodes[idx - 1] : null;
+        const showLevelLabel = !prev || prev.item.level !== item.level || prev.depth !== depth;
 
         // Only in-progress rows receive the live tick. Idle rows
         // receive `null` so their `shouldComponentUpdate` short-circuits.
@@ -1088,6 +1102,7 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
             isDeleting: deletingItemId === item.id,
             searchQuery,
             isSearchMatch: searchMatchIds?.has(item.id),
+            showLevelLabel,
           }),
           // Inline add form — rendered below the parent node
           isInlineAddActive && onInlineAddSubmit

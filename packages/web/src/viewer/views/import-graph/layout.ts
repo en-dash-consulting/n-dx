@@ -98,14 +98,20 @@ export function layoutFocusedGraph(opts: {
   return { nodes, width, height };
 }
 
-/** Polyline path for a directed edge from node a to node b (simple elbow). */
+/**
+ * Polyline path for a directed edge from node a to node b (simple elbow).
+ * `bendShift` offsets the vertical segment's X so parallel edges sharing the
+ * same source-column-to-target-column path don't pile their verticals at the
+ * same X coordinate — pass a small per-edge offset to fan them out.
+ */
 export function elbowPath(
   x1: number,
   y1: number,
   x2: number,
   y2: number,
+  bendShift = 0,
 ): string {
-  const mx = (x1 + x2) / 2;
+  const mx = (x1 + x2) / 2 + bendShift;
   return `M ${x1} ${y1} L ${mx} ${y1} L ${mx} ${y2} L ${x2} ${y2}`;
 }
 

@@ -15,11 +15,15 @@ import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { insertChild, loadPRD, savePRD, appendLog } from "./routes-rex/rex-route-helpers.js";
+import { loadPRD, appendLog } from "./routes-rex/rex-route-helpers.js";
+import { refreshPRDCache } from "./prd-io.js";
 
 import {
   type PRDItem,
   isPriority,
+  resolveStore,
+  collectAllIds,
+  cascadeParentReset,
 } from "./rex-gateway.js";
 
 /**
@@ -74,12 +78,14 @@ interface EditedProposalTask {
 interface EditedProposalFeature {
   title: string;
   description?: string;
+  /** If set, nest tasks under this existing feature instead of creating a new one. */
+  existingId?: string;
   tasks: EditedProposalTask[];
   selected: boolean;
 }
 
 interface EditedProposal {
-  epic: { title: string; description?: string };
+  epic: { title: string; description?: string; existingId?: string };
   features: EditedProposalFeature[];
   selected: boolean;
 }
@@ -335,6 +341,10 @@ async function handleAcceptProposals(
       return true;
     }
 
+    // See handleAcceptEditedProposals: write through the rex store so items
+    // land in the folder tree (the authoritative source per CLAUDE.md), not
+    // the legacy prd.md that the watcher overwrites.
+    const store = await resolveStore(ctx.rexDir);
     let addedCount = 0;
 
     for (const p of toAccept) {
@@ -347,7 +357,7 @@ async function handleAcceptProposals(
         source: p.epic.source,
       };
       if (p.epic.description) epicItem.description = p.epic.description;
-      doc.items.push(epicItem);
+      await store.addItem(epicItem);
       addedCount++;
 
       for (const f of p.features) {
@@ -360,7 +370,7 @@ async function handleAcceptProposals(
           source: f.source,
         };
         if (f.description) featureItem.description = f.description;
-        insertChild(doc.items, epicId, featureItem);
+        await store.addItem(featureItem, epicId);
         addedCount++;
 
         for (const t of f.tasks) {
@@ -376,13 +386,15 @@ async function handleAcceptProposals(
           if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
           if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
           if (t.tags) taskItem.tags = t.tags;
-          insertChild(doc.items, featureId, taskItem);
+          await store.addItem(taskItem, featureId);
           addedCount++;
         }
       }
     }
 
-    savePRD(ctx, doc);
+    // Refresh the cache from the store so the dashboard sees the new items
+    // immediately (see handleAcceptEditedProposals for context).
+    refreshPRDCache(ctx.rexDir, await store.loadDocument());
 
     // Remove accepted proposals from pending (keep remaining)
     if (input.indices && input.indices.length < allProposals.length) {
@@ -454,35 +466,66 @@ async function handleAcceptEditedProposals(
       return true;
     }
 
+    // Write through the rex store so items land in the folder tree
+    // (.rex/prd_tree/), the authoritative source per CLAUDE.md. Respect
+    // `existingId` on epic/feature so smart-placement nests under the
+    // matched container instead of creating a duplicate.
+    const store = await resolveStore(ctx.rexDir);
+    const knownIds = new Set(collectAllIds((await store.loadDocument()).items));
+    // Parents whose status may need reverting from `completed` to `pending`
+    // after we nest a new task underneath them. Deduped so we only cascade
+    // each branch once at the end.
+    const parentsToCascade = new Set<string>();
     let addedCount = 0;
     const selectedProposals = input.proposals.filter((p) => p.selected);
 
     for (const p of selectedProposals) {
-      const epicId = randomUUID();
-      const epicItem: PRDItem = {
-        id: epicId,
-        title: p.epic.title.trim(),
-        level: "epic",
-        status: "pending",
-        source: "web-proposal-editor",
-      };
-      if (p.epic.description?.trim()) epicItem.description = p.epic.description.trim();
-      doc.items.push(epicItem);
-      addedCount++;
-
-      for (const f of p.features) {
-        if (!f.selected) continue;
-        const featureId = randomUUID();
-        const featureItem: PRDItem = {
-          id: featureId,
-          title: f.title.trim(),
-          level: "feature",
+      let epicId: string;
+      if (p.epic.existingId && knownIds.has(p.epic.existingId)) {
+        epicId = p.epic.existingId;
+        console.log(`[accept-edited] reuse epic id=${epicId} title="${p.epic.title}"`);
+      } else {
+        if (p.epic.existingId) {
+          console.log(
+            `[accept-edited] payload epic.existingId="${p.epic.existingId}" not found in PRD — creating new`,
+          );
+        } else {
+          console.log(`[accept-edited] no existingId for epic "${p.epic.title}" — creating new`);
+        }
+        epicId = randomUUID();
+        const epicItem: PRDItem = {
+          id: epicId,
+          title: p.epic.title.trim(),
+          level: "epic",
           status: "pending",
           source: "web-proposal-editor",
         };
-        if (f.description?.trim()) featureItem.description = f.description.trim();
-        insertChild(doc.items, epicId, featureItem);
+        if (p.epic.description?.trim()) epicItem.description = p.epic.description.trim();
+        await store.addItem(epicItem);
+        knownIds.add(epicId);
         addedCount++;
+      }
+
+      for (const f of p.features) {
+        if (!f.selected) continue;
+        let featureId: string;
+        if (f.existingId && knownIds.has(f.existingId)) {
+          featureId = f.existingId;
+          console.log(`[accept-edited] reuse feature id=${featureId} title="${f.title}"`);
+        } else {
+          featureId = randomUUID();
+          const featureItem: PRDItem = {
+            id: featureId,
+            title: f.title.trim(),
+            level: "feature",
+            status: "pending",
+            source: "web-proposal-editor",
+          };
+          if (f.description?.trim()) featureItem.description = f.description.trim();
+          await store.addItem(featureItem, epicId);
+          knownIds.add(featureId);
+          addedCount++;
+        }
 
         for (const t of f.tasks) {
           if (!t.selected) continue;
@@ -498,9 +541,20 @@ async function handleAcceptEditedProposals(
           if (t.acceptanceCriteria?.length) taskItem.acceptanceCriteria = t.acceptanceCriteria;
           if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
           if (t.tags?.length) taskItem.tags = t.tags;
-          insertChild(doc.items, featureId, taskItem);
+          await store.addItem(taskItem, featureId);
+          knownIds.add(taskId);
+          parentsToCascade.add(featureId);
           addedCount++;
         }
+      }
+    }
+
+    // Reset any completed feature/epic in the chain back to `pending` now
+    // that they have a new in-progress task underneath them.
+    for (const parentId of parentsToCascade) {
+      const { resetItems } = await cascadeParentReset(store, parentId);
+      for (const item of resetItems) {
+        console.log(`[accept-edited] reset ${item.level} id=${item.id} title="${item.title}" -> pending`);
       }
     }
 
@@ -509,7 +563,10 @@ async function handleAcceptEditedProposals(
       return true;
     }
 
-    savePRD(ctx, doc);
+    // Refresh the cache from the store so the next GET /api/rex/prd in the
+    // same tick sees the new items (the folder-tree watcher would catch up
+    // eventually, but we want immediate visibility for the dashboard).
+    refreshPRDCache(ctx.rexDir, await store.loadDocument());
 
     // Clear pending proposals file
     const pendingPath = join(ctx.rexDir, "pending-proposals.json");
@@ -565,7 +622,11 @@ async function handleSmartAddPreview(
     // Pass description via --description flag (not positional) to prevent any
     // stale UI text from being concatenated into the argument list.
     const description = String(input.text).trim();
-    const args = ["add", "--format=json", "--description", description];
+    // The dashboard preview is a draft the user reviews — `--fast` forces the
+    // vendor's light tier (e.g. haiku) so the CLI provider completes well
+    // within the timeout from a daemonized server. The user-driven CLI
+    // `n-dx add` keeps the configured top-tier model.
+    const args = ["add", "--format=json", "--fast", "--description", description];
     if (input.parentId) args.push("--parent", input.parentId);
     args.push(ctx.projectDir);
 
@@ -573,22 +634,39 @@ async function handleSmartAddPreview(
     const binArgs = [...prefixArgs, ...args];
 
     // Smart add does a full LLM round-trip to generate a proposal tree.
-    // With an API key (ANTHROPIC_API_KEY / `n-dx config claude.api_key`) this
-    // takes seconds via the API provider. Without one, llm-client falls back
-    // to spawning the `claude` CLI, which is far slower from a long-running
-    // server process (no warm session) and can blow past the timeout.
+    // The Claude CLI provider (no API key needed) normally returns in well
+    // under a minute; a timeout here means the spawned `claude` process
+    // itself stalled in the server context (e.g. token refresh with no TTY,
+    // or a different PATH/env than your shell) — not a missing API key.
     const SMART_ADD_TIMEOUT_MS = 240_000;
+    const startedAt = Date.now();
+    console.log(`[smart-add-preview] spawn`, { binPath, binArgs, cwd: ctx.projectDir });
     const cliResult = await foundationExec(binPath, binArgs, {
       cwd: ctx.projectDir,
       timeout: SMART_ADD_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
       env: process.env,
     });
+    const elapsedMs = Date.now() - startedAt;
+    console.log(`[smart-add-preview] finished in ${elapsedMs}ms`, {
+      exitCode: cliResult.exitCode,
+      stdoutBytes: cliResult.stdout.length,
+      stderrBytes: cliResult.stderr.length,
+    });
+    if (cliResult.stderr.trim()) {
+      console.log(`[smart-add-preview] stderr:\n${cliResult.stderr.trim()}`);
+    }
 
     if (cliResult.error && !cliResult.stdout.trim()) {
       if (cliResult.exitCode === null) {
         throw new Error(
-          `Smart add timed out after ${SMART_ADD_TIMEOUT_MS / 1000}s. This usually means no API key is configured, so it fell back to the slow Claude CLI provider. Set an API key for fast generation: \`n-dx config claude.api_key <key>\` (or export ANTHROPIC_API_KEY before \`ndx start\`), then restart the dashboard.`,
+          `Smart add timed out after ${SMART_ADD_TIMEOUT_MS / 1000}s — the LLM call never returned. ` +
+            `The Claude CLI provider is in use (this is normal without an API key). ` +
+            `Verify the CLI works from the environment that launched the dashboard: ` +
+            `\`time claude -p "hi"\`. If that hangs, the \`claude\` CLI isn't usable there ` +
+            `(re-auth with \`claude\`, or run \`ndx start\` from a shell where it works). ` +
+            `An API key (\`n-dx config claude.api_key\`) is an optional faster path, not required.` +
+            (cliResult.stderr.trim() ? `\n\nstderr:\n${cliResult.stderr.trim()}` : ""),
         );
       }
       throw new Error(cliResult.stderr || cliResult.error.message);

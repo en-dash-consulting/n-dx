@@ -37,6 +37,7 @@ import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import { hashPRD } from "../../core/pending-cache.js";
 import {
   matchProposalNodesToPRD,
+  matchProposalNodeToPRD,
   attachDuplicateReasonsToProposals,
   buildDuplicateOverrideMarkerIndex,
 } from "./smart-add-duplicates.js";
@@ -1219,6 +1220,22 @@ function emitPrdPaths(prdPaths: string[]): void {
   }
 }
 
+/**
+ * Resolve the vendor's light/fast tier model (haiku for claude,
+ * gpt-5.4-mini for codex) for `--fast`/preview smart-add runs where
+ * generation latency matters more than top-tier proposal quality.
+ */
+async function resolveLightSmartAddModel(dir: string): Promise<string | undefined> {
+  try {
+    const rexDir = join(dir, REX_DIR);
+    const llmConfig = await loadLLMConfig(rexDir);
+    const vendor = llmConfig.vendor ?? getLLMVendor() ?? "claude";
+    return resolveVendorModel(vendor, llmConfig, "light");
+  } catch {
+    return undefined;
+  }
+}
+
 async function resolveSmartAddModel(
   dir: string,
   requestedModel?: string,
@@ -1290,6 +1307,98 @@ async function loadSmartAddContext(
   return { existing, parentLevel, itemFileMap };
 }
 
+/**
+ * A proposed container should reuse an existing one if the dedup scorer
+ * already considers them a match (`match.duplicate`). That scorer combines
+ * exact-title, semantic title-contains, and blended title+content similarity
+ * with a 0.7 threshold — already calibrated for "this is the same thing,"
+ * so trust it here rather than imposing an extra-strict 0.85 gate that
+ * silently dropped real content-overlap matches and let duplicates through.
+ */
+function isContainerMatch(
+  match: ProposalDuplicateMatch,
+  kind: "epic" | "feature",
+): boolean {
+  return !!match.duplicate && !!match.matchedItem && match.matchedItem.level === kind;
+}
+
+/**
+ * Auto-fill `existingId` on proposed epics/features that match an existing
+ * PRD container, so `n-dx add` nests the new task under the existing
+ * epic/feature instead of creating a duplicate. The LLM is supposed to set
+ * `existingId` itself but is unreliable; this is the deterministic fallback.
+ * Respects an `existingId` the LLM already set.
+ */
+export function applySmartPlacement(proposals: Proposal[], existing: PRDItem[]): void {
+  if (existing.length === 0) return;
+  const knownIds = new Set<string>();
+  const idToTitle = new Map<string, string>();
+  const collect = (items: PRDItem[]): void => {
+    for (const it of items) {
+      knownIds.add(it.id);
+      idToTitle.set(it.id, it.title);
+      if (it.children?.length) collect(it.children);
+    }
+  };
+  collect(existing);
+
+  for (const p of proposals) {
+    // The LLM may set existingId itself — but it routinely hallucinates IDs
+    // that don't exist in the PRD. Validate against the real id set; if it
+    // doesn't resolve, clear and run our scorer so a real match can take over.
+    if (p.epic.existingId && !knownIds.has(p.epic.existingId)) {
+      llmDebug(`epic "${p.epic.title}" had LLM-hallucinated existingId="${p.epic.existingId}" — discarded`);
+      p.epic.existingId = undefined;
+    }
+    if (p.epic.existingId) {
+      llmDebug(`epic "${p.epic.title}" honoring LLM existingId="${p.epic.existingId}" (title="${idToTitle.get(p.epic.existingId) ?? "?"}")`);
+    } else {
+      const match = matchProposalNodeToPRD(
+        { key: "epic", kind: "epic", title: p.epic.title, description: p.epic.description },
+        existing,
+      );
+      const placed = isContainerMatch(match, "epic");
+      llmDebug(
+        `epic "${p.epic.title}" -> ${
+          match.matchedItem
+            ? `best="${match.matchedItem.title}" reason=${match.reason} score=${match.score.toFixed(2)} placed=${placed}`
+            : `(no candidate; ${existing.length} existing items considered)`
+        }`,
+      );
+      if (placed) p.epic.existingId = match.matchedItem!.id;
+    }
+
+    for (const feature of p.features) {
+      if (feature.existingId && !knownIds.has(feature.existingId)) {
+        llmDebug(`feature "${feature.title}" had LLM-hallucinated existingId="${feature.existingId}" — discarded`);
+        feature.existingId = undefined;
+      }
+      if (feature.existingId) {
+        llmDebug(`feature "${feature.title}" honoring LLM existingId="${feature.existingId}"`);
+        continue;
+      }
+      // Only auto-match a feature when its epic is also being nested into an
+      // existing one — otherwise we'd attach the new feature's tasks under a
+      // feature that lives in a DIFFERENT existing epic, leaving the
+      // proposal's epic orphaned.
+      if (!p.epic.existingId) continue;
+      const match = matchProposalNodeToPRD(
+        { key: "feature", kind: "feature", title: feature.title, description: feature.description },
+        existing,
+      );
+      const placed = isContainerMatch(match, "feature");
+      llmDebug(
+        `feature "${feature.title}" -> ${
+          match.matchedItem
+            ? `best="${match.matchedItem.title}" reason=${match.reason} score=${match.score.toFixed(2)} placed=${placed}`
+            : `(no candidate)`
+        }`,
+      );
+      if (placed) feature.existingId = match.matchedItem!.id;
+    }
+  }
+}
+
 async function generateSmartAddProposals(params: {
   dir: string;
   existing: PRDItem[];
@@ -1317,6 +1426,7 @@ async function generateSmartAddProposals(params: {
         parentId,
       });
       const proposals = reasonResult.proposals;
+      if (!parentId) applySmartPlacement(proposals, existing);
       const method = reasonResult.tokenUsage.calls > 0
         ? `via LLM (${effectiveModel})`
         : "from file structure";
@@ -1344,6 +1454,7 @@ async function generateSmartAddProposals(params: {
       parentId,
     });
     const proposals = reasonResult.proposals;
+    if (!parentId) applySmartPlacement(proposals, existing);
     spinner?.stop(proposals.length > 0 ? `Generated ${proposals.length} proposal(s).` : undefined);
     return proposals;
   } catch (err) {
@@ -1717,7 +1828,13 @@ export async function cmdSmartAdd(
     return;
   }
 
-  const model = await resolveSmartAddModel(dir, flags.model);
+  // `--fast` forces the light tier (e.g. haiku) — used by the web Quick Add
+  // preview where generation latency matters far more than top-tier quality.
+  // Explicit `--model` always wins.
+  const fast = flags.fast === "true" && !flags.model;
+  const model = fast
+    ? (await resolveLightSmartAddModel(dir)) ?? (await resolveSmartAddModel(dir, flags.model))
+    : await resolveSmartAddModel(dir, flags.model);
   const { existing, parentLevel, itemFileMap } = await loadSmartAddContext(dir, input.parentId);
   const proposals = await generateSmartAddProposals({
     dir,
