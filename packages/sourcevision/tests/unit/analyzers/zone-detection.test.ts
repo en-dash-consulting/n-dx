@@ -449,26 +449,24 @@ describe("analyzeZones", () => {
     expect(run1).toEqual(run2);
   });
 
-  it("excludes test files from cohesion/coupling metric computation", async () => {
-    // Two source files form a tight cluster (cohesion=1),
-    // plus a test file that imports from an external zone.
-    // Without test-file exclusion, the test→external edge would inflate coupling.
+  it("quarantines tests living in a test-only directory (Swift Tests/ layout)", async () => {
+    // Tests that live in a TEST-ONLY directory get quarantined into their
+    // own zone so they don't share a zone with the implementation they
+    // assert against. (Colocated tests like Go's _test.go stay with their
+    // package — covered separately below.)
     const inventory = makeInventory([
       makeFileEntry("src/core/a.ts"),
       makeFileEntry("src/core/b.ts"),
-      makeFileEntry("src/core/a.test.ts", { role: "test" }),
+      makeFileEntry("tests/core/a.test.ts", { role: "test" }),
       makeFileEntry("src/other/x.ts"),
       makeFileEntry("src/other/y.ts"),
       makeFileEntry("src/other/z.ts"),
     ]);
     const imports = makeImports([
-      // Core cluster: a↔b
       makeEdge("src/core/a.ts", "src/core/b.ts"),
       makeEdge("src/core/b.ts", "src/core/a.ts"),
-      // Test imports from external zone
-      makeEdge("src/core/a.test.ts", "src/core/a.ts"),
-      makeEdge("src/core/a.test.ts", "src/other/x.ts"),
-      // Other cluster
+      makeEdge("tests/core/a.test.ts", "src/core/a.ts"),
+      makeEdge("tests/core/a.test.ts", "src/other/x.ts"),
       makeEdge("src/other/x.ts", "src/other/y.ts"),
       makeEdge("src/other/y.ts", "src/other/z.ts"),
       makeEdge("src/other/x.ts", "src/other/z.ts"),
@@ -476,17 +474,36 @@ describe("analyzeZones", () => {
 
     const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
 
-    // Find the zone containing core files
     const coreZone = result.zones.find((z) => z.files.includes("src/core/a.ts"));
     expect(coreZone).toBeDefined();
-
-    // Test file should still be a zone member (not excluded from membership)
-    expect(coreZone!.files).toContain("src/core/a.test.ts");
-
-    // But coupling should only reflect source-file edges:
-    // a.ts and b.ts both only connect to each other → coupling should be 0
-    // (if test file were counted, the test→other/x.ts edge would add coupling)
+    expect(coreZone!.files).not.toContain("tests/core/a.test.ts");
     expect(coreZone!.coupling).toBe(0);
+    const testsZone = result.zones.find((z) => z.files.includes("tests/core/a.test.ts"));
+    expect(testsZone).toBeDefined();
+    expect(testsZone!.files).not.toContain("src/core/a.ts");
+  });
+
+  it("keeps colocated tests (Go-style _test.go) inside their production package zone", async () => {
+    // When a test file lives in a directory that ALSO contains production
+    // files (Go's `internal/foo/foo_test.go` next to `foo.go`), the test
+    // belongs with its package — the test-only-directory heuristic doesn't
+    // fire and the test gets partitioned by Louvain alongside production.
+    const inventory = makeInventory([
+      makeFileEntry("internal/handler/user.go"),
+      makeFileEntry("internal/handler/user_test.go", { role: "test" }),
+      makeFileEntry("internal/service/user.go"),
+    ]);
+    const imports = makeImports([
+      makeEdge("internal/handler/user.go", "internal/service/user.go"),
+      makeEdge("internal/handler/user_test.go", "internal/handler/user.go"),
+    ]);
+
+    const { zones: result } = await analyzeZones(inventory, imports, { enrich: false });
+
+    const handlerZone = result.zones.find((z) => z.files.includes("internal/handler/user.go"));
+    expect(handlerZone).toBeDefined();
+    // Colocated test stays with its package.
+    expect(handlerZone!.files).toContain("internal/handler/user_test.go");
   });
 });
 

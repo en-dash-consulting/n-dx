@@ -922,11 +922,65 @@ function assertAnchorZones(
 
 // ── Recursive subdivision ────────────────────────────────────────────────────
 
-/** Zones with more than this many files are subdivided recursively. */
-export const SUBDIVISION_THRESHOLD = 50;
+/**
+ * Absolute floor for the subdivision threshold. A zone with fewer than this
+ * many files is never subdivided regardless of project size — the noise
+ * floor below which sub-zoning is more confusing than useful.
+ */
+export const SUBDIVISION_THRESHOLD_MIN = 12;
+
+/**
+ * Project-relative subdivision trigger. Any zone exceeding this fraction of
+ * total project files is considered "likely multiple concerns" and gets
+ * recursively split — independent of its measured cohesion (a 29-file zone
+ * with cohesion 0.79 routinely contains 3+ architectural roles glued
+ * together by a few shared types).
+ */
+export const SUBDIVISION_THRESHOLD_PCT = 0.15;
+
+/**
+ * Compute the subdivision threshold for a project of `totalFiles` files.
+ * Caller passes `inventory.files.length` — we use the larger of the absolute
+ * floor and the project-relative fraction so small repos still subdivide
+ * meaningful blobs and large repos don't fragment into noise.
+ *
+ * Legacy export `SUBDIVISION_THRESHOLD` kept as the absolute floor so any
+ * external consumer pinning to the constant still gets reasonable behavior.
+ */
+export function subdivisionThreshold(totalFiles: number): number {
+  return Math.max(SUBDIVISION_THRESHOLD_MIN, Math.floor(totalFiles * SUBDIVISION_THRESHOLD_PCT));
+}
+
+/** @deprecated use {@link subdivisionThreshold}(totalFiles) — kept for back-compat */
+export const SUBDIVISION_THRESHOLD = SUBDIVISION_THRESHOLD_MIN;
 
 /** Maximum recursion depth for subdivision to prevent infinite loops. */
 export const MAX_SUBDIVISION_DEPTH = 3;
+
+/**
+ * Map a test file path to its community ID. Groups test files by their
+ * top-level Tests/<suite>/ prefix so projects with multiple test targets
+ * (e.g. `Tests/GoToBedCoreTests`, `Tests/GoToBedTests`) get one zone per
+ * suite. Files not under a Tests/<suite>/ path fall back to a single
+ * "tests" community.
+ */
+export function deriveTestSuiteCommunity(filePath: string): string {
+  const segments = filePath.split("/");
+  // Look for a "Tests" or "tests" or "test" segment near the top of the path.
+  for (let i = 0; i < segments.length - 1; i++) {
+    const lc = segments[i].toLowerCase();
+    if (lc === "tests" || lc === "test") {
+      const suite = segments[i + 1];
+      // Only use the suite if it's itself a directory (not the test file
+      // sitting directly in Tests/) — otherwise lump under generic tests.
+      if (i + 2 < segments.length) {
+        return `tests:${segments[i]}/${suite}`;
+      }
+      return `tests:${segments[i]}`;
+    }
+  }
+  return "tests";
+}
 
 /**
  * Subdivide a large zone by running the full zone pipeline on its internal
@@ -943,8 +997,13 @@ export function subdivideZone(
   testFiles: Set<string> = new Set(),
   depth: number = 0
 ): Zone[] {
-  // Don't subdivide small zones or if we've hit max depth
-  if (zone.files.length < SUBDIVISION_THRESHOLD || depth >= MAX_SUBDIVISION_DEPTH) {
+  // Don't subdivide small zones or if we've hit max depth. The threshold is
+  // project-size-relative — a 29-file zone in a 111-file project is 26 % of
+  // the codebase and almost certainly contains multiple architectural roles
+  // glued by shared types; under the legacy flat 50-file gate, that zone
+  // would never have been touched.
+  const threshold = subdivisionThreshold(inventory.files.length);
+  if (zone.files.length < threshold || depth >= MAX_SUBDIVISION_DEPTH) {
     return [];
   }
 
@@ -1649,8 +1708,23 @@ function buildZonesFromCommunities(
     .map(([comm, members]) => [comm, members.sort()] as const)
     .sort(([, a], [, b]) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 
-  for (const [, members] of sortedCommunities) {
-    let id = deriveZoneId(members, parentId);
+  for (const [communityId, members] of sortedCommunities) {
+    // Quarantined-test communities have IDs of the form `tests:<suite>` from
+    // deriveTestSuiteCommunity. The default `deriveZoneId` skips "tests" as
+    // a generic segment, so a community whose files all live in a test
+    // directory would collide with the production zone that shares the
+    // adjacent segment (e.g. `tests/core/` derives to "core" which
+    // collides with `src/core/`). Honor the community ID directly so test
+    // zones get a stable test-flavored id (`tests-<suite>`).
+    let id: string;
+    if (communityId.startsWith("tests:")) {
+      const suiteRaw = communityId.slice("tests:".length);
+      const suite = suiteRaw.split("/").pop() ?? suiteRaw;
+      const normalized = suite.toLowerCase().replace(/_/g, "-").replace(/^-+|-+$/g, "");
+      id = normalized ? `tests-${normalized}` : "tests";
+    } else {
+      id = deriveZoneId(members, parentId);
+    }
     if (usedIds.has(id)) {
       const disambiguated = disambiguateZoneId(id, members, parentId);
       if (disambiguated !== id && !usedIds.has(disambiguated)) {
@@ -2258,31 +2332,87 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
     addStabilityEdges(graph, importOnlyGraph, previousZoneAssignment, stabilityWeight);
   }
 
+  // ── Quarantine tests from production partitioning (selective) ──
+  // Tests routinely import production code heavily — `XYZTests.swift`
+  // touches every type in `XYZ.swift`, which makes Louvain glue tests to
+  // their subjects' zones. We strip those tests from the Louvain input and
+  // drop them into their own per-suite zone(s).
+  //
+  // BUT: only when the tests live in a TEST-ONLY directory. Go convention
+  // puts `user_test.go` next to `user.go` inside `internal/handler/`; that
+  // package boundary IS the architectural unit and the test belongs with
+  // it. So a test file whose directory also contains production files is
+  // a "colocated" test and stays with its package.
+  const productionDirs = new Set<string>();
+  for (const f of scopeFiles) {
+    if (testFiles.has(f)) continue;
+    const slash = f.lastIndexOf("/");
+    productionDirs.add(slash === -1 ? "" : f.slice(0, slash));
+  }
+  const quarantineTests = new Set<string>();
+  for (const t of testFiles) {
+    if (!scopeFileSet.has(t)) continue;
+    const slash = t.lastIndexOf("/");
+    const dir = slash === -1 ? "" : t.slice(0, slash);
+    if (!productionDirs.has(dir)) quarantineTests.add(t);
+  }
+  // Filter AFTER proximity + stability edges are added so production files
+  // without imports still appear in productionGraph via proximity links.
+  const productionGraph: Map<string, Map<string, number>> = new Map();
+  for (const [node, neighbors] of graph) {
+    if (quarantineTests.has(node)) continue;
+    const filtered = new Map<string, number>();
+    for (const [n, w] of neighbors) {
+      if (quarantineTests.has(n)) continue;
+      filtered.set(n, w);
+    }
+    productionGraph.set(node, filtered);
+  }
+  // Ensure non-quarantined scope files with NO edges at all still get
+  // partitioned (would otherwise be dropped on the floor by Louvain and
+  // re-collected as "unzoned" with no chance to land in a real zone).
+  for (const f of scopeFiles) {
+    if (quarantineTests.has(f)) continue;
+    if (!productionGraph.has(f)) productionGraph.set(f, new Map());
+  }
+
   // ── Scale maxZones by file count ──
   // Small packages shouldn't fragment into many zones. Scale from 3 (≤36 files)
   // up to the configured cap (default 30 at 360+ files).
   // Also ensure we allow enough zones for the size policy to work —
   // if maxZonePercent limits zone size, we need at least ceil(n/maxSize) zones.
-  const graphNodeCount = graph.size;
+  // graphNodeCount reflects the partitioning surface (production only) so
+  // maxZoneSize stays relative to the code that's actually being clustered.
+  const graphNodeCount = productionGraph.size;
   const scaledByCount = Math.max(3, Math.floor(graphNodeCount / 12));
   const maxPct = Math.max(1, Math.min(100, maxZonePercent));
   const maxZoneSize = Math.max(3, Math.ceil(graphNodeCount * maxPct / 100));
   const minForSizePolicy = maxPct < 100 ? Math.ceil(graphNodeCount / maxZoneSize) : 0;
   const scaledMaxZones = Math.min(maxZones, Math.max(scaledByCount, minForSizePolicy));
 
-  // ── Louvain community detection ──
+  // ── Louvain community detection (production only) ──
   const smallZoneMergeLog: MergeLogEntry[] = [];
-  let community = louvainPhase1(graph, 100, 1.0, previousZoneAssignment);
-  community = mergeBidirectionalCoupling(community, graph);
-  community = mergeSmallCommunities(community, graph, smallZoneMergeThreshold, smallZoneMergeLog);
-  community = mergeSatelliteCommunities(community, graph);
-  community = capZoneCount(community, graph, scaledMaxZones);
+  let community = louvainPhase1(productionGraph, 100, 1.0, previousZoneAssignment);
+  community = mergeBidirectionalCoupling(community, productionGraph);
+  community = mergeSmallCommunities(community, productionGraph, smallZoneMergeThreshold, smallZoneMergeLog);
+  community = mergeSatelliteCommunities(community, productionGraph);
+  community = capZoneCount(community, productionGraph, scaledMaxZones);
 
-  // ── Split oversized communities ──
-  community = splitLargeCommunities(community, graph, maxZoneSize);
+  // ── Split oversized communities (production only) ──
+  community = splitLargeCommunities(community, productionGraph, maxZoneSize);
 
   mergeSameIdCommunities(community, maxPct < 100 ? maxZoneSize : undefined);
-  community = capZoneCount(community, graph, scaledMaxZones);  // re-cap after split
+  community = capZoneCount(community, productionGraph, scaledMaxZones);  // re-cap after split
+
+  // ── Drop quarantined tests into their own per-suite zones ──
+  // Group quarantined test files by their top-level Tests/<suite>/ prefix
+  // so multi-target projects (e.g. GoToBedCoreTests + GoToBedTests) get a
+  // zone per suite rather than one mega-tests zone. Colocated tests
+  // (`internal/foo/*_test.go`) stayed in productionGraph and are already
+  // partitioned alongside their package.
+  for (const testFile of quarantineTests) {
+    community.set(testFile, deriveTestSuiteCommunity(testFile));
+  }
 
   // ── Build zones from communities ──
   const { zones, filenameBasedZoneIds } = buildZonesFromCommunities(

@@ -192,9 +192,12 @@ describe("subdivideZone", () => {
 });
 
 describe("SUBDIVISION_THRESHOLD", () => {
-  it("is set to a reasonable value", () => {
-    expect(SUBDIVISION_THRESHOLD).toBeGreaterThanOrEqual(30);
-    expect(SUBDIVISION_THRESHOLD).toBeLessThanOrEqual(100);
+  it("absolute floor stays in a sane range (formerly flat threshold)", () => {
+    // The threshold went from a flat 50 to a project-size-relative
+    // function; SUBDIVISION_THRESHOLD now exports the absolute floor that
+    // applies on small projects.
+    expect(SUBDIVISION_THRESHOLD).toBeGreaterThanOrEqual(8);
+    expect(SUBDIVISION_THRESHOLD).toBeLessThanOrEqual(20);
   });
 });
 
