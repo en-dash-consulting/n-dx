@@ -2,9 +2,10 @@
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
 level: "epic"
 title: "Hench"
-status: "pending"
+status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
-endedAt: "2026-05-26T14:07:04.696Z"
+completedAt: "2026-05-27T18:40:09.125Z"
+endedAt: "2026-05-27T18:40:09.125Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
 ---
 
@@ -13,7 +14,7 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | Title | Status |
 |-------|--------|
 | [API vs CLI Invocation Context Detection and Display](./api-vs-cli-invocation-context-28bd8b/index.md) | completed |
-| [Auto-Commit Timer-Expiry Stall Recovery in --loop/--yes Mode](./auto-commit-timer-expiry-stall-97d722/index.md) | pending |
+| [Auto-Commit Timer-Expiry Stall Recovery in --loop/--yes Mode](./auto-commit-timer-expiry-stall-97d722/index.md) | completed |
 | [Branch Work System of Record](./branch-work-system-of-record/index.md) | completed |
 | [Commit Approval Bypass for Autonomous Runs](./commit-approval-bypass-for-3ca4d0/index.md) | completed |
 | [Ctrl-C Interrupt Rollback Prompt Coordination](./ctrl-c-interrupt-rollback-469c79/index.md) | completed |
