@@ -1,5 +1,5 @@
 ---
-"rex": patch
+"@n-dx/rex": patch
 ---
 
 Allow partial accept inside a recommendation group via
