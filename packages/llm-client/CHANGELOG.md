@@ -1,5 +1,15 @@
 # @n-dx/llm-client
 
+## 0.4.3
+
+### Patch Changes
+
+- [#229](https://github.com/en-dash-consulting/n-dx/pull/229) [`2a754b2`](https://github.com/en-dash-consulting/n-dx/commit/2a754b21efed8738ce798eb1cc231d34e668efa0) Thanks [@dnaniel](https://github.com/dnaniel)! - Republish via npm Trusted Publishing. 0.4.2 was bumped in source but never
+  made it to the registry because the original NPM_TOKEN-based publish in
+  the Release run for [#227](https://github.com/en-dash-consulting/n-dx/issues/227) returned E404. Workflow now uses OIDC; this
+  changeset moves all six packages to 0.4.3 so they get published with
+  provenance attestation.
+
 ## 0.4.2
 
 ### Patch Changes
