@@ -8,3 +8,4 @@ Analyze the codebase and propose PRD updates.
 6. Present proposals to the user for review
 7. For each approved proposal, use `add_item` (rex MCP) to create it with appropriate descriptions, acceptance criteria, and parent placement
 8. Show the updated PRD tree via `get_prd_status`
+9. **Commit**: run `git status --porcelain` — if empty, print "Working tree clean — nothing to commit." and stop. Otherwise run `git add -A` then `git commit -m "ndx-plan: add <N> proposed PRD items"` (replace `<N>` with the count of items created).

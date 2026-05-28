@@ -25,6 +25,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    - Rename items for consistency with `edit_item` (rex MCP)
 5. Run `reorganize` (rex MCP) with mode `fast` to verify no structural issues remain
 6. Show the updated structure via `get_prd_status`
+7. **Commit**: run `git status --porcelain` — if empty, print "Working tree clean — nothing to commit." and stop. Otherwise run `git add -A` then `git commit -m "ndx-reshape: restructure PRD hierarchy"`.
 
 ## Guidelines
 
