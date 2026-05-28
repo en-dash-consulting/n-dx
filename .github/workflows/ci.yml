@@ -88,6 +88,12 @@ jobs:
             exit 1
           fi
 
+      - name: Validate changesets
+        # Validates every changeset's front matter against the workspace
+        # (catches stale package names like "rex" vs "@n-dx/rex" that would
+        # otherwise only fail in the Release workflow after merge to main).
+        run: pnpm exec changeset status
+
   smoke-macos:
     name: CLI Smoke (macOS)
     runs-on: macos-latest

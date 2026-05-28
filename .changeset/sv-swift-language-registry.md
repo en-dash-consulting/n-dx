@@ -1,5 +1,5 @@
 ---
-"sourcevision": patch
+"@n-dx/sourcevision": patch
 ---
 
 Register Swift as a first-class language in the language registry so `.swift`
