@@ -1,5 +1,52 @@
 # @n-dx/llm-client
 
+## 0.4.2
+
+### Patch Changes
+
+- [#216](https://github.com/en-dash-consulting/n-dx/pull/216) [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a) Thanks [@dnaniel](https://github.com/dnaniel)! - Close the child's stdin immediately when calling `exec()`. `execFile`
+  pipes stdio by default, but `exec` never writes to the child's stdin —
+  leaving it open caused any spawned process that reads stdin (e.g.
+  `rex add`'s `readStdin()` in non-TTY mode) to hang forever waiting for
+  an EOF that would never arrive. This was the root cause of the
+  dashboard Quick Add timing out at 240 s with zero output from a
+  daemonized `ndx start`.
+
+- [#216](https://github.com/en-dash-consulting/n-dx/pull/216) [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a) Thanks [@dnaniel](https://github.com/dnaniel)! - Correct the haiku model id. `TIER_MODELS.claude.light` and
+  `MODEL_ALIASES.haiku` referenced `claude-haiku-4-20250414`, which doesn't
+  exist — the API returns 404, but the Claude CLI provider hangs silently
+  on the bad id instead of erroring. That caused dashboard Quick Add (which
+  forces the light tier via `--fast`) to time out at 240 s with zero
+  output. Updated to the dateless alias `claude-haiku-4-5` (matching the
+  existing pattern used for `opus`/`sonnet`); it resolves to the latest
+  Haiku 4.5 release without pinning to a snapshot that will eventually be
+  deprecated.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Make `sv analyze` (and especially `--full`) substantially faster.
+
+  - **Parallel enrichment batches.** Previously batches inside a single
+    enrichment pass ran sequentially because each fed an `enrichedNames` hint
+    forward to the next. That hint was advisory (collisions are resolved
+    post-hoc), so batches now run via `Promise.allSettled`. On a typical
+    7-zone repo this roughly halves Phase 4 wall-clock per pass.
+  - **Early-exit `--full` on convergence.** The pass loop now fingerprints
+    zone identity + finding/insight counts after each pass and stops as soon
+    as a pass produces no observable change. Stable codebases routinely run
+    4 passes today where 1–2 do all the real work; the rest were dead weight.
+  - **`ZONES_PER_BATCH` 5 → 7.** Lets the typical small-to-medium project run
+    in a single batch instead of two.
+  - **Tightened file-header excerpts.** Per-file cap 800 → 400 chars,
+    per-batch budget 6 KB → 2.5 KB. Headers are still useful as ground-truth
+    for "is this documented", but the previous budget inflated the full
+    prompt enough to consistently miss the 90 s per-call timeout on slower
+    networks.
+  - **Per-call timeout configurable + default bumped.** `claude` CLI
+    invocations now default to 120 s (was 90 s) and respect
+    `NDX_CLAUDE_PER_CALL_TIMEOUT_MS=<ms>` for users on slow networks /
+    larger prompts. The 90 s cap was killing many legitimate-but-slow
+    full-prompt completions before first byte (claude buffers stdout fully,
+    so partial progress is invisible).
+
 ## 0.4.1
 
 ### Patch Changes

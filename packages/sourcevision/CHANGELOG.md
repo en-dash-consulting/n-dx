@@ -1,5 +1,199 @@
 # @n-dx/sourcevision
 
+## 0.4.2
+
+### Patch Changes
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Cut enrichment LLM cost and wall-clock without quality regression.
+
+  **Skip the LLM on structural-only zones.** Zones whose files are entirely
+  non-source (build scripts, assets, docs, config — `inventory.role !==
+"source"` for every file) get a templated name and description derived
+  from their dominant role and top-level directory. On a typical small repo
+  this skips ~30–40 % of zones entirely (gotobed: 4 of 9 — Build & CI
+  Scripts, App Bundle Resources, Product Website, Project Root). Quality
+  loss is negligible because there's nothing for the LLM to analyze in
+  these zones beyond "which directory is this in" — the previous LLM
+  output was effectively the same templated paraphrase.
+
+  **Use Haiku for pass 1 (naming-dominant), Sonnet for pass 2+.** Pass 1's
+  job is mostly zone naming + initial observations; Haiku does that
+  accurately in roughly 1/3 the wall-clock of Sonnet and at a fraction of
+  the cost. Pass 2+ (cross-zone relationships, anti-patterns, suggestions)
+  stays on the standard model so analytical quality doesn't regress.
+  Respects `claude.lightModel` / `codex.lightModel` overrides in
+  `.n-dx.json` for users who want to pin a specific cheap model.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Phase 0 of the context-graph rework: introduces three foundational primitives
+  that downstream finding/zone consumers will gate on.
+
+  - `Zone.evidenceSources?` (imports / proximity / declared / pinned) and
+    `Zone.confidence?` so consumers can distinguish import-graph-backed zones
+    from proximity-only fallbacks.
+  - `Finding.anchors?` (file/line/symbol coordinates) and `Finding.confidence?`
+    so unverified hypotheses can be filtered before reaching the user.
+  - New `.sourcevision/project-profile.json` (`ProjectProfile` type) capturing
+    primary language, detected frameworks (SwiftUI, AppKit, React, …),
+    release infrastructure (release-please, changesets, Cargo, pyproject,
+    git-tag build scripts), build and CI surfaces, and import-graph quality.
+
+  No behavior changes yet — schema fields are optional and the profile file is
+  emitted but not yet consumed by the finding prompt. Subsequent commits gate
+  structural findings on `importGraphQuality` and suppress recommendations
+  that contradict detected release infrastructure.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Zone clustering now uses an explicit edge-weight model. `ImportEdge` gained an
+  optional `weight` field; Louvain prefers it when set (falling back to
+  `symbols.length` for any resolver that hasn't opted in). The Swift resolver
+  now reports raw reference counts (a file that references `AppEnvironment` 20
+  times is structurally more coupled than one that mentions it once), with each
+  edge capped at weight 10 so a single hot edge can't dominate zone assignment.
+  Net effect on Swift codebases: composition-root files cluster with the layer
+  that uses them heavily, not with the layer whose types they happen to
+  import.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Make `sv analyze` (and especially `--full`) substantially faster.
+
+  - **Parallel enrichment batches.** Previously batches inside a single
+    enrichment pass ran sequentially because each fed an `enrichedNames` hint
+    forward to the next. That hint was advisory (collisions are resolved
+    post-hoc), so batches now run via `Promise.allSettled`. On a typical
+    7-zone repo this roughly halves Phase 4 wall-clock per pass.
+  - **Early-exit `--full` on convergence.** The pass loop now fingerprints
+    zone identity + finding/insight counts after each pass and stops as soon
+    as a pass produces no observable change. Stable codebases routinely run
+    4 passes today where 1–2 do all the real work; the rest were dead weight.
+  - **`ZONES_PER_BATCH` 5 → 7.** Lets the typical small-to-medium project run
+    in a single batch instead of two.
+  - **Tightened file-header excerpts.** Per-file cap 800 → 400 chars,
+    per-batch budget 6 KB → 2.5 KB. Headers are still useful as ground-truth
+    for "is this documented", but the previous budget inflated the full
+    prompt enough to consistently miss the 90 s per-call timeout on slower
+    networks.
+  - **Per-call timeout configurable + default bumped.** `claude` CLI
+    invocations now default to 120 s (was 90 s) and respect
+    `NDX_CLAUDE_PER_CALL_TIMEOUT_MS=<ms>` for users on slow networks /
+    larger prompts. The 90 s cap was killing many legitimate-but-slow
+    full-prompt completions before first byte (claude buffers stdout fully,
+    so partial progress is invisible).
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Stop fabricating findings against documented files. The enrichment prompt now
+  includes each batched file's leading doc-comment block as an authoritative
+  header excerpt (TS/JS/Swift/Rust/Python/Go/HTML/MD comment conventions are
+  recognized). The LLM is explicitly told not to call a documented file
+  "undocumented".
+
+  Adds a defensive backstop that drops findings whose text begins with a
+  hypothesis ("If X then…", "Should/Might/May/Could/Possibly/Perhaps…",
+  "It may/might/could/appears/seems…"). Dropped findings are logged with a
+  single-line count so the user knows what was filtered. The prompt guard
+  already discouraged these; this filter catches the leaks.
+
+  Also marks `projectDir` as in-memory-only on `ProjectProfile` so the
+  on-disk `.sourcevision/project-profile.json` stays portable across machines.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Extend the reference-count edge-weight model to JS/TS imports. The resolver
+  now counts how many times each named-import binding actually appears in the
+  file body (after the import statement itself) and uses that as the edge
+  weight, capped at 10. Same hub-attraction problem the Swift resolver had: a
+  file that imports `cheap-helper` and uses it once shouldn't drag toward
+  `cheap-helper`'s zone as hard as a file that uses it 30 times. Wildcard and
+  default imports keep the baseline weight 1 because there's no parseable
+  local alias to count.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Feed the detected project profile into the LLM finding prompt with hard
+  constraints that suppress recommendations that don't fit the project's shape:
+
+  - When `importGraphQuality` is `sparse` or `absent` (e.g. a Swift, Rust, or
+    Python project with no resolvable JS/TS imports), the LLM is told NOT to
+    emit structural findings — those zones come from file-tree proximity and
+    can't carry meaningful coupling/cohesion claims.
+  - When the repo already has release infrastructure (release-please,
+    changesets, package.json, Cargo, pyproject, git-tag build scripts), the LLM
+    is told NOT to recommend introducing a VERSION file or competing release
+    scheme.
+  - When SwiftUI is detected as a framework, the LLM is told not to recommend
+    MVVM coordinator/view-model transplants or protocols-for-testability by
+    default.
+  - When the primary language is anything other than TS/JS, the LLM is told not
+    to propose JS/TS-specific patterns (e.g. Combine `.replaceError` on a sink
+    whose `Failure` is `Never`).
+  - Conditional "If X then Y" findings must be confirmed and rewritten as facts
+    or omitted.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Add a Swift import + symbol-reference resolver so sourcevision produces a real
+  file→file graph on Swift codebases instead of falling back to proximity-only
+  zone detection. Swift's `import X` references modules, not files, so a literal
+  import parser would produce zero internal edges — this resolver does two
+  passes: (1) external `import X` for framework detection (Foundation, SwiftUI,
+  AppKit, etc., classified against an Apple stdlib list), and (2) a project-wide
+  declaration index (`class/struct/enum/protocol/actor/extension/typealias`)
+  plus a reference scan that emits an internal edge for each project-declared
+  symbol used in another file. Comments and string literals are stripped before
+  both passes so doc-comment mentions don't produce phantom edges.
+
+  The result is that `importGraphQuality` flips from `"absent"` to `"rich"` on a
+  typical SwiftUI app — Louvain produces meaningful zones with real cohesion,
+  and the prompt-side gating no longer needs to suppress every structural
+  finding on the project.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Register Swift as a first-class language in the language registry so `.swift`
+  files are actually discovered and reach the Swift import resolver. Without
+  this, `Package.swift` / `.xcodeproj` projects were being treated as TypeScript
+  fallback — `.swift` was filtered out of `parseableExtensions` before phase 2
+  ran, leaving the import graph empty even though the Swift resolver was wired
+  in. Adds the `swiftConfig` (extensions, test/generated patterns, build/skip
+  directories, `Package.swift` as module file), wires it through
+  `detectLanguage` / `detectLanguages`, and adds Swift to `VALID_LANGUAGE_IDS`.
+  Tiebreak preference on tied counts: TypeScript > Swift > Go (preserves the
+  legacy "TS wins go.mod+package.json tie" behavior).
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Two complementary partitioning fixes that target the "29-file blob with three
+  concerns glued together" failure mode on small/medium repos.
+
+  **A. Quarantine out-of-package tests.** When a test file lives in a
+  test-only directory (Swift `Tests/<suite>/...`, Vitest/Jest `tests/...`),
+  strip it out of Louvain entirely and drop it into its own per-suite
+  `tests-<suite>` zone. Tests routinely import production code heavily, which
+  previously made Louvain glue the test to whatever it asserted against (a
+  classic anti-pattern in the partition).
+
+  Tests COLOCATED with their package (Go's `internal/foo/foo_test.go` next
+  to `foo.go`) keep their existing behavior — they stay with the package
+  because the directory they live in also contains production code, signaling
+  "this test belongs here." Detection: a test directory is "test-only" iff
+  no production file shares its directory.
+
+  **B. Project-relative subdivision threshold.** `SUBDIVISION_THRESHOLD` was
+  a flat 50 files, meaning a 29-file zone in a 111-file project (26 % of
+  the codebase!) never got recursively subdivided. Now `max(12,
+floor(totalFiles * 0.15))` — any zone over 15 % of the project triggers
+  subdivision regardless of how high its measured cohesion is, because high
+  cohesion at large size usually means "many concerns connected by shared
+  vocabulary," not "one tight thing."
+
+- [#211](https://github.com/en-dash-consulting/n-dx/pull/211) [`d85139f`](https://github.com/en-dash-consulting/n-dx/commit/d85139fab48b4ad66d5b6b1619243b505b96f0fc) Thanks [@dnaniel](https://github.com/dnaniel)! - SourceVision zone-pin determinism, analyze stability, and Map UX.
+
+  **SourceVision** — Stop spurious enrichment-pass resets on a no-op `analyze`
+  (partition-independent input fingerprint reused when code/config is unchanged).
+  Zone pins whose target zone did not form are no longer silently dropped — a
+  grouped warning finding is emitted (issue [#210](https://github.com/en-dash-consulting/n-dx/issues/210), part 1). New
+  `sourcevision.zones.anchors` config declares a named zone from a file glob that
+  is forced to exist, making single-target pin consolidations deterministic
+  across runs (issue [#210](https://github.com/en-dash-consulting/n-dx/issues/210), part 2). `.rex/` and `.hench/` are excluded from the
+  file inventory so generated PRD markdown / run logs no longer skew Overview
+  language stats.
+
+  **Web** — Codebase/Zone Map overhaul: deterministic grouped grid layout (no
+  overlap), flexbox-centered node labels, cursor-anchored bounded zoom/pan
+  (wheel + touch pinch), near-fullscreen File Street View modal, Escape as a
+  hierarchical back, and a non-hijacking hover hint. Quick Add now resolves the
+  rex CLI from the server's own install (fixes `Cannot find module` for non-n-dx
+  projects) with a longer smart-add timeout and an actionable no-API-key error.
+
+- Updated dependencies [[`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a), [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a), [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8)]:
+  - @n-dx/llm-client@0.4.2
+
 ## 0.4.1
 
 ### Patch Changes

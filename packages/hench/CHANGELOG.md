@@ -1,5 +1,56 @@
 # @n-dx/hench
 
+## 0.4.2
+
+### Patch Changes
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Stop assuming every project is JS/TS during `hench init`.
+
+  - Detect Swift projects (`Package.swift`, `*.xcodeproj`, `*.xcworkspace`) and
+    apply a Swift guard profile: `allowedCommands: ["swift", "make",
+"xcodebuild", "xcrun", "git"]`, Swift-aware blocked paths
+    (`.build/`, `DerivedData/`, `Pods/`, `Carthage/`), and longer timeouts to
+    fit Xcode build times. Adds `"swift"` to `ProjectLanguage`.
+  - `autoDetectTestCommand` now prefers a Makefile `validate` target over the
+    raw language toolchain — a strong "project author wrapped the full gate
+    here" signal — and falls back to per-language defaults for Swift (`swift
+test`), Cargo (`cargo test`), Go (`go test ./...`), and Python (`pytest`)
+    before giving up.
+
+  Net effect: on a Swift codebase with a `make validate` gate, `ndx init`
+  yields a usable `.hench/config.json` with the right toolchain allowed AND
+  the resolver picks up `make validate` automatically — no manual
+  `hench.fullTestCommand` override needed.
+
+- [#206](https://github.com/en-dash-consulting/n-dx/pull/206) [`d278f05`](https://github.com/en-dash-consulting/n-dx/commit/d278f0506c94ae8bce068f770caa450e07a3330e) Thanks [@endash-shal](https://github.com/endash-shal)! - Rework the PRD context graph, harden the hench run loop, and add LLM auto-failover.
+
+  **PRD context graph (web)** — Top-down progressive-disclosure layout with folder-tree
+  visual style; shape-based nodes for epic/feature/task/subtask; click-through opens the
+  Rex task detail panel with subtree highlighting. Hierarchy is now driven from
+  `.rex/prd_tree/` paths.
+
+  **Hench run loop** — Per-task attempt tracking, completed tasks excluded from
+  selection, and the loop advances immediately on success. The `no-plan-mode` rule is
+  embedded in the agent system prompt; autonomous runs (`--auto` / `--loop` /
+  `--epic-by-epic`) default to `acceptEdits`. New
+  `docs/contributing/run-loop-invariants.md`.
+
+  **LLM auto-failover** — New `llm.autoFailover` flag with vendor-specific failover
+  chains; `hench run` restores the original config after a failover attempt. Model
+  resolution honours top-level `llm.model` → `llm.{vendor}.model` → tier default.
+
+  **Rex storage** — PRD tree rewritten to canonical `index.md`-per-folder layout with
+  single-child compaction and atomic leaf-to-folder promotion for subtasks. Timestamped
+  snapshots before structural migrations; cross-PRD duplicate detection in `reshape`.
+
+  **CLI / DX** — New `ndx tree` command and tree-formatted `rex status`; `ndx self-heal`
+  gains a pre-execution approval gate with `selfHeal.autoConfirm`. Obfuscated-code commit
+  blocker added.
+
+- Updated dependencies [[`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a), [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a), [`d278f05`](https://github.com/en-dash-consulting/n-dx/commit/d278f0506c94ae8bce068f770caa450e07a3330e), [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8), [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8), [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a), [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8)]:
+  - @n-dx/llm-client@0.4.2
+  - @n-dx/rex@0.4.2
+
 ## 0.4.1
 
 ### Patch Changes

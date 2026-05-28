@@ -1,5 +1,80 @@
 # @n-dx/rex
 
+## 0.4.2
+
+### Patch Changes
+
+- [#206](https://github.com/en-dash-consulting/n-dx/pull/206) [`d278f05`](https://github.com/en-dash-consulting/n-dx/commit/d278f0506c94ae8bce068f770caa450e07a3330e) Thanks [@endash-shal](https://github.com/endash-shal)! - Rework the PRD context graph, harden the hench run loop, and add LLM auto-failover.
+
+  **PRD context graph (web)** — Top-down progressive-disclosure layout with folder-tree
+  visual style; shape-based nodes for epic/feature/task/subtask; click-through opens the
+  Rex task detail panel with subtree highlighting. Hierarchy is now driven from
+  `.rex/prd_tree/` paths.
+
+  **Hench run loop** — Per-task attempt tracking, completed tasks excluded from
+  selection, and the loop advances immediately on success. The `no-plan-mode` rule is
+  embedded in the agent system prompt; autonomous runs (`--auto` / `--loop` /
+  `--epic-by-epic`) default to `acceptEdits`. New
+  `docs/contributing/run-loop-invariants.md`.
+
+  **LLM auto-failover** — New `llm.autoFailover` flag with vendor-specific failover
+  chains; `hench run` restores the original config after a failover attempt. Model
+  resolution honours top-level `llm.model` → `llm.{vendor}.model` → tier default.
+
+  **Rex storage** — PRD tree rewritten to canonical `index.md`-per-folder layout with
+  single-child compaction and atomic leaf-to-folder promotion for subtasks. Timestamped
+  snapshots before structural migrations; cross-PRD duplicate detection in `reshape`.
+
+  **CLI / DX** — New `ndx tree` command and tree-formatted `rex status`; `ndx self-heal`
+  gains a pre-execution approval gate with `selfHeal.autoConfirm`. Obfuscated-code commit
+  blocker added.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Allow partial accept inside a recommendation group via
+  `rex recommend --accept=hashes:<hash>,<hash>,…`. Findings matching the listed
+  hash prefixes are filtered first; the recommendation tree is regenerated from
+  just those findings and accepted whole. Lets you keep the one valid finding
+  inside a noisy group without forcing acks on the rest or having to take the
+  group all-or-nothing.
+
+- [#224](https://github.com/en-dash-consulting/n-dx/pull/224) [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8) Thanks [@dnaniel](https://github.com/dnaniel)! - Make `rex recommend` acknowledgement workflow address-by-hash. Each finding
+  now prints with a stable 6-char hash prefix (`[a3f5d8]`) and
+  `--acknowledge=<hash|index>,…` accepts either. Hashes are recommended because
+  indices renumber after every ack — a planned `--acknowledge=1,5,9` no longer
+  goes wrong when the first ack shifts the list.
+
+  Adds `--unacknowledge=<hash|index>,…` to undo prior acknowledgements
+  (previously required hand-editing `.rex/acknowledged-findings.json`) and
+  `--reason=<category>` to capture _why_ — canonical categories are
+  `tool-artifact`, `already-done`, `doesnt-apply`, `over-engineered`,
+  `speculative`, and free-form values are also accepted. The recorded reason
+  will later let the analyzer mine repeated junk and improve its prompts.
+
+- [#216](https://github.com/en-dash-consulting/n-dx/pull/216) [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a) Thanks [@dnaniel](https://github.com/dnaniel)! - Smart-add fixes — nesting, dashboard Quick Add, and clearer errors.
+
+  **Nesting (rex):** `n-dx add` no longer creates a duplicate epic when the work
+  belongs under an existing one. The LLM was supposed to set `existingId` for
+  placement under an existing epic/feature but often omitted it. Added a
+  deterministic post-generation pass that matches proposed epics/features
+  against existing PRD containers (high-confidence, title-based) and fills
+  `existingId` so the new task nests instead of duplicating. Respects an
+  `existingId` the LLM already set; skipped when an explicit `--parent` is
+  given.
+
+  **Dashboard Quick Add latency (rex + web):** new `--fast` flag for `rex add`
+  forces the vendor's light tier (haiku for Claude, gpt-5.4-mini for Codex) so
+  the CLI provider completes well within the timeout from a daemonized server.
+  The web Quick Add preview now passes `--fast`; the user-driven CLI
+  `n-dx add` is unchanged.
+
+  **Timeout error message (web):** the smart-add timeout no longer wrongly
+  implies "set an API key" is the fix — the Claude CLI provider is a valid
+  first-class path. The message now points at the right diagnostic
+  (`time claude -p`), notes an API key is only an optional speed-up, and
+  appends captured stderr when present.
+
+- Updated dependencies [[`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a), [`29bd146`](https://github.com/en-dash-consulting/n-dx/commit/29bd14608135ee9b0ae1168f77226113436da67a), [`aca6ede`](https://github.com/en-dash-consulting/n-dx/commit/aca6ede08e1182b5307a27e17ee320a33066b8a8)]:
+  - @n-dx/llm-client@0.4.2
+
 ## 0.4.1
 
 ### Patch Changes
