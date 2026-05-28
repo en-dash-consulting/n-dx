@@ -85,62 +85,122 @@
 .meter-fill.mid { background: var(--orange); }
 .meter-fill.bad { background: var(--red); }
 
-/* Finding cards */
+/* ── Finding cards ─────────────────────────────────────────────────────────
+   Rethink: severity tints + left bars made every dashboard look like an AI
+   dropped a flood of warning shouts on the page. Instead:
+   - Cards have a single neutral surface — no severity background, no
+     "severity stripe" on the left edge. The card chrome doesn't compete
+     with the actual content.
+   - Severity is signaled by a small colored ICON + small-caps LABEL on the
+     meta row. Color sits on the symbol, not on the entire card.
+   - Type, scope, and severity live in a single quiet meta line above the
+     body — separated by `·` rather than stacked badges with their own
+     backgrounds.
+   - Body text is the visual anchor: high contrast, comfortable reading
+     size, leading optimized for prose. Everything else recedes.
+   Each severity uses --finding-tone-* so dark/light themes get matched
+   tones without inverting backgrounds. */
 .finding-card {
+  --finding-tone: var(--text-dim);
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  line-height: 1.5;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-.finding-card p { margin: 4px 0; }
-
-.finding-card.severity-critical { border-left: 3px solid var(--red); }
-.finding-card.severity-warning { border-left: 3px solid var(--orange); }
-.finding-card.severity-info { border-left: 3px solid var(--accent); }
-
-.finding-scope {
-  font-size: 11px;
-  color: var(--text-dim);
-  font-family: monospace;
-  margin-left: 8px;
+.finding-card:hover {
+  border-color: color-mix(in srgb, var(--text-dim) 28%, var(--border));
 }
 
-.finding-related {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 8px;
-}
+.finding-card p { margin: 0; }
 
-.finding-related code {
-  font-size: 11px;
-  background: var(--bg-hover);
-  padding: 1px 6px;
-  border-radius: 3px;
-  color: var(--text-dim);
-}
+/* Per-severity ACCENT ONLY (icon + label). No card-background tint, no
+   left bar. Override the bare `.severity-warning` rules in tables.css
+   that would otherwise wash the entire card orange. */
+.finding-card.severity-info    { --finding-tone: var(--accent); background: var(--bg-surface); }
+.finding-card.severity-warning { --finding-tone: var(--orange); background: var(--bg-surface); }
+.finding-card.severity-critical { --finding-tone: var(--red);   background: var(--bg-surface); }
 
-/* Richer finding cards */
 .finding-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
+  gap: 10px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
+  font-size: 11px;
 }
 
 .finding-icon {
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
+  color: var(--finding-tone);
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Severity label sits inline next to its icon — small caps, color-keyed.
+   No background, no border, no pill chrome. */
+.finding-card .severity-badge {
+  background: transparent;
+  color: var(--finding-tone);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0;
+}
+
+.finding-type-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: lowercase;
+  padding: 0;
+  background: transparent;
+}
+.finding-type-badge::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--text-muted, var(--text-dim));
+  font-weight: 500;
+}
+
+.finding-scope-link {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.finding-scope-link::before {
+  content: "·";
+  margin-right: 4px;
+  color: var(--text-muted, var(--text-dim));
+  font-family: inherit;
+}
+
+.finding-zone-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .finding-text {
-  margin: 4px 0;
-  line-height: 1.6;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
 }
 
 .finding-meta {
@@ -148,34 +208,29 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 6px;
-}
-
-.finding-zone-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.finding-scope-link {
+  margin-top: 10px;
   font-size: 11px;
-  color: var(--accent-dim);
-  font-family: monospace;
-  display: inline-flex;
-  align-items: center;
+}
+
+.finding-related {
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
-.finding-type-badge {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 500;
-  background: var(--bg-hover);
+.finding-related code {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: color-mix(in srgb, var(--bg-hover) 50%, transparent);
+  padding: 2px 6px;
+  border-radius: 4px;
   color: var(--text-dim);
-  text-transform: capitalize;
+  cursor: default;
+  transition: color 0.12s ease;
+}
+
+.finding-related code:hover {
+  color: var(--text);
 }
 
 .finding-related-label {
@@ -184,12 +239,11 @@
   font-weight: 500;
 }
 
-.finding-related code {
-  cursor: default;
-  transition: color 0.1s;
+.finding-scope {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-
-.finding-related code:hover { color: var(--text); }
 
 /* Getting started card */
 .getting-started {
