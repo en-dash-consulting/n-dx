@@ -95,7 +95,9 @@ jobs:
         # Validates every changeset's front matter against the workspace
         # (catches stale package names like "rex" vs "@n-dx/rex" that would
         # otherwise only fail in the Release workflow after merge to main).
-        run: pnpm exec changeset status
+        # --since=origin/main is required because PR checkouts are detached
+        # HEAD with no local "main" branch for changeset to diff against.
+        run: pnpm exec changeset status --since=origin/main
 
   smoke-macos:
     name: CLI Smoke (macOS)
