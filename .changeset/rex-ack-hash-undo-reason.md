@@ -1,5 +1,5 @@
 ---
-"rex": minor
+"rex": patch
 ---
 
 Make `rex recommend` acknowledgement workflow address-by-hash. Each finding

@@ -1,5 +1,5 @@
 ---
-"sourcevision": minor
+"sourcevision": patch
 ---
 
 Cut enrichment LLM cost and wall-clock without quality regression.

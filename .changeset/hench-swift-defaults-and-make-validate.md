@@ -1,5 +1,5 @@
 ---
-"@n-dx/hench": minor
+"@n-dx/hench": patch
 ---
 
 Stop assuming every project is JS/TS during `hench init`.

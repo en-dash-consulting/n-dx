@@ -1,5 +1,5 @@
 ---
-"sourcevision": minor
+"sourcevision": patch
 ---
 
 Two complementary partitioning fixes that target the "29-file blob with three

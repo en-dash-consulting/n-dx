@@ -1,5 +1,5 @@
 ---
-"sourcevision": minor
+"sourcevision": patch
 ---
 
 Phase 0 of the context-graph rework: introduces three foundational primitives

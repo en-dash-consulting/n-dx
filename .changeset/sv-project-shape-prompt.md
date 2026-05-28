@@ -1,5 +1,5 @@
 ---
-"sourcevision": minor
+"sourcevision": patch
 ---
 
 Feed the detected project profile into the LLM finding prompt with hard

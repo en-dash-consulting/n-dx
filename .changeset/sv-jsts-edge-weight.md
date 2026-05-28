@@ -1,5 +1,5 @@
 ---
-"sourcevision": minor
+"sourcevision": patch
 ---
 
 Extend the reference-count edge-weight model to JS/TS imports. The resolver

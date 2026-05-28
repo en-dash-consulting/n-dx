@@ -1,5 +1,5 @@
 ---
-"sourcevision": minor
+"sourcevision": patch
 ---
 
 Stop fabricating findings against documented files. The enrichment prompt now

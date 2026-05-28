@@ -1,5 +1,5 @@
 ---
-"rex": minor
+"rex": patch
 ---
 
 Allow partial accept inside a recommendation group via
