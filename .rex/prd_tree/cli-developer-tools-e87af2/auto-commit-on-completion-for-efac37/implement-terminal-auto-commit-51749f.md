@@ -1,0 +1,25 @@
+---
+id: "51749fa5-9948-4ca3-afa5-b23cbbc7573b"
+level: "task"
+title: "Implement terminal auto-commit step in each file-modifying external skill"
+status: "completed"
+priority: "critical"
+tags:
+  - "skills"
+  - "claude-code"
+  - "commit"
+  - "automation"
+source: "smart-add"
+startedAt: "2026-05-28T15:47:09.315Z"
+completedAt: "2026-05-28T15:55:59.693Z"
+endedAt: "2026-05-28T15:55:59.693Z"
+resolutionType: "code-change"
+resolutionDetail: "Added terminal auto-commit step to ndx-config, ndx-plan, ndx-capture, ndx-reshape. Each step: check git status --porcelain (no-op if clean), git add -A, git commit with skill-scoped message. ndx-work and read-only skills untouched. Regenerated .agents/skills/ from source."
+acceptanceCriteria:
+  - "Each targeted file-modifying external skill stages and commits changes as its final step"
+  - "Commit message includes the skill name and a one-line summary of what changed"
+  - "Skill exits cleanly without attempting a commit when the working tree is clean"
+  - "Hench agent run-loop skills are not touched and do not gain or lose commit behavior"
+  - "Read-only skills (triage, code-review without --fix, etc.) are not modified"
+description: "For every skill identified as file-modifying and not already committing, add a terminal step that stages all modified files, generates a concise commit message scoped to the skill's action (e.g., 'Apply simplify cleanup pass' or 'Update Claude Code settings via update-config'), and commits before the skill signals completion. The step must be a no-op when the working tree is clean after the skill's work. Hench run-loop skills and read-only skills must remain entirely unchanged."
+---
