@@ -1,5 +1,5 @@
 ---
-"sourcevision": patch
+"@n-dx/sourcevision": patch
 "@n-dx/llm-client": patch
 ---
 

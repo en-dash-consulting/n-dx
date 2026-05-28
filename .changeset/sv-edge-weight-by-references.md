@@ -1,5 +1,5 @@
 ---
-"sourcevision": patch
+"@n-dx/sourcevision": patch
 ---
 
 Zone clustering now uses an explicit edge-weight model. `ImportEdge` gained an

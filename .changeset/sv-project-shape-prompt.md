@@ -1,5 +1,5 @@
 ---
-"sourcevision": patch
+"@n-dx/sourcevision": patch
 ---
 
 Feed the detected project profile into the LLM finding prompt with hard

@@ -30,6 +30,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # changeset status compares against main to compute the release plan
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v5
@@ -87,6 +90,14 @@ jobs:
             echo "No changeset found. Add one with 'pnpm changeset' or 'pnpm changeset --empty' if no release is needed."
             exit 1
           fi
+
+      - name: Validate changesets
+        # Validates every changeset's front matter against the workspace
+        # (catches stale package names like "rex" vs "@n-dx/rex" that would
+        # otherwise only fail in the Release workflow after merge to main).
+        # --since=origin/main is required because PR checkouts are detached
+        # HEAD with no local "main" branch for changeset to diff against.
+        run: pnpm exec changeset status --since=origin/main
 
   smoke-macos:
     name: CLI Smoke (macOS)
