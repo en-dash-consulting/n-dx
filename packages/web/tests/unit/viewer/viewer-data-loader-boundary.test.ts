@@ -33,14 +33,14 @@ describe("viewer-data-loader boundaries", () => {
   it("keeps loader schema helpers inside the loader zone", () => {
     expect(existsSync(join(VIEWER_DIR, "validate.ts"))).toBe(false);
 
-    expect(readFileSync(join(LOADER_DIR, "data-loader.ts"), "utf-8")).toContain(
-      'from "./schema/index.js"',
-    );
-    expect(readFileSync(join(LOADER_DIR, "schema", "index.ts"), "utf-8")).toContain(
-      'from "./validate.js"',
-    );
-    expect(readFileSync(join(LOADER_DIR, "schema", "index.ts"), "utf-8")).toContain(
-      'from "./compat.js"',
-    );
+    // Schema helpers live inside the loader zone (loader/schema/) and the loader
+    // imports them from there. The intermediate ./schema/index.js barrel was
+    // collapsed, so the loader imports the helper modules directly.
+    const loaderSource = readFileSync(join(LOADER_DIR, "data-loader.ts"), "utf-8");
+    expect(loaderSource).toContain('from "./schema/validate.js"');
+    expect(loaderSource).toContain('from "./schema/compat.js"');
+
+    expect(existsSync(join(LOADER_DIR, "schema", "validate.ts"))).toBe(true);
+    expect(existsSync(join(LOADER_DIR, "schema", "compat.ts"))).toBe(true);
   });
 });

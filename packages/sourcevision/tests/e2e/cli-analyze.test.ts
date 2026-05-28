@@ -4,7 +4,13 @@ import { mkdtemp, cp, rm } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { validateInventory, validateImports, validateClassifications, validateZones, validateComponents } from "../../src/schema/validate.js";
+import { validate, InventorySchema, ImportsSchema, ClassificationsSchema, ZonesSchema, ComponentsSchema } from "../../src/schema/validate.js";
+
+const validateInventory = (data: unknown) => validate(InventorySchema, data);
+const validateImports = (data: unknown) => validate(ImportsSchema, data);
+const validateClassifications = (data: unknown) => validate(ClassificationsSchema, data);
+const validateZones = (data: unknown) => validate(ZonesSchema, data);
+const validateComponents = (data: unknown) => validate(ComponentsSchema, data);
 
 const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");

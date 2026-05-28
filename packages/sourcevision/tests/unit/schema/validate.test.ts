@@ -1,14 +1,26 @@
 import { describe, it, expect } from "vitest";
 import {
-  validateManifest,
-  validateInventory,
-  validateImports,
-  validateZones,
-  validateComponents,
-  validateClassifications,
+  validate,
   validateModule,
   formatValidationErrors,
+  ManifestSchema,
+  InventorySchema,
+  ImportsSchema,
+  ZonesSchema,
+  ComponentsSchema,
+  ClassificationsSchema,
 } from "../../../src/schema/validate.js";
+
+// Test-local convenience wrappers. The production validate*() helpers were
+// inlined to validate(Schema, data) in 799a48194; these keep the call sites
+// below readable without reintroducing the wrappers in production code.
+const validateManifest = (data: unknown) => validate(ManifestSchema, data);
+const validateInventory = (data: unknown) => validate(InventorySchema, data);
+const validateImports = (data: unknown) => validate(ImportsSchema, data);
+const validateZones = (data: unknown) => validate(ZonesSchema, data);
+const validateComponents = (data: unknown) => validate(ComponentsSchema, data);
+const validateClassifications = (data: unknown) =>
+  validate(ClassificationsSchema, data);
 
 describe("validateManifest", () => {
   it("accepts valid manifest", () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { detectLanguage, getLanguageConfig, VALID_LANGUAGE_IDS } from "../../../src/language/index.js";
+import { detectLanguage, getLanguageConfig, VALID_LANGUAGE_IDS } from "../../../src/language/detect.js";
 import { typescriptConfig } from "../../../src/language/typescript.js";
 import { goConfig } from "../../../src/language/go.js";
 

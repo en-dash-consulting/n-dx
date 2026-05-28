@@ -1292,7 +1292,7 @@ async function handlePlan(rest) {
 /** Execute one refresh pipeline step; returns true on success, false on failure. */
 async function runRefreshStep(step, plan, dir, stepStatuses) {
   if (step.kind === "sourcevision-analyze") {
-    const code = await run(tools.sourcevision, ["analyze", ...plan.quietFlags, dir]);
+    const code = await run(tools.sourcevision, ["analyze", ...plan.analyzeFlags, dir]);
     if (code !== 0) {
       const detail = `exit code ${code}`;
       printRefreshStepTransition(step.kind, "failed", detail);

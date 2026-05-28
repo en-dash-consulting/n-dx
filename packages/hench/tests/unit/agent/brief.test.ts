@@ -1054,7 +1054,7 @@ describe("assembleTaskBrief — context assembly", () => {
       },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       loadConfig: async () => ({
         schema: "rex/v1",
         project: "test-project",
@@ -1082,7 +1082,7 @@ describe("assembleTaskBrief — context assembly", () => {
       },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       loadWorkflow: async () => "1. Read code\n2. Make changes\n3. Test",
     };
 
@@ -1100,7 +1100,7 @@ describe("assembleTaskBrief — context assembly", () => {
       },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       loadWorkflow: async () => {
         throw new Error("ENOENT: workflow.md not found");
       },
@@ -1125,7 +1125,7 @@ describe("assembleTaskBrief — context assembly", () => {
       { timestamp: "2025-01-01T12:00:00Z", event: "status_changed", detail: "Task-1 now pending" },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       readLog: async () => logEntries,
     };
 
@@ -1151,7 +1151,7 @@ describe("assembleTaskBrief — context assembly", () => {
       { timestamp: "2025-01-01T10:00:00Z", event: "system_init" },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       readLog: async () => logEntries,
     };
 

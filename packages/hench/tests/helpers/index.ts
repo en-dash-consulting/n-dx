@@ -11,7 +11,7 @@ import type { PRDStore, PRDItem } from "@n-dx/rex";
 import type { CliRunResult } from "../../src/agent/lifecycle/event-accumulator.js";
 import type { RunRecord } from "../../src/schema/v1.js";
 import type { PromptEnvelope } from "../../src/schema/v1.js";
-import { createPromptEnvelope } from "../../src/llm/prompt-envelope.js";
+import { createPromptEnvelope } from "../../src/prd/llm-gateway.js";
 import { initConfig } from "../../src/store/config.js";
 
 /**

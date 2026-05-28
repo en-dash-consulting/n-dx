@@ -112,7 +112,7 @@ describe("updateCompletedTaskStatus", () => {
   });
 
   it("calls appendLog to record completion event", async () => {
-    const { store } = mockStore("pending");
+    const { store } = mockStoreWithTracking("pending");
     const appendLogSpy = vi.spyOn(store, "appendLog");
 
     const run: RunRecord = {

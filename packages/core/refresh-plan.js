@@ -1,4 +1,4 @@
-const ALLOWED_REFRESH_FLAGS = new Set(["--ui-only", "--data-only", "--pr-markdown", "--no-build", "--quiet", "-q"]);
+const ALLOWED_REFRESH_FLAGS = new Set(["--ui-only", "--data-only", "--pr-markdown", "--no-build", "--quiet", "-q", "--fast"]);
 
 export class RefreshPlanError extends Error {
   constructor(message, suggestion) {
@@ -25,6 +25,11 @@ export function buildRefreshPlan(flags) {
   const prMarkdown = flags.includes("--pr-markdown");
   const noBuild = flags.includes("--no-build");
   const quietFlags = flags.filter((f) => f === "--quiet" || f === "-q");
+  const fast = flags.includes("--fast");
+  // Flags forwarded to `sourcevision analyze`: quiet flags plus optional --fast
+  // (structural-only, skips LLM archetype/zone enrichment). Not forwarded to the
+  // pr-markdown step, which has no such mode.
+  const analyzeFlags = [...quietFlags, ...(fast ? ["--fast"] : [])];
 
   if (uiOnly && dataOnly) {
     throw new RefreshPlanError(
@@ -51,7 +56,7 @@ export function buildRefreshPlan(flags) {
     skippedSteps.push({ kind: "sourcevision-dashboard-artifacts", reason: "--pr-markdown" });
     skippedSteps.push({ kind: "web-build", reason: "--pr-markdown" });
     notes.push("Refresh plan: running PR markdown refresh only; skipping data analysis and UI build.");
-    return { steps, skippedSteps, quietFlags, notes, needsSourcevisionDir };
+    return { steps, skippedSteps, quietFlags, analyzeFlags, notes, needsSourcevisionDir };
   }
 
   if (!uiOnly) {
@@ -75,5 +80,5 @@ export function buildRefreshPlan(flags) {
     steps.push({ kind: "web-build" });
   }
 
-  return { steps, skippedSteps, quietFlags, notes, needsSourcevisionDir };
+  return { steps, skippedSteps, quietFlags, analyzeFlags, notes, needsSourcevisionDir };
 }
