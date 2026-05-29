@@ -15,6 +15,19 @@ name: Release
 on:
   push:
     branches: [main]
+  # Manual trigger for trusted-publisher validation without publishing.
+  # Choose "validate-oidc" to run only the OIDC exchange probe — confirms
+  # each package's trusted publisher config accepts this workflow + env
+  # combination, without uploading anything.
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        description: "Run mode"
+        default: publish
+        options:
+          - publish
+          - validate-oidc
 
 concurrency:
   group: release-${{ github.ref }}
@@ -35,10 +48,73 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate trusted publisher OIDC exchange
+        # Runs only when manually dispatched with mode=validate-oidc. Mints
+        # the same GitHub OIDC token the publish step would, then POSTs it
+        # to npm's token-exchange endpoint for each package. A 200 response
+        # means the package's Trusted Publisher config matches this
+        # workflow + environment exactly; any other status means publish
+        # would fail. No upload happens — purely a config probe.
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'validate-oidc'
+        env:
+          REGISTRY: https://registry.npmjs.org
+          # Space-separated list of package names (without @n-dx/ prefix)
+          PACKAGES: "core rex sourcevision hench llm-client web"
+        run: |
+          set -uo pipefail
+          AUDIENCE="npm:registry.npmjs.org"
+
+          # 1) Mint the GitHub OIDC token (same flow npm CLI uses)
+          ID_TOKEN=$(curl -sSf \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}" \
+            | jq -r '.value')
+
+          if [ -z "${ID_TOKEN}" ] || [ "${ID_TOKEN}" = "null" ]; then
+            echo "::error::Failed to mint GitHub OIDC token"
+            exit 1
+          fi
+
+          echo "OIDC token claims (compare these to the trusted publisher config on npmjs.com):"
+          echo "${ID_TOKEN}" | cut -d. -f2 | base64 -d 2>/dev/null \
+            | jq '{repository, workflow_ref, environment, ref, event_name, sub}' || true
+          echo
+
+          # 2) Probe the token-exchange endpoint per package.
+          # Encoding matches npm-package-arg's escapedName: only "/" → "%2f".
+          FAILED=0
+          for pkg in ${PACKAGES}; do
+            ENC="@n-dx%2f${pkg}"
+            URL="${REGISTRY}/-/npm/v1/oidc/token/exchange/package/${ENC}"
+
+            HTTP=$(curl -sS -o /tmp/oidc-resp.json -w "%{http_code}" \
+              -X POST "${URL}" \
+              -H "Authorization: Bearer ${ID_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -H "npm-auth-type: oidc")
+
+            if [ "${HTTP}" = "200" ] && jq -e .token /tmp/oidc-resp.json > /dev/null 2>&1; then
+              echo "✓ @n-dx/${pkg}: trusted publisher config accepts this workflow"
+            else
+              echo "✗ @n-dx/${pkg}: HTTP ${HTTP}"
+              cat /tmp/oidc-resp.json | jq . 2>/dev/null || cat /tmp/oidc-resp.json
+              echo
+              FAILED=$((FAILED + 1))
+            fi
+          done
+
+          if [ "${FAILED}" -gt 0 ]; then
+            echo "::error::${FAILED} package(s) failed OIDC validation — check trusted publisher configs on npmjs.com"
+            exit 1
+          fi
+          echo "All packages validated successfully."
+
       - name: Install pnpm
+        if: github.event_name == 'push' || inputs.mode == 'publish'
         uses: pnpm/action-setup@v5
 
       - name: Setup Node
+        if: github.event_name == 'push' || inputs.mode == 'publish'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -52,21 +128,27 @@ jobs:
         # Pinned to 11.15.0: npm 11.16.0 (released 2026-05-27) regressed
         # `npm info` with "Invalid time value" against npmjs.org metadata,
         # breaking `changeset publish`. Revisit when npm ships a fix.
+        if: github.event_name == 'push' || inputs.mode == 'publish'
         run: npm install -g npm@11.15.0
 
       - name: Install dependencies
+        if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm install --frozen-lockfile
 
       - name: Check obfuscated code policy
+        if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm security:obfuscation
 
       - name: Build
+        if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm build
 
       - name: Run unit tests
+        if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm -r run test
 
       - name: Create Release PR or Publish
+        if: github.event_name == 'push' || inputs.mode == 'publish'
         id: changesets
         uses: changesets/action@v1
         with:
