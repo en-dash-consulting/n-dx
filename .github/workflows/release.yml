@@ -93,8 +93,10 @@ jobs:
               -H "Content-Type: application/json" \
               -H "npm-auth-type: oidc")
 
-            if [ "${HTTP}" = "200" ] && jq -e .token /tmp/oidc-resp.json > /dev/null 2>&1; then
-              echo "✓ @n-dx/${pkg}: trusted publisher config accepts this workflow"
+            # Success = registry minted a publish token. npm returns 201
+            # Created on success; presence of .token is the real signal.
+            if jq -e .token /tmp/oidc-resp.json > /dev/null 2>&1; then
+              echo "✓ @n-dx/${pkg}: trusted publisher accepted (HTTP ${HTTP})"
             else
               echo "✗ @n-dx/${pkg}: HTTP ${HTTP}"
               cat /tmp/oidc-resp.json | jq . 2>/dev/null || cat /tmp/oidc-resp.json
