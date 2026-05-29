@@ -84,10 +84,19 @@ jobs:
         # to consume the changesets, so the directory is empty by design.
         if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
         run: |
+          # Skip if the PR touches no publishable package code. This avoids
+          # the empty-changeset trap (a marker changeset added solely to
+          # satisfy this rule will later stall the Release run with
+          # "All changesets are empty; not creating PR" and block publish).
+          PKG_CHANGES=$(git diff --name-only origin/main...HEAD -- 'packages/' ':!packages/*/CHANGELOG.md' ':!packages/*/package.json' || true)
+          if [ -z "$PKG_CHANGES" ]; then
+            echo "PR touches no package source — skipping changeset requirement."
+            exit 0
+          fi
           # Check for .changeset/*.md files (not config.json, not README)
           CHANGESETS=$(ls .changeset/*.md 2>/dev/null | grep -v README || true)
           if [ -z "$CHANGESETS" ]; then
-            echo "No changeset found. Add one with 'pnpm changeset' or 'pnpm changeset --empty' if no release is needed."
+            echo "No changeset found. Add one with 'pnpm changeset'."
             exit 1
           fi
 
