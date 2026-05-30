@@ -1,5 +1,26 @@
 # @n-dx/core
 
+## 0.4.4
+
+### Patch Changes
+
+- [#233](https://github.com/en-dash-consulting/n-dx/pull/233) [`a31403d`](https://github.com/en-dash-consulting/n-dx/commit/a31403d8438cfea90f87abff1caf70f92d07e64c) Thanks [@dnaniel](https://github.com/dnaniel)! - Fix: include `self-heal-confirm.js` in the published `@n-dx/core` tarball.
+  The file exists in source and is imported by `cli.js` (line 50), but was
+  missing from `package.json`'s `files` array, so 0.4.3 published without
+  it and `ndx` crashed at startup with
+  `ERR_MODULE_NOT_FOUND: Cannot find module … self-heal-confirm.js`.
+
+  Because the changeset config groups all six `@n-dx/*` packages as
+  `fixed`, this patch bumps the whole set to 0.4.4 — the other five
+  packages republish unchanged but at the new version.
+
+- Updated dependencies []:
+  - @n-dx/rex@0.4.4
+  - @n-dx/hench@0.4.4
+  - @n-dx/sourcevision@0.4.4
+  - @n-dx/llm-client@0.4.4
+  - @n-dx/web@0.4.4
+
 ## 0.4.3
 
 ### Patch Changes
