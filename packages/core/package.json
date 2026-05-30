@@ -66,6 +66,7 @@
     "cli-timeout.js",
     "update-check.js",
     "pair-programming.js",
+    "self-heal-confirm.js",
     "stale-check.js"
   ],
   "scripts": {
