@@ -7,11 +7,12 @@
  * manifest (package.json, pyproject.toml, go.mod, Cargo.toml) and
  * top-level directory listing — never from n-dx's documentation.
  *
- * This task is responsible only for the "no README exists yet" path:
- * when any case-insensitive README variant is already present, this
- * module returns `{ written: false, reason: "existing-variant" }` and
- * leaves the project untouched.  The proposed-file fallback for the
- * "README already exists" case is owned by a sibling task.
+ * Two write modes:
+ *   - `primary` — no README variant exists; synthesized content is
+ *     written to `README.md`.
+ *   - `proposed` — a case-insensitive README variant already exists;
+ *     the original is left untouched and synthesized content is written
+ *     to `README.proposed.md` (overwriting any prior proposed file).
  *
  * @module n-dx/readme-generator
  */
@@ -246,24 +247,24 @@ export function composeReadme({ projectName, description, scripts, topLevelDirs 
 /**
  * Generate a README for the target project.
  *
- * Writes `README.md` only when no case-insensitive README variant is
- * present in the target directory.  When a variant already exists this
- * function leaves the project untouched and returns
- * `{ written: false, reason: "existing-variant", existingReadme: "<name>" }`.
- * The proposed-file fallback (writing `README.proposed.md` when a
- * variant exists) is owned by a sibling task and is intentionally not
- * implemented here.
+ * Behavior:
+ *   - When no case-insensitive README variant exists, writes synthesized
+ *     content to `README.md` and returns `{ written: true, mode: "primary" }`.
+ *   - When any variant already exists, the original is **never** read,
+ *     modified, deleted, or overwritten.  Instead, the synthesized
+ *     content is written to `README.proposed.md` at the project root.
+ *     Any pre-existing `README.proposed.md` is overwritten (not appended).
+ *     Returns `{ written: true, mode: "proposed", existingReadme: "<name>" }`.
+ *
+ * Diff hint: callers may use the returned `existingReadme` to construct
+ * a "diff README.proposed.md against <existingReadme>" hint for users.
  *
  * @param {string} dir  Project root directory.
- * @returns {{ written: boolean, path?: string, mode?: "primary",
- *   reason?: "existing-variant", existingReadme?: string }}
+ * @returns {{ written: boolean, path?: string, mode?: "primary" | "proposed",
+ *   existingReadme?: string }}
  */
 export function generateTargetReadme(dir) {
   const existing = findExistingReadme(dir);
-  if (existing) {
-    return { written: false, reason: "existing-variant", existingReadme: existing };
-  }
-
   const manifest = readProjectManifest(dir);
   const projectName = manifest.name || basename(resolve(dir));
   const topLevelDirs = listTopLevelDirs(dir);
@@ -273,6 +274,20 @@ export function generateTargetReadme(dir) {
     scripts: manifest.scripts,
     topLevelDirs,
   });
+
+  if (existing) {
+    // Existing variant must never be read, modified, deleted, or overwritten.
+    // Synthesized content goes to README.proposed.md; if that file already
+    // exists from a prior run, it is overwritten (not appended).
+    const proposedPath = join(dir, "README.proposed.md");
+    writeFileSync(proposedPath, content);
+    return {
+      written: true,
+      path: proposedPath,
+      mode: "proposed",
+      existingReadme: existing,
+    };
+  }
 
   const outPath = join(dir, "README.md");
   writeFileSync(outPath, content);

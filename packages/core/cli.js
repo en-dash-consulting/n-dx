@@ -37,7 +37,7 @@
 import { spawn, execFileSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
-import { dirname, isAbsolute, join, resolve } from "path";
+import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
 import { runConfig, loadProjectConfig, repairProjectConfig } from "./config.js";
@@ -1121,7 +1121,7 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
  *   llmSkipped: boolean, selectedProvider: string|undefined, selection: object,
  *   providerSource: string, modelSource: string, assistantResults: object }} opts
  */
-function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults }) {
+function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult }) {
   console.log("");
   console.log("n-dx initialized");
   console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
@@ -1143,7 +1143,26 @@ function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, 
   for (const line of formatInitReport(assistantResults, { activeVendor: selectedProvider })) {
     console.log(line);
   }
+  for (const line of formatReadmeSummaryLines(readmeResult)) {
+    console.log(line);
+  }
   console.log("");
+}
+
+/**
+ * Format the README generation result for the init summary.  Returns a
+ * single line for the "proposed" mode pointing users at the diff, or an
+ * empty array when no proposed file was written.
+ *
+ * @param {{ written?: boolean, mode?: string, path?: string,
+ *   existingReadme?: string } | null | undefined} result
+ * @returns {string[]}
+ */
+function formatReadmeSummaryLines(result) {
+  if (!result || result.mode !== "proposed" || !result.path) return [];
+  const proposed = basename(result.path);
+  const existing = result.existingReadme || "the existing README";
+  return [`  ${proposed} written — diff against ${existing} to merge.`];
 }
 
 async function handleInit(rest) {
@@ -1245,8 +1264,9 @@ async function handleInit(rest) {
   // Generate a target-repo README before assistant artifacts so the user's
   // project documentation reflects only their own manifest/structure — not
   // the n-dx tooling files written later in this phase.
+  let readmeResult = null;
   try {
-    generateTargetReadme(dir);
+    readmeResult = generateTargetReadme(dir);
   } catch {
     // Non-fatal — README generation is a best-effort convenience.
   }
@@ -1254,7 +1274,7 @@ async function handleInit(rest) {
   const assistantResults = setupAssistantIntegrations(dir, assistantEnabled);
   printStaticInitSummary({
     svExists, rexExists, henchExists, llmSkipped, selectedProvider,
-    selection, providerSource, modelSource, assistantResults,
+    selection, providerSource, modelSource, assistantResults, readmeResult,
   });
   exitWithCleanup(0);
 }

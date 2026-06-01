@@ -168,8 +168,11 @@ describe("ndx init: target-repo README generation", () => {
       expectNoNdxFlavor(proposed);
 
       // A README.md sibling must not have been silently created when a
-      // non-".md" variant (README, README.rst) was present.
-      if (variantName !== "README.md") {
+      // non-".md" variant (README, README.rst) was present.  Skip the
+      // assertion when the variant itself IS a .md file (any case): on
+      // case-insensitive filesystems readme.md and README.md alias to
+      // the same inode, so the check would be meaningless.
+      if (variantName.toLowerCase() !== "readme.md") {
         expect(existsSync(join(tmpDir, "README.md"))).toBe(false);
       }
     });
