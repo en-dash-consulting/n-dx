@@ -80,6 +80,7 @@ import {
   formatOrchestratorCommandHelp,
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport } from "./assistant-integration.js";
+import { generateTargetReadme } from "./readme-generator.js";
 import { formatClaudeCliNotFoundError } from "./claude-integration.js";
 import {
   formatInitBanner,
@@ -1240,6 +1241,15 @@ async function handleInit(rest) {
     const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
     recordInitVersion(dir, version);
   } catch { /* non-fatal */ }
+
+  // Generate a target-repo README before assistant artifacts so the user's
+  // project documentation reflects only their own manifest/structure — not
+  // the n-dx tooling files written later in this phase.
+  try {
+    generateTargetReadme(dir);
+  } catch {
+    // Non-fatal — README generation is a best-effort convenience.
+  }
 
   const assistantResults = setupAssistantIntegrations(dir, assistantEnabled);
   printStaticInitSummary({

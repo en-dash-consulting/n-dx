@@ -232,6 +232,17 @@ function InitApp({
         }
       }
 
+      // Target-repo README generation — runs before assistant integrations
+      // so the synthesized structure overview reflects the user's project,
+      // not the n-dx artifacts written by the assistant setup that follows.
+      // Errors are best-effort; failure does not block the rest of init.
+      const readmeUrl = new URL("./readme-generator.js", import.meta.url).href;
+      const readmeScript = [
+        `import{generateTargetReadme}from"${readmeUrl}";`,
+        `try{generateTargetReadme(${JSON.stringify(dir)})}catch{}`,
+      ].join("");
+      await spawnAsync("node", ["--input-type=module", "-e", readmeScript]);
+
       // Assistant integrations (vendor-neutral) — inline ESM subprocess
       // that returns the summary lines from formatInitReport plus any error.
       setPhase("assistants", "active");
