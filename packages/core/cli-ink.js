@@ -21,7 +21,11 @@ import {
   LEGS,
   INIT_PHASES,
 } from "./cli-brand.js";
-import { formatGitWarningLines } from "./git-preflight.js";
+import {
+  formatGitWarningLines,
+  commitInitBaseline,
+  formatGitInitCommitLines,
+} from "./git-preflight.js";
 
 // ── Subprocess helper (never blocks the main thread) ───────────────────
 
@@ -124,10 +128,14 @@ function Recap({
   assistantLines,
   readmeResult,
   gitWarningLines,
+  gitCommitLines,
+  gitCommitOk,
 }) {
   const readmeLine = readmeResult && readmeResult.mode === "proposed" && readmeResult.path
     ? `  ${basename(readmeResult.path)} written — diff against ${readmeResult.existingReadme || "the existing README"} to merge.`
     : null;
+  // Success lines render in green, failure/skip lines in yellow.
+  const commitColor = gitCommitOk ? "green" : "yellow";
   return html`
     <${Box} flexDirection="column" marginTop=${1}>
       <${Box} paddingLeft=${2} gap=${1}>
@@ -147,6 +155,7 @@ function Recap({
       ${assistantLines.map((line, i) => html`<${Text} key=${"ai" + i}>${line}<//>`)}
       ${readmeLine && html`<${Text}>${readmeLine}<//>`}
       ${(gitWarningLines ?? []).map((line, i) => html`<${Text} key=${"git" + i} color="yellow">${line}<//>`)}
+      ${(gitCommitLines ?? []).map((line, i) => html`<${Text} key=${"gc" + i} color=${commitColor}>${line}<//>`)}
       <${Text}> <//>
       <${Text} dimColor>  Next steps:<//>
       <${Text} dimColor>    ${TOOL_NAME} start .          spin up the dashboard + MCP servers<//>
@@ -295,6 +304,13 @@ function InitApp({
       }
       setPhase("assistants", "done");
 
+      // Stage and commit the n-dx baseline when the preflight just
+      // initialized git in this run.  Runs after every tool directory and
+      // assistant surface has been written so the snapshot is complete.
+      const gitCommitResult = gitResult?.status === "initialized"
+        ? commitInitBaseline(dir)
+        : null;
+
       setRecap({
         sourcevision: svExists ? "already exists (reused)" : "created",
         rex: rexExists ? "already exists (reused)" : "created",
@@ -305,6 +321,8 @@ function InitApp({
         assistantLines,
         readmeResult,
         gitWarningLines: formatGitWarningLines(gitResult),
+        gitCommitLines: formatGitInitCommitLines(gitCommitResult),
+        gitCommitOk: gitCommitResult?.status === "committed",
       });
 
       // Let the dino keep walking while the user reads the recap

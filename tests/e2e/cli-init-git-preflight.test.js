@@ -89,5 +89,20 @@ describe("ndx init: git preflight", () => {
     expect(output).not.toContain("not a git repository");
     expect(output).not.toContain("auto-commit features are disabled");
     expect(output).toContain("LLM configuration");
+    // No baseline commit attempt for pre-existing repos — the commit step
+    // only runs when this `ndx init` invocation created the repo itself.
+    expect(output).not.toContain("Initial git commit created");
+    expect(output).not.toContain("Initial git commit skipped");
+  });
+
+  it("does not attempt the baseline commit in non-interactive runs (no consent)", () => {
+    // Without a TTY, runGitPreflight returns `non-interactive` and the
+    // baseline commit step is skipped entirely.  Pin the absence so a future
+    // refactor doesn't accidentally trigger a spawn against `git commit`
+    // outside an init'd repo.
+    const output = run(["init", "--provider=codex", "--no-claude", tmpDir], { env: initEnv });
+    expect(output).not.toContain("Initial git commit created");
+    expect(output).not.toContain("Initial git commit skipped");
+    expect(output).not.toContain("creating the initial n-dx commit failed");
   });
 });

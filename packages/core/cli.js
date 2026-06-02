@@ -81,7 +81,12 @@ import {
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport } from "./assistant-integration.js";
 import { generateTargetReadme } from "./readme-generator.js";
-import { runGitPreflight, formatGitWarningLines } from "./git-preflight.js";
+import {
+  runGitPreflight,
+  formatGitWarningLines,
+  commitInitBaseline,
+  formatGitInitCommitLines,
+} from "./git-preflight.js";
 import { formatClaudeCliNotFoundError } from "./claude-integration.js";
 import {
   formatInitBanner,
@@ -1122,7 +1127,7 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
  *   llmSkipped: boolean, selectedProvider: string|undefined, selection: object,
  *   providerSource: string, modelSource: string, assistantResults: object }} opts
  */
-function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult, gitResult }) {
+function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult, gitResult, gitCommitResult }) {
   console.log("");
   console.log("n-dx initialized");
   console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
@@ -1148,6 +1153,9 @@ function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, 
     console.log(line);
   }
   for (const line of formatGitWarningLines(gitResult)) {
+    console.log(line);
+  }
+  for (const line of formatGitInitCommitLines(gitCommitResult)) {
     console.log(line);
   }
   console.log("");
@@ -1282,10 +1290,19 @@ async function handleInit(rest) {
   }
 
   const assistantResults = setupAssistantIntegrations(dir, assistantEnabled);
+
+  // When the user just consented to `git init` in the preflight, stage and
+  // commit the n-dx baseline now that every tool directory and assistant
+  // surface has been written.  Done AFTER all writes so the snapshot is
+  // complete; a missing path here would just be skipped, not error.
+  const gitCommitResult = gitResult?.status === "initialized"
+    ? commitInitBaseline(dir)
+    : null;
+
   printStaticInitSummary({
     svExists, rexExists, henchExists, llmSkipped, selectedProvider,
     selection, providerSource, modelSource, assistantResults, readmeResult,
-    gitResult,
+    gitResult, gitCommitResult,
   });
   exitWithCleanup(0);
 }
