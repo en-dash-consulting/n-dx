@@ -71,7 +71,7 @@ function latestCommitFullMsg(cwd) {
  * Return the list of files changed in the most recent commit.
  */
 function latestCommitFiles(cwd) {
-  return execSync("git show --pretty='' --name-only HEAD", { cwd, encoding: "utf-8" })
+  return execSync("git show --pretty=format: --name-only HEAD", { cwd, encoding: "utf-8" })
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
