@@ -44,13 +44,32 @@ describe("file-modifying skills: commit step presence", () => {
     it(`${skill}: uses skill-scoped commit message prefix`, () => {
       const body = getSkillBody(skill);
       // The commit message must start with the skill name so commits are attributable.
-      expect(body).toContain(`"${skill}:`);
+      expect(body).toContain(`${skill}:`);
     });
 
     it(`${skill}: commit step is conditional — skip when tree is clean`, () => {
       const body = getSkillBody(skill);
       // Must mention the "empty → stop" guard so the skill is a no-op on a clean tree.
       expect(body).toMatch(/if.*empty.*stop|nothing to commit|Working tree clean/i);
+    });
+
+    it(`${skill}: commit message includes n-dx authorship trailer`, () => {
+      const body = getSkillBody(skill);
+      // Co-Authored-By trailer routes commits to the n-dx GitHub identity.
+      expect(body).toContain("Co-Authored-By: En Dash's n-dx <n-dx@endash.us>");
+    });
+
+    it(`${skill}: commit message includes model audit trailer (N-DX: skill/<name>)`, () => {
+      const body = getSkillBody(skill);
+      // N-DX trailer identifies which skill produced the commit — the model audit trail.
+      expect(body).toContain(`N-DX: skill/${skill}`);
+    });
+
+    it(`${skill}: runs git status --porcelain against project root (catches MCP side-effects)`, () => {
+      const body = getSkillBody(skill);
+      // The body must call out that porcelain status detects MCP-side-effect writes,
+      // not just direct file edits — that's the regression we're guarding against.
+      expect(body.toLowerCase()).toMatch(/mcp|prd_tree|side-effect|project root/);
     });
   }
 });

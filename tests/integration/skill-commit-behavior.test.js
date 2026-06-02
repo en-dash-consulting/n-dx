@@ -61,6 +61,37 @@ function latestCommitMsg(cwd) {
 }
 
 /**
+ * Return the full message body of the most recent commit (subject + trailers).
+ */
+function latestCommitFullMsg(cwd) {
+  return execSync("git log -1 --pretty=%B", { cwd, encoding: "utf-8" });
+}
+
+/**
+ * Return the list of files changed in the most recent commit.
+ */
+function latestCommitFiles(cwd) {
+  return execSync("git show --pretty='' --name-only HEAD", { cwd, encoding: "utf-8" })
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Build the multi-line commit message in the exact shape each file-modifying skill
+ * instructs the LLM to produce: subject, blank line, N-DX trailer, Co-Authored-By
+ * trailer. Mirrors the HEREDOC block in the skill bodies.
+ */
+function buildSkillCommitMessage(skillName, subject) {
+  return [
+    `${skillName}: ${subject}`,
+    "",
+    `N-DX: skill/${skillName}`,
+    "Co-Authored-By: En Dash's n-dx <n-dx@endash.us>",
+  ].join("\n");
+}
+
+/**
  * Run the exact commit-step logic described in every file-modifying skill:
  *
  *   1. git status --porcelain  →  if empty, skip
@@ -84,14 +115,14 @@ function runSkillCommitStep(cwd, commitMessage) {
 const FILE_MODIFYING_SKILLS = [
   {
     name: "ndx-config",
-    // Representative commit message as specified in the skill body.
-    commitMessage: "ndx-config: update llm.vendor configuration",
+    // Representative commit message subject as specified in the skill body.
+    subject: "update llm.vendor configuration",
     makeChange: (dir) =>
       writeFileSync(join(dir, ".n-dx.json"), '{"llm":{"vendor":"claude"}}\n'),
   },
   {
     name: "ndx-capture",
-    commitMessage: "ndx-capture: add 'Fix login bug' to PRD",
+    subject: "add 'Fix login bug' to PRD",
     makeChange: (dir) => {
       // Simulate what rex add_item writes: a new file in .rex/prd_tree/
       const prdDir = join(dir, ".rex", "prd_tree", "fix-login-bug");
@@ -101,7 +132,7 @@ const FILE_MODIFYING_SKILLS = [
   },
   {
     name: "ndx-plan",
-    commitMessage: "ndx-plan: add 2 proposed PRD items",
+    subject: "add 2 proposed PRD items",
     makeChange: (dir) => {
       const itemA = join(dir, ".rex", "prd_tree", "new-epic");
       const itemB = join(dir, ".rex", "prd_tree", "new-feature");
@@ -113,7 +144,7 @@ const FILE_MODIFYING_SKILLS = [
   },
   {
     name: "ndx-reshape",
-    commitMessage: "ndx-reshape: restructure PRD hierarchy",
+    subject: "restructure PRD hierarchy",
     makeChange: (dir) => {
       // Simulate a reshape: add a new parent container and a renamed item.
       const newParentDir = join(dir, ".rex", "prd_tree", "platform");
@@ -125,9 +156,10 @@ const FILE_MODIFYING_SKILLS = [
   },
 ];
 
-for (const { name, commitMessage, makeChange } of FILE_MODIFYING_SKILLS) {
+for (const { name, subject, makeChange } of FILE_MODIFYING_SKILLS) {
   describe(`${name}: commit step`, () => {
     let dir;
+    const commitMessage = buildSkillCommitMessage(name, subject);
     beforeEach(() => { dir = makeGitRepo(); });
     afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
@@ -146,6 +178,20 @@ for (const { name, commitMessage, makeChange } of FILE_MODIFYING_SKILLS) {
       expect(latestCommitMsg(dir)).toContain(`${name}:`);
     });
 
+    it("includes the n-dx authorship trailer (Co-Authored-By)", () => {
+      makeChange(dir);
+      runSkillCommitStep(dir, commitMessage);
+      expect(latestCommitFullMsg(dir)).toContain(
+        "Co-Authored-By: En Dash's n-dx <n-dx@endash.us>",
+      );
+    });
+
+    it(`includes the model audit trailer (N-DX: skill/${name})`, () => {
+      makeChange(dir);
+      runSkillCommitStep(dir, commitMessage);
+      expect(latestCommitFullMsg(dir)).toContain(`N-DX: skill/${name}`);
+    });
+
     it("produces no commit when the tree is already clean", () => {
       const before = countCommits(dir);
       const committed = runSkillCommitStep(dir, commitMessage);
@@ -155,6 +201,80 @@ for (const { name, commitMessage, makeChange } of FILE_MODIFYING_SKILLS) {
     });
   });
 }
+
+// ---------------------------------------------------------------------------
+// /ndx-capture regression: MCP-only-dirty and mixed-dirty states
+// ---------------------------------------------------------------------------
+
+describe("/ndx-capture: MCP-side-effect dirtiness is detected and committed", () => {
+  let dir;
+  beforeEach(() => { dir = makeGitRepo(); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it("commits the new prd_tree/index.md when MCP add_item is the only writer", () => {
+    // Pre-track an existing prd_tree slug so `git status` reports a real
+    // modified path (mirrors the real-world case where add_item edits an
+    // existing parent's index.md and also creates a new child slug).
+    const childSlug = join(dir, ".rex", "prd_tree", "fix-login-bug");
+    mkdirSync(childSlug, { recursive: true });
+    writeFileSync(join(childSlug, "index.md"), "# Fix login bug\n");
+
+    const commitMessage = buildSkillCommitMessage(
+      "ndx-capture",
+      "add 'Fix login bug' to PRD",
+    );
+    const committed = runSkillCommitStep(dir, commitMessage);
+
+    expect(committed, "porcelain status against the project root must detect MCP-only writes").toBe(true);
+
+    const files = latestCommitFiles(dir);
+    expect(
+      files.some((f) => f === ".rex/prd_tree/fix-login-bug/index.md"),
+      `expected commit to include .rex/prd_tree/fix-login-bug/index.md; got ${JSON.stringify(files)}`,
+    ).toBe(true);
+
+    const fullMsg = latestCommitFullMsg(dir);
+    expect(fullMsg).toContain("ndx-capture: add 'Fix login bug' to PRD");
+    expect(fullMsg).toContain("N-DX: skill/ndx-capture");
+    expect(fullMsg).toContain("Co-Authored-By: En Dash's n-dx <n-dx@endash.us>");
+  });
+
+  it("commits both prd_tree and direct-edit files in a mixed-dirty state", () => {
+    // Simulate a session where the LLM both edited a file directly AND
+    // produced an MCP-driven prd_tree write. Both kinds of dirty paths must
+    // be captured in the same commit.
+    writeFileSync(join(dir, "src.ts"), "export const x = 1;\n");
+    const prdDir = join(dir, ".rex", "prd_tree", "mixed-task");
+    mkdirSync(prdDir, { recursive: true });
+    writeFileSync(join(prdDir, "index.md"), "# Mixed task\n");
+
+    const commitMessage = buildSkillCommitMessage(
+      "ndx-capture",
+      "add 'Mixed task' to PRD",
+    );
+    const committed = runSkillCommitStep(dir, commitMessage);
+
+    expect(committed).toBe(true);
+
+    const files = latestCommitFiles(dir);
+    expect(files).toContain("src.ts");
+    expect(files).toContain(".rex/prd_tree/mixed-task/index.md");
+
+    const fullMsg = latestCommitFullMsg(dir);
+    expect(fullMsg).toContain("N-DX: skill/ndx-capture");
+    expect(fullMsg).toContain("Co-Authored-By: En Dash's n-dx <n-dx@endash.us>");
+  });
+
+  it("makes no commit when /ndx-capture runs but the MCP writes produced no dirty paths (no-op)", () => {
+    // The skill's no-op guard must hold when MCP calls are pure reads
+    // (e.g. get_prd_status only) and no writes occur.
+    const before = countCommits(dir);
+    const commitMessage = buildSkillCommitMessage("ndx-capture", "ignored");
+    const committed = runSkillCommitStep(dir, commitMessage);
+    expect(committed).toBe(false);
+    expect(countCommits(dir)).toBe(before);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Hench run-loop: no double-commit
