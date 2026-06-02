@@ -14,7 +14,7 @@ import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
-import { ConsecutiveFailureCounter } from "./consecutive-failures.js";
+import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { section } from "../../types/output.js";
@@ -1354,8 +1354,11 @@ async function runLoop(
           );
           status = result.status;
 
-          // Track consecutive failures for 3-strike auto-cancel
-          if (!shouldContinueLoop(status)) {
+          // Track consecutive failures for 3-strike auto-cancel.
+          // Uses isFailureStatus (not !shouldContinueLoop) so that
+          // error_transient and cancelled — which keep the loop iterating —
+          // still count toward the threshold instead of resetting the counter.
+          if (isFailureStatus(status)) {
             consecutiveFailureCounter.recordFailure(result.selectedTaskId || "unknown");
           } else {
             consecutiveFailureCounter.recordSuccess();

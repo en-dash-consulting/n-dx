@@ -291,6 +291,64 @@ describe("consecutive failure counter in --loop mode", () => {
     });
   });
 
+  describe("isFailureStatus predicate", () => {
+    it("returns true for hard failure statuses", async () => {
+      const { isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      expect(isFailureStatus("failed")).toBe(true);
+      expect(isFailureStatus("timeout")).toBe(true);
+      expect(isFailureStatus("budget_exceeded")).toBe(true);
+    });
+
+    it("returns true for error_transient and cancelled (regression: bug 1358)", async () => {
+      // Pre-fix bug: the call site used !shouldContinueLoop(status), which
+      // returned false for error_transient/cancelled, so those statuses
+      // SILENTLY RESET the counter via recordSuccess(). The 3-strike
+      // threshold could never fire if every run errored transiently.
+      const { isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      expect(isFailureStatus("error_transient")).toBe(true);
+      expect(isFailureStatus("cancelled")).toBe(true);
+    });
+
+    it("returns false for completed status", async () => {
+      const { isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      expect(isFailureStatus("completed")).toBe(false);
+    });
+
+    it("returns false for running and unknown statuses", async () => {
+      const { isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      expect(isFailureStatus("running")).toBe(false);
+      expect(isFailureStatus("no_actionable_task")).toBe(false);
+      expect(isFailureStatus("")).toBe(false);
+    });
+
+    it("agrees with shared.ts FAILURE_STATUSES set", async () => {
+      // Hard guard: the rollback gate (shared.ts FAILURE_STATUSES) and the
+      // counter gate (isFailureStatus) must agree. If they diverge, a run
+      // can be rolled back but still reset the counter, or vice versa.
+      const { isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      const sharedFailureStatuses = [
+        "failed",
+        "timeout",
+        "budget_exceeded",
+        "error_transient",
+        "cancelled",
+      ];
+      for (const status of sharedFailureStatuses) {
+        expect(isFailureStatus(status)).toBe(true);
+      }
+    });
+  });
+
   describe("loop iteration simulation", () => {
     it("simulates loop with 3 consecutive failures → exit", async () => {
       const { ConsecutiveFailureCounter } = await import(
@@ -361,6 +419,132 @@ describe("consecutive failure counter in --loop mode", () => {
       // Should NOT cancel (pattern is fail, pass, fail, pass, fail... which never reaches 3 consecutive)
       expect(canceledAt).toBe(-1);
       expect(counter.shouldCancel()).toBe(false);
+    });
+
+    /**
+     * Fixture-driven regression for the call-site classification bug.
+     *
+     * `runLoop` decides whether to call `recordFailure` or `recordSuccess`
+     * based on the run's status. The bug was that the call site used
+     * `!shouldContinueLoop(status)` — a loop-continuation predicate — which
+     * incorrectly treated `error_transient` and `cancelled` as successes,
+     * silently resetting the counter and preventing the 3-strike trigger
+     * from ever firing.
+     *
+     * This test reproduces the runLoop body's classification step using
+     * `isFailureStatus` (the fixed predicate) and a fixture that yields
+     * the failing status on every iteration. It must:
+     *   • record exactly 3 failures
+     *   • cancel after the 3rd iteration
+     *   • emit a message that names the failing task and the count
+     */
+    function runFixtureLoop(
+      counter: { recordFailure: (id: string) => void; recordSuccess: () => void; shouldCancel: () => boolean; getCancellationMessage: () => string },
+      isFailure: (status: string) => boolean,
+      fixture: () => { status: string; taskId: string },
+      maxIterations: number = 10,
+    ): { iterations: number; cancelMessage: string } {
+      let iterations = 0;
+      let cancelMessage = "";
+      while (iterations < maxIterations) {
+        iterations++;
+        const outcome = fixture();
+        if (isFailure(outcome.status)) {
+          counter.recordFailure(outcome.taskId);
+        } else {
+          counter.recordSuccess();
+        }
+        if (counter.shouldCancel()) {
+          cancelMessage = counter.getCancellationMessage();
+          break;
+        }
+      }
+      return { iterations, cancelMessage };
+    }
+
+    it("always-failing fixture exits after exactly 3 agent invocations with auto-cancel message", async () => {
+      const { ConsecutiveFailureCounter, isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      const counter = new ConsecutiveFailureCounter();
+      let i = 0;
+      const result = runFixtureLoop(
+        counter,
+        isFailureStatus,
+        () => ({ status: "failed", taskId: `always-fail-${++i}` }),
+      );
+      expect(result.iterations).toBe(3);
+      expect(result.cancelMessage).toContain("3");
+      expect(result.cancelMessage).toContain("always-fail-3");
+      expect(result.cancelMessage).toMatch(/auto-cancel|consecutive/i);
+    });
+
+    it("always-error_transient fixture also exits after 3 agent invocations (bug-1358 regression)", async () => {
+      // Pre-fix: this fixture looped forever because error_transient was
+      // classified as a success by the call site.
+      const { ConsecutiveFailureCounter, isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      const counter = new ConsecutiveFailureCounter();
+      let i = 0;
+      const result = runFixtureLoop(
+        counter,
+        isFailureStatus,
+        () => ({ status: "error_transient", taskId: `transient-${++i}` }),
+      );
+      expect(result.iterations).toBe(3);
+      expect(result.cancelMessage).toContain("transient-3");
+    });
+
+    it("2 failures + 1 success + 2 failures does NOT cancel at iteration 4", async () => {
+      const { ConsecutiveFailureCounter, isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      const counter = new ConsecutiveFailureCounter();
+      const sequence = [
+        { status: "failed", taskId: "task-1" },
+        { status: "failed", taskId: "task-2" },
+        { status: "completed", taskId: "task-3" }, // resets counter
+        { status: "failed", taskId: "task-4" },
+        { status: "failed", taskId: "task-5" },
+      ];
+      let cursor = 0;
+      const result = runFixtureLoop(
+        counter,
+        isFailureStatus,
+        () => sequence[cursor++],
+        sequence.length,
+      );
+      // Loop should run all 5 iterations without cancelling
+      expect(result.iterations).toBe(5);
+      expect(result.cancelMessage).toBe("");
+      expect(counter.count()).toBe(2);
+      expect(counter.shouldCancel()).toBe(false);
+    });
+
+    it("2 failures + 1 success + 3 failures DOES cancel at iteration 6", async () => {
+      const { ConsecutiveFailureCounter, isFailureStatus } = await import(
+        "../../../../src/cli/commands/consecutive-failures.js"
+      );
+      const counter = new ConsecutiveFailureCounter();
+      const sequence = [
+        { status: "failed", taskId: "task-1" },
+        { status: "failed", taskId: "task-2" },
+        { status: "completed", taskId: "task-3" }, // resets counter
+        { status: "failed", taskId: "task-4" },
+        { status: "failed", taskId: "task-5" },
+        { status: "failed", taskId: "task-6" },
+      ];
+      let cursor = 0;
+      const result = runFixtureLoop(
+        counter,
+        isFailureStatus,
+        () => sequence[cursor++],
+        sequence.length,
+      );
+      expect(result.iterations).toBe(6);
+      expect(result.cancelMessage).toContain("task-6");
+      expect(result.cancelMessage).toContain("3");
     });
 
     it("simulates loop that passes several, then fails 3 times → exit", async () => {
