@@ -21,7 +21,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
@@ -95,7 +95,7 @@ const FILE_MODIFYING_SKILLS = [
     makeChange: (dir) => {
       // Simulate what rex add_item writes: a new file in .rex/prd_tree/
       const prdDir = join(dir, ".rex", "prd_tree", "fix-login-bug");
-      execSync(`mkdir -p ${JSON.stringify(prdDir)}`);
+      mkdirSync(prdDir, { recursive: true });
       writeFileSync(join(prdDir, "index.md"), "# Fix login bug\n");
     },
   },
@@ -105,7 +105,8 @@ const FILE_MODIFYING_SKILLS = [
     makeChange: (dir) => {
       const itemA = join(dir, ".rex", "prd_tree", "new-epic");
       const itemB = join(dir, ".rex", "prd_tree", "new-feature");
-      execSync(`mkdir -p ${JSON.stringify(itemA)} ${JSON.stringify(itemB)}`);
+      mkdirSync(itemA, { recursive: true });
+      mkdirSync(itemB, { recursive: true });
       writeFileSync(join(itemA, "index.md"), "# New epic\n");
       writeFileSync(join(itemB, "index.md"), "# New feature\n");
     },
@@ -117,7 +118,7 @@ const FILE_MODIFYING_SKILLS = [
       // Simulate a reshape: add a new parent container and a renamed item.
       const newParentDir = join(dir, ".rex", "prd_tree", "platform");
       const movedDir = join(dir, ".rex", "prd_tree", "platform", "auth");
-      execSync(`mkdir -p ${JSON.stringify(movedDir)}`);
+      mkdirSync(movedDir, { recursive: true });
       writeFileSync(join(newParentDir, "index.md"), "# Platform\n");
       writeFileSync(join(movedDir, "index.md"), "# Auth (moved)\n");
     },
