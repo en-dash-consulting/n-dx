@@ -81,6 +81,7 @@ import {
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport } from "./assistant-integration.js";
 import { generateTargetReadme } from "./readme-generator.js";
+import { runGitPreflight, formatGitWarningLines } from "./git-preflight.js";
 import { formatClaudeCliNotFoundError } from "./claude-integration.js";
 import {
   formatInitBanner,
@@ -1121,7 +1122,7 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
  *   llmSkipped: boolean, selectedProvider: string|undefined, selection: object,
  *   providerSource: string, modelSource: string, assistantResults: object }} opts
  */
-function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult }) {
+function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult, gitResult }) {
   console.log("");
   console.log("n-dx initialized");
   console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
@@ -1144,6 +1145,9 @@ function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, 
     console.log(line);
   }
   for (const line of formatReadmeSummaryLines(readmeResult)) {
+    console.log(line);
+  }
+  for (const line of formatGitWarningLines(gitResult)) {
     console.log(line);
   }
   console.log("");
@@ -1174,6 +1178,11 @@ async function handleInit(rest) {
   const quiet = flags.includes("--quiet") || flags.includes("-q");
 
   await repairInitConfig(dir, quiet);
+
+  // Git preflight runs before any tool-directory setup so a declined prompt
+  // does not leave the project half-initialized. The check is a pure
+  // filesystem walk for `.git`; the prompt only surfaces when interactive.
+  const gitResult = await runGitPreflight(dir, { quiet });
 
   const assistantEnabled = resolveInitAssistants(rest, dir);
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
@@ -1216,6 +1225,7 @@ async function handleInit(rest) {
         llmSkipped,
         tools,
         runInitCapture,
+        gitResult,
       });
     } catch (err) {
       console.error(err?.message || err);
@@ -1275,6 +1285,7 @@ async function handleInit(rest) {
   printStaticInitSummary({
     svExists, rexExists, henchExists, llmSkipped, selectedProvider,
     selection, providerSource, modelSource, assistantResults, readmeResult,
+    gitResult,
   });
   exitWithCleanup(0);
 }

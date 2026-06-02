@@ -21,6 +21,7 @@ import {
   LEGS,
   INIT_PHASES,
 } from "./cli-brand.js";
+import { formatGitWarningLines } from "./git-preflight.js";
 
 // ── Subprocess helper (never blocks the main thread) ───────────────────
 
@@ -122,6 +123,7 @@ function Recap({
   model,
   assistantLines,
   readmeResult,
+  gitWarningLines,
 }) {
   const readmeLine = readmeResult && readmeResult.mode === "proposed" && readmeResult.path
     ? `  ${basename(readmeResult.path)} written — diff against ${readmeResult.existingReadme || "the existing README"} to merge.`
@@ -144,6 +146,7 @@ function Recap({
           <//>`}
       ${assistantLines.map((line, i) => html`<${Text} key=${"ai" + i}>${line}<//>`)}
       ${readmeLine && html`<${Text}>${readmeLine}<//>`}
+      ${(gitWarningLines ?? []).map((line, i) => html`<${Text} key=${"git" + i} color="yellow">${line}<//>`)}
       <${Text}> <//>
       <${Text} dimColor>  Next steps:<//>
       <${Text} dimColor>    ${TOOL_NAME} start .          spin up the dashboard + MCP servers<//>
@@ -170,6 +173,7 @@ function InitApp({
   llmSkipped,
   tools,
   runInitCapture,
+  gitResult,
   onComplete,
 }) {
   const [phases, setPhases] = useState([]);
@@ -300,6 +304,7 @@ function InitApp({
         model: model ? (modelSource ? `${model} (${modelSource})` : model) : null,
         assistantLines,
         readmeResult,
+        gitWarningLines: formatGitWarningLines(gitResult),
       });
 
       // Let the dino keep walking while the user reads the recap

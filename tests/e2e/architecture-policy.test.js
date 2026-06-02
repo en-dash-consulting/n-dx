@@ -69,6 +69,8 @@ const ALLOWED = new Set([
   "packages/web/src/server/merge-history.ts",
   // Claude Code integration — runs `claude mcp add` via execSync
   "packages/core/claude-integration.js",
+  // Git preflight — invokes `git init` when the user consents during `ndx init`
+  "packages/core/git-preflight.js",
   // Codex integration — writes .codex/config.toml, .agents/skills, AGENTS.md
   "packages/core/codex-integration.js",
   // CI preflight script — runs build/test/check steps via child processes

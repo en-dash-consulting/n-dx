@@ -67,6 +67,7 @@
     "update-check.js",
     "pair-programming.js",
     "readme-generator.js",
+    "git-preflight.js",
     "self-heal-confirm.js",
     "stale-check.js"
   ],
