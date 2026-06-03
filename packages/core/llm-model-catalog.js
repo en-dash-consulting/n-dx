@@ -39,8 +39,8 @@ export const LLM_MODEL_CATALOG = {
   ],
   claude: [
     { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", recommended: true },
-    { id: "claude-opus-4-7", label: "Claude Opus 4.7", recommended: false },
-    { id: "claude-haiku-4-20250414", label: "Claude Haiku 4", recommended: false },
+    { id: "claude-opus-4-8", label: "Claude Opus 4.8", recommended: false },
+    { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", recommended: false },
   ],
 };
 

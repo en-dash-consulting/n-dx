@@ -953,12 +953,12 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Validated: must be a valid HTTP(S) URL.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
-                                    Examples: claude-sonnet-4-6, claude-opus-4-20250514
+                                    Examples: claude-sonnet-4-6, claude-opus-4-8
                                     Default: claude-sonnet-4-6
   claude.lightModel        string    Model override for light-weight tasks (optional)
                                     When set, light-tier tasks use this model instead of
                                     the default haiku. Use for cost/latency optimization.
-                                    Example: claude-haiku-4-20250414
+                                    Example: claude-haiku-4-5
 
 LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendor setup):
   llm.vendor               string    Active LLM vendor: "claude" or "codex"
@@ -971,7 +971,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.claude.lightModel    string    Claude model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
                                     light tier use this model. Falls back
-                                    to claude-haiku-4-20250414 if not set.
+                                    to claude-haiku-4-5 if not set.
   llm.codex.cli_path       string    Codex CLI path (optional; validated executable)
                                     Stored in .n-dx.local.json.
   llm.codex.api_key        string    Codex API key (optional)
