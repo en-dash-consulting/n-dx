@@ -34,7 +34,6 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
 import type { PRDDocument, PRDItem } from "./rex-gateway.js";
-import { resolveSiblingSlugs } from "./rex-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Public types

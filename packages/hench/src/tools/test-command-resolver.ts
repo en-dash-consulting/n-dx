@@ -219,8 +219,7 @@ async function promptForTestCommand(): Promise<string | undefined> {
 Test command: `;
 
     rl.question(prompt, (input: string) => {
-      const trimmed = input.trim();
-      finish(trimmed || undefined);
+      finish(input.trim() || undefined);
     });
   });
 }
@@ -254,7 +253,7 @@ async function persistTestCommand(
     config.fullTestCommand = command;
 
     // Write back with canonical formatting
-    const { toCanonicalJSON } = await import("../store/json.js");
+    const { toCanonicalJSON } = await import("../prd/llm-gateway.js");
     await writeFileSync(configPath, toCanonicalJSON(config), "utf-8");
   } catch (err) {
     // Best-effort — don't fail the run if we can't persist

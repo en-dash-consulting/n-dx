@@ -14,13 +14,16 @@ import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
+import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { section } from "../../types/output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor } from "../../prd/llm-gateway.js";
-import { ExecutionQueue, formatQueueStatus, resolveSchedulingPriority } from "../../queue/index.js";
-import type { TaskPriority } from "../../queue/index.js";
+import { ExecutionQueue } from "../../queue/execution-queue.js";
+import { formatQueueStatus } from "../../queue/format.js";
+import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
+import type { TaskPriority } from "../../queue/execution-queue.js";
 import { ProcessLimiter } from "../../process/limiter.js";
 import { MemoryThrottle } from "../../process/memory-throttle.js";
 import { checkQuotaRemaining, formatQuotaLog } from "../../quota/index.js";
@@ -1282,6 +1285,8 @@ async function runLoop(
   const attemptTracker = createAttemptTracker();
   // Tasks excluded from selection due to reaching 3 attempts
   const forcedExclusionIds = new Set<string>();
+  // Track consecutive failures per loop invocation (3-strike auto-cancel)
+  const consecutiveFailureCounter = new ConsecutiveFailureCounter();
 
   try {
     const scope = epicId ? "epic tasks" : "all tasks";
@@ -1349,6 +1354,16 @@ async function runLoop(
           );
           status = result.status;
 
+          // Track consecutive failures for 3-strike auto-cancel.
+          // Uses isFailureStatus (not !shouldContinueLoop) so that
+          // error_transient and cancelled — which keep the loop iterating —
+          // still count toward the threshold instead of resetting the counter.
+          if (isFailureStatus(status)) {
+            consecutiveFailureCounter.recordFailure(result.selectedTaskId || "unknown");
+          } else {
+            consecutiveFailureCounter.recordSuccess();
+          }
+
           // Track attempt count for the selected task
           if (result.selectedTaskId) {
             const attemptCount = attemptTracker.incrementAndGetCount(result.selectedTaskId);
@@ -1395,6 +1410,13 @@ async function runLoop(
 
       // Emit quota log line(s) at the inter-run boundary.
       await emitQuotaLog();
+
+      // Check for 3-strike auto-cancel on consecutive failures
+      if (consecutiveFailureCounter.shouldCancel()) {
+        const cancelMessage = consecutiveFailureCounter.getCancellationMessage();
+        info(`\n${red(cancelMessage)}`);
+        break;
+      }
 
       if (!shouldContinueLoop(status)) {
         // In loop mode, hard failures don't stop the loop — the stuck

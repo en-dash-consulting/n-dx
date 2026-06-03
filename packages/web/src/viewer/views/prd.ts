@@ -15,8 +15,7 @@
  * @see ../hooks/use-toast.ts — toast notification state
  */
 
-import { h, Fragment } from "preact";
-import type { VNode } from "preact";
+import {h} from "preact";import type { VNode } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { PRDTree, ALL_STATUSES } from "../components/prd-tree/index.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";

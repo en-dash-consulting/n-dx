@@ -16,7 +16,6 @@ import type { PRDItem } from "../schema/index.js";
 import { isRootLevel } from "../schema/index.js";
 import type { EpiclessFeature } from "./structural.js";
 import { similarity } from "../analyze/dedupe.js";
-import { extractKeywords } from "./keywords.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

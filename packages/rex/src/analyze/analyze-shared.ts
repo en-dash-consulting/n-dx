@@ -11,7 +11,7 @@
 
 import { extname } from "node:path";
 import type { TokenUsage, AnalyzeTokenUsage } from "../schema/index.js";
-import { NEWEST_MODELS } from "@n-dx/llm-client";
+import { NEWEST_MODELS, accumulateTokenUsage as llmAccumulateTokenUsage, emptyAggregateTokenUsage } from "@n-dx/llm-client";
 
 // ── Model defaults ──
 // Derived from the single canonical source in @n-dx/llm-client so that
@@ -58,28 +58,28 @@ export function parseTokenUsage(envelope: Record<string, unknown>): TokenUsage |
   return usage;
 }
 
-/** Create an empty AnalyzeTokenUsage accumulator. */
+/**
+ * Create an empty AnalyzeTokenUsage accumulator.
+ *
+ * Thin wrapper over {@link emptyAggregateTokenUsage} from llm-client,
+ * providing backward-compatible AnalyzeTokenUsage type for rex consumers.
+ */
 export function emptyAnalyzeTokenUsage(): AnalyzeTokenUsage {
-  return { calls: 0, inputTokens: 0, outputTokens: 0 };
+  return emptyAggregateTokenUsage();
 }
 
-/** Accumulate a single call's token usage into the aggregate. */
+/**
+ * Accumulate a single call's token usage into the aggregate.
+ *
+ * Delegates to {@link accumulateTokenUsage} from llm-client, the canonical
+ * implementation used by both rex and hench. This function is re-exported
+ * for backward compatibility; new code should import from llm-client directly.
+ */
 export function accumulateTokenUsage(
   aggregate: AnalyzeTokenUsage,
   usage?: TokenUsage,
 ): void {
-  aggregate.calls++;
-  if (!usage) return;
-  aggregate.inputTokens += usage.input;
-  aggregate.outputTokens += usage.output;
-  if (usage.cacheCreationInput) {
-    aggregate.cacheCreationInputTokens =
-      (aggregate.cacheCreationInputTokens ?? 0) + usage.cacheCreationInput;
-  }
-  if (usage.cacheReadInput) {
-    aggregate.cacheReadInputTokens =
-      (aggregate.cacheReadInputTokens ?? 0) + usage.cacheReadInput;
-  }
+  llmAccumulateTokenUsage(aggregate, usage);
 }
 
 // ── Format detection ──
@@ -408,3 +408,105 @@ export const TASK_QUALITY_RULES = `Task quality:
  * Strict output format instruction shared by all PRD prompts.
  */
 export const OUTPUT_INSTRUCTION = `Respond with ONLY a valid JSON array. No explanation, no markdown fences, no commentary — just the JSON.`;
+
+// ── Text / Markdown utilities ──
+
+/** Strip inline markdown formatting from a heading string. */
+export function cleanHeading(raw: string): string {
+  let h = raw;
+  // Bold / italic: **text**, __text__, *text*, _text_
+  h = h.replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1");
+  h = h.replace(/_{1,2}([^_]+)_{1,2}/g, "$1");
+  // Links: [text](url) → text
+  h = h.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  // Inline code: `text` → text
+  h = h.replace(/`([^`]+)`/g, "$1");
+  // Strikethrough: ~~text~~ → text
+  h = h.replace(/~~([^~]+)~~/g, "$1");
+  return h.trim();
+}
+
+/** Normalize a string for case-insensitive comparison: lowercase + trim. */
+export function normalizeTitle(s: string): string {
+  return s.toLowerCase().trim();
+}
+
+// ── Structured file parsing (JSON/YAML without LLM) ──
+
+/**
+ * Parse a JSON file's content and extract items with name/description fields.
+ * Traverses the entire structure recursively to find objects with title/name.
+ * Returns an empty array on parse failure.
+ */
+export function extractJsonItems(
+  content: string,
+): { name: string; description?: string }[] {
+  try {
+    const data = JSON.parse(content);
+    const items: { name: string; description?: string }[] = [];
+
+    function scan(obj: unknown): void {
+      if (Array.isArray(obj)) {
+        for (const el of obj) scan(el);
+      } else if (obj && typeof obj === "object") {
+        const o = obj as Record<string, unknown>;
+        const name = (o.title ?? o.name) as string | undefined;
+        if (typeof name === "string") {
+          items.push({
+            name,
+            description: typeof o.description === "string" ? o.description : undefined,
+          });
+        }
+        for (const val of Object.values(o)) {
+          if (typeof val === "object" && val !== null) scan(val);
+        }
+      }
+    }
+
+    scan(data);
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Parse a YAML file's content and extract items with title/name and description fields.
+ * Uses a simple line-by-line regex approach (no external YAML parser).
+ * Returns an empty array if no items are found.
+ */
+export function extractYamlItems(
+  content: string,
+): { name: string; description?: string }[] {
+  // Simple YAML extraction: look for title/name fields
+  const items: { name: string; description?: string }[] = [];
+  const lines = content.split("\n");
+  let currentName: string | null = null;
+  let currentDesc: string | null = null;
+
+  for (const line of lines) {
+    const nameMatch = line.match(/^\s*(?:title|name)\s*:\s*["']?(.+?)["']?\s*$/);
+    if (nameMatch) {
+      if (currentName) {
+        items.push({
+          name: currentName,
+          description: currentDesc ?? undefined,
+        });
+      }
+      currentName = nameMatch[1];
+      currentDesc = null;
+      continue;
+    }
+    const descMatch = line.match(/^\s*description\s*:\s*["']?(.+?)["']?\s*$/);
+    if (descMatch && currentName) {
+      currentDesc = descMatch[1];
+    }
+  }
+  if (currentName) {
+    items.push({
+      name: currentName,
+      description: currentDesc ?? undefined,
+    });
+  }
+  return items;
+}

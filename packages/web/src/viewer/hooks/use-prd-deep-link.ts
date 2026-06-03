@@ -15,8 +15,7 @@
  * component's render and CRUD logic.
  */
 
-import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
+import {useState, useEffect, useRef} from "preact/hooks";import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById, getAncestorIds } from "../components/prd-tree/tree-utils.js";
 
 export interface PRDDeepLinkDeps {

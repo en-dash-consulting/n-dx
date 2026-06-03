@@ -65,8 +65,7 @@ export function getTaskDuration(
     }
 
     if (isRunning) {
-      const elapsed = nowMs - startMs;
-      return { elapsedMs: elapsed > 0 ? elapsed : 0, isRunning };
+      return { elapsedMs: Math.max(0, nowMs - startMs), isRunning };
     }
 
     const endStr = item.endedAt ?? item.completedAt;

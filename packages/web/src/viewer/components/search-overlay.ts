@@ -12,8 +12,7 @@
  * @module viewer/components/search-overlay
  */
 
-import { h, Fragment } from "preact";
-import type { ComponentChild } from "preact";
+import {h} from "preact";import type { ComponentChild } from "preact";
 import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
 import type { NavigateTo } from "../api.js";
 

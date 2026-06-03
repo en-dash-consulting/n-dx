@@ -39,6 +39,7 @@ import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
+import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
 
 // ---------------------------------------------------------------------------
 // Co-authorship trailer
@@ -725,6 +726,12 @@ export interface FinalizeRunOptions {
    */
   autoCommit?: boolean;
   /**
+   * Commit message watcher instance to check if the auto-commit timer
+   * already fired and committed changes. Allows performCommitPromptIfNeeded
+   * to skip its own commit when timer-expiry already succeeded.
+   */
+  commitWatcher?: CommitMsgWatcher;
+  /**
    * Skip the mandatory full test suite gate before commit.
    * Default: false (gate is mandatory). Set via --skip-test-gate flag.
    */
@@ -990,12 +997,21 @@ export async function performCommitPromptIfNeeded(
   autonomous?: boolean,
   store?: PRDStore,
   taskId?: string,
+  commitWatcher?: CommitMsgWatcher,
 ): Promise<void> {
   if (autoCommit || run.status !== "completed") return;
 
   const { join } = await import("node:path");
   const { readFileSync, existsSync, unlinkSync } = await import("node:fs");
   const msgPath = join(projectDir, PENDING_COMMIT_FILE);
+
+  // If the commit message watcher already auto-committed, acknowledge it and return.
+  // The timer fires asynchronously and deletes the message file, so when we reach
+  // this point, the file may be gone. Check the watcher's flag to detect this case.
+  if (commitWatcher?.didAutoCommit()) {
+    detail("Auto-commit: timer-expiry auto-commit acknowledged — proceeding to next task.");
+    return;
+  }
 
   if (!existsSync(msgPath)) return;
 
@@ -1536,6 +1552,8 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // unattended runs do not stall waiting for user input.
   // The store and taskId are passed so that the PRD status transition can be
   // staged alongside code changes and included in the same commit.
+  // The commitWatcher is checked to detect if the timer-expiry auto-commit
+  // already fired and committed changes.
   await performCommitPromptIfNeeded(
     run,
     projectDir,
@@ -1544,6 +1562,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     opts.autonomous,
     opts.store,
     run.taskId,
+    opts.commitWatcher,
   );
 
   // Rollback uncommitted changes when the run failed (unless suppressed).

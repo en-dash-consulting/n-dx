@@ -6,33 +6,11 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { sanitizeBranchName } from "@n-dx/llm-client";
+
+export { sanitizeBranchName };
 
 const QUIET_GIT = { stdio: ["ignore", "pipe", "ignore"] as ["ignore", "pipe", "ignore"] };
-
-/**
- * Characters unsafe for filenames or confusing in branch-to-path mapping.
- * Covers path separators, shell metacharacters, Windows-illegal chars,
- * and git reflog/caret notation.
- */
-const UNSAFE_CHARS = /[/\\:*?"<>|@{}\s~^]/g;
-
-/**
- * Sanitize a git branch name for use in filenames.
- *
- * - Replaces slashes, special characters, and whitespace with hyphens
- * - Collapses consecutive hyphens
- * - Trims leading/trailing hyphens
- * - Lowercases for consistency
- *
- * Dots are preserved (common in release branches like `release/v1.2.3`).
- */
-export function sanitizeBranchName(branch: string): string {
-  return branch
-    .replace(UNSAFE_CHARS, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-}
 
 /**
  * Resolve the current git branch name.

@@ -4,6 +4,7 @@ import { PROJECT_DIRS } from "@n-dx/llm-client";
 import type { Priority } from "../schema/index.js";
 import { computeFindingHash, loadAcknowledged, isAcknowledged } from "./acknowledge.js";
 import type { AcknowledgedStore } from "./acknowledge.js";
+import { cleanHeading, extractJsonItems, extractYamlItems } from "./analyze-shared.js";
 
 export interface ScanResult {
   name: string;
@@ -217,21 +218,6 @@ function isGeneratedDoc(rel: string, extraIgnore: string[] = []): boolean {
   return false;
 }
 
-/** Strip inline markdown formatting from a heading string */
-function cleanHeading(raw: string): string {
-  let h = raw;
-  // Bold / italic: **text**, __text__, *text*, _text_
-  h = h.replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1");
-  h = h.replace(/_{1,2}([^_]+)_{1,2}/g, "$1");
-  // Links: [text](url) → text
-  h = h.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
-  // Inline code: `text` → text
-  h = h.replace(/`([^`]+)`/g, "$1");
-  // Strikethrough: ~~text~~ → text
-  h = h.replace(/~~([^~]+)~~/g, "$1");
-  return h.trim();
-}
-
 function extractMarkdownHeadings(
   content: string,
 ): { heading: string; bullets: string[] }[] {
@@ -264,74 +250,6 @@ function extractMarkdownHeadings(
   }
   if (current) sections.push(current);
   return sections;
-}
-
-function extractJsonItems(
-  content: string,
-): { name: string; description?: string }[] {
-  try {
-    const data = JSON.parse(content);
-    const items: { name: string; description?: string }[] = [];
-
-    function scan(obj: unknown): void {
-      if (Array.isArray(obj)) {
-        for (const el of obj) scan(el);
-      } else if (obj && typeof obj === "object") {
-        const o = obj as Record<string, unknown>;
-        const name = (o.title ?? o.name) as string | undefined;
-        if (typeof name === "string") {
-          items.push({
-            name,
-            description: typeof o.description === "string" ? o.description : undefined,
-          });
-        }
-        for (const val of Object.values(o)) {
-          if (typeof val === "object" && val !== null) scan(val);
-        }
-      }
-    }
-
-    scan(data);
-    return items;
-  } catch {
-    return [];
-  }
-}
-
-function extractYamlItems(
-  content: string,
-): { name: string; description?: string }[] {
-  // Simple YAML extraction: look for title/name fields
-  const items: { name: string; description?: string }[] = [];
-  const lines = content.split("\n");
-  let currentName: string | null = null;
-  let currentDesc: string | null = null;
-
-  for (const line of lines) {
-    const nameMatch = line.match(/^\s*(?:title|name)\s*:\s*["']?(.+?)["']?\s*$/);
-    if (nameMatch) {
-      if (currentName) {
-        items.push({
-          name: currentName,
-          description: currentDesc ?? undefined,
-        });
-      }
-      currentName = nameMatch[1];
-      currentDesc = null;
-      continue;
-    }
-    const descMatch = line.match(/^\s*description\s*:\s*["']?(.+?)["']?\s*$/);
-    if (descMatch && currentName) {
-      currentDesc = descMatch[1];
-    }
-  }
-  if (currentName) {
-    items.push({
-      name: currentName,
-      description: currentDesc ?? undefined,
-    });
-  }
-  return items;
 }
 
 export async function scanDocs(

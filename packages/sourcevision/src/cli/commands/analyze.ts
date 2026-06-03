@@ -1,6 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, join, relative } from "node:path";
-import {
+import {resolve, join} from "node:path";import {
   SV_DIR,
   DATA_FILES,
   SUPPLEMENTARY_FILES,

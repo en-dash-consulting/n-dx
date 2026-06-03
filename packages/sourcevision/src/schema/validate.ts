@@ -410,7 +410,7 @@ export type ValidationResult<T> =
   | { ok: true; data: T }
   | { ok: false; errors: z.ZodError };
 
-function validate<T>(
+export function validate<T>(
   schema: z.ZodSchema<T>,
   data: unknown
 ): ValidationResult<T> {
@@ -419,48 +419,6 @@ function validate<T>(
     return { ok: true, data: result.data };
   }
   return { ok: false, errors: result.error };
-}
-
-export function validateManifest(data: unknown): ValidationResult<V1.Manifest> {
-  return validate(ManifestSchema, data);
-}
-
-export function validateInventory(
-  data: unknown
-): ValidationResult<V1.Inventory> {
-  return validate(InventorySchema, data);
-}
-
-export function validateImports(data: unknown): ValidationResult<V1.Imports> {
-  return validate(ImportsSchema, data);
-}
-
-export function validateClassifications(
-  data: unknown
-): ValidationResult<V1.Classifications> {
-  return validate(ClassificationsSchema, data);
-}
-
-export function validateZones(data: unknown): ValidationResult<V1.Zones> {
-  return validate(ZonesSchema, data);
-}
-
-export function validateComponents(
-  data: unknown
-): ValidationResult<V1.Components> {
-  return validate(ComponentsSchema, data);
-}
-
-export function validateCallGraph(
-  data: unknown
-): ValidationResult<V1.CallGraph> {
-  return validate(CallGraphSchema, data);
-}
-
-export function validateBranchWorkRecord(
-  data: unknown
-): ValidationResult<V1.BranchWorkRecord> {
-  return validate(BranchWorkRecordSchema, data);
 }
 
 /** Validate any module output by name */

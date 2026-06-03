@@ -1,14 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { findAutoCompletions } from "../../../src/core/parent-completion.js";
-import type { PRDItem } from "../../../src/schema/index.js";
-
-function makeItem(overrides: Partial<PRDItem> & { id: string; title: string }): PRDItem {
-  return {
-    status: "pending",
-    level: "task",
-    ...overrides,
-  };
-}
+import { makeItem } from "../../helpers/index.js";
 
 describe("findAutoCompletions", () => {
   it("returns empty when item has no parent", () => {

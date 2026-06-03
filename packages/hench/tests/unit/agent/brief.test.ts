@@ -7,7 +7,8 @@ import {
   collectEpicTaskIds,
 } from "../../../src/agent/planning/brief.js";
 import type { TaskBrief } from "../../../src/schema/v1.js";
-import type { PRDStore, PRDItem } from "@n-dx/rex";
+import type { PRDItem } from "@n-dx/rex";
+import { mockStoreWithDefaults } from "../../helpers/index.js";
 
 describe("formatTaskBrief", () => {
   const minimalBrief: TaskBrief = {
@@ -180,36 +181,6 @@ describe("formatTaskBrief", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Mock store helper
-// ---------------------------------------------------------------------------
-
-function mockStore(items: PRDItem[]): PRDStore {
-  return {
-    loadDocument: async () => ({
-      schema: "rex/v1",
-      title: "Test",
-      items,
-    }),
-    loadConfig: async () => ({
-      schema: "rex/v1",
-      project: "test",
-      adapter: "file",
-    }),
-    loadWorkflow: async () => "",
-    readLog: async () => [],
-    // Unused in these tests
-    saveDocument: async () => {},
-    saveConfig: async () => {},
-    getItem: async () => null,
-    addItem: async () => {},
-    updateItem: async () => {},
-    removeItem: async () => {},
-    appendLog: async () => {},
-    saveWorkflow: async () => {},
-    capabilities: () => ({ adapter: "file", supportsTransactions: false, supportsWatch: false }),
-  };
-}
 
 // ---------------------------------------------------------------------------
 // TaskNotActionableError
@@ -242,7 +213,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(assembleTaskBrief(store, "done-1")).rejects.toThrow(TaskNotActionableError);
 
@@ -266,7 +237,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(assembleTaskBrief(store, "defer-1")).rejects.toThrow(TaskNotActionableError);
 
@@ -290,7 +261,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     try {
       await assembleTaskBrief(store, "done-2");
@@ -309,7 +280,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     try {
       await assembleTaskBrief(store, "defer-2");
@@ -330,7 +301,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         blockedBy: ["dep-1"],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(assembleTaskBrief(store, "blocked-1")).rejects.toThrow(TaskNotActionableError);
 
@@ -355,7 +326,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief, taskId } = await assembleTaskBrief(store, "ok-1");
     expect(taskId).toBe("ok-1");
@@ -371,7 +342,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief, taskId } = await assembleTaskBrief(store, "wip-1");
     expect(taskId).toBe("wip-1");
@@ -387,7 +358,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     try {
       await assembleTaskBrief(store, "blocked-test");
@@ -409,7 +380,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     try {
       await assembleTaskBrief(store, "done-3");
@@ -429,7 +400,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
         blockedBy: ["dep-1"],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.task.blockedBy).toEqual(["dep-1"]);
@@ -456,7 +427,7 @@ describe("assembleTaskBrief — auto-selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId, brief } = await assembleTaskBrief(store);
     expect(taskId).toBe("task-1");
@@ -478,7 +449,7 @@ describe("assembleTaskBrief — auto-selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId, brief } = await assembleTaskBrief(store);
     expect(taskId).toBe("task-2");
@@ -500,7 +471,7 @@ describe("assembleTaskBrief — auto-selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store);
     expect(taskId).toBe("task-2");
@@ -521,7 +492,7 @@ describe("assembleTaskBrief — auto-selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(assembleTaskBrief(store)).rejects.toThrow("No actionable tasks found in PRD");
   });
@@ -535,7 +506,7 @@ describe("assembleTaskBrief — auto-selection", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(assembleTaskBrief(store, "non-existent")).rejects.toThrow(
       "Task not found: non-existent",
@@ -564,7 +535,7 @@ describe("assembleTaskBrief — auto-selection", () => {
         blockedBy: ["blocker-task"],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     // Without exclusion, blocked-task is not actionable because blocker-task isn't done
     const { taskId: firstSelection } = await assembleTaskBrief(store);
@@ -714,7 +685,7 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     // Without epic filter, highest priority task is selected (critical > medium)
     const { taskId: noFilter } = await assembleTaskBrief(store);
@@ -741,7 +712,7 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store, undefined, { epicId: "epic-1" });
     expect(taskId).toBe("task-high");
@@ -760,7 +731,7 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store, undefined, { epicId: "epic-1" });
     expect(taskId).toBe("task-wip");
@@ -784,7 +755,7 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
         status: "pending",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     await expect(
       assembleTaskBrief(store, undefined, { epicId: "epic-1" }),
@@ -817,7 +788,7 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     // Even though blocked task is critical priority, blocker must be done first
     const { taskId } = await assembleTaskBrief(store, undefined, { epicId: "epic-1" });
@@ -848,7 +819,7 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store, undefined, { epicId: "epic-1" });
     expect(taskId).toBe("task-ready");
@@ -867,7 +838,7 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     // First task excluded (e.g., stuck), should select second task
     const { taskId } = await assembleTaskBrief(store, undefined, {
@@ -907,7 +878,7 @@ describe("assembleTaskBrief — epic-filtered selection", () => {
       // Subtask outside the epic (root level) should be excluded
       { id: "subtask-other", title: "Other Subtask", level: "subtask", status: "pending", priority: "critical" },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { taskId } = await assembleTaskBrief(store, undefined, { epicId: "epic-1" });
     expect(taskId).toBe("subtask-1");
@@ -929,7 +900,7 @@ describe("assembleTaskBrief — context assembly", () => {
         priority: "high",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.task.priority).toBe("high");
@@ -945,7 +916,7 @@ describe("assembleTaskBrief — context assembly", () => {
         tags: ["frontend", "auth"],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.task.tags).toEqual(["frontend", "auth"]);
@@ -961,7 +932,7 @@ describe("assembleTaskBrief — context assembly", () => {
         description: "This is a detailed description of the task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.task.description).toBe("This is a detailed description of the task");
@@ -977,7 +948,7 @@ describe("assembleTaskBrief — context assembly", () => {
         acceptanceCriteria: ["Criterion 1", "Criterion 2"],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.task.acceptanceCriteria).toEqual(["Criterion 1", "Criterion 2"]);
@@ -1010,7 +981,7 @@ describe("assembleTaskBrief — context assembly", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.parentChain).toHaveLength(2);
@@ -1057,7 +1028,7 @@ describe("assembleTaskBrief — context assembly", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.siblings).toHaveLength(2);
@@ -1083,7 +1054,7 @@ describe("assembleTaskBrief — context assembly", () => {
       },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       loadConfig: async () => ({
         schema: "rex/v1",
         project: "test-project",
@@ -1111,7 +1082,7 @@ describe("assembleTaskBrief — context assembly", () => {
       },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       loadWorkflow: async () => "1. Read code\n2. Make changes\n3. Test",
     };
 
@@ -1129,7 +1100,7 @@ describe("assembleTaskBrief — context assembly", () => {
       },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       loadWorkflow: async () => {
         throw new Error("ENOENT: workflow.md not found");
       },
@@ -1154,7 +1125,7 @@ describe("assembleTaskBrief — context assembly", () => {
       { timestamp: "2025-01-01T12:00:00Z", event: "status_changed", detail: "Task-1 now pending" },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       readLog: async () => logEntries,
     };
 
@@ -1180,7 +1151,7 @@ describe("assembleTaskBrief — context assembly", () => {
       { timestamp: "2025-01-01T10:00:00Z", event: "system_init" },
     ];
     const store: PRDStore = {
-      ...mockStore(items),
+      ...mockStoreWithDefaults(items),
       readLog: async () => logEntries,
     };
 
@@ -1207,7 +1178,7 @@ describe("assembleTaskBrief — context assembly", () => {
         status: "pending",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.parentChain).toHaveLength(0);
@@ -1248,7 +1219,7 @@ describe("getActionableTasks", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const tasks = await getActionableTasks(store);
     expect(tasks[0].id).toBe("task-2"); // high
@@ -1277,7 +1248,7 @@ describe("getActionableTasks", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const tasks = await getActionableTasks(store);
     expect(tasks).toHaveLength(1);
@@ -1292,7 +1263,7 @@ describe("getActionableTasks", () => {
       { id: "task-4", title: "Task 4", status: "pending", level: "task" },
       { id: "task-5", title: "Task 5", status: "pending", level: "task" },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const tasks = await getActionableTasks(store, 2);
     expect(tasks).toHaveLength(2);
@@ -1323,7 +1294,7 @@ describe("getActionableTasks", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const tasks = await getActionableTasks(store);
     expect(tasks[0].parentChain).toBe("Epic > Feature");
@@ -1338,7 +1309,7 @@ describe("getActionableTasks", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const tasks = await getActionableTasks(store);
     expect(tasks).toEqual([]);
@@ -1353,7 +1324,7 @@ describe("getActionableTasks", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const tasks = await getActionableTasks(store);
     expect(tasks[0].priority).toBe("medium");
@@ -1385,7 +1356,7 @@ describe("assembleTaskBrief — requirements", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.requirements).toHaveLength(1);
@@ -1441,7 +1412,7 @@ describe("assembleTaskBrief — requirements", () => {
         ],
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.requirements).toHaveLength(2);
@@ -1466,7 +1437,7 @@ describe("assembleTaskBrief — requirements", () => {
         level: "task",
       },
     ];
-    const store = mockStore(items);
+    const store = mockStoreWithDefaults(items);
 
     const { brief } = await assembleTaskBrief(store, "task-1");
     expect(brief.requirements).toEqual([]);

@@ -14,8 +14,7 @@
 
 import { h, Fragment } from "preact";
 import { useState, useMemo, useCallback, useEffect } from "preact/hooks";
-import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel } from "./types.js";
-import { computeBranchStats, completionRatio } from "./compute.js";
+import type {PRDItemData, PRDDocumentData, ItemLevel} from "./types.js";import { computeBranchStats, completionRatio } from "./compute.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 

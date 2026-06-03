@@ -16,7 +16,6 @@ import {
 import { parseDocument } from "./markdown-parser.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
-import { titleToFilename } from "./title-to-filename.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
 import { PRD_TREE_DIRNAME } from "./paths.js";

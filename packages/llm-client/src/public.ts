@@ -171,6 +171,16 @@ export type {
   CodexTokenMapping,
 } from "./token-usage.js";
 
+// Token usage accumulation (shared by rex and hench)
+export {
+  emptyAggregateTokenUsage,
+  accumulateTokenUsage,
+} from "./token-usage.js";
+
+export type {
+  AggregateTokenUsage,
+} from "./token-usage.js";
+
 // Providers
 export { createApiClient } from "./api-provider.js";
 export type { ApiProviderOptions } from "./api-provider.js";
@@ -217,6 +227,7 @@ export {
   execShellCmd,
   getCurrentHead,
   getCurrentBranch,
+  sanitizeBranchName,
   isExecutableOnPath,
   spawnTool,
   spawnManaged,

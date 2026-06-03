@@ -11,7 +11,8 @@ import { join } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, loadPRD, savePRD, appendLog, parentIdOf } from "./rex-route-helpers.js";
+import { findItemById, appendLog, parentIdOf } from "./rex-route-helpers.js";
+import { loadPRDSync, savePRDSync } from "../prd-io.js";
 
 import {
   type PRDItem,
@@ -323,7 +324,7 @@ function handlePrunePreview(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -394,7 +395,7 @@ async function handlePruneExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -458,7 +459,7 @@ async function handlePruneExecute(
     writeFileSync(archivePath, JSON.stringify(archive, null, 2) + "\n");
 
     // Save pruned document
-    savePRD(ctx, doc);
+    savePRDSync(ctx.rexDir, doc);
 
     // Log the prune action
     const titles = result.pruned.map((i) => i.title).join(", ");

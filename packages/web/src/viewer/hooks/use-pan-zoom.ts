@@ -7,8 +7,7 @@
  * - Programmatic zoom-in, zoom-out, and fit-to-content controls
  */
 
-import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "preact/hooks";
-import type { RefObject } from "preact";
+import {useState, useCallback, useRef, useLayoutEffect} from "preact/hooks";import type { RefObject } from "preact";
 
 export interface ViewBox {
   x: number;

@@ -7,7 +7,8 @@ import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { findItemById, loadPRD, savePRD, appendLog } from "./rex-route-helpers.js";
+import { findItemById, appendLog } from "./rex-route-helpers.js";
+import { loadPRDSync, savePRDSync } from "../prd-io.js";
 
 import {
   type PRDItem,
@@ -142,7 +143,7 @@ function handleGetRequirements(
   ctx: ServerContext,
   itemId: string,
 ): boolean {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -175,7 +176,7 @@ async function handleAddRequirement(
   itemId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -232,7 +233,7 @@ async function handleAddRequirement(
     }
     (item.requirements as RequirementRecord[]).push(requirement);
 
-    savePRD(ctx, doc);
+    savePRDSync(ctx.rexDir, doc);
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
@@ -264,7 +265,7 @@ async function handleUpdateRequirement(
   reqId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -305,7 +306,7 @@ async function handleUpdateRequirement(
     const existing = reqs[reqIdx];
     Object.assign(existing, updates, { id: reqId });
 
-    savePRD(ctx, doc);
+    savePRDSync(ctx.rexDir, doc);
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
@@ -336,7 +337,7 @@ function handleDeleteRequirement(
   reqId: string,
   broadcast?: WebSocketBroadcaster,
 ): boolean {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -360,7 +361,7 @@ function handleDeleteRequirement(
     delete item.requirements;
   }
 
-  savePRD(ctx, doc);
+  savePRDSync(ctx.rexDir, doc);
 
   appendLog(ctx, {
     timestamp: new Date().toISOString(),
@@ -410,7 +411,7 @@ function handleRequirementsCoverage(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;
@@ -483,7 +484,7 @@ function handleRequirementsTraceability(
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  const doc = loadPRD(ctx);
+  const doc = loadPRDSync(ctx.rexDir);
   if (!doc) {
     errorResponse(res, 404, "No PRD data found");
     return true;

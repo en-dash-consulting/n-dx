@@ -9,7 +9,12 @@ import { tmpdir } from "node:os";
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
 function runRefresh(args, opts = {}) {
-  return execFileSync("node", [CLI_PATH, "refresh", ...args], {
+  // These e2e tests verify refresh orchestration (step messages, artifact
+  // metadata, flag handling), not LLM archetype enrichment. --fast keeps
+  // `sourcevision analyze` structural-only (~0.6s vs ~22s) and avoids live LLM
+  // calls that otherwise make these tests slow, flaky, and token-costly.
+  const withFast = args.includes("--fast") ? args : ["--fast", ...args];
+  return execFileSync("node", [CLI_PATH, "refresh", ...withFast], {
     encoding: "utf-8",
     timeout: 60000,
     ...opts,

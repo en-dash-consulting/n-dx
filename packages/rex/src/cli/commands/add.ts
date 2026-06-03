@@ -15,6 +15,7 @@ import { snapshotPRDTree, pruneBackups } from "../../core/backup-snapshots.js";
 import { REX_DIR } from "./constants.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { cascadeParentReset } from "../../core/parent-reset.js";
+import { parseCsvList } from "../parse-utils.js";
 import { CLIError } from "../errors.js";
 import { info, result, warn } from "../output.js";
 import { emitMigrationNotification } from "../migration-notification.js";
@@ -180,7 +181,7 @@ export async function cmdAdd(
   if (flags.priority) item.priority = flags.priority as Priority;
 
   if (flags.blockedBy) {
-    const deps = flags.blockedBy.split(",").map((s) => s.trim()).filter(Boolean);
+    const deps = parseCsvList(flags.blockedBy);
     if (deps.length > 0) {
       item.blockedBy = deps;
     }

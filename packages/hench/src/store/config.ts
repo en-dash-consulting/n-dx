@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { validateConfig, DEFAULT_HENCH_CONFIG } from "../schema/index.js";
-import { toCanonicalJSON } from "./json.js";
+import { toCanonicalJSON } from "../prd/llm-gateway.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import type { HenchConfig, ProjectLanguage } from "../schema/index.js";
 

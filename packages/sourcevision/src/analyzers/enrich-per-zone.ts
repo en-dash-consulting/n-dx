@@ -28,8 +28,7 @@ import {
 import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone } from "./enrich-parsing.js";
-import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
-import { startSpinner } from "../cli/output.js";
+import {emptyAnalyzeTokenUsage} from "./token-usage.js";import { startSpinner } from "../cli/output.js";
 
 // ── Per-zone structure hash ──────────────────────────────────────────────────
 

@@ -19,18 +19,17 @@
  */
 
 import { h, Fragment, Component } from "preact";
-import type { VNode, ComponentChildren } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "./types.js";
-import { computeBranchStats, completionRatio, formatTimestamp, itemMatchesFilter } from "./compute.js";
-import { isWorkItem, isRootLevel } from "./levels.js";
+import { computeBranchStats, completionRatio, formatTimestamp } from "./compute.js";
+import { isWorkItem } from "./levels.js";
 import { defaultStatusFilter } from "../../views/status-filter.js";
 import { InlineAddForm } from "./inline-add-form.js";
 import type { InlineAddInput } from "./inline-add-form.js";
 import { InlineStatusPicker } from "./inline-status-picker.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { useTreeEventDelegation } from "./tree-event-delegate.js";
-import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex, DEFAULT_ITEM_HEIGHT } from "./virtual-scroll.js";
+import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex } from "./virtual-scroll.js";
 import type { FlatNode } from "./virtual-scroll.js";
 import { highlightSearchText, buildBranchVisibleSet } from "./tree-search.js";
 import { getTaskDuration } from "./durations.js";
@@ -166,11 +165,6 @@ function TagList({ tags }: { tags: string[] }) {
   );
 }
 
-function formatTokenCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
 
 function TimestampSuffix({ item }: { item: PRDItemData }) {
   if (item.status === "completed" && item.completedAt) {

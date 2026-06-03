@@ -4,7 +4,9 @@ import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
 import { goConfig } from "../../src/language/go.js";
-import { validateZones } from "../../src/schema/validate.js";
+import { validate, ZonesSchema } from "../../src/schema/validate.js";
+
+const validateZones = (data: unknown) => validate(ZonesSchema, data);
 import type { Imports, Zones } from "../../src/schema/v1.js";
 
 const GO_FIXTURE = join(import.meta.dirname, "../fixtures/go-project");

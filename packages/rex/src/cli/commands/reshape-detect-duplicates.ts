@@ -8,8 +8,7 @@
  */
 
 import { similarity } from "../../analyze/dedupe.js";
-import { findItem, walkTree } from "../../core/tree.js";
-import { comparePRDFileAge } from "./smart-add-duplicates.js";
+import {walkTree} from "../../core/tree.js";import { comparePRDFileAge } from "./smart-add-duplicates.js";
 import type { ReshapeProposal, MergeAction } from "../../core/reshape.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
 import type { ItemFileMap } from "./smart-add-duplicates.js";

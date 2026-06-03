@@ -95,21 +95,21 @@ export type {
 
 // ---- Execution queue -------------------------------------------------------
 
-export { ExecutionQueue, normalizePriority } from "./queue/index.js";
+export { ExecutionQueue, normalizePriority } from "./queue/execution-queue.js";
 
 export type {
   TaskPriority,
   QueueEntry,
   QueueStatus,
-} from "./queue/index.js";
+} from "./queue/execution-queue.js";
 
 // ---- Priority scheduling ---------------------------------------------------
 
-export { resolveSchedulingPriority, extractPriorityFromTags } from "./queue/index.js";
+export { resolveSchedulingPriority, extractPriorityFromTags } from "./queue/priority-scheduler.js";
 
 export type {
   TaskPriorityMetadata,
-} from "./queue/index.js";
+} from "./queue/priority-scheduler.js";
 
 // ---- Process concurrency limiter -------------------------------------------
 

@@ -14,10 +14,7 @@ import { join } from "node:path";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
-import { findItem, insertChild, updateInTree, removeFromTree, walkTree } from "../core/tree.js";
-import {
-  mapItemToNotion,
-  mapNotionToItem,
+import {findItem, walkTree} from "../core/tree.js";import {  mapItemToNotion,  mapNotionToItem,
   mapNotionToDocument,
   resolveParentPage,
   buildStatusGroupMap,

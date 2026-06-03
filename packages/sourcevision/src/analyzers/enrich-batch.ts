@@ -21,9 +21,8 @@ import {
   buildMetaPrompt,
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
-import { callClaude, resolveLightModel, ClaudeClientError } from "./claude-client.js";
-import { tryParseJSON, extractFindings, formatFileLabel, findPrevZone } from "./enrich-parsing.js";
-import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
+import { callClaude, ClaudeClientError, resolveLightModel } from "./claude-client.js";
+import {tryParseJSON, extractFindings, formatFileLabel} from "./enrich-parsing.js";import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────

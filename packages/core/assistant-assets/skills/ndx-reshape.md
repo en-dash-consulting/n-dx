@@ -25,6 +25,19 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    - Rename items for consistency with `edit_item` (rex MCP)
 5. Run `reorganize` (rex MCP) with mode `fast` to verify no structural issues remain
 6. Show the updated structure via `get_prd_status`
+7. **Commit**: run `git status --porcelain` against the project root — this catches every MCP-driven write under `.rex/prd_tree/` (`move_item`, `merge_items`, `edit_item`, `add_item`, and `reorganize` all mutate the folder tree). If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block via a HEREDOC:
+
+   ```sh
+   git commit -m "$(cat <<'EOF'
+   ndx-reshape: restructure PRD hierarchy
+
+   N-DX: skill/ndx-reshape
+   Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
+   EOF
+   )"
+   ```
+
+   Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 
 ## Guidelines
 

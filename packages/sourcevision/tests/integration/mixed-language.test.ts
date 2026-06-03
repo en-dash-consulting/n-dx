@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
-import { detectLanguages, mergeLanguageConfigs } from "../../src/language/index.js";
+import { detectLanguages, mergeLanguageConfigs } from "../../src/language/detect.js";
 import type { Inventory, Imports } from "../../src/schema/v1.js";
 import type { LanguageConfig } from "../../src/language/registry.js";
 

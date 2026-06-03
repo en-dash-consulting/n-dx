@@ -110,13 +110,12 @@ export function analyzeClassifications(
     }
 
     // Classify the file — prefer projectLanguages array over single projectLanguage
-    const effectiveLanguages = options?.projectLanguages
-      ?? (options?.projectLanguage ? [options.projectLanguage] : undefined);
     const result = classifyFile(
       file.path,
       archetypes,
       exportMap.get(file.path),
-      effectiveLanguages,
+      options?.projectLanguages
+        ?? (options?.projectLanguage ? [options.projectLanguage] : undefined),
     );
     classifications.push(result);
   }

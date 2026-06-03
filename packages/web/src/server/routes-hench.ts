@@ -35,8 +35,7 @@
  */
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import {writeFile} from "node:fs/promises";import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";

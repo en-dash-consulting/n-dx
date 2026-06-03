@@ -11,14 +11,15 @@
 import type { Manifest, Inventory, Imports, Zones, Components, CallGraph } from "../external.js";
 import { DATA_FILES } from "../external.js";
 import {
-  migrateData,
-  validateManifest,
-  validateInventory,
-  validateImports,
-  validateZones,
-  validateComponents,
-  validateCallGraph,
-} from "./schema/index.js";
+  validate,
+  ManifestSchema,
+  InventorySchema,
+  ImportsSchema,
+  ZonesSchema,
+  ComponentsSchema,
+  CallGraphSchema,
+} from "./schema/validate.js";
+import { migrateData } from "./schema/compat.js";
 import type { LoadedData } from "../types.js";
 import { registerPoller, unregisterPoller } from "../polling/index.js";
 
@@ -32,12 +33,12 @@ interface ModuleDef {
 }
 
 const MODULE_DEFS: ModuleDef[] = [
-  { key: "manifest", file: DATA_FILES.manifest, validate: validateManifest },
-  { key: "inventory", file: DATA_FILES.inventory, validate: validateInventory },
-  { key: "imports", file: DATA_FILES.imports, validate: validateImports },
-  { key: "zones", file: DATA_FILES.zones, validate: validateZones },
-  { key: "components", file: DATA_FILES.components, validate: validateComponents },
-  { key: "callGraph", file: DATA_FILES.callGraph, validate: validateCallGraph },
+  { key: "manifest", file: DATA_FILES.manifest, validate: (data) => validate(ManifestSchema, data) },
+  { key: "inventory", file: DATA_FILES.inventory, validate: (data) => validate(InventorySchema, data) },
+  { key: "imports", file: DATA_FILES.imports, validate: (data) => validate(ImportsSchema, data) },
+  { key: "zones", file: DATA_FILES.zones, validate: (data) => validate(ZonesSchema, data) },
+  { key: "components", file: DATA_FILES.components, validate: (data) => validate(ComponentsSchema, data) },
+  { key: "callGraph", file: DATA_FILES.callGraph, validate: (data) => validate(CallGraphSchema, data) },
 ];
 
 /** Map from data filename to its module key, for selective refresh. */

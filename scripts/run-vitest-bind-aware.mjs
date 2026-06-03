@@ -47,6 +47,14 @@ const passthroughArgs = process.argv.slice(3);
 const bindAvailable = await canBindLoopback();
 
 const vitestArgs = ["run", ...passthroughArgs];
+
+// The sourcevision eval gate makes real LLM calls and is documented to run only
+// via `pnpm gauntlet:evals` (it is also excluded from `pnpm gauntlet`). Keep it
+// out of the default `pnpm test` gate.
+if (profile === "root") {
+  vitestArgs.push("--exclude", "tests/gauntlet/sourcevision-evals/evals.test.js");
+}
+
 if (!bindAvailable) {
   const excludes = excludesForProfile(profile);
   if (excludes.length > 0) {

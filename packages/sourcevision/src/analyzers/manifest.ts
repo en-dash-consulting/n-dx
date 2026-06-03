@@ -20,8 +20,7 @@ export function readManifest(dir: string): Manifest {
   const manifestPath = join(absDir, SV_DIR, "manifest.json");
 
   if (existsSync(manifestPath)) {
-    const raw = readFileSync(manifestPath, "utf-8");
-    return JSON.parse(raw) as Manifest;
+    return JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest;
   }
 
   // Create a fresh manifest

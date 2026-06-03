@@ -1,14 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toCanonicalJSON, sortItems } from "../../../src/core/canonical.js";
-import type { PRDItem } from "../../../src/schema/index.js";
-
-function makeItem(overrides: Partial<PRDItem> & { id: string; title: string }): PRDItem {
-  return {
-    status: "pending",
-    level: "task",
-    ...overrides,
-  };
-}
+import { makeItem } from "../../helpers/index.js";
 
 describe("toCanonicalJSON", () => {
   it("produces pretty-printed JSON with trailing newline", () => {

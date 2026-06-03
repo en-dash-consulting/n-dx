@@ -119,9 +119,7 @@ function fmtNumber(n: number): string {
 }
 
 function fmtWindow(since: string | null, until: string | null): string {
-  const from = since ? new Date(since).toLocaleDateString() : "start";
-  const to = until ? new Date(until).toLocaleDateString() : "now";
-  return `${from} → ${to}`;
+  return `${since ? new Date(since).toLocaleDateString() : "start"} → ${until ? new Date(until).toLocaleDateString() : "now"}`;
 }
 
 const PKG_COLORS: Record<string, string> = {

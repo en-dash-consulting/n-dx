@@ -13,7 +13,6 @@ import {
   accumulateTokenUsage,
 } from "./reason.js";
 import type { ReasonResult } from "./reason.js";
-import type { Proposal } from "./propose.js";
 import { info } from "../cli/output.js";
 
 // ── Types ──

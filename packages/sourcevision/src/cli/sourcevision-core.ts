@@ -8,11 +8,12 @@
 export { SV_DIR, TOOL_VERSION } from "../constants.js";
 export { DATA_FILES, SUPPLEMENTARY_FILES } from "../schema/data-files.js";
 export {
-  validateManifest,
-  validateInventory,
-  validateImports,
-  validateZones,
-  validateComponents,
+  validate,
+  ManifestSchema,
+  InventorySchema,
+  ImportsSchema,
+  ZonesSchema,
+  ComponentsSchema,
 } from "../schema/index.js";
 export type {
   AnalyzeTokenUsage,
@@ -34,7 +35,7 @@ export type {
 export { SCHEMA_VERSION } from "../schema/v1.js";
 export { toCanonicalJSON } from "../util/sort.js";
 export { toPosix } from "../util/paths.js";
-export { detectLanguages, mergeLanguageConfigs } from "../language/index.js";
+export { detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
 export { analyzeInventory } from "../analyzers/inventory.js";
 export type { InventoryResult } from "../analyzers/inventory.js";
 export { analyzeImports } from "../analyzers/imports.js";

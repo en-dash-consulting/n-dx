@@ -51,7 +51,8 @@ describe("createItemsFromRecommendations", () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    vi.doMock("@n-dx/llm-client", () => ({
+    vi.doMock("@n-dx/llm-client", async () => ({
+      ...(await vi.importActual<typeof import("@n-dx/llm-client")>("@n-dx/llm-client")),
       PROJECT_DIRS: {
         REX: ".rex",
         SOURCEVISION: ".sourcevision",

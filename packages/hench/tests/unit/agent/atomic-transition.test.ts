@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import Anthropic from "@anthropic-ai/sdk";
-import { initConfig } from "../../../src/store/config.js";
 import { toolRexUpdateStatus } from "../../../src/tools/rex.js";
 import { serializeDocument } from "@n-dx/rex";
 import { createStore } from "@n-dx/rex/dist/store/index.js";
+import { mockStore, setupProjectDir, cleanupProjectDir } from "../../helpers/index.js";
 
 async function readPRDFromMarkdown(rexDir: string): Promise<{ items: Array<{ id: string; status: string; children?: unknown[] }> }> {
   return await createStore("file", rexDir).loadDocument() as {
@@ -28,47 +27,6 @@ const messagesProto = Object.getPrototypeOf(
  * the task to in_progress before starting work.
  */
 
-async function setupProjectDir(): Promise<{ projectDir: string; henchDir: string; rexDir: string }> {
-  const projectDir = await mkdtemp(join(tmpdir(), "hench-test-atomic-"));
-  const henchDir = join(projectDir, ".hench");
-  const rexDir = join(projectDir, ".rex");
-
-  await initConfig(henchDir);
-  await mkdir(rexDir, { recursive: true });
-
-  await writeFile(
-    join(rexDir, "config.json"),
-    JSON.stringify({
-      schema: "rex/v1",
-      project: "test",
-      adapter: "file",
-    }),
-    "utf-8",
-  );
-
-  await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
-
-  return { projectDir, henchDir, rexDir };
-}
-
-function mockStore() {
-  return {
-    updateItem: vi.fn().mockResolvedValue(undefined),
-    appendLog: vi.fn().mockResolvedValue(undefined),
-    addItem: vi.fn().mockResolvedValue(undefined),
-    loadDocument: vi.fn(),
-    saveDocument: vi.fn(),
-    getItem: vi.fn(),
-    removeItem: vi.fn(),
-    loadConfig: vi.fn(),
-    saveConfig: vi.fn(),
-    readLog: vi.fn(),
-    loadWorkflow: vi.fn(),
-    saveWorkflow: vi.fn(),
-    capabilities: vi.fn(),
-  };
-}
-
 describe("atomic task state transitions", () => {
   describe("agentLoop (file store integration)", () => {
     let projectDir: string;
@@ -80,7 +38,7 @@ describe("atomic task state transitions", () => {
     });
 
     afterEach(async () => {
-      await rm(projectDir, { recursive: true, force: true });
+      await cleanupProjectDir(projectDir);
     });
 
     afterEach(() => {
@@ -233,7 +191,7 @@ describe("atomic task state transitions", () => {
     });
 
     afterEach(async () => {
-      await rm(projectDir, { recursive: true, force: true });
+      await cleanupProjectDir(projectDir);
     });
 
     it("does not transition status on dry run", async () => {

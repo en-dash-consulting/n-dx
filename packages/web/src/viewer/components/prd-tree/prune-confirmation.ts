@@ -17,7 +17,6 @@
 
 import { h } from "preact";
 import { useState, useCallback } from "preact/hooks";
-import type { ItemLevel } from "./types.js";
 import { getLevelLabel, getLevelPlural } from "./levels.js";
 import { PruneDiffTree } from "./prune-diff-tree.js";
 import type { EpicImpact } from "./prune-diff-tree.js";

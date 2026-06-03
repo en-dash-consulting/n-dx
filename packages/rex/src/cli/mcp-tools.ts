@@ -24,6 +24,7 @@ import { detectReorganizations } from "../core/reorganize.js";
 import { applyProposals } from "../core/reorganize-executor.js";
 import { computeHealthScore } from "../core/health.js";
 import { computeFacetDistribution, suggestFacets, getItemFacets } from "../core/facets.js";
+import { parseIntList } from "./parse-utils.js";
 import {
   aggregateItemTokenUsage,
   readRunTokensFromHench,
@@ -576,7 +577,7 @@ export async function handleReorganize(
       toApply = plan.proposals.filter((p) => p.risk === "low");
     } else if (args.accept !== "all") {
       // Parse comma-separated IDs
-      const ids = new Set(args.accept.split(",").map((s) => parseInt(s.trim(), 10)));
+      const ids = new Set(parseIntList(args.accept));
       toApply = plan.proposals.filter((p) => ids.has(p.id));
     }
 

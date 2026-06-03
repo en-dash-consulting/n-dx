@@ -17,8 +17,7 @@ import { randomUUID } from "node:crypto";
 import type { PRDStore } from "../store/contracts.js";
 import { withSelfHealTag } from "../store/self-heal-tag.js";
 import type { PRDItem, ItemLevel } from "../schema/index.js";
-import { LEVEL_HIERARCHY, CHILD_LEVEL, isLeafLevel, getLevelLabel } from "../schema/index.js";
-import { findItem, insertChild } from "../core/tree.js";
+import {LEVEL_HIERARCHY, CHILD_LEVEL, getLevelLabel} from "../schema/index.js";import { findItem, insertChild } from "../core/tree.js";
 import { validateDAG } from "../core/dag.js";
 import {
   detectRecommendationConflicts,

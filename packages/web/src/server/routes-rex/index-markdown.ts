@@ -10,8 +10,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { loadPRDSync } from "../prd-io.js";
-import { jsonResponse, errorResponse } from "../response-utils.js";
-import { PRD_TREE_DIRNAME } from "../rex-gateway.js";
+import {errorResponse} from "../response-utils.js";import { PRD_TREE_DIRNAME } from "../rex-gateway.js";
 import type { ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 

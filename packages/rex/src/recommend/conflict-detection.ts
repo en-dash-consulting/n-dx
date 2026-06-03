@@ -17,6 +17,7 @@
  */
 
 import { similarity } from "./similarity.js";
+import { normalize } from "./text-similarity-shared.js";
 import { walkRecommendationTree } from "./tree.js";
 import type {
   EnrichedRecommendation,
@@ -101,10 +102,6 @@ export interface ConflictReport {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
-
-function normalize(text: string): string {
-  return text.toLowerCase().trim().replace(/\s+/g, " ");
-}
 
 function titleContains(a: string, b: string): boolean {
   if (a.length < 5 || b.length < 5) return false;

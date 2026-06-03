@@ -116,8 +116,7 @@ export interface ArchiveBatch {
  */
 export async function loadArchive(archivePath: string): Promise<Archive> {
   try {
-    const raw = await readFile(archivePath, "utf-8");
-    return JSON.parse(raw) as Archive;
+    return JSON.parse(await readFile(archivePath, "utf-8")) as Archive;
   } catch {
     return { schema: "rex/archive/v1", batches: [] };
   }

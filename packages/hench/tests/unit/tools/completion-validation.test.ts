@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { toolRexUpdateStatus } from "../../../src/tools/rex.js";
+import { mockStore } from "../../helpers/index.js";
 
 /**
  * Tests that toolRexUpdateStatus integrates completion validation
@@ -16,31 +17,16 @@ import { validateCompletion, formatValidationResult } from "../../../src/validat
 const mockValidate = vi.mocked(validateCompletion);
 const mockFormat = vi.mocked(formatValidationResult);
 
-function mockStore() {
-  return {
-    updateItem: vi.fn().mockResolvedValue(undefined),
-    appendLog: vi.fn().mockResolvedValue(undefined),
-    addItem: vi.fn().mockResolvedValue(undefined),
-    loadDocument: vi.fn().mockResolvedValue({
-      schema: "rex/v1",
-      title: "Test",
-      items: [],
-    }),
-    saveDocument: vi.fn(),
-    getItem: vi.fn().mockResolvedValue({
-      id: "task-1",
-      title: "Test task",
-      status: "in_progress",
-      level: "task",
-    }),
-    removeItem: vi.fn(),
-    loadConfig: vi.fn(),
-    saveConfig: vi.fn(),
-    readLog: vi.fn(),
-    loadWorkflow: vi.fn(),
-    saveWorkflow: vi.fn(),
-    capabilities: vi.fn(),
-  };
+/**
+ * Shared mock store with a loadDocument that resolves to a document.
+ * toolRexUpdateStatus reads `doc.items` during requirements validation and
+ * auto-completion, so the bare helper mock (loadDocument → undefined) is not
+ * enough for the completed-status paths.
+ */
+function makeStore() {
+  const store = mockStore();
+  store.loadDocument.mockResolvedValue({ schema: "rex/v1", title: "Test", items: [] });
+  return store;
 }
 
 beforeEach(() => {
@@ -49,7 +35,7 @@ beforeEach(() => {
 
 describe("toolRexUpdateStatus with completion validation", () => {
   it("rejects completion when validation fails", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     mockValidate.mockResolvedValue({
       valid: false,
@@ -79,7 +65,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("allows completion when validation passes", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     mockValidate.mockResolvedValue({
       valid: true,
@@ -104,7 +90,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("passes testCommand to validation", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     mockValidate.mockResolvedValue({
       valid: true,
@@ -124,7 +110,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("skips validation when no projectDir provided", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     const result = await toolRexUpdateStatus(
       store,
@@ -138,7 +124,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("skips validation for non-completed statuses", async () => {
-    const store = mockStore();
+    const store = makeStore();
     store.getItem.mockResolvedValue({
       id: "task-1",
       title: "Test task",
@@ -162,7 +148,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("rejects completion when tests fail", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     mockValidate.mockResolvedValue({
       valid: false,
@@ -186,7 +172,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("passes startingHead to validation", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     mockValidate.mockResolvedValue({
       valid: true,
@@ -206,7 +192,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("passes both startingHead and testCommand to validation", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     mockValidate.mockResolvedValue({
       valid: true,
@@ -229,7 +215,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("rejection message includes guidance about staging changes", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     mockValidate.mockResolvedValue({
       valid: false,
@@ -250,7 +236,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("logs formatted validation detail on rejection", async () => {
-    const store = mockStore();
+    const store = makeStore();
 
     mockValidate.mockResolvedValue({
       valid: false,
@@ -278,7 +264,7 @@ describe("toolRexUpdateStatus with completion validation", () => {
   });
 
   it("skips validation for deferred status even with projectDir", async () => {
-    const store = mockStore();
+    const store = makeStore();
     store.getItem.mockResolvedValue({
       id: "task-1",
       title: "Test task",

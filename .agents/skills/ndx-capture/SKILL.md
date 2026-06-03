@@ -17,6 +17,7 @@ Capture a requirement, feature idea, or task from conversation context.
 6. Present to the user for confirmation before creating
 7. Use `add_item` (rex MCP) to create, then confirm placement in hierarchy
 8. Check for dependencies: does this item block or depend on other pending items? If so, set `blockedBy` via `edit_item` (rex MCP)
+9. **Commit**: run `git status --porcelain` — if empty, print "Working tree clean — nothing to commit." and stop. Otherwise run `git add -A` then `git commit -m "ndx-capture: add '<title>' to PRD"` (using the captured item title).
 
 ## Always do these without being asked
 

@@ -3,11 +3,12 @@ import { resolve, join } from "node:path";
 import { SV_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import {
-  validateManifest,
-  validateInventory,
-  validateImports,
-  validateZones,
-  validateComponents,
+  validate,
+  ManifestSchema,
+  InventorySchema,
+  ImportsSchema,
+  ZonesSchema,
+  ComponentsSchema,
   DATA_FILES,
 } from "../sourcevision-core.js";
 import { info, result } from "../output.js";
@@ -28,11 +29,11 @@ export function cmdValidate(dir: string): void {
     file: string;
     validate: (data: unknown) => { ok: boolean; errors?: unknown };
   }> = [
-    { name: "manifest", file: DATA_FILES.manifest, validate: validateManifest },
-    { name: "inventory", file: DATA_FILES.inventory, validate: validateInventory },
-    { name: "imports", file: DATA_FILES.imports, validate: validateImports },
-    { name: "zones", file: DATA_FILES.zones, validate: validateZones },
-    { name: "components", file: DATA_FILES.components, validate: validateComponents },
+    { name: "manifest", file: DATA_FILES.manifest, validate: (data) => validate(ManifestSchema, data) },
+    { name: "inventory", file: DATA_FILES.inventory, validate: (data) => validate(InventorySchema, data) },
+    { name: "imports", file: DATA_FILES.imports, validate: (data) => validate(ImportsSchema, data) },
+    { name: "zones", file: DATA_FILES.zones, validate: (data) => validate(ZonesSchema, data) },
+    { name: "components", file: DATA_FILES.components, validate: (data) => validate(ComponentsSchema, data) },
   ];
 
   let allValid = true;

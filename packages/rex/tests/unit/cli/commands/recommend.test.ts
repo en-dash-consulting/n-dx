@@ -77,7 +77,8 @@ describe("cmdRecommend --accept indexed selection", () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    vi.doMock("@n-dx/llm-client", () => ({
+    vi.doMock("@n-dx/llm-client", async () => ({
+      ...(await vi.importActual<typeof import("@n-dx/llm-client")>("@n-dx/llm-client")),
       PROJECT_DIRS: {
         REX: ".rex",
         SOURCEVISION: ".sourcevision",
@@ -762,7 +763,8 @@ describe("cmdRecommend --accept creation summary output", () => {
     infoCalls = [];
 
     vi.resetModules();
-    vi.doMock("@n-dx/llm-client", () => ({
+    vi.doMock("@n-dx/llm-client", async () => ({
+      ...(await vi.importActual<typeof import("@n-dx/llm-client")>("@n-dx/llm-client")),
       PROJECT_DIRS: {
         REX: ".rex",
         SOURCEVISION: ".sourcevision",
@@ -931,7 +933,8 @@ describe("cmdRecommend --accept conflict detection", () => {
     infoCalls = [];
 
     vi.resetModules();
-    vi.doMock("@n-dx/llm-client", () => ({
+    vi.doMock("@n-dx/llm-client", async () => ({
+      ...(await vi.importActual<typeof import("@n-dx/llm-client")>("@n-dx/llm-client")),
       PROJECT_DIRS: {
         REX: ".rex",
         SOURCEVISION: ".sourcevision",
@@ -1035,7 +1038,8 @@ describe("cmdRecommend --actionable-only", () => {
     infoCalls = [];
 
     vi.resetModules();
-    vi.doMock("@n-dx/llm-client", () => ({
+    vi.doMock("@n-dx/llm-client", async () => ({
+      ...(await vi.importActual<typeof import("@n-dx/llm-client")>("@n-dx/llm-client")),
       PROJECT_DIRS: {
         REX: ".rex",
         SOURCEVISION: ".sourcevision",

@@ -4,7 +4,12 @@ import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
 import { analyzeComponents } from "../../src/analyzers/components.js";
-import { validateInventory, validateImports, validateZones, validateComponents } from "../../src/schema/validate.js";
+import { validate, InventorySchema, ImportsSchema, ZonesSchema, ComponentsSchema } from "../../src/schema/validate.js";
+
+const validateInventory = (data: unknown) => validate(InventorySchema, data);
+const validateImports = (data: unknown) => validate(ImportsSchema, data);
+const validateZones = (data: unknown) => validate(ZonesSchema, data);
+const validateComponents = (data: unknown) => validate(ComponentsSchema, data);
 
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");
 

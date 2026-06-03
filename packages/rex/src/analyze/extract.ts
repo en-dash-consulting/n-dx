@@ -28,8 +28,9 @@ import {
   PRD_SCHEMA,
   TASK_QUALITY_RULES,
   OUTPUT_INSTRUCTION,
+  cleanHeading,
+  normalizeTitle,
 } from "./analyze-shared.js";
-import type { FileFormat } from "./analyze-shared.js";
 import { spawnClaude } from "./llm-bridge.js";
 import {
   validateFileInput,
@@ -121,17 +122,6 @@ export function classifyHeadingLevels(
 
 // ── Markdown parsing ───────────────────────────────────────────────
 
-/** Strip inline markdown formatting from a heading string. */
-function cleanHeading(raw: string): string {
-  let h = raw;
-  h = h.replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1");
-  h = h.replace(/_{1,2}([^_]+)_{1,2}/g, "$1");
-  h = h.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
-  h = h.replace(/`([^`]+)`/g, "$1");
-  h = h.replace(/~~([^~]+)~~/g, "$1");
-  return h.trim();
-}
-
 /**
  * Parse markdown content into a tree of sections.
  * Handles code fences, heading hierarchy, bullets, and paragraph text.
@@ -208,12 +198,6 @@ function parseMarkdownSections(content: string): {
   return { sections: root.children, headingLevels };
 }
 
-// ── Normalization for dedup ────────────────────────────────────────
-
-function normalize(s: string): string {
-  return s.toLowerCase().trim();
-}
-
 // ── Proposal building ──────────────────────────────────────────────
 
 const SOURCE = "file-import";
@@ -266,7 +250,7 @@ function buildProposalsFromSections(
 
     if (role === "epic") {
       const proposal = buildEpicProposal(section, roleMap, existingTitles, sourceFile, preserveContext ? [section.heading] : undefined);
-      if (proposal.features.length > 0 || !existingTitles.has(normalize(section.heading))) {
+      if (proposal.features.length > 0 || !existingTitles.has(normalizeTitle(section.heading))) {
         proposals.push(proposal);
       }
     } else if (role === "feature") {
@@ -274,7 +258,7 @@ function buildProposalsFromSections(
       const feature = buildFeature(section, roleMap, existingTitles, sourceFile, preserveContext ? ["Imported Requirements", section.heading] : undefined);
       if (feature) {
         const existing = proposals.find(
-          (p) => normalize(p.epic.title) === normalize("Imported Requirements"),
+          (p) => normalizeTitle(p.epic.title) === normalizeTitle("Imported Requirements"),
         );
         if (existing) {
           existing.features.push(feature);
@@ -311,7 +295,7 @@ function buildEpicProposal(
   if (section.bullets.length > 0) {
     const featureContext = contextPath ? [...contextPath, section.heading] : undefined;
     const tasks = section.bullets
-      .filter((b) => !existingTitles.has(normalize(b)))
+      .filter((b) => !existingTitles.has(normalizeTitle(b)))
       .map((b) => makeTask(b, contextDescription(featureContext), undefined, sourceFile));
     if (tasks.length > 0) {
       features.push({
@@ -336,7 +320,7 @@ function buildEpicProposal(
       if (task) {
         // Find or create a "General" feature under this epic
         let generalFeature: { title: string; source: string; description?: string; tasks: ProposalTask[] } | undefined =
-          features.find((f) => normalize(f.title) === normalize(section.heading));
+          features.find((f) => normalizeTitle(f.title) === normalizeTitle(section.heading));
         if (!generalFeature) {
           generalFeature = {
             title: section.heading,
@@ -375,13 +359,13 @@ function buildFeature(
   sourceFile?: string,
   contextPath?: string[],
 ): { title: string; source: string; description?: string; tasks: ProposalTask[] } | null {
-  if (existingTitles.has(normalize(section.heading))) return null;
+  if (existingTitles.has(normalizeTitle(section.heading))) return null;
 
   const tasks: ProposalTask[] = [];
 
   // Bullets under this feature → tasks
   for (const bullet of section.bullets) {
-    if (!existingTitles.has(normalize(bullet))) {
+    if (!existingTitles.has(normalizeTitle(bullet))) {
       tasks.push(makeTask(bullet, contextDescription(contextPath), undefined, sourceFile));
     }
   }
@@ -412,7 +396,7 @@ function buildTaskFromSection(
   sourceFile?: string,
   contextPath?: string[],
 ): ProposalTask | null {
-  if (existingTitles.has(normalize(section.heading))) return null;
+  if (existingTitles.has(normalizeTitle(section.heading))) return null;
 
   const paragraphDesc = section.paragraphs.join(" ") || undefined;
   const contextDesc = contextDescription(contextPath);
@@ -439,7 +423,7 @@ function addOrphanTask(
   const defaultFeatureTitle = "General";
 
   let epicProposal = proposals.find(
-    (p) => normalize(p.epic.title) === normalize(defaultEpicTitle),
+    (p) => normalizeTitle(p.epic.title) === normalizeTitle(defaultEpicTitle),
   );
   if (!epicProposal) {
     epicProposal = {
@@ -450,7 +434,7 @@ function addOrphanTask(
   }
 
   let feature = epicProposal.features.find(
-    (f) => normalize(f.title) === normalize(defaultFeatureTitle),
+    (f) => normalizeTitle(f.title) === normalizeTitle(defaultFeatureTitle),
   );
   if (!feature) {
     feature = { title: defaultFeatureTitle, source: SOURCE, tasks: [] };
@@ -1074,14 +1058,14 @@ function buildFromStructuredText(
 
       // Direct bullets → tasks under a default feature
       const bulletTasks = section.bullets
-        .filter((b) => !existingTitles.has(normalize(b)))
+        .filter((b) => !existingTitles.has(normalizeTitle(b)))
         .map((b) => makeTask(b, undefined, undefined, sourceFile));
 
       // Extract requirement sentences from paragraphs
       const proseText = section.paragraphs.join(" ");
       const reqSentences = extractRequirementSentences(proseText);
       const reqTasks = reqSentences
-        .filter((s) => !existingTitles.has(normalize(s)))
+        .filter((s) => !existingTitles.has(normalizeTitle(s)))
         .map((s) => makeTask(s, undefined, undefined, sourceFile));
 
       const allTasks = [...bulletTasks, ...reqTasks];
@@ -1094,7 +1078,7 @@ function buildFromStructuredText(
         });
       }
 
-      if (features.length > 0 || !existingTitles.has(normalize(section.header))) {
+      if (features.length > 0 || !existingTitles.has(normalizeTitle(section.header))) {
         const proposal: Proposal = {
           epic: { title: section.header, source: SOURCE },
           features,
@@ -1104,18 +1088,18 @@ function buildFromStructuredText(
       }
     } else if (role === "feature") {
       const tasks = section.bullets
-        .filter((b) => !existingTitles.has(normalize(b)))
+        .filter((b) => !existingTitles.has(normalizeTitle(b)))
         .map((b) => makeTask(b, undefined, undefined, sourceFile));
 
       // Extract requirement sentences from paragraphs
       const proseText = section.paragraphs.join(" ");
       const reqSentences = extractRequirementSentences(proseText);
       const reqTasks = reqSentences
-        .filter((s) => !existingTitles.has(normalize(s)))
+        .filter((s) => !existingTitles.has(normalizeTitle(s)))
         .map((s) => makeTask(s, undefined, undefined, sourceFile));
 
       const allTasks = [...tasks, ...reqTasks];
-      if (existingTitles.has(normalize(section.header)) && allTasks.length === 0) continue;
+      if (existingTitles.has(normalizeTitle(section.header)) && allTasks.length === 0) continue;
 
       const feature = {
         title: section.header,
@@ -1129,7 +1113,7 @@ function buildFromStructuredText(
         currentEpic.features.push(feature);
       } else {
         let defaultEpic = proposals.find(
-          (p) => normalize(p.epic.title) === normalize("Imported Requirements"),
+          (p) => normalizeTitle(p.epic.title) === normalizeTitle("Imported Requirements"),
         );
         if (!defaultEpic) {
           defaultEpic = {
@@ -1142,7 +1126,7 @@ function buildFromStructuredText(
       }
     } else {
       // Task-level or no role
-      if (existingTitles.has(normalize(section.header))) continue;
+      if (existingTitles.has(normalizeTitle(section.header))) continue;
       const task = makeTask(
         section.header,
         section.paragraphs.join(" ") || undefined,
@@ -1178,7 +1162,7 @@ export function extractFromMarkdown(
   }
 
   const existingTitles = new Set(
-    (options?.existingItems ?? []).map((item) => normalize(item.title)),
+    (options?.existingItems ?? []).map((item) => normalizeTitle(item.title)),
   );
 
   const { sections, headingLevels } = parseMarkdownSections(content);
@@ -1234,7 +1218,7 @@ export function extractFromText(
   }
 
   const existingTitles = new Set(
-    (options?.existingItems ?? []).map((item) => normalize(item.title)),
+    (options?.existingItems ?? []).map((item) => normalizeTitle(item.title)),
   );
   const sourceFile = options?.sourceFile;
 
@@ -1407,14 +1391,14 @@ function buildFromFlatContent(
     if (block.bullets.length === 0) continue;
 
     const tasks = block.bullets
-      .filter((b) => !existingTitles.has(normalize(b)))
+      .filter((b) => !existingTitles.has(normalizeTitle(b)))
       .map((b) => makeTask(b, undefined, undefined, sourceFile));
 
     if (tasks.length === 0) continue;
 
     const featureTitle = block.title ?? "General";
     const existing = features.find(
-      (f) => normalize(f.title) === normalize(featureTitle),
+      (f) => normalizeTitle(f.title) === normalizeTitle(featureTitle),
     );
     if (existing) {
       existing.tasks.push(...tasks);
@@ -1458,7 +1442,7 @@ function buildFromProse(
 ): ExtractionResult {
   const requirements = extractRequirementSentences(content);
   const tasks = requirements
-    .filter((r) => !existingTitles.has(normalize(r)))
+    .filter((r) => !existingTitles.has(normalizeTitle(r)))
     .map((r) => makeTask(r, undefined, undefined, sourceFile));
 
   if (tasks.length === 0) {
@@ -1531,7 +1515,7 @@ export function isAmbiguousStructure(
 
   // Everything fell into the default "Imported Requirements" bucket → unclear structure
   const allDefault = proposals.every(
-    (p) => normalize(p.epic.title) === normalize("Imported Requirements"),
+    (p) => normalizeTitle(p.epic.title) === normalizeTitle("Imported Requirements"),
   );
   if (allDefault) return true;
 
@@ -1680,7 +1664,7 @@ export async function maybeDisambiguate(
   if (!isAmbiguousStructure(patternResult.proposals, content)) return patternResult;
 
   const existingTitles = new Set(
-    (options?.existingItems ?? []).map((item) => normalize(item.title)),
+    (options?.existingItems ?? []).map((item) => normalizeTitle(item.title)),
   );
 
   return disambiguateWithLLM(content, existingTitles, patternResult, options.model);

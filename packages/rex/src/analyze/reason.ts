@@ -6,8 +6,7 @@ import { z } from "zod";
 import type { PRDItem, AnalyzeTokenUsage } from "../schema/index.js";
 import { isContainerLevel } from "../schema/index.js";
 import type { ScanResult } from "./scanners.js";
-import type { Proposal, ProposalTask } from "./propose.js";
-import { walkTree } from "../core/tree.js";
+import type {Proposal} from "./propose.js";import { walkTree } from "../core/tree.js";
 // Re-export shared utilities for backward compatibility — existing consumers
 // that import from "./reason.js" continue to work without changes.
 export {
@@ -47,6 +46,9 @@ import {
   PRD_SCHEMA,
   TASK_QUALITY_RULES,
   OUTPUT_INSTRUCTION,
+  normalizeTitle,
+  extractJsonItems,
+  extractYamlItems,
 } from "./analyze-shared.js";
 import type { ClaudeResult, FileFormat } from "./analyze-shared.js";
 import { spawnClaude } from "./llm-bridge.js";
@@ -375,79 +377,6 @@ export function validateProposalQuality(proposals: Proposal[]): QualityIssue[] {
   return issues;
 }
 
-// ── Structured file parsing (JSON/YAML without LLM) ──
-
-function extractJsonItems(
-  content: string,
-): { name: string; description?: string }[] {
-  try {
-    const data = JSON.parse(content);
-    const items: { name: string; description?: string }[] = [];
-
-    function scan(obj: unknown): void {
-      if (Array.isArray(obj)) {
-        for (const el of obj) scan(el);
-      } else if (obj && typeof obj === "object") {
-        const o = obj as Record<string, unknown>;
-        const name = (o.title ?? o.name) as string | undefined;
-        if (typeof name === "string") {
-          items.push({
-            name,
-            description: typeof o.description === "string" ? o.description : undefined,
-          });
-        }
-        for (const val of Object.values(o)) {
-          if (typeof val === "object" && val !== null) scan(val);
-        }
-      }
-    }
-
-    scan(data);
-    return items;
-  } catch {
-    return [];
-  }
-}
-
-function extractYamlItems(
-  content: string,
-): { name: string; description?: string }[] {
-  const items: { name: string; description?: string }[] = [];
-  const lines = content.split("\n");
-  let currentName: string | null = null;
-  let currentDesc: string | null = null;
-
-  for (const line of lines) {
-    const nameMatch = line.match(/^\s*(?:title|name)\s*:\s*["']?(.+?)["']?\s*$/);
-    if (nameMatch) {
-      if (currentName) {
-        items.push({
-          name: currentName,
-          description: currentDesc ?? undefined,
-        });
-      }
-      currentName = nameMatch[1];
-      currentDesc = null;
-      continue;
-    }
-    const descMatch = line.match(/^\s*description\s*:\s*["']?(.+?)["']?\s*$/);
-    if (descMatch && currentName) {
-      currentDesc = descMatch[1];
-    }
-  }
-  if (currentName) {
-    items.push({
-      name: currentName,
-      description: currentDesc ?? undefined,
-    });
-  }
-  return items;
-}
-
-function normalize(s: string): string {
-  return s.toLowerCase().trim();
-}
-
 /**
  * Attempt to parse structured file content (JSON/YAML) directly into proposals
  * without an LLM call. Returns null if the format is markdown or if the content
@@ -484,20 +413,20 @@ export function parseStructuredFile(
       if (validated && validated.length > 0) {
         // Existing title set for dedup
         const existingTitles = new Set(
-          existingItems.map((item) => normalize(item.title)),
+          existingItems.map((item) => normalizeTitle(item.title)),
         );
 
         const result = validated
           .map((p) => ({
             epic: { title: p.epic.title, source: "file-import" },
             features: p.features
-              .filter((f) => !existingTitles.has(normalize(f.title)))
+              .filter((f) => !existingTitles.has(normalizeTitle(f.title)))
               .map((f) => ({
                 title: f.title,
                 source: "file-import",
                 description: f.description,
                 tasks: f.tasks
-                  .filter((t) => !existingTitles.has(normalize(t.title)))
+                  .filter((t) => !existingTitles.has(normalizeTitle(t.title)))
                   .map((t) => ({
                     title: t.title,
                     source: "file-import",
@@ -509,7 +438,7 @@ export function parseStructuredFile(
                   })),
               })),
           }))
-          .filter((p) => p.features.length > 0 || !existingTitles.has(normalize(p.epic.title)));
+          .filter((p) => p.features.length > 0 || !existingTitles.has(normalizeTitle(p.epic.title)));
 
         if (result.length > 0) return result;
         return null;
@@ -527,9 +456,9 @@ export function parseStructuredFile(
 
   // Dedup against existing PRD
   const existingTitles = new Set(
-    existingItems.map((item) => normalize(item.title)),
+    existingItems.map((item) => normalizeTitle(item.title)),
   );
-  const newItems = items.filter((i) => !existingTitles.has(normalize(i.name)));
+  const newItems = items.filter((i) => !existingTitles.has(normalizeTitle(i.name)));
 
   if (newItems.length === 0) return null;
 
@@ -898,7 +827,7 @@ export function mergeProposals(all: Proposal[]): Proposal[] {
   const epicMap = new Map<string, Proposal>();
 
   for (const p of all) {
-    const key = normalize(p.epic.title);
+    const key = normalizeTitle(p.epic.title);
     const existing = epicMap.get(key);
     if (!existing) {
       // Clone to avoid mutating inputs
@@ -912,22 +841,22 @@ export function mergeProposals(all: Proposal[]): Proposal[] {
     } else {
       // Merge features into existing epic
       const seenFeatures = new Set(
-        existing.features.map((f) => normalize(f.title)),
+        existing.features.map((f) => normalizeTitle(f.title)),
       );
       for (const f of p.features) {
-        const fKey = normalize(f.title);
+        const fKey = normalizeTitle(f.title);
         if (seenFeatures.has(fKey)) {
           // Merge tasks into existing feature
           const target = existing.features.find(
-            (ef) => normalize(ef.title) === fKey,
+            (ef) => normalizeTitle(ef.title) === fKey,
           )!;
           const seenTasks = new Set(
-            target.tasks.map((t) => normalize(t.title)),
+            target.tasks.map((t) => normalizeTitle(t.title)),
           );
           for (const t of f.tasks) {
-            if (!seenTasks.has(normalize(t.title))) {
+            if (!seenTasks.has(normalizeTitle(t.title))) {
               target.tasks.push(t);
-              seenTasks.add(normalize(t.title));
+              seenTasks.add(normalizeTitle(t.title));
             }
           }
         } else {
