@@ -42,6 +42,21 @@ function listPublishablePackages() {
     .filter(Boolean);
 }
 
+// `npm pack --json` is documented to print only a JSON array, but some npm
+// versions still run the package's `prepack`/`prepare` (build) lifecycle even
+// with `--ignore-scripts`, prepending a build banner to stdout (e.g.
+// "> @n-dx/web@x build\nBuilt viewer: ..."). Parse from the first `[` so the
+// test is robust to that preamble regardless of the local npm version.
+function parseNpmPackReport(out) {
+  const start = out.indexOf("[");
+  if (start === -1) {
+    throw new Error(
+      `npm pack --json produced no JSON array:\n${out.slice(0, 500)}`,
+    );
+  }
+  return JSON.parse(out.slice(start));
+}
+
 function packAndExtract(pkgDir) {
   const tmpRoot = mkdtempSync(join(tmpdir(), "ndx-pack-load-"));
 
@@ -53,7 +68,7 @@ function packAndExtract(pkgDir) {
     ["pack", "--json", "--ignore-scripts", "--pack-destination", tmpRoot],
     { cwd: pkgDir, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
   );
-  const [report] = JSON.parse(out);
+  const [report] = parseNpmPackReport(out);
   const tgzPath = join(tmpRoot, report.filename);
 
   const extractDir = join(tmpRoot, "extracted");
