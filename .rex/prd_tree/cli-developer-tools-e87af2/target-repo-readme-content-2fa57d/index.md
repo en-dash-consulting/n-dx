@@ -12,5 +12,5 @@ description: "Update the content template used by ndx init when generating READM
 
 | Title | Status |
 |-------|--------|
-| [Add regression tests asserting all four required sections appear in generated README output](./add-regression-tests-asserting-094e97.md) | pending |
+| [Add regression tests asserting all four required sections appear in generated README output](./add-regression-tests-asserting-094e97.md) | completed |
 | [Update README generation template to include Overview, Quick Start, Testing, and License sections](./update-readme-generation-909899.md) | pending |

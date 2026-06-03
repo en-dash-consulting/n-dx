@@ -10,15 +10,22 @@
  *      instead writes the synthesized content to README.proposed.md.
  *   3. README.proposed.md is overwritten on rerun; the original is still
  *      untouched.
+ *   4. The synthesized content (in either output path) contains the four
+ *      required sections — Overview, Quick Start, Testing, License — in
+ *      that order, with non-empty stubs when their backing manifest fields
+ *      are absent. Pinned by the "README section template" describe block
+ *      below.
  *
  * The tests run `ndx init` against synthetic target repos in throwaway
  * temp dirs so the assertions stay isolated from the n-dx repo itself.
  *
  * TDD ordering: this file is the regression contract for the sibling tasks
- * "Generate target-repo README.md …" and "Write README.proposed.md instead
- * of overwriting an existing README …". Until those tasks ship, the body
- * tests are expected to fail — that is the red phase. Do not skip them;
- * the sibling implementations are responsible for turning them green.
+ * "Generate target-repo README.md …", "Write README.proposed.md instead
+ * of overwriting an existing README …", and "Update README generation
+ * template to include Overview, Quick Start, Testing, and License
+ * sections". Until those tasks ship, the body tests are expected to fail
+ * — that is the red phase. Do not skip them; the sibling implementations
+ * are responsible for turning them green.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
@@ -203,5 +210,153 @@ describe("ndx init: target-repo README generation", () => {
     expect(afterProposed).not.toBe(sentinel);
     expect(afterProposed.length).toBeGreaterThan(0);
     expectNoNdxFlavor(afterProposed);
+  });
+});
+
+/**
+ * Required section headings, in canonical order. The README template must
+ * emit them in this sequence in both output paths (README.md and
+ * README.proposed.md).
+ */
+const REQUIRED_HEADINGS = ["## Overview", "## Quick Start", "## Testing", "## License"];
+
+function assertAllSections(content) {
+  for (const heading of REQUIRED_HEADINGS) {
+    expect(content, `must contain "${heading}"`).toContain(heading);
+  }
+}
+
+function assertSectionOrder(content) {
+  const indexes = REQUIRED_HEADINGS.map((h) => content.indexOf(h));
+  for (let i = 1; i < indexes.length; i++) {
+    expect(
+      indexes[i],
+      `section "${REQUIRED_HEADINGS[i]}" must follow "${REQUIRED_HEADINGS[i - 1]}"`,
+    ).toBeGreaterThan(indexes[i - 1]);
+  }
+}
+
+/**
+ * Extract the body of a markdown section, given its heading. Returns the
+ * text between the heading and the next "##"-level heading (or EOF), with
+ * the heading marker itself and surrounding whitespace stripped.
+ */
+function extractSectionBody(content, heading) {
+  const startIdx = content.indexOf(heading);
+  if (startIdx === -1) return "";
+  const bodyStart = startIdx + heading.length;
+  const nextHeading = content.indexOf("\n## ", bodyStart);
+  const bodyEnd = nextHeading === -1 ? content.length : nextHeading;
+  return content.slice(bodyStart, bodyEnd).trim();
+}
+
+describe("ndx init: README section template", () => {
+  let tmpDir;
+  let binDir;
+  let initEnv;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-readme-sections-"));
+    binDir = await mkdtemp(join(tmpdir(), "ndx-init-readme-sections-bin-"));
+    await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+    initEnv = {
+      ...process.env,
+      PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+      CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
+    };
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+    await rm(binDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Write a package.json with all signals the section template can draw
+   * from — description (→ Overview), scripts.test (→ Testing), and a
+   * license field (→ License). Individual fields can be cleared by passing
+   * `{ <field>: undefined }` (JSON.stringify drops undefined values).
+   */
+  async function writeRichManifest(overrides = {}) {
+    const defaults = {
+      name: "synthetic-target-app",
+      version: "0.0.0",
+      description: "A synthetic project for section-template regression tests",
+      license: "MIT",
+      scripts: { test: "vitest run" },
+    };
+    await writeFile(
+      join(tmpDir, "package.json"),
+      JSON.stringify({ ...defaults, ...overrides }, null, 2) + "\n",
+    );
+  }
+
+  function ndxInit() {
+    return run(["init", "--provider=codex", "--no-claude", tmpDir], { env: initEnv });
+  }
+
+  it("primary README.md contains Overview, Quick Start, Testing, and License sections in order", async () => {
+    await writeRichManifest();
+
+    ndxInit();
+
+    const readme = await readFile(join(tmpDir, "README.md"), "utf-8");
+    assertAllSections(readme);
+    assertSectionOrder(readme);
+    expectNoNdxFlavor(readme);
+  });
+
+  it("proposed README.proposed.md mirrors all four sections in order", async () => {
+    await writeRichManifest();
+    // Pre-existing README forces the proposed-file output path.
+    await writeFile(join(tmpDir, "README.md"), "# Hand-written original\n");
+
+    ndxInit();
+
+    const proposedPath = join(tmpDir, "README.proposed.md");
+    expect(existsSync(proposedPath)).toBe(true);
+    const proposed = await readFile(proposedPath, "utf-8");
+    assertAllSections(proposed);
+    assertSectionOrder(proposed);
+    expectNoNdxFlavor(proposed);
+  });
+
+  it("emits a non-empty ## License stub when package.json lacks a license field", async () => {
+    await writeRichManifest({ license: undefined });
+    // Sanity-check the manifest we wrote actually has no license key.
+    const manifest = JSON.parse(
+      await readFile(join(tmpDir, "package.json"), "utf-8"),
+    );
+    expect(manifest.license).toBeUndefined();
+
+    ndxInit();
+
+    const readme = await readFile(join(tmpDir, "README.md"), "utf-8");
+    expect(readme).toContain("## License");
+    const body = extractSectionBody(readme, "## License");
+    expect(
+      body.length,
+      "License stub must be non-empty when no license is declared",
+    ).toBeGreaterThan(0);
+  });
+
+  it("emits a non-empty ## Testing stub when no test command is detected", async () => {
+    // Provide manifest with a build script but no test script — so the
+    // template has nothing to populate the Testing section with.
+    await writeRichManifest({ scripts: { build: "tsc -p ." } });
+    const manifest = JSON.parse(
+      await readFile(join(tmpDir, "package.json"), "utf-8"),
+    );
+    expect(manifest.scripts.test).toBeUndefined();
+
+    ndxInit();
+
+    const readme = await readFile(join(tmpDir, "README.md"), "utf-8");
+    expect(readme).toContain("## Testing");
+    const body = extractSectionBody(readme, "## Testing");
+    expect(
+      body.length,
+      "Testing stub must be non-empty when no test command is detected",
+    ).toBeGreaterThan(0);
   });
 });
