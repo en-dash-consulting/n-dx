@@ -37,6 +37,18 @@
   ],
   "zones": [
     {
+      "id": "components",
+      "files": [
+        "src/components/Button.tsx"
+      ]
+    },
+    {
+      "id": "hooks",
+      "files": [
+        "src/hooks/useToggle.ts"
+      ]
+    },
+    {
       "id": "src",
       "files": [
         "src/config.ts",
