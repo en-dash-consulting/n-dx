@@ -79,6 +79,14 @@ jobs:
       - name: Run unit tests
         run: pnpm -r run test
 
+      # Root-level e2e / integration / gauntlet suites live in tests/** and are
+      # NOT covered by `pnpm -r run test` (which only runs per-package tests).
+      # The bind-aware runner excludes the LLM-spend sourcevision eval gate
+      # (run separately via `pnpm gauntlet:evals`) and any loopback-bind suites
+      # when the runner can't bind a local socket.
+      - name: Run root e2e / integration tests
+        run: node scripts/run-vitest-bind-aware.mjs root
+
       - name: Require changeset
         # Skip on the Changesets release PR: that PR's whole purpose is
         # to consume the changesets, so the directory is empty by design.
