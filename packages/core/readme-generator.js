@@ -83,22 +83,33 @@ export function findExistingReadme(dir) {
  *
  * @param {string} dir
  * @returns {{ name: string | null, description: string | null,
- *   scripts: Record<string, string> | null, source: string | null }}
+ *   scripts: Record<string, string> | null, license: string | null,
+ *   source: string | null }}
  */
 export function readProjectManifest(dir) {
-  const empty = { name: null, description: null, scripts: null, source: null };
+  const empty = {
+    name: null, description: null, scripts: null, license: null, source: null,
+  };
 
   // 1. package.json (Node)
   const pkgPath = join(dir, "package.json");
   if (existsSync(pkgPath)) {
     try {
       const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+      let license = null;
+      if (typeof pkg.license === "string" && pkg.license.length > 0) {
+        license = pkg.license;
+      } else if (pkg.license && typeof pkg.license === "object" && typeof pkg.license.type === "string") {
+        // Deprecated object form: { type: "MIT", url: "..." }
+        license = pkg.license.type;
+      }
       return {
         name: typeof pkg.name === "string" && pkg.name.length > 0 ? pkg.name : null,
         description: typeof pkg.description === "string" && pkg.description.length > 0
           ? pkg.description
           : null,
         scripts: pkg.scripts && typeof pkg.scripts === "object" ? pkg.scripts : null,
+        license,
         source: "package.json",
       };
     } catch {
@@ -113,11 +124,15 @@ export function readProjectManifest(dir) {
       const py = readFileSync(pyPath, "utf-8");
       const nameMatch = py.match(/^\s*name\s*=\s*["']([^"'\n]+)["']/m);
       const descMatch = py.match(/^\s*description\s*=\s*["']([^"'\n]+)["']/m);
+      // License can appear as `license = "MIT"` or `license = { text = "MIT" }`.
+      const licenseStr = py.match(/^\s*license\s*=\s*["']([^"'\n]+)["']/m);
+      const licenseText = py.match(/^\s*license\s*=\s*\{[^}]*text\s*=\s*["']([^"'\n]+)["']/m);
       if (nameMatch || descMatch) {
         return {
           name: nameMatch ? nameMatch[1] : null,
           description: descMatch ? descMatch[1] : null,
           scripts: null,
+          license: licenseStr ? licenseStr[1] : (licenseText ? licenseText[1] : null),
           source: "pyproject.toml",
         };
       }
@@ -138,6 +153,7 @@ export function readProjectManifest(dir) {
           name: last || m[1],
           description: null,
           scripts: null,
+          license: null,
           source: "go.mod",
         };
       }
@@ -153,11 +169,13 @@ export function readProjectManifest(dir) {
       const cargo = readFileSync(cargoPath, "utf-8");
       const nameMatch = cargo.match(/^\s*name\s*=\s*"([^"\n]+)"/m);
       const descMatch = cargo.match(/^\s*description\s*=\s*"([^"\n]+)"/m);
+      const licenseMatch = cargo.match(/^\s*license\s*=\s*"([^"\n]+)"/m);
       if (nameMatch || descMatch) {
         return {
           name: nameMatch ? nameMatch[1] : null,
           description: descMatch ? descMatch[1] : null,
           scripts: null,
+          license: licenseMatch ? licenseMatch[1] : null,
           source: "Cargo.toml",
         };
       }
@@ -167,6 +185,83 @@ export function readProjectManifest(dir) {
   }
 
   return empty;
+}
+
+/**
+ * Detect the install + test commands appropriate for the project, based on
+ * its manifest source and lockfile presence.
+ *
+ * For Node projects, the package manager is inferred from lockfile
+ * presence (pnpm-lock.yaml → pnpm, yarn.lock → yarn, bun.lockb → bun,
+ * package-lock.json or default → npm). For non-Node manifests, the
+ * canonical install/test commands for that ecosystem are returned.
+ *
+ * Returned fields:
+ *   - installCommand — single-line shell command that installs dependencies
+ *     (or null when no signal is available).
+ *   - testCommand — single-line shell command that runs the project test
+ *     suite (or null when no signal is available — Node test commands are
+ *     only returned when `scripts.test` is set on the manifest).
+ *
+ * @param {string} dir
+ * @param {{ source: string | null, scripts: Record<string, string> | null }} manifest
+ * @returns {{ installCommand: string | null, testCommand: string | null,
+ *   packageManager: string | null }}
+ */
+export function detectCommands(dir, manifest) {
+  const source = manifest?.source ?? null;
+  const scripts = manifest?.scripts ?? null;
+
+  if (source === "package.json") {
+    let pm = "npm";
+    if (existsSync(join(dir, "pnpm-lock.yaml"))) pm = "pnpm";
+    else if (existsSync(join(dir, "yarn.lock"))) pm = "yarn";
+    else if (existsSync(join(dir, "bun.lockb"))) pm = "bun";
+    const installCommand = pm === "yarn" ? "yarn install" : `${pm} install`;
+    const hasTestScript = scripts && typeof scripts.test === "string" && scripts.test.length > 0;
+    const testCommand = hasTestScript ? `${pm} test` : null;
+    return { installCommand, testCommand, packageManager: pm };
+  }
+
+  if (source === "pyproject.toml") {
+    let installCommand = "pip install -e .";
+    if (existsSync(join(dir, "poetry.lock"))) installCommand = "poetry install";
+    else if (existsSync(join(dir, "uv.lock"))) installCommand = "uv sync";
+    return { installCommand, testCommand: "pytest", packageManager: null };
+  }
+
+  if (source === "go.mod") {
+    return { installCommand: "go mod download", testCommand: "go test ./...", packageManager: null };
+  }
+
+  if (source === "Cargo.toml") {
+    return { installCommand: "cargo build", testCommand: "cargo test", packageManager: null };
+  }
+
+  return { installCommand: null, testCommand: null, packageManager: null };
+}
+
+/**
+ * Detect a license file in the project root (case-insensitive). Returns
+ * the filename when found, used as a fallback signal when the manifest
+ * does not declare a license.
+ *
+ * @param {string} dir
+ * @returns {string | null}
+ */
+export function findLicenseFile(dir) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return null;
+  }
+  for (const name of entries) {
+    const lower = name.toLowerCase();
+    if (lower === "license" || lower === "licence") return name;
+    if (lower.startsWith("license.") || lower.startsWith("licence.")) return name;
+  }
+  return null;
 }
 
 /**
@@ -196,49 +291,81 @@ export function listTopLevelDirs(dir, limit = 12) {
 /**
  * Compose README markdown from manifest + structure data.
  *
- * Output is intentionally minimal — title, one-paragraph summary, and
- * either a structure or scripts overview (or both when available).
+ * The template guarantees four sections, in this canonical order:
+ *
+ *   1. ## Overview      — manifest `description` or a project-name stub
+ *   2. ## Quick Start   — install command (per detected package manager)
+ *                         plus an optional top-level structure summary
+ *   3. ## Testing       — detected test command or a stub explaining how
+ *                         to wire one up
+ *   4. ## License       — manifest `license` field or "See LICENSE"
+ *
+ * Every section emits a non-empty body even when its backing signal is
+ * absent, so the four canonical headings are stable across projects.
  *
  * @param {{ projectName: string, description: string | null,
- *   scripts: Record<string, string> | null, topLevelDirs: string[] }} input
+ *   scripts: Record<string, string> | null, topLevelDirs: string[],
+ *   license: string | null, installCommand: string | null,
+ *   testCommand: string | null, licenseFile: string | null }} input
  * @returns {string}
  */
-export function composeReadme({ projectName, description, scripts, topLevelDirs }) {
+export function composeReadme({
+  projectName, description, scripts, topLevelDirs,
+  license, installCommand, testCommand, licenseFile,
+}) {
   const lines = [`# ${projectName}`, ""];
 
+  // 1. Overview — from manifest description, otherwise a project-name stub.
+  lines.push("## Overview", "");
   if (description && description.trim().length > 0) {
     lines.push(description.trim(), "");
   } else {
     lines.push(`Source code for the \`${projectName}\` project.`, "");
   }
 
-  const hasScripts = scripts && Object.keys(scripts).length > 0;
-
+  // 2. Quick Start — install command (when detectable) + structure hint.
+  lines.push("## Quick Start", "");
+  if (installCommand) {
+    lines.push("```sh", installCommand, "```", "");
+  } else {
+    lines.push(
+      `Clone the repository, then follow your platform's standard build steps for \`${projectName}\`.`,
+      "",
+    );
+  }
   if (topLevelDirs.length > 0) {
-    lines.push("## Structure", "");
+    lines.push("Top-level layout:", "");
     for (const d of topLevelDirs) {
       lines.push(`- \`${d}/\``);
     }
     lines.push("");
   }
 
-  if (hasScripts) {
-    lines.push("## Scripts", "");
-    const keys = Object.keys(scripts);
-    for (const k of keys.slice(0, 20)) {
-      const cmd = scripts[k];
-      if (typeof cmd !== "string") continue;
-      lines.push(`- \`${k}\` — \`${cmd}\``);
-    }
-    lines.push("");
+  // 3. Testing — detected test command, otherwise a stub pointing at the
+  // manifest. Always populated so the heading is never followed by empty
+  // body (acceptance criterion: non-empty stub when no signal exists).
+  lines.push("## Testing", "");
+  if (testCommand) {
+    lines.push("```sh", testCommand, "```", "");
+  } else {
+    lines.push(
+      "No test command detected. Add a test script to your project manifest and document the command here.",
+      "",
+    );
   }
 
-  // Fallback: when neither structure nor scripts produced content, still
-  // emit a structure-only stub so the acceptance criterion "structure or
-  // scripts overview" is honored.
-  if (topLevelDirs.length === 0 && !hasScripts) {
-    lines.push("## Structure", "");
-    lines.push("- (no top-level directories detected)", "");
+  // 4. License — manifest `license` field, falling back to a LICENSE-file
+  // hint, falling back to a generic "See LICENSE" pointer.
+  lines.push("## License", "");
+  if (license && license.trim().length > 0) {
+    const licenseLine = licenseFile
+      ? `${license.trim()} — see [${licenseFile}](./${licenseFile}) for the full text.`
+      : `${license.trim()} — see LICENSE for the full text.`;
+    lines.push(licenseLine, "");
+  } else if (licenseFile) {
+    lines.push(`See [${licenseFile}](./${licenseFile}).`, "");
+  } else {
+    lines.push("See LICENSE.", "");
   }
 
   return lines.join("\n");
@@ -268,11 +395,17 @@ export function generateTargetReadme(dir) {
   const manifest = readProjectManifest(dir);
   const projectName = manifest.name || basename(resolve(dir));
   const topLevelDirs = listTopLevelDirs(dir);
+  const { installCommand, testCommand } = detectCommands(dir, manifest);
+  const licenseFile = findLicenseFile(dir);
   const content = composeReadme({
     projectName,
     description: manifest.description,
     scripts: manifest.scripts,
     topLevelDirs,
+    license: manifest.license,
+    installCommand,
+    testCommand,
+    licenseFile,
   });
 
   if (existing) {
