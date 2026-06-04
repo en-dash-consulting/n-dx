@@ -114,6 +114,7 @@ export {
 export type {
   LLMVendor,
   CodexConfig,
+  GoogleConfig,
   LLMConfig,
   LLMClient,
   TaskWeight,
@@ -203,6 +204,14 @@ export {
   parseOpenAiTokenUsage,
 } from "./openai-api-provider.js";
 export type { OpenAiApiProviderOptions } from "./openai-api-provider.js";
+
+export {
+  createGoogleApiProvider,
+  resolveGoogleApiKey,
+  parseGeminiTokenUsage,
+  validateGeminiModelId,
+} from "./google-api-provider.js";
+export type { GoogleApiProviderOptions } from "./google-api-provider.js";
 
 // Factory
 export {
