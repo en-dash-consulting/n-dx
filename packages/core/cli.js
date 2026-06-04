@@ -449,7 +449,8 @@ function extractModelFlags(args) {
     (a) =>
       a.startsWith("--model=") ||
       a.startsWith("--claude-model=") ||
-      a.startsWith("--codex-model="),
+      a.startsWith("--codex-model=") ||
+      a.startsWith("--google-model="),
   );
 }
 
@@ -486,8 +487,19 @@ function extractInitCodexModel(args) {
   return flag.slice("--codex-model=".length).trim();
 }
 
+function extractInitGoogleModel(args) {
+  const flag = args.find((a) => a.startsWith("--google-model="));
+  if (!flag) return undefined;
+  return flag.slice("--google-model=".length).trim();
+}
+
 function stripInitVendorModelFlags(args) {
-  return args.filter((a) => !a.startsWith("--claude-model=") && !a.startsWith("--codex-model="));
+  return args.filter(
+    (a) =>
+      !a.startsWith("--claude-model=") &&
+      !a.startsWith("--codex-model=") &&
+      !a.startsWith("--google-model="),
+  );
 }
 
 /**
@@ -567,7 +579,7 @@ function readLLMVendor(dir) {
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
     const vendor = data?.llm?.vendor;
-    return vendor === "claude" || vendor === "codex" ? vendor : undefined;
+    return vendor === "claude" || vendor === "codex" || vendor === "google" ? vendor : undefined;
   } catch {
     return undefined;
   }
@@ -875,6 +887,7 @@ function runInitCapture(toolPath, args) {
  * @param {string[]} rest
  * @returns {{ providerFromFlag: string|undefined, modelFromFlag: string|undefined,
  *   claudeModelFromFlag: string|undefined, codexModelFromFlag: string|undefined,
+ *   googleModelFromFlag: string|undefined,
  *   effectiveProvider: string|undefined, effectiveModel: string|undefined }}
  */
 function parseInitFlagSet(rest) {
@@ -882,9 +895,10 @@ function parseInitFlagSet(rest) {
   const modelFromFlag = extractInitModel(rest);
   const claudeModelFromFlag = extractInitClaudeModel(rest);
   const codexModelFromFlag = extractInitCodexModel(rest);
+  const googleModelFromFlag = extractInitGoogleModel(rest);
 
   if (providerFromFlag !== undefined && !SUPPORTED_PROVIDERS.includes(providerFromFlag)) {
-    console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude.`);
+    console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude, google.`);
     exitWithCleanup(1);
   }
 
@@ -894,6 +908,7 @@ function parseInitFlagSet(rest) {
     model: modelFromFlag,
     claudeModel: claudeModelFromFlag,
     codexModel: codexModelFromFlag,
+    googleModel: googleModelFromFlag,
   });
 
   if (validation.errors.length > 0) {
@@ -920,17 +935,22 @@ function parseInitFlagSet(rest) {
   // Resolve effective provider:
   // A lone vendor-specific flag implies the provider (e.g. --claude-model=X → provider=claude).
   // When both vendor-specific flags are present, --provider is required to set the active vendor.
+  const onlyClaudeModel = claudeModelFromFlag && !codexModelFromFlag && !googleModelFromFlag;
+  const onlyCodexModel = codexModelFromFlag && !claudeModelFromFlag && !googleModelFromFlag;
+  const onlyGoogleModel = googleModelFromFlag && !claudeModelFromFlag && !codexModelFromFlag;
   const effectiveProvider = providerFromFlag
-    || (claudeModelFromFlag && !codexModelFromFlag ? "claude"
-      : codexModelFromFlag && !claudeModelFromFlag ? "codex"
-        : undefined);
+    || (onlyClaudeModel ? "claude"
+      : onlyCodexModel ? "codex"
+        : onlyGoogleModel ? "google"
+          : undefined);
 
   // The active model is the --model flag, or the vendor-specific flag matching the active provider.
   const effectiveModel = modelFromFlag
     || (effectiveProvider === "claude" ? claudeModelFromFlag : undefined)
-    || (effectiveProvider === "codex" ? codexModelFromFlag : undefined);
+    || (effectiveProvider === "codex" ? codexModelFromFlag : undefined)
+    || (effectiveProvider === "google" ? googleModelFromFlag : undefined);
 
-  return { providerFromFlag, modelFromFlag, claudeModelFromFlag, codexModelFromFlag, effectiveProvider, effectiveModel };
+  return { providerFromFlag, modelFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, effectiveProvider, effectiveModel };
 }
 
 /**
@@ -1005,12 +1025,12 @@ function resolveInitAssistants(rest, dir) {
  * @param {string|undefined} effectiveProvider
  * @param {string|undefined} effectiveModel
  * @param {boolean} quiet
- * @param {{ providerFromFlag?: string, claudeModelFromFlag?: string, codexModelFromFlag?: string }} vendorFlags
+ * @param {{ providerFromFlag?: string, claudeModelFromFlag?: string, codexModelFromFlag?: string, googleModelFromFlag?: string }} vendorFlags
  * @returns {Promise<{ selectedProvider: string|undefined, selection: object,
  *   llmSkipped: boolean, providerSource: string, modelSource: string }>}
  */
 async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, vendorFlags = {}) {
-  const { providerFromFlag, claudeModelFromFlag, codexModelFromFlag } = vendorFlags;
+  const { providerFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag } = vendorFlags;
 
   const existingVendor = readLLMVendor(dir);
   const existingModel = readLLMModel(dir, effectiveProvider || existingVendor);
@@ -1033,9 +1053,14 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
   // Map providerSource / modelSource to user-facing labels for the summary.
   const modelFlagLabel = (selection.model === claudeModelFromFlag && claudeModelFromFlag) ? "--claude-model"
     : (selection.model === codexModelFromFlag && codexModelFromFlag) ? "--codex-model"
-      : "--model";
-  const providerFlagLabel = (!providerFromFlag && (claudeModelFromFlag || codexModelFromFlag))
-    ? `--${claudeModelFromFlag && !codexModelFromFlag ? "claude" : codexModelFromFlag && !claudeModelFromFlag ? "codex" : "vendor"}-model`
+      : (selection.model === googleModelFromFlag && googleModelFromFlag) ? "--google-model"
+        : "--model";
+  const vendorModelFlagCount = [claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag].filter(Boolean).length;
+  const providerFlagLabel = (!providerFromFlag && vendorModelFlagCount > 0)
+    ? `--${claudeModelFromFlag && vendorModelFlagCount === 1 ? "claude"
+        : codexModelFromFlag && vendorModelFlagCount === 1 ? "codex"
+          : googleModelFromFlag && vendorModelFlagCount === 1 ? "google"
+            : "vendor"}-model`
     : "--provider";
   const PROVIDER_SOURCE_LABELS = { flag: `from ${providerFlagLabel} flag`, config: "from existing config", prompt: "selected" };
   const MODEL_SOURCE_LABELS = { flag: `from ${modelFlagLabel} flag`, config: "from existing config", prompt: "selected" };
@@ -1086,9 +1111,9 @@ async function runSubInitPhase(name, work, detail, quiet) {
  * @param {string} dir
  * @param {{ llmSkipped: boolean, selectedProvider: string|undefined,
  *   selectedModel: string|undefined, claudeModelFromFlag: string|undefined,
- *   codexModelFromFlag: string|undefined }} opts
+ *   codexModelFromFlag: string|undefined, googleModelFromFlag: string|undefined }} opts
  */
-async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag }) {
+async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag }) {
   if (!llmSkipped && selectedProvider) {
     const origLog = console.log;
     console.log = () => {};
@@ -1099,13 +1124,17 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
       }
       // Persist vendor-specific models independently.
       // --claude-model always writes to llm.claude.model, --codex-model to
-      // llm.codex.model, even when the active vendor is different. This
-      // enables CI scripts that configure both vendors in a single init call.
+      // llm.codex.model, --google-model to llm.google.model, even when the
+      // active vendor is different. This enables CI scripts that configure
+      // multiple vendors in a single init call.
       if (claudeModelFromFlag && selectedProvider !== "claude") {
         await runConfig(["llm.claude.model", claudeModelFromFlag, dir]);
       }
       if (codexModelFromFlag && selectedProvider !== "codex") {
         await runConfig(["llm.codex.model", codexModelFromFlag, dir]);
+      }
+      if (googleModelFromFlag && selectedProvider !== "google") {
+        await runConfig(["llm.google.model", googleModelFromFlag, dir]);
       }
     } finally {
       console.log = origLog;
@@ -1146,7 +1175,7 @@ function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, 
 }
 
 async function handleInit(rest) {
-  const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
+  const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
   const initArgs = buildInitArgs(rest);
   const dir = resolveDir(initArgs);
@@ -1157,14 +1186,14 @@ async function handleInit(rest) {
 
   const assistantEnabled = resolveInitAssistants(rest, dir);
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
-    providerFromFlag, claudeModelFromFlag, codexModelFromFlag,
+    providerFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag,
   });
   const { selectedProvider, selection, llmSkipped, providerSource, modelSource } = llmResult;
 
   // When no provider is available and it wasn't a user cancellation (e.g.
   // non-TTY with no flags or config), exit with a clear message.
   if (!selectedProvider && !llmSkipped) {
-    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex' or 'claude'.");
+    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex', 'claude', or 'google'.");
     exitWithCleanup(1);
   }
 
@@ -1233,7 +1262,7 @@ async function handleInit(rest) {
 
   await persistInitLLMConfig(dir, {
     llmSkipped, selectedProvider, selectedModel: selection.model,
-    claudeModelFromFlag, codexModelFromFlag,
+    claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag,
   });
 
   try {
@@ -1564,7 +1593,7 @@ async function handleWork(rest) {
     const vendor = readLLMVendor(dir);
     if (!vendor) {
       console.error("Error: No LLM vendor configured for this project.");
-      console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+      console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', or 'ndx config llm.vendor google' to configure a vendor.");
       exitWithCleanup(1);
     }
   }

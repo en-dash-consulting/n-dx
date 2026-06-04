@@ -108,7 +108,8 @@ async function saveProjectJSON(path, data) {
     (data?.claude?.api_key && typeof data.claude.api_key === "string") ||
     (data?.llm?.claude?.api_key &&
       typeof data.llm.claude.api_key === "string") ||
-    (data?.llm?.codex?.api_key && typeof data.llm.codex.api_key === "string");
+    (data?.llm?.codex?.api_key && typeof data.llm.codex.api_key === "string") ||
+    (data?.llm?.google?.api_key && typeof data.llm.google.api_key === "string");
   if (hasSensitiveData) {
     await chmod(path, 0o600);
   }
@@ -470,6 +471,94 @@ async function testApiConnection(apiKey, endpoint, model) {
 }
 
 /**
+ * Validate llm.google.api_key: check the format matches the Google AI key pattern.
+ * Google API keys start with "AIza" and are at least 30 characters.
+ * Throws with a helpful message on failure.
+ */
+function validateGoogleApiKey(value) {
+  if (typeof value !== "string" || !value.startsWith("AIza") || value.length < 30) {
+    throw new Error(
+      `Invalid API key format. Google AI keys start with "AIza" and are at least 30 characters.\n` +
+        "  Get your key at: https://aistudio.google.com/apikey",
+    );
+  }
+}
+
+/**
+ * Run a lightweight preflight call to the Gemini API to validate the API key.
+ *
+ * Reads the API key from llmConfig.google.api_key or the GEMINI_API_KEY env var.
+ * Returns { ok: true } on success, or { ok: false, detail, errorCode } on failure.
+ *
+ * Test bypass: set NDX_TEST_GOOGLE_PREFLIGHT=ok to skip the HTTP call (for integration
+ * tests that cannot make real Gemini API requests).
+ *
+ * @param {object} llmConfig  Contents of .n-dx.json llm section
+ * @returns {Promise<{ ok: boolean, vendor: "google", detail?: string, errorCode?: string }>}
+ */
+async function runGoogleApiPreflight(llmConfig) {
+  // Test bypass: allows integration tests to simulate successful auth without HTTP
+  if (process.env.NDX_TEST_GOOGLE_PREFLIGHT === "ok") {
+    return { ok: true, vendor: "google" };
+  }
+
+  const apiKey = llmConfig?.google?.api_key || process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return {
+      ok: false,
+      vendor: "google",
+      detail:
+        "No API key found. Set the GEMINI_API_KEY environment variable or store the key with: " +
+        "n-dx config llm.google.api_key <key>",
+      errorCode: "NDX_GOOGLE_PREFLIGHT_NO_KEY",
+    };
+  }
+
+  if (!apiKey.startsWith("AIza") || apiKey.length < 30) {
+    return {
+      ok: false,
+      vendor: "google",
+      detail: `API key format is invalid. Google AI keys start with "AIza" and are at least 30 characters.`,
+      errorCode: "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT",
+    };
+  }
+
+  // Lightweight live call: list models (pageSize=1 minimises response size)
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}&pageSize=1`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (resp.ok) {
+      return { ok: true, vendor: "google" };
+    }
+    let detail;
+    if (resp.status === 400) {
+      detail = "API key is invalid or malformed.";
+    } else if (resp.status === 403) {
+      detail = "API key is not authorised for the Generative Language API. Ensure the API is enabled in your Google Cloud project.";
+    } else {
+      detail = `Gemini API returned HTTP ${resp.status}.`;
+    }
+    return {
+      ok: false,
+      vendor: "google",
+      detail,
+      errorCode: (resp.status === 400 || resp.status === 403)
+        ? "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED"
+        : "NDX_GOOGLE_PREFLIGHT_HTTP_ERROR",
+      statusCode: resp.status,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      vendor: "google",
+      detail: err?.message || "Failed to connect to the Gemini API.",
+      errorCode: "NDX_GOOGLE_PREFLIGHT_CONNECT_ERROR",
+    };
+  }
+}
+
+/**
  * Validate claude.api_endpoint: check the URL is well-formed.
  * Throws with a helpful message on failure.
  */
@@ -590,9 +679,9 @@ const CLAUDE_VALIDATORS = {
  * Validate llm.vendor.
  */
 function validateLLMVendor(value) {
-  if (value !== "claude" && value !== "codex") {
+  if (value !== "claude" && value !== "codex" && value !== "google") {
     throw new Error(
-      `Invalid vendor "${value}". Expected one of: claude, codex.`,
+      `Invalid vendor "${value}". Expected one of: claude, codex, google.`,
     );
   }
 }
@@ -620,6 +709,9 @@ const LLM_VALIDATORS = {
   "codex.cli_path": validateCodexCliPath,
   "codex.api_endpoint": validateApiEndpoint,
   "codex.model": validateModel,
+  "google.api_key": validateGoogleApiKey,
+  "google.api_endpoint": validateApiEndpoint,
+  "google.model": validateModel,
   autoFailover: validateAutoFailover,
 };
 
@@ -647,8 +739,17 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
 /**
  * Run provider auth preflight for the selected vendor.
  * Returns an object instead of throwing so callers can branch deterministically.
+ *
+ * For google, performs a lightweight HTTP call to the Gemini API.
+ * For claude/codex, spawns the vendor CLI synchronously.
+ *
+ * @returns {Promise<{ ok: boolean, binary?: string, args?: string[], detail?: string, errorCode?: string }>}
  */
-function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
+async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
+  if (vendor === "google") {
+    return runGoogleApiPreflight(llmConfig);
+  }
+
   const { binary, args } = getVendorAuthPreflightCommand(
     vendor,
     llmConfig,
@@ -811,6 +912,28 @@ function printVendorPreflightFailure(
   llmConfig,
   legacyClaudeConfig,
 ) {
+  // Google uses API-key auth — no binary / CLI args to display.
+  if (vendor === "google") {
+    const errorCode = preflight.errorCode || "NDX_GOOGLE_PREFLIGHT_FAILED";
+    console.error(`Provider auth preflight failed for "google".`);
+    if (preflight.detail) {
+      console.error(`Details: ${preflight.detail}`);
+    }
+    console.error(`[${errorCode}]`);
+    if (
+      preflight.errorCode === "NDX_GOOGLE_PREFLIGHT_NO_KEY" ||
+      preflight.errorCode === "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT"
+    ) {
+      console.error("Get a free API key at: https://aistudio.google.com/apikey");
+      console.error("Set it with: export GEMINI_API_KEY=<your-key>");
+      console.error("Or store in config: n-dx config llm.google.api_key <your-key>");
+    } else if (preflight.errorCode === "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED") {
+      console.error("Get a valid API key at: https://aistudio.google.com/apikey");
+    }
+    console.error(`Retry after updating your key: ndx config llm.vendor google`);
+    return;
+  }
+
   console.error(
     `Provider auth preflight failed for "${vendor}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
   );
@@ -961,7 +1084,7 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Example: claude-haiku-4-20250414
 
 LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendor setup):
-  llm.vendor               string    Active LLM vendor: "claude" or "codex"
+  llm.vendor               string    Active LLM vendor: "claude", "codex", or "google"
                                     Required for multi-vendor workflows.
   llm.claude.cli_path      string    Claude CLI path (optional; validated executable)
                                     Stored in .n-dx.local.json.
@@ -981,6 +1104,12 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     When set, commands that explicitly opt into the
                                     light tier use this model.
                                     Falls back to gpt-5.4-mini if not set.
+  llm.google.api_key       string    Google Gemini API key (optional; validated format)
+                                    Preflight validates the key against the Gemini API.
+                                    Set GEMINI_API_KEY env var as an alternative.
+                                    Get a key at: https://aistudio.google.com/apikey
+  llm.google.api_endpoint  string    Gemini API endpoint (optional; validated URL)
+  llm.google.model         string    Gemini default model (optional)
   llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
                                     When true, hench retries failed runs on fallback models
                                     before surfacing the original error. Disabled by default
@@ -991,6 +1120,13 @@ Claude preflight error codes:
   NDX_CLAUDE_PREFLIGHT_NOT_ON_PATH    Configured Claude command is not resolvable on PATH
   NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED  Claude CLI is present but needs authentication
   NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED  Claude appears authenticated/installed, but ndx cannot launch a usable executable
+
+Google preflight error codes:
+  NDX_GOOGLE_PREFLIGHT_NO_KEY           No GEMINI_API_KEY env var or llm.google.api_key in config
+  NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT  Key does not match expected format (starts with "AIza", ≥30 chars)
+  NDX_GOOGLE_PREFLIGHT_AUTH_FAILED      Gemini API rejected the key (HTTP 400 or 403)
+  NDX_GOOGLE_PREFLIGHT_HTTP_ERROR       Gemini API returned an unexpected HTTP error
+  NDX_GOOGLE_PREFLIGHT_CONNECT_ERROR    Could not connect to the Gemini API
 
 Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.rex.showTokenBudget      boolean   Show token budget on task items (default: false)
@@ -1120,6 +1256,7 @@ Examples:
                                                Set default model for API calls
   n-dx config llm.vendor claude                Set active LLM vendor to Claude
   n-dx config llm.vendor codex                 Set active LLM vendor to Codex
+  n-dx config llm.vendor google                Set active LLM vendor to Google (Gemini)
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config llm.claude.model claude-opus-4-20250514
                                                Set Claude model (llm namespace)
@@ -1330,7 +1467,7 @@ async function coerceAndValidateProjectValue(
 }
 
 /** Run vendor auth preflight when setting llm.vendor. */
-function runLLMVendorPreflight(coerced, configs) {
+async function runLLMVendorPreflight(coerced, configs) {
   const currentLLM =
     configs.llm && typeof configs.llm === "object" ? configs.llm : {};
   const llmForPreflight = { ...currentLLM, vendor: coerced };
@@ -1339,7 +1476,7 @@ function runLLMVendorPreflight(coerced, configs) {
       ? configs.claude
       : undefined;
 
-  const preflight = runVendorAuthPreflight(
+  const preflight = await runVendorAuthPreflight(
     coerced,
     llmForPreflight,
     legacyClaude,
@@ -1378,7 +1515,7 @@ async function handleSetProjectSection(
 
   // Vendor auth preflight for llm.vendor
   if (pkg === "llm" && settingPath === "vendor") {
-    runLLMVendorPreflight(coerced, configs);
+    await runLLMVendorPreflight(coerced, configs);
   }
 
   setByPath(configs[pkg], settingPath, coerced);

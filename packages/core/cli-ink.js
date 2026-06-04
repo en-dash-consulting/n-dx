@@ -162,6 +162,7 @@ function InitApp({
   assistantEnabled,
   claudeModelFromFlag,
   codexModelFromFlag,
+  googleModelFromFlag,
   llmSkipped,
   tools,
   runInitCapture,
@@ -229,6 +230,9 @@ function InitApp({
         }
         if (codexModelFromFlag && provider !== "codex") {
           await spawnAsync("node", [cliPath, "config", "llm.codex.model", codexModelFromFlag, dir]);
+        }
+        if (googleModelFromFlag && provider !== "google") {
+          await spawnAsync("node", [cliPath, "config", "llm.google.model", googleModelFromFlag, dir]);
         }
       }
 
