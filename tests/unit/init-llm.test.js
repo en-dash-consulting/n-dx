@@ -1027,4 +1027,121 @@ describe("validateInitFlags", () => {
       expect(Object.keys(result).sort()).toEqual(["errors", "warnings"]);
     });
   });
+
+  // ── Google model flag ──────────────────────────────────────────────────────
+
+  describe("google model flag", () => {
+    it("accepts --google-model alone without errors", () => {
+      const { errors } = validateInitFlags({ googleModel: "gemini-2.5-pro" });
+      expect(errors).toEqual([]);
+    });
+
+    it("errors when --google-model and --model are both set", () => {
+      const { errors } = validateInitFlags({ googleModel: "gemini-2.5-pro", model: "gemini-2.5-pro" });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("Cannot set both --google-model and --model");
+    });
+
+    it("warns when --google-model is not in google catalog", () => {
+      const { errors, warnings } = validateInitFlags({ googleModel: "gemini-custom-v99" });
+      expect(errors).toEqual([]);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('Unknown model "gemini-custom-v99"');
+      expect(warnings[0]).toContain("google");
+      expect(warnings[0]).toContain("Proceeding anyway");
+    });
+
+    it("does not warn when --google-model is in catalog", () => {
+      const { warnings } = validateInitFlags({ googleModel: "gemini-2.5-pro" });
+      expect(warnings).toEqual([]);
+    });
+
+    it("accepts --provider=google + --google-model (same vendor)", () => {
+      const { errors } = validateInitFlags({ provider: "google", googleModel: "gemini-2.5-pro" });
+      expect(errors).toEqual([]);
+    });
+
+    it("--google-model alone implies google as effective provider for --model check", () => {
+      const { errors, warnings } = validateInitFlags({ googleModel: "gemini-2.5-pro", model: "gemini-2.5-pro" });
+      // Combination is ambiguous — error, not warning
+      expect(errors).toHaveLength(1);
+    });
+  });
+});
+
+// ─── google provider in SUPPORTED_PROVIDERS ──────────────────────────────────
+
+describe("google provider", () => {
+  it("google is in SUPPORTED_PROVIDERS", () => {
+    expect(SUPPORTED_PROVIDERS).toContain("google");
+  });
+
+  it("PROVIDER_LABELS has google label", () => {
+    expect(PROVIDER_LABELS).toHaveProperty("google");
+    expect(PROVIDER_LABELS.google).toBe("Gemini (Google)");
+  });
+
+  it("LLM_MODEL_CATALOG has google entry", () => {
+    expect(LLM_MODEL_CATALOG).toHaveProperty("google");
+    expect(Array.isArray(LLM_MODEL_CATALOG.google)).toBe(true);
+    expect(LLM_MODEL_CATALOG.google.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("google catalog has exactly one recommended model", () => {
+    const recommended = LLM_MODEL_CATALOG.google.filter((m) => m.recommended);
+    expect(recommended).toHaveLength(1);
+  });
+
+  it("google recommended model is gemini-2.5-pro", () => {
+    const recommended = getRecommendedModel("google");
+    expect(recommended).toBeDefined();
+    expect(recommended.id).toBe("gemini-2.5-pro");
+  });
+
+  it("resolveInitLLMSelection carries over existing google config", () => {
+    const result = resolveInitLLMSelection({
+      flags: {},
+      existingConfig: { vendor: "google", model: "gemini-2.5-pro" },
+      isTTY: true,
+    });
+    expect(result.provider).toBe("google");
+    expect(result.providerSource).toBe("config");
+    expect(result.model).toBe("gemini-2.5-pro");
+    expect(result.needsProviderPrompt).toBe(false);
+    expect(result.needsModelPrompt).toBe(false);
+  });
+
+  it("promptLLMSelection works end-to-end for google", async () => {
+    const resolution = {
+      provider: undefined,
+      model: undefined,
+      providerSource: undefined,
+      modelSource: undefined,
+      needsProviderPrompt: true,
+      needsModelPrompt: true,
+    };
+    const result = await promptLLMSelection(resolution, {
+      promptProvider: async () => "google",
+      promptModel: async () => "gemini-2.5-flash",
+    });
+    expect(result.provider).toBe("google");
+    expect(result.model).toBe("gemini-2.5-flash");
+    expect(result.providerSource).toBe("prompt");
+    expect(result.modelSource).toBe("prompt");
+    expect(result.cancelled).toBe(false);
+  });
+
+  it("default model prompt auto-selects recommended google model in non-TTY", async () => {
+    const resolution = {
+      provider: "google",
+      model: undefined,
+      providerSource: "flag",
+      modelSource: undefined,
+      needsProviderPrompt: false,
+      needsModelPrompt: true,
+    };
+    const result = await promptLLMSelection(resolution);
+    expect(result.model).toBe("gemini-2.5-pro");
+    expect(result.modelSource).toBe("prompt");
+  });
 });

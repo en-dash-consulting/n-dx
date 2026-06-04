@@ -254,6 +254,100 @@ describe("n-dx init provider selection", () => {
     });
   });
 
+  describe("google provider init", () => {
+    /**
+     * Google preflight uses the Gemini API HTTP call rather than a CLI binary.
+     *
+     * Happy-path tests set NDX_TEST_GOOGLE_PREFLIGHT=ok (test bypass that skips
+     * the live HTTP call) and a format-valid GEMINI_API_KEY.  Missing-key tests
+     * omit both so the preflight returns a key-not-found error before any HTTP.
+     */
+    function pathEnvWith(...dirs) {
+      return {
+        ...process.env,
+        PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
+        // Suppress accidental real HTTP calls in CI by default (overridden per test)
+        GEMINI_API_KEY: undefined,
+        NDX_TEST_GOOGLE_PREFLIGHT: undefined,
+      };
+    }
+
+    it("completes google init and persists vendor to config (happy path)", async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-ok-"));
+      try {
+        run(["init", "--provider=google", "--no-claude", projectDir], {
+          env: {
+            ...pathEnvWith(),
+            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+          },
+        });
+        const ndxConfig = JSON.parse(await readFile(join(projectDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("google");
+      } finally {
+        await rm(projectDir, { recursive: true, force: true });
+      }
+    });
+
+    it("shows google in LLM configuration summary after init", async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-summary-"));
+      try {
+        const output = run(["init", "--provider=google", "--no-claude", projectDir], {
+          env: {
+            ...pathEnvWith(),
+            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+          },
+        });
+        expect(output).toContain("LLM configuration");
+        expect(output).toMatch(/Provider\s+google/);
+      } finally {
+        await rm(projectDir, { recursive: true, force: true });
+      }
+    });
+
+    it("fails with actionable message when GEMINI_API_KEY is absent", () => {
+      const result = runFail(["init", "--provider=google", "--no-claude", tmpDir], {
+        env: {
+          ...pathEnvWith(),
+          // Explicitly strip the key and bypass flag so preflight runs for real
+          GEMINI_API_KEY: undefined,
+          NDX_TEST_GOOGLE_PREFLIGHT: undefined,
+        },
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Provider auth preflight failed for \"google\"");
+      expect(result.stderr).toContain("NDX_GOOGLE_PREFLIGHT_NO_KEY");
+      expect(result.stderr).toContain("aistudio.google.com/apikey");
+    });
+
+    it("skips provider re-prompt when existing config already has google vendor (idempotency)", async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-reuse-"));
+      try {
+        // First init
+        run(["init", "--provider=google", "--no-claude", projectDir], {
+          env: {
+            ...pathEnvWith(),
+            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+          },
+        });
+        // Second init — no --provider flag; should re-use existing config
+        run(["init", "--no-claude", projectDir], {
+          env: {
+            ...pathEnvWith(),
+            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+          },
+        });
+        const ndxConfig = JSON.parse(await readFile(join(projectDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("google");
+      } finally {
+        await rm(projectDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("branded init experience", () => {
     it("shows trex mascot banner during init", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-phases-"));
