@@ -51,6 +51,22 @@ export interface CodexConfig {
   lightModel?: string;
 }
 
+/** Optional Google Gemini-specific config section in `.n-dx.json`. */
+export interface GoogleConfig {
+  /** Google API key (from Google AI Studio or GCP). */
+  api_key?: string;
+  /** Custom API endpoint base URL. When set, overrides the default Gemini URL. */
+  api_endpoint?: string;
+  /** Default Gemini model ID (e.g. `"gemini-2.5-pro"`). */
+  model?: string;
+  /**
+   * Model override for the 'light' task weight tier.
+   * When set, resolveVendorModel uses this model for light-weight tasks
+   * instead of TIER_MODELS.google.light.
+   */
+  lightModel?: string;
+}
+
 /** Vendor-neutral config shape loaded from `.n-dx.json`. */
 export interface LLMConfig {
   /** Default vendor selected by the project. */
@@ -66,6 +82,8 @@ export interface LLMConfig {
   claude?: ClaudeConfig;
   /** Codex-specific config (reserved for adapter integration). */
   codex?: CodexConfig;
+  /** Google Gemini-specific config. */
+  google?: GoogleConfig;
   /**
    * Enable automatic failover on model/vendor errors.
    * When true, hench retries failed runs on fallback models before surfacing errors.

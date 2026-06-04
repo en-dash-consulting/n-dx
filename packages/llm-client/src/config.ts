@@ -35,6 +35,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-4-6",
   codex: "gpt-5.5",
+  google: "gemini-2.5-pro",
 };
 
 /**
@@ -54,6 +55,10 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
   codex: {
     light: "gpt-5.4-mini",
     standard: NEWEST_MODELS.codex,
+  },
+  google: {
+    light: "gemini-2.0-flash",
+    standard: NEWEST_MODELS.google,
   },
 };
 
@@ -79,6 +84,9 @@ const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
 export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
   claude: 640_000,
   codex: 400_000,
+  // Gemini models have 1M+ token context windows; cap conservatively to
+  // leave room for system prompt, tool definitions, and model overhead.
+  google: 800_000,
 };
 
 /**
@@ -172,6 +180,22 @@ export function resolveVendorModel(
       return normalizeCodexModel(config.codex.model);
     }
     return TIER_MODELS.codex.standard;
+  }
+  if (vendor === "google") {
+    if (weight === "light") {
+      if (config?.google?.lightModel) {
+        return config.google.lightModel;
+      }
+      return TIER_MODELS.google.light;
+    }
+    // Standard tier precedence: top-level llm.model > llm.google.model > tier default.
+    if (config?.model) {
+      return config.model;
+    }
+    if (config?.google?.model) {
+      return config.google.model;
+    }
+    return TIER_MODELS.google.standard;
   }
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).
