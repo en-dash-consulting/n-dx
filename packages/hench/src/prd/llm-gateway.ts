@@ -127,6 +127,8 @@ export {
   resolveModel,
   resolveVendorModel,
   NEWEST_MODELS,
+  TIER_MODELS,
+  GOOGLE_MODELS,
   VENDOR_CONTEXT_CHAR_LIMITS,
   isModelCompatibleWithVendor,
   resetStaleModel,
@@ -177,6 +179,8 @@ export type {
   LLMProvider,
   ProviderInfo,
 } from "@n-dx/llm-client";
+
+export type { GoogleConfig } from "@n-dx/llm-client";
 
 export type {
   ClaudeConfig,

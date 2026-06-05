@@ -157,7 +157,7 @@ export async function cmdPrune(
         const dryRunVendor = getLLMVendor() ?? "claude";
         const dryRunModelSource = flags.model
           ? "cli-override" as const
-          : llmConfig.claude?.model || llmConfig.codex?.model
+          : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
             ? "configured" as const
             : "default" as const;
         printVendorModelHeader(dryRunVendor, llmConfig, {
@@ -380,7 +380,7 @@ async function consolidateAfterPrune(
     const vendor = getLLMVendor() ?? "claude";
     const modelSource = flags.model
       ? "cli-override" as const
-      : llmConfig.claude?.model || llmConfig.codex?.model
+      : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
         ? "configured" as const
         : "default" as const;
     printVendorModelHeader(vendor, llmConfig, {
@@ -544,7 +544,7 @@ async function smartPrune(
   const vendor = getLLMVendor() ?? "claude";
   const modelSource = flags.model
     ? "cli-override" as const
-    : llmConfig.claude?.model || llmConfig.codex?.model
+    : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
       ? "configured" as const
       : "default" as const;
   printVendorModelHeader(vendor, llmConfig, {
