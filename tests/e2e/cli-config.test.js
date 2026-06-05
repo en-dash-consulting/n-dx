@@ -1151,8 +1151,7 @@ describe("n-dx config", () => {
       expect(stderr).toContain("30 characters");
     });
 
-    it("rejects an empty string", () => {
-      // An empty string fails both the startsWith and length checks
+    it("rejects a key with no recognizable prefix", () => {
       const stderr = runFail(["llm.google.api_key", "notakeyatall", tmpDir]);
       expect(stderr).toContain("Invalid API key format");
     });

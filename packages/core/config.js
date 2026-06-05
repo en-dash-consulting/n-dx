@@ -474,8 +474,10 @@ async function testApiConnection(apiKey, endpoint, model) {
  * Validate llm.google.api_key: check the format matches the Google AI key pattern.
  * Google API keys start with "AIza" and are at least 30 characters.
  * Throws with a helpful message on failure.
+ *
+ * Exported for unit testing; internal use also via LLM_VALIDATORS.
  */
-function validateGoogleApiKey(value) {
+export function validateGoogleApiKey(value) {
   if (typeof value !== "string" || !value.startsWith("AIza") || value.length < 30) {
     throw new Error(
       `Invalid API key format. Google AI keys start with "AIza" and are at least 30 characters.\n` +

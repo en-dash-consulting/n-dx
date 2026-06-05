@@ -38,6 +38,72 @@ describe("Google config validation gauntlet", () => {
     expect(googleApiProvider).toBeDefined();
   });
 
+  // ── validateGoogleApiKey — key format boundary cases ──────────────────────
+
+  describe("validateGoogleApiKey", () => {
+    it("exports validateGoogleApiKey from packages/core/config.js", async () => {
+      const mod = await import("../../packages/core/config.js");
+      expect(typeof mod.validateGoogleApiKey).toBe("function");
+    });
+
+    it("accepts a valid 39-char AIza... key (typical Google AI Studio format)", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      expect(() =>
+        validateGoogleApiKey("AIzaSyDdI0hATkDExampleKey1234567890X"),
+      ).not.toThrow();
+    });
+
+    it("accepts a 30-char minimum-length AIza... key", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      const key = "AIzaShortestValidKey1234567890";
+      expect(key.length).toBe(30);
+      expect(() => validateGoogleApiKey(key)).not.toThrow();
+    });
+
+    it("rejects a key shorter than 30 characters", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      const shortKey = "AIzaSyShort12345678"; // 19 chars — well under 30
+      expect(shortKey.length).toBeLessThan(30);
+      expect(() => validateGoogleApiKey(shortKey)).toThrow(/Invalid API key format/);
+    });
+
+    it("rejects a key with the wrong prefix (no AIza)", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      expect(() =>
+        validateGoogleApiKey("sk-ant-api03-not-google-12345678901234567890"),
+      ).toThrow(/Invalid API key format/);
+    });
+
+    it("rejects an empty string", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      expect(() => validateGoogleApiKey("")).toThrow(/Invalid API key format/);
+    });
+
+    it("error message mentions AIza prefix and 30-character minimum", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      let caught;
+      try {
+        validateGoogleApiKey("bad-key");
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeDefined();
+      expect(caught.message).toContain("AIza");
+      expect(caught.message).toContain("30 characters");
+    });
+
+    it("error message includes aistudio.google.com hint URL", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      let caught;
+      try {
+        validateGoogleApiKey("wrong");
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught?.message).toContain("aistudio.google.com");
+    });
+  });
+
   // ── validateGeminiModelId ──────────────────────────────────────────────────
 
   describe("validateGeminiModelId", () => {
