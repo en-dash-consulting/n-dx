@@ -27,11 +27,12 @@ export type { LLMVendor };
  *
  * - `light` — simple classification and other explicitly low-complexity work
  * - `standard` — multi-turn agents, deep analysis, full-capability tasks
+ * - `heavy` — maximum capability: complex reasoning, long-horizon tasks
  *
  * Used by `resolveVendorModel()` to select the appropriate model tier.
  * When omitted, defaults to 'standard' for backward compatibility.
  */
-export type TaskWeight = "light" | "standard";
+export type TaskWeight = "light" | "standard" | "heavy";
 
 /** Optional Codex-specific config section in `.n-dx.json`. */
 export interface CodexConfig {

@@ -153,8 +153,15 @@ export {
   resolveVendorModel,
   NEWEST_MODELS,
   TIER_MODELS,
+  GOOGLE_MODELS,
   VENDOR_CONTEXT_CHAR_LIMITS,
+  MODEL_CONTEXT_WINDOWS,
+  MODEL_COSTS,
 } from "./config.js";
+
+// Budget preflight
+export { budgetPreflight } from "./budget-preflight.js";
+export type { BudgetPreflightResult } from "./budget-preflight.js";
 
 // Token usage parsing
 export {

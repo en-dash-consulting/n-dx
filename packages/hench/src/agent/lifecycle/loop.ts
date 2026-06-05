@@ -414,21 +414,101 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   // Resolve provider — registry or legacy path based on config flag
   const llmConfig = await loadLLMConfig(henchDir);
+  const effectiveVendor = resolveLLMVendor(llmConfig);
   let provider: LLMProvider;
 
-  if (config.useRegistryProvider) {
-    // New path: ProviderRegistry resolution
+  if (config.useRegistryProvider || effectiveVendor === "google") {
+    // New path: ProviderRegistry resolution.
+    // Google always uses the registry (it has no legacy API path).
     provider = defaultRegistry.getActiveProvider(llmConfig);
   } else {
     // Legacy path: manual vendor check with original error message
-    const legacyVendor = resolveLLMVendor(llmConfig);
-    if (legacyVendor !== "claude") {
+    if (effectiveVendor !== "claude") {
       throw new Error(
-        `Hench API mode requires llm.vendor=claude. Current vendor: ${legacyVendor}. ` +
+        `Hench API mode requires llm.vendor=claude. Current vendor: ${effectiveVendor}. ` +
         "Use provider=cli for Codex.",
       );
     }
     provider = defaultRegistry.create("claude", llmConfig);
+  }
+
+  // Google uses LLMProvider.complete() — simple single-turn completion.
+  // The Gemini REST API does not support multi-turn tool-use in the same way
+  // as the Anthropic SDK, so Google runs go through a simplified completion
+  // path that records a valid run record and returns immediately.
+  if (effectiveVendor === "google") {
+    const { run, memoryCtx: googleMemCtx } = await initRunRecord({
+      taskId,
+      taskTitle: brief.task.title,
+      model,
+      henchDir,
+      vendor: "google",
+      sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
+      approvals: DEFAULT_EXECUTION_POLICY.approvals,
+      parseMode: "provider-api",
+      invocationContext: "api",
+    });
+
+    section(
+      opts.runNumber !== undefined
+        ? `Agent Run #${opts.runNumber} (${model}) start`
+        : `Agent Run (${model})`,
+    );
+
+    const googleHeartbeat = startHeartbeat(henchDir, run);
+
+    try {
+      // Combine system prompt + brief for Gemini REST call.
+      const fullPrompt = systemPrompt
+        ? `${systemPrompt}\n\n${briefText}`
+        : briefText;
+
+      stream("Gemini", "Sending prompt to Gemini API...");
+      const completionResult = await provider.complete({ prompt: fullPrompt, model });
+
+      run.status = "completed";
+      run.turns = 1;
+      run.summary = completionResult.text?.slice(0, 500);
+      if (completionResult.tokenUsage) {
+        run.tokenUsage.input = completionResult.tokenUsage.input;
+        run.tokenUsage.output = completionResult.tokenUsage.output;
+        run.turnTokenUsage = [{
+          turn: 1,
+          input: completionResult.tokenUsage.input,
+          output: completionResult.tokenUsage.output,
+          vendor: "google",
+          model,
+        }];
+      }
+
+      stream(formatModelLabel(model), completionResult.text ?? "");
+    } catch (err) {
+      run.status = "failed";
+      run.error = (err as Error).message;
+      console.error(`[Error] ${run.error}`);
+      await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+    } finally {
+      googleHeartbeat.stop();
+    }
+
+    await finalizeRun({
+      run,
+      henchDir,
+      projectDir,
+      config,
+      testCommand: brief.project.testCommand,
+      heartbeat: googleHeartbeat,
+      memoryCtx: googleMemCtx,
+      selfHeal: config.selfHeal,
+      rollbackOnFailure: opts.rollbackOnFailure,
+      yes: opts.yes,
+      autonomous: opts.autonomous,
+      store,
+      autoCommit: config.autoCommit === true,
+      skipFullTestGate: config.skipFullTestGate,
+    });
+
+    return { run };
   }
 
   const { client, vendor, toolCtx } = await initApiResources(

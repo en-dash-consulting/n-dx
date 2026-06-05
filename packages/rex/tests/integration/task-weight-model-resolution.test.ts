@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { NEWEST_MODELS } from "@n-dx/llm-client";
+import { NEWEST_MODELS, TIER_MODELS } from "@n-dx/llm-client";
 import { cmdInit } from "../../src/cli/commands/init.js";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -295,6 +295,43 @@ describe("task-weight model resolution in rex commands", () => {
 
       expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
       expect(capturedSmartAddModels[0]).toBe(NEWEST_MODELS.codex);
+    });
+
+    it("falls back to the current Google default when vendor=google and no google model is configured", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          llm: {
+            vendor: "google",
+          },
+        }),
+        "utf-8",
+      );
+
+      await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
+
+      expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
+      // Standard tier uses TIER_MODELS.google.standard (gemini-2.5-flash).
+      // NEWEST_MODELS.google (gemini-2.5-pro) is the heavy tier for Google.
+      expect(capturedSmartAddModels[0]).toBe(TIER_MODELS.google.standard);
+    });
+
+    it("uses llm.google.model when configured for google", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({
+          llm: {
+            vendor: "google",
+            google: { model: "gemini-2.0-flash" },
+          },
+        }),
+        "utf-8",
+      );
+
+      await cmdSmartAdd(tmpDir, "Add user authentication", {}, {});
+
+      expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
+      expect(capturedSmartAddModels[0]).toBe("gemini-2.0-flash");
     });
   });
 

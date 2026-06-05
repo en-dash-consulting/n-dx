@@ -836,12 +836,20 @@ export async function cmdRun(
   // vendor-pinned slot inside `resolveVendorModel`.
   const cliModelOverride =
     flags.model
-    ?? (llmVendor === "claude" ? flags["claude-model"] : flags["codex-model"]);
+    ?? (llmVendor === "claude"
+      ? flags["claude-model"]
+      : llmVendor === "codex"
+        ? flags["codex-model"]
+        : flags["google-model"]);
   const configuredModel = resolveVendorModel(llmVendor, llmConfig);
   const resolvedModel = cliModelOverride ? resolveModel(cliModelOverride) : configuredModel;
   const hasConfiguredModel =
     !!llmConfig?.model
-    || (llmVendor === "claude" ? !!llmConfig?.claude?.model : !!llmConfig?.codex?.model);
+    || (llmVendor === "claude"
+      ? !!llmConfig?.claude?.model
+      : llmVendor === "codex"
+        ? !!llmConfig?.codex?.model
+        : !!llmConfig?.google?.model);
   const modelSource: "cli-override" | "configured" | "default" = cliModelOverride
     ? "cli-override"
     : hasConfiguredModel
@@ -852,7 +860,11 @@ export async function cmdRun(
   // resolved (either top-level llm.model or vendor-pinned) is incompatible
   // with the active vendor. Picks the same value resolveVendorModel uses.
   const activeConfiguredModel = llmConfig?.model
-    ?? (llmVendor === "claude" ? llmConfig?.claude?.model : llmConfig?.codex?.model);
+    ?? (llmVendor === "claude"
+      ? llmConfig?.claude?.model
+      : llmVendor === "codex"
+        ? llmConfig?.codex?.model
+        : llmConfig?.google?.model);
   if (!cliModelOverride && activeConfiguredModel) {
     if (
       llmVendor === "claude" &&
@@ -870,6 +882,15 @@ export async function cmdRun(
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="codex".`,
         `Either use a Codex/GPT model (e.g., gpt-4o, o1) or switch vendor: 'n-dx config llm.vendor claude'`,
+      );
+    }
+    if (
+      llmVendor === "google" &&
+      !isModelCompatibleWithVendor("google", activeConfiguredModel)
+    ) {
+      throw new CLIError(
+        `Configured model "${activeConfiguredModel}" is not compatible with vendor="google".`,
+        `Either use a Gemini model (e.g., gemini-2.5-pro, gemini-2.0-flash) or switch vendor: 'n-dx config llm.vendor claude'`,
       );
     }
   }
@@ -927,17 +948,27 @@ export async function cmdRun(
     tagsFilter = tagsFilter ? [...tagsFilter, SELF_HEAL_TAG] : [SELF_HEAL_TAG];
   }
 
+  // Codex only supports CLI mode (no API loop).
   if (llmVendor === "codex" && provider === "api" && !dryRun) {
     throw new CLIError(
-      "Hench API provider is only supported for vendor=claude.",
+      "Hench API provider is only supported for vendor=claude or vendor=google.",
       "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
     );
   }
 
-  // Fail fast if CLI provider selected but vendor CLI binary not available
-  if (provider === "cli" && !dryRun) {
+  // Google only supports API mode (no CLI binary exists).
+  if (llmVendor === "google" && provider === "cli" && !dryRun) {
+    throw new CLIError(
+      "Google vendor does not support CLI mode — it uses the Gemini REST API directly.",
+      "Set 'n-dx config hench.provider api' or switch vendor: 'n-dx config llm.vendor claude'.",
+    );
+  }
+
+  // Fail fast if CLI provider selected but vendor CLI binary not available.
+  // Google is excluded — it has no CLI binary and is already guarded above.
+  if (provider === "cli" && !dryRun && llmVendor !== "google") {
     const customPath = resolveVendorCliPath(llmConfig);
-    requireLLMCLI(llmVendor, customPath);
+    requireLLMCLI(llmVendor as "claude" | "codex", customPath);
   }
 
   const iterations = flags.iterations ? safeParseInt(flags.iterations, "iterations") : 1;

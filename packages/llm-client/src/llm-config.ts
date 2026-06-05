@@ -8,7 +8,7 @@
 import { join } from "node:path";
 import { access, readFile } from "node:fs/promises";
 import { deepMerge } from "./project-config.js";
-import type { LLMConfig, LLMVendor, CodexConfig } from "./llm-types.js";
+import type { LLMConfig, LLMVendor, CodexConfig, GoogleConfig } from "./llm-types.js";
 import type { ClaudeConfig } from "./types.js";
 import { normalizeCodexModel } from "./config.js";
 
@@ -20,7 +20,19 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 function extractVendor(value: unknown): LLMVendor | undefined {
-  return value === "claude" || value === "codex" ? value : undefined;
+  return value === "claude" || value === "codex" || value === "google" ? value : undefined;
+}
+
+function extractGoogleConfig(value: unknown): GoogleConfig | undefined {
+  const v = asRecord(value);
+  if (!v) return undefined;
+
+  const cfg: GoogleConfig = {};
+  if (typeof v.api_key === "string" && v.api_key) cfg.api_key = v.api_key;
+  if (typeof v.api_endpoint === "string" && v.api_endpoint) cfg.api_endpoint = v.api_endpoint;
+  if (typeof v.model === "string" && v.model) cfg.model = v.model;
+  if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
+  return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
 function extractClaudeConfig(value: unknown): ClaudeConfig | undefined {
@@ -71,6 +83,7 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
   const llmVendor = extractVendor(llm?.vendor);
   const llmClaude = extractClaudeConfig(llm?.claude);
   const llmCodex = extractCodexConfig(llm?.codex);
+  const llmGoogle = extractGoogleConfig(llm?.google);
   const legacyClaude = extractClaudeConfig(root.claude);
   const autoFailover =
     typeof llm?.autoFailover === "boolean" ? llm.autoFailover : undefined;
@@ -88,6 +101,7 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
   }
   if (llmClaude || legacyClaude) config.claude = llmClaude ?? legacyClaude;
   if (llmCodex) config.codex = llmCodex;
+  if (llmGoogle) config.google = llmGoogle;
   if (autoFailover !== undefined) config.autoFailover = autoFailover;
   return config;
 }

@@ -1137,6 +1137,9 @@ function determineSmartAddModelSource(vendor: LLMVendor, llmConfig: LLMConfig): 
   if (vendor === "codex" && llmConfig.codex?.model) {
     return "configured";
   }
+  if (vendor === "google" && llmConfig.google?.model) {
+    return "configured";
+  }
   return "default";
 }
 
@@ -1251,7 +1254,8 @@ async function resolveSmartAddModel(
     const configuredModel = resolveVendorModel(vendor, llmConfig);
     const hasVendorModelOverride =
       (vendor === "claude" && typeof llmConfig.claude?.model === "string" && llmConfig.claude.model.trim().length > 0) ||
-      (vendor === "codex" && typeof llmConfig.codex?.model === "string" && llmConfig.codex.model.trim().length > 0);
+      (vendor === "codex" && typeof llmConfig.codex?.model === "string" && llmConfig.codex.model.trim().length > 0) ||
+      (vendor === "google" && typeof llmConfig.google?.model === "string" && llmConfig.google.model.trim().length > 0);
 
     if (hasVendorModelOverride) {
       llmDebug(`effective model=${configuredModel}`);
