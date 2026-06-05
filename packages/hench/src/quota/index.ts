@@ -29,6 +29,8 @@ export type {
 export { fetchCodexQuota } from "./codex-quota.js";
 export type { ClaudeQuotaResult, FetchClaudeQuotaOptions } from "./claude-quota.js";
 export { fetchClaudeQuota } from "./claude-quota.js";
+export type { GoogleQuotaResult, FetchGoogleQuotaOptions } from "./google-quota.js";
+export { fetchGoogleQuota } from "./google-quota.js";
 export type {
   TokenRetrievalError,
   TokenRetrievalErrorKind,
@@ -54,8 +56,10 @@ export { validateRunTokensPostRun } from "./token-validation-hook.js";
 
 import { fetchCodexQuota } from "./codex-quota.js";
 import { fetchClaudeQuota } from "./claude-quota.js";
+import { fetchGoogleQuota } from "./google-quota.js";
 import { loadLLMConfig, resolveVendorModel } from "../prd/llm-gateway.js";
 import type { LLMConfig } from "../prd/llm-gateway.js";
+import { resolveLLMVendor } from "../store/project-config.js";
 import type { QuotaRemaining } from "./types.js";
 
 /**
@@ -80,13 +84,15 @@ import type { QuotaRemaining } from "./types.js";
 export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
   const results: QuotaRemaining[] = [];
 
-  // Load LLM config once — shared between both provider sections.
+  // Load LLM config once — shared between all provider sections.
   let llmConfig: LLMConfig = {};
   try {
     llmConfig = await loadLLMConfig(process.cwd());
   } catch {
     // Config load failure is non-fatal — each provider falls back gracefully.
   }
+
+  const activeVendor = resolveLLMVendor(llmConfig);
 
   // ── Claude (Anthropic) ──────────────────────────────────────────────────────
   // Budget-based: reads .n-dx.json weeklyBudget + .hench/runs/ accumulated spend.
@@ -115,6 +121,25 @@ export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
       }
       // On failure: silently skip — the inter-run loop must never be interrupted
       // by quota-check errors.
+    }
+  }
+
+  // ── Google (Gemini) ─────────────────────────────────────────────────────────
+  // Gemini does not expose a public quota API. When google is the active vendor,
+  // emit a notice entry so the inter-run log is not silent about quota status.
+  if (activeVendor === "google") {
+    const googleModel = resolveVendorModel("google", llmConfig);
+    const googleResult = fetchGoogleQuota({ model: googleModel });
+    if (googleResult.ok) {
+      results.push(googleResult.quota);
+    } else {
+      // Always "unavailable" — surface it as an informational notice.
+      results.push({
+        vendor: "google",
+        model: googleModel,
+        percentRemaining: 0,
+        unavailable: true,
+      });
     }
   }
 

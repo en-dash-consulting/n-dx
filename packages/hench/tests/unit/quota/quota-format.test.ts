@@ -170,4 +170,54 @@ describe("formatQuotaLog", () => {
       expect(line).toContain("claude / claude-opus-4-5");
     });
   });
+
+  // ── Unavailable entries (Google / no quota API) ───────────────────────────
+  describe("when entry has unavailable=true", () => {
+    it("renders 'quota unavailable' instead of a percentage", () => {
+      const entry: QuotaRemaining = {
+        vendor: "google",
+        model: "gemini-2.5-flash",
+        percentRemaining: 0,
+        unavailable: true,
+      };
+      const [line] = formatQuotaLog([entry]);
+      expect(line).toContain("quota unavailable");
+      expect(line).not.toContain("%");
+    });
+
+    it("includes vendor and model in the unavailable message", () => {
+      const entry: QuotaRemaining = {
+        vendor: "google",
+        model: "gemini-2.5-flash",
+        percentRemaining: 0,
+        unavailable: true,
+      };
+      const [line] = formatQuotaLog([entry]);
+      expect(line).toContain("google");
+      expect(line).toContain("gemini-2.5-flash");
+    });
+
+    it("applies no ANSI color codes to unavailable entries", () => {
+      const entry: QuotaRemaining = {
+        vendor: "google",
+        model: "gemini-2.5-flash",
+        percentRemaining: 0,
+        unavailable: true,
+      };
+      const [line] = formatQuotaLog([entry]);
+      expect(line).not.toContain(RED);
+      expect(line).not.toContain(YELLOW);
+      expect(line).not.toContain(RESET);
+    });
+
+    it("formats correctly alongside available entries in a mixed array", () => {
+      const entries: QuotaRemaining[] = [
+        quota("claude", "claude-opus-4-5", 42),
+        { vendor: "google", model: "gemini-2.5-flash", percentRemaining: 0, unavailable: true },
+      ];
+      const [claudeLine, googleLine] = formatQuotaLog(entries);
+      expect(claudeLine).toContain("42%");
+      expect(googleLine).toContain("quota unavailable");
+    });
+  });
 });
