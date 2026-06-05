@@ -16,6 +16,10 @@ export function isModelCompatibleWithVendor(
     return resolveModel(trimmed).startsWith("claude-");
   }
 
+  if (vendor === "google") {
+    return trimmed.startsWith("gemini-");
+  }
+
   return /^(gpt-|o\d|codex)/i.test(trimmed);
 }
 

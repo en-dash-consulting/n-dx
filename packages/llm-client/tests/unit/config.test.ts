@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveVendorModel, NEWEST_MODELS, TIER_MODELS } from "../../src/config.js";
+import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveVendorModel, NEWEST_MODELS, TIER_MODELS, GOOGLE_MODELS } from "../../src/config.js";
 
 describe("loadClaudeConfig", () => {
   let tmpDir: string;
@@ -255,6 +255,11 @@ describe("NEWEST_MODELS", () => {
     expect(typeof NEWEST_MODELS.codex).toBe("string");
     expect(NEWEST_MODELS.codex.length).toBeGreaterThan(0);
   });
+
+  it("defines a newest model for google vendor", () => {
+    expect(typeof NEWEST_MODELS.google).toBe("string");
+    expect(NEWEST_MODELS.google.length).toBeGreaterThan(0);
+  });
 });
 
 describe("TIER_MODELS", () => {
@@ -274,11 +279,45 @@ describe("TIER_MODELS", () => {
     expect(TIER_MODELS.codex.light).toBe("gpt-5.4-mini");
   });
 
-  it("defines both tiers for both vendors", () => {
-    expect(TIER_MODELS.claude.light).toBeDefined();
-    expect(TIER_MODELS.claude.standard).toBeDefined();
-    expect(TIER_MODELS.codex.light).toBeDefined();
-    expect(TIER_MODELS.codex.standard).toBeDefined();
+  it("defines all three tiers for all vendors", () => {
+    for (const vendor of ["claude", "codex", "google"] as const) {
+      expect(TIER_MODELS[vendor].light).toBeDefined();
+      expect(TIER_MODELS[vendor].standard).toBeDefined();
+      expect(TIER_MODELS[vendor].heavy).toBeDefined();
+    }
+  });
+
+  it("claude.heavy maps to opus", () => {
+    expect(TIER_MODELS.claude.heavy).toBe("claude-opus-4-7");
+  });
+
+  it("google tiers match GOOGLE_MODELS", () => {
+    expect(TIER_MODELS.google.light).toBe(GOOGLE_MODELS.light);
+    expect(TIER_MODELS.google.standard).toBe(GOOGLE_MODELS.standard);
+    expect(TIER_MODELS.google.heavy).toBe(GOOGLE_MODELS.heavy);
+  });
+});
+
+describe("GOOGLE_MODELS", () => {
+  it("lists three distinct Gemini model IDs", () => {
+    const ids = new Set([GOOGLE_MODELS.light, GOOGLE_MODELS.standard, GOOGLE_MODELS.heavy]);
+    expect(ids.size).toBe(3);
+  });
+
+  it("light tier is gemini-2.0-flash", () => {
+    expect(GOOGLE_MODELS.light).toBe("gemini-2.0-flash");
+  });
+
+  it("standard tier is gemini-2.5-flash", () => {
+    expect(GOOGLE_MODELS.standard).toBe("gemini-2.5-flash");
+  });
+
+  it("heavy tier is gemini-2.5-pro", () => {
+    expect(GOOGLE_MODELS.heavy).toBe("gemini-2.5-pro");
+  });
+
+  it("heavy tier equals NEWEST_MODELS.google", () => {
+    expect(GOOGLE_MODELS.heavy).toBe(NEWEST_MODELS.google);
   });
 });
 
@@ -416,6 +455,67 @@ describe("resolveVendorModel", () => {
       const config = { codex: { lightModel: "gpt-5" } };
       // Using a non-standard model for light tier
       expect(resolveVendorModel("codex", config, "light")).toBe("gpt-5");
+    });
+  });
+
+  // Google vendor tests
+  describe("google vendor", () => {
+    it("returns GOOGLE_MODELS.standard for google with no config", () => {
+      expect(resolveVendorModel("google")).toBe(GOOGLE_MODELS.standard);
+    });
+
+    it("returns GOOGLE_MODELS.light for google with weight=light", () => {
+      expect(resolveVendorModel("google", {}, "light")).toBe(GOOGLE_MODELS.light);
+    });
+
+    it("returns GOOGLE_MODELS.heavy for google with weight=heavy", () => {
+      expect(resolveVendorModel("google", {}, "heavy")).toBe(GOOGLE_MODELS.heavy);
+    });
+
+    it("uses lightModel config for google light tier", () => {
+      expect(
+        resolveVendorModel("google", { google: { lightModel: "gemini-2.0-flash" } }, "light"),
+      ).toBe("gemini-2.0-flash");
+    });
+
+    it("uses google.model config for standard tier", () => {
+      expect(
+        resolveVendorModel("google", { google: { model: "gemini-2.5-flash" } }, "standard"),
+      ).toBe("gemini-2.5-flash");
+    });
+
+    it("uses top-level model for google standard tier", () => {
+      expect(resolveVendorModel("google", { model: "gemini-2.0-flash" }, "standard")).toBe(
+        "gemini-2.0-flash",
+      );
+    });
+
+    it("heavy tier ignores config model overrides", () => {
+      // heavy always uses TIER_MODELS.heavy; no config override path
+      expect(
+        resolveVendorModel("google", { google: { model: "gemini-2.0-flash" } }, "heavy"),
+      ).toBe(GOOGLE_MODELS.heavy);
+    });
+  });
+
+  // Heavy weight tests for all vendors
+  describe("heavy weight", () => {
+    it("returns claude opus for heavy weight", () => {
+      expect(resolveVendorModel("claude", {}, "heavy")).toBe("claude-opus-4-7");
+    });
+
+    it("heavy weight for claude ignores model config", () => {
+      expect(
+        resolveVendorModel("claude", { claude: { model: "claude-haiku-4-5" } }, "heavy"),
+      ).toBe("claude-opus-4-7");
+    });
+
+    it("heavy weight for codex returns TIER_MODELS.codex.heavy", () => {
+      expect(resolveVendorModel("codex", {}, "heavy")).toBe(TIER_MODELS.codex.heavy);
+    });
+
+    it("heavy weight for google returns gemini-2.5-pro", () => {
+      expect(resolveVendorModel("google", {}, "heavy")).toBe("gemini-2.5-pro");
     });
   });
 

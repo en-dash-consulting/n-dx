@@ -26,12 +26,17 @@ import { codexCliAdapter } from "./codex-cli-adapter.js";
  *
  * @param vendor — The LLM vendor identifier (e.g. "claude", "codex")
  * @returns The corresponding VendorAdapter implementation
- * @throws Never — unknown vendors fall back to the Claude adapter
+ * @throws {Error} for vendors without CLI adapters (e.g. "google" — use provider=api)
  */
 export function resolveVendorAdapter(vendor: LLMVendor): VendorAdapter {
   switch (vendor) {
     case "codex":
       return codexCliAdapter;
+    case "google":
+      throw new Error(
+        "Google vendor does not support CLI mode. " +
+        "Use provider=api: 'n-dx config hench.provider api'",
+      );
     case "claude":
     default:
       return claudeCliAdapter;
