@@ -105,7 +105,9 @@ export function resolveVendorCliEnv(llmConfig: LLMConfig): NodeJS.ProcessEnv {
   } else if (vendor === "google") {
     const apiKey = llmConfig.google?.api_key;
     if (apiKey) {
-      return { ...baseEnv, GOOGLE_API_KEY: apiKey };
+      // Honor the configured env var name; default matches createGoogleApiProvider.
+      const apiKeyEnvVar = llmConfig.google?.apiKeyEnv ?? "GEMINI_API_KEY";
+      return { ...baseEnv, [apiKeyEnvVar]: apiKey };
     }
   } else {
     const apiKey = llmConfig.claude?.api_key;

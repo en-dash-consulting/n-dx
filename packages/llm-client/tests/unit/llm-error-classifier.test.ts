@@ -39,13 +39,13 @@ describe("classifyLLMError", () => {
     expect(r.category).toBe("auth");
     expect(r.message).toContain("Google API key");
     expect(r.suggestion).toContain("llm.google.api_key");
-    expect(r.suggestion).toContain("GOOGLE_API_KEY");
+    expect(r.suggestion).toContain("GEMINI_API_KEY");
   });
 
   it("uses google hint in fallback for unknown google errors", () => {
     const r = classifyLLMError(new Error("something unexpected"), "google");
     expect(r.category).toBe("unknown");
-    expect(r.suggestion).toContain("GOOGLE_API_KEY");
+    expect(r.suggestion).toContain("GEMINI_API_KEY");
   });
 
   // ── rate-limit category ───────────────────────────────────────────

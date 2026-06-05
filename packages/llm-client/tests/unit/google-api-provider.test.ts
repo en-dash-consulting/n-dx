@@ -15,7 +15,7 @@ describe("resolveGoogleApiKey", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -26,13 +26,13 @@ describe("resolveGoogleApiKey", () => {
     expect(resolveGoogleApiKey({ api_key: "AIza-cfg" })).toBe("AIza-cfg");
   });
 
-  it("falls back to GOOGLE_API_KEY env var", () => {
-    process.env.GOOGLE_API_KEY = "AIza-env";
+  it("falls back to GEMINI_API_KEY env var by default", () => {
+    process.env.GEMINI_API_KEY = "AIza-env";
     expect(resolveGoogleApiKey()).toBe("AIza-env");
   });
 
   it("prefers config over env var", () => {
-    process.env.GOOGLE_API_KEY = "AIza-env";
+    process.env.GEMINI_API_KEY = "AIza-env";
     expect(resolveGoogleApiKey({ api_key: "AIza-cfg" })).toBe("AIza-cfg");
   });
 
@@ -128,7 +128,7 @@ describe("createGoogleApiProvider — construction", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -166,7 +166,7 @@ describe("createGoogleApiProvider — construction", () => {
   });
 
   it("creates provider with env var api key", () => {
-    process.env.GOOGLE_API_KEY = "AIza-env";
+    process.env.GEMINI_API_KEY = "AIza-env";
     const provider = createGoogleApiProvider();
     expect(provider).toBeDefined();
   });
@@ -211,7 +211,7 @@ describe("createGoogleApiProvider — LLMProvider interface", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -275,7 +275,7 @@ describe("createGoogleApiProvider — complete()", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -483,7 +483,7 @@ describe("createGoogleApiProvider — stream()", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -629,7 +629,7 @@ describe("createGoogleApiProvider — validateAuth()", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -711,17 +711,17 @@ describe("Google provider — registry integration", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
     process.env = originalEnv;
   });
 
-  it("google factory creates API provider when GOOGLE_API_KEY is set", async () => {
+  it("google factory creates API provider when GEMINI_API_KEY is set", async () => {
     const { createDefaultRegistry } = await import("../../src/provider-registry.js");
 
-    process.env.GOOGLE_API_KEY = "AIza-test";
+    process.env.GEMINI_API_KEY = "AIza-test";
     const registry = createDefaultRegistry();
     const provider = registry.create("google", {});
 

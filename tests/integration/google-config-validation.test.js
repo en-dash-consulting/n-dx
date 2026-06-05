@@ -124,17 +124,17 @@ describe("Google config validation gauntlet", () => {
       expect(config.apiKeyEnv).toBeUndefined();
     });
 
-    it("resolveGoogleApiKey reads from default GOOGLE_API_KEY env when no apiKeyEnv set", async () => {
+    it("resolveGoogleApiKey reads from default GEMINI_API_KEY env when no apiKeyEnv set", async () => {
       const { resolveGoogleApiKey } = await import(
         "../../packages/llm-client/dist/google-api-provider.js"
       );
       // With no api_key in config and no env — returns undefined
-      const saved = process.env.GOOGLE_API_KEY;
-      delete process.env.GOOGLE_API_KEY;
+      const saved = process.env.GEMINI_API_KEY;
+      delete process.env.GEMINI_API_KEY;
       try {
         expect(resolveGoogleApiKey({})).toBeUndefined();
       } finally {
-        if (saved !== undefined) process.env.GOOGLE_API_KEY = saved;
+        if (saved !== undefined) process.env.GEMINI_API_KEY = saved;
       }
     });
 
@@ -155,15 +155,15 @@ describe("Google config validation gauntlet", () => {
       const { resolveGoogleApiKey } = await import(
         "../../packages/llm-client/dist/google-api-provider.js"
       );
-      process.env.GOOGLE_API_KEY = "AIzaSy_from_env_12345678901234567890";
+      process.env.GEMINI_API_KEY = "AIzaSy_from_env_12345678901234567890";
       try {
         const key = resolveGoogleApiKey(
           { api_key: "AIzaSy_from_config_12345678901234567890" },
-          "GOOGLE_API_KEY",
+          "GEMINI_API_KEY",
         );
         expect(key).toBe("AIzaSy_from_config_12345678901234567890");
       } finally {
-        delete process.env.GOOGLE_API_KEY;
+        delete process.env.GEMINI_API_KEY;
       }
     });
   });

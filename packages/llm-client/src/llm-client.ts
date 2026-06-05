@@ -55,9 +55,10 @@ export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
   }
 
   if (vendor === "google") {
+    const googleConfig = options.llmConfig?.google;
     const apiKey = resolveGoogleApiKey(
-      options.llmConfig?.google,
-      options.apiKeyEnv ?? "GOOGLE_API_KEY",
+      googleConfig,
+      options.apiKeyEnv ?? googleConfig?.apiKeyEnv ?? "GEMINI_API_KEY",
     );
     // Google only supports API mode — return "api" when key is present, "cli" as
     // a sentinel for "no key" (callers may check mode === "api" to decide whether

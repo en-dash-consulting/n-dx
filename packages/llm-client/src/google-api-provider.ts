@@ -46,7 +46,12 @@ const GEMINI_MODEL_PREFIX = "gemini-";
 export interface GoogleApiProviderOptions {
   /** Google Gemini configuration section from `.n-dx.json`. */
   googleConfig?: GoogleConfig;
-  /** Environment variable name for API key fallback (default: "GOOGLE_API_KEY"). */
+  /**
+   * Environment variable name for API key fallback.
+   * When omitted, the factory first checks `googleConfig.apiKeyEnv`, then
+   * falls back to `"GEMINI_API_KEY"` — consistent with `runGoogleApiPreflight`
+   * and the `GoogleConfig.apiKeyEnv` field default.
+   */
   apiKeyEnv?: string;
   /** Maximum number of retries for transient failures (default: 3). */
   maxRetries?: number;
@@ -82,13 +87,16 @@ export function parseGeminiTokenUsage(
  *
  * Priority:
  * 1. `googleConfig.api_key` from unified config (`.n-dx.json`)
- * 2. Environment variable (default: `GOOGLE_API_KEY`)
+ * 2. Environment variable named by `apiKeyEnv` (default: `"GEMINI_API_KEY"`)
+ *
+ * The `apiKeyEnv` default matches the canonical env var documented in
+ * `GoogleConfig.apiKeyEnv` and used by the config preflight check.
  *
  * @returns The resolved API key, or undefined if not found.
  */
 export function resolveGoogleApiKey(
   googleConfig?: GoogleConfig,
-  apiKeyEnv = "GOOGLE_API_KEY",
+  apiKeyEnv = "GEMINI_API_KEY",
 ): string | undefined {
   return googleConfig?.api_key ?? process.env[apiKeyEnv];
 }
@@ -171,13 +179,16 @@ export function validateGeminiModelId(model: string): void {
 export function createGoogleApiProvider(
   options: GoogleApiProviderOptions = {},
 ): LLMProvider {
-  const apiKeyEnv = options.apiKeyEnv ?? "GOOGLE_API_KEY";
   const googleConfig = options.googleConfig;
+  // Resolution order: explicit override → config field → canonical default.
+  // "GEMINI_API_KEY" is the canonical default, matching GoogleConfig.apiKeyEnv
+  // documentation and the config preflight check (runGoogleApiPreflight).
+  const apiKeyEnv = options.apiKeyEnv ?? googleConfig?.apiKeyEnv ?? "GEMINI_API_KEY";
   const apiKey = resolveGoogleApiKey(googleConfig, apiKeyEnv);
 
   if (!apiKey) {
     throw new ClaudeClientError(
-      `Google API key not found. Set it via 'n-dx config google.api_key <key>' or the ${apiKeyEnv} environment variable.`,
+      `Google API key not found. Set it via 'n-dx config llm.google.api_key <key>' or the ${apiKeyEnv} environment variable.`,
       "auth",
       false,
     );

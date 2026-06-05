@@ -1113,6 +1113,91 @@ describe("n-dx config", () => {
     });
   });
 
+  // ── Google API key config ──────────────────────────────────────────────────
+
+  describe("llm.google.api_key config", () => {
+    // Regression guard: ensure format validation accepts and rejects the right keys.
+    // The canonical Google AI Studio key format starts with "AIza" and is >= 30 chars.
+    // Validation path: ndx config llm.google.api_key → validateGoogleApiKey in config.js.
+
+    it("accepts a valid 39-char AIza... key", async () => {
+      // Real Google AI Studio key format: AIzaSy + 33 alphanumeric chars = 39 total
+      const key = "AIzaSyDdI0hATkDExampleKey1234567890X";
+      const out = run(["llm.google.api_key", key, tmpDir]);
+      expect(out).toContain(`llm.google.api_key = ${key}`);
+
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.google.api_key).toBe(key);
+    });
+
+    it("accepts a 30-char minimum-length AIza... key", async () => {
+      const key = "AIzaShortestValidKey1234567890";
+      expect(key.length).toBe(30);
+      const out = run(["llm.google.api_key", key, tmpDir]);
+      expect(out).toContain(`llm.google.api_key = ${key}`);
+    });
+
+    it("rejects a key that does not start with AIza", () => {
+      const stderr = runFail(["llm.google.api_key", "sk-ant-api03-not-google-12345678901234567890", tmpDir]);
+      expect(stderr).toContain("Invalid API key format");
+      expect(stderr).toContain("AIza");
+    });
+
+    it("rejects a key shorter than 30 characters", () => {
+      const shortKey = "AIzaSyShort12345678"; // < 30 chars
+      expect(shortKey.length).toBeLessThan(30);
+      const stderr = runFail(["llm.google.api_key", shortKey, tmpDir]);
+      expect(stderr).toContain("Invalid API key format");
+      expect(stderr).toContain("30 characters");
+    });
+
+    it("rejects an empty string", () => {
+      // An empty string fails both the startsWith and length checks
+      const stderr = runFail(["llm.google.api_key", "notakeyatall", tmpDir]);
+      expect(stderr).toContain("Invalid API key format");
+    });
+
+    it("accepts the key with --force even if it fails format validation", () => {
+      const out = run(["llm.google.api_key", "custom-non-standard-key", "--force", tmpDir]);
+      expect(out).toContain("llm.google.api_key = custom-non-standard-key");
+    });
+
+    it("provides hint to https://aistudio.google.com/apikey on rejection", () => {
+      const stderr = runFail(["llm.google.api_key", "bad-key", tmpDir]);
+      expect(stderr).toContain("aistudio.google.com");
+    });
+
+    it("provides hint to use --force on validation failure", () => {
+      const stderr = runFail(["llm.google.api_key", "bad-key", tmpDir]);
+      expect(stderr).toContain("--force");
+    });
+
+    it("stores key in .n-dx.json under llm.google.api_key", async () => {
+      const key = "AIzaSyValidKey1234567890ABCDEF1234567";
+      run(["llm.google.api_key", key, tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.google.api_key).toBe(key);
+    });
+
+    it("preserves other llm config when setting the api key", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "google", google: { model: "gemini-2.5-pro" } } }, null, 2) + "\n",
+      );
+      const key = "AIzaSyValidKey1234567890ABCDEF1234567";
+      run(["llm.google.api_key", key, tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.google.api_key).toBe(key);
+      expect(config.llm.google.model).toBe("gemini-2.5-pro");
+      expect(config.llm.vendor).toBe("google");
+    });
+
+    it("documents llm.google.api_key in --help output", () => {
+      const out = run(["--help"]);
+      expect(out).toContain("llm.google.api_key");
+    });
+  });
+
   // ── Language config ────────────────────────────────────────────────────────
 
   describe("language config", () => {
