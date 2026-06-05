@@ -66,6 +66,12 @@ export interface GoogleConfig {
    * instead of TIER_MODELS.google.light.
    */
   lightModel?: string;
+  /**
+   * Environment variable name for the Google API key.
+   * Defaults to `"GEMINI_API_KEY"` when not set.
+   * Override to use a custom env var name (e.g. `"MY_GOOGLE_KEY"`).
+   */
+  apiKeyEnv?: string;
 }
 
 /** Vendor-neutral config shape loaded from `.n-dx.json`. */

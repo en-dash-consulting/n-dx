@@ -502,14 +502,15 @@ async function runGoogleApiPreflight(llmConfig) {
     return { ok: true, vendor: "google" };
   }
 
-  const apiKey = llmConfig?.google?.api_key || process.env.GEMINI_API_KEY;
+  const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
+  const apiKey = llmConfig?.google?.api_key || process.env[apiKeyEnvVar];
 
   if (!apiKey) {
     return {
       ok: false,
       vendor: "google",
       detail:
-        "No API key found. Set the GEMINI_API_KEY environment variable or store the key with: " +
+        `No API key found. Set the ${apiKeyEnvVar} environment variable or store the key with: ` +
         "n-dx config llm.google.api_key <key>",
       errorCode: "NDX_GOOGLE_PREFLIGHT_NO_KEY",
     };
@@ -591,6 +592,50 @@ function validateModel(value) {
     throw new Error("Model name must be a non-empty string.");
   }
   // Warn-level: allow any string but hint at common patterns
+}
+
+/**
+ * Validate llm.google.model: must be a non-empty string starting with "gemini-".
+ *
+ * Gemini model IDs all start with "gemini-" (e.g. "gemini-2.5-pro",
+ * "gemini-2.0-flash"). IDs from other vendors (e.g. "gpt-4o", "claude-sonnet-*")
+ * are rejected immediately.
+ *
+ * Canonical known models (from @n-dx/llm-client GOOGLE_MODELS):
+ *   gemini-2.0-flash  (light tier)
+ *   gemini-2.5-flash  (standard tier)
+ *   gemini-2.5-pro    (heavy tier)
+ *
+ * This list will grow as Google releases new models. The prefix check ("gemini-")
+ * allows unknown future models while still catching clearly wrong values.
+ */
+function validateGoogleModel(value) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(
+      `Invalid value for llm.google.model: model ID must be a non-empty string.\n` +
+        "  Known models: gemini-2.0-flash (light), gemini-2.5-flash (standard), gemini-2.5-pro (heavy)",
+    );
+  }
+  if (!value.startsWith("gemini-")) {
+    throw new Error(
+      `Invalid value for llm.google.model: "${value}" is not a Gemini model ID.\n` +
+        '  Gemini model IDs must start with "gemini-" (e.g. "gemini-2.5-pro", "gemini-2.0-flash").\n' +
+        "  Known models: gemini-2.0-flash (light), gemini-2.5-flash (standard), gemini-2.5-pro (heavy)",
+    );
+  }
+}
+
+/**
+ * Validate llm.google.apiKeyEnv: must be a non-empty string.
+ * This is the name of the environment variable that holds the Google API key.
+ */
+function validateGoogleApiKeyEnv(value) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(
+      "llm.google.apiKeyEnv must be a non-empty string (environment variable name).\n" +
+        "  Example: n-dx config llm.google.apiKeyEnv MY_GOOGLE_API_KEY",
+    );
+  }
 }
 
 /**
@@ -711,7 +756,8 @@ const LLM_VALIDATORS = {
   "codex.model": validateModel,
   "google.api_key": validateGoogleApiKey,
   "google.api_endpoint": validateApiEndpoint,
-  "google.model": validateModel,
+  "google.model": validateGoogleModel,
+  "google.apiKeyEnv": validateGoogleApiKeyEnv,
   autoFailover: validateAutoFailover,
 };
 
@@ -915,6 +961,7 @@ function printVendorPreflightFailure(
   // Google uses API-key auth — no binary / CLI args to display.
   if (vendor === "google") {
     const errorCode = preflight.errorCode || "NDX_GOOGLE_PREFLIGHT_FAILED";
+    const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
     console.error(`Provider auth preflight failed for "google".`);
     if (preflight.detail) {
       console.error(`Details: ${preflight.detail}`);
@@ -925,7 +972,7 @@ function printVendorPreflightFailure(
       preflight.errorCode === "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT"
     ) {
       console.error("Get a free API key at: https://aistudio.google.com/apikey");
-      console.error("Set it with: export GEMINI_API_KEY=<your-key>");
+      console.error(`Set it with: export ${apiKeyEnvVar}=<your-key>`);
       console.error("Or store in config: n-dx config llm.google.api_key <your-key>");
     } else if (preflight.errorCode === "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED") {
       console.error("Get a valid API key at: https://aistudio.google.com/apikey");
@@ -1108,8 +1155,16 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     Preflight validates the key against the Gemini API.
                                     Set GEMINI_API_KEY env var as an alternative.
                                     Get a key at: https://aistudio.google.com/apikey
+  llm.google.apiKeyEnv     string    Environment variable name for the Google API key
+                                    (default: GEMINI_API_KEY). Override when your
+                                    key is stored in a custom env var.
+                                    Example: n-dx config llm.google.apiKeyEnv MY_GOOGLE_KEY
   llm.google.api_endpoint  string    Gemini API endpoint (optional; validated URL)
   llm.google.model         string    Gemini default model (optional)
+                                    Must be a valid Gemini model ID starting with "gemini-".
+                                    Known models: gemini-2.0-flash (light),
+                                    gemini-2.5-flash (standard), gemini-2.5-pro (heavy)
+                                    Validation: rejects non-Gemini model IDs (e.g. "gpt-4o")
   llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
                                     When true, hench retries failed runs on fallback models
                                     before surfacing the original error. Disabled by default
