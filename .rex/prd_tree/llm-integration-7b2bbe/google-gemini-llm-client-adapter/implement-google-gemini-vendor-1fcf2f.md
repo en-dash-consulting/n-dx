@@ -1,0 +1,25 @@
+---
+id: "1fcf2fde-2524-4dc5-a962-a6d9caa9feb4"
+level: "task"
+title: "Implement Google Gemini vendor adapter in llm-client"
+status: "completed"
+priority: "critical"
+tags:
+  - "llm-client"
+  - "google"
+  - "backend"
+source: "smart-add"
+startedAt: "2026-06-04T19:36:16.037Z"
+completedAt: "2026-06-04T19:45:08.447Z"
+endedAt: "2026-06-04T19:45:08.447Z"
+resolutionType: "code-change"
+resolutionDetail: "Implemented google-api-provider.ts with full LLMProvider interface: complete(), stream() (SSE), validateAuth(). Added GoogleConfig type, LLMVendor extended, NEWEST_MODELS/TIER_MODELS/VENDOR_CONTEXT_CHAR_LIMITS updated, resolveVendorModel google branch, provider registered in createDefaultRegistry. 57 unit tests added, all 1002 llm-client tests pass, full monorepo clean."
+acceptanceCriteria:
+  - "Adapter exports a factory compatible with the existing vendor adapter interface used by Claude and Codex adapters"
+  - "Supports at least gemini-2.0-flash and gemini-2.5-pro model IDs at adapter construction time"
+  - "Translates n-dx message format to Gemini API request format and unmarshals responses back to shared output types"
+  - "Streaming responses emit incremental text tokens via the shared streaming output interface"
+  - "Rate-limit and quota errors are classified into the shared LLMErrorKind enum"
+  - "Unit tests cover happy-path completion, streaming output, rate-limit error classification, and invalid-model-id rejection"
+description: "Add a google adapter module to packages/llm-client following the existing claude and codex adapter shapes. Covers API client initialization (via @google/generative-ai SDK or REST), n-dx-to-Gemini message format translation, streaming SSE normalization, and mapping of rate-limit, token-exhaustion, and bad-response errors into the shared LLMErrorKind enum so downstream error handling requires no changes."
+---

@@ -1,0 +1,26 @@
+---
+id: "bbc6ffa4-3df7-423e-b4a7-9161feffbcc2"
+level: "task"
+title: "Add Google provider selection and API key preflight to ndx init"
+status: "completed"
+priority: "critical"
+tags:
+  - "cli"
+  - "init"
+  - "google"
+  - "auth"
+source: "smart-add"
+startedAt: "2026-06-04T19:18:44.215Z"
+completedAt: "2026-06-04T19:35:54.221Z"
+endedAt: "2026-06-04T19:35:54.221Z"
+resolutionType: "code-change"
+resolutionDetail: "Added Google/Gemini as third LLM provider across init-llm.js, config.js, cli.js, cli-ink.js, and llm-model-catalog.js with preflight, idempotency guard, and integration tests."
+acceptanceCriteria:
+  - "ndx init --provider=google completes without error when a valid GEMINI_API_KEY is present"
+  - "Interactive provider prompt lists google as a selectable option"
+  - "An invalid or missing API key produces an actionable error message with remediation steps pointing to the Google AI Studio key page"
+  - "Successful preflight stores llm.vendor=google and llm.google.model to .n-dx.json"
+  - "ndx init with an existing valid Google config skips the provider re-prompt"
+  - "Integration test covers the google init happy path and missing-key failure path"
+description: "Extend the interactive provider selection prompt in ndx init to include google as a third option (alongside claude and codex). After selection, prompt for a Google API key, validate it with a lightweight preflight call to the Gemini API, and persist llm.vendor=google and llm.google.model to .n-dx.json. Mirror the existing Claude and Codex init branch structure and re-init idempotency guard."
+---
