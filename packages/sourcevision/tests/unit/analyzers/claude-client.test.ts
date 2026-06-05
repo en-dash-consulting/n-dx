@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NEWEST_MODELS } from "@n-dx/llm-client";
+import { NEWEST_MODELS, TIER_MODELS } from "@n-dx/llm-client";
 
 // ── Mock @n-dx/llm-client so we can intercept client.complete calls ──────────
 
@@ -28,6 +28,8 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 import {
   callClaude,
   setLLMConfig,
+  getAuthMode,
+  resolveLightModel,
   DEFAULT_MODEL,
   DEFAULT_CODEX_MODEL,
 } from "../../../src/analyzers/claude-client.js";
@@ -89,5 +91,39 @@ describe("claude-client model resolution", () => {
     expect(mockComplete).toHaveBeenCalledWith(
       expect.objectContaining({ model: customCodexModel }),
     );
+  });
+
+  it("uses the standard-tier Google model when no model is configured", async () => {
+    // NEWEST_MODELS.google is the heavy tier (gemini-2.5-pro).
+    // callClaude uses standard weight, so it resolves to TIER_MODELS.google.standard.
+    setLLMConfig({ vendor: "google" });
+    await callClaude("hello");
+    expect(mockComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ model: TIER_MODELS.google.standard }),
+    );
+  });
+
+  it("uses a configured Google model instead of the default", async () => {
+    const customGoogleModel = "gemini-2.0-flash";
+    setLLMConfig({ vendor: "google", google: { model: customGoogleModel } });
+    await callClaude("hello");
+    expect(mockComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ model: customGoogleModel }),
+    );
+  });
+
+  it("resolveLightModel returns the Google light-tier model when vendor is google", () => {
+    setLLMConfig({ vendor: "google" });
+    expect(resolveLightModel()).toBe("gemini-2.0-flash");
+  });
+
+  it("getAuthMode returns api when Google API key is configured", () => {
+    setLLMConfig({ vendor: "google", google: { api_key: "test-gemini-key" } });
+    expect(getAuthMode()).toBe("api");
+  });
+
+  it("getAuthMode returns cli (no-key sentinel) for google without an API key", () => {
+    setLLMConfig({ vendor: "google" });
+    expect(getAuthMode()).toBe("cli");
   });
 });

@@ -34,6 +34,20 @@ describe("classifyLLMError", () => {
     expect(r.suggestion).toContain("codex login");
   });
 
+  it("uses google-specific messaging for google vendor auth error", () => {
+    const r = classifyLLMError(new Error("401 Unauthorized"), "google");
+    expect(r.category).toBe("auth");
+    expect(r.message).toContain("Google API key");
+    expect(r.suggestion).toContain("llm.google.api_key");
+    expect(r.suggestion).toContain("GOOGLE_API_KEY");
+  });
+
+  it("uses google hint in fallback for unknown google errors", () => {
+    const r = classifyLLMError(new Error("something unexpected"), "google");
+    expect(r.category).toBe("unknown");
+    expect(r.suggestion).toContain("GOOGLE_API_KEY");
+  });
+
   // ── rate-limit category ───────────────────────────────────────────
 
   it("classifies 429 as rate-limit", () => {

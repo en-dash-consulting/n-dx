@@ -119,6 +119,14 @@ export function classifyLLMError(
         category: "auth",
       };
     }
+    if (vendor === "google") {
+      return {
+        message: `Authentication failed — your Google API key was rejected.${suffix}`,
+        suggestion:
+          "Check your API key with: n-dx config llm.google.api_key <key>, or set the GOOGLE_API_KEY environment variable.",
+        category: "auth",
+      };
+    }
     return {
       message: `Authentication failed — your API key was rejected.${suffix}`,
       suggestion:
@@ -275,7 +283,9 @@ export function classifyLLMError(
   const authHint =
     vendor === "codex"
       ? "Check Codex CLI login (codex login) and your network connection, then try again."
-      : "Check your API key and network connection, then try again.";
+      : vendor === "google"
+        ? "Check your Google API key (GOOGLE_API_KEY) and network connection, then retry."
+        : "Check your API key and network connection, then try again.";
   return {
     message: `Failed to ${label}: ${err.message}${suffix}`,
     suggestion: authHint,
