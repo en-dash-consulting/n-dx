@@ -38,8 +38,12 @@ function colorFor(percentRemaining: number): string {
  *   "\x1b[31mclaude / claude-opus-4-5: 3% remaining\x1b[0m"
  *   "\x1b[33mcodex / gpt-4o: 7% remaining\x1b[0m"
  *   "claude / claude-sonnet-4-5: 42% remaining"
+ *   "google / gemini-2.5-flash: quota unavailable"
  */
 function formatEntry(entry: QuotaRemaining): string {
+  if (entry.unavailable) {
+    return `${entry.vendor} / ${entry.model}: quota unavailable`;
+  }
   const open = colorFor(entry.percentRemaining);
   const close = open ? ANSI.reset : "";
   const label = `${entry.vendor} / ${entry.model}: ${Math.round(entry.percentRemaining)}% remaining`;
