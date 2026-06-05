@@ -2,7 +2,7 @@
 id: "edd06255-7a7a-457a-8093-de91381a554b"
 level: "task"
 title: "Diagnose and fix Google API key format validation rejecting valid keys"
-status: "in_progress"
+status: "completed"
 priority: "critical"
 tags:
   - "google"
@@ -11,6 +11,10 @@ tags:
   - "validation"
 source: "smart-add"
 startedAt: "2026-06-05T14:41:58.415Z"
+completedAt: "2026-06-05T18:32:24.559Z"
+endedAt: "2026-06-05T18:32:24.559Z"
+resolutionType: "code-change"
+resolutionDetail: "Fixed env var inconsistency (GOOGLE_API_KEY → GEMINI_API_KEY), wired googleConfig.apiKeyEnv into runtime factory, fixed error message typo, added 9 regression tests for ndx config llm.google.api_key validation."
 acceptanceCriteria:
   - "A valid Google AI Studio API key (starting with AIza, 39 chars) is accepted without error via `ndx config llm.google.api_key <key>`"
   - "A valid key is also accepted when entered during `ndx init` provider selection"

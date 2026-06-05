@@ -2,7 +2,7 @@
 id: "3151022c-f35e-4e0e-acbe-25b701ef2cf9"
 level: "task"
 title: "Add regression tests for Google API key validation across config and init paths"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "google"
@@ -10,6 +10,11 @@ tags:
   - "testing"
   - "validation"
 source: "smart-add"
+startedAt: "2026-06-05T18:32:45.645Z"
+completedAt: "2026-06-05T18:36:14.647Z"
+endedAt: "2026-06-05T18:36:14.647Z"
+resolutionType: "code-change"
+resolutionDetail: "Exported validateGoogleApiKey from config.js; added 7 unit tests to google-config-validation.test.js covering all four boundary cases (valid 39-char, valid 30-char min, too-short, wrong prefix, empty string) plus error message assertions; fixed mislabeled cli-config test."
 acceptanceCriteria:
   - "Unit tests assert pass/fail for all four key format boundary cases (valid, too short, wrong prefix, empty)"
   - "At least one integration test exercises the ndx config set path with a valid-format key and asserts no validation error is thrown"
