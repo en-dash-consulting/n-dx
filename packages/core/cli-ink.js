@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from "react";
 import { render, Box, Text } from "ink";
 import { html } from "htm/react";
 import { existsSync } from "fs";
-import { join, dirname } from "path";
+import { basename, join, dirname } from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import {
@@ -21,6 +21,11 @@ import {
   LEGS,
   INIT_PHASES,
 } from "./cli-brand.js";
+import {
+  formatGitWarningLines,
+  commitInitBaseline,
+  formatGitInitCommitLines,
+} from "./git-preflight.js";
 
 // ── Subprocess helper (never blocks the main thread) ───────────────────
 
@@ -121,7 +126,16 @@ function Recap({
   provider,
   model,
   assistantLines,
+  readmeResult,
+  gitWarningLines,
+  gitCommitLines,
+  gitCommitOk,
 }) {
+  const readmeLine = readmeResult && readmeResult.mode === "proposed" && readmeResult.path
+    ? `  ${basename(readmeResult.path)} written — diff against ${readmeResult.existingReadme || "the existing README"} to merge.`
+    : null;
+  // Success lines render in green, failure/skip lines in yellow.
+  const commitColor = gitCommitOk ? "green" : "yellow";
   return html`
     <${Box} flexDirection="column" marginTop=${1}>
       <${Box} paddingLeft=${2} gap=${1}>
@@ -139,6 +153,9 @@ function Recap({
             <${Text}>    Model         ${model ?? "not set"}<//>
           <//>`}
       ${assistantLines.map((line, i) => html`<${Text} key=${"ai" + i}>${line}<//>`)}
+      ${readmeLine && html`<${Text}>${readmeLine}<//>`}
+      ${(gitWarningLines ?? []).map((line, i) => html`<${Text} key=${"git" + i} color="yellow">${line}<//>`)}
+      ${(gitCommitLines ?? []).map((line, i) => html`<${Text} key=${"gc" + i} color=${commitColor}>${line}<//>`)}
       <${Text}> <//>
       <${Text} dimColor>  Next steps:<//>
       <${Text} dimColor>    ${TOOL_NAME} start .          spin up the dashboard + MCP servers<//>
@@ -165,6 +182,7 @@ function InitApp({
   llmSkipped,
   tools,
   runInitCapture,
+  gitResult,
   onComplete,
 }) {
   const [phases, setPhases] = useState([]);
@@ -232,6 +250,28 @@ function InitApp({
         }
       }
 
+      // Target-repo README generation — runs before assistant integrations
+      // so the synthesized structure overview reflects the user's project,
+      // not the n-dx artifacts written by the assistant setup that follows.
+      // Errors are best-effort; failure does not block the rest of init.
+      // The subprocess emits the result as JSON on stdout so the recap can
+      // surface a proposed-file diff hint when an existing README is found.
+      const readmeUrl = new URL("./readme-generator.js", import.meta.url).href;
+      const readmeScript = [
+        `import{generateTargetReadme}from"${readmeUrl}";`,
+        `try{`,
+        `const r=generateTargetReadme(${JSON.stringify(dir)});`,
+        `process.stdout.write(JSON.stringify(r||{}))`,
+        `}catch{process.stdout.write("{}")}`,
+      ].join("");
+      let readmeResult = null;
+      try {
+        const out = await spawnAsync("node", ["--input-type=module", "-e", readmeScript], true);
+        readmeResult = JSON.parse((out && out.trim()) || "{}");
+      } catch {
+        readmeResult = null;
+      }
+
       // Assistant integrations (vendor-neutral) — inline ESM subprocess
       // that returns the summary lines from formatInitReport plus any error.
       setPhase("assistants", "active");
@@ -264,6 +304,13 @@ function InitApp({
       }
       setPhase("assistants", "done");
 
+      // Stage and commit the n-dx baseline when the preflight just
+      // initialized git in this run.  Runs after every tool directory and
+      // assistant surface has been written so the snapshot is complete.
+      const gitCommitResult = gitResult?.status === "initialized"
+        ? commitInitBaseline(dir)
+        : null;
+
       setRecap({
         sourcevision: svExists ? "already exists (reused)" : "created",
         rex: rexExists ? "already exists (reused)" : "created",
@@ -272,6 +319,10 @@ function InitApp({
         provider: `${provider} (${providerSource})`,
         model: model ? (modelSource ? `${model} (${modelSource})` : model) : null,
         assistantLines,
+        readmeResult,
+        gitWarningLines: formatGitWarningLines(gitResult),
+        gitCommitLines: formatGitInitCommitLines(gitCommitResult),
+        gitCommitOk: gitCommitResult?.status === "committed",
       });
 
       // Let the dino keep walking while the user reads the recap

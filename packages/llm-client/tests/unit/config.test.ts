@@ -300,7 +300,7 @@ describe("resolveVendorModel", () => {
   it("expands claude model aliases from config", () => {
     expect(
       resolveVendorModel("claude", { claude: { model: "opus" } }),
-    ).toBe("claude-opus-4-7");
+    ).toBe("claude-opus-4-8");
   });
 
   it("expands 'sonnet' alias to full claude model ID", () => {
@@ -445,7 +445,7 @@ describe("resolveVendorModel", () => {
 
     it("expands shorthand alias from top-level model for claude", () => {
       const config = { model: "opus" };
-      expect(resolveVendorModel("claude", config)).toBe("claude-opus-4-7");
+      expect(resolveVendorModel("claude", config)).toBe("claude-opus-4-8");
     });
 
     it("uses top-level model for codex over vendor-pinned", () => {

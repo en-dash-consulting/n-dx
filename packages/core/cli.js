@@ -37,7 +37,7 @@
 import { spawn, execFileSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
-import { dirname, isAbsolute, join, resolve } from "path";
+import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
 import { runConfig, loadProjectConfig, repairProjectConfig } from "./config.js";
@@ -80,6 +80,13 @@ import {
   formatOrchestratorCommandHelp,
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport } from "./assistant-integration.js";
+import { generateTargetReadme } from "./readme-generator.js";
+import {
+  runGitPreflight,
+  formatGitWarningLines,
+  commitInitBaseline,
+  formatGitInitCommitLines,
+} from "./git-preflight.js";
 import { formatClaudeCliNotFoundError } from "./claude-integration.js";
 import {
   formatInitBanner,
@@ -1120,7 +1127,7 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
  *   llmSkipped: boolean, selectedProvider: string|undefined, selection: object,
  *   providerSource: string, modelSource: string, assistantResults: object }} opts
  */
-function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults }) {
+function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, selectedProvider, selection, providerSource, modelSource, assistantResults, readmeResult, gitResult, gitCommitResult }) {
   console.log("");
   console.log("n-dx initialized");
   console.log(`  .sourcevision/  ${svExists ? "already exists (reused)" : "created"}`);
@@ -1142,7 +1149,32 @@ function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, 
   for (const line of formatInitReport(assistantResults, { activeVendor: selectedProvider })) {
     console.log(line);
   }
+  for (const line of formatReadmeSummaryLines(readmeResult)) {
+    console.log(line);
+  }
+  for (const line of formatGitWarningLines(gitResult)) {
+    console.log(line);
+  }
+  for (const line of formatGitInitCommitLines(gitCommitResult)) {
+    console.log(line);
+  }
   console.log("");
+}
+
+/**
+ * Format the README generation result for the init summary.  Returns a
+ * single line for the "proposed" mode pointing users at the diff, or an
+ * empty array when no proposed file was written.
+ *
+ * @param {{ written?: boolean, mode?: string, path?: string,
+ *   existingReadme?: string } | null | undefined} result
+ * @returns {string[]}
+ */
+function formatReadmeSummaryLines(result) {
+  if (!result || result.mode !== "proposed" || !result.path) return [];
+  const proposed = basename(result.path);
+  const existing = result.existingReadme || "the existing README";
+  return [`  ${proposed} written — diff against ${existing} to merge.`];
 }
 
 async function handleInit(rest) {
@@ -1154,6 +1186,11 @@ async function handleInit(rest) {
   const quiet = flags.includes("--quiet") || flags.includes("-q");
 
   await repairInitConfig(dir, quiet);
+
+  // Git preflight runs before any tool-directory setup so a declined prompt
+  // does not leave the project half-initialized. The check is a pure
+  // filesystem walk for `.git`; the prompt only surfaces when interactive.
+  const gitResult = await runGitPreflight(dir, { quiet });
 
   const assistantEnabled = resolveInitAssistants(rest, dir);
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
@@ -1196,6 +1233,7 @@ async function handleInit(rest) {
         llmSkipped,
         tools,
         runInitCapture,
+        gitResult,
       });
     } catch (err) {
       console.error(err?.message || err);
@@ -1241,10 +1279,30 @@ async function handleInit(rest) {
     recordInitVersion(dir, version);
   } catch { /* non-fatal */ }
 
+  // Generate a target-repo README before assistant artifacts so the user's
+  // project documentation reflects only their own manifest/structure — not
+  // the n-dx tooling files written later in this phase.
+  let readmeResult = null;
+  try {
+    readmeResult = generateTargetReadme(dir);
+  } catch {
+    // Non-fatal — README generation is a best-effort convenience.
+  }
+
   const assistantResults = setupAssistantIntegrations(dir, assistantEnabled);
+
+  // When the user just consented to `git init` in the preflight, stage and
+  // commit the n-dx baseline now that every tool directory and assistant
+  // surface has been written.  Done AFTER all writes so the snapshot is
+  // complete; a missing path here would just be skipped, not error.
+  const gitCommitResult = gitResult?.status === "initialized"
+    ? commitInitBaseline(dir)
+    : null;
+
   printStaticInitSummary({
     svExists, rexExists, henchExists, llmSkipped, selectedProvider,
-    selection, providerSource, modelSource, assistantResults,
+    selection, providerSource, modelSource, assistantResults, readmeResult,
+    gitResult, gitCommitResult,
   });
   exitWithCleanup(0);
 }

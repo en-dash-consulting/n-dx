@@ -1,0 +1,25 @@
+---
+id: "90989978-1e8a-42cf-873f-74da53bf6c72"
+level: "task"
+title: "Update README generation template to include Overview, Quick Start, Testing, and License sections"
+status: "completed"
+priority: "high"
+tags:
+  - "init"
+  - "readme"
+  - "cli"
+source: "smart-add"
+startedAt: "2026-06-03T00:38:58.581Z"
+completedAt: "2026-06-03T00:46:40.176Z"
+endedAt: "2026-06-03T00:46:40.176Z"
+resolutionType: "code-change"
+resolutionDetail: "Updated composeReadme in packages/core/readme-generator.js to emit four canonical sections — Overview, Quick Start, Testing, License — in order. Each section is always present with a non-empty body: Overview from package.json description (fallback to project-name stub), Quick Start from detected install command (npm/pnpm/yarn/bun lockfile-driven for Node, pip/poetry/uv for Python, go/cargo for others, with a clone fallback), Testing from detected test command (npm test variant when scripts.test set; pytest/go test/cargo test for non-Node manifests) or a non-empty stub, and License from manifest license field (Node package.json license string or {type} object form; pyproject.toml license string or {text=} form; Cargo.toml license) with LICENSE-file fallback then \"See LICENSE.\" stub. Extended readProjectManifest to extract license, added detectCommands() and findLicenseFile() helpers. Both README.md (primary) and README.proposed.md (existing-README mode) flow through composeReadme so both outputs carry the same four sections in canonical order."
+acceptanceCriteria:
+  - "Generated README.md contains an ## Overview section populated from package.json description or project summary"
+  - "Generated README.md contains a ## Quick Start section with at minimum an install command derived from the project package manager"
+  - "Generated README.md contains a ## Testing section listing the detected test command or a placeholder if none is detected"
+  - "Generated README.md contains a ## License section citing the license from package.json or falling back to 'See LICENSE'"
+  - "README.proposed.md contains all four sections under the same headings"
+  - "Section order is Overview → Quick Start → Testing → License in both output files"
+description: "Author a content template for the ndx-init-generated README that guarantees presence of Overview, Quick Start, Testing, and License sections in that order. Each section should be populated from available project signals (package.json description, detected test command, license field) with sensible stubs when signals are absent. The template must be applied by both the README.md (empty-repo) and README.proposed.md (existing-README) generation paths."
+---
