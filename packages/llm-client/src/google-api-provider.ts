@@ -29,6 +29,7 @@ import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js
 import { ClaudeClientError } from "./types.js";
 import type { LLMProvider, ProviderInfo, StreamChunk } from "./provider-interface.js";
 import type { GoogleConfig } from "./llm-types.js";
+import type { GeminiFunctionDeclaration } from "./tool-schema.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 const DEFAULT_MAX_RETRIES = 3;
@@ -58,6 +59,72 @@ export interface GoogleApiProviderOptions {
   /** Base delay in ms for exponential backoff (default: 1000). */
   baseDelayMs?: number;
   /** Maximum response tokens (default: 8192). */
+  maxOutputTokens?: number;
+}
+
+// ── Tool-calling types ──────────────────────────────────────────────────────
+
+/**
+ * A single part of a Gemini `contents` turn.
+ *
+ * Gemini conversations are arrays of turns, each turn carrying one or more
+ * parts. A part is exactly one of: model/user text, a model-emitted function
+ * call, or a caller-supplied function response.
+ */
+export type GeminiPart =
+  | { text: string }
+  | { functionCall: { name: string; args: Record<string, unknown> } }
+  | { functionResponse: { name: string; response: Record<string, unknown> } };
+
+/** A single conversation turn in the Gemini `contents` array. */
+export interface GeminiContent {
+  /** `"user"` for caller turns (prompt + function responses); `"model"` for assistant turns. */
+  role: "user" | "model";
+  parts: GeminiPart[];
+}
+
+/** A Gemini `tools` entry wrapping function declarations. */
+export interface GeminiToolBlock {
+  functionDeclarations: GeminiFunctionDeclaration[];
+}
+
+/** Normalized result of a tool-aware Gemini turn. */
+export interface GeminiGenerateResult {
+  /** Raw parts from the model turn (text + functionCall), suitable for pushing back into `contents` as a `"model"` turn. */
+  parts: GeminiPart[];
+  /** Function calls the model requested this turn (empty when the model produced only text). */
+  functionCalls: Array<{ name: string; args: Record<string, unknown> }>;
+  /** Concatenated text parts from the model turn. */
+  text: string;
+  /** Gemini `finishReason` (e.g. `"STOP"`, `"MAX_TOKENS"`), when present. */
+  finishReason?: string;
+  /** Token usage for the turn, parsed from `usageMetadata`. */
+  usage?: TokenUsage;
+}
+
+/**
+ * Provider that additionally supports tool-aware, multi-turn generation.
+ *
+ * Extends {@link LLMProvider} with {@link generateContentWithTools}. The
+ * Google provider implements this; callers guard with
+ * `provider.info.capabilities.includes("function-calling")` before narrowing
+ * to this type.
+ */
+export interface GeminiToolProvider extends LLMProvider {
+  generateContentWithTools(args: GenerateContentWithToolsArgs): Promise<GeminiGenerateResult>;
+}
+
+/** Arguments for a tool-aware Gemini generation turn. */
+export interface GenerateContentWithToolsArgs {
+  /** Model id (defaults to the provider's configured model). */
+  model?: string;
+  /** Full conversation history to send. */
+  contents: GeminiContent[];
+  /** Tool declarations the model may call. */
+  tools?: GeminiToolBlock[];
+  /** System instruction (Gemini's first-class system slot). */
+  systemInstruction?: string;
+  /** Max response tokens (defaults to the provider's configured value). */
   maxOutputTokens?: number;
 }
 
@@ -178,7 +245,7 @@ export function validateGeminiModelId(model: string): void {
  */
 export function createGoogleApiProvider(
   options: GoogleApiProviderOptions = {},
-): LLMProvider {
+): GeminiToolProvider {
   const googleConfig = options.googleConfig;
   // Resolution order: explicit override → config field → canonical default.
   // "GEMINI_API_KEY" is the canonical default, matching GoogleConfig.apiKeyEnv
@@ -207,7 +274,7 @@ export function createGoogleApiProvider(
     vendor: "google",
     mode: "api",
     model: defaultModel,
-    capabilities: ["streaming"],
+    capabilities: ["streaming", "function-calling"],
   };
 
   /**
@@ -230,8 +297,125 @@ export function createGoogleApiProvider(
     });
   }
 
+  /**
+   * Build the JSON request body for a tool-aware, multi-turn request.
+   *
+   * Sends the full `contents` history, optional `tools`, and an optional
+   * `systemInstruction` (Gemini's first-class system slot). Kept separate from
+   * {@link buildBody} so the single-turn `complete()`/`stream()` paths remain
+   * byte-for-byte unchanged.
+   */
+  function buildToolBody(args: GenerateContentWithToolsArgs): string {
+    const body: Record<string, unknown> = {
+      contents: args.contents,
+      generationConfig: { maxOutputTokens: args.maxOutputTokens ?? maxOutputTokens },
+    };
+    if (args.tools && args.tools.length > 0) {
+      body.tools = args.tools;
+    }
+    if (args.systemInstruction) {
+      body.systemInstruction = { parts: [{ text: args.systemInstruction }] };
+    }
+    return JSON.stringify(body);
+  }
+
   return {
     info,
+
+    async generateContentWithTools(
+      args: GenerateContentWithToolsArgs,
+    ): Promise<GeminiGenerateResult> {
+      const model = args.model || defaultModel;
+      validateGeminiModelId(model);
+
+      let lastError: Error | undefined;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await fetch(buildUrl(model, "generateContent"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: buildToolBody(args),
+          });
+
+          if (!response.ok) {
+            const body = await response.text();
+            const message = `Gemini API error ${response.status}: ${body}`;
+
+            if (response.status === 401 || response.status === 403) {
+              throw new ClaudeClientError(message, "auth", false);
+            }
+            if (response.status === 404) {
+              throw new ClaudeClientError(message, "not-found", false);
+            }
+            if (response.status === 408) {
+              throw new ClaudeClientError(message, "timeout", true);
+            }
+            if (RETRY_STATUS_CODES.has(response.status) && attempt < maxRetries) {
+              const delay = baseDelayMs * 2 ** attempt;
+              await new Promise((r) => setTimeout(r, delay));
+              continue;
+            }
+            if (RETRY_STATUS_CODES.has(response.status)) {
+              throw new ClaudeClientError(message, "rate-limit", true);
+            }
+            throw new ClaudeClientError(message, "unknown", false);
+          }
+
+          const data = await response.json() as Record<string, unknown>;
+          const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
+          const firstCandidate = candidates?.[0];
+          const content = firstCandidate?.content as Record<string, unknown> | undefined;
+          const rawParts = (content?.parts as Array<Record<string, unknown>> | undefined) ?? [];
+
+          const parts: GeminiPart[] = [];
+          const functionCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+          let text = "";
+
+          for (const part of rawParts) {
+            if (typeof part.text === "string") {
+              text += part.text;
+              parts.push({ text: part.text });
+            } else if (part.functionCall && typeof part.functionCall === "object") {
+              const fc = part.functionCall as Record<string, unknown>;
+              const name = typeof fc.name === "string" ? fc.name : "";
+              const fcArgs = (fc.args as Record<string, unknown> | undefined) ?? {};
+              functionCalls.push({ name, args: fcArgs });
+              parts.push({ functionCall: { name, args: fcArgs } });
+            }
+          }
+
+          const finishReason = typeof firstCandidate?.finishReason === "string"
+            ? firstCandidate.finishReason as string
+            : undefined;
+
+          const usage = data.usageMetadata
+            ? parseGeminiTokenUsage(data.usageMetadata as Record<string, unknown>)
+            : undefined;
+
+          return { parts, functionCalls, text, finishReason, usage };
+        } catch (err) {
+          if (err instanceof ClaudeClientError) {
+            throw err;
+          }
+          lastError = err as Error;
+
+          if (attempt < maxRetries) {
+            const delay = baseDelayMs * 2 ** attempt;
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+
+          throw new ClaudeClientError(
+            (err as Error).message ?? "Unknown error",
+            "unknown",
+            false,
+          );
+        }
+      }
+
+      throw lastError ?? new ClaudeClientError("Exhausted retries", "unknown", false);
+    },
 
     async validateAuth(): Promise<boolean> {
       try {

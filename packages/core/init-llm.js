@@ -311,10 +311,11 @@ export async function promptLLMSelection(resolution, options = {}) {
  * @param {string} [flags.claudeModel]   --claude-model= value
  * @param {string} [flags.codexModel]    --codex-model= value
  * @param {string} [flags.googleModel]   --google-model= value
+ * @param {string} [flags.googleLightModel]  --google-light-model= value
  *
  * @returns {{ errors: string[], warnings: string[] }}
  */
-export function validateInitFlags({ provider, model, claudeModel, codexModel, googleModel }) {
+export function validateInitFlags({ provider, model, claudeModel, codexModel, googleModel, googleLightModel }) {
   const errors = [];
   const warnings = [];
   const isKnownModel = (vendor, value) => {
@@ -370,6 +371,16 @@ export function validateInitFlags({ provider, model, claudeModel, codexModel, go
       if (catalog && !isKnownModel("google", googleModel)) {
         warnings.push(
           `Unknown model "${googleModel}" for google. ` +
+          `Known models: ${catalog.map((m) => m.id).join(", ")}. Proceeding anyway.`,
+        );
+      }
+    }
+
+    if (googleLightModel) {
+      const catalog = getModelsForVendor("google");
+      if (catalog && !isKnownModel("google", googleLightModel)) {
+        warnings.push(
+          `Unknown light model "${googleLightModel}" for google. ` +
           `Known models: ${catalog.map((m) => m.id).join(", ")}. Proceeding anyway.`,
         );
       }

@@ -755,3 +755,163 @@ describe("Google provider — registry integration", () => {
     expect(registry.vendors()).toContain("google");
   });
 });
+
+// ── createGoogleApiProvider — generateContentWithTools() ─────────────────
+
+describe("createGoogleApiProvider — generateContentWithTools()", () => {
+  const originalEnv = process.env;
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    globalThis.fetch = originalFetch;
+  });
+
+  function mockFetchResponse(body: unknown, status = 200): void {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+      text: async () => JSON.stringify(body),
+    });
+  }
+
+  const TOOLS = [{
+    functionDeclarations: [{
+      name: "read_file",
+      description: "Read a file.",
+      parameters: { type: "OBJECT" as const, properties: { path: { type: "STRING" as const } }, required: ["path"] },
+    }],
+  }];
+
+  it("declares the function-calling capability", () => {
+    const provider = createGoogleApiProvider({ googleConfig: { api_key: "AIza-test" } });
+    expect(provider.info.capabilities).toContain("function-calling");
+  });
+
+  it("parses a functionCall response into functionCalls + parts", async () => {
+    mockFetchResponse({
+      candidates: [{
+        content: {
+          role: "model",
+          parts: [{ functionCall: { name: "read_file", args: { path: "a.ts" } } }],
+        },
+        finishReason: "STOP",
+      }],
+      usageMetadata: { promptTokenCount: 30, candidatesTokenCount: 12 },
+    });
+
+    const provider = createGoogleApiProvider({ googleConfig: { api_key: "AIza-test" } });
+    const result = await provider.generateContentWithTools({
+      model: "gemini-2.5-pro",
+      contents: [{ role: "user", parts: [{ text: "read a.ts" }] }],
+      tools: TOOLS,
+    });
+
+    expect(result.functionCalls).toEqual([{ name: "read_file", args: { path: "a.ts" } }]);
+    expect(result.parts).toEqual([{ functionCall: { name: "read_file", args: { path: "a.ts" } } }]);
+    expect(result.text).toBe("");
+    expect(result.finishReason).toBe("STOP");
+    expect(result.usage).toEqual({ input: 30, output: 12 });
+  });
+
+  it("parses a text-only STOP response (no function calls)", async () => {
+    mockFetchResponse({
+      candidates: [{
+        content: { role: "model", parts: [{ text: "All done." }] },
+        finishReason: "STOP",
+      }],
+      usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 3 },
+    });
+
+    const provider = createGoogleApiProvider({ googleConfig: { api_key: "AIza-test" } });
+    const result = await provider.generateContentWithTools({
+      model: "gemini-2.5-pro",
+      contents: [{ role: "user", parts: [{ text: "hi" }] }],
+      tools: TOOLS,
+    });
+
+    expect(result.functionCalls).toEqual([]);
+    expect(result.text).toBe("All done.");
+    expect(result.finishReason).toBe("STOP");
+  });
+
+  it("sends contents, tools, and systemInstruction in the request body", async () => {
+    mockFetchResponse({
+      candidates: [{ content: { role: "model", parts: [{ text: "ok" }] }, finishReason: "STOP" }],
+    });
+
+    const provider = createGoogleApiProvider({ googleConfig: { api_key: "AIza-test" } });
+    await provider.generateContentWithTools({
+      model: "gemini-2.5-pro",
+      contents: [{ role: "user", parts: [{ text: "go" }] }],
+      tools: TOOLS,
+      systemInstruction: "You are a coding agent.",
+    });
+
+    const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(fetchCall[0]).toContain(":generateContent");
+    const body = JSON.parse(fetchCall[1].body as string);
+    expect(body.contents).toEqual([{ role: "user", parts: [{ text: "go" }] }]);
+    expect(body.tools).toEqual(TOOLS);
+    expect(body.systemInstruction).toEqual({ parts: [{ text: "You are a coding agent." }] });
+  });
+
+  it("throws ClaudeClientError with reason 'auth' on 401 (non-retryable)", async () => {
+    mockFetchResponse({ error: { code: 401 } }, 401);
+
+    const provider = createGoogleApiProvider({ googleConfig: { api_key: "AIza-bad" } });
+    try {
+      await provider.generateContentWithTools({
+        contents: [{ role: "user", parts: [{ text: "hi" }] }],
+        tools: TOOLS,
+      });
+      throw new Error("expected throw");
+    } catch (err) {
+      expect((err as ClaudeClientError).reason).toBe("auth");
+      expect((err as ClaudeClientError).retryable).toBe(false);
+    }
+  });
+
+  it("retries on 429 then throws rate-limit after exhaustion", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: async () => "RESOURCE_EXHAUSTED",
+      json: async () => ({ error: { code: 429 } }),
+    });
+
+    const provider = createGoogleApiProvider({
+      googleConfig: { api_key: "AIza-test" },
+      maxRetries: 1,
+      baseDelayMs: 1,
+    });
+
+    try {
+      await provider.generateContentWithTools({
+        contents: [{ role: "user", parts: [{ text: "hi" }] }],
+        tools: TOOLS,
+      });
+      throw new Error("expected throw");
+    } catch (err) {
+      expect((err as ClaudeClientError).reason).toBe("rate-limit");
+      expect((err as ClaudeClientError).retryable).toBe(true);
+    }
+    // 1 initial attempt + 1 retry
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a non-Gemini model ID", async () => {
+    const provider = createGoogleApiProvider({ googleConfig: { api_key: "AIza-test" } });
+    await expect(provider.generateContentWithTools({
+      model: "gpt-4o",
+      contents: [{ role: "user", parts: [{ text: "hi" }] }],
+      tools: TOOLS,
+    })).rejects.toThrow(ClaudeClientError);
+  });
+});

@@ -973,8 +973,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 122,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration)",
+    maxExports: 132,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop)",
   },
 ];
 

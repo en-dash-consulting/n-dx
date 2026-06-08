@@ -611,20 +611,32 @@ function validateModel(value) {
  * This list will grow as Google releases new models. The prefix check ("gemini-")
  * allows unknown future models while still catching clearly wrong values.
  */
-function validateGoogleModel(value) {
+function validateGeminiModelField(value, fieldKey) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(
-      `Invalid value for llm.google.model: model ID must be a non-empty string.\n` +
+      `Invalid value for llm.google.${fieldKey}: model ID must be a non-empty string.\n` +
         "  Known models: gemini-2.0-flash (light), gemini-2.5-flash (standard), gemini-2.5-pro (heavy)",
     );
   }
   if (!value.startsWith("gemini-")) {
     throw new Error(
-      `Invalid value for llm.google.model: "${value}" is not a Gemini model ID.\n` +
+      `Invalid value for llm.google.${fieldKey}: "${value}" is not a Gemini model ID.\n` +
         '  Gemini model IDs must start with "gemini-" (e.g. "gemini-2.5-pro", "gemini-2.0-flash").\n' +
         "  Known models: gemini-2.0-flash (light), gemini-2.5-flash (standard), gemini-2.5-pro (heavy)",
     );
   }
+}
+
+function validateGoogleModel(value) {
+  validateGeminiModelField(value, "model");
+}
+
+/**
+ * Validate llm.google.lightModel: a Gemini model ID used for light-tier tasks
+ * (analysis, classification). Same rules as llm.google.model.
+ */
+function validateGoogleLightModel(value) {
+  validateGeminiModelField(value, "lightModel");
 }
 
 /**
@@ -759,6 +771,7 @@ const LLM_VALIDATORS = {
   "google.api_key": validateGoogleApiKey,
   "google.api_endpoint": validateApiEndpoint,
   "google.model": validateGoogleModel,
+  "google.lightModel": validateGoogleLightModel,
   "google.apiKeyEnv": validateGoogleApiKeyEnv,
   autoFailover: validateAutoFailover,
 };

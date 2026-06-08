@@ -127,6 +127,7 @@ describe("validateTokenReporting", () => {
         vendorBreakdown: { codex: 3 },
         isCodexRun: true,
         isClaudeRun: false,
+        isGoogleRun: false,
       });
     });
 
@@ -166,6 +167,55 @@ describe("validateTokenReporting", () => {
       });
       expect(result.metrics.isCodexRun).toBe(true);
       expect(result.metrics.isClaudeRun).toBe(true);
+    });
+  });
+
+  describe("google/gemini runs", () => {
+    function createGoogleTurn(turn = 1): TurnTokenUsage {
+      return { turn, vendor: "google", model: "gemini-2.5-pro", input: 1000, output: 200 };
+    }
+
+    it("flags isGoogleRun for a Gemini run", () => {
+      const run = createRunRecord({
+        turnTokenUsage: [createGoogleTurn()],
+        tokenUsage: { input: 1000, output: 200 },
+        model: "gemini-2.5-pro",
+      });
+
+      const result = validateTokenReporting(run);
+
+      expect(result.metrics.isGoogleRun).toBe(true);
+      expect(result.metrics.isCodexRun).toBe(false);
+      expect(result.metrics.isClaudeRun).toBe(false);
+    });
+
+    it("fails when a Google run reports zero tokens", () => {
+      const run = createRunRecord({
+        turnTokenUsage: [createGoogleTurn()],
+        tokenUsage: { input: 0, output: 0 },
+        model: "gemini-2.5-pro",
+      });
+
+      const result = validateTokenReporting(run);
+
+      expect(result.ok).toBe(false);
+      expect(result.issues.some((i) => i.category === "non-zero" && i.severity === "error")).toBe(true);
+    });
+
+    it("does not compare Google runs against Claude baselines (no false outliers)", () => {
+      // Token volume that would be an outlier against Claude/Codex baselines —
+      // but with no google baselines configured, no outlier issue should fire.
+      const run = createRunRecord({
+        turns: 1,
+        taskTitle: "Simple task",
+        turnTokenUsage: [{ turn: 1, vendor: "google", model: "gemini-2.5-pro", input: 50000, output: 10000 }],
+        tokenUsage: { input: 50000, output: 10000 },
+        model: "gemini-2.5-pro",
+      });
+
+      const result = validateTokenReporting(run);
+
+      expect(result.issues.filter((i) => i.category === "outlier")).toHaveLength(0);
     });
   });
 

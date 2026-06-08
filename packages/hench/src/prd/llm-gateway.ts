@@ -165,6 +165,8 @@ export {
   toAnthropicToolDefs,
   toOpenAiToolDef,
   toOpenAiToolDefs,
+  toGeminiFunctionDeclaration,
+  toGeminiFunctionDeclarations,
 } from "@n-dx/llm-client";
 
 // ---- Provider registry ------------------------------------------------------
@@ -177,6 +179,12 @@ export {
 export type {
   LLMProvider,
   ProviderInfo,
+  GeminiToolProvider,
+  GeminiContent,
+  GeminiPart,
+  GeminiToolBlock,
+  GeminiGenerateResult,
+  GenerateContentWithToolsArgs,
 } from "@n-dx/llm-client";
 
 export type { GoogleConfig } from "@n-dx/llm-client";
@@ -208,4 +216,6 @@ export type {
   ToolPropertySchema,
   AnthropicToolDef,
   OpenAiToolDef,
+  GeminiFunctionDeclaration,
+  GeminiSchema,
 } from "@n-dx/llm-client";

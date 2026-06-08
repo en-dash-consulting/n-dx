@@ -450,7 +450,8 @@ function extractModelFlags(args) {
       a.startsWith("--model=") ||
       a.startsWith("--claude-model=") ||
       a.startsWith("--codex-model=") ||
-      a.startsWith("--google-model="),
+      a.startsWith("--google-model=") ||
+      a.startsWith("--google-light-model="),
   );
 }
 
@@ -493,12 +494,19 @@ function extractInitGoogleModel(args) {
   return flag.slice("--google-model=".length).trim();
 }
 
+function extractInitGoogleLightModel(args) {
+  const flag = args.find((a) => a.startsWith("--google-light-model="));
+  if (!flag) return undefined;
+  return flag.slice("--google-light-model=".length).trim();
+}
+
 function stripInitVendorModelFlags(args) {
   return args.filter(
     (a) =>
       !a.startsWith("--claude-model=") &&
       !a.startsWith("--codex-model=") &&
-      !a.startsWith("--google-model="),
+      !a.startsWith("--google-model=") &&
+      !a.startsWith("--google-light-model="),
   );
 }
 
@@ -896,6 +904,7 @@ function parseInitFlagSet(rest) {
   const claudeModelFromFlag = extractInitClaudeModel(rest);
   const codexModelFromFlag = extractInitCodexModel(rest);
   const googleModelFromFlag = extractInitGoogleModel(rest);
+  const googleLightModelFromFlag = extractInitGoogleLightModel(rest);
 
   if (providerFromFlag !== undefined && !SUPPORTED_PROVIDERS.includes(providerFromFlag)) {
     console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude, google.`);
@@ -909,6 +918,7 @@ function parseInitFlagSet(rest) {
     claudeModel: claudeModelFromFlag,
     codexModel: codexModelFromFlag,
     googleModel: googleModelFromFlag,
+    googleLightModel: googleLightModelFromFlag,
   });
 
   if (validation.errors.length > 0) {
@@ -950,7 +960,7 @@ function parseInitFlagSet(rest) {
     || (effectiveProvider === "codex" ? codexModelFromFlag : undefined)
     || (effectiveProvider === "google" ? googleModelFromFlag : undefined);
 
-  return { providerFromFlag, modelFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, effectiveProvider, effectiveModel };
+  return { providerFromFlag, modelFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, effectiveProvider, effectiveModel };
 }
 
 /**
@@ -1113,7 +1123,7 @@ async function runSubInitPhase(name, work, detail, quiet) {
  *   selectedModel: string|undefined, claudeModelFromFlag: string|undefined,
  *   codexModelFromFlag: string|undefined, googleModelFromFlag: string|undefined }} opts
  */
-async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag }) {
+async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag }) {
   if (!llmSkipped && selectedProvider) {
     const origLog = console.log;
     console.log = () => {};
@@ -1135,6 +1145,11 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
       }
       if (googleModelFromFlag && selectedProvider !== "google") {
         await runConfig(["llm.google.model", googleModelFromFlag, dir]);
+      }
+      // --google-light-model pins the light-tier Gemini model (used for
+      // analysis/classification). Always persisted to llm.google.lightModel.
+      if (googleLightModelFromFlag) {
+        await runConfig(["llm.google.lightModel", googleLightModelFromFlag, dir]);
       }
     } finally {
       console.log = origLog;
@@ -1175,7 +1190,7 @@ function printStaticInitSummary({ svExists, rexExists, henchExists, llmSkipped, 
 }
 
 async function handleInit(rest) {
-  const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
+  const { effectiveProvider, effectiveModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerFromFlag } = parseInitFlagSet(rest);
 
   const initArgs = buildInitArgs(rest);
   const dir = resolveDir(initArgs);
@@ -1262,7 +1277,7 @@ async function handleInit(rest) {
 
   await persistInitLLMConfig(dir, {
     llmSkipped, selectedProvider, selectedModel: selection.model,
-    claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag,
+    claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag,
   });
 
   try {
