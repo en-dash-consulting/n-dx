@@ -218,7 +218,15 @@ export {
   parseGeminiTokenUsage,
   validateGeminiModelId,
 } from "./google-api-provider.js";
-export type { GoogleApiProviderOptions } from "./google-api-provider.js";
+export type {
+  GoogleApiProviderOptions,
+  GeminiContent,
+  GeminiPart,
+  GeminiToolBlock,
+  GeminiGenerateResult,
+  GeminiToolProvider,
+  GenerateContentWithToolsArgs,
+} from "./google-api-provider.js";
 
 // Factory
 export {
@@ -344,6 +352,8 @@ export type {
   ToolDefinition,
   AnthropicToolDef,
   OpenAiToolDef,
+  GeminiFunctionDeclaration,
+  GeminiSchema,
 } from "./tool-schema.js";
 
 export {
@@ -351,6 +361,8 @@ export {
   toAnthropicToolDefs,
   toOpenAiToolDef,
   toOpenAiToolDefs,
+  toGeminiFunctionDeclaration,
+  toGeminiFunctionDeclarations,
 } from "./tool-schema.js";
 
 // Deprecation warning filter (CLI entry points)

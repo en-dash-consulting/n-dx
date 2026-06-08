@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails } from "../../guard/index.js";
-import { TOOL_DEFINITIONS, dispatchTool } from "../../tools/dispatch.js";
+import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
@@ -15,7 +15,13 @@ import {
   resolveLLMVendor,
 } from "../../store/project-config.js";
 import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt } from "../../prd/llm-gateway.js";
-import type { LLMProvider } from "../../prd/llm-gateway.js";
+import type {
+  LLMProvider,
+  GeminiToolProvider,
+  GeminiContent,
+  GeminiPart,
+} from "../../prd/llm-gateway.js";
+import type { TokenUsage } from "../../schema/index.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
@@ -374,6 +380,322 @@ function streamAssistantText(assistantContent: Anthropic.ContentBlock[], label: 
 }
 
 // ---------------------------------------------------------------------------
+// Gemini tool-loop helpers — Gemini speaks `contents`/`functionCall` rather
+// than Anthropic content blocks, so the Anthropic-typed helpers above cannot
+// be reused. These mirror them for the Gemini agentic loop.
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the tool context for a Gemini run (GuardRails + memory monitor).
+ *
+ * Sibling of {@link initApiResources} that omits the Anthropic client — the
+ * Gemini loop drives the provider's `generateContentWithTools` directly, so it
+ * needs only the shared {@link ToolContext} for guarded tool dispatch.
+ */
+function initGoogleApiResources(
+  config: HenchConfig,
+  projectDir: string,
+  store: PRDStore,
+  taskId: string,
+  testCommand: string | undefined,
+  startingHead: string | undefined,
+): ToolContext {
+  const guard = new GuardRails(projectDir, config.guard);
+  const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
+
+  return {
+    guard,
+    projectDir,
+    store,
+    taskId,
+    testCommand,
+    startingHead,
+    memoryMonitor,
+    selfHeal: config.selfHeal,
+  };
+}
+
+/**
+ * Accumulate a pre-parsed {@link TokenUsage} into run totals and the per-turn
+ * breakdown.
+ *
+ * Gemini reports `promptTokenCount`/`candidatesTokenCount` (already normalized
+ * to `input`/`output` by `parseGeminiTokenUsage` inside the provider), so —
+ * unlike {@link recordTurnTokenUsage} — this variant takes the normalized
+ * usage directly rather than re-parsing Anthropic-shaped `input_tokens` keys.
+ */
+function recordTurnTokenUsageNormalized(
+  run: RunRecord,
+  usage: TokenUsage | undefined,
+  turn: number,
+  vendor: string,
+  model: string,
+): void {
+  if (!usage) return;
+
+  run.tokenUsage.input += usage.input;
+  run.tokenUsage.output += usage.output;
+  if (usage.cacheCreationInput) {
+    run.tokenUsage.cacheCreationInput = (run.tokenUsage.cacheCreationInput ?? 0) + usage.cacheCreationInput;
+  }
+  if (usage.cacheReadInput) {
+    run.tokenUsage.cacheReadInput = (run.tokenUsage.cacheReadInput ?? 0) + usage.cacheReadInput;
+  }
+
+  const turnUsage: TurnTokenUsage = {
+    turn,
+    input: usage.input,
+    output: usage.output,
+    vendor,
+    model,
+  };
+  if (usage.cacheCreationInput) turnUsage.cacheCreationInput = usage.cacheCreationInput;
+  if (usage.cacheReadInput) turnUsage.cacheReadInput = usage.cacheReadInput;
+  run.turnTokenUsage!.push(turnUsage);
+}
+
+/**
+ * Dispatch each Gemini functionCall through the shared tool dispatcher, record
+ * results in the run, and return one `functionResponse` part per call to feed
+ * back as the next `"user"` turn.
+ *
+ * Gemini equivalent of {@link executeToolCalls} — same dispatch/recording, but
+ * returns {@link GeminiPart} function responses instead of Anthropic tool_result
+ * blocks.
+ */
+async function executeGeminiFunctionCalls(
+  functionCalls: Array<{ name: string; args: Record<string, unknown> }>,
+  toolCtx: ToolContext,
+  turn: number,
+  run: RunRecord,
+): Promise<GeminiPart[]> {
+  const responses: GeminiPart[] = [];
+
+  for (const fc of functionCalls) {
+    const startMs = Date.now();
+    stream("Tool", `${fc.name}(${JSON.stringify(fc.args).slice(0, 100)})`);
+
+    const output = await dispatchTool(toolCtx, fc.name, fc.args, rexToolHandlers);
+
+    const durationMs = Date.now() - startMs;
+
+    run.toolCalls.push({
+      turn,
+      tool: fc.name,
+      input: fc.args,
+      output: output.slice(0, MAX_TOOL_OUTPUT_STORED),
+      durationMs,
+    });
+
+    responses.push({ functionResponse: { name: fc.name, response: { result: output } } });
+
+    stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
+    detail(`${durationMs}ms`);
+  }
+
+  return responses;
+}
+
+/** Prune Gemini conversation history (keep brief + last MAX_CONTEXT_PAIRS pairs). */
+function pruneGeminiContents(contents: GeminiContent[]): void {
+  const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
+  if (contents.length <= maxKeep) return;
+
+  const removed = contents.length - maxKeep;
+  contents.splice(1, removed);
+  detail(`Pruned ${removed} turns to stay within token budget`);
+}
+
+/** Parameters for the Gemini agentic tool-use loop. */
+interface GeminiToolLoopParams {
+  provider: GeminiToolProvider;
+  config: HenchConfig;
+  model: string;
+  systemPrompt: string | undefined;
+  briefText: string;
+  taskTitle: string;
+  testCommand: string | undefined;
+  taskId: string;
+  henchDir: string;
+  projectDir: string;
+  store: PRDStore;
+  maxTurns: number;
+  tokenBudget: number | undefined;
+  startingHead: string | undefined;
+  opts: AgentLoopOptions;
+}
+
+/**
+ * Gemini agentic tool-use loop.
+ *
+ * Mirrors the Claude API loop's lifecycle (run record, heartbeat, SIGINT
+ * cancellation, budget checks, review gate, finalization) but speaks Gemini's
+ * `contents`/`functionCall` protocol. Each turn sends the full conversation
+ * plus tool declarations; functionCalls are dispatched through the shared
+ * {@link dispatchTool} and their results fed back as the next user turn. The
+ * loop terminates when the model returns no functionCalls (treated as
+ * completion), the turn cap is hit, the token budget is exceeded, or the run
+ * is cancelled.
+ *
+ * No cross-vendor failover happens inside this loop in v1 — the Claude
+ * failover path (`callWithFailover`) is bound to the Anthropic message format
+ * and would require translating `contents` → `MessageParam`. The provider's
+ * own retry/backoff (RETRY_STATUS_CODES) covers transient rate-limit/server
+ * errors. TODO: wire google→claude failover via getNextFailoverAttempt.
+ */
+async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoopResult> {
+  const {
+    provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
+    taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead, opts,
+  } = params;
+
+  const hasToolCalling =
+    provider.info.capabilities.includes("function-calling") &&
+    typeof provider.generateContentWithTools === "function";
+
+  const { run, memoryCtx } = await initRunRecord({
+    taskId,
+    taskTitle,
+    model,
+    henchDir,
+    vendor: "google",
+    sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
+    approvals: DEFAULT_EXECUTION_POLICY.approvals,
+    parseMode: hasToolCalling ? "gemini-tools" : "provider-api",
+    invocationContext: "api",
+  });
+
+  section(
+    opts.runNumber !== undefined
+      ? `Agent Run #${opts.runNumber} (${model}) start`
+      : `Agent Run (${model})`,
+  );
+
+  const heartbeat = startHeartbeat(henchDir, run);
+
+  // Register SIGINT handler for graceful cancellation (mirrors Claude loop).
+  let cancelled = false;
+  const handleSignal = () => {
+    if (cancelled) process.exit(1);
+    cancelled = true;
+  };
+  process.on("SIGINT", handleSignal);
+
+  try {
+    if (!hasToolCalling) {
+      // Graceful degradation: single-turn completion when the provider does
+      // not support function-calling.
+      const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${briefText}` : briefText;
+      stream("Gemini", "Sending prompt to Gemini API...");
+      const completionResult = await provider.complete({ prompt: fullPrompt, model });
+      run.status = "completed";
+      run.turns = 1;
+      run.summary = completionResult.text?.slice(0, MAX_SUMMARY_LENGTH);
+      recordTurnTokenUsageNormalized(run, completionResult.tokenUsage, 1, "google", model);
+      stream(formatModelLabel(model), completionResult.text ?? "");
+    } else {
+      const toolCtx = initGoogleApiResources(
+        config, projectDir, store, taskId, testCommand, startingHead,
+      );
+      const tools = [{ functionDeclarations: TOOL_DEFINITIONS_GEMINI }];
+      const contents: GeminiContent[] = [
+        { role: "user", parts: [{ text: briefText }] },
+      ];
+
+      for (let turn = 0; turn < maxTurns; turn++) {
+        if (cancelled) {
+          run.status = "cancelled";
+          stream("Cancelled", "Run interrupted by user");
+          break;
+        }
+
+        run.turns = turn + 1;
+        subsection(`Turn ${turn + 1}/${maxTurns}`);
+
+        pruneGeminiContents(contents);
+
+        const result = await provider.generateContentWithTools({
+          model,
+          contents,
+          tools,
+          systemInstruction: systemPrompt,
+          maxOutputTokens: config.maxTokens,
+        });
+
+        recordTurnTokenUsageNormalized(run, result.usage, turn + 1, "google", model);
+
+        const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
+        if (budgetCheck.exceeded) {
+          await handleBudgetExceeded(store, taskId, run, budgetCheck.totalUsed, budgetCheck.budget);
+          break;
+        }
+
+        // Record the model turn in history.
+        contents.push({ role: "model", parts: result.parts });
+
+        if (result.text) {
+          stream(formatModelLabel(model), result.text);
+        }
+
+        // No function calls → the model is done.
+        if (result.functionCalls.length === 0) {
+          run.status = "completed";
+          run.summary = result.text ? result.text.slice(0, MAX_SUMMARY_LENGTH) : undefined;
+          break;
+        }
+
+        // Dispatch tools and feed the responses back as the next user turn.
+        const responses = await executeGeminiFunctionCalls(
+          result.functionCalls, toolCtx, turn + 1, run,
+        );
+        contents.push({ role: "user", parts: responses });
+
+        run.lastActivityAt = new Date().toISOString();
+        await saveRun(henchDir, run);
+      }
+
+      if (run.status === "running") {
+        run.status = "timeout";
+        run.error = `Exceeded max turns (${maxTurns})`;
+        await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+      }
+    }
+  } catch (err) {
+    run.status = "failed";
+    run.error = (err as Error).message;
+    console.error(`[Error] ${run.error}`);
+    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+  } finally {
+    process.removeListener("SIGINT", handleSignal);
+  }
+
+  heartbeat.stop();
+
+  if (opts.review && run.status === "completed") {
+    await runReviewGate(projectDir, store, taskId, run);
+  }
+
+  await finalizeRun({
+    run,
+    henchDir,
+    projectDir,
+    config,
+    testCommand,
+    heartbeat,
+    memoryCtx,
+    selfHeal: config.selfHeal,
+    rollbackOnFailure: opts.rollbackOnFailure,
+    yes: opts.yes,
+    autonomous: opts.autonomous,
+    store,
+    autoCommit: config.autoCommit === true,
+    skipFullTestGate: config.skipFullTestGate,
+  });
+
+  return { run };
+}
+
+// ---------------------------------------------------------------------------
 // Main agent loop
 // ---------------------------------------------------------------------------
 
@@ -432,83 +754,30 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     provider = defaultRegistry.create("claude", llmConfig);
   }
 
-  // Google uses LLMProvider.complete() — simple single-turn completion.
-  // The Gemini REST API does not support multi-turn tool-use in the same way
-  // as the Anthropic SDK, so Google runs go through a simplified completion
-  // path that records a valid run record and returns immediately.
+  // Google (Gemini) drives a dedicated agentic tool-use loop. The Gemini REST
+  // API supports function-calling, so we run a multi-turn loop that mirrors the
+  // Claude path below: send `contents` + tool declarations, dispatch any
+  // requested functionCalls through the shared dispatcher, feed results back,
+  // and loop until the model stops calling tools (or limits are hit). If the
+  // provider does not advertise function-calling, it degrades to single-turn.
   if (effectiveVendor === "google") {
-    const { run, memoryCtx: googleMemCtx } = await initRunRecord({
-      taskId,
-      taskTitle: brief.task.title,
+    return await runGeminiToolLoop({
+      provider: provider as GeminiToolProvider,
+      config,
       model,
-      henchDir,
-      vendor: "google",
-      sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
-      approvals: DEFAULT_EXECUTION_POLICY.approvals,
-      parseMode: "provider-api",
-      invocationContext: "api",
-    });
-
-    section(
-      opts.runNumber !== undefined
-        ? `Agent Run #${opts.runNumber} (${model}) start`
-        : `Agent Run (${model})`,
-    );
-
-    const googleHeartbeat = startHeartbeat(henchDir, run);
-
-    try {
-      // Combine system prompt + brief for Gemini REST call.
-      const fullPrompt = systemPrompt
-        ? `${systemPrompt}\n\n${briefText}`
-        : briefText;
-
-      stream("Gemini", "Sending prompt to Gemini API...");
-      const completionResult = await provider.complete({ prompt: fullPrompt, model });
-
-      run.status = "completed";
-      run.turns = 1;
-      run.summary = completionResult.text?.slice(0, 500);
-      if (completionResult.tokenUsage) {
-        run.tokenUsage.input = completionResult.tokenUsage.input;
-        run.tokenUsage.output = completionResult.tokenUsage.output;
-        run.turnTokenUsage = [{
-          turn: 1,
-          input: completionResult.tokenUsage.input,
-          output: completionResult.tokenUsage.output,
-          vendor: "google",
-          model,
-        }];
-      }
-
-      stream(formatModelLabel(model), completionResult.text ?? "");
-    } catch (err) {
-      run.status = "failed";
-      run.error = (err as Error).message;
-      console.error(`[Error] ${run.error}`);
-      await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
-    } finally {
-      googleHeartbeat.stop();
-    }
-
-    await finalizeRun({
-      run,
+      systemPrompt,
+      briefText,
+      taskTitle: brief.task.title,
+      testCommand: brief.project.testCommand,
+      taskId,
       henchDir,
       projectDir,
-      config,
-      testCommand: brief.project.testCommand,
-      heartbeat: googleHeartbeat,
-      memoryCtx: googleMemCtx,
-      selfHeal: config.selfHeal,
-      rollbackOnFailure: opts.rollbackOnFailure,
-      yes: opts.yes,
-      autonomous: opts.autonomous,
       store,
-      autoCommit: config.autoCommit === true,
-      skipFullTestGate: config.skipFullTestGate,
+      maxTurns,
+      tokenBudget,
+      startingHead,
+      opts,
     });
-
-    return { run };
   }
 
   const { client, vendor, toolCtx } = await initApiResources(
