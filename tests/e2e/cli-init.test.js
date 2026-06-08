@@ -460,6 +460,10 @@ describe("claude CLI discovery diagnostics", () => {
       "/usr/local/bin/claude",
       "/opt/homebrew/bin/claude",
       join(homedir(), ".npm-global", "bin", "claude"),
+      // npm -g installs under the active node prefix sit next to the node
+      // binary itself — and the stripped test PATH still includes that dir,
+      // so claude would be discoverable and the "no claude" scenario invalid.
+      join(dirname(process.execPath), "claude"),
     ];
     return commonPaths.some((p) => existsSync(p));
   }
@@ -474,12 +478,11 @@ describe("claude CLI discovery diagnostics", () => {
       // Include node's own bin dir so subprocesses can find node, but nothing else
       const nodeBinDir = dirname(process.execPath);
 
-      // init no longer hard-fails when the claude CLI binary is missing: it
-      // provisions the file-based Claude surface (CLAUDE.md, skills, permissions)
-      // best-effort and only the MCP registration that needs the binary is
-      // skipped. `run` throws on a non-zero exit, so reaching the assertions
-      // proves init exited 0.
-      const stdout = run(["init", "--provider=codex", tmpDir], {
+      // This runs a FULL init (the claude-discovery failure only surfaces in
+      // the end-of-run summary), which can exceed the default 20s exec budget
+      // under full-suite load — give it extra headroom.
+      const result = runFail(["init", "--provider=codex", tmpDir], {
+        timeout: 50_000,
         env: {
           ...envWithout,
           PATH: `${binDir}${PATH_SEP}${nodeBinDir}`,
@@ -495,7 +498,7 @@ describe("claude CLI discovery diagnostics", () => {
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }
-  });
+  }, 60_000);
 
   // Skipped: feature branch's setupAssistantIntegrations is designed so that
   // failure in one vendor (Claude) does not block another (Codex). When

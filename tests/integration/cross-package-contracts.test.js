@@ -612,7 +612,8 @@ describe("gateway export auto-detection", () => {
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
         "toOpenAiToolDef", "toOpenAiToolDefs", "ProviderRegistry", "defaultRegistry",
         "classifyLLMError", "getNextFailoverAttempt"],
-      ...["PROJECT_DIRS", "NEWEST_MODELS", "VENDOR_CONTEXT_CHAR_LIMITS",
+      ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "GOOGLE_MODELS",
+        "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES"],
     ]);
 

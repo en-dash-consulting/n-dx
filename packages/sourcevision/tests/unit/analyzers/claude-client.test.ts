@@ -123,7 +123,11 @@ describe("claude-client model resolution", () => {
   });
 
   it("getAuthMode returns cli (no-key sentinel) for google without an API key", () => {
+    // Clear any ambient GEMINI_API_KEY so the result reflects the (empty)
+    // config rather than the developer's environment.
+    vi.stubEnv("GEMINI_API_KEY", "");
     setLLMConfig({ vendor: "google" });
     expect(getAuthMode()).toBe("cli");
+    vi.unstubAllEnvs();
   });
 });
