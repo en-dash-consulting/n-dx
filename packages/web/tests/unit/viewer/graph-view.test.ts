@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { h, render } from "preact";
 import type { LoadedData } from "../../../src/viewer/types.js";
 import { Graph } from "../../../src/viewer/views/graph.js";
@@ -54,8 +54,28 @@ function makeLoadedData(overrides: Partial<LoadedData> = {}): LoadedData {
 }
 
 describe("Graph (Import Graph view)", () => {
-  it("renders a clear scope selector and graph panel", () => {
+  // Track every rendered root so we can unmount the Preact tree after each
+  // test. Without this, useEffect flush timers stay scheduled past the file's
+  // jsdom teardown; a late flush falls back to a setTimeout that calls
+  // cancelAnimationFrame (gone after teardown), surfacing as an unhandled
+  // ReferenceError. See sidebar.test.ts for the same cleanup pattern.
+  const roots: HTMLElement[] = [];
+  function newRoot(): HTMLElement {
     const root = document.createElement("div");
+    roots.push(root);
+    return root;
+  }
+
+  afterEach(() => {
+    for (const root of roots) {
+      render(null, root);
+      root.parentNode?.removeChild(root);
+    }
+    roots.length = 0;
+  });
+
+  it("renders a clear scope selector and graph panel", () => {
+    const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
     expect(root.querySelector(".ig-scope-card")).not.toBeNull();
     expect(root.querySelector(".ig-zone-map")).not.toBeNull();
@@ -70,7 +90,7 @@ describe("Graph (Import Graph view)", () => {
 
   it("zone network click refocuses the local graph without opening detail panel", async () => {
     const onSelect = vi.fn();
-    const root = document.createElement("div");
+    const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect }), root);
     const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
     expect(zoneBtn).toBeTruthy();
@@ -88,7 +108,7 @@ describe("Graph (Import Graph view)", () => {
   });
 
   it("closes file street view when clicking the zone map background", async () => {
-    const root = document.createElement("div");
+    const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
     const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
     expect(zoneBtn).toBeTruthy();
@@ -107,14 +127,14 @@ describe("Graph (Import Graph view)", () => {
   });
 
   it("shows loading when imports are missing", () => {
-    const root = document.createElement("div");
+    const root = newRoot();
     const data = makeLoadedData({ imports: null });
     render(h(Graph, { data, onSelect: vi.fn() }), root);
     expect(root.textContent).toContain("No import data");
   });
 
   it("renders summary stats and focused graph when imports exist", async () => {
-    const root = document.createElement("div");
+    const root = newRoot();
     const data = makeLoadedData();
     render(h(Graph, { data, onSelect: vi.fn() }), root);
     expect(root.textContent).toContain("Map");
@@ -128,7 +148,7 @@ describe("Graph (Import Graph view)", () => {
 
   it("zone selection updates visible candidates without opening detail panel", async () => {
     const onSelect = vi.fn();
-    const root = document.createElement("div");
+    const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect }), root);
     const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
     expect(zoneBtn).toBeTruthy();
@@ -148,7 +168,7 @@ describe("Graph (Import Graph view)", () => {
   });
 
   it("expands the codebase map only on upward wheel intent at the top", async () => {
-    const root = document.createElement("div");
+    const root = newRoot();
     root.className = "main";
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
     const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone A"));
@@ -176,7 +196,7 @@ describe("Graph (Import Graph view)", () => {
   });
 
   it("recenters the file street view when the focused graph changes", async () => {
-    const root = document.createElement("div");
+    const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
     const svg = root.querySelector(".ig-graph-column .ig-svg-wrap svg") as SVGSVGElement;
     expect(svg).toBeTruthy();
@@ -196,7 +216,7 @@ describe("Graph (Import Graph view)", () => {
   });
 
   it("supports back and forward through clicked dependency preview nodes", async () => {
-    const root = document.createElement("div");
+    const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-node-file[title='src/a.ts']")).not.toBeNull();
@@ -217,7 +237,7 @@ describe("Graph (Import Graph view)", () => {
   });
 
   it("shows external zones that touch cross-boundary imports", async () => {
-    const root = document.createElement("div");
+    const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
     const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone A"));
     expect(zoneBtn).toBeTruthy();
@@ -242,7 +262,7 @@ describe("Graph (Import Graph view)", () => {
 
   it("navigates to files view on double-click of a node", async () => {
     const navigateTo = vi.fn();
-    const root = document.createElement("div");
+    const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn(), navigateTo }), root);
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-node-file")).not.toBeNull();
