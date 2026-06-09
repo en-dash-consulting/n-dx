@@ -42,6 +42,23 @@ function spawnAsync(cmd, args, captureStdout = false) {
   });
 }
 
+/**
+ * Spawn a child and resolve with its exit code and captured stderr.
+ *
+ * Unlike `spawnAsync`, this never discards the exit status or stderr — used for
+ * config writes (e.g. `config llm.vendor`) whose failures and warnings must reach
+ * the user instead of being silently swallowed.
+ */
+function spawnCapture(cmd, args) {
+  return new Promise((resolve) => {
+    let stderr = "";
+    const child = spawn(cmd, args, { stdio: ["ignore", "ignore", "pipe"] });
+    child.stderr.on("data", (d) => { stderr += d; });
+    child.on("close", (code) => resolve({ code: code ?? 0, stderr: stderr.trim() }));
+    child.on("error", (err) => resolve({ code: 1, stderr: err?.message || String(err) }));
+  });
+}
+
 // ── Spinner ────────────────────────────────────────────────────────────
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -125,6 +142,7 @@ function Recap({
   llmSkipped,
   provider,
   model,
+  llmWarning,
   assistantLines,
   readmeResult,
   gitWarningLines,
@@ -152,6 +170,9 @@ function Recap({
             <${Text}>    Provider      ${provider}<//>
             <${Text}>    Model         ${model ?? "not set"}<//>
           <//>`}
+      ${llmWarning && html`<${Box} flexDirection="column">
+        ${llmWarning.split("\n").map((line, i) => html`<${Text} key=${"llmw" + i} color="yellow">    ⚠ ${line}<//>`)}
+      <//>`}
       ${assistantLines.map((line, i) => html`<${Text} key=${"ai" + i}>${line}<//>`)}
       ${readmeLine && html`<${Text}>${readmeLine}<//>`}
       ${(gitWarningLines ?? []).map((line, i) => html`<${Text} key=${"git" + i} color="yellow">${line}<//>`)}
@@ -207,6 +228,9 @@ function InitApp({
       const svExists = existsSync(join(dir, ".sourcevision"));
       const rexExists = existsSync(join(dir, ".rex"));
       const henchExists = existsSync(join(dir, ".hench"));
+      // Captured warning from the vendor auth preflight (e.g. Gemini selected
+      // before GEMINI_API_KEY is set); surfaced in the recap.
+      let llmWarning = null;
 
       // sourcevision init + fast analysis (no LLM enrichment)
       setPhase("sourcevision", "active");
@@ -238,8 +262,21 @@ function InitApp({
       const cliPath = join(dirname(fileURLToPath(import.meta.url)), "cli.js");
 
       // LLM config writes — spawn the CLI in a subprocess for each key.
+      // The vendor write runs an auth preflight; `--soft-preflight` downgrades a
+      // failed preflight to a warning so the chosen vendor is still persisted
+      // (e.g. selecting Gemini before GEMINI_API_KEY is set). We capture the exit
+      // code + stderr so a genuine failure fails init and any preflight warning is
+      // surfaced in the recap — never silently swallowed.
       if (!llmSkipped && provider) {
-        await spawnAsync("node", [cliPath, "config", "llm.vendor", provider, dir]);
+        const vendorWrite = await spawnCapture("node", [
+          cliPath, "config", "llm.vendor", provider, dir, "--soft-preflight",
+        ]);
+        if (vendorWrite.code !== 0) {
+          setPhase("assistants", "failed");
+          onComplete(1, vendorWrite.stderr || `Failed to set llm.vendor=${provider}`);
+          return;
+        }
+        if (vendorWrite.stderr) llmWarning = vendorWrite.stderr;
         if (model) {
           await spawnAsync("node", [cliPath, "config", `llm.${provider}.model`, model, dir]);
         }
@@ -322,6 +359,7 @@ function InitApp({
         llmSkipped,
         provider: `${provider} (${providerSource})`,
         model: model ? (modelSource ? `${model} (${modelSource})` : model) : null,
+        llmWarning,
         assistantLines,
         readmeResult,
         gitWarningLines: formatGitWarningLines(gitResult),

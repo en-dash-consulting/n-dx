@@ -1121,9 +1121,11 @@ async function runSubInitPhase(name, work, detail, quiet) {
  * Persist LLM vendor/model selection to .n-dx.json after sub-package inits.
  *
  * Skipped entirely when the user cancelled an interactive prompt — no partial
- * config should be written on cancellation. runConfig("llm.vendor", ...) runs
- * auth preflight; if preflight fails it calls process.exit(1) so the model
- * key is never written.
+ * config should be written on cancellation. The llm.vendor write passes
+ * --soft-preflight: the auth preflight still runs, but on failure it prints a
+ * warning (to stderr, which stays visible here) and persists the vendor anyway
+ * instead of aborting — so the selected vendor applies to all later commands and
+ * the auth error surfaces clearly at actual use.
  *
  * @param {string} dir
  * @param {{ llmSkipped: boolean, selectedProvider: string|undefined,
@@ -1135,7 +1137,7 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
     const origLog = console.log;
     console.log = () => {};
     try {
-      await runConfig(["llm.vendor", selectedProvider, dir]);
+      await runConfig(["llm.vendor", selectedProvider, dir, "--soft-preflight"]);
       if (selectedModel) {
         await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
       }

@@ -2,7 +2,7 @@
 id: "46d8b92f-cc15-438a-84e0-9bac61a9adc7"
 level: "task"
 title: "`ndx add` ignores configured Google/Gemini vendor and falls back to Claude"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "bug"
@@ -10,6 +10,11 @@ tags:
   - "llm"
   - "cli"
 source: "skill/ndx-capture"
+startedAt: "2026-06-09T13:52:38.182Z"
+completedAt: "2026-06-09T14:02:44.904Z"
+endedAt: "2026-06-09T14:02:44.904Z"
+resolutionType: "code-change"
+resolutionDetail: "Added two Google vendor regression tests to smart-add-vendor-model-selection.test.ts. The config reading path was already correct via the dirname() adapter in rex/store/project-config.ts — the bug described in the task was pre-fixed. Tests confirm vendor=google correctly resolves to gemini-2.5-flash (standard tier) or a configured llm.google.model."
 acceptanceCriteria:
   - "`ndx init --provider=google` persists `llm.vendor: \"google\"` (and a `llm.google` model block) to the project config that `ndx add` reads."
   - "After Google init, `ndx add \"...\"` prints `Vendor: google` and routes the description-analysis LLM call to Gemini, not Claude."

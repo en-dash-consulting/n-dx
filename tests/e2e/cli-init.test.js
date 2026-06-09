@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -56,6 +56,21 @@ function runFail(args, opts = {}) {
       status: err.status,
     };
   }
+}
+
+/**
+ * Run init capturing stdout/stderr/status without throwing on non-zero exit.
+ * Needed to inspect stderr on a successful exit (e.g. the soft-preflight warning
+ * init emits while still persisting the vendor and exiting 0).
+ */
+function runCapture(args, opts = {}) {
+  const res = spawnSync("node", [CLI_PATH, ...args], {
+    encoding: "utf-8",
+    timeout: 20000,
+    stdio: "pipe",
+    ...opts,
+  });
+  return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
 }
 
 describe("n-dx init provider selection", () => {
@@ -199,19 +214,25 @@ describe("n-dx init provider selection", () => {
       }
     });
 
-    it("prompts codex login command when codex auth is missing", async () => {
+    it("warns but still persists vendor when codex auth is missing (soft preflight)", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-codex-fail-"));
       try {
         await writeFakeBinary(join(binDir, "codex"), { stderrLine: "not logged in", exitCode: 7 });
 
-        const result = runFail(
-          ["init", "--provider=codex", tmpDir],
+        const result = runCapture(
+          ["init", "--provider=codex", "--no-claude", tmpDir],
           { env: pathEnvWith(binDir) },
         );
 
-        expect(result.status).not.toBe(0);
+        // init no longer aborts: the chosen vendor is persisted and applies to
+        // all later commands; the auth problem is surfaced as a visible warning.
+        expect(result.status).toBe(0);
         expect(result.stderr).toContain("Provider auth preflight failed for \"codex\"");
         expect(result.stderr).toContain("Next step: run 'codex login'");
+        expect(result.stderr).toContain("Proceeding anyway");
+
+        const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("codex");
       } finally {
         await rm(binDir, { recursive: true, force: true });
       }
@@ -235,19 +256,23 @@ describe("n-dx init provider selection", () => {
       }
     });
 
-    it("prompts claude login command when claude auth is missing", async () => {
+    it("warns but still persists vendor when claude auth is missing (soft preflight)", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-claude-fail-"));
       try {
         await writeFakeBinary(join(binDir, "claude"), { stderrLine: "please login", exitCode: 9 });
 
-        const result = runFail(
+        const result = runCapture(
           ["init", "--provider=claude", tmpDir],
           { env: pathEnvWith(binDir) },
         );
 
-        expect(result.status).not.toBe(0);
+        expect(result.status).toBe(0);
         expect(result.stderr).toContain("Provider auth preflight failed for \"claude\"");
         expect(result.stderr).toContain("Next step: run 'claude login'");
+        expect(result.stderr).toContain("Proceeding anyway");
+
+        const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("claude");
       } finally {
         await rm(binDir, { recursive: true, force: true });
       }
@@ -306,8 +331,8 @@ describe("n-dx init provider selection", () => {
       }
     });
 
-    it("fails with actionable message when GEMINI_API_KEY is absent", () => {
-      const result = runFail(["init", "--provider=google", "--no-claude", tmpDir], {
+    it("warns with an actionable message but still persists google when GEMINI_API_KEY is absent", async () => {
+      const result = runCapture(["init", "--provider=google", "--no-claude", tmpDir], {
         env: {
           ...pathEnvWith(),
           // Explicitly strip the key and bypass flag so preflight runs for real
@@ -315,10 +340,17 @@ describe("n-dx init provider selection", () => {
           NDX_TEST_GOOGLE_PREFLIGHT: undefined,
         },
       });
-      expect(result.status).not.toBe(0);
+      // init persists the chosen vendor (so `ndx add`/`work` use Gemini and the
+      // auth error surfaces clearly at use time) and emits a visible warning
+      // instead of silently aborting and reverting to the Claude default.
+      expect(result.status).toBe(0);
       expect(result.stderr).toContain("Provider auth preflight failed for \"google\"");
       expect(result.stderr).toContain("NDX_GOOGLE_PREFLIGHT_NO_KEY");
       expect(result.stderr).toContain("aistudio.google.com/apikey");
+      expect(result.stderr).toContain("Proceeding anyway");
+
+      const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(ndxConfig.llm.vendor).toBe("google");
     });
 
     it("skips provider re-prompt when existing config already has google vendor (idempotency)", async () => {
