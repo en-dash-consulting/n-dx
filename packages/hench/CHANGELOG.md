@@ -1,5 +1,15 @@
 # @n-dx/hench
 
+## 0.4.5
+
+### Patch Changes
+
+- [#222](https://github.com/en-dash-consulting/n-dx/pull/222) [`75fe836`](https://github.com/en-dash-consulting/n-dx/commit/75fe8361174f0913d21b8cb7d393dca05cf5fa0f) Thanks [@endash-shal](https://github.com/endash-shal)! - reduce code size, improve skills for claude
+
+- Updated dependencies [[`75fe836`](https://github.com/en-dash-consulting/n-dx/commit/75fe8361174f0913d21b8cb7d393dca05cf5fa0f), [`6bdf00b`](https://github.com/en-dash-consulting/n-dx/commit/6bdf00b7af631518bbb829bb89160638b500507b)]:
+  - @n-dx/llm-client@0.4.5
+  - @n-dx/rex@0.4.5
+
 ## 0.4.4
 
 ### Patch Changes
