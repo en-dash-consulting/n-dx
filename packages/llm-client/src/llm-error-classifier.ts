@@ -9,6 +9,8 @@
 import type { LLMVendor } from "./llm-types.js";
 import { formatRetryCountdown, classifyTimeout } from "./rate-limit.js";
 import type { TimeoutKind } from "./rate-limit.js";
+import { CLI_ERROR_CODES } from "./types.js";
+import type { CLIErrorCode } from "./types.js";
 
 /** Error categories returned by {@link classifyLLMError}. */
 export type LLMErrorCategory =
@@ -26,6 +28,78 @@ export interface LLMErrorClassification {
   message: string;
   suggestion: string;
   category: LLMErrorCategory;
+  /**
+   * Stable CLI error code matching the category. Lets CLI wrap sites label the
+   * error accurately (e.g. NDX_CLI_LLM_RATE_LIMITED) instead of defaulting to
+   * NDX_CLI_GENERIC.
+   */
+  code: CLIErrorCode;
+}
+
+/**
+ * Extract a concise, human-readable provider reason from a raw error message.
+ *
+ * Vendor adapters embed the raw API response in the thrown error message:
+ *   - Google/OpenAI: `"<Vendor> API error <NNN>: {json body}"`
+ *   - Claude SDK / CLI providers: a plain message or stderr string
+ *
+ * The friendly classifier branches (rate-limit, auth, server, …) otherwise
+ * discard this, hiding the part that distinguishes e.g. a daily quota
+ * (RESOURCE_EXHAUSTED) from a transient per-minute throttle. This helper pulls
+ * out a short detail string to append to those messages, uniformly across
+ * vendors. Returns "" when there is nothing useful to add.
+ */
+export function extractProviderDetail(rawMessage: string): string {
+  if (!rawMessage) return "";
+
+  // Strip a leading "<Vendor> API error <NNN>: " / "... stream error <NNN>: "
+  // prefix produced by the fetch-based providers, leaving the raw body.
+  const prefix = /^[A-Za-z][\w.-]* API(?: stream)? error \d+:\s*/;
+  const body = rawMessage.replace(prefix, "").trim();
+  if (!body) return "";
+
+  let detail = body;
+
+  // Google and OpenAI both return { error: { message, status?, code? } }.
+  if (body.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(body) as {
+        error?: {
+          message?: unknown;
+          status?: unknown;
+          code?: unknown;
+          details?: Array<Record<string, unknown>>;
+        };
+      };
+      const err = parsed.error;
+      if (err && typeof err === "object") {
+        const message = typeof err.message === "string" ? err.message : "";
+        const label =
+          typeof err.status === "string"
+            ? err.status
+            : typeof err.code === "string"
+              ? err.code
+              : "";
+        // Google quota errors carry the daily-vs-throttle signal in details[].
+        const extras: string[] = [];
+        for (const d of err.details ?? []) {
+          const metric = (d.violations as Array<Record<string, unknown>> | undefined)?.[0]
+            ?.quotaMetric;
+          if (typeof metric === "string") extras.push(metric);
+          if (typeof d.retryDelay === "string") extras.push(`retry in ${d.retryDelay}`);
+        }
+        const head = label && message ? `${label}: ${message}` : label || message;
+        detail = [head, ...extras].filter(Boolean).join(" — ") || body;
+      }
+    } catch {
+      // Not JSON after all — fall back to the raw body.
+    }
+  }
+
+  // Collapse whitespace and truncate so multi-line bodies don't flood the terminal.
+  detail = detail.replace(/\s+/g, " ").trim();
+  if (detail.length > 300) detail = `${detail.slice(0, 297)}…`;
+  return detail;
 }
 
 /**
@@ -103,6 +177,11 @@ export function classifyLLMError(
     ? err.message.replace(debugMatch[0], "").trim()
     : err.message;
 
+  // Concise provider reason (e.g. Gemini's RESOURCE_EXHAUSTED + quota metric),
+  // appended to the friendly branches so errors are self-diagnosing.
+  const detail = extractProviderDetail(cleanedMessage);
+  const detailSuffix = detail ? ` (${detail})` : "";
+
   // ── Authentication (401, invalid key, expired token) ──────────────
   const isAuthError =
     /\b401\b/.test(msg) ||
@@ -113,25 +192,28 @@ export function classifyLLMError(
   if (isAuthError) {
     if (vendor === "codex") {
       return {
-        message: `Authentication failed — Codex CLI credentials were rejected.${suffix}`,
+        message: `Authentication failed — Codex CLI credentials were rejected.${suffix}${detailSuffix}`,
         suggestion:
           "Run 'codex login', then retry. If needed, set the binary path with: n-dx config llm.codex.cli_path /path/to/codex",
         category: "auth",
+        code: CLI_ERROR_CODES.AUTH_FAILED,
       };
     }
     if (vendor === "google") {
       return {
-        message: `Authentication failed — your Google API key was rejected.${suffix}`,
+        message: `Authentication failed — your Google API key was rejected.${suffix}${detailSuffix}`,
         suggestion:
           "Check your API key with: n-dx config llm.google.api_key <key>, or set the GEMINI_API_KEY environment variable.",
         category: "auth",
+        code: CLI_ERROR_CODES.AUTH_FAILED,
       };
     }
     return {
-      message: `Authentication failed — your API key was rejected.${suffix}`,
+      message: `Authentication failed — your API key was rejected.${suffix}${detailSuffix}`,
       suggestion:
         "Check your API key with: n-dx config claude.apiKey, or switch to CLI mode.",
       category: "auth",
+      code: CLI_ERROR_CODES.AUTH_FAILED,
     };
   }
 
@@ -156,10 +238,11 @@ export function classifyLLMError(
     }
     return {
       message:
-        `Rate limit exceeded — the API is temporarily throttling requests.${suffix}`,
+        `Rate limit exceeded — the API is temporarily throttling requests.${suffix}${detailSuffix}`,
       suggestion:
         `${retryHint}, or use a different model with --model.`,
       category: "rate-limit",
+      code: CLI_ERROR_CODES.LLM_RATE_LIMITED,
     };
   }
 
@@ -174,10 +257,11 @@ export function classifyLLMError(
       usageDetail = ` (${ctx.budgetUsed.toLocaleString()} / ${ctx.budgetLimit.toLocaleString()} tokens used)`;
     }
     return {
-      message: `Token budget exhausted${usageDetail} — the configured spending limit was reached.${suffix}`,
+      message: `Token budget exhausted${usageDetail} — the configured spending limit was reached.${suffix}${detailSuffix}`,
       suggestion:
         "Increase budget with: ndx config rex.budget.tokens <value> or ndx config rex.budget.cost <value>.",
       category: "budget",
+      code: CLI_ERROR_CODES.BUDGET_EXCEEDED,
     };
   }
 
@@ -192,16 +276,18 @@ export function classifyLLMError(
     const kind: TimeoutKind = classifyTimeout(err);
     if (kind === "network") {
       return {
-        message: `Network timeout — the connection to the API timed out.${suffix}`,
+        message: `Network timeout — the connection to the API timed out.${suffix}${detailSuffix}`,
         suggestion: "Check your internet connection and proxy settings, then try again.",
         category: "network",
+        code: CLI_ERROR_CODES.NETWORK_ERROR,
       };
     }
     return {
-      message: `API timeout — the request took too long to process.${suffix}`,
+      message: `API timeout — the request took too long to process.${suffix}${detailSuffix}`,
       suggestion:
         "Try reducing input size or using a smaller/faster model with --model.",
       category: "timeout",
+      code: CLI_ERROR_CODES.TIMEOUT,
     };
   }
 
@@ -213,9 +299,10 @@ export function classifyLLMError(
     msg.includes("fetch failed")
   ) {
     return {
-      message: `Network error — could not reach the API.${suffix}`,
+      message: `Network error — could not reach the API.${suffix}${detailSuffix}`,
       suggestion: "Check your internet connection and try again.",
       category: "network",
+      code: CLI_ERROR_CODES.NETWORK_ERROR,
     };
   }
 
@@ -232,6 +319,7 @@ export function classifyLLMError(
         suggestion:
           "Install Codex CLI and/or set its path: n-dx config llm.codex.cli_path /path/to/codex",
         category: "unknown",
+        code: CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
       };
     }
     return {
@@ -239,6 +327,7 @@ export function classifyLLMError(
       suggestion:
         "Install it (npm install -g @anthropic-ai/claude-cli) or set an API key: n-dx config claude.apiKey <key>",
       category: "unknown",
+      code: CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
     };
   }
 
@@ -260,6 +349,7 @@ export function classifyLLMError(
       message,
       suggestion,
       category: "parse",
+      code: CLI_ERROR_CODES.JSON_PARSE_FAILED,
     };
   }
 
@@ -271,10 +361,11 @@ export function classifyLLMError(
   ) {
     return {
       message:
-        `The API is temporarily overloaded or experiencing errors.${suffix}`,
+        `The API is temporarily overloaded or experiencing errors.${suffix}${detailSuffix}`,
       suggestion:
         "Wait a moment and retry. Consider using a different model with --model.",
       category: "server",
+      code: CLI_ERROR_CODES.LLM_SERVER_ERROR,
     };
   }
 
@@ -290,5 +381,6 @@ export function classifyLLMError(
     message: `Failed to ${label}: ${err.message}${suffix}`,
     suggestion: authHint,
     category: "unknown",
+    code: CLI_ERROR_CODES.GENERIC,
   };
 }

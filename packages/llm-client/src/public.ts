@@ -371,6 +371,7 @@ export { suppressKnownDeprecations } from "./suppress-deprecations.js";
 // LLM error classification (shared across domain packages)
 export {
   classifyLLMError,
+  extractProviderDetail,
 } from "./llm-error-classifier.js";
 export type {
   LLMErrorCategory,

@@ -478,12 +478,29 @@ async function testApiConnection(apiKey, endpoint, model) {
  * Exported for unit testing; internal use also via LLM_VALIDATORS.
  */
 export function validateGoogleApiKey(value) {
-  if (typeof value !== "string" || !value.startsWith("AIza") || value.length < 30) {
+  if (typeof value !== "string" || !isValidGoogleApiKeyFormat(value)) {
     throw new Error(
-      `Invalid API key format. Google AI keys start with "AIza" and are at least 30 characters.\n` +
+      `Invalid API key format. Google AI keys start with "AIza" or "AQ" and are at least 30 characters.\n` +
         "  Get your key at: https://aistudio.google.com/apikey",
     );
   }
+}
+
+/**
+ * Check whether a string matches the expected Google AI / Gemini API key format.
+ *
+ * Google issues keys with two prefixes: the legacy "AIza" prefix and the newer
+ * "AQ" prefix. Both are at least 30 characters.
+ *
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isValidGoogleApiKeyFormat(value) {
+  return (
+    typeof value === "string" &&
+    (value.startsWith("AIza") || value.startsWith("AQ")) &&
+    value.length >= 30
+  );
 }
 
 /**
@@ -518,11 +535,11 @@ async function runGoogleApiPreflight(llmConfig) {
     };
   }
 
-  if (!apiKey.startsWith("AIza") || apiKey.length < 30) {
+  if (!isValidGoogleApiKeyFormat(apiKey)) {
     return {
       ok: false,
       vendor: "google",
-      detail: `API key format is invalid. Google AI keys start with "AIza" and are at least 30 characters.`,
+      detail: `API key format is invalid. Google AI keys start with "AIza" or "AQ" and are at least 30 characters.`,
       errorCode: "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT",
     };
   }
@@ -1193,7 +1210,7 @@ Claude preflight error codes:
 
 Google preflight error codes:
   NDX_GOOGLE_PREFLIGHT_NO_KEY           No GEMINI_API_KEY env var or llm.google.api_key in config
-  NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT  Key does not match expected format (starts with "AIza", ≥30 chars)
+  NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT  Key does not match expected format (starts with "AIza" or "AQ", ≥30 chars)
   NDX_GOOGLE_PREFLIGHT_AUTH_FAILED      Gemini API rejected the key (HTTP 400 or 403)
   NDX_GOOGLE_PREFLIGHT_HTTP_ERROR       Gemini API returned an unexpected HTTP error
   NDX_GOOGLE_PREFLIGHT_CONNECT_ERROR    Could not connect to the Gemini API

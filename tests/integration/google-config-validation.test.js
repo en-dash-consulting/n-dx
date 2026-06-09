@@ -60,6 +60,20 @@ describe("Google config validation gauntlet", () => {
       expect(() => validateGoogleApiKey(key)).not.toThrow();
     });
 
+    it("accepts a key with the new AQ... prefix", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      expect(() =>
+        validateGoogleApiKey("AQ.Ab8RN6JExampleNewFormatKey1234567890"),
+      ).not.toThrow();
+    });
+
+    it("accepts a 30-char minimum-length AQ... key", async () => {
+      const { validateGoogleApiKey } = await import("../../packages/core/config.js");
+      const key = "AQShortestValidNewFormatKey123";
+      expect(key.length).toBe(30);
+      expect(() => validateGoogleApiKey(key)).not.toThrow();
+    });
+
     it("rejects a key shorter than 30 characters", async () => {
       const { validateGoogleApiKey } = await import("../../packages/core/config.js");
       const shortKey = "AIzaSyShort12345678"; // 19 chars — well under 30
@@ -89,6 +103,7 @@ describe("Google config validation gauntlet", () => {
       }
       expect(caught).toBeDefined();
       expect(caught.message).toContain("AIza");
+      expect(caught.message).toContain("AQ");
       expect(caught.message).toContain("30 characters");
     });
 

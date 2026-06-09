@@ -174,7 +174,7 @@ async function _cmdReshapeCore(
     tokenUsage = reshapeResult.tokenUsage;
   } catch (err) {
     const classified = classifyLLMError(err instanceof Error ? err : new Error(String(err)), vendor, "analyze PRD structure");
-    throw new CLIError(classified.message, classified.suggestion);
+    throw new CLIError(classified.message, classified.suggestion, classified.code);
   }
 
   // Combine proposals: cross-PRD duplicates, hash-suffix duplicates, then LLM proposals

@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyLLMError,
+  extractProviderDetail,
   type LLMErrorCategory,
   type LLMErrorClassification,
   type LLMErrorContext,
@@ -279,5 +280,110 @@ describe("classifyLLMError", () => {
       expect(r.suggestion).toBeTruthy();
       expect(r.category).toBe(expected);
     }
+  });
+
+  // ── stable error code per category ────────────────────────────────
+
+  it("sets a stable CLI error code matching the category", () => {
+    const cases: Array<[Error, string]> = [
+      [new Error("401 Unauthorized"), "NDX_CLI_AUTH_FAILED"],
+      [new Error("429 Rate limit"), "NDX_CLI_LLM_RATE_LIMITED"],
+      [new Error("budget exceeded"), "NDX_CLI_BUDGET_EXCEEDED"],
+      [new Error("408 request timeout"), "NDX_CLI_TIMEOUT"],
+      [new Error("ETIMEDOUT timed out"), "NDX_CLI_NETWORK_ERROR"],
+      [new Error("ENOTFOUND"), "NDX_CLI_NETWORK_ERROR"],
+      [new Error("invalid json"), "NDX_CLI_JSON_PARSE_FAILED"],
+      [new Error("529 Overloaded"), "NDX_CLI_LLM_SERVER_ERROR"],
+      [new Error("something totally unexpected"), "NDX_CLI_GENERIC"],
+    ];
+    for (const [err, expectedCode] of cases) {
+      expect(classifyLLMError(err).code).toBe(expectedCode);
+    }
+  });
+
+  // ── raw provider detail surfaced ──────────────────────────────────
+
+  it("surfaces Google's RESOURCE_EXHAUSTED reason on a 429", () => {
+    const body = JSON.stringify({
+      error: {
+        code: 429,
+        message: "Quota exceeded for quota metric 'Generate requests'.",
+        status: "RESOURCE_EXHAUSTED",
+      },
+    });
+    const r = classifyLLMError(
+      new Error(`Gemini API error 429: ${body}`),
+      "google",
+    );
+    expect(r.category).toBe("rate-limit");
+    expect(r.message).toContain("RESOURCE_EXHAUSTED");
+    expect(r.message).toContain("Quota exceeded");
+  });
+
+  it("surfaces OpenAI's parsed error message on auth failure", () => {
+    const body = JSON.stringify({
+      error: { message: "Incorrect API key provided", code: "invalid_api_key" },
+    });
+    const r = classifyLLMError(
+      new Error(`OpenAI API error 401: ${body}`),
+      "codex",
+    );
+    expect(r.category).toBe("auth");
+    expect(r.message).toContain("Incorrect API key provided");
+  });
+
+  it("passes a plain (non-JSON) provider message through as detail", () => {
+    const r = classifyLLMError(new Error("429 upstream connect error, too busy"));
+    expect(r.category).toBe("rate-limit");
+    expect(r.message).toContain("upstream connect error");
+  });
+});
+
+describe("extractProviderDetail", () => {
+  it("parses a Google JSON body into '<status>: <message>'", () => {
+    const body = JSON.stringify({
+      error: { message: "Quota exceeded.", status: "RESOURCE_EXHAUSTED" },
+    });
+    expect(extractProviderDetail(`Gemini API error 429: ${body}`)).toBe(
+      "RESOURCE_EXHAUSTED: Quota exceeded.",
+    );
+  });
+
+  it("appends quota metric / retry delay from Google details[]", () => {
+    const body = JSON.stringify({
+      error: {
+        message: "Quota exceeded.",
+        status: "RESOURCE_EXHAUSTED",
+        details: [
+          { violations: [{ quotaMetric: "generativelanguage.googleapis.com/generate_requests" }] },
+          { retryDelay: "37s" },
+        ],
+      },
+    });
+    const detail = extractProviderDetail(`Gemini API error 429: ${body}`);
+    expect(detail).toContain("generate_requests");
+    expect(detail).toContain("retry in 37s");
+  });
+
+  it("strips the stream-error prefix too", () => {
+    const body = JSON.stringify({ error: { message: "boom", code: "x" } });
+    expect(extractProviderDetail(`OpenAI API stream error 500: ${body}`)).toBe("x: boom");
+  });
+
+  it("returns a plain body verbatim when it is not JSON", () => {
+    expect(extractProviderDetail("Gemini API error 503: service unavailable")).toBe(
+      "service unavailable",
+    );
+  });
+
+  it("collapses whitespace and truncates very long detail", () => {
+    const long = "x".repeat(500);
+    const out = extractProviderDetail(long);
+    expect(out.length).toBeLessThanOrEqual(300);
+    expect(out.endsWith("…")).toBe(true);
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(extractProviderDetail("")).toBe("");
   });
 });
