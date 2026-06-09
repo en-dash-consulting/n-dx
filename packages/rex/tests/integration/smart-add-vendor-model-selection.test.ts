@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { NEWEST_MODELS } from "@n-dx/llm-client";
+import { NEWEST_MODELS, TIER_MODELS } from "@n-dx/llm-client";
 import { cmdInit } from "../../src/cli/commands/init.js";
 
 const {
@@ -149,5 +149,31 @@ describe("vendor-scoped model selection in rex add", () => {
 
     expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
     expect(capturedModels).toEqual(["claude-sonnet-4-6"]);
+  });
+
+  it("uses the standard-tier Gemini model when vendor=google and no model configured", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "google" } }),
+      "utf-8",
+    );
+
+    await cmdSmartAdd(tmpDir, "Add authentication", {}, {});
+
+    expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
+    expect(capturedModels).toEqual([TIER_MODELS.google.standard]);
+  });
+
+  it("uses llm.google.model when vendor=google and a model is configured", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "google", google: { model: "gemini-2.0-flash" } } }),
+      "utf-8",
+    );
+
+    await cmdSmartAdd(tmpDir, "Add authentication", {}, {});
+
+    expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
+    expect(capturedModels).toEqual(["gemini-2.0-flash"]);
   });
 });
