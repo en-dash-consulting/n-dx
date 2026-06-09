@@ -2,9 +2,8 @@
 id: "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3"
 level: "epic"
 title: "LLM Integration"
-status: "completed"
+status: "pending"
 startedAt: "2026-04-13T18:35:49.604Z"
-completedAt: "2026-06-05T18:36:16.129Z"
 endedAt: "2026-06-05T18:36:16.129Z"
 description: "AI client infrastructure: vendor-neutral LLM foundation, token usage tracking and analytics, budget management, vendor support (Claude, Codex), onboarding and authentication.\n\n---\n\nAutomated recommendations from SourceVision analysis. 21 zone+category groups covering 25 total findings."
 ---
@@ -45,3 +44,4 @@ description: "AI client infrastructure: vendor-neutral LLM foundation, token usa
 | [Token Usage Attribution per PRD Item](./token-usage-attribution-per-prd-item/index.md) | completed |
 | [Token usage tracking and analytics](./token-usage-tracking-and-analytics/index.md) | completed |
 | [Unified Server Architecture: HTTP MCP and ndx start](./unified-server-architecture-e96db7/index.md) | completed |
+| [`ndx add` ignores configured Google/Gemini vendor and falls back to Claude](./ndx-add-ignores-configured-46d8b9.md) | pending |
