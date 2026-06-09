@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const isWin = process.platform === "win32";
 
@@ -1041,6 +1041,69 @@ describe("n-dx config", () => {
       expect(stderr).toContain(`Next step: run '${fakeClaude} login'`);
 
       await expect(readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8")).rejects.toThrow(/ENOENT/);
+    });
+  });
+
+  // ── --soft-preflight (ndx init persist-and-warn behavior) ─────────────────
+  //
+  // `ndx init` writes llm.vendor with --soft-preflight so that selecting a vendor
+  // whose auth is not yet configured (e.g. Gemini before GEMINI_API_KEY is set)
+  // still persists the choice and applies to all later commands, surfacing a
+  // visible warning instead of silently aborting (and silently falling back to
+  // the Claude default at use time). Regression guard for that exact bug.
+
+  describe("llm.vendor --soft-preflight (init persist + warn)", () => {
+    /** Spawn `config` capturing stdout/stderr/status (success doesn't throw). */
+    function runCapture(args, env) {
+      const res = spawnSync("node", [CLI_PATH, "config", ...args], {
+        encoding: "utf-8",
+        timeout: 10000,
+        env: env ?? process.env,
+      });
+      return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
+    }
+
+    // No GEMINI_API_KEY → runGoogleApiPreflight returns NO_KEY offline (no HTTP).
+    const noKeyEnv = () => ({ ...process.env, GEMINI_API_KEY: "" });
+
+    it("persists vendor=google and warns when the Gemini preflight fails, without aborting", async () => {
+      const { stdout, stderr, status } = runCapture(
+        ["llm.vendor", "google", tmpDir, "--soft-preflight"],
+        noKeyEnv(),
+      );
+
+      // Soft mode does not abort.
+      expect(status).toBe(0);
+      // The failure detail + remediation are still surfaced (never swallowed)...
+      expect(stderr).toContain('Provider auth preflight failed for "google"');
+      expect(stderr).toContain("GEMINI_API_KEY");
+      // ...followed by a clear "proceeding anyway" notice.
+      expect(stderr).toContain("Proceeding anyway");
+      expect(stdout).toContain("llm.vendor = google");
+
+      // The vendor IS persisted, so later commands use Gemini (not the Claude default).
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.vendor).toBe("google");
+    });
+
+    it("without --soft-preflight, the same failure aborts and writes nothing (manual-use path)", async () => {
+      const { stderr, status } = runCapture(
+        ["llm.vendor", "google", tmpDir],
+        noKeyEnv(),
+      );
+
+      expect(status).toBe(1);
+      expect(stderr).toContain('Provider auth preflight failed for "google"');
+      await expect(readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8")).rejects.toThrow(/ENOENT/);
+    });
+
+    it("persists the configured Gemini model alongside the soft-preflighted vendor", async () => {
+      runCapture(["llm.vendor", "google", tmpDir, "--soft-preflight"], noKeyEnv());
+      run(["llm.google.model", "gemini-2.5-pro", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.vendor).toBe("google");
+      expect(config.llm.google.model).toBe("gemini-2.5-pro");
     });
   });
 

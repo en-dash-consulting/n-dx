@@ -1536,8 +1536,17 @@ async function coerceAndValidateProjectValue(
   return coerced;
 }
 
-/** Run vendor auth preflight when setting llm.vendor. */
-async function runLLMVendorPreflight(coerced, configs) {
+/**
+ * Run vendor auth preflight when setting llm.vendor.
+ *
+ * When `soft` is true (the `--soft-preflight` flag, used by `ndx init`), a failed
+ * preflight is downgraded from a fatal abort to a visible warning: the failure
+ * detail + remediation are printed, then the caller is allowed to persist the
+ * vendor anyway. This lets init record the user's chosen vendor (so it applies to
+ * all later commands) even before auth is configured — the auth error then surfaces
+ * clearly at actual use rather than silently reverting to the Claude default.
+ */
+async function runLLMVendorPreflight(coerced, configs, soft = false) {
   const currentLLM =
     configs.llm && typeof configs.llm === "object" ? configs.llm : {};
   const llmForPreflight = { ...currentLLM, vendor: coerced };
@@ -1558,7 +1567,13 @@ async function runLLMVendorPreflight(coerced, configs) {
       llmForPreflight,
       legacyClaude,
     );
-    process.exit(1);
+    if (!soft) {
+      process.exit(1);
+    }
+    console.error(
+      `Proceeding anyway — "${coerced}" is set but its auth was not validated. ` +
+        `Resolve the issue above, then re-run any ndx command to use ${coerced}.`,
+    );
   }
 }
 
@@ -1583,9 +1598,11 @@ async function handleSetProjectSection(
     flags,
   );
 
-  // Vendor auth preflight for llm.vendor
+  // Vendor auth preflight for llm.vendor. `--soft-preflight` (used by `ndx init`)
+  // downgrades a failed preflight from a fatal abort to a warning so the chosen
+  // vendor is still persisted.
   if (pkg === "llm" && settingPath === "vendor") {
-    await runLLMVendorPreflight(coerced, configs);
+    await runLLMVendorPreflight(coerced, configs, flags["soft-preflight"] === "true");
   }
 
   setByPath(configs[pkg], settingPath, coerced);
