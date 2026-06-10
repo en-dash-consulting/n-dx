@@ -42,34 +42,36 @@ function listPublishablePackages() {
     .filter(Boolean);
 }
 
-// `npm pack --json` is documented to print only a JSON array, but some npm
-// versions still run the package's `prepack`/`prepare` (build) lifecycle even
-// with `--ignore-scripts`, prepending a build banner to stdout (e.g.
-// "> @n-dx/web@x build\nBuilt viewer: ..."). Parse from the first `[` so the
-// test is robust to that preamble regardless of the local npm version.
-function parseNpmPackReport(out) {
-  const start = out.indexOf("[");
-  if (start === -1) {
+// `pnpm pack --json` prints a single JSON object { name, version, filename,
+// files }. Slice to the outermost {...} so any pnpm notice line on stdout
+// doesn't break the parse.
+function parsePackReport(out) {
+  const start = out.indexOf("{");
+  const end = out.lastIndexOf("}");
+  if (start === -1 || end === -1) {
     throw new Error(
-      `npm pack --json produced no JSON array:\n${out.slice(0, 500)}`,
+      `pnpm pack --json produced no JSON object:\n${out.slice(0, 500)}`,
     );
   }
-  return JSON.parse(out.slice(start));
+  return JSON.parse(out.slice(start, end + 1));
 }
 
 function packAndExtract(pkgDir) {
   const tmpRoot = mkdtempSync(join(tmpdir(), "ndx-pack-load-"));
 
-  // `--ignore-scripts` skips `prepare`/`prepack` so the build banner doesn't
-  // pollute stdout. The test runs against pre-built dist/ output (produced by
-  // pnpm install / pnpm run build), since dist/ is what publish actually ships.
+  // Use `pnpm pack` (not `npm pack`): npm runs the `prepare` lifecycle on pack
+  // even with --ignore-scripts / .npmrc ignore-scripts=true, which rebuilds the
+  // shared packages/*/dist mid-suite and races other root tests that load those
+  // CLIs (e.g. a concurrent `rex prune` loading a half-written module). pnpm
+  // honors ignore-scripts=true, so it packs the pre-built dist/ (what publish
+  // ships) without rebuilding.
   const out = execFileSync(
-    "npm",
-    ["pack", "--json", "--ignore-scripts", "--pack-destination", tmpRoot],
+    "pnpm",
+    ["pack", "--json", "--pack-destination", tmpRoot],
     { cwd: pkgDir, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
   );
-  const [report] = parseNpmPackReport(out);
-  const tgzPath = join(tmpRoot, report.filename);
+  const report = parsePackReport(out);
+  const tgzPath = report.filename; // pnpm reports an absolute path
 
   const extractDir = join(tmpRoot, "extracted");
   mkdirSync(extractDir);
