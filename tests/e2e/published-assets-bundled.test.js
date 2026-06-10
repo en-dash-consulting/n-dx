@@ -33,13 +33,16 @@ describe("@n-dx/core publishes assistant-assets/", () => {
     expect(includesAssets).toBe(true);
   });
 
-  it("`npm pack --dry-run` ships manifest.json and at least one skill", () => {
+  it("`pnpm pack --dry-run` ships manifest.json and at least one skill", () => {
+    // pnpm (not npm): npm rebuilds shared dist via the `prepare` lifecycle on
+    // pack even with ignore-scripts, racing other root tests. pnpm honors
+    // .npmrc ignore-scripts=true. `pnpm pack --json` prints a single object.
     const out = execFileSync(
-      "npm",
+      "pnpm",
       ["pack", "--dry-run", "--json"],
       { cwd: CORE_DIR, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
     );
-    const [report] = JSON.parse(out);
+    const report = JSON.parse(out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1));
     const shipped = new Set(report.files.map((f) => f.path));
     expect(shipped.has("assistant-assets/manifest.json")).toBe(true);
     expect(
