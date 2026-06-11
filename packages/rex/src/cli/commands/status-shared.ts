@@ -29,11 +29,11 @@ export const STATUS_ICONS: Record<string, string> = {
 
 export const STATUS_BADGES: Record<string, string> = {
   pending: "",
-  in_progress: "[ACTIVE] ",
+  in_progress: bold(cyan("[ACTIVE] ")),
   completed: "",
-  failing: "[FAIL] ",
+  failing: bold(red("[FAIL] ")),
   deferred: "",
-  blocked: "[BLOCKED] ",
+  blocked: bold(yellow("[BLOCKED] ")),
   deleted: "",
 };
 
