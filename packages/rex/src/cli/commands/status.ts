@@ -26,6 +26,7 @@ import {
   buildPerPRDSections,
   renderShowIndividualJson,
   renderShowIndividualHuman,
+  renderWhatNextHints,
 } from "./status-sections.js";
 
 // Re-export shared utilities so existing consumers (tests, etc.) keep working.
@@ -234,5 +235,6 @@ export async function cmdStatus(
   }
 
   renderAutoCompletableHints(doc.items);
+  renderWhatNextHints(doc.items);
   renderStaleWarnings(doc.items);
 }
