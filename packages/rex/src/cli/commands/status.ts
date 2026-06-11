@@ -212,7 +212,7 @@ export async function cmdStatus(
   result("");
 
   if (doc.items.length === 0) {
-    result("  No items yet. Run: rex add epic --title=\"...\" " + dir);
+    result("  No items yet. Run: ndx add \"feature\" " + dir);
     return;
   }
 
