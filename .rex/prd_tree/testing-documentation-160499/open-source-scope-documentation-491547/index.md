@@ -12,5 +12,5 @@ description: "OPEN_SOURCE_SCOPE.md exists but may be stale relative to the curre
 
 | Title | Status |
 |-------|--------|
-| [Add OPEN_SOURCE_SCOPE.md references to README and key documentation pages](./add-open-source-scope-md-b74fb9.md) | in_progress |
+| [Add OPEN_SOURCE_SCOPE.md references to README and key documentation pages](./add-open-source-scope-md-b74fb9.md) | completed |
 | [Audit and update OPEN_SOURCE_SCOPE.md against current codebase state](./audit-and-update-open-source-077d7c.md) | pending |

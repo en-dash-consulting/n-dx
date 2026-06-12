@@ -370,7 +370,7 @@ The `/triage` skill in Claude Code prioritizes and reprioritizes GitHub issues a
 
 ### Resources
 
-See [PACKAGE_GUIDELINES.md](PACKAGE_GUIDELINES.md) for package conventions, gateway patterns, and dependency hierarchy. See [TESTING.md](TESTING.md) for test tier requirements.
+See [PACKAGE_GUIDELINES.md](PACKAGE_GUIDELINES.md) for package conventions, gateway patterns, and dependency hierarchy. See [TESTING.md](TESTING.md) for test tier requirements. See [OPEN_SOURCE_SCOPE.md](OPEN_SOURCE_SCOPE.md) for licensing boundaries, included/excluded components, and contribution expectations.
 
 ## Community
 

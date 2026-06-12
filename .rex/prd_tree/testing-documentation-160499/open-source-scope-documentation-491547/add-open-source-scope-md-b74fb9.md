@@ -2,13 +2,15 @@
 id: "b74fb9f4-44c7-41ac-a0e2-9ecfd64befb7"
 level: "task"
 title: "Add OPEN_SOURCE_SCOPE.md references to README and key documentation pages"
-status: "in_progress"
+status: "completed"
 priority: "medium"
 tags:
   - "docs"
   - "open-source"
 source: "smart-add"
 startedAt: "2026-06-12T14:15:09.648Z"
+completedAt: "2026-06-12T14:17:39.588Z"
+endedAt: "2026-06-12T14:17:39.588Z"
 acceptanceCriteria:
   - "README.md contains at least one link to OPEN_SOURCE_SCOPE.md in a visible section (e.g., Contributing or License)"
   - "AGENTS.md or its source template (packages/core/assistant-assets/project-guidance.md) references OPEN_SOURCE_SCOPE.md"
