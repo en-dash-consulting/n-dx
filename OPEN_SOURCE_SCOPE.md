@@ -29,9 +29,9 @@ The following components are proprietary and not included:
 
 ## Contribution expectations
 
-Contributions are welcome under the terms of the
-[Contributor License Agreement (CLA)](CONTRIBUTING.md). By submitting a pull
-request you agree that your contribution may be distributed under ELv2.
+Contributions are welcome. By submitting a pull request you agree that your
+contribution will be distributed under the same [Elastic License 2.0](LICENSE)
+that covers this project.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, workflow, and code-style
 requirements.
