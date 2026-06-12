@@ -27,8 +27,10 @@ describe("mixed Go + TypeScript fixture — integration", () => {
     detectedConfigs = await detectLanguages(MIXED_FIXTURE);
     mergedConfig = mergeLanguageConfigs(detectedConfigs);
 
-    // Use merged config so both Go and TS files are properly inventoried
-    inventory = await analyzeInventory(MIXED_FIXTURE, { languageConfig: mergedConfig });
+    // Use merged config so both Go and TS files are properly inventoried.
+    // codeOnly:false so go.mod/package.json (config files) remain in the
+    // inventory for the config-detection assertions below.
+    inventory = await analyzeInventory(MIXED_FIXTURE, { languageConfig: mergedConfig, codeOnly: false });
 
     // Pass "go" as the language hint — the import analyzer already includes
     // JS/TS extensions for backward compatibility, so Go imports are the
