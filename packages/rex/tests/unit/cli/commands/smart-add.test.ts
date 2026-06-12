@@ -673,6 +673,33 @@ describe("classifySmartAddError", () => {
     const r2 = classifySmartAddError(new Error("unauthorized request: check credentials"), "description");
     expect(r2.message).toContain("Authentication failed");
   });
+
+  it("returns a stable CLI error code matching the category", () => {
+    expect(
+      classifySmartAddError(new Error("429 Too Many Requests"), "description").code,
+    ).toBe("NDX_CLI_LLM_RATE_LIMITED");
+    expect(
+      classifySmartAddError(new Error("401 Unauthorized"), "description").code,
+    ).toBe("NDX_CLI_AUTH_FAILED");
+  });
+
+  it("surfaces the raw provider reason (Gemini quota) in the message", () => {
+    const body = JSON.stringify({
+      error: {
+        code: 429,
+        message: "Quota exceeded for quota metric 'Generate requests'.",
+        status: "RESOURCE_EXHAUSTED",
+      },
+    });
+    const result = classifySmartAddError(
+      new Error(`Gemini API error 429: ${body}`),
+      "description",
+      "google",
+    );
+    expect(result.code).toBe("NDX_CLI_LLM_RATE_LIMITED");
+    expect(result.message).toContain("RESOURCE_EXHAUSTED");
+    expect(result.message).toContain("Quota exceeded");
+  });
 });
 
 describe("applySmartPlacement", () => {

@@ -182,6 +182,122 @@ export function toOpenAiToolDefs(tools: ReadonlyArray<ToolDefinition>): OpenAiTo
   return tools.map(toOpenAiToolDef);
 }
 
+// ── Gemini compilation ───────────────────────────────────────────────────
+
+/**
+ * Gemini function-declaration shape.
+ *
+ * Matches the `FunctionDeclaration` type from the Generative Language API.
+ * Gemini wraps these in `{ functionDeclarations: [...] }` inside the request
+ * `tools` array. The `parameters` field is an OpenAPI 3.0 schema **subset**
+ * (not raw JSON Schema): types are UPPERCASE (`STRING`, `OBJECT`, …) and
+ * unsupported JSON Schema keywords (`additionalProperties`, `$schema`, …)
+ * must be omitted.
+ */
+export interface GeminiFunctionDeclaration {
+  name: string;
+  description: string;
+  parameters: GeminiSchema;
+}
+
+/**
+ * Gemini OpenAPI-subset schema node. Types are uppercase; only the keywords
+ * Gemini accepts are present.
+ */
+export interface GeminiSchema {
+  type: "STRING" | "NUMBER" | "INTEGER" | "BOOLEAN" | "ARRAY" | "OBJECT";
+  description?: string;
+  enum?: string[];
+  properties?: Record<string, GeminiSchema>;
+  required?: string[];
+  items?: GeminiSchema;
+}
+
+/** Map a neutral lowercase JSON Schema type to Gemini's uppercase form. */
+function toGeminiType(type: JsonSchemaType): GeminiSchema["type"] {
+  switch (type) {
+    case "string":
+      return "STRING";
+    case "number":
+      return "NUMBER";
+    case "integer":
+      return "INTEGER";
+    case "boolean":
+      return "BOOLEAN";
+    case "array":
+      return "ARRAY";
+    case "object":
+      return "OBJECT";
+  }
+}
+
+/**
+ * Recursively convert a ToolPropertySchema to Gemini's OpenAPI-subset schema.
+ *
+ * Uppercases `type` at every level, preserves `description`/`enum`/`required`,
+ * recurses into `properties` and `items`, and drops any keyword Gemini does
+ * not accept (e.g. `additionalProperties`, `$schema`, `default`).
+ */
+function toGeminiSchema(schema: ToolPropertySchema): GeminiSchema {
+  const out: GeminiSchema = { type: toGeminiType(schema.type) };
+
+  if (schema.description !== undefined) {
+    out.description = schema.description;
+  }
+  if (schema.enum !== undefined) {
+    out.enum = [...schema.enum];
+  }
+  if (schema.properties !== undefined) {
+    const props: Record<string, GeminiSchema> = {};
+    for (const [key, value] of Object.entries(schema.properties)) {
+      props[key] = toGeminiSchema(value);
+    }
+    out.properties = props;
+  }
+  if (schema.required !== undefined) {
+    out.required = [...schema.required];
+  }
+  if (schema.items !== undefined) {
+    out.items = toGeminiSchema(schema.items);
+  }
+
+  return out;
+}
+
+/**
+ * Compile a vendor-neutral tool definition to a Gemini function declaration.
+ *
+ * The Gemini API expects `parameters` (an OpenAPI 3.0 schema subset) rather
+ * than `input_schema`. Empty parameter objects are emitted as a valid
+ * `{ type: "OBJECT", properties: {} }` since Gemini rejects a missing schema.
+ */
+export function toGeminiFunctionDeclaration(tool: ToolDefinition): GeminiFunctionDeclaration {
+  const properties: Record<string, GeminiSchema> = {};
+  for (const [key, value] of Object.entries(tool.inputSchema.properties)) {
+    properties[key] = toGeminiSchema(value);
+  }
+
+  const parameters: GeminiSchema = { type: "OBJECT", properties };
+  if (tool.inputSchema.required.length > 0) {
+    parameters.required = [...tool.inputSchema.required];
+  }
+
+  return {
+    name: tool.name,
+    description: tool.description,
+    parameters,
+  };
+}
+
+/**
+ * Compile an array of vendor-neutral tool definitions to Gemini format.
+ */
+export function toGeminiFunctionDeclarations(
+  tools: ReadonlyArray<ToolDefinition>,
+): GeminiFunctionDeclaration[] {
+  return tools.map(toGeminiFunctionDeclaration);
+}
+
 // ── Internal helpers ─────────────────────────────────────────────────────
 
 /**

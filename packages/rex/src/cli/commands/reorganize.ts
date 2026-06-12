@@ -46,7 +46,7 @@ async function runLlmAnalysis(
     const vendor = getLLMVendor() ?? "claude";
     const modelSource = flags.model
       ? "cli-override" as const
-      : llmConfig.claude?.model || llmConfig.codex?.model
+      : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
         ? "configured" as const
         : "default" as const;
     printVendorModelHeader(vendor, llmConfig, {

@@ -131,7 +131,7 @@ async function _cmdReshapeCore(
   const vendor = getLLMVendor() ?? "claude";
   const modelSource = flags.model
     ? "cli-override" as const
-    : llmConfig.claude?.model || llmConfig.codex?.model
+    : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
       ? "configured" as const
       : "default" as const;
   printVendorModelHeader(vendor, llmConfig, {
@@ -174,7 +174,7 @@ async function _cmdReshapeCore(
     tokenUsage = reshapeResult.tokenUsage;
   } catch (err) {
     const classified = classifyLLMError(err instanceof Error ? err : new Error(String(err)), vendor, "analyze PRD structure");
-    throw new CLIError(classified.message, classified.suggestion);
+    throw new CLIError(classified.message, classified.suggestion, classified.code);
   }
 
   // Combine proposals: cross-PRD duplicates, hash-suffix duplicates, then LLM proposals

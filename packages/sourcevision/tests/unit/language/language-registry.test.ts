@@ -109,7 +109,7 @@ describe("getLanguageConfig registry", () => {
 
   it("returns undefined for unsupported languages", () => {
     expect(getLanguageConfig("rust")).toBeUndefined();
-    expect(getLanguageConfig("python")).toBeUndefined();
+    expect(getLanguageConfig("cobol")).toBeUndefined();
   });
 
   it("configs satisfy the LanguageConfig interface shape", () => {

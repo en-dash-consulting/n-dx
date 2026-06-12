@@ -71,6 +71,11 @@ export function resolveVendorCliPath(llmConfig: LLMConfig, henchConfig?: HenchCo
   if (vendor === "codex") {
     return llmConfig.codex?.cli_path ?? "codex";
   }
+  // Google uses the REST API — no CLI binary. Return empty string so callers
+  // that check cli availability will surface a clear "vendor has no CLI" error.
+  if (vendor === "google") {
+    return "";
+  }
   const configured = sharedResolveCliPath(llmConfig.claude ?? {});
   if (configured !== "claude") return configured; // explicit user config wins
   // Fall back to persisted discovered path from .hench/config.json
@@ -96,6 +101,13 @@ export function resolveVendorCliEnv(llmConfig: LLMConfig): NodeJS.ProcessEnv {
     const apiKey = llmConfig.codex?.api_key;
     if (apiKey) {
       return { ...baseEnv, OPENAI_API_KEY: apiKey };
+    }
+  } else if (vendor === "google") {
+    const apiKey = llmConfig.google?.api_key;
+    if (apiKey) {
+      // Honor the configured env var name; default matches createGoogleApiProvider.
+      const apiKeyEnvVar = llmConfig.google?.apiKeyEnv ?? "GEMINI_API_KEY";
+      return { ...baseEnv, [apiKeyEnvVar]: apiKey };
     }
   } else {
     const apiKey = llmConfig.claude?.api_key;

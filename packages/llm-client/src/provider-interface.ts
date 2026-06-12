@@ -58,7 +58,7 @@ import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js
  *
  * `llm-types.ts` re-exports this type so all existing consumers are unaffected.
  */
-export type LLMVendor = "claude" | "codex";
+export type LLMVendor = "claude" | "codex" | "google";
 
 // ── Auth mode ─────────────────────────────────────────────────────────────
 

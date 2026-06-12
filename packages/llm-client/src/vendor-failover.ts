@@ -6,6 +6,8 @@
  *   then crosses to Codex (starting with standard, then light tier).
  * - When the active vendor is Codex, failover tries lighter Codex models first,
  *   then crosses to Claude (starting with standard, then light tier).
+ * - When the active vendor is Google, failover tries the lighter Google model first,
+ *   then crosses to Claude (starting with standard, then light tier).
  *
  * All model IDs are resolved through `resolveVendorModel()` to respect project config
  * overrides (custom models, lightModel settings, etc.), never hardcoded literals.
@@ -13,6 +15,7 @@
  * Chain lengths:
  * - Claude-origin: sonnet (attempt 0) → haiku (1) → codex-standard (2) → codex-light (3) → exhausted (4+)
  * - Codex-origin: gpt-5.5 (attempt 0) → gpt-5.4-mini (1) → sonnet (2) → haiku (3) → exhausted (4+)
+ * - Google-origin: flash (attempt 0) → google-light/flash (1) → claude-standard (2) → claude-light (3) → exhausted (4+)
  *
  * The chain terminates after 3 failover attempts (attempts 1-3), with attempt 4+ reporting exhaustion.
  */
@@ -45,6 +48,12 @@ export interface FailoverAttemptResult {
  * - Attempt 3: claude (light/haiku)
  * - Attempt 4+: exhausted
  *
+ * Failover chain for Google-origin:
+ * - Attempt 1: google (light/gemini-2.0-flash)
+ * - Attempt 2: claude (standard/sonnet)
+ * - Attempt 3: claude (light/haiku)
+ * - Attempt 4+: exhausted
+ *
  * @param attemptNumber - Zero-based attempt counter. Attempt 0 is the original run;
  *                        attempts 1-3 are valid failover attempts; 4+ are exhausted.
  * @param originVendor  - The vendor that originated the failing run.
@@ -68,6 +77,9 @@ export function getNextFailoverAttempt(
   }
   if (originVendor === "codex") {
     return getCodexFailoverAttempt(attemptNumber, llmConfig);
+  }
+  if (originVendor === "google") {
+    return getGoogleFailoverAttempt(attemptNumber, llmConfig);
   }
 
   // Unknown vendor: exhaust immediately.
@@ -130,6 +142,46 @@ function getCodexFailoverAttempt(
         isExhausted: false,
         vendor: "codex",
         model: resolveVendorModel("codex", llmConfig, "light"),
+      };
+
+    case 2:
+      // Cross to Claude standard (sonnet)
+      return {
+        isExhausted: false,
+        vendor: "claude",
+        model: resolveVendorModel("claude", llmConfig, "standard"),
+      };
+
+    case 3:
+      // Try Claude light (haiku)
+      return {
+        isExhausted: false,
+        vendor: "claude",
+        model: resolveVendorModel("claude", llmConfig, "light"),
+      };
+
+    default:
+      // Attempt 4+ is exhausted
+      return { isExhausted: true };
+  }
+}
+
+/**
+ * Get the next failover attempt when the origin vendor is Google.
+ *
+ * Sequence: google light (flash) → claude standard → claude light → exhausted
+ */
+function getGoogleFailoverAttempt(
+  attemptNumber: number,
+  llmConfig?: LLMConfig,
+): FailoverAttemptResult {
+  switch (attemptNumber) {
+    case 1:
+      // Try Google light (gemini-2.0-flash)
+      return {
+        isExhausted: false,
+        vendor: "google",
+        model: resolveVendorModel("google", llmConfig, "light"),
       };
 
     case 2:

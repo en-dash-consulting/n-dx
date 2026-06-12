@@ -38,6 +38,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Poll until `condition()` is true or `deadlineMs` elapses. Fixed sleeps are
+ * flaky under full-suite load (the git commit subprocess can take longer than
+ * any fixed buffer), so positive-path tests poll for the observable outcome.
+ */
+async function waitFor(condition: () => boolean, deadlineMs = 5000): Promise<void> {
+  const start = Date.now();
+  while (!condition() && Date.now() - start < deadlineMs) {
+    await sleep(25);
+  }
+}
+
 describe("startCommitMsgWatcher (auto-commit timer)", () => {
   let projectDir: string;
 
@@ -70,8 +82,8 @@ describe("startCommitMsgWatcher (auto-commit timer)", () => {
       "utf-8",
     );
 
-    // Wait for the timer to fire (150ms + buffer)
-    await sleep(400);
+    // Wait for the timer to fire and the commit subprocess to complete
+    await waitFor(() => watcher.didAutoCommit());
 
     watcher.cancel(); // no-op at this point; timer already fired
 
@@ -108,7 +120,7 @@ describe("startCommitMsgWatcher (auto-commit timer)", () => {
 
     // Wait past the original 200ms timer (but still within what would be a
     // second 200ms timer started on the second write)
-    await sleep(350);
+    await waitFor(() => watcher.didAutoCommit());
 
     watcher.cancel();
 
@@ -178,7 +190,9 @@ describe("startCommitMsgWatcher (auto-commit timer)", () => {
     await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
     await execAsync("git add src.ts", { cwd: projectDir });
 
-    const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 150 });
+    // Generous timeout so the clear-write below reliably lands before expiry
+    // even under full-suite load
+    const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 500 });
 
     // Write a non-empty file to arm the timer, then clear it before it fires
     await writeFile(
@@ -186,10 +200,11 @@ describe("startCommitMsgWatcher (auto-commit timer)", () => {
       "feat: will be cleared",
       "utf-8",
     );
-    // Immediately clear — before the 150ms timer fires
+    // Immediately clear — before the 500ms timer fires
     await writeFile(join(projectDir, ".hench-commit-msg.txt"), "", "utf-8");
 
-    await sleep(300);
+    // At expiry the watcher deletes the empty sentinel without committing
+    await waitFor(() => !existsSync(join(projectDir, ".hench-commit-msg.txt")));
     watcher.cancel();
 
     // No commit should have been created
@@ -214,7 +229,7 @@ describe("startCommitMsgWatcher (auto-commit timer)", () => {
     // Start watcher after the file already exists — should detect it immediately
     const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 150 });
 
-    await sleep(350);
+    await waitFor(() => watcher.didAutoCommit());
     watcher.cancel();
 
     expect(await getHeadSubject(projectDir)).toBe("feat: early write");

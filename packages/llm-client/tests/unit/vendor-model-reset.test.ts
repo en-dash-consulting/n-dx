@@ -48,6 +48,28 @@ describe("vendor-model-reset", () => {
       });
     });
 
+    describe("Google vendor", () => {
+      it("accepts gemini-family models", () => {
+        expect(isModelCompatibleWithVendor("google", "gemini-2.5-pro")).toBe(true);
+        expect(isModelCompatibleWithVendor("google", "gemini-2.0-flash")).toBe(true);
+        expect(isModelCompatibleWithVendor("google", "gemini-2.5-flash")).toBe(true);
+      });
+
+      it("rejects claude-family models", () => {
+        expect(isModelCompatibleWithVendor("google", "claude-sonnet-4-6")).toBe(false);
+        expect(isModelCompatibleWithVendor("google", "sonnet")).toBe(false);
+      });
+
+      it("rejects gpt-family models", () => {
+        expect(isModelCompatibleWithVendor("google", "gpt-4o")).toBe(false);
+      });
+
+      it("rejects empty/undefined models", () => {
+        expect(isModelCompatibleWithVendor("google", "")).toBe(false);
+        expect(isModelCompatibleWithVendor("google", undefined)).toBe(false);
+      });
+    });
+
     describe("Codex vendor", () => {
       it("accepts gpt-family models", () => {
         expect(isModelCompatibleWithVendor("codex", "gpt-4o")).toBe(true);

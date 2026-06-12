@@ -38,6 +38,38 @@ Swap between using the local development build of n-dx and the published npm ver
    - If currently local: "To switch to npm: `/dev-link npm`"
    - If currently npm: "To switch to local dev: `/dev-link local`"
 
+## Windows (PowerShell / cmd)
+
+The `pnpm` commands above are cross-platform and identical on Windows. Only two things differ: the binary-resolution check (`which` → `Get-Command`/`where`) and command chaining (`&&` is not valid in `cmd` or Windows PowerShell 5.1). Run the `cd` as its own step.
+
+Switch to local dev build:
+
+```powershell
+pnpm build --filter @n-dx/core
+pnpm remove -g @n-dx/core          # ignore error if not installed
+cd packages\core
+pnpm link --global
+cd ..\..
+pnpm ls -g --depth=0               # expect: @n-dx/core link:...\packages\core
+Get-Command ndx                    # PowerShell — resolves to the pnpm global bin
+ndx --version                      # should match local
+```
+
+Switch to npm registry version:
+
+```powershell
+pnpm remove -g @n-dx/core
+pnpm add -g @n-dx/core
+pnpm ls -g --depth=0               # expect: @n-dx/core X.Y.Z (a version, not a link)
+ndx --version                      # should match published version
+```
+
+Notes for Windows:
+- Binary check: `Get-Command ndx` in PowerShell, or `where.exe ndx` in `cmd` (the `which` equivalent).
+- Chaining: PowerShell 7+ accepts `&&`; `cmd` accepts `&&`; Windows PowerShell 5.1 does **not** — use `;` or separate lines.
+- Path separators: use `packages\core` (or `packages/core` — pnpm accepts both).
+- Ensure pnpm's global bin is on `PATH`. Run `pnpm setup` once if `ndx` is not found after linking, then restart the shell.
+
 ## Important notes
 
 - Always use `pnpm` (not `npm`) for global link/install — this repo uses pnpm and binaries resolve through pnpm's global bin directory

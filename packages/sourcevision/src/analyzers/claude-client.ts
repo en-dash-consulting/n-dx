@@ -92,7 +92,12 @@ export function setClaudeClient(client: ClaudeClient): void {
  * using CLI execution. Returns undefined if no config has been set yet.
  */
 export function getAuthMode(): AuthMode | undefined {
-  if (_llmClient) return _llmClient.mode;
+  if (_llmClient) {
+    // ClaudeClient.mode is a top-level property for Claude/Codex providers.
+    // LLMProvider-shaped clients (e.g. Google) do not expose a top-level mode —
+    // fall through to detectLLMAuthMode when mode is absent.
+    if (_llmClient.mode) return _llmClient.mode;
+  }
   if (_llmConfig) {
     return detectLLMAuthMode({
       vendor: resolveVendor(),

@@ -31,6 +31,10 @@ export function isModelCompatibleWithVendor(
     return resolveModel(trimmed).startsWith("claude-");
   }
 
+  if (vendor === "google") {
+    return trimmed.startsWith("gemini-");
+  }
+
   // Codex: GPT models (gpt-*), O-series (o1, o3, etc), or explicit "codex" brand
   return /^(gpt-|o\d|codex)/i.test(trimmed);
 }

@@ -9,6 +9,18 @@ import { exec as execCb } from "node:child_process";
 const execAsync = promisify(execCb);
 
 /**
+ * Poll until `condition()` is true or `deadlineMs` elapses. Fixed sleeps are
+ * flaky under full-suite load (the git commit subprocess can take longer than
+ * any fixed buffer), so tests poll for the observable outcome instead.
+ */
+async function waitFor(condition: () => boolean, deadlineMs = 5000): Promise<void> {
+  const start = Date.now();
+  while (!condition() && Date.now() - start < deadlineMs) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+/**
  * Integration test for timer-expiry auto-commit in --yes mode.
  *
  * Simulates the scenario: when hench runs with --yes/--auto/--loop, a timer-expiry
@@ -71,9 +83,8 @@ describe("Timer-expiry auto-commit in --yes mode", () => {
     // Start the watcher with a short timeout
     const commitWatcher = startCommitMsgWatcher({ projectDir, timeoutMs: 150 });
 
-    // Wait for timer to fire and auto-commit
-    // Timer fires at 150ms, add 200ms buffer to ensure it completes
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // Wait for the timer to fire and the auto-commit subprocess to complete
+    await waitFor(() => commitWatcher.didAutoCommit());
 
     // Verify the auto-commit happened
     expect(commitWatcher.didAutoCommit()).toBe(true);
@@ -154,8 +165,9 @@ describe("Timer-expiry auto-commit in --yes mode", () => {
       "utf-8",
     );
 
-    // Wait for timer
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    // Wait for the timer-expiry auto-commit to fully complete — the HEAD
+    // sampled below must already include it, or it lands mid-assertion
+    await waitFor(() => commitWatcher.didAutoCommit());
 
     // Get the current HEAD
     const { execStdout } = await import("../../src/process/exec.js");

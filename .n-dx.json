@@ -10,7 +10,56 @@
   "sourcevision": {
     "zones": {
       "mergeThreshold": 5,
+      "anchors": [
+        {
+          "id": "web-server",
+          "name": "Web Server",
+          "include": [
+            "packages/web/src/server/**"
+          ]
+        },
+        {
+          "id": "viewer-message-pipeline",
+          "name": "Viewer Message Pipeline",
+          "include": [
+            "packages/web/src/viewer/messaging/**"
+          ]
+        },
+        {
+          "id": "web-viewer",
+          "name": "Web Viewer",
+          "include": [
+            "packages/web/src/viewer/**"
+          ],
+          "exclude": [
+            "packages/web/src/viewer/messaging/**"
+          ]
+        },
+        {
+          "id": "rex-cli",
+          "name": "Rex CLI",
+          "include": [
+            "packages/rex/src/cli/**",
+            "packages/rex/src/analyze/**",
+            "packages/rex/src/core/**",
+            "packages/rex/src/schema/**",
+            "packages/rex/src/store/**"
+          ],
+          "exclude": [
+            "packages/rex/src/cli/commands/chunked-review*",
+            "packages/rex/src/cli/commands/modification-intent.ts",
+            "packages/rex/src/analyze/batch-types.ts",
+            "packages/rex/src/cli/commands/fix.ts",
+            "packages/rex/src/store/tests/**"
+          ]
+        }
+      ],
       "pins": {
+        "packages/web/src/shared/index.ts": "web-shared",
+        "packages/web/src/shared/data-files.ts": "web-shared",
+        "packages/web/src/shared/features.ts": "web-shared",
+        "packages/web/src/shared/view-id.ts": "web-shared",
+        "packages/web/src/shared/view-routing.ts": "web-shared",
         "packages/web/src/viewer/views/hench-runs.ts": "web-dashboard",
         "packages/web/src/viewer/hooks/use-gateway.ts": "web-viewer",
         "packages/web/src/viewer/hooks/use-project-status.ts": "web-viewer",
@@ -209,7 +258,7 @@
       }
     }
   },
-  "_initVersion": "0.3.3",
+  "_initVersion": "0.4.4",
   "cli": {
     "timeoutMs": 18000000
   },

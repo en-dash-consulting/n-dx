@@ -27,11 +27,12 @@ export type { LLMVendor };
  *
  * - `light` — simple classification and other explicitly low-complexity work
  * - `standard` — multi-turn agents, deep analysis, full-capability tasks
+ * - `heavy` — maximum capability: complex reasoning, long-horizon tasks
  *
  * Used by `resolveVendorModel()` to select the appropriate model tier.
  * When omitted, defaults to 'standard' for backward compatibility.
  */
-export type TaskWeight = "light" | "standard";
+export type TaskWeight = "light" | "standard" | "heavy";
 
 /** Optional Codex-specific config section in `.n-dx.json`. */
 export interface CodexConfig {
@@ -51,6 +52,28 @@ export interface CodexConfig {
   lightModel?: string;
 }
 
+/** Optional Google Gemini-specific config section in `.n-dx.json`. */
+export interface GoogleConfig {
+  /** Google API key (from Google AI Studio or GCP). */
+  api_key?: string;
+  /** Custom API endpoint base URL. When set, overrides the default Gemini URL. */
+  api_endpoint?: string;
+  /** Default Gemini model ID (e.g. `"gemini-2.5-pro"`). */
+  model?: string;
+  /**
+   * Model override for the 'light' task weight tier.
+   * When set, resolveVendorModel uses this model for light-weight tasks
+   * instead of TIER_MODELS.google.light.
+   */
+  lightModel?: string;
+  /**
+   * Environment variable name for the Google API key.
+   * Defaults to `"GEMINI_API_KEY"` when not set.
+   * Override to use a custom env var name (e.g. `"MY_GOOGLE_KEY"`).
+   */
+  apiKeyEnv?: string;
+}
+
 /** Vendor-neutral config shape loaded from `.n-dx.json`. */
 export interface LLMConfig {
   /** Default vendor selected by the project. */
@@ -66,6 +89,8 @@ export interface LLMConfig {
   claude?: ClaudeConfig;
   /** Codex-specific config (reserved for adapter integration). */
   codex?: CodexConfig;
+  /** Google Gemini-specific config. */
+  google?: GoogleConfig;
   /**
    * Enable automatic failover on model/vendor errors.
    * When true, hench retries failed runs on fallback models before surfacing errors.

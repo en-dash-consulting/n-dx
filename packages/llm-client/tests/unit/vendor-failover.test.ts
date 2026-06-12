@@ -174,6 +174,76 @@ describe("getNextFailoverAttempt", () => {
     });
   });
 
+  describe("Google-origin chain", () => {
+    // Google starts at flash (standard tier), failover chain is:
+    // 1. gemini-2.0-flash (google light)
+    // 2. claude-sonnet-4-6 (claude standard)
+    // 3. claude-haiku-4-5 (claude light)
+    // 4+ exhausted
+
+    it("returns google light on first failover attempt", () => {
+      const result = getNextFailoverAttempt(1, "google");
+      expect(result).toEqual({
+        isExhausted: false,
+        vendor: "google",
+        model: TIER_MODELS.google.light,
+      });
+    });
+
+    it("returns claude standard on second failover attempt", () => {
+      const result = getNextFailoverAttempt(2, "google");
+      expect(result).toEqual({
+        isExhausted: false,
+        vendor: "claude",
+        model: TIER_MODELS.claude.standard,
+      });
+    });
+
+    it("returns claude light on third failover attempt", () => {
+      const result = getNextFailoverAttempt(3, "google");
+      expect(result).toEqual({
+        isExhausted: false,
+        vendor: "claude",
+        model: TIER_MODELS.claude.light,
+      });
+    });
+
+    it("returns exhausted on fourth failover attempt", () => {
+      const result = getNextFailoverAttempt(4, "google");
+      expect(result).toEqual({
+        isExhausted: true,
+      });
+    });
+
+    it("returns exhausted on fifth and beyond attempts", () => {
+      expect(getNextFailoverAttempt(5, "google")).toEqual({
+        isExhausted: true,
+      });
+      expect(getNextFailoverAttempt(10, "google")).toEqual({
+        isExhausted: true,
+      });
+    });
+
+    it("returns exhausted for attempt 0 with google origin", () => {
+      const result = getNextFailoverAttempt(0, "google");
+      expect(result).toEqual({
+        isExhausted: true,
+      });
+    });
+
+    it("uses custom google light model when configured", () => {
+      const customConfig = {
+        google: { lightModel: "gemini-2.0-flash-exp" },
+      };
+      const result = getNextFailoverAttempt(1, "google", customConfig);
+      expect(result).toEqual({
+        isExhausted: false,
+        vendor: "google",
+        model: "gemini-2.0-flash-exp",
+      });
+    });
+  });
+
   describe("failover chain documentation", () => {
     it("documents the maximum chain length of 3 failover attempts for any vendor", () => {
       // Attempt 1, 2, 3 are valid failover attempts
@@ -186,6 +256,11 @@ describe("getNextFailoverAttempt", () => {
       expect(getNextFailoverAttempt(2, "codex").isExhausted).toBe(false);
       expect(getNextFailoverAttempt(3, "codex").isExhausted).toBe(false);
       expect(getNextFailoverAttempt(4, "codex").isExhausted).toBe(true);
+
+      expect(getNextFailoverAttempt(1, "google").isExhausted).toBe(false);
+      expect(getNextFailoverAttempt(2, "google").isExhausted).toBe(false);
+      expect(getNextFailoverAttempt(3, "google").isExhausted).toBe(false);
+      expect(getNextFailoverAttempt(4, "google").isExhausted).toBe(true);
     });
   });
 });

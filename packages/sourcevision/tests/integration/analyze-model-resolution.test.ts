@@ -76,6 +76,35 @@ describe("sourcevision analyze respects .n-dx.json model config", () => {
     expect(metadata.model).toBe(customModel);
   });
 
+  it("changing llm.vendor to google switches to correct vendor model", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "google" } }),
+    );
+
+    const llmConfig = await loadLLMConfig(tmpDir);
+    setLLMConfig(llmConfig);
+
+    const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
+    expect(metadata.vendor).toBe("google");
+    expect(metadata.model).toBe(resolveVendorModel("google", llmConfig));
+  });
+
+  it("changing llm.google.model in .n-dx.json is reflected in token event metadata", async () => {
+    const customModel = "gemini-2.0-flash";
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "google", google: { model: customModel } } }),
+    );
+
+    const llmConfig = await loadLLMConfig(tmpDir);
+    setLLMConfig(llmConfig);
+
+    const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
+    expect(metadata.vendor).toBe("google");
+    expect(metadata.model).toBe(customModel);
+  });
+
   it("resolveVendorModel result matches metadata model for both vendors", async () => {
     // Claude with override
     await writeFile(

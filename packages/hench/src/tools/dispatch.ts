@@ -24,8 +24,8 @@
  * @module
  */
 
-import type { ToolDefinition, AnthropicToolDef } from "../prd/llm-gateway.js";
-import { toAnthropicToolDefs } from "../prd/llm-gateway.js";
+import type { ToolDefinition, AnthropicToolDef, GeminiFunctionDeclaration } from "../prd/llm-gateway.js";
+import { toAnthropicToolDefs, toGeminiFunctionDeclarations } from "../prd/llm-gateway.js";
 import { toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles } from "./files.js";
 import { toolRunCommand } from "./shell.js";
 import { toolGit } from "./git.js";
@@ -176,6 +176,15 @@ export const TOOL_DEFINITIONS_NEUTRAL: ReadonlyArray<ToolDefinition> = [
  * continues to work unchanged. The compilation happens once at module load.
  */
 export const TOOL_DEFINITIONS: AnthropicToolDef[] = toAnthropicToolDefs(TOOL_DEFINITIONS_NEUTRAL);
+
+/**
+ * Gemini-compiled tool definitions (function declarations).
+ *
+ * Used by the Gemini agentic loop, which wraps these in a single
+ * `{ functionDeclarations: TOOL_DEFINITIONS_GEMINI }` tool block. The
+ * compilation (uppercased OpenAPI-subset types) happens once at module load.
+ */
+export const TOOL_DEFINITIONS_GEMINI: GeminiFunctionDeclaration[] = toGeminiFunctionDeclarations(TOOL_DEFINITIONS_NEUTRAL);
 
 /** Tools that spawn child processes and should be memory-checked. */
 const PROCESS_SPAWNING_TOOLS = new Set(["run_command", "git"]);
