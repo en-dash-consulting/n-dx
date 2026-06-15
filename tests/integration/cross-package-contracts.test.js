@@ -597,7 +597,7 @@ describe("gateway export auto-detection", () => {
         "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "yellow",
         "green", "red", "magenta", "colorSuccess", "colorWarn", "colorInfo",
         "colorDim", "colorPending", "colorPink", "STATUS_COLORS", "colorStatus",
-        "formatHelp", "formatTypoSuggestion",
+        "formatHelp", "formatTypoSuggestion", "createSpinner",
         "CLIError", "ClaudeClientError", "CLI_ERROR_CODES",
         "exec", "execStdout", "execShellCmd", "getCurrentHead", "getCurrentBranch",
         "isExecutableOnPath", "spawnTool", "spawnManaged", "ProcessPool", "ProcessLimitError",
