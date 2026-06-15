@@ -12,7 +12,7 @@ import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
 import { groupByFacet, getFacetValue } from "../../core/facets.js";
 import { walkTree } from "../../core/tree.js";
-import { green, yellow } from "@n-dx/llm-client";
+import { green, yellow, createSpinner } from "@n-dx/llm-client";
 import { filterDeleted } from "./status-shared.js";
 import {
   buildCoverageMap,
@@ -140,11 +140,13 @@ export async function cmdStatus(
   // Compute coverage if requested
   let verifyResult: VerifyResult | undefined;
   if (showCoverage) {
+    const spinner = createSpinner("Verifying coverage...").start();
     verifyResult = await verify({
       projectDir: dir,
       items: doc.items,
       runTests: false,
     });
+    spinner.stop();
   }
 
   // Build time filter for token usage
