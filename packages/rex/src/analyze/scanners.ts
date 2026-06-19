@@ -35,6 +35,8 @@ const SKIP_DIRS = new Set([
   ".next",
   ".turbo",
   "vendor",
+  ".claude",
+  ".codex",
 ]);
 
 /** Directories that contain generated output — not human-written docs */
@@ -70,6 +72,8 @@ const SKIP_DOC_FILES = new Set([
   "turbo.json",
   "go.mod",
   "go.sum",
+  "CLAUDE.md",
+  "AGENTS.md",
 ]);
 
 async function globFiles(
