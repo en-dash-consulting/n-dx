@@ -1340,7 +1340,12 @@ async function handlePlan(rest) {
 
   // Skip sourcevision when importing from a specific file
   if (!hasFile) {
-    await runOrDie(tools.sourcevision, ["analyze", ...flags.filter((f) => f === "--quiet" || f === "-q"), dir]);
+    await runOrDie(tools.sourcevision, [
+      "analyze",
+      ...flags.filter((f) => f === "--quiet" || f === "-q"),
+      ...(flags.includes("--no-llm") ? ["--fast"] : []),
+      dir,
+    ]);
   }
 
   await runOrDie(tools.rex, ["analyze", ...flags, dir]);
