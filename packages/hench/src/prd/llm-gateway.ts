@@ -70,6 +70,7 @@ export {
   bold,
   dim,
   cyan,
+  carolinaBlue,
   yellow,
   green,
   red,
