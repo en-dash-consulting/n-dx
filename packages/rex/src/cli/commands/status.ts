@@ -140,13 +140,13 @@ export async function cmdStatus(
   // Compute coverage if requested
   let verifyResult: VerifyResult | undefined;
   if (showCoverage) {
-    const spinner = createSpinner("Verifying coverage...").start();
+    const spinner = format !== "json" ? createSpinner("Verifying coverage...").start() : null;
     verifyResult = await verify({
       projectDir: dir,
       items: doc.items,
       runTests: false,
     });
-    spinner.stop();
+    spinner?.stop();
   }
 
   // Build time filter for token usage
