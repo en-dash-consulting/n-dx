@@ -126,7 +126,7 @@ export function formatRunSuccessMessage(text: string): string {
  * Format a loop-iteration boundary separator line.
  *
  * Rendered in yellow (colorWarn) to visually distinguish loop-iteration
- * boundaries from the cyan ═══ agent-turn section separators.  Width matches
+ * boundaries from the carolinaBlue ═══ agent-turn section separators.  Width matches
  * SECTION_WIDTH (60 chars) for visual consistency with the rest of the
  * transcript.
  *

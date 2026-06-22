@@ -594,7 +594,7 @@ describe("gateway export auto-detection", () => {
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "loadProjectOverrides", "mergeWithOverrides", "toCanonicalJSON",
         "setQuiet", "isQuiet", "info", "result", "warn", "suppressKnownDeprecations",
-        "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "yellow",
+        "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "carolinaBlue", "yellow",
         "green", "red", "magenta", "colorSuccess", "colorWarn", "colorInfo",
         "colorDim", "colorPending", "colorPink", "STATUS_COLORS", "colorStatus",
         "formatHelp", "formatTypoSuggestion", "createSpinner",

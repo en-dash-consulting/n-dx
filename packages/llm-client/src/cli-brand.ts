@@ -1,4 +1,4 @@
-import { cyan, green, red, dim } from "./help-format.js";
+import { carolinaBlue, green, red, dim } from "./help-format.js";
 import { isQuiet } from "./output.js";
 
 const isTTY = () => !!(process.stdout && process.stdout.isTTY);
@@ -20,10 +20,10 @@ export function createSpinner(text: string) {
         console.log(`  ${dim("▸")} ${text}`);
         return this;
       }
-      process.stdout.write(`  ${cyan(SPINNER_FRAMES[0])} ${text}`);
+      process.stdout.write(`  ${carolinaBlue(SPINNER_FRAMES[0])} ${text}`);
       timer = setInterval(() => {
         frame = (frame + 1) % SPINNER_FRAMES.length;
-        process.stdout.write(`\r\x1b[K  ${cyan(SPINNER_FRAMES[frame])} ${text}`);
+        process.stdout.write(`\r\x1b[K  ${carolinaBlue(SPINNER_FRAMES[frame])} ${text}`);
       }, TICK_MS);
       return this;
     },
