@@ -201,17 +201,20 @@ async function spawnOnce(
       "-o",
       outputPath,
       ...(request.cliFlags ?? []),
-      request.prompt,
+      "-",
     ];
     debugLog(`spawn start cli="${cliBinary}" model="${request.model || resolveCodexModel(codexConfig)}" promptChars=${request.prompt.length}`);
     debugLog(`spawn args: ${JSON.stringify(args)}`);
 
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(cliBinary, args, {
-        stdio: ["ignore", "ignore", "pipe"],
+        stdio: ["pipe", "ignore", "pipe"],
         env: envOverride ?? process.env,
         shell: process.platform === "win32",
       });
+
+      proc.stdin.write(request.prompt);
+      proc.stdin.end();
 
       let stderr = "";
       let timeoutId: NodeJS.Timeout | undefined;

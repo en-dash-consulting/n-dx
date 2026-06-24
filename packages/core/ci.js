@@ -128,7 +128,7 @@ async function runDocsPhase(dir, info, isJSON, spawnTracked) {
   // Step 0c: docs build
   info("── docs build ──");
   const docsBuild = await new Promise((res) => {
-    const child = spawnTracked("pnpm", ["docs:build"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawnTracked("pnpm", ["docs:build"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"], shell: process.platform === "win32" });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => { stdout += d; });
