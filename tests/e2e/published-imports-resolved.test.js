@@ -56,6 +56,7 @@ function getPackedFiles(pkgDir) {
     cwd: pkgDir,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "ignore"],
+    shell: true,
   });
   const jsonStart = out.indexOf("[");
   if (jsonStart === -1) {
