@@ -1,9 +1,9 @@
 ---
-"@n-dx/sourcevision": minor
-"@n-dx/llm-client": minor
-"@n-dx/hench": minor
-"@n-dx/core": minor
-"@n-dx/rex": minor
+"@n-dx/sourcevision": patch
+"@n-dx/llm-client": patch
+"@n-dx/hench": patch
+"@n-dx/core": patch
+"@n-dx/rex": patch
 ---
 
 Added Google integration
