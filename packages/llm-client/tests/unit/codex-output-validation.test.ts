@@ -44,9 +44,11 @@ function mockProcess(exitCode: number) {
   const proc = new EventEmitter() as EventEmitter & {
     stderr: Readable;
     stdout: null;
+    stdin: { write: () => void; end: () => void };
   };
   proc.stderr = new EventEmitter() as unknown as Readable;
   proc.stdout = null;
+  proc.stdin = { write: vi.fn(), end: vi.fn() };
   process.nextTick(() => proc.emit("close", exitCode));
   return proc;
 }
