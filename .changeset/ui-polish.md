@@ -1,5 +1,5 @@
 ---
-"@n-dx/llm-client": minor
+"@n-dx/llm-client": patch
 "@n-dx/hench": patch
 "@n-dx/rex": patch
 ---
