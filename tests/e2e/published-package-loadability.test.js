@@ -53,7 +53,8 @@ function packAndExtract(pkgDir) {
     ["pack", "--json", "--ignore-scripts", "--pack-destination", tmpRoot],
     { cwd: pkgDir, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
   );
-  const [report] = JSON.parse(out);
+  const cleanOut = out.substring(out.indexOf("["));
+  const [report] = JSON.parse(cleanOut);
   const tgzPath = join(tmpRoot, report.filename);
 
   const extractDir = join(tmpRoot, "extracted");

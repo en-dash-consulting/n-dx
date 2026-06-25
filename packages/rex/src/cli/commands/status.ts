@@ -12,7 +12,7 @@ import type { VerifyResult } from "../../core/verify.js";
 import type { TokenUsageFilter } from "../../core/token-usage.js";
 import { groupByFacet, getFacetValue } from "../../core/facets.js";
 import { walkTree } from "../../core/tree.js";
-import { green, yellow } from "@n-dx/llm-client";
+import { green, yellow, createSpinner } from "@n-dx/llm-client";
 import { filterDeleted } from "./status-shared.js";
 import {
   buildCoverageMap,
@@ -26,6 +26,7 @@ import {
   buildPerPRDSections,
   renderShowIndividualJson,
   renderShowIndividualHuman,
+  renderWhatNextHints,
 } from "./status-sections.js";
 
 // Re-export shared utilities so existing consumers (tests, etc.) keep working.
@@ -139,11 +140,13 @@ export async function cmdStatus(
   // Compute coverage if requested
   let verifyResult: VerifyResult | undefined;
   if (showCoverage) {
+    const spinner = format !== "json" ? createSpinner("Verifying coverage...").start() : null;
     verifyResult = await verify({
       projectDir: dir,
       items: doc.items,
       runTests: false,
     });
+    spinner?.stop();
   }
 
   // Build time filter for token usage
@@ -212,7 +215,7 @@ export async function cmdStatus(
   result("");
 
   if (doc.items.length === 0) {
-    result("  No items yet. Run: rex add epic --title=\"...\" " + dir);
+    result("  No items yet. Run: ndx add \"feature\" " + dir);
     return;
   }
 
@@ -234,5 +237,6 @@ export async function cmdStatus(
   }
 
   renderAutoCompletableHints(doc.items);
+  renderWhatNextHints(doc.items);
   renderStaleWarnings(doc.items);
 }

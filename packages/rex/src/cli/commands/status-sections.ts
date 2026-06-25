@@ -14,6 +14,7 @@ import {
 import { formatAggregateTokenUsage, formatBudgetWarnings } from "./token-format.js";
 import { walkTree } from "../../core/tree.js";
 import { info, warn, result } from "../output.js";
+import { bold, cyan } from "@n-dx/llm-client";
 import type { PRDItem, ItemStatus } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import {
@@ -253,9 +254,21 @@ export function renderAutoCompletableHints(items: PRDItem[]): void {
   const autoCompletable = findAutoCompletable(items);
   if (autoCompletable.length === 0) return;
   info("");
-  info("Auto-completable:");
+  info(bold(cyan("💡 ACTION:")) + " Auto-completable items found.");
   for (const ac of autoCompletable) {
     info(`  ● ${ac.title} — all children done, can be marked completed`);
+  }
+}
+
+/** Render what to do next hint based on tree stats. */
+export function renderWhatNextHints(items: PRDItem[]): void {
+  const stats = computeStats(items);
+  if (stats.failing > 0) {
+    info("");
+    info(bold(cyan("💡 WHAT NEXT:")) + " Run " + bold("ndx work .") + " to fix failing tasks.");
+  } else if (stats.inProgress === 0 && stats.pending > 0) {
+    info("");
+    info(bold(cyan("💡 WHAT NEXT:")) + " Run " + bold("ndx work .") + " to pick up a pending task.");
   }
 }
 

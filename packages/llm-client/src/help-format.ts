@@ -99,6 +99,7 @@ export function dim(text: string): string {
 export function cyan(text: string): string {
   return ansi("36", text, "39");
 }
+export const carolinaBlue = cyan;
 
 /** Yellow text (flags, options). */
 export function yellow(text: string): string {
