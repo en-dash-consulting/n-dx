@@ -241,10 +241,16 @@ export async function enrichZonesWithAI(
       // No LLM work to do — everything preserved or templated.
       return { ...empty, zones: [...unchangedZones, ...templatedZones], pass: prevEnrichPass };
     } else if (batches.length > 0) {
-      console.warn("  [enrich] All batches failed — using algorithmic names");
+      console.warn("  [enrich] All batches failed — keeping algorithmic names for un-enriched zones");
     }
-    if (templatedZones.length > 0) {
-      return { ...empty, zones: templatedZones, pass: prevEnrichPass };
+    // Fall back to the algorithmic Louvain names for any zone we couldn't
+    // enrich (LLM hang / rate-limit / auth failure) rather than dropping it.
+    // Returning only templatedZones here collapses the analysis to
+    // structural-only zones and erases every cross-zone crossing — a
+    // transient API blip must not silently produce an empty zone graph.
+    const fallbackZones = [...zonesToEnrich, ...unchangedZones, ...templatedZones];
+    if (fallbackZones.length > 0) {
+      return { ...empty, zones: fallbackZones, pass: prevEnrichPass };
     }
     return empty;
   }
