@@ -267,6 +267,10 @@ export {
   warn,
 } from "./output.js";
 
+// Brand and animation
+export { createSpinner } from "./cli-brand.js";
+
+
 // Vendor/model header (surfaces active vendor+model at command start)
 export {
   printVendorModelHeader,
@@ -370,6 +374,7 @@ export {
   bold,
   dim,
   cyan,
+  carolinaBlue,
   yellow,
   green,
   red,

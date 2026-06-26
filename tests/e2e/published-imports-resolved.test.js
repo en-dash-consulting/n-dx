@@ -57,6 +57,7 @@ function getPackedFiles(pkgDir) {
     cwd: pkgDir,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "ignore"],
+    shell: true,
   });
   const report = JSON.parse(out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1));
   return new Set(report.files.map((f) => f.path));
