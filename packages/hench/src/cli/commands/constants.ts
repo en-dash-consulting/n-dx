@@ -36,6 +36,7 @@ export function usage(): void {
         items: [
           { name: "init [dir]", description: "Create .hench/ with config.json and runs/" },
           { name: "run [dir]", description: "Execute one task from Rex PRD" },
+          { name: "record [dir]", description: "Write an assisted run record (used by the /ndx-work skill)" },
           { name: "config [key] [value]", description: "View or edit workflow configuration" },
           { name: "template [subcommand]", description: "Manage workflow templates (list, show, apply, save, delete)" },
           { name: "status [dir]", description: "Show recent run history" },
