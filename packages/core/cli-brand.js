@@ -60,6 +60,12 @@ export function green(text) {
 export function red(text) {
   return ansi("31", text, "39");
 }
+export function cyan(text) {
+  return ansi("36", text, "39");
+}
+export function yellow(text) {
+  return ansi("33", text, "39");
+}
 export function bold(text) {
   return ansi("1", text, "22");
 }
@@ -205,7 +211,7 @@ export { QUADRANT_LEGS };
 
 // ── Spinner ────────────────────────────────────────────────────────────
 
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER_FRAMES = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"];
 const TICK_MS = 80;
 
 /**
@@ -221,11 +227,11 @@ export function createSpinner(text) {
         console.log(`  ${dim("▸")} ${text}`);
         return this;
       }
-      process.stdout.write(`  ${purple(SPINNER_FRAMES[0])} ${text}`);
+      process.stdout.write(`  ${cyan(SPINNER_FRAMES[0])} ${text}`);
       timer = setInterval(() => {
         frame = (frame + 1) % SPINNER_FRAMES.length;
         process.stdout.write(
-          `\r\x1b[K  ${purple(SPINNER_FRAMES[frame])} ${text}`,
+          `\r\x1b[K  ${cyan(SPINNER_FRAMES[frame])} ${text}`,
         );
       }, TICK_MS);
       return this;

@@ -65,6 +65,31 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["status", "show"],
   },
+  record: {
+    tool: "hench",
+    command: "record",
+    summary: "write an assisted run record to .hench/runs/",
+    usage: "hench record --task=<id> [options] [dir]",
+    description:
+      "Writes a lightweight run record for work performed through the /ndx-work\n" +
+      "skill (Claude Code) rather than a spawned hench agent, so it appears in\n" +
+      "run history and is auditable. The record is marked assisted with empty\n" +
+      "token usage — Claude Code does not expose its own token consumption to\n" +
+      "the running skill, so there is no usage to attribute.",
+    options: [
+      { flag: "--task=<id>", description: "Rex task ID the work addressed (required)" },
+      { flag: "--title=<title>", description: "Task title (defaults to the task ID)" },
+      { flag: "--status=<status>", description: "Run status: completed (default) | failed | cancelled | ..." },
+      { flag: "--summary=<text>", description: "Short description of what was done" },
+      { flag: "--turns=<n>", description: "Number of agent turns to record (default: 0)" },
+      { flag: "--format=json", description: "Output the new run ID as JSON" },
+    ],
+    examples: [
+      { command: "hench record --task=abc123 --status=completed", description: "Record a completed assisted run" },
+      { command: "hench record --task=abc123 --title=\"Add auth\" --summary=\"Implemented login\"", description: "Record with title and summary" },
+    ],
+    related: ["run", "status", "show"],
+  },
   status: {
     tool: "hench",
     command: "status",

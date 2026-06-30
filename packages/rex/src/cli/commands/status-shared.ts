@@ -11,7 +11,7 @@ import { isFullyCompleted } from "../../core/prune.js";
 import { isRootLevel } from "../../schema/index.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { TreeStats } from "../../core/stats.js";
-import { dim, red, cyan, yellow, green } from "@n-dx/llm-client";
+import { dim, red, cyan, yellow, green, bold } from "@n-dx/llm-client";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -25,6 +25,16 @@ export const STATUS_ICONS: Record<string, string> = {
   deferred: "◌",
   blocked: "⊘",
   deleted: "✕",
+};
+
+export const STATUS_BADGES: Record<string, string> = {
+  pending: "",
+  in_progress: bold(cyan("[ACTIVE] ")),
+  completed: "",
+  failing: bold(red("[FAIL] ")),
+  deferred: "",
+  blocked: bold(yellow("[BLOCKED] ")),
+  deleted: "",
 };
 
 const FILLED = "█";
@@ -190,6 +200,7 @@ export function renderTree(
   const lines: string[] = [];
   for (const item of items) {
     const icon = STATUS_ICONS[item.status] ?? "?";
+    const badge = STATUS_BADGES[item.status] ?? "";
     const prefix = "  ".repeat(indent);
     const override = overrideSuffix(item);
     const priority = item.priority ? ` [${item.priority}]` : "";
@@ -207,14 +218,14 @@ export function renderTree(
         const bar = renderProgressBar(ratio);
         lines.push(
           colorLine(
-            `${prefix}${icon} ${item.title}${override}${priority} ${bar} ${pct}% ${count}${blocked}`,
+            `${prefix}${badge}${icon} ${item.title}${override}${priority} ${bar} ${pct}% ${count}${blocked}`,
             item.status,
           ),
         );
       } else {
         lines.push(
           colorLine(
-            `${prefix}${icon} ${item.title}${override}${priority} ${count}${ts}${blocked}`,
+            `${prefix}${badge}${icon} ${item.title}${override}${priority} ${count}${ts}${blocked}`,
             item.status,
           ),
         );
@@ -223,7 +234,7 @@ export function renderTree(
     } else {
       lines.push(
         colorLine(
-          `${prefix}${icon} ${item.title}${override}${priority}${cov}${ts}${blocked}`,
+          `${prefix}${badge}${icon} ${item.title}${override}${priority}${cov}${ts}${blocked}`,
           item.status,
         ),
       );
@@ -237,18 +248,26 @@ export function formatStats(
   options?: { hidingCompleted?: boolean },
 ): string {
   const parts = [];
-  if (stats.completed > 0) parts.push(green(`${stats.completed} completed`));
-  if (stats.inProgress > 0) parts.push(cyan(`${stats.inProgress} in progress`));
-  if (stats.pending > 0) parts.push(`${stats.pending} pending`);
-  if (stats.failing > 0) parts.push(red(`${stats.failing} failing`));
-  if (stats.deferred > 0) parts.push(dim(`${stats.deferred} deferred`));
-  if (stats.blocked > 0) parts.push(yellow(`${stats.blocked} blocked`));
-  if (stats.deleted > 0) parts.push(dim(`${stats.deleted} deleted`));
-  const pct =
-    stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-  const suffix =
-    options?.hidingCompleted
-      ? " (hiding completed/deleted items, use --all for full tree)"
+  if (stats.completed > 0) parts.push(green(`● ${stats.completed} done`));
+  if (stats.inProgress > 0) parts.push(cyan(`◐ ${stats.inProgress} active`));
+  if (stats.pending > 0) parts.push(`○ ${stats.pending} pending`);
+  if (stats.failing > 0) parts.push(red(`✗ ${stats.failing} failing`));
+  if (stats.deferred > 0) parts.push(dim(`◌ ${stats.deferred} deferred`));
+  if (stats.blocked > 0) parts.push(yellow(`⊘ ${stats.blocked} blocked`));
+  if (stats.deleted > 0) parts.push(dim(`✕ ${stats.deleted} deleted`));
+  
+  const ratio = stats.total > 0 ? stats.completed / stats.total : 0;
+  const pct = Math.round(ratio * 100);
+  const bar = renderProgressBar(ratio, 20);
+  
+  const suffix = options?.hidingCompleted
+      ? "\n  (hiding completed/deleted items, use --all for full tree)"
       : "";
-  return `${parts.join(", ")} — ${pct}% complete (${stats.completed}/${stats.total})${suffix}`;
+
+  return `
+  ${cyan("■■■")} ${bold("STATUS")} ${cyan("■■■")}
+  [${bar}] ${pct}%
+  
+  ${parts.join("  ")}
+${suffix}`;
 }

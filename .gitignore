@@ -43,3 +43,6 @@ scripts/HENCH_CALLGRAPH_FINDINGS.md
 !.local_testing/test-base-commands.sh
 !.local_testing/.dockerignore
 .codex/config.toml
+
+# macOS
+.DS_Store

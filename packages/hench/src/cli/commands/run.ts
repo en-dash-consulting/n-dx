@@ -19,7 +19,7 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { section } from "../../types/output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor } from "../../prd/llm-gateway.js";
+import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -126,7 +126,7 @@ export function formatRunSuccessMessage(text: string): string {
  * Format a loop-iteration boundary separator line.
  *
  * Rendered in yellow (colorWarn) to visually distinguish loop-iteration
- * boundaries from the cyan ═══ agent-turn section separators.  Width matches
+ * boundaries from the carolinaBlue ═══ agent-turn section separators.  Width matches
  * SECTION_WIDTH (60 chars) for visual consistency with the rest of the
  * transcript.
  *
@@ -1435,8 +1435,9 @@ async function runLoop(
 
       // Pause between tasks (interruptible)
       if (!stopping && pauseMs > 0) {
-        info(`\n${formatPauseMessage(pauseMs, "task")}`);
+        const spinner = createSpinner(formatPauseMessage(pauseMs, "task")).start();
         await loopPause(pauseMs, ac.signal);
+        spinner.stop();
       }
 
       // Emit a pink separator at each loop-iteration boundary so long
@@ -1686,8 +1687,9 @@ async function runEpicByEpic(
 
         // Pause between tasks (interruptible)
         if (!stopping && pauseMs > 0) {
-          info(`\n${formatPauseMessage(pauseMs, "task")}`);
+          const spinner = createSpinner(formatPauseMessage(pauseMs, "task")).start();
           await loopPause(pauseMs, ac.signal);
+          spinner.stop();
         }
       }
 

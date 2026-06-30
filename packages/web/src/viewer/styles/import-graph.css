@@ -1579,16 +1579,22 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.34fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .ig-zone-map {
   min-width: 0;
+  /* Flex so the SVG fills the grid cell's height. With align-items: stretch
+     above, this cell stretches to match the (often taller) boundary strip
+     when many boundaries are listed; the SVG then grows to fill the box
+     instead of leaving a gap beneath it. */
+  display: flex;
 }
 
 .ig-zone-map svg {
   display: block;
   width: 100%;
+  flex: 1;
   min-height: 220px;
   touch-action: none;
   cursor: grab;
@@ -1709,6 +1715,13 @@
 .ig-boundary-list {
   display: grid;
   gap: 6px;
+  /* Cap the row list so a project with many cross-zone boundaries doesn't
+     stretch the whole block tall; the rows scroll while the strip's header
+     stays pinned above. ~9 rows at the current row height. */
+  max-height: 340px;
+  overflow-y: auto;
+  /* Keep rows clear of the scrollbar gutter. */
+  padding-right: 4px;
 }
 
 .ig-boundary-row {

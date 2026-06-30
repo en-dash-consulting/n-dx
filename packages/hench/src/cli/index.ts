@@ -85,7 +85,7 @@ async function main(): Promise<void> {
     return process.cwd();
   };
 
-  const HENCH_COMMANDS = ["init", "run", "status", "show", "config", "template"];
+  const HENCH_COMMANDS = ["init", "run", "record", "status", "show", "config", "template"];
 
   // Orchestration commands that belong to ndx, not hench directly
   const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -131,6 +131,11 @@ async function main(): Promise<void> {
       case "run": {
         const { cmdRun } = await import("./commands/run.js");
         await cmdRun(resolveDir(), flags);
+        break;
+      }
+      case "record": {
+        const { cmdRecord } = await import("./commands/record.js");
+        await cmdRecord(resolveDir(), flags);
         break;
       }
       case "status": {
@@ -192,7 +197,7 @@ async function main(): Promise<void> {
           );
         }
 
-        const HENCH_COMMANDS = ["init", "run", "status", "show", "config", "template", "validate-tokens"];
+        const HENCH_COMMANDS = ["init", "run", "record", "status", "show", "config", "template", "validate-tokens"];
         const typoHint = formatTypoSuggestion(command, HENCH_COMMANDS, "hench ");
         throw new CLIError(
           `Unknown command: ${command}`,

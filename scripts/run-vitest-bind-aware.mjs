@@ -50,9 +50,11 @@ const vitestArgs = ["run", ...passthroughArgs];
 
 // The sourcevision eval gate makes real LLM calls and is documented to run only
 // via `pnpm gauntlet:evals` (it is also excluded from `pnpm gauntlet`). Keep it
-// out of the default `pnpm test` gate.
+// out of the default `pnpm test` gate. The pattern must be a glob — vitest's
+// `--exclude` matches globs against absolute paths, so a bare relative path
+// (no `**/` prefix) silently fails to match and the suite runs anyway.
 if (profile === "root") {
-  vitestArgs.push("--exclude", "tests/gauntlet/sourcevision-evals/evals.test.js");
+  vitestArgs.push("--exclude", "**/sourcevision-evals/evals.test.js");
 }
 
 if (!bindAvailable) {

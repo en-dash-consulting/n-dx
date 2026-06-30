@@ -44,7 +44,7 @@ function spawnAsync(cmd, args, captureStdout = false) {
 
 // ── Spinner ────────────────────────────────────────────────────────────
 
-const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const FRAMES = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"];
 
 function Spinner() {
   const [f, setF] = useState(0);
@@ -52,7 +52,7 @@ function Spinner() {
     const t = setInterval(() => setF((i) => (i + 1) % FRAMES.length), 80);
     return () => clearInterval(t);
   }, []);
-  return html`<${Text} color="magenta">${FRAMES[f]}<//>`;
+  return html`<${Text} color="cyan">${FRAMES[f]}<//>`;
 }
 
 // ── Walking dino header ────────────────────────────────────────────────

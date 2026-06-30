@@ -760,6 +760,17 @@ export interface RunRecord {
    * this field load normally.
    */
   invocationContext?: "cli" | "api";
+  /**
+   * True when the record was written by an assisted execution path (the
+   * `/ndx-work` skill driving the task through Claude Code) rather than by a
+   * spawned hench agent. Assisted runs are auditable in run history but their
+   * `tokenUsage` is empty — Claude Code does not expose its own token usage to
+   * the running skill. Distinguishes a 0-token assisted record from a genuine
+   * hench run so token analytics don't read it as an anomaly.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  assisted?: boolean;
 }
 
 export interface TaskBriefTask {

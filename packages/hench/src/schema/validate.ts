@@ -222,6 +222,7 @@ export const RunRecordSchema = z.object({
   turnTokenUsage: z.array(TurnTokenUsageSchema).optional(),
   toolCalls: z.array(ToolCallRecordSchema),
   model: z.string(),
+  assisted: z.boolean().optional(),
   retryAttempts: z.number().int().nonnegative().optional(),
   structuredSummary: RunSummaryDataSchema.optional(),
   memoryStats: RunMemoryStatsSchema.optional(),

@@ -52,7 +52,7 @@ export { PROJECT_DIRS } from "@n-dx/llm-client";
 export { toCanonicalJSON } from "@n-dx/llm-client";
 
 // ---- CLI output control -----------------------------------------------------
-export { setQuiet, isQuiet, info, result, warn } from "@n-dx/llm-client";
+export { setQuiet, isQuiet, info, result, warn, createSpinner } from "@n-dx/llm-client";
 
 // ---- Deprecation filter (CLI entry points) ----------------------------------
 export { suppressKnownDeprecations } from "@n-dx/llm-client";
@@ -70,6 +70,7 @@ export {
   bold,
   dim,
   cyan,
+  carolinaBlue,
   yellow,
   green,
   red,
