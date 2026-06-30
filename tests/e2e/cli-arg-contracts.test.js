@@ -114,6 +114,7 @@ const REX_COMMANDS = [
 const HENCH_COMMANDS = [
   "init",
   "run",
+  "record",
   "config",
   "template",
   "status",

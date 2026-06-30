@@ -370,8 +370,8 @@ describe("claude CLI discovery diagnostics", () => {
     return commonPaths.some((p) => existsSync(p));
   }
 
-  it("exits non-zero and lists searched paths when claude CLI is absent from PATH", async () => {
-    if (claudeFoundOnSystem()) return; // skip on machines with claude installed system-wide
+  it("provisions the Claude surface best-effort (exit 0) when claude CLI is absent from PATH", async () => {
+    if (claudeFoundOnSystem()) return; // only meaningful where claude is genuinely unreachable (e.g. CI)
 
     const binDir = await mkdtemp(join(tmpdir(), "ndx-diag-bin-"));
     try {
@@ -380,7 +380,12 @@ describe("claude CLI discovery diagnostics", () => {
       // Include node's own bin dir so subprocesses can find node, but nothing else
       const nodeBinDir = dirname(process.execPath);
 
-      const result = runFail(["init", "--provider=codex", tmpDir], {
+      // init no longer hard-fails when the claude CLI binary is missing: it
+      // provisions the file-based Claude surface (CLAUDE.md, skills, permissions)
+      // best-effort and only the MCP registration that needs the binary is
+      // skipped. `run` throws on a non-zero exit, so reaching the assertions
+      // proves init exited 0.
+      const stdout = run(["init", "--provider=codex", tmpDir], {
         env: {
           ...envWithout,
           PATH: `${binDir}${PATH_SEP}${nodeBinDir}`,
@@ -388,11 +393,11 @@ describe("claude CLI discovery diagnostics", () => {
         },
       });
 
-      expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain("claude CLI not found");
-      expect(result.stderr).toContain("Searched:");
-      expect(result.stderr).toMatch(/claude \(PATH\)/);
-      expect(result.stderr).toMatch(/brew install claude|npm install -g claude/);
+      // Claude file surface is still written even with the CLI absent.
+      expect(existsSync(join(tmpDir, "CLAUDE.md"))).toBe(true);
+      expect(stdout).toContain("CLAUDE.md");
+      // The removed hard-fail diagnostic must not resurface.
+      expect(stdout).not.toContain("claude CLI not found");
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }

@@ -1058,10 +1058,26 @@ export function computeStructureHash(zones: Zone[]): string {
 }
 
 /**
+ * Version of the zone-partitioning algorithm. Folded into the input
+ * fingerprint so that a sourcevision upgrade which changes how files are
+ * grouped invalidates any cached partition produced by an older algorithm —
+ * even when the project's files and zone config are byte-identical.
+ *
+ * BUMP THIS whenever the zone partition output changes for unchanged inputs
+ * (graph construction, Louvain params, subdivision/merge thresholds, scope
+ * filtering, etc.). Without the bump, `analyzeZones` reuses the prior
+ * partition (see the reuse path keyed on computeInputFingerprint), so users
+ * silently keep stale zones — and, e.g., an empty codebase map — until they
+ * delete `.sourcevision`. Monotonic integer; history is intentionally terse.
+ */
+export const ZONE_ALGORITHM_VERSION = 2;
+
+/**
  * Hash the analysis inputs that determine the Louvain partition, independent
- * of the partition itself. Same file contents + same zone config → same
- * fingerprint → safe to reuse the previous zone structure and skip the
- * non-deterministic Louvain re-run that would otherwise reset enrichmentPass.
+ * of the partition itself. Same file contents + same zone config + same
+ * algorithm version → same fingerprint → safe to reuse the previous zone
+ * structure and skip the non-deterministic Louvain re-run that would
+ * otherwise reset enrichmentPass.
  */
 export function computeInputFingerprint(
   inventory: Inventory,
@@ -1069,6 +1085,7 @@ export function computeInputFingerprint(
   smallZoneMergeThreshold?: number,
   maxZonePercent?: number,
   zoneAnchors?: readonly ZoneAnchor[],
+  algorithmVersion: number = ZONE_ALGORITHM_VERSION,
 ): string {
   const fileData = inventory.files
     .map((f) => `${f.path}\0${f.hash}`)
@@ -1085,8 +1102,9 @@ export function computeInputFingerprint(
     .sort()
     .join("\n");
   const cfg = `mt=${smallZoneMergeThreshold ?? ""}\0mzp=${maxZonePercent ?? ""}`;
+  const algo = `algo=${algorithmVersion}`;
   return createHash("sha256")
-    .update(`${fileData}\0\0${pinData}\0\0${anchorData}\0\0${cfg}`)
+    .update(`${algo}\0\0${fileData}\0\0${pinData}\0\0${anchorData}\0\0${cfg}`)
     .digest("hex")
     .slice(0, 16);
 }

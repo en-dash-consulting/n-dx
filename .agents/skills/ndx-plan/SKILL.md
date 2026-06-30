@@ -13,4 +13,16 @@ Analyze the codebase and propose PRD updates.
 6. Present proposals to the user for review
 7. For each approved proposal, use `add_item` (rex MCP) to create it with appropriate descriptions, acceptance criteria, and parent placement
 8. Show the updated PRD tree via `get_prd_status`
-9. **Commit**: run `git status --porcelain` — if empty, print "Working tree clean — nothing to commit." and stop. Otherwise run `git add -A` then `git commit -m "ndx-plan: add <N> proposed PRD items"` (replace `<N>` with the count of items created).
+9. **Commit**: run `git status --porcelain` against the project root — this picks up every MCP write under `.rex/prd_tree/` (each `add_item` call produces a new `<slug>/index.md`). If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block via a HEREDOC:
+
+   ```sh
+   git commit -m "$(cat <<'EOF'
+   ndx-plan: add <N> proposed PRD items
+
+   N-DX: skill/ndx-plan
+   Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
+   EOF
+   )"
+   ```
+
+   Replace `<N>` with the count of items created. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.

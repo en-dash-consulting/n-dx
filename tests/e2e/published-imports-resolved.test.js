@@ -48,21 +48,18 @@ function listWorkspacePackages() {
 }
 
 function getPackedFiles(pkgDir) {
-  // npm pack runs prepack/prepublish lifecycle scripts before emitting
-  // the JSON report. Scripts may print `> @scope/pkg@x.y.z prepack …`
-  // banners to stdout, so locate the first `[` (the JSON array start)
-  // and parse from there.
-  const out = execFileSync("npm", ["pack", "--dry-run", "--json"], {
+  // Use `pnpm pack` (not `npm pack`): npm runs the `prepare` lifecycle on pack
+  // even with --ignore-scripts / .npmrc ignore-scripts=true, which rebuilds the
+  // shared packages/*/dist mid-suite and races other root tests that load those
+  // CLIs. pnpm honors ignore-scripts=true, so it reports the built output
+  // without rebuilding. `pnpm pack --json` prints a single JSON object.
+  const out = execFileSync("pnpm", ["pack", "--dry-run", "--json"], {
     cwd: pkgDir,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "ignore"],
     shell: true,
   });
-  const jsonStart = out.indexOf("[");
-  if (jsonStart === -1) {
-    throw new Error(`npm pack --json produced no array output:\n${out}`);
-  }
-  const [report] = JSON.parse(out.slice(jsonStart));
+  const report = JSON.parse(out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1));
   return new Set(report.files.map((f) => f.path));
 }
 

@@ -133,60 +133,65 @@
       "files": [
         "src/client/App.tsx",
         "src/client/components/Button.tsx",
+        "src/client/components/Card.tsx",
+        "src/client/components/Input.tsx",
         "src/client/components/Nav.tsx",
-        "src/client/index.tsx"
+        "src/client/hooks/useFetch.ts",
+        "src/client/index.tsx",
+        "src/client/pages/HomePage.tsx",
+        "src/client/pages/UserPage.tsx"
       ]
     },
     {
-      "id": "client-components",
+      "id": "client-hooks",
       "files": [
-        "src/client/components/Card.tsx",
-        "src/client/pages/HomePage.tsx",
-        "src/client/stores/postStore.ts"
+        "src/client/hooks/useAuth.ts"
+      ]
+    },
+    {
+      "id": "client-stores",
+      "files": [
+        "src/client/stores/userStore.ts"
       ]
     },
     {
       "id": "server",
       "files": [
-        "src/server/app.ts",
-        "src/server/index.ts",
+        "src/client/stores/postStore.ts",
+        "src/server/models/post.ts",
         "src/server/models/user.ts",
-        "src/server/routes/auth.ts",
         "src/server/routes/posts.ts",
         "src/server/routes/users.ts",
         "src/server/services/post-service.ts",
-        "src/server/services/user-service.ts"
+        "src/server/services/user-service.ts",
+        "src/shared/types.ts"
       ]
     },
     {
       "id": "server-middleware",
       "files": [
+        "src/server/app.ts",
+        "src/server/index.ts",
         "src/server/middleware/auth.ts",
-        "src/server/middleware/logger.ts"
+        "src/server/middleware/logger.ts",
+        "src/server/routes/auth.ts"
       ]
     },
     {
       "id": "shared",
       "files": [
-        "src/server/models/post.ts",
         "src/shared/constants.ts",
         "src/shared/index.ts",
-        "src/shared/schemas/post.ts",
-        "src/shared/schemas/user.ts",
-        "src/shared/types.ts",
         "src/shared/utils/format.ts",
         "src/shared/utils/parse.ts",
         "src/shared/utils/validate.ts"
       ]
     },
     {
-      "id": "user",
+      "id": "shared-schemas",
       "files": [
-        "src/client/components/Input.tsx",
-        "src/client/hooks/useAuth.ts",
-        "src/client/hooks/useFetch.ts",
-        "src/client/pages/UserPage.tsx",
-        "src/client/stores/userStore.ts"
+        "src/shared/schemas/post.ts",
+        "src/shared/schemas/user.ts"
       ]
     }
   ]
