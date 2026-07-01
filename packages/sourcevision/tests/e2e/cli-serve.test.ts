@@ -40,7 +40,9 @@ function getFreePort(): Promise<number> {
   });
 }
 
-function waitForServer(port: number, timeout = 10000): Promise<void> {
+// 25s keeps a margin under the 30s per-test budget — under full-suite load
+// the server process can take well over 10s to boot.
+function waitForServer(port: number, timeout = 25000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = () => {

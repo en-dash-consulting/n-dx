@@ -251,7 +251,8 @@ describe("analyzeInventory", () => {
     await writeFile(join(tmpDir, "src", "app.ts"), 'console.log("hi");\n');
     await writeFile(join(tmpDir, "README.md"), "# Hello\n");
 
-    const inv = await analyzeInventory(tmpDir);
+    // codeOnly:false to exercise language/role classification across non-code types.
+    const inv = await analyzeInventory(tmpDir, { codeOnly: false });
 
     expect(inv.files).toHaveLength(3);
     expect(inv.summary.totalFiles).toBe(3);
@@ -265,6 +266,62 @@ describe("analyzeInventory", () => {
     expect(tsFile!.language).toBe("TypeScript");
     expect(tsFile!.lineCount).toBe(1);
     expect(tsFile!.hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("excludes non-code files by default (codeOnly)", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-codeonly-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+
+    await writeFile(join(tmpDir, "package.json"), '{ "name": "test" }\n');
+    await writeFile(join(tmpDir, "src", "app.ts"), 'console.log("hi");\n');
+    await writeFile(join(tmpDir, "lib.py"), "x = 1\n");
+    await writeFile(join(tmpDir, "README.md"), "# Hello\n");
+    await writeFile(join(tmpDir, "logo.png"), "\x89PNG\r\n");
+    await writeFile(join(tmpDir, "data.json"), "{}\n");
+
+    const inv = await analyzeInventory(tmpDir);
+    const paths = inv.files.map((f) => f.path).sort();
+
+    // Only program-code files survive the default code-only walk.
+    expect(paths).toEqual(["lib.py", "src/app.ts"]);
+  });
+
+  it("includes extra extensions when configured (extraExtensions)", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-extraext-"));
+    await writeFile(join(tmpDir, "app.ts"), "code\n");
+    await writeFile(join(tmpDir, "schema.proto"), "message M {}\n");
+    await writeFile(join(tmpDir, "data.json"), "{}\n");
+
+    const inv = await analyzeInventory(tmpDir, { extraExtensions: [".proto"] });
+    const paths = inv.files.map((f) => f.path).sort();
+
+    expect(paths).toEqual(["app.ts", "schema.proto"]);
+  });
+
+  it("inventories every file when codeOnly is false", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-all-"));
+    await writeFile(join(tmpDir, "app.ts"), "code\n");
+    await writeFile(join(tmpDir, "README.md"), "# Hello\n");
+    await writeFile(join(tmpDir, "data.json"), "{}\n");
+
+    const inv = await analyzeInventory(tmpDir, { codeOnly: false });
+    const paths = inv.files.map((f) => f.path).sort();
+
+    expect(paths).toEqual(["README.md", "app.ts", "data.json"]);
+  });
+
+  it("skips Python virtualenv directories", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-venv-"));
+    await writeFile(join(tmpDir, "pyproject.toml"), "[project]\nname='x'\n");
+    await writeFile(join(tmpDir, "app.py"), "print('hi')\n");
+    await mkdir(join(tmpDir, ".venv", "lib", "site-packages"), { recursive: true });
+    await writeFile(join(tmpDir, ".venv", "lib", "site-packages", "dep.py"), "x = 1\n");
+
+    const inv = await analyzeInventory(tmpDir);
+    const paths = inv.files.map((f) => f.path);
+
+    expect(paths).toContain("app.py");
+    expect(paths.some((p) => p.includes("site-packages"))).toBe(false);
   });
 
   it("produces deterministic output across runs", async () => {
@@ -562,7 +619,9 @@ describe("ignore file integration", () => {
     await writeFile(join(tmpDir, "debug.log"), "ignore me\n");
     await writeFile(join(tmpDir, "important.log"), "keep me\n");
 
-    const inv = await analyzeInventory(tmpDir);
+    // codeOnly:false so the assertion isolates ignore-filter behavior from the
+    // code-only walk (which would otherwise drop the non-code .log files).
+    const inv = await analyzeInventory(tmpDir, { codeOnly: false });
     const paths = inv.files.map((f) => f.path);
 
     expect(paths).not.toContain("debug.log");
@@ -574,7 +633,7 @@ describe("ignore file integration", () => {
     await writeFile(join(tmpDir, "app.ts"), "code\n");
     await writeFile(join(tmpDir, "data.log"), "log\n");
 
-    const inv = await analyzeInventory(tmpDir);
+    const inv = await analyzeInventory(tmpDir, { codeOnly: false });
     const paths = inv.files.map((f) => f.path);
 
     expect(paths).toContain("app.ts");

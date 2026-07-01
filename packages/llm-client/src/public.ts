@@ -114,6 +114,7 @@ export {
 export type {
   LLMVendor,
   CodexConfig,
+  GoogleConfig,
   LLMConfig,
   LLMClient,
   TaskWeight,
@@ -152,8 +153,15 @@ export {
   resolveVendorModel,
   NEWEST_MODELS,
   TIER_MODELS,
+  GOOGLE_MODELS,
   VENDOR_CONTEXT_CHAR_LIMITS,
+  MODEL_CONTEXT_WINDOWS,
+  MODEL_COSTS,
 } from "./config.js";
+
+// Budget preflight
+export { budgetPreflight } from "./budget-preflight.js";
+export type { BudgetPreflightResult } from "./budget-preflight.js";
 
 // Token usage parsing
 export {
@@ -203,6 +211,22 @@ export {
   parseOpenAiTokenUsage,
 } from "./openai-api-provider.js";
 export type { OpenAiApiProviderOptions } from "./openai-api-provider.js";
+
+export {
+  createGoogleApiProvider,
+  resolveGoogleApiKey,
+  parseGeminiTokenUsage,
+  validateGeminiModelId,
+} from "./google-api-provider.js";
+export type {
+  GoogleApiProviderOptions,
+  GeminiContent,
+  GeminiPart,
+  GeminiToolBlock,
+  GeminiGenerateResult,
+  GeminiToolProvider,
+  GenerateContentWithToolsArgs,
+} from "./google-api-provider.js";
 
 // Factory
 export {
@@ -328,6 +352,8 @@ export type {
   ToolDefinition,
   AnthropicToolDef,
   OpenAiToolDef,
+  GeminiFunctionDeclaration,
+  GeminiSchema,
 } from "./tool-schema.js";
 
 export {
@@ -335,6 +361,8 @@ export {
   toAnthropicToolDefs,
   toOpenAiToolDef,
   toOpenAiToolDefs,
+  toGeminiFunctionDeclaration,
+  toGeminiFunctionDeclarations,
 } from "./tool-schema.js";
 
 // Deprecation warning filter (CLI entry points)
@@ -343,6 +371,7 @@ export { suppressKnownDeprecations } from "./suppress-deprecations.js";
 // LLM error classification (shared across domain packages)
 export {
   classifyLLMError,
+  extractProviderDetail,
 } from "./llm-error-classifier.js";
 export type {
   LLMErrorCategory,

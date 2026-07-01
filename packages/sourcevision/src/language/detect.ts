@@ -6,10 +6,11 @@
  *
  * Detection order:
  * 1. Explicit override in `.n-dx.json` (`"language": "go"`)
- * 2. Presence of `go.mod` → Go
- * 3. Presence of `package.json` → TypeScript/JS
- * 4. File-count tiebreak (both markers present) → whichever has more source files
- * 5. Fallback → TypeScript/JS (backward-compatible default)
+ * 2. Single language marker present → that language
+ *    (`go.mod` → Go, `package.json` → TS/JS, `Package.swift`/`*.xcodeproj` → Swift,
+ *     `pyproject.toml`/`setup.py`/`requirements.txt`/`Pipfile` → Python)
+ * 3. Multiple markers present → file-count tiebreak (whichever has more source files)
+ * 4. Fallback → TypeScript/JS (backward-compatible default)
  *
  * Multi-language detection (`detectLanguages`) returns ALL detected language
  * configs rather than picking a winner. `mergeLanguageConfigs` combines
@@ -24,12 +25,14 @@ import type { LanguageConfig } from "./registry.js";
 import { typescriptConfig } from "./typescript.js";
 import { goConfig } from "./go.js";
 import { swiftConfig } from "./swift.js";
+import { pythonConfig } from "./python.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
 const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
   ["go", goConfig],
   ["swift", swiftConfig],
+  ["python", pythonConfig],
   ["typescript", typescriptConfig],
   ["javascript", typescriptConfig],
 ]);
@@ -38,7 +41,7 @@ const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
  * Valid language identifiers accepted by the `.n-dx.json` `language` field.
  * Includes `"auto"` which triggers marker-based detection.
  */
-export const VALID_LANGUAGE_IDS: readonly string[] = ["typescript", "javascript", "go", "swift", "auto"] as const;
+export const VALID_LANGUAGE_IDS: readonly string[] = ["typescript", "javascript", "go", "swift", "python", "auto"] as const;
 
 /**
  * Look up a language config by id. Returns `undefined` for unknown ids.
@@ -67,7 +70,19 @@ async function fileExists(filePath: string): Promise<boolean> {
 function tiebreakRank(config: LanguageConfig): number {
   if (config === typescriptConfig) return 0;
   if (config === swiftConfig) return 1;
-  return 2;
+  if (config === goConfig) return 2;
+  return 3;
+}
+
+/**
+ * Python marker present? Any of the canonical project manifests at the root.
+ */
+async function hasPythonMarker(rootDir: string): Promise<boolean> {
+  const markers = ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile"];
+  for (const m of markers) {
+    if (await fileExists(join(rootDir, m))) return true;
+  }
+  return false;
 }
 
 /**
@@ -106,18 +121,57 @@ async function readConfigOverride(rootDir: string): Promise<string | undefined> 
   return undefined;
 }
 
+/** Inventory-related overrides read from the `.n-dx.json` `sourcevision` key. */
+export interface InventoryConfigOverride {
+  /** Restrict the inventory to program-code files only (default true). */
+  codeOnly?: boolean;
+  /** Extra file extensions to always include when `codeOnly` is true (lower-cased, leading dot). */
+  extraExtensions?: string[];
+  /** Extra directory names to skip during the inventory walk. */
+  extraSkipDirs?: string[];
+}
+
+/**
+ * Read inventory-related overrides from `.n-dx.json` under the `sourcevision`
+ * key. Returns an empty object when the file or key is absent/invalid, so the
+ * caller applies its own defaults (notably `codeOnly` defaults to true).
+ */
+export async function loadInventoryConfig(rootDir: string): Promise<InventoryConfigOverride> {
+  try {
+    const raw = await readFile(join(rootDir, ".n-dx.json"), "utf-8");
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    const sv = config.sourcevision;
+    if (!sv || typeof sv !== "object") return {};
+    const s = sv as Record<string, unknown>;
+    const out: InventoryConfigOverride = {};
+    if (typeof s.codeOnly === "boolean") out.codeOnly = s.codeOnly;
+    if (Array.isArray(s.extraExtensions)) {
+      out.extraExtensions = s.extraExtensions.filter((e): e is string => typeof e === "string");
+    }
+    if (Array.isArray(s.extraSkipDirs)) {
+      out.extraSkipDirs = s.extraSkipDirs.filter((e): e is string => typeof e === "string");
+    }
+    return out;
+  } catch {
+    // File doesn't exist or is invalid — use defaults
+    return {};
+  }
+}
+
 /**
  * Count source files by language family in the top two directory levels.
  * Performs a shallow scan (not a full recursive walk) for speed.
  */
-async function countSourceFiles(rootDir: string): Promise<{ go: number; ts: number; swift: number }> {
+async function countSourceFiles(rootDir: string): Promise<{ go: number; ts: number; swift: number; py: number }> {
   let go = 0;
   let ts = 0;
   let swift = 0;
+  let py = 0;
 
   const goExts = goConfig.extensions;
   const tsExts = typescriptConfig.extensions;
   const swiftExts = swiftConfig.extensions;
+  const pyExts = pythonConfig.extensions;
 
   // Scan root + one level of subdirectories
   const dirsToScan = [rootDir];
@@ -125,13 +179,20 @@ async function countSourceFiles(rootDir: string): Promise<{ go: number; ts: numb
   try {
     const topEntries = await readdir(rootDir, { withFileTypes: true });
     for (const entry of topEntries) {
-      if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules" && entry.name !== "vendor") {
+      if (
+        entry.isDirectory() &&
+        !entry.name.startsWith(".") &&
+        entry.name !== "node_modules" &&
+        entry.name !== "vendor" &&
+        entry.name !== "venv" &&
+        entry.name !== "site-packages"
+      ) {
         dirsToScan.push(join(rootDir, entry.name));
       }
     }
   } catch {
     // Can't read root — return zeros
-    return { go, ts, swift };
+    return { go, ts, swift, py };
   }
 
   for (const dir of dirsToScan) {
@@ -143,13 +204,14 @@ async function countSourceFiles(rootDir: string): Promise<{ go: number; ts: numb
         if (goExts.has(ext)) go++;
         if (tsExts.has(ext)) ts++;
         if (swiftExts.has(ext)) swift++;
+        if (pyExts.has(ext)) py++;
       }
     } catch {
       // Skip unreadable directories
     }
   }
 
-  return { go, ts, swift };
+  return { go, ts, swift, py };
 }
 
 // ── Detection ───────────────────────────────────────────────────────────────
@@ -174,23 +236,26 @@ export async function detectLanguage(rootDir: string): Promise<LanguageConfig> {
   }
 
   // Step 2 & 3: Check for language markers
-  const [hasGoMod, hasPackageJson, hasSwift] = await Promise.all([
+  const [hasGoMod, hasPackageJson, hasSwift, hasPython] = await Promise.all([
     fileExists(join(rootDir, "go.mod")),
     fileExists(join(rootDir, "package.json")),
     hasSwiftMarker(rootDir),
+    hasPythonMarker(rootDir),
   ]);
 
   // Single-marker fast paths.
-  if (hasGoMod && !hasPackageJson && !hasSwift) return goConfig;
-  if (hasSwift && !hasGoMod && !hasPackageJson) return swiftConfig;
-  if (hasPackageJson && !hasGoMod && !hasSwift) return typescriptConfig;
+  if (hasGoMod && !hasPackageJson && !hasSwift && !hasPython) return goConfig;
+  if (hasSwift && !hasGoMod && !hasPackageJson && !hasPython) return swiftConfig;
+  if (hasPython && !hasGoMod && !hasPackageJson && !hasSwift) return pythonConfig;
+  if (hasPackageJson && !hasGoMod && !hasSwift && !hasPython) return typescriptConfig;
 
   // Step 4: Multiple markers present — file-count tiebreak picks primary.
-  if (hasGoMod || hasPackageJson || hasSwift) {
+  if (hasGoMod || hasPackageJson || hasSwift || hasPython) {
     const counts = await countSourceFiles(rootDir);
     const candidates: Array<[number, LanguageConfig]> = [];
     if (hasGoMod) candidates.push([counts.go, goConfig]);
     if (hasSwift) candidates.push([counts.swift, swiftConfig]);
+    if (hasPython) candidates.push([counts.py, pythonConfig]);
     if (hasPackageJson) candidates.push([counts.ts, typescriptConfig]);
     candidates.sort((a, b) => {
       if (a[0] !== b[0]) return b[0] - a[0];
@@ -219,20 +284,22 @@ export async function detectLanguage(rootDir: string): Promise<LanguageConfig> {
 export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]> {
   // Check for language markers (Swift adds Package.swift / .xcodeproj /
   // .xcworkspace; only one needs to be present).
-  const [hasGoMod, hasPackageJson, hasSwift] = await Promise.all([
+  const [hasGoMod, hasPackageJson, hasSwift, hasPython] = await Promise.all([
     fileExists(join(rootDir, "go.mod")),
     fileExists(join(rootDir, "package.json")),
     hasSwiftMarker(rootDir),
+    hasPythonMarker(rootDir),
   ]);
 
   const present: Array<{ config: LanguageConfig; count: number }> = [];
 
   // When any markers are present, count source files so we can order by
   // primary. countSourceFiles is cheap (shallow scan).
-  if (hasGoMod || hasPackageJson || hasSwift) {
+  if (hasGoMod || hasPackageJson || hasSwift || hasPython) {
     const counts = await countSourceFiles(rootDir);
     if (hasGoMod) present.push({ config: goConfig, count: counts.go });
     if (hasSwift) present.push({ config: swiftConfig, count: counts.swift });
+    if (hasPython) present.push({ config: pythonConfig, count: counts.py });
     if (hasPackageJson) present.push({ config: typescriptConfig, count: counts.ts });
   }
 

@@ -1,0 +1,9 @@
+---
+"@n-dx/sourcevision": patch
+"@n-dx/llm-client": patch
+"@n-dx/hench": patch
+"@n-dx/core": patch
+"@n-dx/rex": patch
+---
+
+Added Google integration

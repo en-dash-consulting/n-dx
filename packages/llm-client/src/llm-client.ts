@@ -11,6 +11,7 @@ import type { AuthMode, ClaudeClient, ClaudeConfig } from "./types.js";
 import type { LLMVendor, LLMConfig } from "./llm-types.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
 import { resolveOpenAiApiKey } from "./openai-api-provider.js";
+import { createGoogleApiProvider, resolveGoogleApiKey } from "./google-api-provider.js";
 
 /**
  * Vendor-neutral client creation options.
@@ -53,6 +54,18 @@ export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
     return apiKey ? "api" : "cli";
   }
 
+  if (vendor === "google") {
+    const googleConfig = options.llmConfig?.google;
+    const apiKey = resolveGoogleApiKey(
+      googleConfig,
+      options.apiKeyEnv ?? googleConfig?.apiKeyEnv ?? "GEMINI_API_KEY",
+    );
+    // Google only supports API mode — return "api" when key is present, "cli" as
+    // a sentinel for "no key" (callers may check mode === "api" to decide whether
+    // to surface auth errors eagerly).
+    return apiKey ? "api" : "cli";
+  }
+
   const claudeConfig = options.claudeConfig ?? options.llmConfig?.claude ?? {};
   return detectAuthMode({
     claudeConfig,
@@ -73,6 +86,17 @@ export function createLLMClient(options: CreateLLMClientOptions): ClaudeClient {
     return createCodexCliClient({
       codexConfig: options.llmConfig?.codex,
     });
+  }
+
+  if (vendor === "google") {
+    // Google uses the REST API — adapt LLMProvider to the ClaudeClient shape.
+    // The Google provider implements LLMProvider which is a superset of the
+    // ClaudeClient interface (both expose complete() and info).
+    const googleProvider = createGoogleApiProvider({
+      googleConfig: options.llmConfig?.google,
+    });
+    // Cast is safe: ClaudeClient is structurally compatible with LLMProvider.complete()
+    return googleProvider as unknown as ClaudeClient;
   }
 
   const claudeConfig = options.claudeConfig ?? options.llmConfig?.claude ?? {};

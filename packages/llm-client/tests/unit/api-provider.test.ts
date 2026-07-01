@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createApiClient } from "../../src/api-provider.js";
+import { createApiClient, formatSdkError } from "../../src/api-provider.js";
 import { ClaudeClientError } from "../../src/types.js";
 import type { LLMProvider } from "../../src/provider-interface.js";
 
@@ -120,5 +120,32 @@ describe("createApiClient — LLMProvider interface", () => {
   it("does not expose stream (not implemented)", () => {
     const client = createApiClient({ claudeConfig: { api_key: "sk-ant-test" } });
     expect(client.stream).toBeUndefined();
+  });
+});
+
+describe("formatSdkError", () => {
+  it("appends the SDK's nested error body when not already in the message", () => {
+    const err = Object.assign(new Error("429 status code (no body)"), {
+      status: 429,
+      error: { type: "error", error: { type: "rate_limit_error", message: "Number of request tokens has exceeded your daily limit" } },
+    });
+    expect(formatSdkError(err)).toBe(
+      "429 status code (no body): Number of request tokens has exceeded your daily limit",
+    );
+  });
+
+  it("does not duplicate the nested message when already present", () => {
+    const err = Object.assign(new Error("429: rate limit hit"), {
+      error: { error: { message: "rate limit hit" } },
+    });
+    expect(formatSdkError(err)).toBe("429: rate limit hit");
+  });
+
+  it("falls back to the plain message when there is no nested body", () => {
+    expect(formatSdkError(new Error("socket hang up"))).toBe("socket hang up");
+  });
+
+  it("returns a sentinel for a non-error value", () => {
+    expect(formatSdkError(undefined)).toBe("Unknown error");
   });
 });

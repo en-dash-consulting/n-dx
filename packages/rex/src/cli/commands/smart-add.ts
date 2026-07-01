@@ -41,7 +41,7 @@ import {
   buildDuplicateOverrideMarkerIndex,
 } from "./smart-add-duplicates.js";
 import type { ProposalDuplicateMatch, ItemFileMap } from "./smart-add-duplicates.js";
-import type { LLMVendor, LLMConfig } from "@n-dx/llm-client";
+import type { LLMVendor, LLMConfig, CLIErrorCode } from "@n-dx/llm-client";
 import { printVendorModelHeader, resolveVendorModel } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
@@ -647,11 +647,11 @@ export function classifySmartAddError(
   err: Error,
   mode: "description" | "file",
   vendor: LLMVendor = "claude",
-): { message: string; suggestion: string } {
+): { message: string; suggestion: string; code: CLIErrorCode } {
   const context = mode === "file" ? "process ideas file" : "analyze description";
   llmDebug(`classify error vendor=${vendor} mode=${mode} message="${err.message}"`);
-  const { message, suggestion } = classifyLLMError(err, vendor, context);
-  return { message, suggestion };
+  const { message, suggestion, code } = classifyLLMError(err, vendor, context);
+  return { message, suggestion, code };
 }
 
 async function savePending(
@@ -1137,6 +1137,9 @@ function determineSmartAddModelSource(vendor: LLMVendor, llmConfig: LLMConfig): 
   if (vendor === "codex" && llmConfig.codex?.model) {
     return "configured";
   }
+  if (vendor === "google" && llmConfig.google?.model) {
+    return "configured";
+  }
   return "default";
 }
 
@@ -1251,7 +1254,8 @@ async function resolveSmartAddModel(
     const configuredModel = resolveVendorModel(vendor, llmConfig);
     const hasVendorModelOverride =
       (vendor === "claude" && typeof llmConfig.claude?.model === "string" && llmConfig.claude.model.trim().length > 0) ||
-      (vendor === "codex" && typeof llmConfig.codex?.model === "string" && llmConfig.codex.model.trim().length > 0);
+      (vendor === "codex" && typeof llmConfig.codex?.model === "string" && llmConfig.codex.model.trim().length > 0) ||
+      (vendor === "google" && typeof llmConfig.google?.model === "string" && llmConfig.google.model.trim().length > 0);
 
     if (hasVendorModelOverride) {
       llmDebug(`effective model=${configuredModel}`);
@@ -1434,7 +1438,7 @@ async function generateSmartAddProposals(params: {
     } catch (err) {
       spinner?.stop();
       const classified = classifySmartAddError(err as Error, "file", getLLMVendor() ?? "claude");
-      throw new CLIError(classified.message, classified.suggestion);
+      throw new CLIError(classified.message, classified.suggestion, classified.code);
     }
   }
 
@@ -1459,7 +1463,7 @@ async function generateSmartAddProposals(params: {
   } catch (err) {
     spinner?.stop();
     const classified = classifySmartAddError(err as Error, "description", getLLMVendor() ?? "claude");
-    throw new CLIError(classified.message, classified.suggestion);
+    throw new CLIError(classified.message, classified.suggestion, classified.code);
   }
 }
 

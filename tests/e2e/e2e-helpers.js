@@ -245,7 +245,7 @@ export async function setupSourcevisionDir(dir) {
     join(dir, ".sourcevision", "imports.json"),
     JSON.stringify({
       edges: [],
-      external: {},
+      external: [],
       summary: { totalEdges: 0, totalExternal: 0 },
     }),
   );

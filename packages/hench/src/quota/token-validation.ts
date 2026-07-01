@@ -54,6 +54,8 @@ export interface TokenValidationMetrics {
   isCodexRun: boolean;
   /** Whether the run is a Claude run (any turn used Claude). */
   isClaudeRun: boolean;
+  /** Whether the run is a Google/Gemini run (any turn used Google). */
+  isGoogleRun: boolean;
 }
 
 /**
@@ -62,7 +64,7 @@ export interface TokenValidationMetrics {
  * Used for outlier detection and cost comparison.
  */
 export interface TokenBaseline {
-  vendor: "codex" | "claude";
+  vendor: "codex" | "claude" | "google";
   taskComplexity: "simple" | "moderate" | "complex";
   /** Expected input tokens for this complexity level. */
   expectedInput: number;
@@ -201,6 +203,7 @@ export function validateTokenReporting(
     vendorBreakdown: {},
     isCodexRun: turns.some((t) => t.vendor === "codex"),
     isClaudeRun: turns.some((t) => t.vendor === "claude"),
+    isGoogleRun: turns.some((t) => t.vendor === "google"),
   };
 
   // Compute per-turn metrics
@@ -245,9 +248,20 @@ export function validateTokenReporting(
     }
   }
 
+  // Validation 1b: Google/Gemini runs should also report non-zero tokens —
+  // zero usage indicates a usageMetadata parse failure in the Gemini adapter.
+  if (metrics.isGoogleRun && metrics.totalInput === 0 && metrics.totalOutput === 0) {
+    issues.push({
+      severity: "error",
+      category: "non-zero",
+      message: "Google run reported zero tokens (input and output). This indicates token retrieval failure.",
+    });
+  }
+
   // Validation 2: Outlier detection
   const complexity = detectTaskComplexity(run);
-  const relevantBaselines = baselines.filter((b) => b.vendor === (metrics.isCodexRun ? "codex" : "claude") && b.taskComplexity === complexity);
+  const baselineVendor = metrics.isCodexRun ? "codex" : metrics.isGoogleRun ? "google" : "claude";
+  const relevantBaselines = baselines.filter((b) => b.vendor === baselineVendor && b.taskComplexity === complexity);
 
   for (const baseline of relevantBaselines) {
     const rangeFactor = baseline.rangePercent / 200;

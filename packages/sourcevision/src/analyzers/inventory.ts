@@ -10,7 +10,7 @@ import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
 import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import { toPosix } from "../util/paths.js";
-import { detectLanguage as detectProjectLanguage } from "../language/detect.js";
+import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { typescriptConfig } from "../language/typescript.js";
 import type { LanguageConfig } from "../language/registry.js";
 
@@ -38,6 +38,7 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   ".mjs": "JavaScript",
   ".cjs": "JavaScript",
   ".py": "Python",
+  ".pyi": "Python",
   ".rb": "Ruby",
   ".go": "Go",
   ".rs": "Rust",
@@ -444,7 +445,13 @@ export async function loadIgnoreFilter(rootDir: string): Promise<IgnoreFilter> {
 
 // ── File discovery ───────────────────────────────────────────────────────────
 
-async function walkDir(dir: string, rootDir: string, ig: IgnoreFilter, skipDirs: ReadonlySet<string>): Promise<string[]> {
+async function walkDir(
+  dir: string,
+  rootDir: string,
+  ig: IgnoreFilter,
+  skipDirs: ReadonlySet<string>,
+  acceptFile?: (relPath: string) => boolean,
+): Promise<string[]> {
   const files: string[] = [];
   const entries = await readdir(dir, { withFileTypes: true });
 
@@ -457,10 +464,12 @@ async function walkDir(dir: string, rootDir: string, ig: IgnoreFilter, skipDirs:
 
     if (entry.isDirectory()) {
       if (ig.ignores(relPath + "/")) continue;
-      const sub = await walkDir(fullPath, rootDir, ig, skipDirs);
+      const sub = await walkDir(fullPath, rootDir, ig, skipDirs, acceptFile);
       files.push(...sub);
     } else if (entry.isFile()) {
       if (ig.ignores(relPath)) continue;
+      // Code-only filter — skip non-code files before they are stat'd/read.
+      if (acceptFile && !acceptFile(relPath)) continue;
       files.push(relPath);
     }
   }
@@ -474,6 +483,18 @@ export interface InventoryOptions {
   previousInventory?: Inventory;
   /** Pre-resolved language config. When omitted, detectLanguage() auto-detects. */
   languageConfig?: LanguageConfig;
+  /**
+   * Restrict the inventory to program-code files only. When true (the default),
+   * files whose detected language is not a programming language are skipped
+   * during the walk, unless their extension is listed in `extraExtensions`.
+   * Set false to inventory every file (legacy behavior). When omitted, the
+   * value is read from `.n-dx.json` (`sourcevision.codeOnly`), defaulting to true.
+   */
+  codeOnly?: boolean;
+  /** Extra file extensions to include when `codeOnly` is true (lower-cased, leading dot). */
+  extraExtensions?: string[];
+  /** Extra directory names to skip during the walk (in addition to base + language skips). */
+  extraSkipDirs?: string[];
 }
 
 export interface InventoryStats {
@@ -501,11 +522,29 @@ export async function analyzeInventory(
   // Resolve language config once per analysis run
   const langConfig = options?.languageConfig ?? await detectProjectLanguage(absDir);
 
-  // Build skip set: always-skipped dirs + language-specific dirs
-  const skipDirs = new Set([...BASE_SKIP_DIRS, ...langConfig.skipDirectories]);
+  // Resolve inventory overrides (.n-dx.json `sourcevision` key). Explicit
+  // options always win; otherwise fall back to config, then built-in defaults.
+  const inventoryConfig = await loadInventoryConfig(absDir);
+  const codeOnly = options?.codeOnly ?? inventoryConfig.codeOnly ?? true;
+  const extraExtensions = new Set(
+    (options?.extraExtensions ?? inventoryConfig.extraExtensions ?? []).map((e) => e.toLowerCase()),
+  );
+  const extraSkipDirs = options?.extraSkipDirs ?? inventoryConfig.extraSkipDirs ?? [];
+
+  // Build skip set: always-skipped dirs + language-specific dirs + user extras
+  const skipDirs = new Set([...BASE_SKIP_DIRS, ...langConfig.skipDirectories, ...extraSkipDirs]);
+
+  // Code-only walk filter: keep files whose detected language is a programming
+  // language, plus any user-supplied extra extensions. Disabled when codeOnly
+  // is false (legacy: inventory every file).
+  const acceptFile = (relPath: string): boolean => {
+    if (!codeOnly) return true;
+    if (PROGRAMMING_LANGUAGES.has(detectLanguage(relPath))) return true;
+    return extraExtensions.has(extname(relPath).toLowerCase());
+  };
 
   const ig = await loadIgnoreFilter(absDir);
-  const filePaths = await walkDir(absDir, absDir, ig, skipDirs);
+  const filePaths = await walkDir(absDir, absDir, ig, skipDirs, acceptFile);
 
   const prev = options?.previousInventory;
   const prevMap = new Map<string, FileEntry>();
