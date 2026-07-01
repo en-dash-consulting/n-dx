@@ -1,5 +1,15 @@
 # @n-dx/llm-client
 
+## 0.4.6
+
+### Patch Changes
+
+- [#243](https://github.com/en-dash-consulting/n-dx/pull/243) [`925d9a8`](https://github.com/en-dash-consulting/n-dx/commit/925d9a846e35ca8cbd98084ff5aa0152bc486f99) Thanks [@dnaniel](https://github.com/dnaniel)! - Raise the per-CLI-call timeout default from 120s to 300s. Zone-enrichment and classification prompts ask the model for several KB of JSON (1.5–2.5k output tokens), and Sonnet's time-to-first-token alone can run 30–120s before generation begins. Because `--output-format json` buffers the whole response, a slow-but-legitimate completion looks like `stdout=0B` until it finishes — and a 120s cap killed many of these mid-generation, surfacing as "claude hung past 120s". The new 300s default lets them complete; `NDX_CLAUDE_PER_CALL_TIMEOUT_MS` still overrides it.
+
+- [#267](https://github.com/en-dash-consulting/n-dx/pull/267) [`579d831`](https://github.com/en-dash-consulting/n-dx/commit/579d831018b949938f6ad18a0a637315a2b9b352) Thanks [@stevemikedan](https://github.com/stevemikedan)! - Fix Codex CLI provider on Windows: pass prompt via stdin instead of argv. On Windows, `shell: true` routes through cmd.exe which splits unquoted multi-word arguments on spaces, causing Codex to receive a fragmented prompt. Passing `-` as the prompt argument and writing to `proc.stdin` bypasses cmd.exe argument parsing.
+
+- [#269](https://github.com/en-dash-consulting/n-dx/pull/269) [`545d611`](https://github.com/en-dash-consulting/n-dx/commit/545d611c9a47a372ada5e9b65f2a48d034d37482) Thanks [@en-drza](https://github.com/en-drza)! - Introduced animated carolinaBlue loader and aesthetic DX improvements for long-running status and work commands.
+
 ## 0.4.5
 
 ### Patch Changes
