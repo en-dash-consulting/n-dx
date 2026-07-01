@@ -512,8 +512,10 @@ describe("claude CLI discovery diagnostics", () => {
 
       // This runs a FULL init (the claude-discovery failure only surfaces in
       // the end-of-run summary), which can exceed the default 20s exec budget
-      // under full-suite load — give it extra headroom.
-      const result = runFail(["init", "--provider=codex", tmpDir], {
+      // under full-suite load — give it extra headroom. init provisions the
+      // Claude surface best-effort and exits 0 even with the CLI absent, so
+      // capture the result rather than expecting a non-zero exit.
+      const result = runCapture(["init", "--provider=codex", tmpDir], {
         timeout: 50_000,
         env: {
           ...envWithout,
@@ -522,11 +524,12 @@ describe("claude CLI discovery diagnostics", () => {
         },
       });
 
+      expect(result.status).toBe(0);
       // Claude file surface is still written even with the CLI absent.
       expect(existsSync(join(tmpDir, "CLAUDE.md"))).toBe(true);
-      expect(stdout).toContain("CLAUDE.md");
+      expect(result.stdout).toContain("CLAUDE.md");
       // The removed hard-fail diagnostic must not resurface.
-      expect(stdout).not.toContain("claude CLI not found");
+      expect(result.stdout).not.toContain("claude CLI not found");
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }
