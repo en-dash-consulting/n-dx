@@ -11,6 +11,7 @@ import { loadConfig } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
+import { performPreRunCommitGateIfNeeded } from "../../agent/lifecycle/shared.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
@@ -1141,6 +1142,23 @@ export async function cmdRun(
         `⚠ --permission-mode is a Claude CLI feature; ignoring "${effectivePermissionMode}" for vendor=${llmVendor}.`,
       );
       effectivePermissionMode = undefined;
+    }
+
+    // One-time pre-run commit gate: before the work loop begins, offer to
+    // commit any pre-existing uncommitted changes so the user's in-progress
+    // edits are not folded into hench's own commits. Runs once per invocation
+    // (not per iteration) and only prompts in an attended TTY session.
+    const gate = await performPreRunCommitGateIfNeeded({
+      projectDir: dir,
+      henchDir,
+      model,
+      yes,
+      autonomous,
+      dryRun,
+    });
+    if (gate === "stop") {
+      info("Stopped before running. Commit or discard your changes, then re-run.");
+      return;
     }
 
     if (epicByEpic) {

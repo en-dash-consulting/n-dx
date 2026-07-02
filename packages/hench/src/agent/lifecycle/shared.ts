@@ -29,6 +29,8 @@ import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
+import type { ReviewDiff } from "../analysis/review.js";
+import { defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
@@ -37,7 +39,7 @@ import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
-import { loadLLMConfig } from "../../store/project-config.js";
+import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
 
@@ -787,10 +789,17 @@ interface AskYesNoOptions {
 
 const ROLLBACK_INTERRUPT_HINT = "Press Ctrl+C again to abort the rollback prompt and exit.";
 
-async function askYesNoWithSuspendedSigint(
+/**
+ * Shared core behind {@link askYesNoWithSuspendedSigint} and the pre-run
+ * commit gate's three-way prompt. Opens a readline with the outer run-loop
+ * SIGINT handlers temporarily suspended and resolves with the raw answer.
+ * Resolves `null` when a "decline"-mode prompt is cancelled via Ctrl-C. Keep
+ * all readline/SIGINT plumbing here — callers only map the answer string.
+ */
+async function readLineWithSuspendedSigint(
   question: string,
   options: AskYesNoOptions = {},
-): Promise<boolean> {
+): Promise<string | null> {
   const { createInterface } = await import("node:readline");
   const interruptMode = options.interruptMode ?? "decline";
 
@@ -804,7 +813,7 @@ async function askYesNoWithSuspendedSigint(
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
 
-  return new Promise<boolean>((resolve) => {
+  return new Promise<string | null>((resolve) => {
     let settled = false;
     let interruptCount = 0;
     let secondInterruptArmed = false;
@@ -827,10 +836,10 @@ async function askYesNoWithSuspendedSigint(
         exitProcess(1);
       }
 
-      finish(false);
+      finish(null);
     };
 
-    const finish = (value: boolean): void => {
+    const finish = (value: string | null): void => {
       if (settled) return;
       settled = true;
       process.removeListener("SIGINT", onInterrupt);
@@ -851,10 +860,19 @@ async function askYesNoWithSuspendedSigint(
     rl.on("SIGINT", onInterrupt);
 
     rl.question(question, (answer) => {
-      const trimmed = answer.trim().toLowerCase();
-      finish(trimmed === "" || trimmed === "y" || trimmed === "yes");
+      finish(answer);
     });
   });
+}
+
+async function askYesNoWithSuspendedSigint(
+  question: string,
+  options: AskYesNoOptions = {},
+): Promise<boolean> {
+  const answer = await readLineWithSuspendedSigint(question, options);
+  if (answer === null) return false;
+  const trimmed = answer.trim().toLowerCase();
+  return trimmed === "" || trimmed === "y" || trimmed === "yes";
 }
 
 /**
@@ -927,6 +945,151 @@ async function countStagedFiles(projectDir: string): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Pre-run commit gate
+// ---------------------------------------------------------------------------
+
+/** Cap the diff sent to the LLM so message generation stays cheap and fast. */
+const PRE_RUN_COMMIT_DIFF_CHAR_LIMIT = 12_000;
+/** Deterministic message used when the LLM is unavailable or errors. */
+const PRE_RUN_COMMIT_FALLBACK_MESSAGE = "chore: commit local changes before hench run";
+
+export type PreRunCommitChoice = "commit" | "stop" | "proceed";
+export type PreRunCommitGateResult = "proceed" | "stop";
+
+/**
+ * Three-way prompt for the pre-run commit gate. Bare Enter proceeds (least
+ * friction); Ctrl-C stops (treat an interrupt as "don't start the run").
+ * Built on the same SIGINT-suspended readline core as the yes/no prompt.
+ */
+async function promptPreRunCommitChoice(): Promise<PreRunCommitChoice> {
+  const answer = await readLineWithSuspendedSigint(
+    "\nCommit these changes first? [c]ommit / [s]top / [p]roceed (default: proceed) ",
+  );
+  if (answer === null) return "stop";
+  const trimmed = answer.trim().toLowerCase();
+  if (trimmed === "c" || trimmed === "commit") return "commit";
+  if (trimmed === "s" || trimmed === "stop") return "stop";
+  return "proceed";
+}
+
+/**
+ * Best-effort LLM commit subject for pre-existing changes. Falls back to a
+ * deterministic message when no provider/credentials are available or the
+ * call fails — the gate must never block or error on message generation.
+ */
+async function proposePreRunCommitMessage(
+  diff: ReviewDiff,
+  henchDir: string,
+  model?: string,
+): Promise<string> {
+  try {
+    const llmConfig = await loadLLMConfig(henchDir);
+    const provider = defaultRegistry.getActiveProvider(llmConfig);
+    const resolvedModel = model ?? resolveVendorModel(resolveLLMVendor(llmConfig), llmConfig);
+    const prompt =
+      "Write a single-line git commit subject (max 72 chars, conventional-commit " +
+      "style, no body, no surrounding quotes or backticks) summarizing these " +
+      `uncommitted changes:\n\n${diff.stat}\n\n${diff.diff.slice(0, PRE_RUN_COMMIT_DIFF_CHAR_LIMIT)}`;
+    const { text } = await provider.complete({ prompt, model: resolvedModel });
+    const firstLine = (text ?? "").split("\n").map((line) => line.trim()).find(Boolean);
+    return firstLine ? firstLine.slice(0, 100) : PRE_RUN_COMMIT_FALLBACK_MESSAGE;
+  } catch {
+    return PRE_RUN_COMMIT_FALLBACK_MESSAGE;
+  }
+}
+
+/**
+ * Stage everything and commit with the standard N-DX audit trailers. Reuses
+ * {@link buildCoAuthoredByTrailerLine} so the co-authorship trailer stays in
+ * one place; the `N-DX:` line marks this as a pre-run gate commit (no run/task
+ * context exists yet, so the run-scoped trailers do not apply).
+ */
+async function commitPreRunChanges(projectDir: string, message: string): Promise<void> {
+  await execStdout("git", ["add", "-A"], { cwd: projectDir, timeout: 30_000 });
+  const trailers = `N-DX: pre-run commit gate\n${buildCoAuthoredByTrailerLine()}`;
+  await execStdout("git", ["commit", "-m", message, "-m", trailers], {
+    cwd: projectDir,
+    timeout: 30_000,
+  });
+}
+
+export interface PreRunCommitGateOptions {
+  projectDir: string;
+  henchDir: string;
+  model?: string;
+  yes?: boolean;
+  autonomous?: boolean;
+  dryRun?: boolean;
+  /** Test seams — default to the real implementations. */
+  deps?: {
+    listDirty?: (dir: string) => Promise<string[]>;
+    collectDiff?: (dir: string) => Promise<ReviewDiff>;
+    proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string) => Promise<string>;
+    promptChoice?: () => Promise<PreRunCommitChoice>;
+    commit?: (dir: string, message: string) => Promise<void>;
+    isTTY?: boolean;
+  };
+}
+
+/**
+ * One-time pre-run git gate. Runs once per `hench run` invocation, before the
+ * work loop begins (never per iteration). When the working tree carries
+ * pre-existing uncommitted changes and the session is interactive, it shows
+ * the diff stat plus a proposed commit message and asks whether to commit,
+ * stop, or proceed. Clean trees and non-interactive/autonomous runs proceed
+ * without prompting so unattended loops are never blocked.
+ *
+ * Returns "stop" when the caller should abort before running, else "proceed".
+ */
+export async function performPreRunCommitGateIfNeeded(
+  opts: PreRunCommitGateOptions,
+): Promise<PreRunCommitGateResult> {
+  const { projectDir, henchDir, model, yes, autonomous, dryRun } = opts;
+  const deps = opts.deps ?? {};
+  const listDirty = deps.listDirty ?? listDirtyPaths;
+  const collectDiff = deps.collectDiff ?? ((dir: string) => collectReviewDiff(dir));
+  const proposeMessage = deps.proposeMessage ?? proposePreRunCommitMessage;
+  const promptChoice = deps.promptChoice ?? promptPreRunCommitChoice;
+  const commit = deps.commit ?? commitPreRunChanges;
+  const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
+
+  // Dry runs never touch the working tree; skip the gate entirely.
+  if (dryRun) return "proceed";
+
+  const dirty = await listDirty(projectDir);
+  if (dirty.length === 0) return "proceed"; // Clean tree → start immediately, no prompt.
+
+  // Only prompt in an attended TTY session. Autonomous (--auto/--loop/
+  // --epic-by-epic) and --yes runs proceed as normal so loops never block.
+  const isInteractive = isTTY && !yes && !autonomous;
+  if (!isInteractive) {
+    info(`Proceeding with ${dirty.length} uncommitted file(s) in the working tree.`);
+    return "proceed";
+  }
+
+  const diff = await collectDiff(projectDir);
+  const proposed = await proposeMessage(diff, henchDir, model);
+
+  section("Uncommitted changes detected");
+  subsection("Changes");
+  info(diff.stat || `${dirty.length} file(s)`);
+  subsection("Proposed commit message");
+  info(proposed);
+
+  const choice = await promptChoice();
+  if (choice === "stop") return "stop";
+  if (choice === "commit") {
+    try {
+      await commit(projectDir, proposed);
+      info("Committed pre-existing changes. Starting run…");
+    } catch (err) {
+      info(`⚠ Pre-run commit failed: ${(err as Error).message} — proceeding without committing.`);
+    }
+  }
+  return "proceed";
 }
 
 /**
