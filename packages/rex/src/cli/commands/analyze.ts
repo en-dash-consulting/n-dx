@@ -66,7 +66,7 @@ function resolveAnalyzeTokenEventMetadata(
     return { vendor, model: explicitModel };
   }
 
-  if (vendor === "codex" || vendor === "claude") {
+  if (vendor === "codex" || vendor === "claude" || vendor === "google") {
     return {
       vendor,
       model: normalizeProviderMetadata(resolveVendorModel(vendor, llmConfig))

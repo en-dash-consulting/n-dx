@@ -174,6 +174,7 @@ sv <command> [args]               # alias for sourcevision
 | `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
+| `OPEN_SOURCE_SCOPE.md` | Licensing boundaries, included/excluded components, and contribution expectations |
 
 > **PRD file layout.** `.rex/prd_tree/` is the sole writable PRD surface. Each item (epic/feature/task) maps to a slug-named directory containing `index.md`; subtasks are encoded as sections within the parent task's `index.md`. No JSON files are written by the rex CLI, MCP tools, or `rex update`. `.rex/prd.md` and branch-scoped `.rex/prd_{branch}_{date}.md` files are legacy migration sources — absent after running `rex migrate-to-folder-tree`. `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running; do not read it from code outside the web server.
 

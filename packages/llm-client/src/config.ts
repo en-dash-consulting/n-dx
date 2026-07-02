@@ -35,26 +35,49 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-4-6",
   codex: "gpt-5.5",
+  google: "gemini-2.5-pro",
+};
+
+/**
+ * Google Gemini model catalog — maps task weight tiers to canonical Gemini model IDs.
+ *
+ * Three models span the cost/capability spectrum:
+ *   light    — fast and cheap for simple classification and lightweight tasks
+ *   standard — balanced for multi-turn agents and general analysis
+ *   heavy    — highest capability for complex reasoning and long-horizon tasks
+ *
+ * NEWEST_MODELS.google points to the heavy (most capable) tier model. Callers that
+ * want the recommended balanced model for interactive use should resolve via
+ * resolveVendorModel("google", config, "standard").
+ */
+export const GOOGLE_MODELS: Record<TaskWeight, string> = {
+  light: "gemini-2.0-flash",
+  standard: "gemini-2.5-flash",
+  heavy: "gemini-2.5-pro",
 };
 
 /**
  * Per-tier model mapping for task-weight-aware model selection.
  *
- * The `standard` tier always equals NEWEST_MODELS for backward compatibility —
- * existing code that omits the weight parameter continues to use the default model.
- * The `light` tier maps to cheaper/faster models for simple tasks.
+ * The `standard` tier equals NEWEST_MODELS for claude and codex (backward
+ * compatibility). For Google, the heavy tier equals NEWEST_MODELS.google —
+ * the most capable model — while standard is a balanced mid-tier.
  *
- * Invariant: TIER_MODELS[vendor].standard === NEWEST_MODELS[vendor]
+ * Invariant: TIER_MODELS.claude.standard === NEWEST_MODELS.claude
+ *            TIER_MODELS.codex.standard  === NEWEST_MODELS.codex
  */
 export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
   claude: {
     light: "claude-haiku-4-5",
     standard: NEWEST_MODELS.claude,
+    heavy: "claude-opus-4-7",
   },
   codex: {
     light: "gpt-5.4-mini",
     standard: NEWEST_MODELS.codex,
+    heavy: NEWEST_MODELS.codex, // no ultra-codex tier yet — same as standard
   },
+  google: GOOGLE_MODELS,
 };
 
 const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
@@ -79,6 +102,54 @@ const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
 export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
   claude: 640_000,
   codex: 400_000,
+  // Gemini models have 1M+ token context windows; cap conservatively to
+  // leave room for system prompt, tool definitions, and model overhead.
+  google: 800_000,
+};
+
+/**
+ * Per-model context window sizes in tokens.
+ *
+ * Used by budget preflight to estimate whether a prompt fits within a model's
+ * context window. Values are conservative minimums — actual limits may be higher
+ * depending on the API tier or region.
+ *
+ * ~4 chars per token is the standard approximation for English prose.
+ */
+export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
+  // Google Gemini
+  "gemini-2.0-flash": 1_000_000,
+  "gemini-2.5-flash": 1_000_000,
+  "gemini-2.5-pro": 1_000_000,
+  // Claude
+  "claude-haiku-4-5": 200_000,
+  "claude-sonnet-4-6": 200_000,
+  "claude-opus-4-7": 200_000,
+  // Codex / OpenAI
+  "gpt-5.4-mini": 128_000,
+  "gpt-5.5": 200_000,
+};
+
+/**
+ * Per-model cost constants (USD per million tokens).
+ *
+ * Used by budget preflight to estimate request cost. Values are approximate
+ * public pricing as of mid-2026 and should be updated when vendors change rates.
+ */
+export const MODEL_COSTS: Readonly<
+  Record<string, { inputPerMToken: number; outputPerMToken: number }>
+> = {
+  // Google Gemini
+  "gemini-2.0-flash": { inputPerMToken: 0.10, outputPerMToken: 0.40 },
+  "gemini-2.5-flash": { inputPerMToken: 0.15, outputPerMToken: 0.60 },
+  "gemini-2.5-pro": { inputPerMToken: 1.25, outputPerMToken: 10.00 },
+  // Claude
+  "claude-haiku-4-5": { inputPerMToken: 0.80, outputPerMToken: 4.00 },
+  "claude-sonnet-4-6": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
+  "claude-opus-4-7": { inputPerMToken: 15.00, outputPerMToken: 75.00 },
+  // Codex / OpenAI
+  "gpt-5.4-mini": { inputPerMToken: 0.40, outputPerMToken: 1.60 },
+  "gpt-5.5": { inputPerMToken: 7.00, outputPerMToken: 21.00 },
 };
 
 /**
@@ -119,8 +190,9 @@ export function normalizeCodexModel(model: string): string {
  * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
- * - `'light'` — resolves to cheaper/faster models (haiku, gpt-5.4-mini)
- * - `'standard'` or omitted — resolves to full-capability models (sonnet, gpt-5)
+ * - `'light'` — cheaper/faster models (haiku, gemini-flash, gpt-5.4-mini)
+ * - `'standard'` or omitted — full-capability balanced models (sonnet, gemini-2.5-flash)
+ * - `'heavy'` — most capable models (opus, gemini-2.5-pro); always uses TIER_MODELS.heavy
  *
  * For the 'light' weight, if `lightModel` is configured, it takes precedence
  * over both `model` and `TIER_MODELS`. This allows users to customize which
@@ -129,7 +201,7 @@ export function normalizeCodexModel(model: string): string {
  * For Claude, the result is also passed through `resolveModel()` so that
  * shorthand aliases (e.g. "sonnet") are expanded to full API model IDs.
  *
- * @param vendor  The LLM vendor ("claude" | "codex").
+ * @param vendor  The LLM vendor ("claude" | "codex" | "google").
  * @param config  Optional `LLMConfig` loaded from `.n-dx.json`.
  * @param weight  Optional task weight for tier-based selection. Defaults to 'standard'.
  * @returns       A fully-qualified model string ready for use in API calls.
@@ -146,6 +218,10 @@ export function resolveVendorModel(
         return resolveModel(config.claude.lightModel);
       }
       return resolveModel(TIER_MODELS.claude.light);
+    }
+    if (weight === "heavy") {
+      // Heavy tier: always uses the most capable model; no config override path.
+      return resolveModel(TIER_MODELS.claude.heavy);
     }
     // Standard tier precedence: top-level llm.model > llm.claude.model > tier default.
     if (config?.model) {
@@ -164,6 +240,10 @@ export function resolveVendorModel(
       }
       return TIER_MODELS.codex.light;
     }
+    if (weight === "heavy") {
+      // Heavy tier: always uses the most capable model; no config override path.
+      return TIER_MODELS.codex.heavy;
+    }
     // Standard tier precedence: top-level llm.model > llm.codex.model > tier default.
     if (config?.model) {
       return normalizeCodexModel(config.model);
@@ -172,6 +252,26 @@ export function resolveVendorModel(
       return normalizeCodexModel(config.codex.model);
     }
     return TIER_MODELS.codex.standard;
+  }
+  if (vendor === "google") {
+    if (weight === "light") {
+      if (config?.google?.lightModel) {
+        return config.google.lightModel;
+      }
+      return TIER_MODELS.google.light;
+    }
+    if (weight === "heavy") {
+      // Heavy tier: always uses the most capable model; no config override path.
+      return TIER_MODELS.google.heavy;
+    }
+    // Standard tier precedence: top-level llm.model > llm.google.model > tier default.
+    if (config?.model) {
+      return config.model;
+    }
+    if (config?.google?.model) {
+      return config.google.model;
+    }
+    return TIER_MODELS.google.standard;
   }
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).

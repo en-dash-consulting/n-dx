@@ -4,7 +4,8 @@ level: "epic"
 title: "LLM Integration"
 status: "completed"
 startedAt: "2026-04-13T18:35:49.604Z"
-completedAt: "2026-04-14T20:10:12.757Z"
+completedAt: "2026-06-09T14:02:46.085Z"
+endedAt: "2026-06-09T14:02:46.085Z"
 description: "AI client infrastructure: vendor-neutral LLM foundation, token usage tracking and analytics, budget management, vendor support (Claude, Codex), onboarding and authentication.\n\n---\n\nAutomated recommendations from SourceVision analysis. 21 zone+category groups covering 25 total findings."
 ---
 
@@ -26,6 +27,10 @@ description: "AI client infrastructure: vendor-neutral LLM foundation, token usa
 | [Fix observation in polling (2 findings)](./fix-observation-in-polling-2-findings/index.md) | completed |
 | [Fix suggestion in token (1 finding)](./fix-suggestion-in-token-1-finding/index.md) | completed |
 | [Fix suggestion in web-2 (1 finding)](./fix-suggestion-in-web-2-1-finding/index.md) | completed |
+| [Google API Key Format Validation Bug Fix](./google-api-key-format-validation-bug-fix/index.md) | completed |
+| [Google Gemini LLM Client Adapter](./google-gemini-llm-client-adapter/index.md) | completed |
+| [Google Provider Init, Configuration, and Authentication](./google-provider-init-141728/index.md) | completed |
+| [Hench and Rex Integration with Google Provider](./hench-and-rex-integration-with-ae9b2c/index.md) | completed |
 | [Init-time LLM Onboarding and Authentication](./init-time-llm-onboarding-and-8eaa2e/index.md) | completed |
 | [LLM Client Circular Dependency Resolution](./llm-client-circular-dependency-9dc205/index.md) | completed |
 | [Memory-Aware Polling Loop Management](./memory-aware-polling-loop-management/index.md) | completed |
@@ -40,3 +45,4 @@ description: "AI client infrastructure: vendor-neutral LLM foundation, token usa
 | [Token Usage Attribution per PRD Item](./token-usage-attribution-per-prd-item/index.md) | completed |
 | [Token usage tracking and analytics](./token-usage-tracking-and-analytics/index.md) | completed |
 | [Unified Server Architecture: HTTP MCP and ndx start](./unified-server-architecture-e96db7/index.md) | completed |
+| [`ndx add` ignores configured Google/Gemini vendor and falls back to Claude](./ndx-add-ignores-configured-46d8b9.md) | completed |

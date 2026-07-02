@@ -25,6 +25,14 @@ import { detail } from "../../types/output.js";
 /** The sentinel file the agent writes its proposed commit message to. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
 
+/**
+ * Fallback poll interval. `fs.watch` is platform-dependent and can miss
+ * events (e.g. on macOS the FSEvents stream starts asynchronously, so a file
+ * written right after the watcher is created may produce no event). A cheap
+ * existsSync poll guarantees detection regardless of event delivery.
+ */
+const FALLBACK_POLL_INTERVAL_MS = 1000;
+
 export interface CommitMsgWatcher {
   /** Cancel the watcher and any pending timer. No-op if already cancelled. */
   cancel(): void;
@@ -64,8 +72,16 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   let cancelled = false;
   let timerArmed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
   let watcherClosed = false;
   let autoCommitted = false;
+
+  function stopPolling(): void {
+    if (pollTimer !== undefined) {
+      clearInterval(pollTimer);
+      pollTimer = undefined;
+    }
+  }
 
   function closeWatcher(): void {
     if (!watcherClosed) {
@@ -84,6 +100,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
       clearTimeout(timer);
       timer = undefined;
     }
+    stopPolling();
     closeWatcher();
   }
 
@@ -130,6 +147,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   function armTimerOnce(): void {
     if (timerArmed || cancelled || timeoutMs === 0) return;
     timerArmed = true;
+    stopPolling(); // file detected — the fallback poll has done its job
     timer = setTimeout(() => {
       timer = undefined;
       if (!cancelled) {
@@ -166,6 +184,13 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   // Prevent the watcher from keeping the process alive after the run ends.
   if (typeof watcher.unref === "function") {
     watcher.unref();
+  }
+
+  // Fallback poll in case fs.watch never delivers an event (see
+  // FALLBACK_POLL_INTERVAL_MS). Stopped as soon as the timer arms.
+  if (timeoutMs > 0 && !timerArmed) {
+    pollTimer = setInterval(checkFile, FALLBACK_POLL_INTERVAL_MS);
+    pollTimer.unref?.();
   }
 
   return {

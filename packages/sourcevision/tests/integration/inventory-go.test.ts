@@ -7,8 +7,11 @@ const GO_FIXTURE = join(import.meta.dirname, "../fixtures/go-project");
 
 describe("analyzeInventory — Go fixture project", () => {
   // Pre-resolve language config to avoid auto-detection picking up the
-  // monorepo's package.json instead of the fixture's go.mod.
-  const opts = { languageConfig: goConfig };
+  // monorepo's package.json instead of the fixture's go.mod. codeOnly:false so
+  // this suite can assert role classification of non-code files (go.mod,
+  // go.sum, .golangci.yml, testdata/*.json), which the default code-only walk
+  // would otherwise exclude from the inventory.
+  const opts = { languageConfig: goConfig, codeOnly: false };
 
   it("inventories the Go fixture without errors", async () => {
     const inv = await analyzeInventory(GO_FIXTURE, opts);

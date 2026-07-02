@@ -694,8 +694,14 @@ export async function analyzeImports(
   const prev = options?.previousImports;
   const changedFiles = options?.changedFiles;
   const fileSetChanged = options?.fileSetChanged ?? true;
+  // Opt-in guard (NDX_SV_SAFE_INCREMENTAL=1): fall back to a full re-analysis when a
+  // legacy/partial imports.json has non-array edges/external, instead of throwing
+  // "prev.external is not iterable" in buildIncrementalState. Default off keeps behavior
+  // byte-identical to today.
+  const safeIncremental = process.env.NDX_SV_SAFE_INCREMENTAL === "1";
+  const prevShapeOk = !safeIncremental || (Array.isArray(prev?.edges) && Array.isArray(prev?.external));
   // Incremental path: no adds/deletes, have previous, have change list
-  const canIncremental = prev && changedFiles && !fileSetChanged;
+  const canIncremental = prev && prevShapeOk && changedFiles && !fileSetChanged;
 
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();

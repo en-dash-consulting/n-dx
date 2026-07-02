@@ -42,6 +42,7 @@ import type { LLMConfig } from "./llm-types.js";
 import { createClient } from "./create-client.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
 import { createOpenAiApiProvider, resolveOpenAiApiKey } from "./openai-api-provider.js";
+import { createGoogleApiProvider, resolveGoogleApiKey } from "./google-api-provider.js";
 
 // ── Factory type ──────────────────────────────────────────────────────────
 
@@ -199,6 +200,11 @@ export function createDefaultRegistry(): ProviderRegistry {
       info,
       complete: (request) => client.complete(request),
     } satisfies LLMProvider;
+  });
+
+  // Google: API provider using the Gemini REST API.
+  registry.register("google", (config) => {
+    return createGoogleApiProvider({ googleConfig: config.google });
   });
 
   return registry;

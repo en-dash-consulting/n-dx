@@ -53,6 +53,26 @@ function defaultApiRateLimitOnRetry(attempt: number, maxAttempts: number, delayM
   process.stderr.write(`Rate limited — retry in ${countdown} (attempt ${attempt} of ${maxAttempts})\n`);
 }
 
+/**
+ * Build the error message thrown for an Anthropic SDK failure.
+ *
+ * The SDK's `.message` is often terse; the parsed response body hangs off
+ * `err.error.error.message` (shape `{ type: "error", error: { type, message } }`).
+ * Append that nested reason when it isn't already part of the message, so the
+ * SDK path surfaces the same provider detail the fetch-based providers do.
+ *
+ * Exported for unit testing.
+ */
+export function formatSdkError(err: unknown): string {
+  const base = (err as { message?: string } | null | undefined)?.message ?? "Unknown error";
+  const nested = (err as { error?: { error?: { message?: unknown } } } | null | undefined)?.error
+    ?.error?.message;
+  if (typeof nested === "string" && nested && !base.includes(nested)) {
+    return `${base}: ${nested}`;
+  }
+  return base;
+}
+
 /** Options specific to the API provider. */
 export interface ApiProviderOptions extends ClaudeClientOptions {
   /** Maximum number of retries for transient failures (default: 3). */
@@ -131,7 +151,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
           return false;
         }
         throw new ClaudeClientError(
-          (err as Error).message,
+          formatSdkError(err),
           "unknown",
           false,
         );
@@ -172,7 +192,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
           // Classify the error
           if (status === 401 || status === 403) {
             throw new ClaudeClientError(
-              (err as Error).message,
+              formatSdkError(err),
               "auth",
               false,
             );
@@ -180,7 +200,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
 
           if (status === 408 || (err as Error).message?.includes("timeout")) {
             throw new ClaudeClientError(
-              (err as Error).message,
+              formatSdkError(err),
               "timeout",
               true,
             );
@@ -210,7 +230,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
           if (status && RETRY_STATUS_CODES.has(status)) {
             const retryAfterMs = extractRetryAfterMs(err);
             throw new ClaudeClientError(
-              (err as Error).message,
+              formatSdkError(err),
               "rate-limit",
               true,
               retryAfterMs,
@@ -218,7 +238,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
           }
 
           throw new ClaudeClientError(
-            (err as Error).message,
+            formatSdkError(err),
             "unknown",
             false,
           );

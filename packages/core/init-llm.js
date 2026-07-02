@@ -20,10 +20,11 @@
 
 import { getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";
 
-const SUPPORTED_PROVIDERS = ["codex", "claude"];
+const SUPPORTED_PROVIDERS = ["codex", "claude", "google"];
 const LEGACY_CATALOG_MODEL_ALIASES = {
   codex: ["gpt-5-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"],
   claude: [],
+  google: [],
 };
 
 /**
@@ -35,6 +36,7 @@ const LEGACY_CATALOG_MODEL_ALIASES = {
 const PROVIDER_LABELS = {
   codex: "Codex (OpenAI)",
   claude: "Claude (Anthropic)",
+  google: "Gemini (Google)",
 };
 
 /**
@@ -308,10 +310,12 @@ export async function promptLLMSelection(resolution, options = {}) {
  * @param {string} [flags.model]         --model= value
  * @param {string} [flags.claudeModel]   --claude-model= value
  * @param {string} [flags.codexModel]    --codex-model= value
+ * @param {string} [flags.googleModel]   --google-model= value
+ * @param {string} [flags.googleLightModel]  --google-light-model= value
  *
  * @returns {{ errors: string[], warnings: string[] }}
  */
-export function validateInitFlags({ provider, model, claudeModel, codexModel }) {
+export function validateInitFlags({ provider, model, claudeModel, codexModel, googleModel, googleLightModel }) {
   const errors = [];
   const warnings = [];
   const isKnownModel = (vendor, value) => {
@@ -330,10 +334,13 @@ export function validateInitFlags({ provider, model, claudeModel, codexModel }) 
   if (codexModel && model) {
     errors.push("Cannot set both --codex-model and --model. Use one or the other.");
   }
+  if (googleModel && model) {
+    errors.push("Cannot set both --google-model and --model. Use one or the other.");
+  }
 
   // Note: --claude-model + --codex-model is valid (configure both vendors).
   // Note: --provider=codex + --claude-model is valid (set active vendor to codex,
-  //        configure claude model independently). Same for --provider=claude + --codex-model.
+  //        configure claude model independently). Same for cross-vendor combinations.
 
   // ── Unknown model warnings ─────────────────────────────────────────────
 
@@ -359,9 +366,29 @@ export function validateInitFlags({ provider, model, claudeModel, codexModel }) 
       }
     }
 
+    if (googleModel) {
+      const catalog = getModelsForVendor("google");
+      if (catalog && !isKnownModel("google", googleModel)) {
+        warnings.push(
+          `Unknown model "${googleModel}" for google. ` +
+          `Known models: ${catalog.map((m) => m.id).join(", ")}. Proceeding anyway.`,
+        );
+      }
+    }
+
+    if (googleLightModel) {
+      const catalog = getModelsForVendor("google");
+      if (catalog && !isKnownModel("google", googleLightModel)) {
+        warnings.push(
+          `Unknown light model "${googleLightModel}" for google. ` +
+          `Known models: ${catalog.map((m) => m.id).join(", ")}. Proceeding anyway.`,
+        );
+      }
+    }
+
     // Check --model against the effective provider (flag or implied).
     if (model) {
-      const effectiveProvider = provider || (claudeModel ? "claude" : codexModel ? "codex" : undefined);
+      const effectiveProvider = provider || (claudeModel ? "claude" : codexModel ? "codex" : googleModel ? "google" : undefined);
       if (effectiveProvider) {
         const catalog = getModelsForVendor(effectiveProvider);
         if (catalog && !isKnownModel(effectiveProvider, model)) {

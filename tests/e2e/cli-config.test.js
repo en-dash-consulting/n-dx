@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const isWin = process.platform === "win32";
 
@@ -1044,6 +1044,69 @@ describe("n-dx config", () => {
     });
   });
 
+  // ── --soft-preflight (ndx init persist-and-warn behavior) ─────────────────
+  //
+  // `ndx init` writes llm.vendor with --soft-preflight so that selecting a vendor
+  // whose auth is not yet configured (e.g. Gemini before GEMINI_API_KEY is set)
+  // still persists the choice and applies to all later commands, surfacing a
+  // visible warning instead of silently aborting (and silently falling back to
+  // the Claude default at use time). Regression guard for that exact bug.
+
+  describe("llm.vendor --soft-preflight (init persist + warn)", () => {
+    /** Spawn `config` capturing stdout/stderr/status (success doesn't throw). */
+    function runCapture(args, env) {
+      const res = spawnSync("node", [CLI_PATH, "config", ...args], {
+        encoding: "utf-8",
+        timeout: 10000,
+        env: env ?? process.env,
+      });
+      return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
+    }
+
+    // No GEMINI_API_KEY → runGoogleApiPreflight returns NO_KEY offline (no HTTP).
+    const noKeyEnv = () => ({ ...process.env, GEMINI_API_KEY: "" });
+
+    it("persists vendor=google and warns when the Gemini preflight fails, without aborting", async () => {
+      const { stdout, stderr, status } = runCapture(
+        ["llm.vendor", "google", tmpDir, "--soft-preflight"],
+        noKeyEnv(),
+      );
+
+      // Soft mode does not abort.
+      expect(status).toBe(0);
+      // The failure detail + remediation are still surfaced (never swallowed)...
+      expect(stderr).toContain('Provider auth preflight failed for "google"');
+      expect(stderr).toContain("GEMINI_API_KEY");
+      // ...followed by a clear "proceeding anyway" notice.
+      expect(stderr).toContain("Proceeding anyway");
+      expect(stdout).toContain("llm.vendor = google");
+
+      // The vendor IS persisted, so later commands use Gemini (not the Claude default).
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.vendor).toBe("google");
+    });
+
+    it("without --soft-preflight, the same failure aborts and writes nothing (manual-use path)", async () => {
+      const { stderr, status } = runCapture(
+        ["llm.vendor", "google", tmpDir],
+        noKeyEnv(),
+      );
+
+      expect(status).toBe(1);
+      expect(stderr).toContain('Provider auth preflight failed for "google"');
+      await expect(readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8")).rejects.toThrow(/ENOENT/);
+    });
+
+    it("persists the configured Gemini model alongside the soft-preflighted vendor", async () => {
+      runCapture(["llm.vendor", "google", tmpDir, "--soft-preflight"], noKeyEnv());
+      run(["llm.google.model", "gemini-2.5-pro", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.vendor).toBe("google");
+      expect(config.llm.google.model).toBe("gemini-2.5-pro");
+    });
+  });
+
   // ── LLM autoFailover config ────────────────────────────────────────────────
 
   describe("llm.autoFailover config", () => {
@@ -1110,6 +1173,90 @@ describe("n-dx config", () => {
       const out = run([tmpDir]);
       expect(out).toContain("autoFailover");
       expect(out).toContain("true");
+    });
+  });
+
+  // ── Google API key config ──────────────────────────────────────────────────
+
+  describe("llm.google.api_key config", () => {
+    // Regression guard: ensure format validation accepts and rejects the right keys.
+    // The canonical Google AI Studio key format starts with "AIza" and is >= 30 chars.
+    // Validation path: ndx config llm.google.api_key → validateGoogleApiKey in config.js.
+
+    it("accepts a valid 39-char AIza... key", async () => {
+      // Real Google AI Studio key format: AIzaSy + 33 alphanumeric chars = 39 total
+      const key = "AIzaSyDdI0hATkDExampleKey1234567890X";
+      const out = run(["llm.google.api_key", key, tmpDir]);
+      expect(out).toContain(`llm.google.api_key = ${key}`);
+
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.google.api_key).toBe(key);
+    });
+
+    it("accepts a 30-char minimum-length AIza... key", async () => {
+      const key = "AIzaShortestValidKey1234567890";
+      expect(key.length).toBe(30);
+      const out = run(["llm.google.api_key", key, tmpDir]);
+      expect(out).toContain(`llm.google.api_key = ${key}`);
+    });
+
+    it("rejects a key that does not start with AIza", () => {
+      const stderr = runFail(["llm.google.api_key", "sk-ant-api03-not-google-12345678901234567890", tmpDir]);
+      expect(stderr).toContain("Invalid API key format");
+      expect(stderr).toContain("AIza");
+    });
+
+    it("rejects a key shorter than 30 characters", () => {
+      const shortKey = "AIzaSyShort12345678"; // < 30 chars
+      expect(shortKey.length).toBeLessThan(30);
+      const stderr = runFail(["llm.google.api_key", shortKey, tmpDir]);
+      expect(stderr).toContain("Invalid API key format");
+      expect(stderr).toContain("30 characters");
+    });
+
+    it("rejects a key with no recognizable prefix", () => {
+      const stderr = runFail(["llm.google.api_key", "notakeyatall", tmpDir]);
+      expect(stderr).toContain("Invalid API key format");
+    });
+
+    it("accepts the key with --force even if it fails format validation", () => {
+      const out = run(["llm.google.api_key", "custom-non-standard-key", "--force", tmpDir]);
+      expect(out).toContain("llm.google.api_key = custom-non-standard-key");
+    });
+
+    it("provides hint to https://aistudio.google.com/apikey on rejection", () => {
+      const stderr = runFail(["llm.google.api_key", "bad-key", tmpDir]);
+      expect(stderr).toContain("aistudio.google.com");
+    });
+
+    it("provides hint to use --force on validation failure", () => {
+      const stderr = runFail(["llm.google.api_key", "bad-key", tmpDir]);
+      expect(stderr).toContain("--force");
+    });
+
+    it("stores key in .n-dx.json under llm.google.api_key", async () => {
+      const key = "AIzaSyValidKey1234567890ABCDEF1234567";
+      run(["llm.google.api_key", key, tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.google.api_key).toBe(key);
+    });
+
+    it("preserves other llm config when setting the api key", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "google", google: { model: "gemini-2.5-pro" } } }, null, 2) + "\n",
+      );
+      const key = "AIzaSyValidKey1234567890ABCDEF1234567";
+      run(["llm.google.api_key", key, tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.google.api_key).toBe(key);
+      expect(config.llm.google.model).toBe("gemini-2.5-pro");
+      expect(config.llm.vendor).toBe("google");
+    });
+
+    it("documents llm.google.api_key in --help output", () => {
+      const out = run(["--help"]);
+      expect(out).toContain("llm.google.api_key");
     });
   });
 

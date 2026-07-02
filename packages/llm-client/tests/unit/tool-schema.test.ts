@@ -12,6 +12,8 @@ import {
   toAnthropicToolDefs,
   toOpenAiToolDef,
   toOpenAiToolDefs,
+  toGeminiFunctionDeclaration,
+  toGeminiFunctionDeclarations,
 } from "../../src/tool-schema.js";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
@@ -335,6 +337,107 @@ describe("toOpenAiToolDefs", () => {
 
   it("returns an empty array for empty input", () => {
     expect(toOpenAiToolDefs([])).toEqual([]);
+  });
+});
+
+// ── toGeminiFunctionDeclaration ──────────────────────────────────────────
+
+const EMPTY_PARAMS_TOOL: ToolDefinition = {
+  name: "no_args",
+  description: "A tool with no parameters.",
+  inputSchema: {
+    type: "object",
+    properties: {},
+    required: [],
+  },
+};
+
+describe("toGeminiFunctionDeclaration", () => {
+  it("compiles a simple tool definition with uppercased types", () => {
+    const result = toGeminiFunctionDeclaration(SIMPLE_TOOL);
+
+    expect(result.name).toBe("read_file");
+    expect(result.description).toBe("Read the contents of a file.");
+    expect(result.parameters.type).toBe("OBJECT");
+    expect(result.parameters.properties).toEqual({
+      path: { type: "STRING", description: "File path" },
+    });
+    expect(result.parameters.required).toEqual(["path"]);
+  });
+
+  it("uses parameters key (Gemini convention, not input_schema)", () => {
+    const result = toGeminiFunctionDeclaration(SIMPLE_TOOL);
+    expect("parameters" in result).toBe(true);
+    expect("input_schema" in result).toBe(false);
+  });
+
+  it("uppercases all primitive types", () => {
+    const result = toGeminiFunctionDeclaration(OPTIONAL_PARAMS_TOOL);
+    const props = result.parameters.properties!;
+    expect(props.command.type).toBe("STRING");
+    expect(props.timeout.type).toBe("NUMBER");
+  });
+
+  it("uppercases boolean types", () => {
+    const result = toGeminiFunctionDeclaration(BOOLEAN_PARAM_TOOL);
+    expect(result.parameters.properties!.recursive.type).toBe("BOOLEAN");
+  });
+
+  it("preserves enum constraints", () => {
+    const result = toGeminiFunctionDeclaration(ENUM_TOOL);
+    expect(result.parameters.properties!.status.enum).toEqual([
+      "pending", "in_progress", "completed",
+    ]);
+  });
+
+  it("uppercases nested object property types", () => {
+    const result = toGeminiFunctionDeclaration(NESTED_OBJECT_TOOL);
+    const options = result.parameters.properties!.options;
+    expect(options.type).toBe("OBJECT");
+    expect(options.properties!.verbose.type).toBe("BOOLEAN");
+    expect(options.properties!.level.type).toBe("STRING");
+    expect(options.properties!.level.enum).toEqual(["debug", "info", "warn"]);
+    expect(options.required).toEqual(["verbose"]);
+  });
+
+  it("uppercases array item types", () => {
+    const result = toGeminiFunctionDeclaration(ARRAY_PARAM_TOOL);
+    const tags = result.parameters.properties!.tags;
+    expect(tags.type).toBe("ARRAY");
+    expect(tags.items?.type).toBe("STRING");
+  });
+
+  it("omits the required array when there are no required params", () => {
+    const result = toGeminiFunctionDeclaration(EMPTY_PARAMS_TOOL);
+    expect(result.parameters.type).toBe("OBJECT");
+    expect(result.parameters.properties).toEqual({});
+    expect(result.parameters.required).toBeUndefined();
+  });
+
+  it("does not emit JSON Schema keywords Gemini rejects (additionalProperties)", () => {
+    const result = toGeminiFunctionDeclaration(NESTED_OBJECT_TOOL);
+    const json = JSON.stringify(result);
+    expect(json).not.toContain("additionalProperties");
+    expect(json).not.toContain("$schema");
+  });
+
+  it("does not mutate the original tool definition", () => {
+    const result = toGeminiFunctionDeclaration(ENUM_TOOL);
+    result.parameters.properties!.status.description = "changed";
+    expect(ENUM_TOOL.inputSchema.properties.status.description).toBe("New status");
+  });
+});
+
+describe("toGeminiFunctionDeclarations", () => {
+  it("compiles an array of tool definitions", () => {
+    const results = toGeminiFunctionDeclarations([SIMPLE_TOOL, ENUM_TOOL]);
+    expect(results).toHaveLength(2);
+    expect(results[0].name).toBe("read_file");
+    expect(results[1].name).toBe("update_status");
+  });
+
+  it("returns an empty array for empty input", () => {
+    expect(toGeminiFunctionDeclarations([])).toEqual([]);
   });
 });
 

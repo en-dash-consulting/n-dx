@@ -81,7 +81,9 @@ export function printVendorModelHeader(
     ? config?.claude?.model
     : vendor === "codex"
       ? config?.codex?.model
-      : undefined;
+      : vendor === "google"
+        ? config?.google?.model
+        : undefined;
   const configuredFrom: "top-level" | "vendor-pinned" | undefined = config?.model
     ? "top-level"
     : vendorPinnedModel

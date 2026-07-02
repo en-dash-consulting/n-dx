@@ -127,6 +127,8 @@ export {
   resolveModel,
   resolveVendorModel,
   NEWEST_MODELS,
+  TIER_MODELS,
+  GOOGLE_MODELS,
   VENDOR_CONTEXT_CHAR_LIMITS,
   isModelCompatibleWithVendor,
   resetStaleModel,
@@ -164,6 +166,8 @@ export {
   toAnthropicToolDefs,
   toOpenAiToolDef,
   toOpenAiToolDefs,
+  toGeminiFunctionDeclaration,
+  toGeminiFunctionDeclarations,
 } from "@n-dx/llm-client";
 
 // ---- Provider registry ------------------------------------------------------
@@ -176,7 +180,15 @@ export {
 export type {
   LLMProvider,
   ProviderInfo,
+  GeminiToolProvider,
+  GeminiContent,
+  GeminiPart,
+  GeminiToolBlock,
+  GeminiGenerateResult,
+  GenerateContentWithToolsArgs,
 } from "@n-dx/llm-client";
+
+export type { GoogleConfig } from "@n-dx/llm-client";
 
 export type {
   ClaudeConfig,
@@ -205,4 +217,6 @@ export type {
   ToolPropertySchema,
   AnthropicToolDef,
   OpenAiToolDef,
+  GeminiFunctionDeclaration,
+  GeminiSchema,
 } from "@n-dx/llm-client";

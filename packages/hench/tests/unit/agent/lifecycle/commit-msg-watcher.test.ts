@@ -26,6 +26,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Poll until `condition()` is true or `deadlineMs` elapses. Fixed sleeps are
+ * flaky under full-suite load, so tests poll for the observable outcome.
+ */
+async function waitFor(condition: () => boolean, deadlineMs = 5000): Promise<void> {
+  const start = Date.now();
+  while (!condition() && Date.now() - start < deadlineMs) {
+    await sleep(25);
+  }
+}
+
 async function setupGitRepo(dir: string): Promise<void> {
   await execAsync("git init", { cwd: dir });
   await execAsync("git config user.email test@test.com", { cwd: dir });
@@ -66,7 +77,8 @@ describe("startCommitMsgWatcher — timeout handler branches", () => {
 
     const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 100 });
 
-    await sleep(300); // wait past timer
+    // At expiry the watcher deletes the empty sentinel
+    await waitFor(() => !existsSync(msgPath));
     watcher.cancel();
 
     // File must be gone — no partial state on disk.
@@ -85,7 +97,7 @@ describe("startCommitMsgWatcher — timeout handler branches", () => {
 
     const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 100 });
 
-    await sleep(300);
+    await waitFor(() => !existsSync(msgPath));
     watcher.cancel();
 
     expect(existsSync(msgPath)).toBe(false);
@@ -107,7 +119,8 @@ describe("startCommitMsgWatcher — timeout handler branches", () => {
 
     const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 100 });
 
-    await sleep(300);
+    // Wait for the timer to fire and the commit subprocess to complete
+    await waitFor(() => watcher.didAutoCommit());
     watcher.cancel();
 
     // The commit must exist and the file must be gone.

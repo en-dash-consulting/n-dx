@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -56,6 +56,21 @@ function runFail(args, opts = {}) {
       status: err.status,
     };
   }
+}
+
+/**
+ * Run init capturing stdout/stderr/status without throwing on non-zero exit.
+ * Needed to inspect stderr on a successful exit (e.g. the soft-preflight warning
+ * init emits while still persisting the vendor and exiting 0).
+ */
+function runCapture(args, opts = {}) {
+  const res = spawnSync("node", [CLI_PATH, ...args], {
+    encoding: "utf-8",
+    timeout: 20000,
+    stdio: "pipe",
+    ...opts,
+  });
+  return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
 }
 
 describe("n-dx init provider selection", () => {
@@ -199,19 +214,25 @@ describe("n-dx init provider selection", () => {
       }
     });
 
-    it("prompts codex login command when codex auth is missing", async () => {
+    it("warns but still persists vendor when codex auth is missing (soft preflight)", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-codex-fail-"));
       try {
         await writeFakeBinary(join(binDir, "codex"), { stderrLine: "not logged in", exitCode: 7 });
 
-        const result = runFail(
-          ["init", "--provider=codex", tmpDir],
+        const result = runCapture(
+          ["init", "--provider=codex", "--no-claude", tmpDir],
           { env: pathEnvWith(binDir) },
         );
 
-        expect(result.status).not.toBe(0);
+        // init no longer aborts: the chosen vendor is persisted and applies to
+        // all later commands; the auth problem is surfaced as a visible warning.
+        expect(result.status).toBe(0);
         expect(result.stderr).toContain("Provider auth preflight failed for \"codex\"");
         expect(result.stderr).toContain("Next step: run 'codex login'");
+        expect(result.stderr).toContain("Proceeding anyway");
+
+        const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("codex");
       } finally {
         await rm(binDir, { recursive: true, force: true });
       }
@@ -235,21 +256,126 @@ describe("n-dx init provider selection", () => {
       }
     });
 
-    it("prompts claude login command when claude auth is missing", async () => {
+    it("warns but still persists vendor when claude auth is missing (soft preflight)", async () => {
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-claude-fail-"));
       try {
         await writeFakeBinary(join(binDir, "claude"), { stderrLine: "please login", exitCode: 9 });
 
-        const result = runFail(
+        const result = runCapture(
           ["init", "--provider=claude", tmpDir],
           { env: pathEnvWith(binDir) },
         );
 
-        expect(result.status).not.toBe(0);
+        expect(result.status).toBe(0);
         expect(result.stderr).toContain("Provider auth preflight failed for \"claude\"");
         expect(result.stderr).toContain("Next step: run 'claude login'");
+        expect(result.stderr).toContain("Proceeding anyway");
+
+        const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("claude");
       } finally {
         await rm(binDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("google provider init", () => {
+    /**
+     * Google preflight uses the Gemini API HTTP call rather than a CLI binary.
+     *
+     * Happy-path tests set NDX_TEST_GOOGLE_PREFLIGHT=ok (test bypass that skips
+     * the live HTTP call) and a format-valid GEMINI_API_KEY.  Missing-key tests
+     * omit both so the preflight returns a key-not-found error before any HTTP.
+     */
+    function pathEnvWith(...dirs) {
+      return {
+        ...process.env,
+        PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
+        // Suppress accidental real HTTP calls in CI by default (overridden per test)
+        GEMINI_API_KEY: undefined,
+        NDX_TEST_GOOGLE_PREFLIGHT: undefined,
+      };
+    }
+
+    it("completes google init and persists vendor to config (happy path)", async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-ok-"));
+      try {
+        run(["init", "--provider=google", "--no-claude", projectDir], {
+          env: {
+            ...pathEnvWith(),
+            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+          },
+        });
+        const ndxConfig = JSON.parse(await readFile(join(projectDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("google");
+      } finally {
+        await rm(projectDir, { recursive: true, force: true });
+      }
+    });
+
+    it("shows google in LLM configuration summary after init", async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-summary-"));
+      try {
+        const output = run(["init", "--provider=google", "--no-claude", projectDir], {
+          env: {
+            ...pathEnvWith(),
+            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+          },
+        });
+        expect(output).toContain("LLM configuration");
+        expect(output).toMatch(/Provider\s+google/);
+      } finally {
+        await rm(projectDir, { recursive: true, force: true });
+      }
+    });
+
+    it("warns with an actionable message but still persists google when GEMINI_API_KEY is absent", async () => {
+      const result = runCapture(["init", "--provider=google", "--no-claude", tmpDir], {
+        env: {
+          ...pathEnvWith(),
+          // Explicitly strip the key and bypass flag so preflight runs for real
+          GEMINI_API_KEY: undefined,
+          NDX_TEST_GOOGLE_PREFLIGHT: undefined,
+        },
+      });
+      // init persists the chosen vendor (so `ndx add`/`work` use Gemini and the
+      // auth error surfaces clearly at use time) and emits a visible warning
+      // instead of silently aborting and reverting to the Claude default.
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain("Provider auth preflight failed for \"google\"");
+      expect(result.stderr).toContain("NDX_GOOGLE_PREFLIGHT_NO_KEY");
+      expect(result.stderr).toContain("aistudio.google.com/apikey");
+      expect(result.stderr).toContain("Proceeding anyway");
+
+      const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(ndxConfig.llm.vendor).toBe("google");
+    });
+
+    it("skips provider re-prompt when existing config already has google vendor (idempotency)", async () => {
+      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-reuse-"));
+      try {
+        // First init
+        run(["init", "--provider=google", "--no-claude", projectDir], {
+          env: {
+            ...pathEnvWith(),
+            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+          },
+        });
+        // Second init — no --provider flag; should re-use existing config
+        run(["init", "--no-claude", projectDir], {
+          env: {
+            ...pathEnvWith(),
+            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+          },
+        });
+        const ndxConfig = JSON.parse(await readFile(join(projectDir, ".n-dx.json"), "utf-8"));
+        expect(ndxConfig.llm.vendor).toBe("google");
+      } finally {
+        await rm(projectDir, { recursive: true, force: true });
       }
     });
   });
@@ -366,6 +492,10 @@ describe("claude CLI discovery diagnostics", () => {
       "/usr/local/bin/claude",
       "/opt/homebrew/bin/claude",
       join(homedir(), ".npm-global", "bin", "claude"),
+      // npm -g installs under the active node prefix sit next to the node
+      // binary itself — and the stripped test PATH still includes that dir,
+      // so claude would be discoverable and the "no claude" scenario invalid.
+      join(dirname(process.execPath), "claude"),
     ];
     return commonPaths.some((p) => existsSync(p));
   }
@@ -380,12 +510,13 @@ describe("claude CLI discovery diagnostics", () => {
       // Include node's own bin dir so subprocesses can find node, but nothing else
       const nodeBinDir = dirname(process.execPath);
 
-      // init no longer hard-fails when the claude CLI binary is missing: it
-      // provisions the file-based Claude surface (CLAUDE.md, skills, permissions)
-      // best-effort and only the MCP registration that needs the binary is
-      // skipped. `run` throws on a non-zero exit, so reaching the assertions
-      // proves init exited 0.
-      const stdout = run(["init", "--provider=codex", tmpDir], {
+      // This runs a FULL init (the claude-discovery failure only surfaces in
+      // the end-of-run summary), which can exceed the default 20s exec budget
+      // under full-suite load — give it extra headroom. init provisions the
+      // Claude surface best-effort and exits 0 even with the CLI absent, so
+      // capture the result rather than expecting a non-zero exit.
+      const result = runCapture(["init", "--provider=codex", tmpDir], {
+        timeout: 50_000,
         env: {
           ...envWithout,
           PATH: `${binDir}${PATH_SEP}${nodeBinDir}`,
@@ -393,15 +524,16 @@ describe("claude CLI discovery diagnostics", () => {
         },
       });
 
+      expect(result.status).toBe(0);
       // Claude file surface is still written even with the CLI absent.
       expect(existsSync(join(tmpDir, "CLAUDE.md"))).toBe(true);
-      expect(stdout).toContain("CLAUDE.md");
+      expect(result.stdout).toContain("CLAUDE.md");
       // The removed hard-fail diagnostic must not resurface.
-      expect(stdout).not.toContain("claude CLI not found");
+      expect(result.stdout).not.toContain("claude CLI not found");
     } finally {
       await rm(binDir, { recursive: true, force: true });
     }
-  });
+  }, 60_000);
 
   // Skipped: feature branch's setupAssistantIntegrations is designed so that
   // failure in one vendor (Claude) does not block another (Codex). When

@@ -85,6 +85,7 @@ vi.mock("../../src/analyze/reconcile.js", () => ({
   })),
 }));
 
+import { TIER_MODELS } from "@n-dx/llm-client";
 import { cmdAnalyze } from "../../src/cli/commands/analyze.js";
 
 describe("vendor-scoped model selection in rex analyze", () => {
@@ -148,5 +149,22 @@ describe("vendor-scoped model selection in rex analyze", () => {
     });
 
     expect(model).toMatch(/^claude-/i);
+  });
+
+  it("uses a Gemini model when vendor=google", async () => {
+    const model = await runAnalyzeWithConfig({
+      llm: { vendor: "google", google: { model: "gemini-2.0-flash" } },
+    });
+
+    expect(model).toMatch(/^gemini-/i);
+    expect(model).toBe("gemini-2.0-flash");
+  });
+
+  it("uses the standard-tier Gemini model when vendor=google and no model configured", async () => {
+    const model = await runAnalyzeWithConfig({
+      llm: { vendor: "google" },
+    });
+
+    expect(model).toBe(TIER_MODELS.google.standard);
   });
 });
