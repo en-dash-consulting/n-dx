@@ -1,5 +1,18 @@
 # @n-dx/sourcevision
 
+## 0.4.6
+
+### Patch Changes
+
+- [#243](https://github.com/en-dash-consulting/n-dx/pull/243) [`925d9a8`](https://github.com/en-dash-consulting/n-dx/commit/925d9a846e35ca8cbd98084ff5aa0152bc486f99) Thanks [@dnaniel](https://github.com/dnaniel)! - Keep the zone structure when LLM enrichment fails. Previously, when every enrichment batch failed (e.g. the model timed out), the pass returned only the templated build/asset/docs/config zones and silently dropped the un-enriched code zones — collapsing the analysis to a handful of structural zones with zero cross-zone crossings, despite logging "using algorithmic names". Now a failed pass falls back to the algorithmic Louvain names for the un-enriched code zones (merged with unchanged and templated zones), so a transient LLM outage costs only AI-polished names, not the zone graph or its crossings.
+
+- [#239](https://github.com/en-dash-consulting/n-dx/pull/239) [`b9570fd`](https://github.com/en-dash-consulting/n-dx/commit/b9570fd2d7528c6e315f1a1fc6b3aa33e8537da2) Thanks [@endash-shal](https://github.com/endash-shal)! - Added Google integration
+
+- [#243](https://github.com/en-dash-consulting/n-dx/pull/243) [`925d9a8`](https://github.com/en-dash-consulting/n-dx/commit/925d9a846e35ca8cbd98084ff5aa0152bc486f99) Thanks [@dnaniel](https://github.com/dnaniel)! - Fix stale zone-partition cache surviving a sourcevision upgrade. `analyzeZones` reuses a cached partition when the input fingerprint is unchanged, but the fingerprint omitted the partitioning-algorithm version — so after an upgrade that changes how files are grouped, projects with unchanged files kept serving the old algorithm's zones (surfacing as, e.g., an empty codebase map). A new `ZONE_ALGORITHM_VERSION` is folded into the fingerprint and bumped, so the next `analyze` recomputes instead of reusing a stale partition — no manual `.sourcevision` deletion or zone pins required.
+
+- Updated dependencies [[`925d9a8`](https://github.com/en-dash-consulting/n-dx/commit/925d9a846e35ca8cbd98084ff5aa0152bc486f99), [`579d831`](https://github.com/en-dash-consulting/n-dx/commit/579d831018b949938f6ad18a0a637315a2b9b352), [`545d611`](https://github.com/en-dash-consulting/n-dx/commit/545d611c9a47a372ada5e9b65f2a48d034d37482), [`b9570fd`](https://github.com/en-dash-consulting/n-dx/commit/b9570fd2d7528c6e315f1a1fc6b3aa33e8537da2)]:
+  - @n-dx/llm-client@0.4.6
+
 ## 0.4.5
 
 ### Patch Changes
