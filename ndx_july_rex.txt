@@ -1,0 +1,274 @@
+Product Backlog Draft: N-DX Product
+Epic: Product Usability, Reliability, and Work Tracking
+Item NDX-001: Windows Install Reliability
+
+Type: Bug / Story
+Priority: Suggested P0
+Status: Draft
+
+Description:
+Improve the Windows installation and setup experience so users can reliably install and begin using N-DX.
+
+User Story:
+As a Windows user, I want a reliable installation experience, so that I can successfully start using N-DX without troubleshooting setup failures.
+
+Acceptance Criteria:
+
+Given a Windows user follows the recommended install path, when installation completes, then N-DX is available and runnable.
+Given installation prerequisites are missing, when setup is attempted, then the user receives clear guidance.
+Given installation fails, when an error is shown, then it provides enough information to recover or report the issue.
+
+Notes:
+The supported path should be whichever approach is most reliable and effective after validation. Windows reliability is important because many target enterprise users are expected to be on Windows machines.
+
+Item NDX-002: Recommended Install Path Validation
+
+Type: Spike
+Priority: Suggested P0
+Status: Draft
+
+Description:
+Determine the most reliable and effective installation path for N-DX across expected user environments.
+
+User Story:
+As a product team, we want to validate the most reliable install path, so that users receive clear setup guidance based on tested behavior rather than assumptions.
+
+Acceptance Criteria:
+
+Given the available install options are reviewed, when validation is complete, then one preferred install path is recommended.
+Given the preferred path is identified, when documentation is updated, then users can follow one clear setup flow.
+Given alternate install paths exist, when they are documented, then they are clearly marked as secondary, experimental, or unsupported.
+
+Notes:
+The team has not yet confirmed the best supported install method.
+
+Item NDX-003: Windows CLI Spawn and Execution Fixes
+
+Type: Bug
+Priority: Suggested P0
+Status: Draft
+
+Description:
+Fix Windows-specific CLI execution issues that prevent N-DX from running reliably after installation.
+
+User Story:
+As a Windows user, I want CLI execution to work reliably, so that N-DX commands run successfully in my environment.
+
+Acceptance Criteria:
+
+Given N-DX is installed on Windows, when a supported command is run, then the command executes without platform-specific spawn failures.
+Given a command cannot execute, when the failure occurs, then the error message identifies the command and cause.
+Given Windows-specific handling is required, when commands are launched, then the implementation uses compatible process execution behavior.
+
+Notes:
+This item may overlap with broader Windows install reliability but should remain independently trackable.
+
+Item NDX-004: Codex Workflow Support
+
+Type: Bug / Story
+Priority: Suggested P0
+Status: Draft
+
+Description:
+Improve Codex support so N-DX is usable with Codex workflows.
+
+User Story:
+As an N-DX user working with Codex, I want Codex workflows to function properly, so that N-DX supports the toolchain it claims or intends to support.
+
+Acceptance Criteria:
+
+Given a user configures N-DX for Codex usage, when a supported Codex workflow is executed, then the workflow completes successfully.
+Given Codex support is incomplete or unavailable, when the user attempts to use it, then the limitation is clearly surfaced.
+Given Codex-related failures occur, when errors are displayed, then the user receives actionable information.
+
+Notes:
+Codex is considered largely unusable with N-DX today, making this a P0 usability blocker.
+
+Item NDX-005: Authentication State Checker
+
+Type: Bug / Story
+Priority: Suggested P0
+Status: Draft
+
+Description:
+Detect authentication/session loss before commands continue and cause cascading failures.
+
+User Story:
+As an N-DX user, I want authentication problems detected early, so that commands fail clearly instead of triggering cascading errors.
+
+Acceptance Criteria:
+
+Given a user runs an N-DX command, when authentication is invalid or expired, then the system detects the issue before continuing.
+Given authentication has failed, when the user receives an error, then the message explains how to re-authenticate.
+Given authentication is valid, when commands are run, then execution proceeds normally.
+
+Notes:
+The transcript described session/auth loss causing downstream failures.
+
+Item NDX-006: Front-End Action Fixes
+
+Type: Bug
+Priority: Suggested P1
+Status: Draft
+
+Description:
+Fix front-end actions that do not reliably execute expected N-DX operations.
+
+User Story:
+As an N-DX user, I want front-end action buttons to work correctly, so that I can run supported actions from the UI.
+
+Acceptance Criteria:
+
+Given a user selects a supported front-end action, when the action is triggered, then the expected operation starts.
+Given an action fails, when the error is displayed, then the user can understand what went wrong.
+Given an action is unavailable or unsupported, when the UI is displayed, then the control is disabled or clearly labeled.
+
+Notes:
+Examples discussed included actions such as recommend, plan, or related UI commands, but exact failing actions need validation.
+
+Item NDX-007: Source Vision Vendor Artifact Exclusion
+
+Type: Bug
+Priority: Suggested P1
+Status: Draft
+
+Description:
+Prevent vendor artifacts from being scanned or classified as source logic in Source Vision.
+
+User Story:
+As an N-DX user, I want vendor artifacts excluded from Source Vision analysis, so that generated insights focus on relevant source code.
+
+Acceptance Criteria:
+
+Given a repository includes vendor artifacts, when Source Vision scans the project, then vendor artifacts are excluded from source logic classification.
+Given excluded artifacts are detected, when scan results are generated, then they do not inflate or distort source analysis.
+Given exclusion rules are applied, when the scan completes, then relevant source files remain included.
+
+Notes:
+This item may align with broader Source Vision classification cleanup.
+
+Item NDX-008: Source Vision Build and Config Artifact Classification
+
+Type: Bug
+Priority: Suggested P1
+Status: Draft
+
+Description:
+Improve Source Vision classification so build and configuration artifacts are not incorrectly treated as core source logic.
+
+User Story:
+As an N-DX user, I want Source Vision to classify build and configuration artifacts correctly, so that analysis results are accurate and useful.
+
+Acceptance Criteria:
+
+Given a repository includes build or configuration artifacts, when Source Vision scans the project, then those artifacts are classified appropriately.
+Given artifacts are not core source logic, when results are generated, then they are separated from source logic analysis.
+Given classification rules are updated, when a project is rescanned, then source analysis becomes less noisy.
+
+Notes:
+This should be considered alongside vendor artifact exclusion.
+
+Item NDX-009: Notion Work Tracking Integration MVP
+
+Type: Story
+Priority: Suggested P1
+Status: Draft
+
+Description:
+Create an MVP integration that allows N-DX PRD or work items to connect with Notion as the first supported work-tracking target.
+
+User Story:
+As an N-DX user, I want to connect PRD/work items to Notion, so that planning artifacts can be tracked in a working project system.
+
+Acceptance Criteria:
+
+Given a user has Notion integration credentials, when they configure the integration, then N-DX can connect to the selected Notion database.
+Given PRD or work item data exists in N-DX, when the user pushes items to Notion, then corresponding Notion records are created or updated.
+Given a Notion sync action completes, when the user reviews the result, then success or failure is clearly reported.
+
+Notes:
+Notion is the first MVP target for proving work-tracking integration.
+
+Item NDX-010: Jira Work Tracking Integration
+
+Type: Story
+Priority: Suggested P2
+Status: Draft
+
+Description:
+Add Jira as a separate work-tracking integration target for N-DX.
+
+User Story:
+As an N-DX user, I want to connect PRD/work items to Jira, so that teams using Jira can manage delivery from N-DX-generated requirements.
+
+Acceptance Criteria:
+
+Given a user has Jira access credentials, when they configure the Jira integration, then N-DX can connect to the target Jira project.
+Given PRD or backlog items exist in N-DX, when the user exports or syncs them to Jira, then Jira issues are created or updated.
+Given a Jira sync action completes, when the result is displayed, then the user can see which items succeeded or failed.
+
+Notes:
+This should be tracked separately from Notion rather than bundled into the MVP.
+
+Item NDX-011: GitHub Projects Work Tracking Integration
+
+Type: Story
+Priority: Suggested P2
+Status: Draft
+
+Description:
+Add GitHub Projects as a separate work-tracking integration target for N-DX.
+
+User Story:
+As an N-DX user, I want to connect PRD/work items to GitHub Projects, so that development teams can manage generated work close to their codebase.
+
+Acceptance Criteria:
+
+Given a user has GitHub access, when they configure the GitHub Projects integration, then N-DX can connect to the selected project.
+Given PRD or backlog items exist in N-DX, when the user syncs them to GitHub Projects, then corresponding project items are created or updated.
+Given sync results are available, when the user reviews them, then item-level success and failure information is visible.
+
+Notes:
+This should be treated as a separate integration story.
+
+Item NDX-012: Asana Work Tracking Integration
+
+Type: Story
+Priority: Suggested P2
+Status: Draft
+
+Description:
+Add Asana as a separate work-tracking integration target for N-DX.
+
+User Story:
+As an N-DX user, I want to connect PRD/work items to Asana, so that teams using Asana can manage generated work in their delivery workflow.
+
+Acceptance Criteria:
+
+Given a user has Asana access, when they configure the Asana integration, then N-DX can connect to the selected workspace or project.
+Given PRD or backlog items exist in N-DX, when the user syncs them to Asana, then corresponding tasks are created or updated.
+Given an Asana sync action completes, when the result is shown, then the user can identify successful and failed item updates.
+
+Notes:
+This should remain separate from Jira, GitHub Projects, and Notion integration work.
+
+Item NDX-013: PRD-to-Work-Item Linkage Model
+
+Type: Story
+Priority: Suggested P1
+Status: Draft
+
+Description:
+Define and support linkage between N-DX PRD requirements and downstream work-tracking items.
+
+User Story:
+As an N-DX user, I want PRD requirements linked to downstream work items, so that requirements remain traceable through delivery.
+
+Acceptance Criteria:
+
+Given a PRD requirement exists, when a downstream work item is created, then the relationship between the PRD item and work item is stored.
+Given a work item is linked to a PRD requirement, when the PRD is viewed, then the linked item is visible.
+Given a linked item changes status in an integrated system, when sync status is available, then the PRD linkage reflects the latest known state.
+
+Notes:
+This provides the common model needed for Notion, Jira, GitHub Projects, and Asana integrations.
