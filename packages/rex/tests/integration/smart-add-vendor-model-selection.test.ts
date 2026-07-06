@@ -148,7 +148,7 @@ describe("vendor-scoped model selection in rex add", () => {
     await cmdSmartAdd(tmpDir, "Add authentication", {}, {});
 
     expect(mockReasonFromDescriptions).toHaveBeenCalledTimes(1);
-    expect(capturedModels).toEqual(["claude-sonnet-4-6"]);
+    expect(capturedModels).toEqual([NEWEST_MODELS.claude]);
   });
 
   it("uses the standard-tier Gemini model when vendor=google and no model configured", async () => {
