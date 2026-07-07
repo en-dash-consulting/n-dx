@@ -915,8 +915,8 @@ describe("n-dx config", () => {
 
     it("shows model examples", () => {
       const output = run(["--help"]);
-      expect(output).toContain("claude-sonnet-4-6");
-      expect(output).toContain("claude-opus-4-20250514");
+      expect(output).toContain("claude-sonnet-5");
+      expect(output).toContain("claude-opus-4-8");
     });
 
     it("includes api_endpoint example", () => {
