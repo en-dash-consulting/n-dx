@@ -76,3 +76,24 @@ describe("PRD serialized files are pinned to LF (issue #283)", () => {
     }
   });
 });
+
+describe("other n-dx-serialized tracked files are pinned to LF", () => {
+  // Representative file per tool-written surface. Every one of these is
+  // rewritten by an n-dx command (hench run, sourcevision analyze, ndx
+  // config, ndx init) with LF, so each needs the same eol=lf pin as .rex/.
+  const surfaces = [
+    ".hench/config.json",
+    ".sourcevision/hints.md",
+    ".n-dx.json",
+    "AGENTS.md",
+    ".agents/skills/ndx-work/SKILL.md",
+  ];
+
+  it.each(surfaces)("git resolves eol=lf for %s", (path) => {
+    const out = execFileSync("git", ["check-attr", "eol", "--", path], {
+      encoding: "utf8",
+      cwd: REPO_ROOT,
+    });
+    expect(out.trim()).toMatch(/: lf$/);
+  });
+});
