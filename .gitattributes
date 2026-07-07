@@ -1,0 +1,7 @@
+# rex / n-dx serialize these outputs with LF line endings. Pin them to LF so
+# the serializer's writes and git's checkout agree, and Windows CRLF checkouts
+# (core.autocrlf=true) don't produce spurious line-ending churn in `git status`
+# on every rex mutation. See https://github.com/en-dash-consulting/n-dx/issues/283
+.rex/**/*.md    text eol=lf
+.rex/**/*.json  text eol=lf
+.rex/**/*.jsonl text eol=lf
