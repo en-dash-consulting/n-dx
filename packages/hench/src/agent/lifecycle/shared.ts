@@ -1022,6 +1022,13 @@ export interface PreRunCommitGateOptions {
   model?: string;
   yes?: boolean;
   autonomous?: boolean;
+  /**
+   * Opt in to starting an autonomous run against a dirty working tree.
+   * Set by `--allow-dirty`. Without it, autonomous runs (--auto/--loop/
+   * --epic-by-epic) abort when the tree carries uncommitted changes instead
+   * of silently folding them into hench's own commits.
+   */
+  allowDirty?: boolean;
   dryRun?: boolean;
   /** Test seams — default to the real implementations. */
   deps?: {
@@ -1039,15 +1046,19 @@ export interface PreRunCommitGateOptions {
  * work loop begins (never per iteration). When the working tree carries
  * pre-existing uncommitted changes and the session is interactive, it shows
  * the diff stat plus a proposed commit message and asks whether to commit,
- * stop, or proceed. Clean trees and non-interactive/autonomous runs proceed
- * without prompting so unattended loops are never blocked.
+ * stop, or proceed. Clean trees always proceed without prompting.
+ *
+ * Autonomous runs (--auto/--loop/--epic-by-epic) can't prompt without stalling
+ * an unattended loop, so a dirty tree makes them *abort* by default rather than
+ * silently absorb the pre-existing changes — pass `--allow-dirty` (allowDirty)
+ * to proceed anyway. Other non-interactive runs (e.g. --yes, piped) proceed.
  *
  * Returns "stop" when the caller should abort before running, else "proceed".
  */
 export async function performPreRunCommitGateIfNeeded(
   opts: PreRunCommitGateOptions,
 ): Promise<PreRunCommitGateResult> {
-  const { projectDir, henchDir, model, yes, autonomous, dryRun } = opts;
+  const { projectDir, henchDir, model, yes, autonomous, allowDirty, dryRun } = opts;
   const deps = opts.deps ?? {};
   const listDirty = deps.listDirty ?? listDirtyPaths;
   const collectDiff = deps.collectDiff ?? ((dir: string) => collectReviewDiff(dir));
@@ -1063,9 +1074,19 @@ export async function performPreRunCommitGateIfNeeded(
   if (dirty.length === 0) return "proceed"; // Clean tree → start immediately, no prompt.
 
   // Only prompt in an attended TTY session. Autonomous (--auto/--loop/
-  // --epic-by-epic) and --yes runs proceed as normal so loops never block.
+  // --epic-by-epic) and --yes runs can't prompt without stalling.
   const isInteractive = isTTY && !yes && !autonomous;
   if (!isInteractive) {
+    // Autonomous runs must not fold a pre-existing dirty tree into hench's own
+    // commits. They can't prompt (that would hang an unattended loop), so fail
+    // fast instead — unless the operator explicitly opted in with --allow-dirty.
+    if (autonomous && !allowDirty) {
+      info(
+        `⚠ Refusing to start an autonomous run with ${dirty.length} uncommitted file(s) in the working tree. ` +
+          `Commit or stash them, or pass --allow-dirty to proceed anyway.`,
+      );
+      return "stop";
+    }
     info(`Proceeding with ${dirty.length} uncommitted file(s) in the working tree.`);
     return "proceed";
   }

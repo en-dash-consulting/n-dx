@@ -123,6 +123,7 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "gemini-2.5-pro": 1_000_000,
   // Claude
   "claude-haiku-4-5": 200_000,
+  "claude-fable-5": 1_000_000,
   "claude-sonnet-5": 1_000_000,
   "claude-sonnet-4-6": 200_000,
   "claude-opus-4-7": 200_000,
@@ -146,6 +147,7 @@ export const MODEL_COSTS: Readonly<
   "gemini-2.5-pro": { inputPerMToken: 1.25, outputPerMToken: 10.00 },
   // Claude
   "claude-haiku-4-5": { inputPerMToken: 0.80, outputPerMToken: 4.00 },
+  "claude-fable-5": { inputPerMToken: 10.00, outputPerMToken: 50.00 },
   "claude-sonnet-5": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
   "claude-sonnet-4-6": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
   "claude-opus-4-7": { inputPerMToken: 15.00, outputPerMToken: 75.00 },

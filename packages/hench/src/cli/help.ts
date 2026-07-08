@@ -55,6 +55,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
       { flag: "--model=<model>", description: "Override the Claude model" },
       { flag: "--permission-mode=<mode>", description: "Claude permission posture: default | acceptEdits | bypassPermissions | plan (autonomous runs default to acceptEdits)" },
+      { flag: "--allow-dirty", description: "Let autonomous runs (--auto/--loop/--epic-by-epic) start with an uncommitted working tree (they abort by default)" },
     ],
     examples: [
       { command: "hench run", description: "Run next task (interactive selection)" },

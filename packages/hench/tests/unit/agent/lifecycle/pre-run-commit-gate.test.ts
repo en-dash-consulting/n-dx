@@ -32,6 +32,7 @@ function makeOpts(
     model: overrides.model,
     yes: overrides.yes,
     autonomous: overrides.autonomous,
+    allowDirty: overrides.allowDirty,
     dryRun: overrides.dryRun,
     deps: {
       listDirty: overrides.listDirty ?? listDirty,
@@ -67,8 +68,21 @@ describe("performPreRunCommitGateIfNeeded", () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
-  it("proceeds without prompting in autonomous mode", async () => {
-    const { opts, promptChoice } = makeOpts({ autonomous: true });
+  it("aborts a dirty autonomous run without prompting", async () => {
+    const { opts, promptChoice, commit } = makeOpts({ autonomous: true });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
+    expect(promptChoice).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("proceeds without prompting for a clean autonomous run", async () => {
+    const { opts, promptChoice } = makeOpts({ autonomous: true, dirty: [] });
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
+    expect(promptChoice).not.toHaveBeenCalled();
+  });
+
+  it("proceeds without prompting for a dirty autonomous run when --allow-dirty is set", async () => {
+    const { opts, promptChoice } = makeOpts({ autonomous: true, allowDirty: true });
     expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
     expect(promptChoice).not.toHaveBeenCalled();
   });

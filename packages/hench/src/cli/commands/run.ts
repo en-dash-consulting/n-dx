@@ -917,6 +917,9 @@ export async function cmdRun(
   const rollbackOnFailure = flags["no-rollback"] === "true" ? false : (config.rollbackOnFailure ?? true);
   // --yes suppresses the interactive confirmation prompt before rollback.
   const yes = flags["yes"] === "true";
+  // --allow-dirty lets autonomous runs start against an uncommitted working
+  // tree instead of aborting at the pre-run commit gate.
+  const allowDirty = flags["allow-dirty"] === "true";
   const model = resolvedModel;
   // Always pass the resolved model to the spawned vendor CLI so the user's
   // configured choice (top-level or vendor-pinned) survives the spawn. The
@@ -1154,6 +1157,7 @@ export async function cmdRun(
       model,
       yes,
       autonomous,
+      allowDirty,
       dryRun,
     });
     if (gate === "stop") {
