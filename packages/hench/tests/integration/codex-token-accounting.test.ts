@@ -232,6 +232,55 @@ Tokens used: 8,542 in, 2,130 out
     });
   });
 
+  it("extracts tokens from text output under the event pipeline (non-JSON stdout)", async () => {
+    // Regression: with useEventPipeline on, codex --json emits JSONL, so
+    // JSON.parse(fullStdout) throws. The event-pipeline close path must fall
+    // back to the text-format token parser instead of silently zeroing usage.
+    const mockSpawn = vi.fn();
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return {
+        ...actual,
+        spawn: mockSpawn,
+      };
+    });
+
+    mockSpawn.mockImplementationOnce(() =>
+      mockCliProcess({
+        stdout: `[Codex] Starting execution...
+[Codex] Running tool: shell
+[Codex] Command completed successfully
+Tokens used: 8,542 in, 2,130 out
+[Codex] Execution complete`,
+        code: 0,
+      }),
+    );
+
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", rexDir);
+
+    const result = await cliLoop({
+      config: { ...config, useEventPipeline: true },
+      store,
+      projectDir,
+      henchDir,
+      taskId: "task-1",
+    });
+
+    expect(result.run.tokenUsage).toEqual({ input: 8542, output: 2130 });
+    expect(result.run.turnTokenUsage).toHaveLength(1);
+    expect(result.run.turnTokenUsage[0]).toMatchObject({
+      turn: 1,
+      input: 8542,
+      output: 2130,
+      vendor: "codex",
+    });
+  });
+
   it("emits no token event when Codex output contains no token line", async () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {

@@ -629,7 +629,18 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
                 });
               }
             } catch {
-              // Non-JSON stdout — no token usage to extract
+              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
+              // usage from the text-format summary line.
+              const textTokens = parseCodexCliTokenUsage(fullStdout);
+              if (textTokens) {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: { input: textTokens.input, output: textTokens.output },
+                });
+              }
             }
           }
         }
@@ -650,7 +661,18 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
                 });
               }
             } catch {
-              // Non-JSON stdout
+              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
+              // usage from the text-format summary line.
+              const textTokens = parseCodexCliTokenUsage(fullStdout);
+              if (textTokens) {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: { input: textTokens.input, output: textTokens.output },
+                });
+              }
             }
           }
         }
