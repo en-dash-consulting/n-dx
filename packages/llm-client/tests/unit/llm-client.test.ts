@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createLLMClient, detectLLMAuthMode } from "../../src/llm-client.js";
 
 describe("createLLMClient", () => {
@@ -35,7 +35,10 @@ describe("detectLLMAuthMode", () => {
   });
 
   it("returns cli for codex placeholder", () => {
+    // Ensure no OPENAI_API_KEY in env so the test exercises the no-key → cli path.
+    vi.stubEnv("OPENAI_API_KEY", "");
     const mode = detectLLMAuthMode({ vendor: "codex" });
+    vi.unstubAllEnvs();
     expect(mode).toBe("cli");
   });
 });

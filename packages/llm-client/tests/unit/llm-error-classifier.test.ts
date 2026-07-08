@@ -9,10 +9,13 @@ import { describe, it, expect } from "vitest";
 import {
   classifyLLMError,
   extractProviderDetail,
+  parseAuthPayload,
+  classifyAuthError,
   type LLMErrorCategory,
   type LLMErrorClassification,
   type LLMErrorContext,
 } from "../../src/llm-error-classifier.js";
+import { AuthFailureError, ClaudeClientError } from "../../src/types.js";
 
 describe("classifyLLMError", () => {
   // ── auth category ─────────────────────────────────────────────────
@@ -385,5 +388,187 @@ describe("extractProviderDetail", () => {
 
   it("returns empty string for empty input", () => {
     expect(extractProviderDetail("")).toBe("");
+  });
+});
+
+describe("parseAuthPayload", () => {
+  // ── detection ─────────────────────────────────────────────────────
+
+  it("detects bare 401 status code", () => {
+    const r = parseAuthPayload("401 Unauthorized", "claude");
+    expect(r).not.toBeNull();
+    expect(r?.httpStatus).toBe(401);
+  });
+
+  it("detects 403 status code", () => {
+    const r = parseAuthPayload("403 Forbidden", "claude");
+    expect(r).not.toBeNull();
+    expect(r?.httpStatus).toBe(403);
+  });
+
+  it("detects invalid_api_key without status code", () => {
+    const r = parseAuthPayload("invalid_api_key provided", "claude");
+    expect(r).not.toBeNull();
+    expect(r?.httpStatus).toBeNull();
+    expect(r?.authReason).toMatch(/invalid/i);
+  });
+
+  it("detects invalid API key phrase", () => {
+    const r = parseAuthPayload("Invalid API key provided", "claude");
+    expect(r).not.toBeNull();
+    expect(r?.authReason).toMatch(/invalid/i);
+  });
+
+  it("detects expired token", () => {
+    const r = parseAuthPayload("Your API key has expired", "claude");
+    expect(r).not.toBeNull();
+    expect(r?.authReason).toContain("expired");
+  });
+
+  it("detects expired token variant", () => {
+    const r = parseAuthPayload("Token expired — please refresh credentials", "claude");
+    expect(r).not.toBeNull();
+    expect(r?.authReason).toContain("expired");
+  });
+
+  it("detects authentication_error string", () => {
+    const r = parseAuthPayload("authentication_error: bad credentials", "claude");
+    expect(r).not.toBeNull();
+  });
+
+  it("returns null for rate-limit errors", () => {
+    expect(parseAuthPayload("429 Too Many Requests", "claude")).toBeNull();
+  });
+
+  it("returns null for network errors", () => {
+    expect(parseAuthPayload("ENOTFOUND api.anthropic.com", "claude")).toBeNull();
+  });
+
+  it("returns null for budget errors", () => {
+    expect(parseAuthPayload("budget exceeded", "claude")).toBeNull();
+  });
+
+  it("returns null for empty input", () => {
+    expect(parseAuthPayload("", "claude")).toBeNull();
+  });
+
+  // ── reason extraction from JSON payloads ──────────────────────────
+
+  it("extracts message from Google JSON error body", () => {
+    const body = JSON.stringify({
+      error: { code: 401, message: "API key not valid. Please pass a valid API key.", status: "UNAUTHENTICATED" },
+    });
+    const r = parseAuthPayload(`Gemini API error 401: ${body}`, "google");
+    expect(r).not.toBeNull();
+    expect(r?.httpStatus).toBe(401);
+    expect(r?.authReason).toContain("API key not valid");
+  });
+
+  it("extracts message from Anthropic authentication_error payload", () => {
+    const body = JSON.stringify({
+      type: "error",
+      error: { type: "authentication_error", message: "invalid x-api-key" },
+    });
+    const r = parseAuthPayload(`OpenAI API error 401: ${body}`, "codex");
+    expect(r).not.toBeNull();
+    expect(r?.authReason).toContain("invalid x-api-key");
+  });
+
+  it("extracts message from embedded JSON (no vendor prefix)", () => {
+    const body = JSON.stringify({
+      error: { type: "authentication_error", message: "invalid x-api-key" },
+    });
+    const r = parseAuthPayload(`There was an error: ${body}`, "claude");
+    expect(r).not.toBeNull();
+    expect(r?.authReason).toContain("invalid x-api-key");
+  });
+});
+
+describe("classifyAuthError", () => {
+  // ── returns AuthFailureError ──────────────────────────────────────
+
+  it("returns AuthFailureError for 401", () => {
+    const r = classifyAuthError(new Error("401 Unauthorized"), "claude");
+    expect(r).toBeInstanceOf(AuthFailureError);
+    expect(r?.provider).toBe("claude");
+    expect(r?.httpStatus).toBe(401);
+    expect(r?.message).toContain("Authentication failed");
+    expect(r?.retryable).toBe(false);
+  });
+
+  it("is also instanceof ClaudeClientError (backward compat)", () => {
+    const r = classifyAuthError(new Error("401 Unauthorized"), "claude");
+    expect(r).toBeInstanceOf(ClaudeClientError);
+    expect(r?.reason).toBe("auth");
+  });
+
+  it("carries provider name for claude", () => {
+    const r = classifyAuthError(new Error("Invalid API key"), "claude");
+    expect(r?.provider).toBe("claude");
+  });
+
+  it("carries provider name for google", () => {
+    const body = JSON.stringify({ error: { code: 401, message: "API key not valid.", status: "UNAUTHENTICATED" } });
+    const r = classifyAuthError(new Error(`Gemini API error 401: ${body}`), "google");
+    expect(r?.provider).toBe("google");
+    expect(r?.httpStatus).toBe(401);
+  });
+
+  it("carries provider name for codex", () => {
+    const r = classifyAuthError(new Error("401 Unauthorized"), "codex");
+    expect(r?.provider).toBe("codex");
+  });
+
+  it("has null httpStatus when no status code in message", () => {
+    const r = classifyAuthError(new Error("Invalid API key provided"), "claude");
+    expect(r?.httpStatus).toBeNull();
+  });
+
+  it("returns AuthFailureError for expired-token scenario", () => {
+    const r = classifyAuthError(new Error("Your API key has expired"), "claude");
+    expect(r).toBeInstanceOf(AuthFailureError);
+    expect(r?.authReason).toContain("expired");
+  });
+
+  it("returns AuthFailureError for invalid-key scenario with Claude JSON payload", () => {
+    const body = JSON.stringify({
+      type: "error",
+      error: { type: "authentication_error", message: "invalid x-api-key" },
+    });
+    const r = classifyAuthError(new Error(`401 ${body}`), "claude");
+    expect(r).toBeInstanceOf(AuthFailureError);
+    expect(r?.authReason).toContain("invalid x-api-key");
+    // No raw JSON in the user-facing message
+    expect(r?.message).not.toContain("{");
+  });
+
+  it("returns AuthFailureError for Google 401 — message is clean (no JSON blob)", () => {
+    const body = JSON.stringify({ error: { code: 401, message: "API key not valid.", status: "UNAUTHENTICATED" } });
+    const r = classifyAuthError(new Error(`Gemini API error 401: ${body}`), "google");
+    expect(r).toBeInstanceOf(AuthFailureError);
+    expect(r?.message).toContain("Google API key");
+    expect(r?.message).not.toContain("{");  // no raw JSON blob
+  });
+
+  // ── returns null for non-auth errors ─────────────────────────────
+
+  it("returns null for rate-limit errors (no regression)", () => {
+    const r = classifyAuthError(new Error("429 Too Many Requests"), "claude");
+    expect(r).toBeNull();
+  });
+
+  it("returns null for budget errors (no regression)", () => {
+    const r = classifyAuthError(new Error("budget exceeded"), "claude");
+    expect(r).toBeNull();
+  });
+
+  it("returns null for network errors", () => {
+    const r = classifyAuthError(new Error("ENOTFOUND api.anthropic.com"), "claude");
+    expect(r).toBeNull();
+  });
+
+  it("returns null for generic unknown errors", () => {
+    const r = classifyAuthError(new Error("something unexpected"), "claude");
+    expect(r).toBeNull();
   });
 });
