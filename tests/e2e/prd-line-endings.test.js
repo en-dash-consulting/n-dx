@@ -86,6 +86,7 @@ describe("other n-dx-serialized tracked files are pinned to LF", () => {
     ".sourcevision/hints.md",
     ".n-dx.json",
     "AGENTS.md",
+    "CLAUDE.md",
     ".agents/skills/ndx-work/SKILL.md",
   ];
 
