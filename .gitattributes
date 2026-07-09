@@ -1,0 +1,20 @@
+# rex / n-dx serialize these outputs with LF line endings. Pin them to LF so
+# the serializer's writes and git's checkout agree, and Windows CRLF checkouts
+# (core.autocrlf=true) don't produce spurious line-ending churn in `git status`
+# on every rex mutation. See https://github.com/en-dash-consulting/n-dx/issues/283
+.rex/**/*.md    text eol=lf
+.rex/**/*.json  text eol=lf
+.rex/**/*.jsonl text eol=lf
+
+# Same class: every other tracked file that n-dx tools write with LF
+# (hench run records/config, sourcevision hints, ndx config, and the
+# `ndx init`-generated assistant assets). Without a pin, re-running the
+# tool on a Windows CRLF checkout shows line-ending-only churn.
+.hench/**/*.md          text eol=lf
+.hench/**/*.json        text eol=lf
+.sourcevision/**/*.md   text eol=lf
+.sourcevision/**/*.json text eol=lf
+.n-dx.json              text eol=lf
+AGENTS.md               text eol=lf
+CLAUDE.md               text eol=lf
+.agents/**/*.md         text eol=lf
