@@ -46,12 +46,12 @@ describe("catalog-runtime default alignment", () => {
     expect(recommended.id).toBe(DEFAULT_CODEX_MODEL);
   });
 
-  it("catalog recommended Claude model is claude-sonnet-4-6", () => {
+  it("catalog recommended Claude model is claude-sonnet-5", () => {
     // Pinned assertion — catches both catalog and runtime changes at once.
     // If DEFAULT_CLAUDE_MODEL changes, the cross-reference test above fails.
     // If only the catalog changes, this test fails.
     const recommended = LLM_MODEL_CATALOG.claude.find((m) => m.recommended);
-    expect(recommended.id).toBe("claude-sonnet-4-6");
+    expect(recommended.id).toBe("claude-sonnet-5");
   });
 
   it("catalog recommended Codex model is gpt-5.5", () => {
@@ -59,9 +59,9 @@ describe("catalog-runtime default alignment", () => {
     expect(recommended.id).toBe("gpt-5.5");
   });
 
-  it("runtime DEFAULT_CLAUDE_MODEL is claude-sonnet-4-6", () => {
+  it("runtime DEFAULT_CLAUDE_MODEL is claude-sonnet-5", () => {
     // Pinned assertion — catches runtime default changes independently.
-    expect(DEFAULT_CLAUDE_MODEL).toBe("claude-sonnet-4-6");
+    expect(DEFAULT_CLAUDE_MODEL).toBe("claude-sonnet-5");
   });
 
   it("runtime DEFAULT_CODEX_MODEL is gpt-5.5", () => {

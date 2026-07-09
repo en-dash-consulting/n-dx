@@ -38,8 +38,9 @@ export const LLM_MODEL_CATALOG = {
     { id: "gpt-5.3-codex", label: "GPT-5.3 Codex", recommended: false },
   ],
   claude: [
-    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", recommended: true },
+    { id: "claude-sonnet-5", label: "Claude Sonnet 5", recommended: true },
     { id: "claude-opus-4-8", label: "Claude Opus 4.8", recommended: false },
+    { id: "claude-fable-5", label: "Claude Fable 5", recommended: false },
     { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", recommended: false },
   ],
   google: [
