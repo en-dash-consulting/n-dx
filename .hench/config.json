@@ -7,6 +7,7 @@
   "maxTokens": 8192,
   "rexDir": ".rex",
   "apiKeyEnv": "ANTHROPIC_API_KEY",
+  "fullTestCommand": "pnpm test",
   "guard": {
     "blockedPaths": [
       ".hench/**",
@@ -20,9 +21,10 @@
       "node",
       "git",
       "tsc",
-      "vitest"
+      "vitest",
+      "pnpm"
     ],
-    "commandTimeout": 30000,
+    "commandTimeout": 600000,
     "maxFileSize": 1048576,
     "memoryThrottle": {
       "enabled": false
