@@ -11,21 +11,24 @@
  *
  * ## Scope
  *
- * Two complementary patterns:
+ * Three complementary patterns:
  *
  * 1. **Fire-and-collect** (`exec`, `execStdout`, `execShellCmd`) — run a
  *    command, wait for it to finish, return structured output.
  * 2. **Spawn-and-delegate** (`spawnTool`) — spawn a Node script with
  *    inherited stdio (or piped output), wait for its exit code.
+ * 3. **Windows-safe CLI spawn** (`spawnCli`) — spawn a CLI binary via
+ *    `cmd.exe` on Windows and plain `spawn` elsewhere. Returns the live
+ *    ChildProcess. Fixes GH #37 (EINVAL), #68 (spaces), #69 (DEP0190).
  *
- * Both patterns return structured results and never reject unexpectedly.
- * For fully **streaming** use-cases (e.g. spawning Claude CLI and parsing
- * events as they arrive), use `spawn` directly.
+ * Patterns 1 and 2 return structured results and never reject unexpectedly.
+ * For streaming use-cases (e.g. Claude CLI), prefer `spawnCli`.
  *
  * @module @n-dx/llm-client/exec
  */
 
 import { execFile, execFileSync, spawn } from "node:child_process";
+import type { ChildProcess, StdioOptions } from "node:child_process";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -625,4 +628,87 @@ export class ProcessPool {
 
     return handle;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Windows-safe CLI spawn (GH #37 / #68 / #69)
+// ---------------------------------------------------------------------------
+
+/** Options for {@link spawnCli}. */
+export interface SpawnCliOptions {
+  /** Working directory for the child process. */
+  cwd?: string;
+  /** Environment variables. Defaults to inheriting parent env. */
+  env?: NodeJS.ProcessEnv;
+  /** stdio wiring passed through to spawn. */
+  stdio?: StdioOptions;
+  /**
+   * @internal Override platform detection — for unit tests only.
+   * Production callers must never pass this.
+   */
+  _platform?: NodeJS.Platform;
+}
+
+/**
+ * Quote a single token for use in a Windows cmd.exe verbatim command line.
+ *
+ * Rules (cmd.exe DQUOTE semantics):
+ * - Token with no spaces or double-quote characters: returned unchanged.
+ * - Otherwise: wrapped in double quotes; embedded double quotes are doubled.
+ *
+ * Pure function — safe to call on any platform.
+ * Used by {@link buildWindowsCliCommandLine} and its tests run everywhere.
+ */
+export function quoteWindowsToken(token: string): string {
+  if (!/[ "]/.test(token)) return token;
+  return `"${token.replace(/"/g, '""')}"`;
+}
+
+/**
+ * Build a Windows cmd.exe verbatim command line from a binary path and args.
+ *
+ * Pure function — safe to call on any platform; its tests run on every CI.
+ * Each token is quoted by {@link quoteWindowsToken}: paths with spaces are
+ * wrapped in double quotes and embedded double quotes are doubled.
+ */
+export function buildWindowsCliCommandLine(binary: string, args: string[]): string {
+  return [binary, ...args].map(quoteWindowsToken).join(" ");
+}
+
+/**
+ * Spawn a CLI binary (e.g. `claude`, `codex`) and return the live ChildProcess.
+ *
+ * ## Windows-safe spawn — fixes GH #37, #68, #69
+ *
+ * The legacy pattern `spawn(binary, args, { shell: process.platform === "win32" })` has
+ * three problems on Windows:
+ *   - **#37** — EINVAL when Node tries to spawn a `.cmd` shim without a shell
+ *   - **#69** — [DEP0190] deprecation warning for `shell: true` with explicit args
+ *   - **#68** — binary paths containing spaces fail even with `shell: true`
+ *
+ * This helper resolves all three by invoking `cmd.exe /d /s /c <verbatim-cmdline>`
+ * with `windowsVerbatimArguments: true` on win32. cmd.exe launches the `.cmd` shim
+ * without any shell escaping surprises. On other platforms, a plain `spawn` is used.
+ * `shell: true` is **never** set on any platform.
+ *
+ * @returns The live `ChildProcess` — callers own stdin/stdout/stderr wiring,
+ *          timeout logic, and process lifecycle management.
+ */
+export function spawnCli(
+  cliBinary: string,
+  args: string[],
+  opts: SpawnCliOptions = {},
+): ChildProcess {
+  const { cwd, env, stdio, _platform = process.platform as NodeJS.Platform } = opts;
+  const baseOpts = { cwd, env, stdio };
+
+  if (_platform === "win32") {
+    const cmdLine = buildWindowsCliCommandLine(cliBinary, args);
+    return spawn("cmd.exe", ["/d", "/s", "/c", cmdLine], {
+      ...baseOpts,
+      windowsVerbatimArguments: true,
+    });
+  }
+
+  return spawn(cliBinary, args, baseOpts);
 }

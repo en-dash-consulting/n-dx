@@ -104,6 +104,9 @@ export {
   spawnManaged,
   ProcessPool,
   ProcessLimitError,
+  quoteWindowsToken,
+  buildWindowsCliCommandLine,
+  spawnCli,
 } from "@n-dx/llm-client";
 
 // ---- Token usage parsing and accumulation ----------------------------------
@@ -199,6 +202,7 @@ export type {
   SpawnToolOptions,
   SpawnToolResult,
   ManagedChild,
+  SpawnCliOptions,
   HelpDefinition,
   PromptSectionName,
   PromptSection,

@@ -258,6 +258,9 @@ export {
   killWithFallback,
   ProcessPool,
   ProcessLimitError,
+  quoteWindowsToken,
+  buildWindowsCliCommandLine,
+  spawnCli,
 } from "./exec.js";
 
 export type {
@@ -266,6 +269,7 @@ export type {
   SpawnToolOptions,
   SpawnToolResult,
   ManagedChild,
+  SpawnCliOptions,
 } from "./exec.js";
 
 // Project directory constants

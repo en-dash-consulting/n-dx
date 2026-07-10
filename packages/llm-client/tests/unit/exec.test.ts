@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli } from "../../src/exec.js";
 
 const mockExecFile = vi.mocked(execFile);
 const mockExecFileSync = vi.mocked(execFileSync);
@@ -746,5 +746,148 @@ describe("killWithFallback", () => {
     expect(child.kill).toHaveBeenCalledWith("SIGTERM");
 
     vi.useRealTimers();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// quoteWindowsToken
+// ---------------------------------------------------------------------------
+
+describe("quoteWindowsToken", () => {
+  it("passes through a plain token unchanged", () => {
+    expect(quoteWindowsToken("claude")).toBe("claude");
+  });
+
+  it("passes through a plain flag unchanged", () => {
+    expect(quoteWindowsToken("--print")).toBe("--print");
+  });
+
+  it("passes through a path without spaces unchanged", () => {
+    expect(quoteWindowsToken("C:\\tools\\claude.cmd")).toBe("C:\\tools\\claude.cmd");
+  });
+
+  it("wraps a token with spaces in double quotes", () => {
+    expect(quoteWindowsToken("hello world")).toBe('"hello world"');
+  });
+
+  it("wraps a binary path with spaces in double quotes", () => {
+    expect(quoteWindowsToken("C:\\Program Files\\claude\\claude.cmd")).toBe(
+      '"C:\\Program Files\\claude\\claude.cmd"',
+    );
+  });
+
+  it("escapes embedded double quotes by doubling them (no spaces)", () => {
+    expect(quoteWindowsToken('has"quote')).toBe('"has""quote"');
+  });
+
+  it("escapes embedded double quotes and wraps when both spaces and quotes present", () => {
+    expect(quoteWindowsToken('say "hello"')).toBe('"say ""hello"""');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildWindowsCliCommandLine
+// ---------------------------------------------------------------------------
+
+describe("buildWindowsCliCommandLine", () => {
+  it("builds a simple command line with plain tokens", () => {
+    expect(buildWindowsCliCommandLine("claude", ["--print", "hello"])).toBe(
+      "claude --print hello",
+    );
+  });
+
+  it("quotes a binary path that contains spaces", () => {
+    expect(
+      buildWindowsCliCommandLine("C:\\Program Files\\claude\\claude.cmd", ["--print"]),
+    ).toBe('"C:\\Program Files\\claude\\claude.cmd" --print');
+  });
+
+  it("quotes an arg that contains spaces", () => {
+    expect(buildWindowsCliCommandLine("claude", ["--print", "hello world"])).toBe(
+      'claude --print "hello world"',
+    );
+  });
+
+  it("handles empty args list", () => {
+    expect(buildWindowsCliCommandLine("claude", [])).toBe("claude");
+  });
+
+  it("quotes both binary and arg when both contain spaces", () => {
+    expect(
+      buildWindowsCliCommandLine("C:\\My Tools\\claude.cmd", ["--message", "hi there"]),
+    ).toBe('"C:\\My Tools\\claude.cmd" --message "hi there"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spawnCli
+// ---------------------------------------------------------------------------
+
+describe("spawnCli", () => {
+  it("on non-Windows, spawns the binary directly without shell", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    spawnCli("claude", ["--print", "hello"], { _platform: "linux" });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "claude",
+      ["--print", "hello"],
+      expect.objectContaining({ cwd: undefined, env: undefined }),
+    );
+    const spawnOpts = mockSpawn.mock.calls[0][2] as Record<string, unknown>;
+    expect(spawnOpts.shell).toBeFalsy();
+    expect(spawnOpts.windowsVerbatimArguments).toBeUndefined();
+  });
+
+  it("on Windows, spawns via cmd.exe with windowsVerbatimArguments and no shell", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    spawnCli("claude.cmd", ["--print", "hi"], { _platform: "win32" });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "cmd.exe",
+      ["/d", "/s", "/c", "claude.cmd --print hi"],
+      expect.objectContaining({ windowsVerbatimArguments: true }),
+    );
+    const spawnOpts = mockSpawn.mock.calls[0][2] as Record<string, unknown>;
+    expect(spawnOpts.shell).toBeFalsy();
+  });
+
+  it("on Windows, quotes binary path with spaces in the verbatim command line", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    spawnCli("C:\\Program Files\\claude\\claude.cmd", ["--print"], { _platform: "win32" });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "cmd.exe",
+      ["/d", "/s", "/c", '"C:\\Program Files\\claude\\claude.cmd" --print'],
+      expect.objectContaining({ windowsVerbatimArguments: true }),
+    );
+  });
+
+  it("returns the live ChildProcess", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    const result = spawnCli("claude", ["--print"], { _platform: "linux" });
+
+    expect(result).toBe(child);
+  });
+
+  it("passes cwd and env to spawn", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    const env = { PATH: "/usr/bin" };
+    spawnCli("claude", [], { cwd: "/work", env, _platform: "linux" });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "claude",
+      [],
+      expect.objectContaining({ cwd: "/work", env }),
+    );
   });
 });
