@@ -84,6 +84,14 @@ describe("AdapterRegistry", () => {
       expect(adapters.some((a) => a.name === "notion")).toBe(true);
     });
 
+    it("has 'asana' adapter registered by default with token + projectId schema", () => {
+      const def = registry.get("asana");
+      expect(def).toBeDefined();
+      expect(def!.configSchema.token?.required).toBe(true);
+      expect(def!.configSchema.token?.sensitive).toBe(true);
+      expect(def!.configSchema.projectId?.required).toBe(true);
+    });
+
     it("creates a FileStore for the 'file' adapter", () => {
       const store = registry.create("file", rexDir, {});
       expect(store.capabilities().adapter).toBe("file");

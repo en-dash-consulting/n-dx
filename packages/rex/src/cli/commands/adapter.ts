@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
 import { CLIError } from "../errors.js";
-import { getDefaultRegistry, isRedactedField } from "../../store/adapter-registry.js";
+import { getDefaultRegistry, isRedactedField, BUILT_IN_NAMES } from "../../store/adapter-registry.js";
 import type { AdapterConfig } from "../../store/adapter-registry.js";
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ async function adapterShow(
           definition: def
             ? {
                 description: def.description,
-                builtIn: (new Set(["file", "notion"])).has(name),
+                builtIn: BUILT_IN_NAMES.has(name),
                 configSchema: def.configSchema,
               }
             : null,
@@ -181,7 +181,7 @@ async function adapterShow(
 
   result(`Adapter: ${name}`);
   info(`  Description: ${def.description}`);
-  info(`  Built-in: ${(new Set(["file", "notion"])).has(name) ? "yes" : "no"}`);
+  info(`  Built-in: ${BUILT_IN_NAMES.has(name) ? "yes" : "no"}`);
 
   if (config) {
     info("  Configuration:");
@@ -239,6 +239,7 @@ Usage:
 Examples:
   rex adapter list
   rex adapter add notion --token=secret_abc --databaseId=abc123
+  rex adapter add asana --token=1/abc --projectId=1201234567890123
   rex adapter show notion
   rex adapter remove notion`);
     return;

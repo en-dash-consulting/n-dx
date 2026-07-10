@@ -10,10 +10,12 @@
 
 export { notionIntegrationSchema } from "./notion.js";
 export { jiraIntegrationSchema } from "./jira.js";
+export { asanaIntegrationSchema } from "./asana.js";
 
 import { registerIntegrationSchema, listIntegrationSchemas } from "../integration-schema.js";
 import { notionIntegrationSchema } from "./notion.js";
 import { jiraIntegrationSchema } from "./jira.js";
+import { asanaIntegrationSchema } from "./asana.js";
 
 /** Whether built-in schemas have been registered. */
 let registered = false;
@@ -29,6 +31,7 @@ export function registerBuiltInSchemas(): void {
 
   registerIntegrationSchema(notionIntegrationSchema);
   registerIntegrationSchema(jiraIntegrationSchema);
+  registerIntegrationSchema(asanaIntegrationSchema);
 }
 
 /**

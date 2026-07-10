@@ -499,21 +499,22 @@ describe("Built-in integration schemas", () => {
 // ---------------------------------------------------------------------------
 
 describe("registerBuiltInSchemas", () => {
-  it("registers Notion and Jira schemas", () => {
+  it("registers Notion, Jira, and Asana schemas", () => {
     registerBuiltInSchemas();
     expect(getIntegrationSchema("notion")).toBeDefined();
     expect(getIntegrationSchema("jira")).toBeDefined();
+    expect(getIntegrationSchema("asana")).toBeDefined();
   });
 
   it("is idempotent (safe to call multiple times)", () => {
     registerBuiltInSchemas();
     registerBuiltInSchemas(); // should not throw
-    expect(listIntegrationSchemas()).toHaveLength(2);
+    expect(listIntegrationSchemas()).toHaveLength(3);
   });
 
   it("ensureSchemas returns full list", () => {
     const schemas = ensureSchemas();
-    expect(schemas).toHaveLength(2);
-    expect(schemas.map((s) => s.id).sort()).toEqual(["jira", "notion"]);
+    expect(schemas).toHaveLength(3);
+    expect(schemas.map((s) => s.id).sort()).toEqual(["asana", "jira", "notion"]);
   });
 });

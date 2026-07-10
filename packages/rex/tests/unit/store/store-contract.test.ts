@@ -21,6 +21,14 @@ import { FileStore, ensureRexDir } from "../../../src/store/file-adapter.js";
 import { FolderTreeStore, ensureFolderTreeRexDir } from "../../../src/store/folder-tree-store.js";
 import { NotionStore, ensureNotionRexDir } from "../../../src/store/notion-adapter.js";
 import type { NotionClient, NotionAdapterConfig } from "../../../src/store/notion-client.js";
+import { AsanaStore, ensureAsanaRexDir } from "../../../src/store/asana-adapter.js";
+import type {
+  AsanaClient,
+  AsanaAdapterConfig,
+  AsanaTask,
+  AsanaCreateParams,
+  AsanaUpdateParams,
+} from "../../../src/store/asana-client.js";
 import { serializeDocument } from "../../../src/store/markdown-serializer.js";
 import { PRD_MARKDOWN_FILENAME } from "../../../src/store/prd-md-migration.js";
 
@@ -682,6 +690,81 @@ describeStoreContract("NotionStore", () => ({
         }
         return false;
       },
+    };
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Run the contract against the AsanaStore adapter
+// ---------------------------------------------------------------------------
+
+class ContractMockAsanaClient implements AsanaClient {
+  tasks = new Map<string, AsanaTask>();
+  private nextId = 1;
+
+  async listTasks(_projectId: string): Promise<AsanaTask[]> {
+    return [...this.tasks.values()];
+  }
+
+  async createTask(params: AsanaCreateParams): Promise<AsanaTask> {
+    const gid = `asana-task-${this.nextId++}`;
+    const task: AsanaTask = {
+      gid,
+      name: params.name,
+      notes: params.notes,
+      completed: params.completed ?? false,
+      parent: params.parent ? { gid: params.parent } : null,
+      external: params.external ?? null,
+    };
+    this.tasks.set(gid, task);
+    return task;
+  }
+
+  async updateTask(gid: string, params: AsanaUpdateParams): Promise<AsanaTask> {
+    const task = this.tasks.get(gid);
+    if (!task) throw new Error(`Task not found: ${gid}`);
+    if (params.name !== undefined) task.name = params.name;
+    if (params.notes !== undefined) task.notes = params.notes;
+    if (params.completed !== undefined) task.completed = params.completed;
+    if (params.external !== undefined) task.external = params.external;
+    return task;
+  }
+
+  async deleteTask(gid: string): Promise<void> {
+    this.tasks.delete(gid);
+  }
+}
+
+describeStoreContract("AsanaStore", () => ({
+  supportsPassthrough: false,
+  supportsArchival: false,
+  setup: async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "rex-contract-asana-"));
+    const rexDir = join(tmpDir, ".rex");
+    await ensureAsanaRexDir(rexDir);
+
+    await writeFile(
+      join(rexDir, "config.json"),
+      toCanonicalJSON({
+        schema: SCHEMA_VERSION,
+        project: "contract-test",
+        adapter: "asana",
+      }),
+      "utf-8",
+    );
+    await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
+    await writeFile(join(rexDir, "workflow.md"), "# Workflow", "utf-8");
+
+    const adapterConfig: AsanaAdapterConfig = {
+      token: "1/contract-test",
+      projectId: "project-contract",
+    };
+    const mockClient = new ContractMockAsanaClient();
+    const store = new AsanaStore(rexDir, mockClient, adapterConfig);
+
+    return {
+      store,
+      cleanup: async () => rm(tmpDir, { recursive: true, force: true }),
     };
   },
 }));

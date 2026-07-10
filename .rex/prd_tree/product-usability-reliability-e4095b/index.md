@@ -11,7 +11,7 @@ description: "Improve N-DX install/setup reliability, cross-platform CLI executi
 | Title | Status |
 |-------|--------|
 | [Codex Workflow Support](./codex-workflow-support/index.md) | completed |
-| [Asana Work Tracking Integration](./asana-work-tracking-integration.md) | pending |
+| [Asana Work Tracking Integration](./asana-work-tracking-integration.md) | completed |
 | [Authentication State Checker](./authentication-state-checker.md) | completed |
 | [Front-End Action Fixes](./front-end-action-fixes.md) | completed |
 | [GitHub Projects Work Tracking Integration](./github-projects-work-tracking-84aa58.md) | pending |

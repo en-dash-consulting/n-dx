@@ -140,6 +140,27 @@ describe("rex adapter", () => {
     expect(data.adapters[0].config.databaseId).toBe("db-abc");
   });
 
+  it("configures the asana adapter and redacts its token", async () => {
+    const output = run([
+      "adapter",
+      "add",
+      "asana",
+      "--token=1/secret-asana-token",
+      "--projectId=1201234567890123",
+      tmpDir,
+    ]);
+    expect(output).toContain('Adapter "asana" configured');
+
+    const raw = await readFile(join(tmpDir, ".rex", "adapters.json"), "utf-8");
+    const data = JSON.parse(raw);
+    const asana = data.adapters.find((a: { name: string }) => a.name === "asana");
+    expect(asana).toBeDefined();
+    expect(asana.config.token.__redacted).toBe(true);
+    expect(asana.config.token.envVar).toBe("REX_ASANA_TOKEN");
+    // Non-sensitive project ID stored as-is.
+    expect(asana.config.projectId).toBe("1201234567890123");
+  });
+
   // ---- Show --------------------------------------------------------------
 
   it("shows adapter details", () => {

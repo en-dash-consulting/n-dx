@@ -17,6 +17,8 @@ import { toCanonicalJSON } from "../core/canonical.js";
 import { FileStore } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
+import { AsanaStore } from "./asana-adapter.js";
+import { LiveAsanaClient } from "./asana-client.js";
 import type { PRDStore } from "./contracts.js";
 
 // ---------------------------------------------------------------------------
@@ -148,7 +150,12 @@ export function isRedactedField(v: unknown): v is RedactedField {
 // Built-in adapter definitions
 // ---------------------------------------------------------------------------
 
-const BUILT_IN_NAMES = new Set(["file", "notion"]);
+/**
+ * Names of the adapters that ship with rex and are always registered.
+ * Exported so other modules (e.g. the CLI `adapter` command) can classify an
+ * adapter as built-in without duplicating the list.
+ */
+export const BUILT_IN_NAMES = new Set(["file", "notion", "asana"]);
 
 function fileAdapterDef(): AdapterDefinition {
   return {
@@ -176,6 +183,23 @@ function notionAdapterDef(): AdapterDefinition {
   };
 }
 
+function asanaAdapterDef(): AdapterDefinition {
+  return {
+    name: "asana",
+    description: "Asana project backend",
+    configSchema: {
+      token: { required: true, sensitive: true, description: "Asana personal access token" },
+      projectId: { required: true, description: "Asana project GID" },
+    },
+    factory: (rexDir, config) => {
+      const token = config.token as string;
+      const projectId = config.projectId as string;
+      const client = new LiveAsanaClient(token);
+      return new AsanaStore(rexDir, client, { token, projectId });
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // AdapterRegistry
 // ---------------------------------------------------------------------------
@@ -192,6 +216,7 @@ export class AdapterRegistry {
   constructor() {
     this.adapters.set("file", fileAdapterDef());
     this.adapters.set("notion", notionAdapterDef());
+    this.adapters.set("asana", asanaAdapterDef());
   }
 
   // ---- Registration ------------------------------------------------------

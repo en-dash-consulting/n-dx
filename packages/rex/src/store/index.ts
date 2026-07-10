@@ -51,6 +51,16 @@ export type { LegacyPrdMigrationResult } from "./ensure-legacy-prd-migrated.js";
 export { NotionStore, ensureNotionRexDir } from "./notion-adapter.js";
 export type { NotionClient, NotionAdapterConfig } from "./notion-client.js";
 export { LiveNotionClient } from "./notion-client.js";
+export { AsanaStore, ensureAsanaRexDir } from "./asana-adapter.js";
+export type {
+  AsanaClient,
+  AsanaAdapterConfig,
+  AsanaTask,
+  AsanaCreateParams,
+  AsanaUpdateParams,
+  AsanaExternal,
+} from "./asana-client.js";
+export { LiveAsanaClient } from "./asana-client.js";
 export { SyncEngine } from "../core/sync-engine.js";
 export type { SyncDirection, SyncReport, SyncOptions } from "../core/sync-engine.js";
 export {
@@ -92,10 +102,13 @@ export {
 } from "./integration-schemas/index.js";
 export { notionIntegrationSchema } from "./integration-schemas/notion.js";
 export { jiraIntegrationSchema } from "./integration-schemas/jira.js";
+export { asanaIntegrationSchema } from "./integration-schemas/asana.js";
 
 import { FileStore, PRD_FILENAME } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
+import { AsanaStore } from "./asana-adapter.js";
+import { LiveAsanaClient } from "./asana-client.js";
 import { getDefaultRegistry } from "./adapter-registry.js";
 import { dirname } from "node:path";
 import { resolveGitBranch } from "./branch-naming.js";
@@ -103,6 +116,7 @@ import { findPRDFileForBranch } from "./prd-discovery.js";
 import { PRD_MARKDOWN_FILENAME } from "./prd-md-migration.js";
 import type { PRDStore } from "./contracts.js";
 import type { NotionAdapterConfig } from "./notion-client.js";
+import type { AsanaAdapterConfig } from "./asana-client.js";
 
 /**
  * Create a PRDStore for the given adapter name.
@@ -140,6 +154,20 @@ export function createNotionStore(
 ): PRDStore {
   const client = new LiveNotionClient(config.token);
   return new NotionStore(rexDir, client, config);
+}
+
+/**
+ * Create an Asana-backed store.
+ *
+ * Requires an AsanaAdapterConfig with token and projectId.
+ * The rexDir is still used for config, logs, and workflow files.
+ */
+export function createAsanaStore(
+  rexDir: string,
+  config: AsanaAdapterConfig,
+): PRDStore {
+  const client = new LiveAsanaClient(config.token);
+  return new AsanaStore(rexDir, client, config);
 }
 
 /**
