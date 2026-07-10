@@ -37,6 +37,7 @@ import { ClaudeClientError } from "./types.js";
 import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
+import { diagnoseCliInvocation } from "./exec.js";
 
 /** Regex patterns for stderr content indicating a missing binary (Windows shell). */
 const NOT_FOUND_PATTERNS = /is not recognized as an internal or external command|cannot find the path|The system cannot find the file specified/i;
@@ -188,10 +189,8 @@ function spawnOnce(
 
     proc.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        const pathNote = cliBinary !== "claude"
-          ? `Claude CLI not found at configured path: ${cliBinary}. Check 'n-dx config claude.cli_path'.`
-          : "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code, or set a custom path: n-dx config claude.cli_path /path/to/claude";
-        reject(new ClaudeClientError(pathNote, "not-found", false));
+        const diagnosis = diagnoseCliInvocation(cliBinary, "claude.cli_path");
+        reject(new ClaudeClientError(diagnosis.message, "not-found", false));
       } else {
         reject(new ClaudeClientError(err.message, "unknown", isTransientError(err.message)));
       }
@@ -217,10 +216,8 @@ function spawnOnce(
       // On Windows with shell: true, a missing binary doesn't trigger ENOENT —
       // cmd.exe spawns fine but exits non-zero with a "not recognized" message.
       if (NOT_FOUND_PATTERNS.test(detail)) {
-        const pathNote = cliBinary !== "claude"
-          ? `Claude CLI not found at configured path: ${cliBinary}. Check 'n-dx config claude.cli_path'.`
-          : "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code, or set a custom path: n-dx config claude.cli_path /path/to/claude";
-        reject(new ClaudeClientError(pathNote, "not-found", false));
+        const diagnosis = diagnoseCliInvocation(cliBinary, "claude.cli_path");
+        reject(new ClaudeClientError(diagnosis.message, "not-found", false));
         return;
       }
 

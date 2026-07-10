@@ -2,7 +2,7 @@
 id: "5a7bcd96-f8ce-4fb9-9c96-c88edc3cec79"
 level: "task"
 title: "Add diagnoseCliInvocation helper and wire it into spawn error paths (closes #68)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -11,6 +11,11 @@ tags:
 blockedBy:
   - "75258767-d3b2-4bb6-ab89-bed8627ca7e9"
 source: "exploration-2026-07-10"
+startedAt: "2026-07-10T17:02:41.110Z"
+completedAt: "2026-07-10T17:10:22.481Z"
+endedAt: "2026-07-10T17:10:22.481Z"
+resolutionType: "code-change"
+resolutionDetail: "TDD: 9 failing tests written first for diagnoseCliInvocation (both branches, with/without configKey). Implemented resolveExecutablePath (private, refactors isExecutableOnPath to delegate to it), CliInvocationDiagnosis type, and diagnoseCliInvocation in exec.ts. Exported from public.ts. Wired into cli-provider.ts (ENOENT handler + NOT_FOUND_PATTERNS block) and codex-cli-provider.ts (ENOENT handler), replacing ad-hoc pathNote message-building. Added 5 new assertions to public-api.test.ts for killWithFallback/quoteWindowsToken/buildWindowsCliCommandLine/spawnCli/diagnoseCliInvocation plus SpawnCliOptions/CliInvocationDiagnosis type imports. All 1117 non-pre-existing tests pass."
 acceptanceCriteria:
   - "TDD: failing tests for BOTH branches (on-PATH-but-not-invokable, and not-found) written before implementation"
   - "diagnoseCliInvocation reuses the existing isExecutableOnPath helper in exec.ts; no duplicate PATH-resolution logic"

@@ -261,6 +261,7 @@ export {
   quoteWindowsToken,
   buildWindowsCliCommandLine,
   spawnCli,
+  diagnoseCliInvocation,
 } from "./exec.js";
 
 export type {
@@ -270,6 +271,7 @@ export type {
   SpawnToolResult,
   ManagedChild,
   SpawnCliOptions,
+  CliInvocationDiagnosis,
 } from "./exec.js";
 
 // Project directory constants

@@ -62,6 +62,8 @@ import type {
   SpawnToolOptions,
   SpawnToolResult,
   ManagedChild,
+  SpawnCliOptions,
+  CliInvocationDiagnosis,
   // project-dirs.ts
   ProjectDir,
   // help-format.ts
@@ -135,8 +137,13 @@ import {
   isExecutableOnPath,
   spawnTool,
   spawnManaged,
+  killWithFallback,
   ProcessPool,
   ProcessLimitError,
+  quoteWindowsToken,
+  buildWindowsCliCommandLine,
+  spawnCli,
+  diagnoseCliInvocation,
   // project-dirs.ts
   PROJECT_DIRS,
   // json.ts
@@ -349,6 +356,26 @@ describe("public API — process execution exports", () => {
 
   it("exports ProcessLimitError as a class", () => {
     expect(typeof ProcessLimitError).toBe("function");
+  });
+
+  it("exports killWithFallback as a function", () => {
+    expect(typeof killWithFallback).toBe("function");
+  });
+
+  it("exports quoteWindowsToken as a function", () => {
+    expect(typeof quoteWindowsToken).toBe("function");
+  });
+
+  it("exports buildWindowsCliCommandLine as a function", () => {
+    expect(typeof buildWindowsCliCommandLine).toBe("function");
+  });
+
+  it("exports spawnCli as a function", () => {
+    expect(typeof spawnCli).toBe("function");
+  });
+
+  it("exports diagnoseCliInvocation as a function", () => {
+    expect(typeof diagnoseCliInvocation).toBe("function");
   });
 });
 

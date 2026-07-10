@@ -201,18 +201,86 @@ export function sanitizeBranchName(branch: string): string {
 }
 
 /**
+ * Resolve the first PATH match for `name` to its absolute path.
+ *
+ * Uses `where` (win32) or `which` (unix). Returns null when not found.
+ * Private helper shared by {@link isExecutableOnPath} and {@link diagnoseCliInvocation}.
+ */
+function resolveExecutablePath(name: string): string | null {
+  try {
+    const cmd = process.platform === "win32" ? "where" : "which";
+    const output = execFileSync(cmd, [name], { stdio: "pipe", encoding: "utf-8" }) as string;
+    const first = output.split(/\r?\n/).find((l) => l.trim().length > 0);
+    return first?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Synchronous helper — check whether an executable is on PATH.
  *
  * Uses `which` to locate the binary. Returns true if found, false otherwise.
  */
 export function isExecutableOnPath(name: string): boolean {
-  try {
-    const cmd = process.platform === "win32" ? "where" : "which";
-    execFileSync(cmd, [name], { stdio: "pipe" });
-    return true;
-  } catch {
-    return false;
+  return resolveExecutablePath(name) !== null;
+}
+
+// ---------------------------------------------------------------------------
+// CLI invocation diagnosis (GH #68)
+// ---------------------------------------------------------------------------
+
+/** Result from {@link diagnoseCliInvocation}. */
+export interface CliInvocationDiagnosis {
+  /** Whether the binary was found on PATH. */
+  onPath: boolean;
+  /** Resolved absolute path if found; null if not on PATH. */
+  resolvedPath: string | null;
+  /** Actionable message with likely cause and fix hint. */
+  message: string;
+}
+
+/**
+ * Diagnose why a CLI binary may have failed to spawn.
+ *
+ * Distinguishes two failure modes:
+ * - **On PATH, not invokable** — binary resolves (e.g. `claude.cmd` shim or
+ *   path with spaces) but Node cannot spawn it directly without `cmd.exe`.
+ * - **Not found** — binary is absent from PATH entirely.
+ *
+ * Callable independently of a spawn attempt — safe for preflight checks
+ * (e.g. the future #42 init/doctor flow).
+ *
+ * @param binary    Binary name to check (e.g. `"claude"`, `"codex"`)
+ * @param configKey Config key for the fix hint (e.g. `"llm.claude.cli_path"`)
+ */
+export function diagnoseCliInvocation(
+  binary: string,
+  configKey?: string,
+): CliInvocationDiagnosis {
+  const resolvedPath = resolveExecutablePath(binary);
+
+  if (resolvedPath !== null) {
+    const fixHint = configKey
+      ? `Set \`n-dx config ${configKey} <path>\` to the full resolved path.`
+      : "Pass the full resolved path explicitly.";
+    return {
+      onPath: true,
+      resolvedPath,
+      message:
+        `'${binary}' found at '${resolvedPath}' but is not directly invokable from Node ` +
+        `(e.g. a .cmd shim or a path containing spaces). ${fixHint}`,
+    };
   }
+
+  const fixHint = configKey
+    ? `Install '${binary}' or set \`n-dx config ${configKey} /path/to/${binary}\`.`
+    : `Install '${binary}' or provide the full path explicitly.`;
+  return {
+    onPath: false,
+    resolvedPath: null,
+    message: `'${binary}' not found on PATH. ${fixHint}`,
+  };
 }
 
 // ---------------------------------------------------------------------------

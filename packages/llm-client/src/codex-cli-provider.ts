@@ -29,6 +29,7 @@ import type { CodexConfig } from "./llm-types.js";
 import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-contract.js";
 import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
 import { NEWEST_MODELS } from "./config.js";
+import { diagnoseCliInvocation } from "./exec.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
@@ -234,10 +235,8 @@ async function spawnOnce(
       proc.on("error", (err) => {
         if (timeoutId) clearTimeout(timeoutId);
         if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-          const pathNote = cliBinary !== DEFAULT_CODEX_BINARY
-            ? `Codex CLI not found at configured path: ${cliBinary}. Check 'n-dx config llm.codex.cli_path'.`
-            : "Codex CLI not found. Install it and/or set a custom path: n-dx config llm.codex.cli_path /path/to/codex";
-          reject(new ClaudeClientError(pathNote, "not-found", false));
+          const diagnosis = diagnoseCliInvocation(cliBinary, "llm.codex.cli_path");
+          reject(new ClaudeClientError(diagnosis.message, "not-found", false));
           return;
         }
         reject(new ClaudeClientError(err.message, "unknown", isTransientError(err.message)));

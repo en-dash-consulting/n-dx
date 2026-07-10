@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation } from "../../src/exec.js";
 
 const mockExecFile = vi.mocked(execFile);
 const mockExecFileSync = vi.mocked(execFileSync);
@@ -889,5 +889,98 @@ describe("spawnCli", () => {
       [],
       expect.objectContaining({ cwd: "/work", env }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// diagnoseCliInvocation
+// ---------------------------------------------------------------------------
+
+describe("diagnoseCliInvocation", () => {
+  it("returns onPath:true with trimmed resolved path when binary is on PATH", () => {
+    mockExecFileSync.mockReturnValue("/usr/local/bin/claude\n");
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.onPath).toBe(true);
+    expect(result.resolvedPath).toBe("/usr/local/bin/claude");
+    expect(result.message).toContain("/usr/local/bin/claude");
+  });
+
+  it("message names the invocability cause when binary is on PATH", () => {
+    mockExecFileSync.mockReturnValue("/usr/local/bin/claude\n");
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.message).toMatch(/not.*invokable|\.cmd shim|spaces/i);
+  });
+
+  it("includes generic fix hint (no configKey) when binary is on PATH", () => {
+    mockExecFileSync.mockReturnValue("/usr/local/bin/claude\n");
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.message).toMatch(/full.*path|path.*explicitly/i);
+  });
+
+  it("includes configKey in fix hint when binary is on PATH", () => {
+    mockExecFileSync.mockReturnValue("C:\\tools\\claude.cmd\r\n");
+
+    const result = diagnoseCliInvocation("claude", "llm.claude.cli_path");
+
+    expect(result.onPath).toBe(true);
+    expect(result.resolvedPath).toBe("C:\\tools\\claude.cmd");
+    expect(result.message).toContain("llm.claude.cli_path");
+  });
+
+  it("picks the first non-empty line from multi-line where output", () => {
+    mockExecFileSync.mockReturnValue("C:\\tools\\claude.cmd\r\nC:\\other\\claude.exe\r\n");
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.resolvedPath).toBe("C:\\tools\\claude.cmd");
+  });
+
+  it("returns onPath:false with null resolvedPath when binary not found", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.onPath).toBe(false);
+    expect(result.resolvedPath).toBeNull();
+    expect(result.message).toMatch(/not found.*PATH|PATH.*not found/i);
+  });
+
+  it("includes generic install hint (no configKey) when binary not found", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.message).toMatch(/install.*claude/i);
+  });
+
+  it("includes configKey in fix hint when binary not found", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = diagnoseCliInvocation("codex", "llm.codex.cli_path");
+
+    expect(result.onPath).toBe(false);
+    expect(result.message).toContain("llm.codex.cli_path");
+  });
+
+  it("message names the binary when not found", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = diagnoseCliInvocation("mybin");
+
+    expect(result.message).toContain("mybin");
   });
 });
