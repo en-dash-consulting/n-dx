@@ -22,5 +22,10 @@ description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root
 | [Add centralized spawnCli Windows-safe helper](./add-centralized-spawncli-752587.md) | completed |
 | [Add diagnoseCliInvocation helper and wire it into spawn error paths (closes #68)](./add-diagnosecliinvocation-5a7bcd.md) | completed |
 | [Changeset and cross-shell validation](./changeset-and-cross-shell-validation.md) | pending |
+| [Codex hench adapter: deliver prompt via stdin instead of argv (cmd.exe newline injection)](./codex-hench-adapter-deliver-4cfcaa.md) | pending |
 | [DEP0190 guard test: fail if any CLI spawn reintroduces shell:true](./dep0190-guard-test-fail-if-any-ba6e02.md) | pending |
+| [Fix quoteWindowsToken: unconditional quoting + ArgvQuote backslash rules (both copies) with parity test](./fix-quotewindowstoken-acf2fb.md) | pending |
+| [Fix Windows not-found diagnostics: hench close-path detection, pattern anchoring, absolute-path diagnosis, codex stdin guard](./fix-windows-not-found-3bc11e.md) | pending |
+| [Remove claude-cli-adapter manual --allowed-tools pre-quoting (double-quoting regression)](./remove-claude-cli-adapter-6b7def.md) | pending |
+| [Route remaining in-scope spawn sites: pair-programming.js and sourcevision rex spawns](./route-remaining-in-scope-spawn-ab2081.md) | pending |
 | [Route the four CLI spawn sites through spawnCli](./route-the-four-cli-spawn-sites-a585ca.md) | completed |

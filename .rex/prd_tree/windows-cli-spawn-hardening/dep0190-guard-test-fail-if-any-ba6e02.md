@@ -10,10 +10,11 @@ tags:
   - "gh:37"
   - "gh:68"
 blockedBy:
-  - "a585caf7-a74d-4850-a9d9-046553359e47"
+  - "ab2081f7-57bc-4ef1-9f61-4772eadcce2a"
 acceptanceCriteria:
   - "Guard test fails if any CLI-binary spawn site reintroduces shell:true + args"
+  - "PRECISION TRAP: all four routed sites now contain explanatory COMMENTS mentioning 'shell:true' (e.g. 'instead of shell:true+args'). The scan MUST match actual code, not comments — verify by confirming the test is GREEN on the current (correct) code, and RED when shell:true is reintroduced in real code. Also do not flag execShellCmd's intentional sh -c usage."
   - "Guard test lives with the other architecture-policy / boundary tests"
   - "Full suite still green with the guard in place"
-description: "Add a cross-cutting guard test (architecture-policy style, alongside tests/e2e/architecture-policy.test.js) that scans the CLI-binary spawn sites and FAILS if any reintroduces `shell: process.platform` or shell:true combined with an args array (the DEP0190 pattern). The per-feature correctness tests (quoteWindowsToken, buildWindowsCliCommandLine, .cmd-without-EINVAL, path-with-spaces, diagnostic branches) live in their own implementation tasks under TDD — this task is only the regression lock that prevents future backsliding once the four sites are converted."
+description: "Add a cross-cutting guard test (architecture-policy style, alongside tests/e2e/architecture-policy.test.js) that scans CLI-binary spawn sites and FAILS if any reintroduces `shell: process.platform` or shell:true combined with an args array (the DEP0190 pattern). Scan scope now includes ALL sites routed on this branch: llm-client cli-provider.ts + codex-cli-provider.ts, hench cli-loop.ts + adapters (claude-cli-adapter.ts, codex-cli-adapter.ts), core config.js + pair-programming.js + the extracted win-spawn helper, and sourcevision's rex spawn modules. Known intentional exclusions to allowlist explicitly: exec.ts execShellCmd (sh -c by design), ci.js/pr-check.js pnpm spawns (documented follow-up). The per-feature correctness tests live in their own tasks — this is only the regression lock."
 ---
