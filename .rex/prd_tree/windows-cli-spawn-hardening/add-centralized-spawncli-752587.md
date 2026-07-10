@@ -2,12 +2,17 @@
 id: "75258767-d3b2-4bb6-ab89-bed8627ca7e9"
 level: "task"
 title: "Add centralized spawnCli Windows-safe helper"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
   - "llm-client"
   - "gh:37"
+startedAt: "2026-07-10T16:37:02.533Z"
+completedAt: "2026-07-10T16:42:16.072Z"
+endedAt: "2026-07-10T16:42:16.072Z"
+resolutionType: "code-change"
+resolutionDetail: "Added quoteWindowsToken, buildWindowsCliCommandLine, spawnCli to exec.ts; exported from public.ts; re-exported through llm-gateway.ts. TDD: 23 new tests written failing first, then implementation made them green."
 acceptanceCriteria:
   - "TDD: unit tests for quoteWindowsToken (spaces, embedded quotes, plain flags) and buildWindowsCliCommandLine (quoted binary path, path with spaces) are written and FAILING before any implementation"
   - "buildWindowsCliCommandLine is a pure function so its tests run on every platform, not just win32 CI"

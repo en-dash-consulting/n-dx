@@ -19,7 +19,7 @@ description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root
 
 | Title | Status |
 |-------|--------|
-| [Add centralized spawnCli Windows-safe helper](./add-centralized-spawncli-752587.md) | pending |
+| [Add centralized spawnCli Windows-safe helper](./add-centralized-spawncli-752587.md) | completed |
 | [Add diagnoseCliInvocation helper and wire it into spawn error paths (closes #68)](./add-diagnosecliinvocation-5a7bcd.md) | pending |
 | [Changeset and cross-shell validation](./changeset-and-cross-shell-validation.md) | pending |
 | [DEP0190 guard test: fail if any CLI spawn reintroduces shell:true](./dep0190-guard-test-fail-if-any-ba6e02.md) | pending |
