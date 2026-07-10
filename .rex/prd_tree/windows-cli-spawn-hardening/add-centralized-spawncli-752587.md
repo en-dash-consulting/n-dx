@@ -1,0 +1,20 @@
+---
+id: "75258767-d3b2-4bb6-ab89-bed8627ca7e9"
+level: "task"
+title: "Add centralized spawnCli Windows-safe helper"
+status: "pending"
+priority: "high"
+tags:
+  - "windows"
+  - "llm-client"
+  - "gh:37"
+acceptanceCriteria:
+  - "TDD: unit tests for quoteWindowsToken (spaces, embedded quotes, plain flags) and buildWindowsCliCommandLine (quoted binary path, path with spaces) are written and FAILING before any implementation"
+  - "buildWindowsCliCommandLine is a pure function so its tests run on every platform, not just win32 CI"
+  - "spawnCli, quoteWindowsToken, buildWindowsCliCommandLine implemented in packages/llm-client/src/exec.ts; all new tests green"
+  - "Windows path builds a cmd.exe verbatim command line (/d /s /c, windowsVerbatimArguments:true); non-Windows path is a plain spawn; shell:true is never used"
+  - "Returns the live ChildProcess so callers keep stdin/stdout/stderr/timeout/kill control"
+  - "spawnCli exported from @n-dx/llm-client public.ts and re-exported through hench src/prd/llm-gateway.ts"
+  - "JSDoc documents the #37/#68/#69 rationale"
+description: "Add spawnCli(cliBinary, args, options) plus quoteWindowsToken and a PURE buildWindowsCliCommandLine helper to packages/llm-client/src/exec.ts (extending the existing helpers, not replacing them). On win32, invoke the binary through cmd.exe with a self-quoted verbatim command line (/d /s /c, windowsVerbatimArguments: true) so .cmd shims run without EINVAL, paths with spaces are quoted, and shell:true is never used. On non-Windows, plain spawn. Return the live ChildProcess so callers keep stdin/stdout/stderr/timeout/kill control. Export from public.ts and re-export through hench src/prd/llm-gateway.ts. Follow TDD: tests first."
+---
