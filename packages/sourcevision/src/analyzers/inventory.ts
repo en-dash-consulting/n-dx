@@ -26,6 +26,30 @@ const BASE_SKIP_DIRS: ReadonlySet<string> = new Set([
   PROJECT_DIRS.HENCH,
 ]);
 
+/**
+ * Vendored third-party dependency directories, excluded from the inventory in
+ * every project regardless of detected language. These hold code the project
+ * did not author (like `node_modules`), so scanning them inflates language
+ * stats and pollutes source-logic analysis. Per-language configs still add
+ * their own vendored dirs (e.g. Go's `vendor/`, Python's virtualenvs); this
+ * universal set covers cross-language conventions and the JS ecosystem's own
+ * vendored dirs, which a non-Go/Python project would otherwise never skip.
+ * Matched by exact directory name at any depth, so a plural `vendors/` dir or
+ * a `vendor-utils.ts` source file is unaffected.
+ */
+const VENDOR_SKIP_DIRS: ReadonlySet<string> = new Set([
+  "vendor",
+  "vendored",
+  "third_party",
+  "third-party",
+  "thirdparty",
+  "bower_components",
+  "jspm_packages",
+  "web_modules",
+  "Godeps",
+  ".yarn",
+]);
+
 // ── Language detection ───────────────────────────────────────────────────────
 
 const EXT_TO_LANGUAGE: Record<string, string> = {
@@ -545,8 +569,8 @@ export async function analyzeInventory(
   );
   const extraSkipDirs = options?.extraSkipDirs ?? inventoryConfig.extraSkipDirs ?? [];
 
-  // Build skip set: always-skipped dirs + language-specific dirs + user extras
-  const skipDirs = new Set([...BASE_SKIP_DIRS, ...langConfig.skipDirectories, ...extraSkipDirs]);
+  // Build skip set: always-skipped dirs + vendored deps + language-specific dirs + user extras
+  const skipDirs = new Set([...BASE_SKIP_DIRS, ...VENDOR_SKIP_DIRS, ...langConfig.skipDirectories, ...extraSkipDirs]);
 
   // Code-only walk filter: keep files whose detected language is a programming
   // language, plus any user-supplied extra extensions. Disabled when codeOnly
