@@ -11,6 +11,7 @@ import { loadConfig } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
+import { performPreRunCommitGateIfNeeded } from "../../agent/lifecycle/shared.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
@@ -916,6 +917,9 @@ export async function cmdRun(
   const rollbackOnFailure = flags["no-rollback"] === "true" ? false : (config.rollbackOnFailure ?? true);
   // --yes suppresses the interactive confirmation prompt before rollback.
   const yes = flags["yes"] === "true";
+  // --allow-dirty lets autonomous runs start against an uncommitted working
+  // tree instead of aborting at the pre-run commit gate.
+  const allowDirty = flags["allow-dirty"] === "true";
   const model = resolvedModel;
   // Always pass the resolved model to the spawned vendor CLI so the user's
   // configured choice (top-level or vendor-pinned) survives the spawn. The
@@ -1141,6 +1145,24 @@ export async function cmdRun(
         `⚠ --permission-mode is a Claude CLI feature; ignoring "${effectivePermissionMode}" for vendor=${llmVendor}.`,
       );
       effectivePermissionMode = undefined;
+    }
+
+    // One-time pre-run commit gate: before the work loop begins, offer to
+    // commit any pre-existing uncommitted changes so the user's in-progress
+    // edits are not folded into hench's own commits. Runs once per invocation
+    // (not per iteration) and only prompts in an attended TTY session.
+    const gate = await performPreRunCommitGateIfNeeded({
+      projectDir: dir,
+      henchDir,
+      model,
+      yes,
+      autonomous,
+      allowDirty,
+      dryRun,
+    });
+    if (gate === "stop") {
+      info("Stopped before running. Commit or discard your changes, then re-run.");
+      return;
     }
 
     if (epicByEpic) {

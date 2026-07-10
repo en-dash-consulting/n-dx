@@ -254,7 +254,7 @@ describe("Claude config inheritance (rex)", () => {
 
       await spawnClaude("prompt");
 
-      expect(complete).toHaveBeenCalledWith({ prompt: "prompt", model: "claude-sonnet-4-6" });
+      expect(complete).toHaveBeenCalledWith({ prompt: "prompt", model: "claude-sonnet-5" });
     });
   });
 });

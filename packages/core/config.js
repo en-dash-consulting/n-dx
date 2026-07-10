@@ -437,7 +437,7 @@ async function testApiConnection(apiKey, endpoint, model) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: model || "claude-sonnet-4-6",
+        model: model || "claude-sonnet-5",
         max_tokens: 1,
         messages: [{ role: "user", content: "hi" }],
       }),
@@ -1155,8 +1155,8 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Validated: must be a valid HTTP(S) URL.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
-                                    Examples: claude-sonnet-4-6, claude-opus-4-8
-                                    Default: claude-sonnet-4-6
+                                    Examples: claude-sonnet-5, claude-opus-4-8
+                                    Default: claude-sonnet-5
   claude.lightModel        string    Model override for light-weight tasks (optional)
                                     When set, light-tier tasks use this model instead of
                                     the default haiku. Use for cost/latency optimization.

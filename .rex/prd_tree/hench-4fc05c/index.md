@@ -4,8 +4,8 @@ level: "epic"
 title: "Hench"
 status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-05-27T18:40:09.125Z"
-endedAt: "2026-05-27T18:40:09.125Z"
+completedAt: "2026-07-02T18:43:22.327Z"
+endedAt: "2026-07-02T18:43:22.327Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
 ---
 
@@ -27,10 +27,6 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Graceful Cancellation with Rollback Prompt on Ctrl+C](./graceful-cancellation-with-626d40/index.md) | completed |
 | [Hench Process Concurrency Management](./hench-process-concurrency-management/index.md) | completed |
 | [Hench Resource Monitoring and User Feedback](./hench-resource-monitoring-and-a5f844/index.md) | completed |
-| [Hench Run-Loop Visual Output Refinements](./hench-run-loop-visual-output-1b15f1/index.md) | completed |
-| [Hench Run-Loop Visual Output Refinements](./hench-run-loop-visual-output-d1d062/index.md) | completed |
-| [Hench Run-Loop Visual Output Refinements](./hench-run-loop-visual-output-f505bb/index.md) | completed |
-| [Hench Run-Loop Visual Output Refinements](./hench-run-loop-visual-output-f5ccc9/index.md) | completed |
 | [Hench UI Real-time Task Monitoring](./hench-ui-real-time-task-monitoring/index.md) | completed |
 | [Loop Consecutive-Failure Auto-Cancellation](./loop-consecutive-failure-auto-29e95b/index.md) | completed |
 | [Mandatory Pre-Commit Full Test Suite Gate](./mandatory-pre-commit-full-test-dde6d1/index.md) | completed |
@@ -40,3 +36,4 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Run Loop Cancellation and Iteration Visibility Refinements](./run-loop-cancellation-and-3e4e10/index.md) | completed |
 | [Sequential Epic Execution](./sequential-epic-execution/index.md) | completed |
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-d5ad6f/index.md) | completed |
+| [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-9af68a.md) | completed |

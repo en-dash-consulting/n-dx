@@ -23,7 +23,7 @@ const LOCAL_CONFIG_FILE = ".n-dx.local.json";
  * entry that must stay aligned — enforced by the catalog-runtime contract
  * test in `tests/e2e/catalog-runtime-contract.test.js`.
  */
-export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
 
 /**
  * Canonical 'newest model' per vendor.
@@ -33,7 +33,7 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
  * via `resolveVendorModel()`.
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
-  claude: "claude-sonnet-4-6",
+  claude: "claude-sonnet-5",
   codex: "gpt-5.5",
   google: "gemini-2.5-pro",
 };
@@ -123,6 +123,8 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "gemini-2.5-pro": 1_000_000,
   // Claude
   "claude-haiku-4-5": 200_000,
+  "claude-fable-5": 1_000_000,
+  "claude-sonnet-5": 1_000_000,
   "claude-sonnet-4-6": 200_000,
   "claude-opus-4-7": 200_000,
   // Codex / OpenAI
@@ -145,6 +147,8 @@ export const MODEL_COSTS: Readonly<
   "gemini-2.5-pro": { inputPerMToken: 1.25, outputPerMToken: 10.00 },
   // Claude
   "claude-haiku-4-5": { inputPerMToken: 0.80, outputPerMToken: 4.00 },
+  "claude-fable-5": { inputPerMToken: 10.00, outputPerMToken: 50.00 },
+  "claude-sonnet-5": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
   "claude-sonnet-4-6": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
   "claude-opus-4-7": { inputPerMToken: 15.00, outputPerMToken: 75.00 },
   // Codex / OpenAI

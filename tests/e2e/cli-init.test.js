@@ -468,6 +468,66 @@ describe("n-dx init provider selection", () => {
   });
 });
 
+describe("init injects .gitattributes EOL pins (issue #283)", () => {
+  async function initWithFakeCodex(projectDir, binDir) {
+    await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+    run(["init", "--provider=codex", "--no-claude", projectDir], {
+      timeout: 50_000,
+      env: {
+        ...process.env,
+        PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+      },
+    });
+  }
+
+  it("creates .gitattributes with LF pins and is idempotent on re-init", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-attrs-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-attrs-bin-"));
+    try {
+      await initWithFakeCodex(projectDir, binDir);
+
+      const attrPath = join(projectDir, ".gitattributes");
+      expect(existsSync(attrPath)).toBe(true);
+      const first = await readFile(attrPath, "utf-8");
+      for (const pattern of [".rex/**/*.md", ".hench/**/*.json", ".n-dx.json", "AGENTS.md", "CLAUDE.md"]) {
+        expect(first).toContain(`${pattern}`);
+      }
+      expect(first).toMatch(/\.rex\/\*\*\/\*\.md\s+text eol=lf/);
+
+      // Re-init must not duplicate rules or the header.
+      await initWithFakeCodex(projectDir, binDir);
+      const second = await readFile(attrPath, "utf-8");
+      expect(second).toBe(first);
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it("preserves existing .gitattributes content and user overrides for overlapping patterns", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-attrs-merge-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-attrs-merge-bin-"));
+    try {
+      const userContent = "*.png binary\n.rex/**/*.md -text\n";
+      await writeFile(join(projectDir, ".gitattributes"), userContent);
+
+      await initWithFakeCodex(projectDir, binDir);
+
+      const merged = await readFile(join(projectDir, ".gitattributes"), "utf-8");
+      // User content preserved verbatim, at the top.
+      expect(merged.startsWith(userContent)).toBe(true);
+      // The user's overlapping .rex/**/*.md rule wins — not re-added by init.
+      expect(merged.match(/^\.rex\/\*\*\/\*\.md\s/gm)).toHaveLength(1);
+      // Missing rules are appended.
+      expect(merged).toMatch(/\.hench\/\*\*\/\*\.json\s+text eol=lf/);
+      expect(merged).toMatch(/CLAUDE\.md\s+text eol=lf/);
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
+
 describe("claude CLI discovery diagnostics", () => {
   let tmpDir;
 
