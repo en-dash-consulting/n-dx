@@ -772,7 +772,11 @@ export function spawnCli(
 
   if (_platform === "win32") {
     const cmdLine = buildWindowsCliCommandLine(cliBinary, args);
-    return spawn("cmd.exe", ["/d", "/s", "/c", cmdLine], {
+    // Wrap the whole command line in an extra pair of quotes: `cmd.exe /s`
+    // strips only the outermost quote pair, leaving the inner per-token quotes
+    // (e.g. around a path containing spaces) intact. Without this wrapper, /s
+    // would strip the binary path's own quotes and break spaced paths (#68).
+    return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
       ...baseOpts,
       windowsVerbatimArguments: true,
     });

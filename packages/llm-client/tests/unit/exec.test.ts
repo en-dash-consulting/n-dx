@@ -848,7 +848,7 @@ describe("spawnCli", () => {
 
     expect(mockSpawn).toHaveBeenCalledWith(
       "cmd.exe",
-      ["/d", "/s", "/c", "claude.cmd --print hi"],
+      ["/d", "/s", "/c", '"claude.cmd --print hi"'],
       expect.objectContaining({ windowsVerbatimArguments: true }),
     );
     const spawnOpts = mockSpawn.mock.calls[0][2] as Record<string, unknown>;
@@ -863,7 +863,7 @@ describe("spawnCli", () => {
 
     expect(mockSpawn).toHaveBeenCalledWith(
       "cmd.exe",
-      ["/d", "/s", "/c", '"C:\\Program Files\\claude\\claude.cmd" --print'],
+      ["/d", "/s", "/c", '""C:\\Program Files\\claude\\claude.cmd" --print"'],
       expect.objectContaining({ windowsVerbatimArguments: true }),
     );
   });

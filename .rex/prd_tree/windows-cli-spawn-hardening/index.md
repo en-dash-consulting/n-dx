@@ -23,4 +23,4 @@ description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root
 | [Add diagnoseCliInvocation helper and wire it into spawn error paths (closes #68)](./add-diagnosecliinvocation-5a7bcd.md) | completed |
 | [Changeset and cross-shell validation](./changeset-and-cross-shell-validation.md) | pending |
 | [DEP0190 guard test: fail if any CLI spawn reintroduces shell:true](./dep0190-guard-test-fail-if-any-ba6e02.md) | pending |
-| [Route the four CLI spawn sites through spawnCli](./route-the-four-cli-spawn-sites-a585ca.md) | pending |
+| [Route the four CLI spawn sites through spawnCli](./route-the-four-cli-spawn-sites-a585ca.md) | completed |

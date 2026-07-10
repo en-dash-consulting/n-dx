@@ -107,6 +107,7 @@ export {
   quoteWindowsToken,
   buildWindowsCliCommandLine,
   spawnCli,
+  diagnoseCliInvocation,
 } from "@n-dx/llm-client";
 
 // ---- Token usage parsing and accumulation ----------------------------------
@@ -203,6 +204,7 @@ export type {
   SpawnToolResult,
   ManagedChild,
   SpawnCliOptions,
+  CliInvocationDiagnosis,
   HelpDefinition,
   PromptSectionName,
   PromptSection,

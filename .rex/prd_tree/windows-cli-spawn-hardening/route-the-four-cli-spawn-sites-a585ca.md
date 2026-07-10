@@ -2,7 +2,7 @@
 id: "a585caf7-a74d-4850-a9d9-046553359e47"
 level: "task"
 title: "Route the four CLI spawn sites through spawnCli"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -13,6 +13,9 @@ tags:
 blockedBy:
   - "75258767-d3b2-4bb6-ab89-bed8627ca7e9"
   - "5a7bcd96-f8ce-4fb9-9c96-c88edc3cec79"
+startedAt: "2026-07-10T18:38:09.520Z"
+completedAt: "2026-07-10T18:54:08.303Z"
+endedAt: "2026-07-10T18:54:08.303Z"
 acceptanceCriteria:
   - "No CLI-binary spawn uses shell: process.platform === \"win32\" or shell:true+args anymore (all four sites)"
   - "Sites 1-3 call spawnCli; site 4 (core/config.js) uses the same cmd.exe recipe locally without importing llm-client"

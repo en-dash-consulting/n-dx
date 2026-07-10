@@ -22,7 +22,6 @@
  * @see packages/hench/src/agent/lifecycle/event-accumulator.ts — legacy mutation-based parsers
  */
 
-import { spawn } from "node:child_process";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
@@ -38,7 +37,7 @@ import {
   resolveVendorCliPath,
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
-import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS } from "../../prd/llm-gateway.js";
+import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -527,10 +526,11 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
 
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
-    const proc = spawn(cliBinary, [...spawnConfig.args], {
+    // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
+    // with a self-quoted verbatim command line instead of shell:true+args.
+    const proc = spawnCli(cliBinary, [...spawnConfig.args], {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      shell: process.platform === "win32",
       env: cliEnv ?? process.env,
     });
 
@@ -587,11 +587,17 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
 
     proc.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        const message = adapter.vendor === "codex"
+        // Keep the vendor-specific prefix (matched by formatCLIError) and
+        // append the cross-platform diagnoseCliInvocation detail, which
+        // distinguishes "on PATH but not directly invokable" (.cmd shim /
+        // path with spaces) from "not on PATH at all".
+        const base = adapter.vendor === "codex"
           ? "Codex CLI not found. Configure with: n-dx config llm.codex.cli_path /path/to/codex"
           : "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code\n" +
             "Or switch to the API provider: n-dx config hench.provider api";
-        reject(new Error(message));
+        const configKey = adapter.vendor === "codex" ? "llm.codex.cli_path" : "llm.claude.cli_path";
+        const diagnosis = diagnoseCliInvocation(cliBinary, configKey);
+        reject(new Error(`${base}\n${diagnosis.message}`));
         return;
       }
       reject(err);

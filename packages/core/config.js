@@ -670,16 +670,41 @@ function validateGoogleApiKeyEnv(value) {
 }
 
 /**
+ * Windows-safe synchronous CLI invocation (GH #37/#68/#69).
+ *
+ * The orchestration tier must not import @n-dx/llm-client (spawn-only rule,
+ * enforced by domain-isolation.test.js), so this replicates spawnCli's cmd.exe
+ * verbatim recipe locally: on Windows, invoke `cmd.exe /d /s /c "<cmdline>"`
+ * with windowsVerbatimArguments so .cmd shims and paths containing spaces
+ * resolve without EINVAL (#37) or the DEP0190 shell:true+args deprecation (#69),
+ * self-quoting each token so embedded spaces survive (#68). On other platforms,
+ * a plain execFileSync.
+ */
+function execFileSyncCli(binary, args, options) {
+  if (process.platform === "win32") {
+    const cmdLine = [binary, ...args]
+      .map((t) => (/[ "]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t))
+      .join(" ");
+    // Outer quote pair: `cmd.exe /s` strips only the outermost quotes, keeping
+    // the inner per-token quotes (spaced paths) intact. See exec.ts spawnCli.
+    return execFileSync("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
+      ...options,
+      windowsVerbatimArguments: true,
+    });
+  }
+  return execFileSync(binary, args, options);
+}
+
+/**
  * Validate CLI path by trying to run `<binary> --version`.
  * Returns { ok, version?, error? }.
  */
 function testCliPath(cliPath) {
   try {
-    const output = execFileSync(cliPath, ["--version"], {
+    const output = execFileSyncCli(cliPath, ["--version"], {
       encoding: "utf-8",
       timeout: 10000,
       stdio: "pipe",
-      shell: process.platform === "win32",
     });
     return { ok: true, version: output.trim() };
   } catch (err) {
@@ -834,18 +859,12 @@ async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
     legacyClaudeConfig,
   );
   try {
-    // On Windows, shell: true is needed to resolve .cmd shims, but cmd.exe
-    // re-parses arguments, splitting on spaces. Wrap args that contain spaces
-    // in double-quotes so they survive the shell layer.
-    const isWin = process.platform === "win32";
-    const safeArgs = isWin
-      ? args.map((a) => (a.includes(" ") ? `"${a}"` : a))
-      : args;
-    execFileSync(binary, safeArgs, {
+    // Windows-safe: routes .cmd shims through cmd.exe with a self-quoted
+    // verbatim command line (GH #37/#68/#69) — see execFileSyncCli.
+    execFileSyncCli(binary, args, {
       encoding: "utf-8",
       timeout: 15000,
       stdio: "pipe",
-      shell: isWin,
     });
     return { ok: true, binary, args };
   } catch (err) {

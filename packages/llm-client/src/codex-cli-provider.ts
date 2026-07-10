@@ -18,7 +18,6 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { spawn } from "node:child_process";
 import type {
   ClaudeClient,
   CompletionRequest,
@@ -29,10 +28,12 @@ import type { CodexConfig } from "./llm-types.js";
 import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-contract.js";
 import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
 import { NEWEST_MODELS } from "./config.js";
-import { diagnoseCliInvocation } from "./exec.js";
+import { diagnoseCliInvocation, spawnCli } from "./exec.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
+/** Stderr content indicating a missing binary (Windows cmd.exe shell). */
+const NOT_FOUND_PATTERNS = /is not recognized as an internal or external command|cannot find the path|The system cannot find the file specified/i;
 const TRANSIENT_PATTERNS = [
   /\b500\b/,
   /\b502\b/,
@@ -208,14 +209,15 @@ async function spawnOnce(
     debugLog(`spawn args: ${JSON.stringify(args)}`);
 
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn(cliBinary, args, {
+      // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
+      // with a self-quoted verbatim command line instead of shell:true+args.
+      const proc = spawnCli(cliBinary, args, {
         stdio: ["pipe", "ignore", "pipe"],
         env: envOverride ?? process.env,
-        shell: process.platform === "win32",
       });
 
-      proc.stdin.write(request.prompt);
-      proc.stdin.end();
+      proc.stdin!.write(request.prompt);
+      proc.stdin!.end();
 
       let stderr = "";
       let timeoutId: NodeJS.Timeout | undefined;
@@ -228,7 +230,7 @@ async function spawnOnce(
         }, timeoutMs);
       }
 
-      proc.stderr.on("data", (chunk: Buffer) => {
+      proc.stderr!.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();
       });
 
@@ -253,6 +255,17 @@ async function spawnOnce(
           return;
         }
         const detail = stderr.trim() || `codex exited with code ${code}`;
+
+        // On Windows the cmd.exe shim spawns fine but exits non-zero with a
+        // "not recognized" message when the binary is missing — no ENOENT is
+        // raised. Route that through diagnoseCliInvocation just like the
+        // non-Windows ENOENT path above.
+        if (NOT_FOUND_PATTERNS.test(detail)) {
+          const diagnosis = diagnoseCliInvocation(cliBinary, "llm.codex.cli_path");
+          reject(new ClaudeClientError(diagnosis.message, "not-found", false));
+          return;
+        }
+
         const classified = classifyStderr(detail);
         debugLog(`spawn close code=${code} classified=${classified.reason} retryable=${classified.retryable}`);
         if (detail) {
