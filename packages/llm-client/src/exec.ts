@@ -720,24 +720,69 @@ export interface SpawnCliOptions {
 /**
  * Quote a single token for use in a Windows cmd.exe verbatim command line.
  *
- * Rules (cmd.exe DQUOTE semantics):
- * - Token with no spaces or double-quote characters: returned unchanged.
- * - Otherwise: wrapped in double quotes; embedded double quotes are doubled.
+ * TWIN: this logic is intentionally duplicated in `packages/core/config.js`
+ * (`quoteWindowsToken` / `buildWindowsCliCommandLine`) because the
+ * orchestration tier must not import @n-dx/llm-client (spawn-only rule).
+ * Any change here MUST be mirrored there — the cross-package parity test
+ * `tests/unit/windows-quoting-parity.test.js` fails if the two diverge.
+ *
+ * Rules:
+ * - EVERY token is quoted unconditionally. Always-quoting is safe under
+ *   `cmd.exe /d /s /c` with the outer-quote wrapper: cmd does not treat
+ *   `& | < > ( ) ^ !` specially inside double quotes, and the target CRT
+ *   strips the quotes (`"--print"` re-tokenizes back to `--print` through a
+ *   `.cmd` shim's `%*`). This closes the gap where a token holding cmd.exe
+ *   metacharacters but no space/quote (e.g. `C:\Users\Tom&Jerry\out`) passed
+ *   through unquoted and split the command at `&`.
+ * - Embedded double quotes are doubled (`"` → `""`, cmd DQUOTE semantics).
+ * - Microsoft ArgvQuote / cross-spawn backslash rule: any run of backslashes
+ *   immediately preceding a double quote — an embedded (now-doubled) quote OR
+ *   the appended closing quote — is doubled, so CommandLineToArgvW/CRT parsing
+ *   does not consume the backslashes as quote escapes. Without this, a spaced
+ *   path ending in a backslash would merge with the following argument.
+ * - An empty token becomes a quoted empty string (`""`) so it survives as a
+ *   distinct positional arg instead of collapsing during the join.
+ *
+ * LIMITATION: `%VAR%` expansion is performed by cmd.exe and is NOT prevented
+ * by quoting — cmd expands `%VAR%` inside double quotes. A token containing
+ * `%NAME%` will be substituted with the environment value (or left as-is if
+ * unset) before the target binary sees it. This cannot be fixed at the
+ * quoting layer; callers must avoid passing untrusted `%...%` sequences.
  *
  * Pure function — safe to call on any platform.
  * Used by {@link buildWindowsCliCommandLine} and its tests run everywhere.
  */
 export function quoteWindowsToken(token: string): string {
-  if (!/[ "]/.test(token)) return token;
-  return `"${token.replace(/"/g, '""')}"`;
+  let result = '"';
+  let i = 0;
+  const n = token.length;
+  while (i < n) {
+    let slashes = 0;
+    while (i < n && token[i] === "\\") {
+      slashes++;
+      i++;
+    }
+    if (i === n) {
+      // Trailing backslashes precede the appended closing quote — double them.
+      result += "\\".repeat(slashes * 2);
+    } else if (token[i] === '"') {
+      // Backslashes precede an embedded quote — double them, then double the quote.
+      result += "\\".repeat(slashes * 2) + '""';
+      i++;
+    } else {
+      // Backslashes not adjacent to a quote are literal.
+      result += "\\".repeat(slashes) + token[i];
+      i++;
+    }
+  }
+  return result + '"';
 }
 
 /**
  * Build a Windows cmd.exe verbatim command line from a binary path and args.
  *
  * Pure function — safe to call on any platform; its tests run on every CI.
- * Each token is quoted by {@link quoteWindowsToken}: paths with spaces are
- * wrapped in double quotes and embedded double quotes are doubled.
+ * Each token is quoted unconditionally by {@link quoteWindowsToken}.
  */
 export function buildWindowsCliCommandLine(binary: string, args: string[]): string {
   return [binary, ...args].map(quoteWindowsToken).join(" ");

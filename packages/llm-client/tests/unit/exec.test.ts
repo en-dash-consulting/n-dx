@@ -754,16 +754,16 @@ describe("killWithFallback", () => {
 // ---------------------------------------------------------------------------
 
 describe("quoteWindowsToken", () => {
-  it("passes through a plain token unchanged", () => {
-    expect(quoteWindowsToken("claude")).toBe("claude");
+  it("quotes a plain token unconditionally", () => {
+    expect(quoteWindowsToken("claude")).toBe('"claude"');
   });
 
-  it("passes through a plain flag unchanged", () => {
-    expect(quoteWindowsToken("--print")).toBe("--print");
+  it("quotes a plain flag unconditionally", () => {
+    expect(quoteWindowsToken("--print")).toBe('"--print"');
   });
 
-  it("passes through a path without spaces unchanged", () => {
-    expect(quoteWindowsToken("C:\\tools\\claude.cmd")).toBe("C:\\tools\\claude.cmd");
+  it("quotes a path without spaces unconditionally", () => {
+    expect(quoteWindowsToken("C:\\tools\\claude.cmd")).toBe('"C:\\tools\\claude.cmd"');
   });
 
   it("wraps a token with spaces in double quotes", () => {
@@ -776,12 +776,39 @@ describe("quoteWindowsToken", () => {
     );
   });
 
-  it("escapes embedded double quotes by doubling them (no spaces)", () => {
+  it("escapes embedded double quotes by doubling them", () => {
     expect(quoteWindowsToken('has"quote')).toBe('"has""quote"');
   });
 
   it("escapes embedded double quotes and wraps when both spaces and quotes present", () => {
     expect(quoteWindowsToken('say "hello"')).toBe('"say ""hello"""');
+  });
+
+  // --- audit-remediation edge cases (GH #37 / #68) ---
+
+  it("quotes a token containing cmd.exe metacharacters (no space/quote)", () => {
+    // C:\Users\Tom&Jerry\out.txt — the & would split the command if unquoted.
+    expect(quoteWindowsToken("C:\\Users\\Tom&Jerry\\out.txt")).toBe(
+      '"C:\\Users\\Tom&Jerry\\out.txt"',
+    );
+  });
+
+  it("turns an empty token into a quoted empty string", () => {
+    expect(quoteWindowsToken("")).toBe('""');
+  });
+
+  it("doubles a trailing backslash run before the appended closing quote", () => {
+    // A spaced path ending in a backslash must not merge with the next arg.
+    expect(quoteWindowsToken("C:\\dir with space\\")).toBe('"C:\\dir with space\\\\"');
+  });
+
+  it("doubles a backslash run immediately preceding an embedded quote", () => {
+    // token: a\"b  →  backslash doubled, quote doubled
+    expect(quoteWindowsToken('a\\"b')).toBe('"a\\\\""b"');
+  });
+
+  it("does not double interior backslashes not adjacent to a quote", () => {
+    expect(quoteWindowsToken("a\\b\\c")).toBe('"a\\b\\c"');
   });
 });
 
@@ -790,32 +817,38 @@ describe("quoteWindowsToken", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildWindowsCliCommandLine", () => {
-  it("builds a simple command line with plain tokens", () => {
+  it("quotes every token in a simple command line", () => {
     expect(buildWindowsCliCommandLine("claude", ["--print", "hello"])).toBe(
-      "claude --print hello",
+      '"claude" "--print" "hello"',
     );
   });
 
   it("quotes a binary path that contains spaces", () => {
     expect(
       buildWindowsCliCommandLine("C:\\Program Files\\claude\\claude.cmd", ["--print"]),
-    ).toBe('"C:\\Program Files\\claude\\claude.cmd" --print');
+    ).toBe('"C:\\Program Files\\claude\\claude.cmd" "--print"');
   });
 
   it("quotes an arg that contains spaces", () => {
     expect(buildWindowsCliCommandLine("claude", ["--print", "hello world"])).toBe(
-      'claude --print "hello world"',
+      '"claude" "--print" "hello world"',
     );
   });
 
   it("handles empty args list", () => {
-    expect(buildWindowsCliCommandLine("claude", [])).toBe("claude");
+    expect(buildWindowsCliCommandLine("claude", [])).toBe('"claude"');
+  });
+
+  it("keeps an empty positional arg as a quoted empty string", () => {
+    expect(buildWindowsCliCommandLine("claude", ["", "--print"])).toBe(
+      '"claude" "" "--print"',
+    );
   });
 
   it("quotes both binary and arg when both contain spaces", () => {
     expect(
       buildWindowsCliCommandLine("C:\\My Tools\\claude.cmd", ["--message", "hi there"]),
-    ).toBe('"C:\\My Tools\\claude.cmd" --message "hi there"');
+    ).toBe('"C:\\My Tools\\claude.cmd" "--message" "hi there"');
   });
 });
 
@@ -848,7 +881,7 @@ describe("spawnCli", () => {
 
     expect(mockSpawn).toHaveBeenCalledWith(
       "cmd.exe",
-      ["/d", "/s", "/c", '"claude.cmd --print hi"'],
+      ["/d", "/s", "/c", '""claude.cmd" "--print" "hi""'],
       expect.objectContaining({ windowsVerbatimArguments: true }),
     );
     const spawnOpts = mockSpawn.mock.calls[0][2] as Record<string, unknown>;
@@ -863,7 +896,7 @@ describe("spawnCli", () => {
 
     expect(mockSpawn).toHaveBeenCalledWith(
       "cmd.exe",
-      ["/d", "/s", "/c", '""C:\\Program Files\\claude\\claude.cmd" --print"'],
+      ["/d", "/s", "/c", '""C:\\Program Files\\claude\\claude.cmd" "--print""'],
       expect.objectContaining({ windowsVerbatimArguments: true }),
     );
   });

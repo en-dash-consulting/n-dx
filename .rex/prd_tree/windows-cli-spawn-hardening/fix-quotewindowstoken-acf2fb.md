@@ -2,7 +2,7 @@
 id: "acf2fb32-29dd-495c-ba2c-f871fd21c1b9"
 level: "task"
 title: "Fix quoteWindowsToken: unconditional quoting + ArgvQuote backslash rules (both copies) with parity test"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -11,6 +11,11 @@ tags:
   - "gh:68"
   - "audit-remediation"
 source: "fable-audit-2026-07-10"
+startedAt: "2026-07-11T00:14:55.348Z"
+completedAt: "2026-07-11T00:21:56.808Z"
+endedAt: "2026-07-11T00:21:56.808Z"
+resolutionType: "code-change"
+resolutionDetail: "Rewrote quoteWindowsToken (exec.ts + config.js twin) to quote every token unconditionally, apply ArgvQuote backslash-doubling before quotes, and emit \"\" for empty tokens. Added cross-package parity test and %VAR% JSDoc limitation. New TDD edge-case tests pass; 6 pre-existing provider spawn failures untouched (owned by sibling not-found task)."
 acceptanceCriteria:
   - "TDD: failing tests first for metachar token, empty-string arg, trailing-backslash-before-quote, and backslash-run-before-embedded-quote cases"
   - "quoteWindowsToken quotes every token unconditionally and applies ArgvQuote backslash-doubling rules; empty token yields a quoted empty string"

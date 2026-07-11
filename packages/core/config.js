@@ -670,6 +670,63 @@ function validateGoogleApiKeyEnv(value) {
 }
 
 /**
+ * Quote a single token for a Windows cmd.exe verbatim command line.
+ *
+ * TWIN: this is an exact copy of `quoteWindowsToken` in
+ * `packages/llm-client/src/exec.ts`. It is duplicated (rather than imported)
+ * because the orchestration tier must not import @n-dx/llm-client (spawn-only
+ * rule, enforced by domain-isolation.test.js). Any change here MUST be
+ * mirrored there — the cross-package parity test
+ * `tests/unit/windows-quoting-parity.test.js` fails if the two diverge.
+ *
+ * See the exec.ts twin for the full rule rationale. Summary:
+ * - Every token is quoted unconditionally (safe under `cmd /d /s /c` + the
+ *   outer-quote wrapper; closes the gap where a token with cmd metacharacters
+ *   `& | < > ( ) ^ !` but no space/quote passed through unquoted and split the
+ *   command).
+ * - Embedded double quotes are doubled (`"` → `""`).
+ * - Any run of backslashes immediately before a quote (embedded or the closing
+ *   quote) is doubled, per the Microsoft ArgvQuote / cross-spawn rule, so a
+ *   spaced path ending in a backslash does not merge with the next argument.
+ * - An empty token becomes a quoted empty string (`""`).
+ *
+ * LIMITATION: `%VAR%` expansion is performed by cmd.exe and is NOT prevented
+ * by quoting — this cannot be fixed at the quoting layer.
+ *
+ * Exported for the cross-package parity test.
+ */
+export function quoteWindowsToken(token) {
+  let result = '"';
+  let i = 0;
+  const n = token.length;
+  while (i < n) {
+    let slashes = 0;
+    while (i < n && token[i] === "\\") {
+      slashes++;
+      i++;
+    }
+    if (i === n) {
+      result += "\\".repeat(slashes * 2);
+    } else if (token[i] === '"') {
+      result += "\\".repeat(slashes * 2) + '""';
+      i++;
+    } else {
+      result += "\\".repeat(slashes) + token[i];
+      i++;
+    }
+  }
+  return result + '"';
+}
+
+/**
+ * Build a Windows cmd.exe verbatim command line from a binary path and args.
+ * Twin of `buildWindowsCliCommandLine` in exec.ts. Exported for the parity test.
+ */
+export function buildWindowsCliCommandLine(binary, args) {
+  return [binary, ...args].map(quoteWindowsToken).join(" ");
+}
+
+/**
  * Windows-safe synchronous CLI invocation (GH #37/#68/#69).
  *
  * The orchestration tier must not import @n-dx/llm-client (spawn-only rule,
@@ -682,9 +739,7 @@ function validateGoogleApiKeyEnv(value) {
  */
 function execFileSyncCli(binary, args, options) {
   if (process.platform === "win32") {
-    const cmdLine = [binary, ...args]
-      .map((t) => (/[ "]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t))
-      .join(" ");
+    const cmdLine = buildWindowsCliCommandLine(binary, args);
     // Outer quote pair: `cmd.exe /s` strips only the outermost quotes, keeping
     // the inner per-token quotes (spaced paths) intact. See exec.ts spawnCli.
     return execFileSync("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {

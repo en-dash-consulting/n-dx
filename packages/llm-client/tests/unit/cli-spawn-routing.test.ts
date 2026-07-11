@@ -57,6 +57,6 @@ describe("CLI spawn routing — spawnCli (GH #37/#68/#69)", () => {
 
   it("quotes a binary path containing spaces in the Windows command line", () => {
     const cmdLine = buildWindowsCliCommandLine("C:\\Program Files\\claude.cmd", ["-p", "-"]);
-    expect(cmdLine).toBe('"C:\\Program Files\\claude.cmd" -p -');
+    expect(cmdLine).toBe('"C:\\Program Files\\claude.cmd" "-p" "-"');
   });
 });
