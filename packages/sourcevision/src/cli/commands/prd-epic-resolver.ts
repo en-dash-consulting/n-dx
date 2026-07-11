@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { execFileSyncCli } from "../../util/exec-cli.js";
 
 const REX_DIR = ".rex";
 
@@ -76,12 +77,12 @@ function readPRDDocument(projectDir: string): PRDDocumentLike | null {
     const md = readFileSync(mdPath, "utf-8");
     if (md.trim().startsWith("---")) {
       try {
-        const out = execFileSync("rex", ["parse-md", "--stdin"], {
+        const out = execFileSyncCli("rex", ["parse-md", "--stdin"], {
           input: md,
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "pipe"],
         });
-        return JSON.parse(out) as PRDDocumentLike;
+        return JSON.parse(out as string) as PRDDocumentLike;
       } catch {
         // fall through to JSON
       }

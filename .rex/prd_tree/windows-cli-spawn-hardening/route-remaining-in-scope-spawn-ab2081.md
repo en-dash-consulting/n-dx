@@ -2,7 +2,7 @@
 id: "ab2081f7-57bc-4ef1-9f61-4772eadcce2a"
 level: "task"
 title: "Route remaining in-scope spawn sites: pair-programming.js and sourcevision rex spawns"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "windows"
@@ -13,6 +13,11 @@ tags:
 blockedBy:
   - "4cfcaad0-0e95-488c-950d-17c7f97c62b9"
 source: "fable-audit-2026-07-10"
+startedAt: "2026-07-11T22:00:52.951Z"
+completedAt: "2026-07-11T22:57:25.189Z"
+endedAt: "2026-07-11T22:57:25.189Z"
+resolutionType: "code-change"
+resolutionDetail: "Extracted cmd.exe verbatim spawn recipe into packages/core/win-spawn.js; fixed bare execFileSync(\"rex\",...) in pair-programming.js, branch-work-collector.ts, and prd-epic-resolver.ts; moved multi-line prompts to stdin in runReviewerLlm/runReviewerLlmCapturing; created packages/sourcevision/src/util/exec-cli.ts helper; wrote unit tests for win-spawn.js and exec-cli.ts; fixed pair-programming integration tests for Windows cmd.exe routing; updated cross-package-contracts, architecture-policy, and domain-isolation tests"
 acceptanceCriteria:
   - "packages/core/win-spawn.js (or equivalent) extracted; config.js and pair-programming.js both consume it; no shell:true/shell:win32 remains in pair-programming.js"
   - "Reviewer prompt delivered via stdin, not argv, in both runReviewerLlm paths"

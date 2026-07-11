@@ -47,6 +47,7 @@ const ALLOWED = new Set([
   "packages/core/config.js",
   "packages/core/export.js",
   "packages/core/pair-programming.js",
+  "packages/core/win-spawn.js",
   "pr-check.js",
   // Development scripts
   "packages/web/dev.js",
@@ -61,6 +62,8 @@ const ALLOWED = new Set([
   "packages/sourcevision/src/analyzers/branch-work-filter.ts",
   "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
   "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+  // Windows-safe CLI helper — wraps execFileSync with cmd.exe routing for .cmd shims
+  "packages/sourcevision/src/util/exec-cli.ts",
   // Web server routes — spawn CLI subprocesses for domain tool execution
   "packages/web/src/server/routes-hench.ts",
   "packages/web/src/server/routes-sourcevision.ts",

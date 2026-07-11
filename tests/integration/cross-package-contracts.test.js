@@ -263,6 +263,11 @@ describe("hench → llm-client gateway contract", () => {
     "formatUsage",
     "classifyLLMError",
     "getNextFailoverAttempt",
+    "quoteWindowsToken",
+    "buildWindowsCliCommandLine",
+    "spawnCli",
+    "diagnoseCliInvocation",
+    "diagnoseCliNotFound",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
@@ -612,7 +617,9 @@ describe("gateway export auto-detection", () => {
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
         "toOpenAiToolDef", "toOpenAiToolDefs", "toGeminiFunctionDeclaration",
         "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry",
-        "classifyLLMError", "getNextFailoverAttempt"],
+        "classifyLLMError", "getNextFailoverAttempt",
+        "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli",
+        "diagnoseCliInvocation", "diagnoseCliNotFound"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES"],
