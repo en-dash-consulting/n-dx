@@ -75,7 +75,6 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
 
     expect(config.binary).toBe("codex");
     expect(Array.isArray(config.args)).toBe(true);
-    expect(config.stdinContent).toBeNull(); // Codex: prompt in args, not stdin
     expect(config.cwd).toBe(".");
     expect(typeof config.env).toBe("object");
   });
@@ -125,21 +124,33 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
     expect(config.args).not.toContain("-m");
   });
 
-  it("includes the prompt as the last argument", () => {
+  // cmd.exe newline injection (BatBadBut / CVE-2024-24576 class): a multi-line
+  // argv token is split by cmd.exe at the embedded CR/LF regardless of quoting,
+  // turning subsequent prompt lines into executable shell commands. The only safe
+  // fix is to deliver the prompt via stdin and use "-" as the positional arg.
+  it("delivers prompt via stdin — stdinContent is the combined SYSTEM+TASK string", () => {
     const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, {});
 
-    const lastArg = config.args[config.args.length - 1];
-    // The prompt should contain both system and task content
-    expect(lastArg).toContain("SYSTEM:");
-    expect(lastArg).toContain("You are Hench.");
-    expect(lastArg).toContain("TASK:");
-    expect(lastArg).toContain("Fix the bug.");
+    expect(typeof config.stdinContent).toBe("string");
+    expect(config.stdinContent).toContain("SYSTEM:");
+    expect(config.stdinContent).toContain("You are Hench.");
+    expect(config.stdinContent).toContain("TASK:");
+    expect(config.stdinContent).toContain("Fix the bug.");
   });
 
-  it("stdinContent is null (Codex uses args-based delivery)", () => {
+  it("last positional arg is '-' (codex exec - reads prompt from stdin)", () => {
     const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, {});
 
-    expect(config.stdinContent).toBeNull();
+    expect(config.args[config.args.length - 1]).toBe("-");
+  });
+
+  it("no argv token contains a newline — prevents cmd.exe newline injection", () => {
+    const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, {});
+
+    for (const arg of config.args) {
+      expect(arg).not.toContain("\n");
+      expect(arg).not.toContain("\r");
+    }
   });
 
   it("policy flags match compileCodexPolicyFlags output", () => {
@@ -160,26 +171,25 @@ describe("CodexCliAdapter: snapshot parity", () => {
   it("SNAPSHOT: standard Codex CLI args are deterministic", () => {
     const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, {});
 
-    // Remove the prompt (last arg) since it has variable content from assemblePrompt
-    const argsWithoutPrompt = config.args.slice(0, -1);
-    expect(argsWithoutPrompt).toEqual([
+    expect(config.args).toEqual([
       "exec",
       "--full-auto",
       "--json",
       "--skip-git-repo-check",
+      "-",
     ]);
   });
 
   it("SNAPSHOT: Codex CLI args with model override are deterministic", () => {
     const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, { model: "gpt-5-codex" });
 
-    const argsWithoutPrompt = config.args.slice(0, -1);
-    expect(argsWithoutPrompt).toEqual([
+    expect(config.args).toEqual([
       "exec",
       "--full-auto",
       "--json",
       "--skip-git-repo-check",
       "-m", "gpt-5-codex",
+      "-",
     ]);
   });
 
@@ -793,13 +803,13 @@ describe("CodexCliAdapter: end-to-end pipeline", () => {
     expect(config.args.includes("exec")).toBe(true);
     expect(config.args.includes("--json")).toBe(true);
 
-    // stdin is null (for args-based delivery)
-    expect(config.stdinContent).toBeNull();
+    // Last arg is "-" (stdin sentinel) — prompt is in stdinContent
+    expect(config.args[config.args.length - 1]).toBe("-");
 
-    // Prompt is the last arg and contains both system and task content
-    const lastArg = config.args[config.args.length - 1];
-    expect(lastArg).toContain("SYSTEM:");
-    expect(lastArg).toContain("TASK:");
+    // Prompt delivered via stdin, not argv
+    expect(typeof config.stdinContent).toBe("string");
+    expect(config.stdinContent).toContain("SYSTEM:");
+    expect(config.stdinContent).toContain("TASK:");
   });
 
   it("parse a multi-event Codex sequence into RuntimeEvents", () => {

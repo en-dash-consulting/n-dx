@@ -644,9 +644,13 @@ export const codexCliAdapter: VendorAdapter = {
   ): SpawnConfig {
     const { systemPrompt, taskPrompt } = assemblePrompt(envelope);
 
-    // Codex takes the prompt as a positional argument (not stdin).
-    // Combine system and task prompts into a single prompt string,
-    // matching the format used by dispatchVendorSpawn in cli-loop.ts.
+    // Deliver the prompt via stdin, not argv. On Windows, cmd.exe treats every
+    // embedded CR/LF in a command-line token as a command separator regardless
+    // of quoting (BatBadBut / CVE-2024-24576 class), so a multi-line argv token
+    // is unsafe — subsequent prompt lines can execute as shell commands. Using
+    // "-" as the positional arg tells `codex exec -` to read the prompt from
+    // stdin, which bypasses cmd.exe entirely. The claude adapter uses the same
+    // pattern; cli-loop.ts already pipes stdinContent when it is non-null.
     const prompt = `SYSTEM:\n${systemPrompt}\n\nTASK:\n${taskPrompt}`;
 
     // Compile explicit sandbox and approval flags from the n-dx policy.
@@ -662,14 +666,14 @@ export const codexCliAdapter: VendorAdapter = {
       "--json",
       "--skip-git-repo-check",
       ...(opts.model ? ["-m", opts.model] : []),
-      prompt,
+      "-", // stdin sentinel — codex exec reads the prompt from stdin
     ];
 
     return {
       binary: "codex",
       args,
       env: {},
-      stdinContent: null, // Codex: prompt in args, not stdin
+      stdinContent: prompt,
       cwd: ".",
     };
   },

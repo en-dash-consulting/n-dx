@@ -69,7 +69,8 @@ function extractClaudeContent(envelope: PromptEnvelope): {
 
 /**
  * Extract the logical system and task prompt content from a Codex adapter
- * SpawnConfig. Codex formats as `SYSTEM:\n{sys}\n\nTASK:\n{task}`.
+ * SpawnConfig. Codex formats as `SYSTEM:\n{sys}\n\nTASK:\n{task}` in stdinContent;
+ * the positional arg is "-" (stdin sentinel — avoids cmd.exe newline injection).
  */
 function extractCodexContent(envelope: PromptEnvelope): {
   systemPrompt: string;
@@ -77,11 +78,11 @@ function extractCodexContent(envelope: PromptEnvelope): {
 } {
   const config = codexCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});
 
-  const lastArg = config.args[config.args.length - 1] as string;
-  const systemStart = lastArg.indexOf("SYSTEM:\n") + "SYSTEM:\n".length;
-  const taskMarker = lastArg.indexOf("\n\nTASK:\n");
-  const systemPrompt = lastArg.slice(systemStart, taskMarker);
-  const taskPrompt = lastArg.slice(taskMarker + "\n\nTASK:\n".length);
+  const stdin = config.stdinContent as string;
+  const systemStart = stdin.indexOf("SYSTEM:\n") + "SYSTEM:\n".length;
+  const taskMarker = stdin.indexOf("\n\nTASK:\n");
+  const systemPrompt = stdin.slice(systemStart, taskMarker);
+  const taskPrompt = stdin.slice(taskMarker + "\n\nTASK:\n".length);
 
   return { systemPrompt, taskPrompt };
 }
@@ -337,8 +338,7 @@ describe("AC2: section content equivalence between adapters", () => {
       }
       expect(claudeConfig.stdinContent).toBe(canonical.taskPrompt);
 
-      const codexPrompt = codexConfig.args[codexConfig.args.length - 1] as string;
-      expect(codexPrompt).toBe(
+      expect(codexConfig.stdinContent).toBe(
         `SYSTEM:\n${canonical.systemPrompt}\n\nTASK:\n${canonical.taskPrompt}`,
       );
     }
@@ -354,9 +354,8 @@ describe("AC2: section content equivalence between adapters", () => {
 
     expect(claude.stdinContent).toBe(canonical.taskPrompt);
 
-    const codexPrompt = codex.args[codex.args.length - 1] as string;
-    expect(codexPrompt).toContain(canonical.systemPrompt);
-    expect(codexPrompt).toContain(canonical.taskPrompt);
+    expect(codex.stdinContent).toContain(canonical.systemPrompt);
+    expect(codex.stdinContent).toContain(canonical.taskPrompt);
   });
 });
 

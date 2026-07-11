@@ -2,7 +2,7 @@
 id: "4cfcaad0-0e95-488c-950d-17c7f97c62b9"
 level: "task"
 title: "Codex hench adapter: deliver prompt via stdin instead of argv (cmd.exe newline injection)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -13,6 +13,11 @@ tags:
 blockedBy:
   - "3bc11e6e-5112-49fd-a638-ee73aa520c17"
 source: "fable-audit-2026-07-10"
+startedAt: "2026-07-11T21:29:45.418Z"
+completedAt: "2026-07-11T21:37:10.910Z"
+endedAt: "2026-07-11T21:37:10.910Z"
+resolutionType: "code-change"
+resolutionDetail: "Moved Codex prompt from argv to stdin; \"-\" is the positional sentinel. TDD: wrote failing tests first, then implemented."
 acceptanceCriteria:
   - "TDD: failing test first — codex buildSpawnConfig puts the prompt in stdinContent and '-' in args; no multi-line token remains in argv"
   - "cli-loop stdin piping path exercised for codex (stdinMode 'pipe')"
