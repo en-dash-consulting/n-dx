@@ -2,7 +2,7 @@
 id: "6b7def28-de13-4a56-a8d0-d0eae3833983"
 level: "task"
 title: "Remove claude-cli-adapter manual --allowed-tools pre-quoting (double-quoting regression)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -12,6 +12,11 @@ tags:
 blockedBy:
   - "acf2fb32-29dd-495c-ba2c-f871fd21c1b9"
 source: "fable-audit-2026-07-10"
+startedAt: "2026-07-11T19:57:58.769Z"
+completedAt: "2026-07-11T20:04:51.728Z"
+endedAt: "2026-07-11T20:04:51.728Z"
+resolutionType: "code-change"
+resolutionDetail: "Removed manual double-quote wrapping from --allowed-tools Windows branch; spawnCli/quoteWindowsToken is now the sole quoting authority. TDD: added two failing Windows tests first, then fixed; updated platform-conditional test for cross-platform correctness."
 acceptanceCriteria:
   - "TDD: failing test first asserting the Windows --allowed-tools token contains no literal double-quote characters"
   - "Manual pre-quoting removed; spawnCli/quoteWindowsToken is the single quoting authority"
