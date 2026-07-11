@@ -36,10 +36,7 @@ import { ClaudeClientError } from "./types.js";
 import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
-import { diagnoseCliInvocation, spawnCli } from "./exec.js";
-
-/** Regex patterns for stderr content indicating a missing binary (Windows shell). */
-const NOT_FOUND_PATTERNS = /is not recognized as an internal or external command|cannot find the path|The system cannot find the file specified/i;
+import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 
 /** Regex patterns for stderr content indicating an auth error. */
 const AUTH_PATTERNS = /auth|unauthorized|api.key|credential|login|not logged in/i;
@@ -214,10 +211,13 @@ function spawnOnce(
       const detail = stderr.trim() || stdoutError || `claude exited with code ${code}`;
 
       // On Windows the cmd.exe shim spawns fine but exits non-zero with a
-      // "not recognized" message when the binary is missing — no ENOENT fires.
-      if (NOT_FOUND_PATTERNS.test(detail)) {
-        const diagnosis = diagnoseCliInvocation(cliBinary, "llm.claude.cli_path");
-        reject(new ClaudeClientError(diagnosis.message, "not-found", false));
+      // "not recognized" / "cannot find the path" message when the binary is
+      // missing — no ENOENT fires. diagnoseCliNotFound anchors to the binary
+      // (and confirms via existsSync/PATH) so a generic error the CLI itself
+      // printed isn't misclassified, and preserves the raw stderr detail.
+      const notFoundMessage = diagnoseCliNotFound(detail, cliBinary, "llm.claude.cli_path");
+      if (notFoundMessage) {
+        reject(new ClaudeClientError(notFoundMessage, "not-found", false));
         return;
       }
 

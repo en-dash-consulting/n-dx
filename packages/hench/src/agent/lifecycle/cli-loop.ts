@@ -37,7 +37,8 @@ import {
   resolveVendorCliPath,
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
-import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation } from "../../prd/llm-gateway.js";
+import { isAbsolute } from "node:path";
+import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -166,6 +167,32 @@ const TRANSIENT_PATTERNS = [
 
 export function isTransientError(errorText: string): boolean {
   return TRANSIENT_PATTERNS.some((pattern) => pattern.test(errorText));
+}
+
+/**
+ * Build the error string for a non-zero CLI exit at the close path.
+ *
+ * On win32 a missing vendor CLI never raises ENOENT — {@link spawnCli} launches
+ * `cmd.exe`, which spawns fine and exits non-zero with
+ * `'<binary>' is not recognized as an internal or external command` on stderr.
+ * This is the highest-traffic spawn site, so the NOT_FOUND detection that
+ * cli-provider/codex-cli-provider already do in their close paths is wired here
+ * too: when the (anchored) not-found pattern matches, the message is routed
+ * through {@link diagnoseCliInvocation} with the vendor's config key. The raw
+ * stderr detail is always preserved so no original context is dropped.
+ *
+ * @internal Exported for testing.
+ */
+export function formatCloseError(opts: {
+  code: number | null;
+  stderr: string;
+  vendor: string;
+  cliBinary: string;
+}): string {
+  const { code, stderr, vendor, cliBinary } = opts;
+  const detail = stderr.trim() || `${vendor} exited with code ${code}`;
+  const configKey = vendor === "codex" ? "llm.codex.cli_path" : "llm.claude.cli_path";
+  return diagnoseCliNotFound(detail, cliBinary, configKey) ?? detail;
 }
 
 export function computeDelay(
@@ -597,7 +624,12 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
             "Or switch to the API provider: n-dx config hench.provider api";
         const configKey = adapter.vendor === "codex" ? "llm.codex.cli_path" : "llm.claude.cli_path";
         const diagnosis = diagnoseCliInvocation(cliBinary, configKey);
-        reject(new Error(`${base}\n${diagnosis.message}`));
+        // Only append the diagnosis when it adds information beyond the vendor
+        // install hint already in `base`: the on-PATH-but-failed case or an
+        // absolute configured path (exists / does-not-exist specifics).
+        // Otherwise the diagnosis just restacks a redundant "not found" hint.
+        const addsInfo = diagnosis.onPath || isAbsolute(cliBinary);
+        reject(new Error(addsInfo ? `${base}\n${diagnosis.message}` : base));
         return;
       }
       reject(err);
@@ -787,7 +819,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
       // intercept plan mode — the outer loop owns that flow and will either
       // re-spawn with permissionMode=acceptEdits or surface a cancelled status.
       if (code !== 0 && !result.error && !result.planModeIntercept) {
-        result.error = stderr.trim() || `${adapter.vendor} exited with code ${code}`;
+        result.error = formatCloseError({ code, stderr, vendor: adapter.vendor, cliBinary });
       }
 
       resolve(result);

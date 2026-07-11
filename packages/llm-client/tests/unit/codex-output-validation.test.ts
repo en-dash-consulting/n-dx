@@ -44,11 +44,13 @@ function mockProcess(exitCode: number) {
   const proc = new EventEmitter() as EventEmitter & {
     stderr: Readable;
     stdout: null;
-    stdin: { write: () => void; end: () => void };
+    stdin: EventEmitter & { write: () => void; end: () => void };
   };
   proc.stderr = new EventEmitter() as unknown as Readable;
   proc.stdout = null;
-  proc.stdin = { write: vi.fn(), end: vi.fn() };
+  // stdin is a writable stream in production — the provider attaches an
+  // 'error' listener (EPIPE guard), so the mock must be an EventEmitter.
+  proc.stdin = Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn() });
   process.nextTick(() => proc.emit("close", exitCode));
   return proc;
 }

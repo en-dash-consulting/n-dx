@@ -11,7 +11,8 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound } from "../../src/exec.js";
+import { resolve } from "node:path";
 
 const mockExecFile = vi.mocked(execFile);
 const mockExecFileSync = vi.mocked(execFileSync);
@@ -1015,5 +1016,130 @@ describe("diagnoseCliInvocation", () => {
     const result = diagnoseCliInvocation("mybin");
 
     expect(result.message).toContain("mybin");
+  });
+
+  // --- absolute-path diagnosis (audit-remediation, GH #68) ---
+  // `where` errors ('Invalid pattern') on absolute paths, so an absolute
+  // configured cli_path must be diagnosed via existsSync, not resolveExecutablePath.
+
+  it("diagnoses an existing absolute path as present-but-failed (existsSync branch)", () => {
+    // process.execPath is a real absolute path — existsSync returns true.
+    const result = diagnoseCliInvocation(process.execPath, "llm.claude.cli_path");
+
+    expect(result.onPath).toBe(true);
+    expect(result.resolvedPath).toBe(process.execPath);
+    expect(result.message).toContain("exists but could not be run");
+    expect(result.message).toContain("llm.claude.cli_path");
+    // where/which must NOT be consulted for absolute paths.
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it("diagnoses a missing absolute path as 'configured path does not exist'", () => {
+    const missing = resolve("definitely-not-a-real-binary-xyz.cmd");
+
+    const result = diagnoseCliInvocation(missing, "llm.codex.cli_path");
+
+    expect(result.onPath).toBe(false);
+    expect(result.resolvedPath).toBeNull();
+    expect(result.message).toContain("configured path does not exist");
+    expect(result.message).toContain(missing);
+    expect(result.message).toContain("llm.codex.cli_path");
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it("does not produce a nested '/path/to/C:\\...' hint for an absolute path", () => {
+    const missing = resolve("nope-missing-binary.cmd");
+
+    const result = diagnoseCliInvocation(missing, "llm.codex.cli_path");
+
+    expect(result.message).not.toContain("/path/to/");
+  });
+
+  it("modernizes the on-PATH message away from stale 'not directly invokable' wording", () => {
+    mockExecFileSync.mockReturnValue("/usr/local/bin/claude\n");
+
+    const result = diagnoseCliInvocation("claude", "llm.claude.cli_path");
+
+    expect(result.message).not.toContain("not directly invokable");
+    expect(result.message).toMatch(/exited non-zero|PATH.*mismatch|broken .cmd shim/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCliNotFoundError — anchored not-found detection
+// ---------------------------------------------------------------------------
+
+describe("isCliNotFoundError", () => {
+  it("matches cmd.exe 'is not recognized' naming the binary", () => {
+    const stderr =
+      "'claude.cmd' is not recognized as an internal or external command,\r\n" +
+      "operable program or batch file.";
+    expect(isCliNotFoundError(stderr, "claude.cmd")).toBe(true);
+  });
+
+  it("matches when the binary appears as a full path", () => {
+    const bin = "C:\\tools\\claude.cmd";
+    const stderr = `'${bin}' is not recognized as an internal or external command`;
+    expect(isCliNotFoundError(stderr, bin)).toBe(true);
+  });
+
+  it("matches via basename when stderr names only the basename", () => {
+    const stderr = "'claude.cmd' is not recognized as an internal or external command";
+    expect(isCliNotFoundError(stderr, "C:\\tools\\claude.cmd")).toBe(true);
+  });
+
+  it("does NOT match generic task stderr that doesn't name the binary", () => {
+    // A legitimate run whose subcommand printed a generic Windows error must
+    // not be misclassified as a missing CLI.
+    const stderr = "The system cannot find the file specified.\nfoo.txt could not be opened";
+    expect(isCliNotFoundError(stderr, "claude")).toBe(false);
+  });
+
+  it("does NOT match when there is no not-found phrase at all", () => {
+    expect(isCliNotFoundError("claude: some other failure", "claude")).toBe(false);
+  });
+
+  it("returns false for empty stderr", () => {
+    expect(isCliNotFoundError("", "claude")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// diagnoseCliNotFound — anchoring + existsSync/PATH reality check
+// ---------------------------------------------------------------------------
+
+describe("diagnoseCliNotFound", () => {
+  it("returns null (no reality check) when stderr has no not-found phrase", () => {
+    // No PATH lookup should happen — fast path.
+    expect(diagnoseCliNotFound("codex exited with code 1", "codex")).toBeNull();
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it("classifies the definitive cmd.exe 'is not recognized' as not-found", () => {
+    const bin = resolve("missing-claude.cmd");
+    const stderr = `'${bin}' is not recognized as an internal or external command`;
+    const msg = diagnoseCliNotFound(stderr, bin, "llm.claude.cli_path");
+    expect(msg).not.toBeNull();
+    expect(msg).toContain("llm.claude.cli_path");
+    expect(msg).toContain("is not recognized"); // raw detail preserved
+  });
+
+  it("classifies a genuinely missing binary even when cmd omits the name (generic path message)", () => {
+    // Real win32 behaviour: cmd.exe prints "The system cannot find the path
+    // specified." with NO binary name for a missing absolute path.
+    const missing = resolve("no-such-binary.cmd");
+    const stderr = "The system cannot find the path specified.";
+    const msg = diagnoseCliNotFound(stderr, missing, "llm.codex.cli_path");
+    expect(msg).not.toBeNull();
+    expect(msg).toContain("configured path does not exist");
+  });
+
+  it("does NOT reclassify a generic error from an EXISTING binary's own work", () => {
+    // process.execPath exists → the generic stderr is the CLI's own output.
+    const msg = diagnoseCliNotFound(
+      "The system cannot find the file specified.",
+      process.execPath,
+    );
+    expect(msg).toBeNull();
   });
 });

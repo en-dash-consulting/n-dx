@@ -108,6 +108,7 @@ export {
   buildWindowsCliCommandLine,
   spawnCli,
   diagnoseCliInvocation,
+  diagnoseCliNotFound,
 } from "@n-dx/llm-client";
 
 // ---- Token usage parsing and accumulation ----------------------------------

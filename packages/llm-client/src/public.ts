@@ -262,6 +262,8 @@ export {
   buildWindowsCliCommandLine,
   spawnCli,
   diagnoseCliInvocation,
+  isCliNotFoundError,
+  diagnoseCliNotFound,
 } from "./exec.js";
 
 export type {

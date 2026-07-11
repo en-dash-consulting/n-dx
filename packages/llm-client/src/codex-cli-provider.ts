@@ -28,12 +28,10 @@ import type { CodexConfig } from "./llm-types.js";
 import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-contract.js";
 import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
 import { NEWEST_MODELS } from "./config.js";
-import { diagnoseCliInvocation, spawnCli } from "./exec.js";
+import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
-/** Stderr content indicating a missing binary (Windows cmd.exe shell). */
-const NOT_FOUND_PATTERNS = /is not recognized as an internal or external command|cannot find the path|The system cannot find the file specified/i;
 const TRANSIENT_PATTERNS = [
   /\b500\b/,
   /\b502\b/,
@@ -216,6 +214,11 @@ async function spawnOnce(
         env: envOverride ?? process.env,
       });
 
+      // No-op stdin error guard: a fast-exiting cmd.exe shim can EPIPE the
+      // prompt write before the close handler runs. Without a listener the
+      // 'error' event would crash the process before the friendly diagnosis
+      // is produced. Mirrors cli-provider.ts.
+      proc.stdin!.on("error", () => {/* handled by proc error/close */});
       proc.stdin!.write(request.prompt);
       proc.stdin!.end();
 
@@ -257,12 +260,13 @@ async function spawnOnce(
         const detail = stderr.trim() || `codex exited with code ${code}`;
 
         // On Windows the cmd.exe shim spawns fine but exits non-zero with a
-        // "not recognized" message when the binary is missing — no ENOENT is
-        // raised. Route that through diagnoseCliInvocation just like the
-        // non-Windows ENOENT path above.
-        if (NOT_FOUND_PATTERNS.test(detail)) {
-          const diagnosis = diagnoseCliInvocation(cliBinary, "llm.codex.cli_path");
-          reject(new ClaudeClientError(diagnosis.message, "not-found", false));
+        // "not recognized" / "cannot find the path" message when the binary is
+        // missing — no ENOENT is raised. Route that through diagnoseCliNotFound
+        // just like the non-Windows ENOENT path above; it anchors to the binary
+        // (confirming via existsSync/PATH) and preserves the raw stderr detail.
+        const notFoundMessage = diagnoseCliNotFound(detail, cliBinary, "llm.codex.cli_path");
+        if (notFoundMessage) {
+          reject(new ClaudeClientError(notFoundMessage, "not-found", false));
           return;
         }
 

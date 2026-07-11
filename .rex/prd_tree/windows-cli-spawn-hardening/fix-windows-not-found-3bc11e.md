@@ -2,7 +2,7 @@
 id: "3bc11e6e-5112-49fd-a638-ee73aa520c17"
 level: "task"
 title: "Fix Windows not-found diagnostics: hench close-path detection, pattern anchoring, absolute-path diagnosis, codex stdin guard"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -13,6 +13,11 @@ tags:
 blockedBy:
   - "6b7def28-de13-4a56-a8d0-d0eae3833983"
 source: "fable-audit-2026-07-10"
+startedAt: "2026-07-11T20:48:54.215Z"
+completedAt: "2026-07-11T21:07:52.586Z"
+endedAt: "2026-07-11T21:07:52.586Z"
+resolutionType: "code-change"
+resolutionDetail: "Four Windows not-found diagnostic fixes with TDD. (1) hench close-path: cli-loop formatCloseError() routes non-zero-exit stderr through the not-found diagnosis. (2) Deduped NOT_FOUND patterns into exec.ts, anchored to the binary. (3) diagnoseCliInvocation absolute-path branch via existsSync + modernized on-PATH message. (4) codex stdin no-op error guard. All new tests green; typecheck + architecture gates green."
 acceptanceCriteria:
   - "TDD: failing tests first for (a) hench close-path not-found detection, (b) anchored pattern NOT matching generic task stderr, (c) absolute-path diagnosis both branches, (d) codex stdin error handler presence"
   - "hench cli-loop close/non-zero path routes Windows 'is not recognized' stderr through diagnoseCliInvocation with the vendor config key"
