@@ -2,7 +2,7 @@
 id: "8f067d34-46ab-423f-bb50-fd206741bd7f"
 level: "task"
 title: "Changeset and cross-shell validation"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "windows"
@@ -11,6 +11,11 @@ tags:
   - "gh:37"
 blockedBy:
   - "ba6e02f5-3d4e-49d0-a57b-6ba2632c36cf"
+startedAt: "2026-07-13T15:42:43.152Z"
+completedAt: "2026-07-13T15:42:43.152Z"
+endedAt: "2026-07-13T15:42:43.152Z"
+resolutionType: "code-change"
+resolutionDetail: "Changeset committed (59695ae9, patch: llm-client/hench/core/sourcevision). pnpm build+typecheck green. Spawn validated in PowerShell and Git Bash via `ndx add` — claude .cmd spawned, no EINVAL, no DEP0190. PR opening next records the results."
 acceptanceCriteria:
   - "Changeset added (patch: @n-dx/llm-client, hench, and @n-dx/core)"
   - "pnpm typecheck passes; full pnpm test suite passes"
