@@ -30,6 +30,7 @@ import { ClaudeClientError } from "./types.js";
 import type { LLMProvider, ProviderInfo, StreamChunk } from "./provider-interface.js";
 import type { GoogleConfig } from "./llm-types.js";
 import type { GeminiFunctionDeclaration } from "./tool-schema.js";
+import { classifyAuthError } from "./llm-error-classifier.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 const DEFAULT_MAX_RETRIES = 3;
@@ -173,7 +174,8 @@ export function resolveGoogleApiKey(
 /** Classify an HTTP status code into an ErrorReason and throw. */
 function classifyAndThrow(status: number, message: string): never {
   if (status === 401 || status === 403) {
-    throw new ClaudeClientError(message, "auth", false);
+    throw classifyAuthError(new Error(message), "google") ??
+      new ClaudeClientError(message, "auth", false);
   }
   if (status === 408) {
     throw new ClaudeClientError(message, "timeout", true);
@@ -343,7 +345,8 @@ export function createGoogleApiProvider(
             const message = `Gemini API error ${response.status}: ${body}`;
 
             if (response.status === 401 || response.status === 403) {
-              throw new ClaudeClientError(message, "auth", false);
+              throw classifyAuthError(new Error(message), "google") ??
+                new ClaudeClientError(message, "auth", false);
             }
             if (response.status === 404) {
               throw new ClaudeClientError(message, "not-found", false);
@@ -463,7 +466,8 @@ export function createGoogleApiProvider(
             const message = `Gemini API error ${response.status}: ${body}`;
 
             if (response.status === 401 || response.status === 403) {
-              throw new ClaudeClientError(message, "auth", false);
+              throw classifyAuthError(new Error(message), "google") ??
+                new ClaudeClientError(message, "auth", false);
             }
             if (response.status === 404) {
               throw new ClaudeClientError(message, "not-found", false);
