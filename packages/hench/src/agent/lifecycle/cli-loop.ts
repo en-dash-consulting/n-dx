@@ -1237,6 +1237,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const policy: ExecutionPolicy = {
     ...DEFAULT_EXECUTION_POLICY,
     allowedCommands: config.guard.allowedCommands,
+    // Scope git to the guard allowlist so CLI-mode spawns get subcommand-level
+    // git permissions (Bash(git commit:*), …) instead of a blanket Bash(git:*),
+    // matching the API-provider guard and keeping reset/clean/revert/push off
+    // the auto-approve list.
+    allowedGitSubcommands: config.guard.allowedGitSubcommands,
   };
 
   // Shared: initialize run record + capture start memory snapshot

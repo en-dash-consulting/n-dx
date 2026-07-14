@@ -13,5 +13,5 @@ description: "Close three gaps found while reviewing the #279 pre-run commit gat
 | Title | Status |
 |-------|--------|
 | [Add change-magnitude threshold and config to the pre-run commit gate](./add-change-magnitude-threshold-cec156.md) | pending |
-| [Enforce the git-subcommand allowlist in CLI provider mode (default), not just API mode](./enforce-the-git-subcommand-e76192.md) | pending |
+| [Enforce the git-subcommand allowlist in CLI provider mode (default), not just API mode](./enforce-the-git-subcommand-e76192.md) | completed |
 | [Gate rollbackOnFailure reverts behind an express prompt in interactive runs](./gate-rollbackonfailure-reverts-5aa0a3.md) | pending |
