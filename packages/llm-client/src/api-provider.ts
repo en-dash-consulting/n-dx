@@ -42,6 +42,7 @@ import {
   shouldAutoRetry,
   DEFAULT_AUTO_RETRY_THRESHOLD_MS,
 } from "./rate-limit.js";
+import { classifyAuthError } from "./llm-error-classifier.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 const DEFAULT_MAX_RETRIES = 3;
@@ -191,11 +192,9 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
 
           // Classify the error
           if (status === 401 || status === 403) {
-            throw new ClaudeClientError(
-              formatSdkError(err),
-              "auth",
-              false,
-            );
+            const errMsg = formatSdkError(err);
+            throw classifyAuthError(new Error(errMsg), "claude") ??
+              new ClaudeClientError(errMsg, "auth", false);
           }
 
           if (status === 408 || (err as Error).message?.includes("timeout")) {

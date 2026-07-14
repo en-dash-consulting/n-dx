@@ -9,7 +9,7 @@
 import type { LLMVendor } from "./llm-types.js";
 import { formatRetryCountdown, classifyTimeout } from "./rate-limit.js";
 import type { TimeoutKind } from "./rate-limit.js";
-import { CLI_ERROR_CODES } from "./types.js";
+import { CLI_ERROR_CODES, AuthFailureError } from "./types.js";
 import type { CLIErrorCode } from "./types.js";
 
 /** Error categories returned by {@link classifyLLMError}. */
@@ -425,4 +425,148 @@ export function classifyLLMError(
     category: "unknown",
     code: CLI_ERROR_CODES.GENERIC,
   };
+}
+
+// ── Structured auth failure detection ────────────────────────────────────────
+
+/**
+ * Scan an error message text and extract the first valid JSON error object,
+ * returning `error.message` when present. Used to recover a human-readable
+ * reason from payloads that embed raw JSON (e.g. Claude CLI stdout envelope
+ * or vendor HTTP response bodies).
+ */
+function extractJsonErrorMessage(text: string): string {
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "{") {
+      if (!depth) start = i;
+      depth++;
+    } else if (text[i] === "}" && depth > 0) {
+      depth--;
+      if (!depth && start >= 0) {
+        try {
+          const parsed = JSON.parse(text.slice(start, i + 1)) as Record<string, unknown>;
+          // Anthropic shape: { type: "error", error: { type, message } }
+          // Google shape:    { error: { code, message, status } }
+          // OpenAI shape:    { error: { message, code } }
+          const inner = parsed.error as Record<string, unknown> | undefined;
+          if (inner && typeof inner.message === "string") return inner.message;
+          if (typeof parsed.message === "string") return parsed.message;
+        } catch {
+          // Not valid JSON at this position — keep scanning.
+        }
+        start = -1;
+      }
+    }
+  }
+  return "";
+}
+
+/**
+ * Parse a raw error message string to detect an authentication failure and
+ * extract structured details (HTTP status + normalized reason).
+ *
+ * Returns `null` when the message does not match any known auth-failure
+ * pattern, allowing callers to fall through to their regular error handling.
+ *
+ * This is the structured-detection extension point for auth failures:
+ * provider payloads are scanned for 401/403 HTTP status codes,
+ * `authentication_error` type, and `invalid_api_key` / expired-token
+ * patterns before falling back to plain message matching.
+ */
+export function parseAuthPayload(
+  rawMessage: string,
+  _vendor: LLMVendor,
+): { httpStatus: number | null; authReason: string } | null {
+  if (!rawMessage) return null;
+
+  // Expired-token pattern covers both orders: "token expired" and "expired token".
+  const isExpiredCredential =
+    /expired.*(token|key)|(token|key).*expired|api.key.*expired/i.test(rawMessage);
+
+  const isAuth =
+    /\b(401|403)\b/.test(rawMessage) ||
+    /invalid.*api.*key|invalid_api_key/i.test(rawMessage) ||
+    /authentication.*(fail|error|invalid|expired)/i.test(rawMessage) ||
+    /authentication_error/i.test(rawMessage) ||
+    /unauthorized.*(request|access|error)/i.test(rawMessage) ||
+    isExpiredCredential ||
+    /not logged in|login required/i.test(rawMessage);
+
+  if (!isAuth) return null;
+
+  const statusMatch = /\b(401|403)\b/.exec(rawMessage);
+  const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : null;
+
+  // Try the vendor-prefix-aware extractor first (handles "Gemini API error 401: {...}").
+  // Only trust the result when it actually parsed JSON (no raw braces remaining).
+  const providerDetail = extractProviderDetail(rawMessage);
+  const cleanProviderDetail = providerDetail && !providerDetail.includes("{")
+    ? providerDetail
+    : "";
+
+  // Fall back to a generic JSON scan for messages without the vendor prefix
+  // (e.g. Claude CLI stdout envelopes, plain SDK error strings).
+  const jsonReason = cleanProviderDetail || extractJsonErrorMessage(rawMessage);
+
+  let authReason = jsonReason;
+  if (!authReason) {
+    if (/invalid.*api.*key|invalid_api_key/i.test(rawMessage)) {
+      authReason = "invalid API key";
+    } else if (isExpiredCredential) {
+      authReason = "token expired";
+    } else if (/not logged in|login required/i.test(rawMessage)) {
+      authReason = "not logged in";
+    } else if (httpStatus === 401) {
+      authReason = "401 Unauthorized";
+    } else if (httpStatus === 403) {
+      authReason = "403 Forbidden";
+    } else {
+      authReason = "authentication failed";
+    }
+  }
+
+  return { httpStatus, authReason };
+}
+
+/**
+ * Classify an error as an {@link AuthFailureError} if the error message
+ * indicates an authentication failure. Returns `null` when the error is not
+ * auth-related, allowing the caller to fall through to generic handling.
+ *
+ * The returned `AuthFailureError`:
+ * - Is an `instanceof ClaudeClientError` (existing `reason === "auth"` checks work unchanged).
+ * - Carries `provider`, `httpStatus`, and a normalized `authReason` free of raw JSON blobs.
+ * - Has a vendor-specific user-facing `message` with no raw JSON blobs.
+ */
+export function classifyAuthError(
+  err: Error,
+  vendor: LLMVendor = "claude",
+): AuthFailureError | null {
+  const payload = parseAuthPayload(err.message, vendor);
+  if (!payload) return null;
+
+  const { httpStatus, authReason } = payload;
+
+  // Build a vendor-specific, JSON-free user-facing message directly (not via
+  // classifyLLMError) so the detail suffix never re-introduces a raw JSON blob.
+  let message: string;
+  if (vendor === "codex") {
+    message = "Authentication failed — Codex CLI credentials were rejected.";
+  } else if (vendor === "google") {
+    message = "Authentication failed — your Google API key was rejected.";
+  } else {
+    message = "Authentication failed — your API key was rejected.";
+  }
+  if (authReason && authReason !== "authentication failed") {
+    message += ` (${authReason})`;
+  }
+
+  return new AuthFailureError(
+    message,
+    vendor,
+    httpStatus,
+    payload.authReason,
+  );
 }

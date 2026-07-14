@@ -168,6 +168,38 @@ export class CLIError extends ClaudeClientError {
 }
 
 /**
+ * Structured auth failure from an LLM provider preflight or runtime call.
+ *
+ * Thrown instead of a generic {@link ClaudeClientError} when a provider
+ * returns a 401, 403, or authentication_error response. Carries provider
+ * context so callers can surface targeted re-authentication guidance.
+ *
+ * Consumers can narrow to this type with `instanceof AuthFailureError` to
+ * access the structured fields without breaking existing `reason === "auth"` checks.
+ */
+export class AuthFailureError extends ClaudeClientError {
+  /** LLM vendor name (e.g. "claude", "google", "codex"). */
+  readonly provider: string;
+  /** HTTP status code from the failed request (401, 403), or null for CLI-based errors. */
+  readonly httpStatus: number | null;
+  /** Normalized, human-readable reason extracted from the provider payload. */
+  readonly authReason: string;
+
+  constructor(
+    message: string,
+    provider: string,
+    httpStatus: number | null,
+    authReason: string,
+  ) {
+    super(message, "auth", false);
+    this.name = "AuthFailureError";
+    this.provider = provider;
+    this.httpStatus = httpStatus;
+    this.authReason = authReason;
+  }
+}
+
+/**
  * The unified Claude client interface.
  *
  * Both CLI and API providers implement this interface. Consumers don't need

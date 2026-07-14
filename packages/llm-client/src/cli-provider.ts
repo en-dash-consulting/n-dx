@@ -37,6 +37,7 @@ import { ClaudeClientError } from "./types.js";
 import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
+import { classifyAuthError } from "./llm-error-classifier.js";
 
 /** Regex patterns for stderr content indicating a missing binary (Windows shell). */
 const NOT_FOUND_PATTERNS = /is not recognized as an internal or external command|cannot find the path|The system cannot find the file specified/i;
@@ -225,9 +226,55 @@ function spawnOnce(
       }
 
       const classified = classifyStderr(detail);
+      if (classified.reason === "auth") {
+        const authErr = classifyAuthError(new Error(detail), "claude");
+        if (authErr) { reject(authErr); return; }
+      }
       reject(new ClaudeClientError(detail, classified.reason, classified.retryable));
     });
   });
+}
+
+/**
+ * Attempt to extract a human-readable error message from a raw result string
+ * that may contain an embedded JSON error body (e.g. the Claude CLI emits the
+ * Anthropic API error envelope inside the `result` field of its stdout JSON).
+ *
+ * Scans for the first valid JSON object and returns `error.message` when
+ * present. Returns empty string when no extractable message is found so the
+ * caller can fall back to the original text.
+ */
+function cleanResultMessage(text: string): string {
+  if (!text) return "";
+  // Fast-path: whole value is a JSON object.
+  if (text.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      const inner = parsed.error as Record<string, unknown> | undefined;
+      if (inner && typeof inner.message === "string") return inner.message;
+      if (typeof parsed.message === "string") return parsed.message;
+    } catch { /* not pure JSON — fall through */ }
+  }
+  // Slow-path: JSON blob embedded mid-string (e.g. "Error: {...}").
+  let depth = 0, start = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "{") {
+      if (!depth) start = i;
+      depth++;
+    } else if (text[i] === "}" && depth > 0) {
+      depth--;
+      if (!depth && start >= 0) {
+        try {
+          const parsed = JSON.parse(text.slice(start, i + 1)) as Record<string, unknown>;
+          const inner = parsed.error as Record<string, unknown> | undefined;
+          if (inner && typeof inner.message === "string") return inner.message;
+          if (typeof parsed.message === "string") return parsed.message;
+        } catch { /* not JSON here */ }
+        start = -1;
+      }
+    }
+  }
+  return "";
 }
 
 /**
@@ -245,7 +292,13 @@ function extractStdoutError(stdout: string, format: "json" | "stream-json"): str
     const env = obj as Record<string, unknown>;
     if (env.is_error !== true) return null;
     const status = typeof env.api_error_status === "number" ? `HTTP ${env.api_error_status}` : "";
-    const message = typeof env.result === "string" ? env.result.trim() : "";
+    let message = typeof env.result === "string" ? env.result.trim() : "";
+    // Strip raw JSON blobs that the provider embeds in the result field so
+    // callers never see JSON in the thrown error message.
+    if (message) {
+      const clean = cleanResultMessage(message);
+      if (clean) message = clean;
+    }
     if (message && status) return `${message} (${status})`;
     return message || status || null;
   };
