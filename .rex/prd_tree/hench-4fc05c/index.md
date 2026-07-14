@@ -2,7 +2,7 @@
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
 level: "epic"
 title: "Hench"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-26T15:22:13.999Z"
 completedAt: "2026-07-22T14:48:00.299Z"
 endedAt: "2026-07-22T14:48:00.299Z"
@@ -24,6 +24,7 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Feature 3: Rex Scanner Go Support](./feature-3-rex-scanner-go-support/index.md) | completed |
 | [Feature 4: Hench Go Project Support](./feature-4-hench-go-project-support/index.md) | completed |
 | [Fix Inaccurate File-Change Reporting in Run Summary and Dashboard](./fix-inaccurate-file-change-a10628/index.md) | completed |
+| [Git-Safety Hardening: express-prompt destructive actions and size-aware commit checkpoints](./git-safety-hardening-express-9ffe3e/index.md) | pending |
 | [Graceful Cancellation with Rollback Prompt on Ctrl+C](./graceful-cancellation-with-626d40/index.md) | completed |
 | [Hench Process Concurrency Management](./hench-process-concurrency-management/index.md) | completed |
 | [Hench Resource Monitoring and User Feedback](./hench-resource-monitoring-and-a5f844/index.md) | completed |
