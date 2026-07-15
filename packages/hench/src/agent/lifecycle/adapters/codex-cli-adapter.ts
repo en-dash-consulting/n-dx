@@ -644,13 +644,14 @@ export const codexCliAdapter: VendorAdapter = {
   ): SpawnConfig {
     const { systemPrompt, taskPrompt } = assemblePrompt(envelope);
 
-    // Deliver the prompt via stdin, not argv. On Windows, cmd.exe treats every
-    // embedded CR/LF in a command-line token as a command separator regardless
-    // of quoting (BatBadBut / CVE-2024-24576 class), so a multi-line argv token
-    // is unsafe — subsequent prompt lines can execute as shell commands. Using
-    // "-" as the positional arg tells `codex exec -` to read the prompt from
-    // stdin, which bypasses cmd.exe entirely. The claude adapter uses the same
-    // pattern; cli-loop.ts already pipes stdinContent when it is non-null.
+    // Deliver the prompt via stdin (trailing "-" arg), never argv:
+    //   - Windows: cmd.exe treats embedded CR/LF in an argv token as a command
+    //     separator regardless of quoting (BatBadBut / CVE-2024-24576 class),
+    //     so multi-line prompt content in argv could execute as shell commands.
+    //   - All platforms: briefs are bounded at 400 KB (VENDOR_CONTEXT_CHAR_LIMITS
+    //     .codex), which exceeds ARG_MAX for a single argv element (E2BIG).
+    // Matches the claude adapter and the llm-client codex provider; cli-loop.ts
+    // pipes stdinContent when it is non-null.
     const prompt = `SYSTEM:\n${systemPrompt}\n\nTASK:\n${taskPrompt}`;
 
     // Compile explicit sandbox and approval flags from the n-dx policy.
@@ -660,12 +661,6 @@ export const codexCliAdapter: VendorAdapter = {
     // opts.permissionMode is intentionally ignored — it is a Claude-CLI
     // concept with no Codex equivalent; the run.ts caller drops it with a
     // warning before reaching this adapter.
-    //
-    // The prompt is delivered via stdin (trailing "-"), not as a positional
-    // argv argument. Briefs are bounded at 400 KB (VENDOR_CONTEXT_CHAR_LIMITS.codex),
-    // which exceeds the OS ARG_MAX for a single argv element and would crash the
-    // spawn with E2BIG. `codex exec … -` reads the prompt from stdin, matching
-    // the Claude adapter and the llm-client codex provider.
     const args = [
       "exec",
       ...policyFlags,
