@@ -839,6 +839,12 @@ async function listDirtyPaths(projectDir: string): Promise<string[]> {
  */
 interface AskYesNoOptions {
   interruptMode?: "decline" | "hold-then-exit";
+  /**
+   * Which way an empty answer (bare Enter) resolves. Defaults to `true`
+   * (`[Y/n]` prompts). Set `false` for destructive prompts that should
+   * default to No (`[y/N]`), e.g. the rollback confirmation.
+   */
+  defaultYes?: boolean;
 }
 
 const ROLLBACK_INTERRUPT_HINT = "Press Ctrl+C again to abort the rollback prompt and exit.";
@@ -926,19 +932,21 @@ async function askYesNoWithSuspendedSigint(
   const answer = await readLineWithSuspendedSigint(question, options);
   if (answer === null) return false;
   const trimmed = answer.trim().toLowerCase();
-  return trimmed === "" || trimmed === "y" || trimmed === "yes";
+  if (trimmed === "") return options.defaultYes ?? true;
+  return trimmed === "y" || trimmed === "yes";
 }
 
 /**
- * Ask the user to confirm rollback via stdin (TTY only).
- * Returns true when the user accepts (empty input or 'y'/'yes').
- * The first Ctrl-C prints a hint and keeps the prompt open; a second
- * Ctrl-C aborts the prompt and exits.
+ * Ask the user to confirm the revert via stdin (TTY only).
+ * Reverting is a destructive git action, so the prompt defaults to No —
+ * a bare Enter preserves the working tree; only an explicit 'y'/'yes'
+ * accepts. The first Ctrl-C prints a hint and keeps the prompt open; a
+ * second Ctrl-C aborts the prompt and exits.
  */
 async function promptRollbackConfirm(count: number): Promise<boolean> {
   return askYesNoWithSuspendedSigint(
-    `\nRoll back ${count} uncommitted file(s)? [Y/n] `,
-    { interruptMode: "hold-then-exit" },
+    `\nRevert ${count} uncommitted file(s)? [y/N] `,
+    { interruptMode: "hold-then-exit", defaultYes: false },
   );
 }
 
@@ -946,11 +954,15 @@ async function promptRollbackConfirm(count: number): Promise<boolean> {
  * Revert all uncommitted changes introduced during the run.
  * Skips silently when the working tree is already clean.
  *
- * In interactive TTY mode (stdin is a terminal and --yes was not passed),
- * prompts the user to confirm before reverting.
- * In non-interactive mode (CI, pipe, or --yes) proceeds without a prompt.
+ * In interactive TTY mode (stdin is a terminal, --yes was not passed, and
+ * the run is not autonomous), prompts the user to confirm before reverting;
+ * the prompt defaults to No so a stray Enter never discards work.
+ * In non-interactive mode (CI, pipe, --yes, or any autonomous mode) proceeds
+ * without a prompt, preserving the unattended auto-revert behavior — but a
+ * silent revert only discards tracked changes; untracked files are never
+ * deleted without an express confirmation.
  *
- * Prints the number of reverted paths on completion.
+ * Prints what was reverted on completion.
  */
 interface PerformRollbackOptions {
   /** Skip the interactive confirmation prompt (--yes / non-interactive). */
@@ -976,7 +988,7 @@ async function performRollbackIfNeeded(
   if (isInteractive) {
     const confirmed = await promptRollbackConfirm(dirtyPaths.length);
     if (!confirmed) {
-      info(`Rollback skipped — ${dirtyPaths.length} file(s) left unchanged.`);
+      info(`Changes preserved — ${dirtyPaths.length} uncommitted file(s) left unchanged.`);
       return;
     }
   }
