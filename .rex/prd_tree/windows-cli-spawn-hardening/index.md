@@ -29,6 +29,7 @@ description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root
 | [DEP0190 guard test: fail if any CLI spawn reintroduces shell:true](./dep0190-guard-test-fail-if-any-ba6e02.md) | completed |
 | [Fix quoteWindowsToken: unconditional quoting + ArgvQuote backslash rules (both copies) with parity test](./fix-quotewindowstoken-acf2fb.md) | completed |
 | [Fix Windows not-found diagnostics: hench close-path detection, pattern anchoring, absolute-path diagnosis, codex stdin guard](./fix-windows-not-found-3bc11e.md) | completed |
+| [PR #299 post-review: merge latest main (Hal's #298 overlap) and review cleanup](./pr-299-post-review-merge-latest-a98240.md) | completed |
 | [Remove claude-cli-adapter manual --allowed-tools pre-quoting (double-quoting regression)](./remove-claude-cli-adapter-6b7def.md) | completed |
 | [Route remaining in-scope spawn sites: pair-programming.js and sourcevision rex spawns](./route-remaining-in-scope-spawn-ab2081.md) | completed |
 | [Route the four CLI spawn sites through spawnCli](./route-the-four-cli-spawn-sites-a585ca.md) | completed |
