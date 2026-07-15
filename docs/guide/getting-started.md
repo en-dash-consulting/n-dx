@@ -7,18 +7,32 @@
 
 ## Installation
 
+**Recommended:** install `@n-dx/core` globally with npm.
+
 ```sh
-# npm
 npm install -g @n-dx/core
-
-# pnpm
-pnpm add -g @n-dx/core
-
-# yarn
-yarn global add @n-dx/core
 ```
 
-After installing, `ndx` (or `n-dx`) is available as the primary command. See the [Quickstart](./quickstart) for a 5-minute walkthrough. To build from source, see [Contributing](https://github.com/en-dash-consulting/n-dx#contributing).
+::: details Other package managers
+```sh
+# pnpm (equivalent; preferred if you already use pnpm)
+pnpm add -g @n-dx/core
+
+# yarn (best-effort — not part of our tested path)
+yarn global add @n-dx/core
+```
+:::
+
+::: tip One-off use without installing
+```sh
+npx -p @n-dx/core ndx init .
+```
+Use the `-p @n-dx/core ndx` form. Bare `npx @n-dx/core` does **not** work — the
+binary is named `ndx`, which differs from the package name, so npx cannot pick it
+automatically.
+:::
+
+After installing, `ndx` (or `n-dx`) is available as the primary command. See the [Quickstart](./quickstart) for a 5-minute walkthrough. To build from source (contributors only), see [Contributing](https://github.com/en-dash-consulting/n-dx#contributing). The install paths above were validated end-to-end — see [Install Path Validation](../process/install-path-validation).
 
 ## Initialize a Project
 

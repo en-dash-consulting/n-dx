@@ -934,7 +934,7 @@ function handleVersion(rest) {
  */
 function runInitCapture(toolPath, args) {
   return new Promise((resolve) => {
-    const child = spawnTracked("node", [toolPath, ...args], {
+    const child = spawnTracked(process.execPath, [toolPath, ...args], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, FORCE_COLOR: "0" },
@@ -2335,7 +2335,7 @@ async function handlePairProgramming(rest) {
     process.stderr.write("⚠ pair-programming: creating temporary task...\n");
 
     // Get PRD status to find an epic to use as parent
-    const statusOutput = execFileSync("node", [
+    const statusOutput = execFileSync(process.execPath, [
       resolve(__dir, "../rex/dist/cli/index.js"),
       "status",
       "--format=json",
@@ -2365,7 +2365,7 @@ async function handlePairProgramming(rest) {
     }
 
     // Get the task ID by querying the PRD again and finding the newest pending task
-    const updatedStatusOutput = execFileSync("node", [
+    const updatedStatusOutput = execFileSync(process.execPath, [
       resolve(__dir, "../rex/dist/cli/index.js"),
       "status",
       "--format=json",

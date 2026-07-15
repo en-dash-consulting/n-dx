@@ -38,7 +38,7 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound } from "../../prd/llm-gateway.js";
+import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -667,7 +667,18 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
                 });
               }
             } catch {
-              // Non-JSON stdout — no token usage to extract
+              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
+              // usage from the text-format summary line.
+              const textTokens = parseCodexCliTokenUsage(fullStdout);
+              if (textTokens) {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: { input: textTokens.input, output: textTokens.output },
+                });
+              }
             }
           }
         }
@@ -688,7 +699,18 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
                 });
               }
             } catch {
-              // Non-JSON stdout
+              // Non-JSON stdout (e.g. codex --json JSONL) — recover token
+              // usage from the text-format summary line.
+              const textTokens = parseCodexCliTokenUsage(fullStdout);
+              if (textTokens) {
+                accumulator.push({
+                  type: "token_usage",
+                  vendor: tokenMetadata.vendor,
+                  turn: 1,
+                  timestamp: new Date().toISOString(),
+                  tokenUsage: { input: textTokens.input, output: textTokens.output },
+                });
+              }
             }
           }
         }
@@ -1101,6 +1123,20 @@ interface ErrorContext {
  */
 async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
   const { run, result, accumulated, attempt, store, taskId, retryConfig, vendor } = ctx;
+
+  // Authentication / session loss is never transient: retrying just burns
+  // turns and cascades the same failure. Detect it first — before the
+  // transient check that would otherwise treat a bare "claude exited with
+  // code N" as retryable — and fail immediately with re-auth guidance.
+  if (isAuthError(result.error!)) {
+    const classified = classifyLLMError(new Error(result.error!), vendor as LLMVendor);
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "failed";
+    run.summary = result.summary;
+    run.error = `${classified.message} ${classified.suggestion}`;
+    await handleRunFailure(store, taskId, "deferred", "auth_error", run.error);
+    return "break";
+  }
 
   if (!isTransientError(result.error!)) {
     // Non-transient error: fail immediately

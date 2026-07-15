@@ -432,11 +432,12 @@ describe("Built-in integration schemas", () => {
     });
   });
 
-  describe("Jira schema (stub)", () => {
+  describe("Jira schema", () => {
     it("has correct ID and metadata", () => {
       expect(jiraIntegrationSchema.id).toBe("jira");
       expect(jiraIntegrationSchema.name).toBe("Jira");
-      expect(jiraIntegrationSchema.builtIn).toBe(false);
+      // Promoted to a built-in when the Jira store adapter shipped.
+      expect(jiraIntegrationSchema.builtIn).toBe(true);
       expect(jiraIntegrationSchema.supportsConnectionTest).toBe(true);
     });
 
@@ -499,21 +500,23 @@ describe("Built-in integration schemas", () => {
 // ---------------------------------------------------------------------------
 
 describe("registerBuiltInSchemas", () => {
-  it("registers Notion and Jira schemas", () => {
+  it("registers Notion, Jira, Asana, and GitHub schemas", () => {
     registerBuiltInSchemas();
     expect(getIntegrationSchema("notion")).toBeDefined();
     expect(getIntegrationSchema("jira")).toBeDefined();
+    expect(getIntegrationSchema("asana")).toBeDefined();
+    expect(getIntegrationSchema("github")).toBeDefined();
   });
 
   it("is idempotent (safe to call multiple times)", () => {
     registerBuiltInSchemas();
     registerBuiltInSchemas(); // should not throw
-    expect(listIntegrationSchemas()).toHaveLength(2);
+    expect(listIntegrationSchemas()).toHaveLength(4);
   });
 
   it("ensureSchemas returns full list", () => {
     const schemas = ensureSchemas();
-    expect(schemas).toHaveLength(2);
-    expect(schemas.map((s) => s.id).sort()).toEqual(["jira", "notion"]);
+    expect(schemas).toHaveLength(4);
+    expect(schemas.map((s) => s.id).sort()).toEqual(["asana", "github", "jira", "notion"]);
   });
 });

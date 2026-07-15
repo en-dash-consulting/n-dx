@@ -21,6 +21,32 @@ import { FileStore, ensureRexDir } from "../../../src/store/file-adapter.js";
 import { FolderTreeStore, ensureFolderTreeRexDir } from "../../../src/store/folder-tree-store.js";
 import { NotionStore, ensureNotionRexDir } from "../../../src/store/notion-adapter.js";
 import type { NotionClient, NotionAdapterConfig } from "../../../src/store/notion-client.js";
+import { AsanaStore, ensureAsanaRexDir } from "../../../src/store/asana-adapter.js";
+import type {
+  AsanaClient,
+  AsanaAdapterConfig,
+  AsanaTask,
+  AsanaCreateParams,
+  AsanaUpdateParams,
+} from "../../../src/store/asana-client.js";
+import {
+  GitHubProjectsStore,
+  ensureGitHubProjectsRexDir,
+} from "../../../src/store/github-projects-adapter.js";
+import type {
+  GitHubProjectsClient,
+  GitHubProjectsAdapterConfig,
+  GitHubProjectItem,
+  DraftContent,
+} from "../../../src/store/github-projects-client.js";
+import { JiraStore, ensureJiraRexDir } from "../../../src/store/jira-adapter.js";
+import type {
+  JiraClient,
+  JiraAdapterConfig,
+  JiraIssue,
+  JiraCreateParams,
+  JiraUpdateParams,
+} from "../../../src/store/jira-client.js";
 import { serializeDocument } from "../../../src/store/markdown-serializer.js";
 import { PRD_MARKDOWN_FILENAME } from "../../../src/store/prd-md-migration.js";
 
@@ -682,6 +708,230 @@ describeStoreContract("NotionStore", () => ({
         }
         return false;
       },
+    };
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Run the contract against the AsanaStore adapter
+// ---------------------------------------------------------------------------
+
+class ContractMockAsanaClient implements AsanaClient {
+  tasks = new Map<string, AsanaTask>();
+  private nextId = 1;
+
+  async listTasks(_projectId: string): Promise<AsanaTask[]> {
+    return [...this.tasks.values()];
+  }
+
+  async createTask(params: AsanaCreateParams): Promise<AsanaTask> {
+    const gid = `asana-task-${this.nextId++}`;
+    const task: AsanaTask = {
+      gid,
+      name: params.name,
+      notes: params.notes,
+      completed: params.completed ?? false,
+      parent: params.parent ? { gid: params.parent } : null,
+      external: params.external ?? null,
+    };
+    this.tasks.set(gid, task);
+    return task;
+  }
+
+  async updateTask(gid: string, params: AsanaUpdateParams): Promise<AsanaTask> {
+    const task = this.tasks.get(gid);
+    if (!task) throw new Error(`Task not found: ${gid}`);
+    if (params.name !== undefined) task.name = params.name;
+    if (params.notes !== undefined) task.notes = params.notes;
+    if (params.completed !== undefined) task.completed = params.completed;
+    if (params.external !== undefined) task.external = params.external;
+    return task;
+  }
+
+  async deleteTask(gid: string): Promise<void> {
+    this.tasks.delete(gid);
+  }
+}
+
+describeStoreContract("AsanaStore", () => ({
+  supportsPassthrough: false,
+  supportsArchival: false,
+  setup: async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "rex-contract-asana-"));
+    const rexDir = join(tmpDir, ".rex");
+    await ensureAsanaRexDir(rexDir);
+
+    await writeFile(
+      join(rexDir, "config.json"),
+      toCanonicalJSON({
+        schema: SCHEMA_VERSION,
+        project: "contract-test",
+        adapter: "asana",
+      }),
+      "utf-8",
+    );
+    await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
+    await writeFile(join(rexDir, "workflow.md"), "# Workflow", "utf-8");
+
+    const adapterConfig: AsanaAdapterConfig = {
+      token: "1/contract-test",
+      projectId: "project-contract",
+    };
+    const mockClient = new ContractMockAsanaClient();
+    const store = new AsanaStore(rexDir, mockClient, adapterConfig);
+
+    return {
+      store,
+      cleanup: async () => rm(tmpDir, { recursive: true, force: true }),
+    };
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Run the contract against the GitHubProjectsStore adapter
+// ---------------------------------------------------------------------------
+
+class ContractMockGitHubProjectsClient implements GitHubProjectsClient {
+  items = new Map<string, GitHubProjectItem>();
+  private nextId = 1;
+
+  async listItems(_projectId: string): Promise<GitHubProjectItem[]> {
+    return [...this.items.values()];
+  }
+
+  async createDraftItem(_projectId: string, content: DraftContent): Promise<GitHubProjectItem> {
+    const n = this.nextId++;
+    const item: GitHubProjectItem = {
+      itemId: `PVTI_${n}`,
+      contentId: `DI_${n}`,
+      title: content.title,
+      body: content.body,
+    };
+    this.items.set(item.contentId, item);
+    return item;
+  }
+
+  async updateDraftItem(contentId: string, content: DraftContent): Promise<GitHubProjectItem> {
+    const item = this.items.get(contentId);
+    if (!item) throw new Error(`Draft not found: ${contentId}`);
+    item.title = content.title;
+    item.body = content.body;
+    return item;
+  }
+
+  async deleteItem(_projectId: string, itemId: string): Promise<void> {
+    for (const [key, item] of this.items) {
+      if (item.itemId === itemId) {
+        this.items.delete(key);
+        return;
+      }
+    }
+  }
+}
+
+describeStoreContract("GitHubProjectsStore", () => ({
+  supportsPassthrough: false,
+  supportsArchival: false,
+  setup: async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "rex-contract-github-"));
+    const rexDir = join(tmpDir, ".rex");
+    await ensureGitHubProjectsRexDir(rexDir);
+
+    await writeFile(
+      join(rexDir, "config.json"),
+      toCanonicalJSON({
+        schema: SCHEMA_VERSION,
+        project: "contract-test",
+        adapter: "github",
+      }),
+      "utf-8",
+    );
+    await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
+    await writeFile(join(rexDir, "workflow.md"), "# Workflow", "utf-8");
+
+    const adapterConfig: GitHubProjectsAdapterConfig = {
+      token: "ghp_contract-test",
+      projectId: "PVT_contract",
+    };
+    const mockClient = new ContractMockGitHubProjectsClient();
+    const store = new GitHubProjectsStore(rexDir, mockClient, adapterConfig);
+
+    return {
+      store,
+      cleanup: async () => rm(tmpDir, { recursive: true, force: true }),
+    };
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Run the contract against the JiraStore adapter
+// ---------------------------------------------------------------------------
+
+class ContractMockJiraClient implements JiraClient {
+  issues = new Map<string, JiraIssue>();
+  private nextId = 1;
+
+  async listIssues(_projectKey: string): Promise<JiraIssue[]> {
+    return [...this.issues.values()];
+  }
+
+  async createIssue(params: JiraCreateParams): Promise<JiraIssue> {
+    const key = `${params.projectKey}-${this.nextId++}`;
+    const issue: JiraIssue = {
+      key,
+      summary: params.summary,
+      description: params.description,
+      labels: params.labels ?? [],
+    };
+    this.issues.set(key, issue);
+    return issue;
+  }
+
+  async updateIssue(key: string, params: JiraUpdateParams): Promise<void> {
+    const issue = this.issues.get(key);
+    if (!issue) throw new Error(`Issue not found: ${key}`);
+    issue.summary = params.summary;
+    issue.description = params.description;
+    if (params.labels) issue.labels = params.labels;
+  }
+
+  async deleteIssue(key: string): Promise<void> {
+    this.issues.delete(key);
+  }
+}
+
+describeStoreContract("JiraStore", () => ({
+  supportsPassthrough: false,
+  supportsArchival: false,
+  setup: async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "rex-contract-jira-"));
+    const rexDir = join(tmpDir, ".rex");
+    await ensureJiraRexDir(rexDir);
+
+    await writeFile(
+      join(rexDir, "config.json"),
+      toCanonicalJSON({
+        schema: SCHEMA_VERSION,
+        project: "contract-test",
+        adapter: "jira",
+      }),
+      "utf-8",
+    );
+    await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
+    await writeFile(join(rexDir, "workflow.md"), "# Workflow", "utf-8");
+
+    const adapterConfig: JiraAdapterConfig = {
+      domain: "contract.atlassian.net",
+      email: "contract@test.com",
+      apiToken: "contract-token",
+      projectKey: "CT",
+    };
+    const mockClient = new ContractMockJiraClient();
+    const store = new JiraStore(rexDir, mockClient, adapterConfig);
+
+    return {
+      store,
+      cleanup: async () => rm(tmpDir, { recursive: true, force: true }),
     };
   },
 }));

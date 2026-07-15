@@ -39,10 +39,12 @@ function colorFor(percentRemaining: number): string {
  *   "\x1b[33mcodex / gpt-4o: 7% remaining\x1b[0m"
  *   "claude / claude-sonnet-4-5: 42% remaining"
  *   "google / gemini-2.5-flash: quota unavailable"
+ *   "codex / gpt-5.5: quota unavailable — codex login (session auth) — set OPENAI_API_KEY or llm.codex.api_key for quota"
  */
 function formatEntry(entry: QuotaRemaining): string {
   if (entry.unavailable) {
-    return `${entry.vendor} / ${entry.model}: quota unavailable`;
+    const suffix = entry.notice ? ` — ${entry.notice}` : "";
+    return `${entry.vendor} / ${entry.model}: quota unavailable${suffix}`;
   }
   const open = colorFor(entry.percentRemaining);
   const close = open ? ANSI.reset : "";

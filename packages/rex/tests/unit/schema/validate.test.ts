@@ -131,6 +131,66 @@ describe("validateDocument", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("accepts an item with work-item links", () => {
+    const result = validateDocument({
+      schema: "rex/v1",
+      title: "Test",
+      items: [
+        {
+          id: "t1",
+          title: "Linked Task",
+          status: "pending",
+          level: "task",
+          links: [
+            {
+              system: "notion",
+              workItemId: "page-123",
+              url: "https://notion.so/page-123",
+              syncState: "synced",
+              lastSyncedAt: "2026-07-09T00:00:00.000Z",
+            },
+            { system: "github", workItemId: "42" },
+          ],
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a work-item link with an invalid syncState", () => {
+    const result = validateDocument({
+      schema: "rex/v1",
+      title: "Test",
+      items: [
+        {
+          id: "t1",
+          title: "Linked Task",
+          status: "pending",
+          level: "task",
+          links: [{ system: "notion", workItemId: "page-123", syncState: "bogus" }],
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a work-item link missing required identity fields", () => {
+    const result = validateDocument({
+      schema: "rex/v1",
+      title: "Test",
+      items: [
+        {
+          id: "t1",
+          title: "Linked Task",
+          status: "pending",
+          level: "task",
+          links: [{ system: "notion" }],
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+  });
+
   it("rejects document with invalid priority", () => {
     const result = validateDocument({
       schema: "rex/v1",

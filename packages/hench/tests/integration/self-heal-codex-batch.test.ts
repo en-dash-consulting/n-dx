@@ -396,6 +396,67 @@ describe("Codex self-heal batch pipeline — integration", () => {
     expect(result.run.status).toBe("error_transient");
   });
 
+  // ── Auth loss: detected before retry, fails fast with re-auth guidance ──────
+
+  it("fails immediately on auth/session loss without retrying, and surfaces re-auth guidance", async () => {
+    // Arrange: every spawn reports a lost CLI session on stderr. Auth loss is
+    // never transient — the loop must halt on the first attempt rather than
+    // burning retries, and the recorded error must tell the user how to
+    // re-authenticate.
+    const mockSpawn = vi.fn();
+    vi.doMock("node:child_process", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:child_process")>();
+      return { ...actual, spawn: mockSpawn };
+    });
+
+    mockSpawn.mockImplementation(() =>
+      mockCliProcess({
+        stderr: "Not logged in. Please run codex login to continue.",
+        code: 1,
+      }),
+    );
+
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+    const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
+    const { readFile } = await import("node:fs/promises");
+
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", rexDir);
+
+    const result = await cliLoop({
+      config: {
+        ...config,
+        selfHeal: true,
+        // Two retries are available, but an auth error must not consume them.
+        retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      },
+      store,
+      projectDir,
+      henchDir,
+      taskId: "task-1",
+    });
+
+    // Only one spawn — the loop did not retry the auth failure.
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+
+    // Permanent failure, not error_transient.
+    expect(result.run.status).toBe("failed");
+
+    // The error carries actionable re-authentication guidance.
+    expect(result.run.error).toContain("codex login");
+
+    // An auth_error event was logged (distinct from transient_error).
+    const logText = await readFile(join(rexDir, "execution-log.jsonl"), "utf-8");
+    const events = logText
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { event: string });
+    expect(events.some((e) => e.event === "auth_error")).toBe(true);
+    expect(events.some((e) => e.event === "transient_error")).toBe(false);
+  });
+
   // ── AC-2: Rate-limit error triggers retry; pipeline continues ──────────────
 
   it("retries on 429 rate-limit error and continues the self-heal pipeline", async () => {

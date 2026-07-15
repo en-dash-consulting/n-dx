@@ -223,8 +223,15 @@ async function handleRecommend(
     }
 
     try {
-      const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
-      jsonResponse(res, 200, { ok: true, ...parsed });
+      const parsed = JSON.parse(result.stdout);
+      // `rex recommend --format=json` emits a JSON array of recommendations.
+      // Spreading an array into an object turns it into numeric-keyed props
+      // and loses the count, so expose it under a named key instead.
+      if (Array.isArray(parsed)) {
+        jsonResponse(res, 200, { ok: true, recommendations: parsed, count: parsed.length });
+      } else {
+        jsonResponse(res, 200, { ok: true, ...(parsed as Record<string, unknown>) });
+      }
     } catch {
       jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
     }

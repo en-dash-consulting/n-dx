@@ -203,6 +203,18 @@ export type { TreeEntry } from "./core/tree.js";
 export { computeStats } from "./core/stats.js";
 export type { TreeStats } from "./core/stats.js";
 
+// ---- Core: work-item linkage model ------------------------------------------
+
+export {
+  getLinks,
+  findLink,
+  upsertLink,
+  removeLink,
+  updateLinkSyncState,
+} from "./core/work-item-link.js";
+export type { WorkItemLinkSyncPatch } from "./core/work-item-link.js";
+export type { WorkItemLink, WorkItemSyncState } from "./schema/index.js";
+
 // ---- Core: deletion ---------------------------------------------------------
 
 export { deleteItem, cleanBlockedByRefs } from "./core/delete.js";

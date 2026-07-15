@@ -15,16 +15,24 @@ This guide assumes a **new or empty project**. If you're adding ndx to a codebas
 
 ## 1. Install
 
-```sh
-# npm
-npm install -g @n-dx/core
+**Recommended:** install `@n-dx/core` globally with npm.
 
-# pnpm
+```sh
+npm install -g @n-dx/core
+```
+
+::: details Other package managers
+```sh
+# pnpm (equivalent; preferred if you already use pnpm)
 pnpm add -g @n-dx/core
 
-# yarn
+# yarn (best-effort — not part of our tested path)
 yarn global add @n-dx/core
 ```
+:::
+
+Prefer not to install globally? Run one-off with `npx -p @n-dx/core ndx <command>`
+(the `-p @n-dx/core ndx` form is required — bare `npx @n-dx/core` does not work).
 
 ## 2. Initialize
 

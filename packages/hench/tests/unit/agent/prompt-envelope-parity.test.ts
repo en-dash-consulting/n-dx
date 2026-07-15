@@ -78,6 +78,7 @@ function extractCodexContent(envelope: PromptEnvelope): {
 } {
   const config = codexCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});
 
+  // Codex delivers the combined prompt via stdin (trailing "-" arg).
   const stdin = config.stdinContent as string;
   const systemStart = stdin.indexOf("SYSTEM:\n") + "SYSTEM:\n".length;
   const taskMarker = stdin.indexOf("\n\nTASK:\n");

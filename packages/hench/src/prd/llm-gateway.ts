@@ -89,7 +89,7 @@ export {
 
 // ---- CLI error classes & classification ------------------------------------
 export { CLIError, ClaudeClientError, CLI_ERROR_CODES } from "@n-dx/llm-client";
-export { classifyLLMError } from "@n-dx/llm-client";
+export { classifyLLMError, isAuthError } from "@n-dx/llm-client";
 export type { CLIErrorCode, LLMErrorCategory, LLMErrorClassification } from "@n-dx/llm-client";
 
 // ---- Process execution ------------------------------------------------------

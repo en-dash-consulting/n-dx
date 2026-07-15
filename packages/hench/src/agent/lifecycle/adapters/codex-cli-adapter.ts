@@ -660,6 +660,12 @@ export const codexCliAdapter: VendorAdapter = {
     // opts.permissionMode is intentionally ignored — it is a Claude-CLI
     // concept with no Codex equivalent; the run.ts caller drops it with a
     // warning before reaching this adapter.
+    //
+    // The prompt is delivered via stdin (trailing "-"), not as a positional
+    // argv argument. Briefs are bounded at 400 KB (VENDOR_CONTEXT_CHAR_LIMITS.codex),
+    // which exceeds the OS ARG_MAX for a single argv element and would crash the
+    // spawn with E2BIG. `codex exec … -` reads the prompt from stdin, matching
+    // the Claude adapter and the llm-client codex provider.
     const args = [
       "exec",
       ...policyFlags,

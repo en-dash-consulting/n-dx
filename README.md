@@ -78,15 +78,16 @@ See [`.local_testing/README.md`](.local_testing/) for advanced usage:
 
 **Prerequisites:** Node.js ≥ 18 (22 LTS recommended).
 
-Install with whichever package manager you use:
+**Recommended:** install `@n-dx/core` globally with npm.
 
 ```sh
 npm install -g @n-dx/core
-# or
-pnpm add -g @n-dx/core
-# or
-yarn global add @n-dx/core
 ```
+
+Alternatives: `pnpm add -g @n-dx/core` (equivalent), or `yarn global add @n-dx/core`
+(best-effort, untested). For one-off use without a global install, run
+`npx -p @n-dx/core ndx <command>` — bare `npx @n-dx/core` does not work.
+See [Install Path Validation](docs/process/install-path-validation.md) for the tested-behavior rationale.
 
 Then run:
 

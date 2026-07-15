@@ -84,6 +84,31 @@ describe("AdapterRegistry", () => {
       expect(adapters.some((a) => a.name === "notion")).toBe(true);
     });
 
+    it("has 'asana' adapter registered by default with token + projectId schema", () => {
+      const def = registry.get("asana");
+      expect(def).toBeDefined();
+      expect(def!.configSchema.token?.required).toBe(true);
+      expect(def!.configSchema.token?.sensitive).toBe(true);
+      expect(def!.configSchema.projectId?.required).toBe(true);
+    });
+
+    it("has 'github' adapter registered by default with token + projectId schema", () => {
+      const def = registry.get("github");
+      expect(def).toBeDefined();
+      expect(def!.configSchema.token?.required).toBe(true);
+      expect(def!.configSchema.token?.sensitive).toBe(true);
+      expect(def!.configSchema.projectId?.required).toBe(true);
+    });
+
+    it("has 'jira' adapter registered by default with a sensitive apiToken", () => {
+      const def = registry.get("jira");
+      expect(def).toBeDefined();
+      expect(def!.configSchema.domain?.required).toBe(true);
+      expect(def!.configSchema.apiToken?.required).toBe(true);
+      expect(def!.configSchema.apiToken?.sensitive).toBe(true);
+      expect(def!.configSchema.projectKey?.required).toBe(true);
+    });
+
     it("creates a FileStore for the 'file' adapter", () => {
       const store = registry.create("file", rexDir, {});
       expect(store.capabilities().adapter).toBe("file");

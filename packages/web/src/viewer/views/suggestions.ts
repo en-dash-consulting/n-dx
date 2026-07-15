@@ -13,28 +13,46 @@ interface SuggestionsProps {
 function RefreshRecommendationsButton() {
   const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [count, setCount] = useState<number | null>(null);
 
   const handleClick = useCallback(async () => {
     setState("running");
     setError(null);
+    setCount(null);
     try {
       const res = await fetch("/api/commands/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
+      const d = await res.json().catch(() => ({})) as {
+        error?: string;
+        count?: number;
+        recommendations?: unknown[];
+      };
       if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: "Request failed" })) as { error?: string };
         throw new Error(d.error || `HTTP ${res.status}`);
       }
+      // Surface the operation's real result rather than discarding it — the
+      // server returns the actionable recommendations produced by rex recommend.
+      const n = typeof d.count === "number"
+        ? d.count
+        : Array.isArray(d.recommendations) ? d.recommendations.length : null;
+      setCount(n);
       setState("done");
-      setTimeout(() => setState("idle"), 4000);
+      setTimeout(() => setState("idle"), 6000);
     } catch (err) {
       setError(String(err));
       setState("error");
       setTimeout(() => setState("idle"), 6000);
     }
   }, []);
+
+  const doneLabel = count === null
+    ? "✓ Done"
+    : count === 0
+      ? "✓ No new recommendations"
+      : `✓ ${count} recommendation${count === 1 ? "" : "s"} found`;
 
   return h("div", { class: "overview-reanalyze" },
     h("button", {
@@ -49,7 +67,7 @@ function RefreshRecommendationsButton() {
       state === "running" ? "Refreshing..." : "Refresh Recommendations",
     ),
     state === "done"
-      ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, "\u2713 Done")
+      ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, doneLabel)
       : null,
     state === "error"
       ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")

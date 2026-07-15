@@ -17,6 +17,12 @@ import { toCanonicalJSON } from "../core/canonical.js";
 import { FileStore } from "./file-adapter.js";
 import { NotionStore } from "./notion-adapter.js";
 import { LiveNotionClient } from "./notion-client.js";
+import { AsanaStore } from "./asana-adapter.js";
+import { LiveAsanaClient } from "./asana-client.js";
+import { GitHubProjectsStore } from "./github-projects-adapter.js";
+import { LiveGitHubProjectsClient } from "./github-projects-client.js";
+import { JiraStore } from "./jira-adapter.js";
+import { LiveJiraClient } from "./jira-client.js";
 import type { PRDStore } from "./contracts.js";
 
 // ---------------------------------------------------------------------------
@@ -148,7 +154,12 @@ export function isRedactedField(v: unknown): v is RedactedField {
 // Built-in adapter definitions
 // ---------------------------------------------------------------------------
 
-const BUILT_IN_NAMES = new Set(["file", "notion"]);
+/**
+ * Names of the adapters that ship with rex and are always registered.
+ * Exported so other modules (e.g. the CLI `adapter` command) can classify an
+ * adapter as built-in without duplicating the list.
+ */
+export const BUILT_IN_NAMES = new Set(["file", "notion", "asana", "github", "jira"]);
 
 function fileAdapterDef(): AdapterDefinition {
   return {
@@ -176,6 +187,74 @@ function notionAdapterDef(): AdapterDefinition {
   };
 }
 
+function asanaAdapterDef(): AdapterDefinition {
+  return {
+    name: "asana",
+    description: "Asana project backend",
+    configSchema: {
+      token: { required: true, sensitive: true, description: "Asana personal access token" },
+      projectId: { required: true, description: "Asana project GID" },
+    },
+    factory: (rexDir, config) => {
+      const token = config.token as string;
+      const projectId = config.projectId as string;
+      const client = new LiveAsanaClient(token);
+      return new AsanaStore(rexDir, client, { token, projectId });
+    },
+  };
+}
+
+function githubAdapterDef(): AdapterDefinition {
+  return {
+    name: "github",
+    description: "GitHub Projects (v2) backend",
+    configSchema: {
+      token: { required: true, sensitive: true, description: "GitHub personal access token (project scope)" },
+      projectId: { required: true, description: "GitHub ProjectV2 node ID (PVT_...)" },
+    },
+    factory: (rexDir, config) => {
+      const token = config.token as string;
+      const projectId = config.projectId as string;
+      const client = new LiveGitHubProjectsClient(token);
+      return new GitHubProjectsStore(rexDir, client, { token, projectId });
+    },
+  };
+}
+
+function jiraAdapterDef(): AdapterDefinition {
+  return {
+    name: "jira",
+    description: "Jira Cloud backend",
+    configSchema: {
+      domain: { required: true, description: "Jira Cloud domain (your-company.atlassian.net)" },
+      email: { required: true, description: "Account email for API-token auth" },
+      apiToken: { required: true, sensitive: true, description: "Jira API token" },
+      projectKey: { required: true, description: "Jira project key (e.g. PRD)" },
+      issueType: { required: false, description: "Issue type for new issues (default Task)" },
+      syncLabels: { required: false, description: "Sync PRD tags as Jira labels (default true)" },
+    },
+    factory: (rexDir, config) => {
+      const client = new LiveJiraClient(
+        config.domain as string,
+        config.email as string,
+        config.apiToken as string,
+      );
+      return new JiraStore(rexDir, client, {
+        domain: config.domain as string,
+        email: config.email as string,
+        apiToken: config.apiToken as string,
+        projectKey: config.projectKey as string,
+        issueType: config.issueType as string | undefined,
+        // Config may arrive as a boolean (web UI) or a string (CLI --key=val).
+        syncLabels:
+          config.syncLabels === undefined
+            ? undefined
+            : config.syncLabels !== false && config.syncLabels !== "false",
+      });
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // AdapterRegistry
 // ---------------------------------------------------------------------------
@@ -192,6 +271,9 @@ export class AdapterRegistry {
   constructor() {
     this.adapters.set("file", fileAdapterDef());
     this.adapters.set("notion", notionAdapterDef());
+    this.adapters.set("asana", asanaAdapterDef());
+    this.adapters.set("github", githubAdapterDef());
+    this.adapters.set("jira", jiraAdapterDef());
   }
 
   // ---- Registration ------------------------------------------------------

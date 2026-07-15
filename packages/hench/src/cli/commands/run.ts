@@ -882,7 +882,7 @@ export async function cmdRun(
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="codex".`,
-        `Either use a Codex/GPT model (e.g., gpt-4o, o1) or switch vendor: 'n-dx config llm.vendor claude'`,
+        `Either use a Codex/GPT model (e.g., gpt-5.5, gpt-5.4-mini) or switch vendor: 'n-dx config llm.vendor claude'`,
       );
     }
     if (

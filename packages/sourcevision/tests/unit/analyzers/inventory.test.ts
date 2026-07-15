@@ -195,6 +195,43 @@ describe("classifyRole", () => {
   it("classifies scripts dir files as build", () => {
     expect(classifyRole("scripts/deploy.sh", "Shell")).toBe("build");
   });
+
+  // ── Convention: *.config.* build/tooling config not in the enumerated set ──
+
+  it("classifies enumerated-miss configs as config via the *.config.* convention", () => {
+    // None of these are in typescript.ts configFilenames, so before the
+    // convention heuristic they fell through to the "source" role.
+    expect(classifyRole("drizzle.config.ts", "TypeScript")).toBe("config");
+    expect(classifyRole("playwright.config.ts", "TypeScript")).toBe("config");
+    expect(classifyRole("tsup.config.ts", "TypeScript")).toBe("config");
+    expect(classifyRole("cypress.config.js", "JavaScript")).toBe("config");
+    expect(classifyRole("commitlint.config.cjs", "JavaScript")).toBe("config");
+    expect(classifyRole("uno.config.mts", "TypeScript")).toBe("config");
+  });
+
+  it("applies the *.config.* convention regardless of directory depth", () => {
+    expect(classifyRole("packages/web/vite.config.ts", "TypeScript")).toBe("config");
+    expect(classifyRole("apps/site/astro.config.mjs", "JavaScript")).toBe("config");
+  });
+
+  it("matches config data extensions in the *.config.* convention", () => {
+    expect(classifyRole("release.config.json", "JSON")).toBe("config");
+    expect(classifyRole("renovate.config.yaml", "YAML")).toBe("config");
+  });
+
+  // ── Guardrails: the convention must not swallow genuine source files ──
+
+  it("does not treat a source file named config.ts as config", () => {
+    expect(classifyRole("src/config.ts", "TypeScript")).toBe("source");
+  });
+
+  it("does not match substrings like configuration.ts", () => {
+    expect(classifyRole("src/configuration.ts", "TypeScript")).toBe("source");
+  });
+
+  it("does not match a hyphenated db-config.ts", () => {
+    expect(classifyRole("src/db-config.ts", "TypeScript")).toBe("source");
+  });
 });
 
 // ── deriveCategory ────────────────────────────────────────────────────────────
@@ -322,6 +359,50 @@ describe("analyzeInventory", () => {
 
     expect(paths).toContain("app.py");
     expect(paths.some((p) => p.includes("site-packages"))).toBe(false);
+  });
+
+  it("excludes vendor artifact directories from the inventory", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-vendor-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await writeFile(join(tmpDir, "package.json"), '{ "name": "test" }\n');
+    await writeFile(join(tmpDir, "src", "app.ts"), 'console.log("hi");\n');
+
+    // Committed vendor artifacts (not gitignored) in a TS-primary repo.
+    for (const [dir, file] of [
+      ["vendor", "lib.js"],
+      ["third_party", "dep.ts"],
+      ["bower_components", "jquery.js"],
+      ["jspm_packages", "pkg.js"],
+    ] as const) {
+      await mkdir(join(tmpDir, dir), { recursive: true });
+      await writeFile(join(tmpDir, dir, file), "module.exports = {};\n");
+    }
+
+    const inv = await analyzeInventory(tmpDir);
+    const paths = inv.files.map((f) => f.path);
+
+    expect(paths).toContain("src/app.ts");
+    expect(
+      paths.some((p) =>
+        /(?:^|\/)(vendor|third_party|bower_components|jspm_packages)\//.test(p),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not over-exclude source that merely resembles vendor paths", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-vendor-guard-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    // Plural directory name — not the exact "vendor" convention.
+    await mkdir(join(tmpDir, "vendors"), { recursive: true });
+    await writeFile(join(tmpDir, "vendors", "registry.ts"), "export const x = 1;\n");
+    // A genuine source file whose name contains "vendor".
+    await writeFile(join(tmpDir, "src", "vendor-utils.ts"), "export const y = 2;\n");
+
+    const inv = await analyzeInventory(tmpDir);
+    const paths = inv.files.map((f) => f.path).sort();
+
+    expect(paths).toContain("src/vendor-utils.ts");
+    expect(paths).toContain("vendors/registry.ts");
   });
 
   it("produces deterministic output across runs", async () => {

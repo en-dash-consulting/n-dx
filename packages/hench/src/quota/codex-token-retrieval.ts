@@ -125,6 +125,29 @@ function classifyStatus(status: number): TokenRetrievalErrorKind {
   return "network";
 }
 
+/**
+ * Strip a trailing dated-deployment suffix from an OpenAI model id.
+ *
+ * OpenAI usage responses report dated deployment ids such as
+ * `gpt-4o-2024-08-06` or `gpt-5-codex-2025-03-01`, whereas N-DX config carries
+ * the undated base id (`gpt-4o`, `gpt-5-codex`). Normalising both sides to the
+ * base id lets comparison succeed. Recognises both `-YYYY-MM-DD` and `-YYYYMMDD`.
+ */
+export function stripModelDateSuffix(model: string): string {
+  return model.replace(/-\d{4}-\d{2}-\d{2}$/, "").replace(/-\d{8}$/, "");
+}
+
+/**
+ * True when a configured model id and an API-returned model id refer to the
+ * same model, tolerating dated deployment suffixes on either side.
+ *
+ * Uses equality after date-stripping (not prefix matching) so distinct models
+ * that share a prefix — e.g. `gpt-4o` vs `gpt-4o-mini` — never collide.
+ */
+export function modelMatches(configured: string, apiModel: string): boolean {
+  return stripModelDateSuffix(configured) === stripModelDateSuffix(apiModel);
+}
+
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
@@ -287,8 +310,12 @@ export async function fetchCodexTokenUsage(
     };
   }
 
-  // Find the most recent entry for the configured model
-  const modelEntries = data.data.filter((entry) => entry.model === options.model);
+  // Find the most recent entry for the configured model. Match tolerantly so
+  // dated deployment ids returned by the API (e.g. "gpt-5-codex-2025-03-01")
+  // still resolve to the configured base id (e.g. "gpt-5-codex").
+  const modelEntries = data.data.filter(
+    (entry) => entry.model != null && modelMatches(options.model, entry.model),
+  );
   if (modelEntries.length === 0) {
     return {
       ok: false,

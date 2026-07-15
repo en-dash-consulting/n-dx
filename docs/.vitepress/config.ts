@@ -73,6 +73,7 @@ export default defineConfig({
             { text: "Process Lifecycle", link: "/analysis/process-lifecycle-audit" },
             { text: "Signal Handling", link: "/analysis/signal-handling-audit" },
             { text: "Memory OS Behavior", link: "/process/memory-os-behavior" },
+            { text: "Install Path Validation", link: "/process/install-path-validation" },
           ],
         },
       ],

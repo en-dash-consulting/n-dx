@@ -1,9 +1,9 @@
 /**
- * Jira integration schema definition (stub).
+ * Jira integration schema definition.
  *
- * Demonstrates the extensibility of the integration schema system.
- * This schema defines the configuration fields that would be needed
- * for a future Jira adapter, without implementing the actual adapter.
+ * Backs the built-in Jira adapter (`store/jira-adapter.ts`) — defines the
+ * configuration fields (domain, email, API token, project) surfaced by the web
+ * UI and CLI config flows.
  *
  * @module store/integration-schemas/jira
  */
@@ -18,7 +18,7 @@ export const jiraIntegrationSchema: IntegrationSchema = {
   docsUrl: "https://developer.atlassian.com/cloud/jira/platform/rest/v3/",
   supportsConnectionTest: true,
   supportsSchemaValidation: false,
-  builtIn: false,
+  builtIn: true,
 
   groups: {
     connection: {

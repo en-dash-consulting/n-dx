@@ -198,14 +198,14 @@ function registerMcpServers(dir) {
     // `claude mcp add` fails if the server already exists in any scope.
     for (const scope of ["local", "project", "user"]) {
       try {
-        execSync(`claude mcp remove --scope ${scope} ${name}`, { stdio: "ignore", timeout: 5_000 });
+        execSync(`"${claudeCmd}" mcp remove --scope ${scope} ${name}`, { stdio: "ignore", timeout: 5_000 });
       } catch {
         // Server may not exist in this scope — continue cleanup.
       }
     }
     try {
       execSync(
-        `claude mcp add ${name} -- node "${bin}" ${descriptor.mcpCommand} "${absDir}"`,
+        `"${claudeCmd}" mcp add ${name} -- node "${bin}" ${descriptor.mcpCommand} "${absDir}"`,
         { stdio: "pipe", timeout: 10_000 },
       );
       results.push({ name, transport: "stdio", ok: true });

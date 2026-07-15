@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveVendorModel, NEWEST_MODELS, TIER_MODELS, GOOGLE_MODELS } from "../../src/config.js";
+import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveVendorModel, normalizeCodexModel, NEWEST_MODELS, TIER_MODELS, GOOGLE_MODELS } from "../../src/config.js";
+import { isModelCompatibleWithVendor } from "../../src/vendor-model-reset.js";
 
 describe("loadClaudeConfig", () => {
   let tmpDir: string;
@@ -295,6 +296,38 @@ describe("TIER_MODELS", () => {
     expect(TIER_MODELS.google.light).toBe(GOOGLE_MODELS.light);
     expect(TIER_MODELS.google.standard).toBe(GOOGLE_MODELS.standard);
     expect(TIER_MODELS.google.heavy).toBe(GOOGLE_MODELS.heavy);
+  });
+
+  it("NEWEST_MODELS.codex resolves to a valid codex-CLI model", () => {
+    // Guards against NEWEST_MODELS.codex drifting to an ID the codex CLI would
+    // reject. Compatibility is the strongest local signal of validity.
+    expect(isModelCompatibleWithVendor("codex", NEWEST_MODELS.codex)).toBe(true);
+  });
+
+  it("codex tier models are all codex-CLI compatible", () => {
+    for (const tier of ["light", "standard", "heavy"] as const) {
+      expect(isModelCompatibleWithVendor("codex", TIER_MODELS.codex[tier])).toBe(true);
+    }
+  });
+});
+
+describe("normalizeCodexModel", () => {
+  it("maps legacy codex brand IDs to current canonical models", () => {
+    expect(normalizeCodexModel("gpt-5-codex")).toBe(NEWEST_MODELS.codex);
+    expect(normalizeCodexModel("gpt-5.1-codex-max")).toBe(NEWEST_MODELS.codex);
+    expect(normalizeCodexModel("gpt-5.1-codex-mini")).toBe(TIER_MODELS.codex.light);
+  });
+
+  it("passes through current catalog model IDs unchanged", () => {
+    for (const id of ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"]) {
+      expect(normalizeCodexModel(id)).toBe(id);
+    }
+  });
+
+  it("does not alias the removed non-hyphen 'gpt-5.4mini' form", () => {
+    // The dead alias was removed; the non-hyphen spelling now passes through
+    // unchanged rather than silently resolving to the light-tier model.
+    expect(normalizeCodexModel("gpt-5.4mini")).toBe("gpt-5.4mini");
   });
 });
 

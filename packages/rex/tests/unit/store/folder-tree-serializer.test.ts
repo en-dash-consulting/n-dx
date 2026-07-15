@@ -753,6 +753,34 @@ describe("serializeFolderTree: round-trip with parseFolderTree", () => {
     expect(content).toContain("myCustomField");
     expect(content).toContain('"custom-value"');
   });
+
+  it("round-trips work-item links (linkage model visibility)", async () => {
+    // Criterion 2: a PRD item's links to downstream work items survive
+    // serialize → parse, so they are visible whenever the PRD is loaded.
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Linked Task", {
+      links: [
+        {
+          system: "notion",
+          workItemId: "page-123",
+          url: "https://notion.so/page-123",
+          syncState: "synced",
+          remoteStatus: "In progress",
+          lastSyncedAt: "2026-07-09T00:00:00.000Z",
+        },
+        { system: "github", workItemId: "42" },
+      ],
+    });
+    const epic = makeEpic("11111111-0000-0000-0000-000000000000", "Epic", {
+      children: [task],
+    });
+
+    await serializeFolderTree([epic], testDir);
+    const { items, warnings } = await parseFolderTree(testDir);
+
+    expect(warnings).toEqual([]);
+    const parsedTask = items[0].children?.[0];
+    expect(parsedTask?.links).toEqual(task.links);
+  });
 });
 
 // ── SerializeResult stats ─────────────────────────────────────────────────────

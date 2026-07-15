@@ -24,4 +24,10 @@ export interface QuotaRemaining {
    * solely to surface a "quota unavailable" notice to the user.
    */
   unavailable?: boolean;
+  /**
+   * Optional human-readable reason shown alongside an `unavailable` entry,
+   * e.g. explaining that Codex `codex login` (session auth) cannot query the
+   * billing quota API. Ignored when `unavailable` is not set.
+   */
+  notice?: string;
 }

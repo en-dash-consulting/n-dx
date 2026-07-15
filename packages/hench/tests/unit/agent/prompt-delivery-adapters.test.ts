@@ -124,6 +124,8 @@ describe("AC2: Codex adapter formats with SYSTEM/TASK headers", () => {
     expect(typeof config.stdinContent).toBe("string");
     expect(config.stdinContent).toContain("SYSTEM:");
     expect(config.stdinContent).toContain("TASK:");
+    // Prompt travels via stdin; args end with the "-" stdin marker.
+    expect(config.args[config.args.length - 1]).toBe("-");
   });
 
   it("SYSTEM section contains system + workflow content", () => {
@@ -181,6 +183,7 @@ describe("AC2: Codex adapter formats with SYSTEM/TASK headers", () => {
     expect(typeof config.stdinContent).toBe("string");
     expect(config.stdinContent).toContain("SYSTEM:");
     expect(config.stdinContent).toContain("TASK:");
+    expect(config.args.some((a) => a.includes("SYSTEM:"))).toBe(false);
   });
 
   it("model override is passed through correctly", () => {

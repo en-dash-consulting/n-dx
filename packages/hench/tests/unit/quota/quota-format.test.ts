@@ -210,6 +210,20 @@ describe("formatQuotaLog", () => {
       expect(line).not.toContain(RESET);
     });
 
+    it("appends the notice when an unavailable entry carries one", () => {
+      const entry: QuotaRemaining = {
+        vendor: "codex",
+        model: "gpt-5.5",
+        percentRemaining: 0,
+        unavailable: true,
+        notice: "codex login (session auth) — set OPENAI_API_KEY or llm.codex.api_key for quota",
+      };
+      const [line] = formatQuotaLog([entry]);
+      expect(line).toContain("quota unavailable");
+      expect(line).toContain("codex login (session auth)");
+      expect(line).toContain("OPENAI_API_KEY");
+    });
+
     it("formats correctly alongside available entries in a mixed array", () => {
       const entries: QuotaRemaining[] = [
         quota("claude", "claude-opus-4-5", 42),

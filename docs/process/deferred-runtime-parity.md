@@ -231,7 +231,7 @@ treating them as bugs:
 |------------|--------|-------|---------------------|
 | Output format | stream-json (per-event structured stream) | JSONL (line-delimited events) | Both are structured; normalization is a wrapper concern, not a contract gap |
 | Turn model | Multi-turn with explicit tool-use loop | Effectively single-turn with internal tool dispatch | Both complete tasks; the internal turn model is a vendor implementation detail |
-| Prompt delivery | Separate `--system-prompt` flag | Combined positional argument | `assemblePrompt()` handles the translation; same content reaches both |
+| Prompt delivery | Separate `--system-prompt` flag, task via stdin | Combined `SYSTEM:`/`TASK:` prompt via stdin (`codex exec … -`) | `assemblePrompt()` handles the translation; both use stdin to avoid `E2BIG` on large briefs |
 | Token accounting granularity | Full per-turn breakdown | Partial or aggregate | `TokenDiagnosticStatus` explicitly signals the diagnostic level |
 | Native instruction file | `CLAUDE.md` | `AGENTS.md` | Both generated from `project-guidance.md`; file name is a vendor convention |
 | Permission model | Per-tool allowlists | Sandbox mode + approval policy | `ExecutionPolicy` normalizes intent; vendor flags differ by design |

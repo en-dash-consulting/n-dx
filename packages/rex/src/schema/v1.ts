@@ -216,6 +216,41 @@ export interface CommitAttribution {
   message?: string;
 }
 
+/**
+ * Sync lifecycle state of a single work-item linkage.
+ * - `pending`: link recorded locally, not yet pushed to / confirmed with the remote system
+ * - `synced`: the last sync with the remote system succeeded
+ * - `error`: the last sync attempt failed (see `error` for detail)
+ */
+export type WorkItemSyncState = "pending" | "synced" | "error";
+
+/**
+ * A link between a PRD item and a downstream work-tracking item in an
+ * integrated system (Notion, Jira, GitHub Projects, Asana, …).
+ *
+ * This is the common, system-agnostic linkage model shared by all
+ * work-tracking integrations. A PRD item may carry multiple links (e.g. one
+ * Notion page and one GitHub issue). Link identity is (`system`, `workItemId`).
+ */
+export interface WorkItemLink {
+  /** Integrated system identifier, e.g. "notion" | "jira" | "github" | "asana". */
+  system: string;
+  /** Opaque identifier of the work item within the remote system (page id, issue key, …). */
+  workItemId: string;
+  /** Optional deep link to the work item in the remote system. */
+  url?: string;
+  /** Optional human-readable label/title of the remote work item. */
+  title?: string;
+  /** Latest known status of the remote work item, in the remote system's own vocabulary. */
+  remoteStatus?: string;
+  /** Sync lifecycle state of this linkage. Treated as "pending" when absent. */
+  syncState?: WorkItemSyncState;
+  /** ISO 8601 timestamp of the last successful sync of this link. */
+  lastSyncedAt?: string;
+  /** Error detail when `syncState` is "error". */
+  error?: string;
+}
+
 /** All valid requirement categories as a Set. */
 export const VALID_REQUIREMENT_CATEGORIES = new Set<RequirementCategory>([
   "technical",
@@ -296,6 +331,8 @@ export interface PRDItem {
   mergedProposals?: MergedProposalRecord[];
   /** Commits (SHA hash + author + timestamp) associated with this item. */
   commits?: CommitAttribution[];
+  /** Links to downstream work-tracking items (Notion, Jira, GitHub, Asana, …). */
+  links?: WorkItemLink[];
   children?: PRDItem[];
   [key: string]: unknown;
 }

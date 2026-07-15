@@ -42,8 +42,8 @@ describe("registerMcpServers idempotent removal pattern (source)", () => {
     expect(SRC).toMatch(/for\s*\(\s*const\s+\w+\s+of\s+\[.*"local".*"project".*"user".*\]/);
   });
 
-  it("calls claude mcp remove with --scope flag", () => {
-    expect(SRC).toMatch(/claude mcp remove --scope/);
+  it("calls mcp remove with --scope flag", () => {
+    expect(SRC).toMatch(/" mcp remove --scope/);
   });
 
   it("execSync add call appears after execSync remove call in registerMcpServers", () => {
@@ -52,8 +52,8 @@ describe("registerMcpServers idempotent removal pattern (source)", () => {
     const fnStart = SRC.indexOf("function registerMcpServers");
     const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
     // Match the actual execSync invocations, not comment references
-    const removeMatch = fnBody.match(/execSync\(\s*`claude mcp remove/);
-    const addMatch = fnBody.match(/execSync\(\s*\n?\s*`claude mcp add/);
+    const removeMatch = fnBody.match(/execSync\(\s*`"\$\{claudeCmd\}" mcp remove/);
+    const addMatch = fnBody.match(/execSync\(\s*\n?\s*`"\$\{claudeCmd\}" mcp add/);
     expect(removeMatch).not.toBeNull();
     expect(addMatch).not.toBeNull();
     expect(addMatch.index).toBeGreaterThan(removeMatch.index);
@@ -82,7 +82,7 @@ describe("registerMcpServers idempotent removal pattern (source)", () => {
     const fnStart = SRC.indexOf("function registerMcpServers");
     const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
     // The add call uses stdio: "pipe" so stderr is available on failure
-    expect(fnBody).toMatch(/claude mcp add[\s\S]*?stdio:\s*"pipe"/);
+    expect(fnBody).toMatch(/mcp add[\s\S]*?stdio:\s*"pipe"/);
   });
 });
 
@@ -257,7 +257,7 @@ describe("registerMcpServers error detail capture (source)", () => {
     const fnStart = SRC.indexOf("function registerMcpServers");
     const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
     // The add call should use stdio: "pipe" to capture stderr on failure
-    expect(fnBody).toMatch(/claude mcp add[\s\S]*?stdio:\s*"pipe"/);
+    expect(fnBody).toMatch(/mcp add[\s\S]*?stdio:\s*"pipe"/);
   });
 
   it("catches the error object in the add call", () => {
@@ -331,6 +331,31 @@ describe("registerMcpServers error field in result", () => {
     for (const entry of ok) {
       expect(entry.error).toBeUndefined();
     }
+  });
+});
+
+// ── Source-level: uses discovered claude path (Windows reliability) ──────────
+
+describe("registerMcpServers uses the discovered claude path, not a bare literal", () => {
+  const fnStart = SRC.indexOf("function registerMcpServers");
+  const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+
+  it("assigns the discovered path to a local variable it actually uses", () => {
+    // discoverClaudeCli may resolve claude at a well-known location that is NOT
+    // on PATH (e.g. Windows %APPDATA%\\npm\\claude.cmd). The registration commands
+    // must invoke that resolved path — otherwise `ndx init` silently fails to
+    // register MCP servers on such installs.
+    expect(fnBody).toMatch(/const\s+claudeCmd\s*=\s*discovery\.path/);
+  });
+
+  it("mcp remove invokes the discovered path, not a bare 'claude' literal", () => {
+    expect(fnBody).toMatch(/execSync\(\s*`"\$\{claudeCmd\}" mcp remove --scope/);
+    expect(fnBody).not.toMatch(/execSync\(\s*`claude mcp remove/);
+  });
+
+  it("mcp add invokes the discovered path, not a bare 'claude' literal", () => {
+    expect(fnBody).toMatch(/`"\$\{claudeCmd\}" mcp add /);
+    expect(fnBody).not.toMatch(/execSync\(\s*\n?\s*`claude mcp add/);
   });
 });
 

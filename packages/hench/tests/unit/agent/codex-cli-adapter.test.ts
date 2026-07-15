@@ -75,6 +75,7 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
 
     expect(config.binary).toBe("codex");
     expect(Array.isArray(config.args)).toBe(true);
+    expect(config.stdinContent).not.toBeNull(); // Codex: prompt via stdin, not args
     expect(config.cwd).toBe(".");
     expect(typeof config.env).toBe("object");
   });
@@ -136,6 +137,8 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
     expect(config.stdinContent).toContain("You are Hench.");
     expect(config.stdinContent).toContain("TASK:");
     expect(config.stdinContent).toContain("Fix the bug.");
+    // The prompt is no longer any positional arg.
+    expect(config.args.some((a) => a.includes("SYSTEM:"))).toBe(false);
   });
 
   it("last positional arg is '-' (codex exec - reads prompt from stdin)", () => {
@@ -171,6 +174,7 @@ describe("CodexCliAdapter: snapshot parity", () => {
   it("SNAPSHOT: standard Codex CLI args are deterministic", () => {
     const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, {});
 
+    // The prompt is delivered via stdin; args end with the "-" stdin marker.
     expect(config.args).toEqual([
       "exec",
       "--full-auto",

@@ -50,6 +50,8 @@ export type {
   DuplicateOverrideMarker,
   MergedProposalRecord,
   CommitAttribution,
+  WorkItemLink,
+  WorkItemSyncState,
   PRDItem,
   PRDDocument,
   ActiveInterval,

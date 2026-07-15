@@ -80,9 +80,20 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
   google: GOOGLE_MODELS,
 };
 
+/**
+ * Legacy Codex model IDs that map to current canonical models.
+ *
+ * Keys are model IDs shipped by prior versions (the old `gpt-5-codex` /
+ * `gpt-5.1-codex-*` brand names); values are the current model they resolve to.
+ * `normalizeCodexModel()` applies this mapping when reading config.
+ *
+ * Keep in sync with the orchestration-tier legacy list in
+ * `packages/core/init-llm.js` (`LEGACY_CATALOG_MODEL_ALIASES.codex`), which
+ * treats these same IDs as "known" during `ndx init`. The two tiers cannot
+ * import each other, so the sets are duplicated by design.
+ */
 const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
   "gpt-5-codex": NEWEST_MODELS.codex,
-  "gpt-5.4mini": TIER_MODELS.codex.light,
   "gpt-5.1-codex-max": NEWEST_MODELS.codex,
   "gpt-5.1-codex-mini": TIER_MODELS.codex.light,
 };

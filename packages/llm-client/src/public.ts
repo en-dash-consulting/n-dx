@@ -133,7 +133,7 @@ export type {
   ClaudeClient,
 } from "./types.js";
 
-export { ClaudeClientError, CLIError, CLI_ERROR_CODES } from "./types.js";
+export { ClaudeClientError, CLIError, CLI_ERROR_CODES, AuthFailureError } from "./types.js";
 
 // Vendor-neutral config + client factories
 export { loadLLMConfig } from "./llm-config.js";
@@ -380,6 +380,9 @@ export { suppressKnownDeprecations } from "./suppress-deprecations.js";
 export {
   classifyLLMError,
   extractProviderDetail,
+  isAuthError,
+  parseAuthPayload,
+  classifyAuthError,
 } from "./llm-error-classifier.js";
 export type {
   LLMErrorCategory,

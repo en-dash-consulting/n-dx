@@ -21,6 +21,16 @@
 import { getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";
 
 const SUPPORTED_PROVIDERS = ["codex", "claude", "google"];
+
+/**
+ * Legacy model IDs treated as "known" during init so `validateInitFlags` does
+ * not warn about model IDs shipped by prior versions.
+ *
+ * The `codex` list must stay in sync with the keys of `LEGACY_CODEX_MODEL_ALIASES`
+ * in `packages/llm-client/src/config.ts` — that is where these IDs are actually
+ * resolved to current models at runtime. This tier cannot import the foundation
+ * layer, so the sets are duplicated by design.
+ */
 const LEGACY_CATALOG_MODEL_ALIASES = {
   codex: ["gpt-5-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"],
   claude: ["claude-sonnet-4-6"],

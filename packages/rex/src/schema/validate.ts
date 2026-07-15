@@ -54,6 +54,19 @@ export const CommitAttributionSchema = z
   })
   .strict();
 
+export const WorkItemLinkSchema = z
+  .object({
+    system: z.string(),
+    workItemId: z.string(),
+    url: z.string().optional(),
+    title: z.string().optional(),
+    remoteStatus: z.string().optional(),
+    syncState: z.enum(["pending", "synced", "error"]).optional(),
+    lastSyncedAt: z.string().optional(),
+    error: z.string().optional(),
+  })
+  .strict();
+
 export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
   z
     .object({
@@ -71,6 +84,7 @@ export const PRDItemSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       blockedBy: z.array(z.string()).optional(),
       requirements: z.array(RequirementSchema).optional(),
       commits: z.array(CommitAttributionSchema).optional(),
+      links: z.array(WorkItemLinkSchema).optional(),
       startedAt: z.string().optional(),
       completedAt: z.string().optional(),
       endedAt: z.string().optional(),

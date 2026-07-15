@@ -359,7 +359,7 @@ describe("baseline prompt output for regression comparison", () => {
     expect(args[args.indexOf("--system-prompt") + 1]).toBe(sys);
     expect(stdinContent).toBe(task);
 
-    // Codex delivery: combined positional arg
+    // Codex delivery: combined SYSTEM/TASK prompt via stdin
     const codexPrompt = `SYSTEM:\n${sys}\n\nTASK:\n${task}`;
     expect(codexPrompt).toBe("SYSTEM:\nSystem prompt text\n\nTASK:\nTask prompt text");
   });

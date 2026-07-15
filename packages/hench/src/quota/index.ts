@@ -12,7 +12,9 @@
  * is configured; silently skipped otherwise.
  *
  * Codex (OpenAI): fetches real-time quota from the OpenAI billing API when
- * OPENAI_API_KEY (or llm.codex.api_key in .n-dx.json) is configured.
+ * OPENAI_API_KEY (or llm.codex.api_key in .n-dx.json) is configured. When Codex
+ * is the active vendor but no API key is present (the `codex login` session-auth
+ * path), an "unavailable" notice is surfaced instead of silently skipping.
  *
  * On any failure either provider is silently skipped so the caller's
  * inter-run loop is never interrupted by quota-check errors.
@@ -77,7 +79,9 @@ import type { QuotaRemaining } from "./types.js";
  *
  * Codex: attempted when OPENAI_API_KEY is set or llm.codex.api_key appears
  * in .n-dx.json (read from process.cwd()).  Failures are silently discarded
- * to preserve inter-run loop continuity.
+ * to preserve inter-run loop continuity. When Codex is the active vendor and no
+ * key is available (session auth via `codex login`), a single "unavailable"
+ * notice entry is returned so the missing quota is explained rather than hidden.
  *
  * @returns Array of per-vendor quota snapshots (may be empty).
  */
@@ -121,6 +125,19 @@ export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
       }
       // On failure: silently skip — the inter-run loop must never be interrupted
       // by quota-check errors.
+    } else if (activeVendor === "codex") {
+      // No OPENAI_API_KEY: the primary Codex auth path is `codex login` (ChatGPT
+      // session), which never sets an API key — the CLI provider even deletes it
+      // so session auth wins. The billing quota API requires an API key, so
+      // session-auth quota is not retrievable there. Surface a clear notice
+      // instead of silently skipping, so the user understands why no quota shows.
+      results.push({
+        vendor: "codex",
+        model: codexModel,
+        percentRemaining: 0,
+        unavailable: true,
+        notice: "codex login (session auth) — set OPENAI_API_KEY or llm.codex.api_key for quota",
+      });
     }
   }
 
