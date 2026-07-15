@@ -227,8 +227,8 @@ describe("n-dx init provider selection", () => {
         // init no longer aborts: the chosen vendor is persisted and applies to
         // all later commands; the auth problem is surfaced as a visible warning.
         expect(result.status).toBe(0);
-        expect(result.stderr).toContain("Provider auth preflight failed for \"codex\"");
-        expect(result.stderr).toContain("Next step: run 'codex login'");
+        expect(result.stderr).toContain("Authentication failed for Codex");
+        expect(result.stderr).toContain("codex logout && codex login");
         expect(result.stderr).toContain("Proceeding anyway");
 
         const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
@@ -267,8 +267,8 @@ describe("n-dx init provider selection", () => {
         );
 
         expect(result.status).toBe(0);
-        expect(result.stderr).toContain("Provider auth preflight failed for \"claude\"");
-        expect(result.stderr).toContain("Next step: run 'claude login'");
+        expect(result.stderr).toContain("Authentication failed for Claude");
+        expect(result.stderr).toContain("claude logout && claude login");
         expect(result.stderr).toContain("Proceeding anyway");
 
         const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
@@ -344,7 +344,7 @@ describe("n-dx init provider selection", () => {
       // auth error surfaces clearly at use time) and emits a visible warning
       // instead of silently aborting and reverting to the Claude default.
       expect(result.status).toBe(0);
-      expect(result.stderr).toContain("Provider auth preflight failed for \"google\"");
+      expect(result.stderr).toContain("No API key configured for Google");
       expect(result.stderr).toContain("NDX_GOOGLE_PREFLIGHT_NO_KEY");
       expect(result.stderr).toContain("aistudio.google.com/apikey");
       expect(result.stderr).toContain("Proceeding anyway");

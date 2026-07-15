@@ -14,4 +14,4 @@ description: "When an LLM provider preflight or runtime call returns a 401 or au
 |-------|--------|
 | [Add ndx auth check command and credential verification surface](./add-ndx-auth-check-command-and-87c4d2.md) | pending |
 | [Classify 401 and authentication errors from LLM provider preflight as a distinct typed error](./classify-401-and-authentication-4be48f.md) | completed |
-| [Surface concise re-authentication guidance when provider auth fails](./surface-concise-re-86607f.md) | pending |
+| [Surface concise re-authentication guidance when provider auth fails](./surface-concise-re-86607f.md) | completed |

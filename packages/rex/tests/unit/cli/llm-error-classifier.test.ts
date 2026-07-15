@@ -31,8 +31,8 @@ describe("classifyLLMError", () => {
   it("uses codex-specific messaging when vendor is codex", () => {
     const r = classifyLLMError(new Error("401 Unauthorized"), "codex");
     expect(r.category).toBe("auth");
-    expect(r.message).toContain("Codex CLI");
-    expect(r.suggestion).toContain("codex login");
+    expect(r.message).toContain("Authentication failed for Codex");
+    expect(r.suggestion).toContain("codex logout && codex login");
   });
 
   it("does not false-positive on user input containing 'authentication'", () => {

@@ -10,6 +10,8 @@ import { join } from "node:path";
 import {
   CLI_ERROR_CODES,
   CLIError as BaseCLIError,
+  AuthFailureError,
+  authFailureGuidance,
   type CLIErrorCode,
 } from "@n-dx/llm-client";
 import { REX_DIR } from "./commands/constants.js";
@@ -102,8 +104,8 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
   [
     /\b401\b|invalid.*api.*key|authentication.*(fail|error|invalid|expired)|unauthorized.*(request|access|error)/i,
     CLI_ERROR_CODES.AUTH_FAILED,
-    "Authentication failed — your API key or credentials were rejected.",
-    "Verify your API key with: n-dx config claude.apiKey, or check CLI login.",
+    "Authentication failed — Invalid or expired credentials.",
+    "Re-authenticate: claude logout && claude login (or codex logout && codex login); for Google set ndx config llm.google.api_key <KEY>.",
   ],
   [
     /etimedout|timeout|timed?\s*out/i,
@@ -142,6 +144,14 @@ export function formatCLIError(err: unknown): string {
   // CLIError — already user-friendly
   if (err instanceof CLIError) {
     return renderCLIError(err.code, err.message, err.suggestion);
+  }
+
+  // AuthFailureError carries a canonical, JSON-free message and knows its
+  // provider — render it with the shared re-auth remediation so ndx plan /
+  // ndx analyze read identically to the preflight and ndx work.
+  if (err instanceof AuthFailureError) {
+    const remediation = authFailureGuidance(err.provider).remediation.join(" · ");
+    return renderCLIError(CLI_ERROR_CODES.AUTH_FAILED, err.message, remediation);
   }
 
   const message = err instanceof Error ? err.message : String(err);

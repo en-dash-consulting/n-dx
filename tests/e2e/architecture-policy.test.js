@@ -1233,7 +1233,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
   // Core — lazy-loads utilities
-  ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers only when the configured vendor changes"],
+  ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers when the vendor changes, plus the shared auth-failure guidance and the cli-brand color palette on the preflight-failure error path"],
   ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TTY renderer) only during `ndx init` in interactive TTY mode — avoids React/Ink bundle cost for every CLI invocation"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],

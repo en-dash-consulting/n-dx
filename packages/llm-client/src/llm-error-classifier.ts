@@ -11,6 +11,7 @@ import { formatRetryCountdown, classifyTimeout } from "./rate-limit.js";
 import type { TimeoutKind } from "./rate-limit.js";
 import { CLI_ERROR_CODES, AuthFailureError } from "./types.js";
 import type { CLIErrorCode } from "./types.js";
+import { authFailureGuidance, authFailureMessage } from "./auth-guidance.js";
 
 /** Error categories returned by {@link classifyLLMError}. */
 export type LLMErrorCategory =
@@ -250,10 +251,14 @@ export function classifyLLMError(
         code: CLI_ERROR_CODES.AUTH_FAILED,
       };
     }
+  if (isAuthError) {
+    // Canonical, JSON-free wording shared with the preflight and providers.
+    // The raw provider detail is intentionally omitted from the headline so
+    // no internal error fields leak into the primary message.
+    const guidance = authFailureGuidance(vendor);
     return {
-      message: `Authentication failed — your API key was rejected.${suffix}${detailSuffix}`,
-      suggestion:
-        "Check your API key with: n-dx config claude.apiKey, or switch to CLI mode.",
+      message: `${guidance.headline}${suffix}`,
+      suggestion: guidance.remediation.join("  "),
       category: "auth",
       code: CLI_ERROR_CODES.AUTH_FAILED,
     };
@@ -547,21 +552,11 @@ export function classifyAuthError(
   const payload = parseAuthPayload(err.message, vendor);
   if (!payload) return null;
 
-  const { httpStatus, authReason } = payload;
+  const { httpStatus } = payload;
 
-  // Build a vendor-specific, JSON-free user-facing message directly (not via
-  // classifyLLMError) so the detail suffix never re-introduces a raw JSON blob.
-  let message: string;
-  if (vendor === "codex") {
-    message = "Authentication failed — Codex CLI credentials were rejected.";
-  } else if (vendor === "google") {
-    message = "Authentication failed — your Google API key was rejected.";
-  } else {
-    message = "Authentication failed — your API key was rejected.";
-  }
-  if (authReason && authReason !== "authentication failed") {
-    message += ` (${authReason})`;
-  }
+  // Canonical, JSON-free re-authentication guidance (headline + primary fix).
+  // Built directly (not via classifyLLMError) so no raw payload can leak in.
+  const message = authFailureMessage(vendor);
 
   return new AuthFailureError(
     message,

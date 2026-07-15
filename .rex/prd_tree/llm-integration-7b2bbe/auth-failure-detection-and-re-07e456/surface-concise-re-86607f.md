@@ -2,13 +2,16 @@
 id: "86607ff0-0969-4366-bccb-1a2de835fdcb"
 level: "task"
 title: "Surface concise re-authentication guidance when provider auth fails"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "auth"
   - "ux"
   - "error-handling"
 source: "smart-add"
+startedAt: "2026-07-15T17:35:42.900Z"
+completedAt: "2026-07-15T18:52:39.287Z"
+endedAt: "2026-07-15T18:52:39.287Z"
 acceptanceCriteria:
   - "Auth failure output contains no raw JSON payloads or internal error fields in the primary message"
   - "Output names the provider, states 'Invalid or expired credentials', and includes at least one concrete remediation command"
