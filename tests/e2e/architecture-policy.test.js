@@ -47,6 +47,7 @@ const ALLOWED = new Set([
   "packages/core/config.js",
   "packages/core/export.js",
   "packages/core/pair-programming.js",
+  "packages/core/win-spawn.js",
   "pr-check.js",
   // Development scripts
   "packages/web/dev.js",
@@ -61,6 +62,8 @@ const ALLOWED = new Set([
   "packages/sourcevision/src/analyzers/branch-work-filter.ts",
   "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
   "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+  // Windows-safe CLI helper — wraps execFileSync with cmd.exe routing for .cmd shims
+  "packages/sourcevision/src/util/exec-cli.ts",
   // Web server routes — spawn CLI subprocesses for domain tool execution
   "packages/web/src/server/routes-hench.ts",
   "packages/web/src/server/routes-sourcevision.ts",
@@ -367,6 +370,10 @@ const DOCUMENTED_POLICIES = [
     rule: ".rex/prd.md is read and written only in the migration helper",
     enforcedBy: "architecture-policy.test.js → architecture policy: PRD storage invariant (prd.md migration-helper-only)",
   },
+  {
+    rule: "No CLI spawn site may use shell:true+args (DEP0190 pattern) — use win-spawn.js helpers instead",
+    enforcedBy: "architecture-policy.test.js → architecture policy: DEP0190 spawn guard",
+  },
 ];
 
 describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
@@ -376,7 +383,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(20);
+    expect(DOCUMENTED_POLICIES.length).toBe(21);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {
@@ -975,8 +982,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 135,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries)",
+    maxExports: 142,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries)",
   },
 ];
 
@@ -1626,6 +1633,135 @@ describe("architecture policy: PRD storage invariant (prd.md migration-helper-on
           "These files have been cleaned up — remove them from the allow list:",
           "",
           ...unused.map((u) => `  - ${u}`),
+        ].join("\n"),
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DEP0190 spawn guard: no shell:true+args in CLI-binary spawn sites
+// ---------------------------------------------------------------------------
+
+/**
+ * Prevents reintroduction of the Node.js [DEP0190] spawn anti-pattern at
+ * CLI-binary spawn sites. Two banned patterns:
+ *
+ *   1. `shell: process.platform === "win32"` — the old conditional guard that
+ *      triggered DEP0190 and broke binary paths with spaces (#68, #69).
+ *   2. `shell: true` combined with a non-empty args array — same deprecation.
+ *
+ * Both were replaced on this branch with cmd.exe routing via win-spawn.js.
+ *
+ * Out-of-scope (not in DEP0190_SCOPE):
+ *   - packages/llm-client/src/exec.ts — execShellCmd uses exec("sh", ["-c", cmd])
+ *     with no shell:true; the execShellCmd doc mentions the pattern only in comments
+ *   - packages/core/ci.js / pr-check.js — pnpm .cmd spawns (documented follow-up)
+ *
+ * In-scope exception (allowed by shellTrueIsEmptyArgsPattern):
+ *   - pair-programming.js runShellTestCommand — spawn(cmd, [], { shell: true })
+ *     passes an empty args array; only the command string is given to the shell,
+ *     so no DEP0190 deprecation fires and no argv injection is possible.
+ */
+const DEP0190_SCOPE = [
+  "packages/llm-client/src/cli-provider.ts",
+  "packages/llm-client/src/codex-cli-provider.ts",
+  "packages/hench/src/agent/lifecycle/cli-loop.ts",
+  "packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts",
+  "packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts",
+  "packages/core/config.js",
+  "packages/core/pair-programming.js",
+  "packages/core/win-spawn.js",
+  "packages/sourcevision/src/analyzers/branch-work-collector.ts",
+  "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+  "packages/sourcevision/src/util/exec-cli.ts",
+];
+
+function isCodeLine(line) {
+  const trimmed = line.trim();
+  return (
+    trimmed.length > 0 &&
+    !trimmed.startsWith("//") &&
+    !trimmed.startsWith("*") &&
+    !trimmed.startsWith("/*")
+  );
+}
+
+/**
+ * Returns true when shell:true at lineIndex belongs to a spawn(cmd, [], {…})
+ * call — i.e. the args array is the empty literal []. That is the intentional
+ * runShellTestCommand pattern (passes a full shell command string, not a CLI
+ * binary + argv, so DEP0190 never fires).
+ *
+ * Looks back up to 8 lines for the spawn call opening.
+ */
+function shellTrueIsEmptyArgsPattern(lines, lineIndex) {
+  const start = Math.max(0, lineIndex - 8);
+  const window = lines.slice(start, lineIndex + 1).join("\n");
+  return /spawn\s*\([^)]*,\s*\[\s*\]/.test(window);
+}
+
+describe("architecture policy: DEP0190 spawn guard", () => {
+  it("DEP0190_SCOPE list contains no stale entries (all files exist on disk)", () => {
+    const stale = DEP0190_SCOPE.filter((rel) => !existsSync(join(ROOT, rel)));
+    if (stale.length > 0) {
+      expect.fail(
+        [
+          "DEP0190_SCOPE contains files that no longer exist on disk.",
+          "Update paths after renames/moves:",
+          "",
+          ...stale.map((s) => `  - ${s}`),
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("no CLI spawn site reintroduces shell:true+args (DEP0190 pattern)", () => {
+    const violations = [];
+
+    for (const rel of DEP0190_SCOPE) {
+      const fullPath = join(ROOT, rel);
+      if (!existsSync(fullPath)) continue;
+
+      const content = readFileSync(fullPath, "utf-8");
+      const lines = content.split("\n");
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!isCodeLine(line)) continue;
+
+        // Strip trailing inline comment before matching to avoid flagging
+        // explanatory comments like "// instead of shell:true+args"
+        const commentIdx = line.indexOf("//");
+        const codeOnlyLine = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
+
+        // Pattern 1: shell: process.platform — always banned in scope
+        if (/shell:\s*process\.platform/.test(codeOnlyLine)) {
+          violations.push(`${rel}:${i + 1} — shell: process.platform (DEP0190 pattern; use win-spawn.js helpers)`);
+          continue;
+        }
+
+        // Pattern 2: shell: true — banned except when spawn args is empty []
+        if (/shell:\s*true/.test(codeOnlyLine)) {
+          if (!shellTrueIsEmptyArgsPattern(lines, i)) {
+            violations.push(`${rel}:${i + 1} — shell: true with non-empty args (DEP0190 pattern; use win-spawn.js helpers)`);
+          }
+        }
+      }
+    }
+
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "CLI spawn sites reintroduce the DEP0190 shell:true+args pattern.",
+          "Use win-spawn.js helpers (spawnCli / execFileSyncCli) instead.",
+          "See packages/core/win-spawn.js for the cmd.exe routing pattern.",
+          "",
+          "Violations:",
+          ...violations.map((v) => `  - ${v}`),
+          "",
+          "If this is a new intentional shell:true with empty args (like runShellTestCommand),",
+          "update shellTrueIsEmptyArgsPattern() in architecture-policy.test.js.",
         ].join("\n"),
       );
     }

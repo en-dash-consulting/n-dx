@@ -66,6 +66,7 @@
     "cli-timeout.js",
     "update-check.js",
     "pair-programming.js",
+    "win-spawn.js",
     "readme-generator.js",
     "git-preflight.js",
     "self-heal-confirm.js",

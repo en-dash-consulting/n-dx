@@ -63,8 +63,11 @@ export function buildAllowedTools(allowedCommands: ReadonlyArray<string>): strin
 /**
  * Build the Claude CLI args and stdin content from envelope + policy.
  *
- * Handles Windows cmd.exe escaping quirks. Extracted from cli-loop.ts's
- * `buildClaudeCliArgs` with identical output.
+ * On Windows, system prompt and allowed-tools are adapted for cmd.exe:
+ * the system prompt is embedded in stdin (avoiding arg-length limits and
+ * special-char hazards), and allowed-tools are joined as a single
+ * comma-separated token. Quoting is handled exclusively by
+ * spawnCli/quoteWindowsToken — no pre-quoting is done here.
  *
  * @internal Exported for snapshot testing — not part of the adapter's public API.
  */
@@ -98,9 +101,9 @@ export function buildClaudeCliArgs(input: ClaudeCliInput): { args: string[]; std
     "--verbose",
     ...(isWindows ? [] : ["--system-prompt", input.systemPrompt]),
     "--allowed-tools",
-    // On Windows: join as a single comma-separated arg wrapped in cmd.exe quotes.
-    // Bash(cmd:*) patterns contain ( ) which are special to cmd.exe without quoting.
-    ...(isWindows ? [`"${input.allowedTools.join(",")}"`] : input.allowedTools),
+    // On Windows: join as a single comma-separated arg. spawnCli/quoteWindowsToken
+    // is the sole quoting authority — no manual wrapping here.
+    ...(isWindows ? [input.allowedTools.join(",")] : input.allowedTools),
     ...(input.modelOverride ? ["--model", input.modelOverride] : []),
     ...(input.permissionMode ? ["--permission-mode", input.permissionMode] : []),
   ];

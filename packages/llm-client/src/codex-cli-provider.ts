@@ -18,7 +18,6 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { spawn } from "node:child_process";
 import type {
   ClaudeClient,
   CompletionRequest,
@@ -29,6 +28,7 @@ import type { CodexConfig } from "./llm-types.js";
 import type { ExecutionPolicy, SandboxMode, ApprovalPolicy } from "./runtime-contract.js";
 import { DEFAULT_EXECUTION_POLICY } from "./runtime-contract.js";
 import { NEWEST_MODELS } from "./config.js";
+import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
@@ -207,14 +207,20 @@ async function spawnOnce(
     debugLog(`spawn args: ${JSON.stringify(args)}`);
 
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn(cliBinary, args, {
+      // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
+      // with a self-quoted verbatim command line instead of shell:true+args.
+      const proc = spawnCli(cliBinary, args, {
         stdio: ["pipe", "ignore", "pipe"],
         env: envOverride ?? process.env,
-        shell: process.platform === "win32",
       });
 
-      proc.stdin.write(request.prompt);
-      proc.stdin.end();
+      // No-op stdin error guard: a fast-exiting cmd.exe shim can EPIPE the
+      // prompt write before the close handler runs. Without a listener the
+      // 'error' event would crash the process before the friendly diagnosis
+      // is produced. Mirrors cli-provider.ts.
+      proc.stdin!.on("error", () => {/* handled by proc error/close */});
+      proc.stdin!.write(request.prompt);
+      proc.stdin!.end();
 
       let stderr = "";
       let timeoutId: NodeJS.Timeout | undefined;
@@ -227,17 +233,15 @@ async function spawnOnce(
         }, timeoutMs);
       }
 
-      proc.stderr.on("data", (chunk: Buffer) => {
+      proc.stderr!.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();
       });
 
       proc.on("error", (err) => {
         if (timeoutId) clearTimeout(timeoutId);
         if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-          const pathNote = cliBinary !== DEFAULT_CODEX_BINARY
-            ? `Codex CLI not found at configured path: ${cliBinary}. Check 'n-dx config llm.codex.cli_path'.`
-            : "Codex CLI not found. Install it and/or set a custom path: n-dx config llm.codex.cli_path /path/to/codex";
-          reject(new ClaudeClientError(pathNote, "not-found", false));
+          const diagnosis = diagnoseCliInvocation(cliBinary, "llm.codex.cli_path");
+          reject(new ClaudeClientError(diagnosis.message, "not-found", false));
           return;
         }
         reject(new ClaudeClientError(err.message, "unknown", isTransientError(err.message)));
@@ -254,6 +258,18 @@ async function spawnOnce(
           return;
         }
         const detail = stderr.trim() || `codex exited with code ${code}`;
+
+        // On Windows the cmd.exe shim spawns fine but exits non-zero with a
+        // "not recognized" / "cannot find the path" message when the binary is
+        // missing — no ENOENT is raised. Route that through diagnoseCliNotFound
+        // just like the non-Windows ENOENT path above; it anchors to the binary
+        // (confirming via existsSync/PATH) and preserves the raw stderr detail.
+        const notFoundMessage = diagnoseCliNotFound(detail, cliBinary, "llm.codex.cli_path");
+        if (notFoundMessage) {
+          reject(new ClaudeClientError(notFoundMessage, "not-found", false));
+          return;
+        }
+
         const classified = classifyStderr(detail);
         debugLog(`spawn close code=${code} classified=${classified.reason} retryable=${classified.retryable}`);
         if (detail) {

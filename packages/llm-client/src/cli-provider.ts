@@ -25,7 +25,6 @@
  * @see {@link createApiClient} in `api-provider.ts` for the alternative provider
  */
 
-import { spawn } from "node:child_process";
 import type {
   ClaudeClient,
   ClaudeClientOptions,
@@ -37,10 +36,8 @@ import { ClaudeClientError } from "./types.js";
 import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
+import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
-
-/** Regex patterns for stderr content indicating a missing binary (Windows shell). */
-const NOT_FOUND_PATTERNS = /is not recognized as an internal or external command|cannot find the path|The system cannot find the file specified/i;
 
 /** Regex patterns for stderr content indicating an auth error. */
 const AUTH_PATTERNS = /auth|unauthorized|api.key|credential|login|not logged in/i;
@@ -137,14 +134,15 @@ function spawnOnce(
     const { CLAUDECODE: _, ...cleanEnv } = process.env;
     const spawnStart = Date.now();
     debugLog(`spawn ${cliBinary} model=${request.model} promptBytes=${request.prompt.length}`);
-    const proc = spawn(cliBinary, args, {
+    // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
+    // with a self-quoted verbatim command line instead of shell:true+args.
+    const proc = spawnCli(cliBinary, args, {
       stdio: ["pipe", "pipe", "pipe"],
-      shell: process.platform === "win32",
       env: cleanEnv,
     });
-    proc.stdin.on("error", () => {/* handled by proc error/close */});
-    proc.stdin.write(request.prompt);
-    proc.stdin.end();
+    proc.stdin!.on("error", () => {/* handled by proc error/close */});
+    proc.stdin!.write(request.prompt);
+    proc.stdin!.end();
 
     let stdout = "";
     let stderr = "";
@@ -175,10 +173,10 @@ function spawnOnce(
     }, PER_CALL_TIMEOUT_MS);
     killTimer.unref();
 
-    proc.stdout.on("data", (chunk: Buffer) => {
+    proc.stdout!.on("data", (chunk: Buffer) => {
       stdout += chunk.toString();
     });
-    proc.stderr.on("data", (chunk: Buffer) => {
+    proc.stderr!.on("data", (chunk: Buffer) => {
       stderr += chunk.toString();
     });
 
@@ -189,10 +187,8 @@ function spawnOnce(
 
     proc.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        const pathNote = cliBinary !== "claude"
-          ? `Claude CLI not found at configured path: ${cliBinary}. Check 'n-dx config claude.cli_path'.`
-          : "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code, or set a custom path: n-dx config claude.cli_path /path/to/claude";
-        reject(new ClaudeClientError(pathNote, "not-found", false));
+        const diagnosis = diagnoseCliInvocation(cliBinary, "llm.claude.cli_path");
+        reject(new ClaudeClientError(diagnosis.message, "not-found", false));
       } else {
         reject(new ClaudeClientError(err.message, "unknown", isTransientError(err.message)));
       }
@@ -215,13 +211,14 @@ function spawnOnce(
       const stdoutError = extractStdoutError(stdout, format);
       const detail = stderr.trim() || stdoutError || `claude exited with code ${code}`;
 
-      // On Windows with shell: true, a missing binary doesn't trigger ENOENT —
-      // cmd.exe spawns fine but exits non-zero with a "not recognized" message.
-      if (NOT_FOUND_PATTERNS.test(detail)) {
-        const pathNote = cliBinary !== "claude"
-          ? `Claude CLI not found at configured path: ${cliBinary}. Check 'n-dx config claude.cli_path'.`
-          : "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code, or set a custom path: n-dx config claude.cli_path /path/to/claude";
-        reject(new ClaudeClientError(pathNote, "not-found", false));
+      // On Windows the cmd.exe shim spawns fine but exits non-zero with a
+      // "not recognized" / "cannot find the path" message when the binary is
+      // missing — no ENOENT fires. diagnoseCliNotFound anchors to the binary
+      // (and confirms via existsSync/PATH) so a generic error the CLI itself
+      // printed isn't misclassified, and preserves the raw stderr detail.
+      const notFoundMessage = diagnoseCliNotFound(detail, cliBinary, "llm.claude.cli_path");
+      if (notFoundMessage) {
+        reject(new ClaudeClientError(notFoundMessage, "not-found", false));
         return;
       }
 

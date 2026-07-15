@@ -28,6 +28,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
+import { execFileSyncCli } from "../util/exec-cli.js";
 import { getCurrentBranch, PROJECT_DIRS } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
@@ -147,12 +148,12 @@ export function parsePRDDocument(raw: string): PRDDocumentShape | null {
  */
 function parseMarkdownViaRex(markdown: string): PRDDocumentShape | null {
   try {
-    const out = execFileSync("rex", ["parse-md", "--stdin"], {
+    const out = execFileSyncCli("rex", ["parse-md", "--stdin"], {
       input: markdown,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
-    const parsed = JSON.parse(out);
+    const parsed = JSON.parse(out as string);
     if (!parsed || !Array.isArray(parsed.items)) return null;
     return parsed as PRDDocumentShape;
   } catch {

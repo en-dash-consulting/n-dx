@@ -11,7 +11,8 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound } from "../../src/exec.js";
+import { resolve } from "node:path";
 
 const mockExecFile = vi.mocked(execFile);
 const mockExecFileSync = vi.mocked(execFileSync);
@@ -746,5 +747,399 @@ describe("killWithFallback", () => {
     expect(child.kill).toHaveBeenCalledWith("SIGTERM");
 
     vi.useRealTimers();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// quoteWindowsToken
+// ---------------------------------------------------------------------------
+
+describe("quoteWindowsToken", () => {
+  it("quotes a plain token unconditionally", () => {
+    expect(quoteWindowsToken("claude")).toBe('"claude"');
+  });
+
+  it("quotes a plain flag unconditionally", () => {
+    expect(quoteWindowsToken("--print")).toBe('"--print"');
+  });
+
+  it("quotes a path without spaces unconditionally", () => {
+    expect(quoteWindowsToken("C:\\tools\\claude.cmd")).toBe('"C:\\tools\\claude.cmd"');
+  });
+
+  it("wraps a token with spaces in double quotes", () => {
+    expect(quoteWindowsToken("hello world")).toBe('"hello world"');
+  });
+
+  it("wraps a binary path with spaces in double quotes", () => {
+    expect(quoteWindowsToken("C:\\Program Files\\claude\\claude.cmd")).toBe(
+      '"C:\\Program Files\\claude\\claude.cmd"',
+    );
+  });
+
+  it("escapes embedded double quotes by doubling them", () => {
+    expect(quoteWindowsToken('has"quote')).toBe('"has""quote"');
+  });
+
+  it("escapes embedded double quotes and wraps when both spaces and quotes present", () => {
+    expect(quoteWindowsToken('say "hello"')).toBe('"say ""hello"""');
+  });
+
+  // --- audit-remediation edge cases (GH #37 / #68) ---
+
+  it("quotes a token containing cmd.exe metacharacters (no space/quote)", () => {
+    // C:\Users\Tom&Jerry\out.txt — the & would split the command if unquoted.
+    expect(quoteWindowsToken("C:\\Users\\Tom&Jerry\\out.txt")).toBe(
+      '"C:\\Users\\Tom&Jerry\\out.txt"',
+    );
+  });
+
+  it("turns an empty token into a quoted empty string", () => {
+    expect(quoteWindowsToken("")).toBe('""');
+  });
+
+  it("doubles a trailing backslash run before the appended closing quote", () => {
+    // A spaced path ending in a backslash must not merge with the next arg.
+    expect(quoteWindowsToken("C:\\dir with space\\")).toBe('"C:\\dir with space\\\\"');
+  });
+
+  it("doubles a backslash run immediately preceding an embedded quote", () => {
+    // token: a\"b  →  backslash doubled, quote doubled
+    expect(quoteWindowsToken('a\\"b')).toBe('"a\\\\""b"');
+  });
+
+  it("does not double interior backslashes not adjacent to a quote", () => {
+    expect(quoteWindowsToken("a\\b\\c")).toBe('"a\\b\\c"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildWindowsCliCommandLine
+// ---------------------------------------------------------------------------
+
+describe("buildWindowsCliCommandLine", () => {
+  it("quotes every token in a simple command line", () => {
+    expect(buildWindowsCliCommandLine("claude", ["--print", "hello"])).toBe(
+      '"claude" "--print" "hello"',
+    );
+  });
+
+  it("quotes a binary path that contains spaces", () => {
+    expect(
+      buildWindowsCliCommandLine("C:\\Program Files\\claude\\claude.cmd", ["--print"]),
+    ).toBe('"C:\\Program Files\\claude\\claude.cmd" "--print"');
+  });
+
+  it("quotes an arg that contains spaces", () => {
+    expect(buildWindowsCliCommandLine("claude", ["--print", "hello world"])).toBe(
+      '"claude" "--print" "hello world"',
+    );
+  });
+
+  it("handles empty args list", () => {
+    expect(buildWindowsCliCommandLine("claude", [])).toBe('"claude"');
+  });
+
+  it("keeps an empty positional arg as a quoted empty string", () => {
+    expect(buildWindowsCliCommandLine("claude", ["", "--print"])).toBe(
+      '"claude" "" "--print"',
+    );
+  });
+
+  it("quotes both binary and arg when both contain spaces", () => {
+    expect(
+      buildWindowsCliCommandLine("C:\\My Tools\\claude.cmd", ["--message", "hi there"]),
+    ).toBe('"C:\\My Tools\\claude.cmd" "--message" "hi there"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spawnCli
+// ---------------------------------------------------------------------------
+
+describe("spawnCli", () => {
+  it("on non-Windows, spawns the binary directly without shell", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    spawnCli("claude", ["--print", "hello"], { _platform: "linux" });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "claude",
+      ["--print", "hello"],
+      expect.objectContaining({ cwd: undefined, env: undefined }),
+    );
+    const spawnOpts = mockSpawn.mock.calls[0][2] as Record<string, unknown>;
+    expect(spawnOpts.shell).toBeFalsy();
+    expect(spawnOpts.windowsVerbatimArguments).toBeUndefined();
+  });
+
+  it("on Windows, spawns via cmd.exe with windowsVerbatimArguments and no shell", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    spawnCli("claude.cmd", ["--print", "hi"], { _platform: "win32" });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "cmd.exe",
+      ["/d", "/s", "/c", '""claude.cmd" "--print" "hi""'],
+      expect.objectContaining({ windowsVerbatimArguments: true }),
+    );
+    const spawnOpts = mockSpawn.mock.calls[0][2] as Record<string, unknown>;
+    expect(spawnOpts.shell).toBeFalsy();
+  });
+
+  it("on Windows, quotes binary path with spaces in the verbatim command line", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    spawnCli("C:\\Program Files\\claude\\claude.cmd", ["--print"], { _platform: "win32" });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "cmd.exe",
+      ["/d", "/s", "/c", '""C:\\Program Files\\claude\\claude.cmd" "--print""'],
+      expect.objectContaining({ windowsVerbatimArguments: true }),
+    );
+  });
+
+  it("returns the live ChildProcess", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    const result = spawnCli("claude", ["--print"], { _platform: "linux" });
+
+    expect(result).toBe(child);
+  });
+
+  it("passes cwd and env to spawn", () => {
+    const child = createMockChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    const env = { PATH: "/usr/bin" };
+    spawnCli("claude", [], { cwd: "/work", env, _platform: "linux" });
+
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "claude",
+      [],
+      expect.objectContaining({ cwd: "/work", env }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// diagnoseCliInvocation
+// ---------------------------------------------------------------------------
+
+describe("diagnoseCliInvocation", () => {
+  it("returns onPath:true with trimmed resolved path when binary is on PATH", () => {
+    mockExecFileSync.mockReturnValue("/usr/local/bin/claude\n");
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.onPath).toBe(true);
+    expect(result.resolvedPath).toBe("/usr/local/bin/claude");
+    expect(result.message).toContain("/usr/local/bin/claude");
+  });
+
+  it("message names the invocability cause when binary is on PATH", () => {
+    mockExecFileSync.mockReturnValue("/usr/local/bin/claude\n");
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.message).toMatch(/not.*invokable|\.cmd shim|spaces/i);
+  });
+
+  it("includes generic fix hint (no configKey) when binary is on PATH", () => {
+    mockExecFileSync.mockReturnValue("/usr/local/bin/claude\n");
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.message).toMatch(/full.*path|path.*explicitly/i);
+  });
+
+  it("includes configKey in fix hint when binary is on PATH", () => {
+    mockExecFileSync.mockReturnValue("C:\\tools\\claude.cmd\r\n");
+
+    const result = diagnoseCliInvocation("claude", "llm.claude.cli_path");
+
+    expect(result.onPath).toBe(true);
+    expect(result.resolvedPath).toBe("C:\\tools\\claude.cmd");
+    expect(result.message).toContain("llm.claude.cli_path");
+  });
+
+  it("picks the first non-empty line from multi-line where output", () => {
+    mockExecFileSync.mockReturnValue("C:\\tools\\claude.cmd\r\nC:\\other\\claude.exe\r\n");
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.resolvedPath).toBe("C:\\tools\\claude.cmd");
+  });
+
+  it("returns onPath:false with null resolvedPath when binary not found", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.onPath).toBe(false);
+    expect(result.resolvedPath).toBeNull();
+    expect(result.message).toMatch(/not found.*PATH|PATH.*not found/i);
+  });
+
+  it("includes generic install hint (no configKey) when binary not found", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = diagnoseCliInvocation("claude");
+
+    expect(result.message).toMatch(/install.*claude/i);
+  });
+
+  it("includes configKey in fix hint when binary not found", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = diagnoseCliInvocation("codex", "llm.codex.cli_path");
+
+    expect(result.onPath).toBe(false);
+    expect(result.message).toContain("llm.codex.cli_path");
+  });
+
+  it("message names the binary when not found", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+
+    const result = diagnoseCliInvocation("mybin");
+
+    expect(result.message).toContain("mybin");
+  });
+
+  // --- absolute-path diagnosis (audit-remediation, GH #68) ---
+  // `where` errors ('Invalid pattern') on absolute paths, so an absolute
+  // configured cli_path must be diagnosed via existsSync, not resolveExecutablePath.
+
+  it("diagnoses an existing absolute path as present-but-failed (existsSync branch)", () => {
+    // process.execPath is a real absolute path — existsSync returns true.
+    const result = diagnoseCliInvocation(process.execPath, "llm.claude.cli_path");
+
+    expect(result.onPath).toBe(true);
+    expect(result.resolvedPath).toBe(process.execPath);
+    expect(result.message).toContain("exists but could not be run");
+    expect(result.message).toContain("llm.claude.cli_path");
+    // where/which must NOT be consulted for absolute paths.
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it("diagnoses a missing absolute path as 'configured path does not exist'", () => {
+    const missing = resolve("definitely-not-a-real-binary-xyz.cmd");
+
+    const result = diagnoseCliInvocation(missing, "llm.codex.cli_path");
+
+    expect(result.onPath).toBe(false);
+    expect(result.resolvedPath).toBeNull();
+    expect(result.message).toContain("configured path does not exist");
+    expect(result.message).toContain(missing);
+    expect(result.message).toContain("llm.codex.cli_path");
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it("does not produce a nested '/path/to/C:\\...' hint for an absolute path", () => {
+    const missing = resolve("nope-missing-binary.cmd");
+
+    const result = diagnoseCliInvocation(missing, "llm.codex.cli_path");
+
+    expect(result.message).not.toContain("/path/to/");
+  });
+
+  it("modernizes the on-PATH message away from stale 'not directly invokable' wording", () => {
+    mockExecFileSync.mockReturnValue("/usr/local/bin/claude\n");
+
+    const result = diagnoseCliInvocation("claude", "llm.claude.cli_path");
+
+    expect(result.message).not.toContain("not directly invokable");
+    expect(result.message).toMatch(/exited non-zero|PATH.*mismatch|broken .cmd shim/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCliNotFoundError — anchored not-found detection
+// ---------------------------------------------------------------------------
+
+describe("isCliNotFoundError", () => {
+  it("matches cmd.exe 'is not recognized' naming the binary", () => {
+    const stderr =
+      "'claude.cmd' is not recognized as an internal or external command,\r\n" +
+      "operable program or batch file.";
+    expect(isCliNotFoundError(stderr, "claude.cmd")).toBe(true);
+  });
+
+  it("matches when the binary appears as a full path", () => {
+    const bin = "C:\\tools\\claude.cmd";
+    const stderr = `'${bin}' is not recognized as an internal or external command`;
+    expect(isCliNotFoundError(stderr, bin)).toBe(true);
+  });
+
+  it("matches via basename when stderr names only the basename", () => {
+    const stderr = "'claude.cmd' is not recognized as an internal or external command";
+    expect(isCliNotFoundError(stderr, "C:\\tools\\claude.cmd")).toBe(true);
+  });
+
+  it("does NOT match generic task stderr that doesn't name the binary", () => {
+    // A legitimate run whose subcommand printed a generic Windows error must
+    // not be misclassified as a missing CLI.
+    const stderr = "The system cannot find the file specified.\nfoo.txt could not be opened";
+    expect(isCliNotFoundError(stderr, "claude")).toBe(false);
+  });
+
+  it("does NOT match when there is no not-found phrase at all", () => {
+    expect(isCliNotFoundError("claude: some other failure", "claude")).toBe(false);
+  });
+
+  it("returns false for empty stderr", () => {
+    expect(isCliNotFoundError("", "claude")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// diagnoseCliNotFound — anchoring + existsSync/PATH reality check
+// ---------------------------------------------------------------------------
+
+describe("diagnoseCliNotFound", () => {
+  it("returns null (no reality check) when stderr has no not-found phrase", () => {
+    // No PATH lookup should happen — fast path.
+    expect(diagnoseCliNotFound("codex exited with code 1", "codex")).toBeNull();
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it("classifies the definitive cmd.exe 'is not recognized' as not-found", () => {
+    const bin = resolve("missing-claude.cmd");
+    const stderr = `'${bin}' is not recognized as an internal or external command`;
+    const msg = diagnoseCliNotFound(stderr, bin, "llm.claude.cli_path");
+    expect(msg).not.toBeNull();
+    expect(msg).toContain("llm.claude.cli_path");
+    expect(msg).toContain("is not recognized"); // raw detail preserved
+  });
+
+  it("classifies a genuinely missing binary even when cmd omits the name (generic path message)", () => {
+    // Real win32 behaviour: cmd.exe prints "The system cannot find the path
+    // specified." with NO binary name for a missing absolute path.
+    const missing = resolve("no-such-binary.cmd");
+    const stderr = "The system cannot find the path specified.";
+    const msg = diagnoseCliNotFound(stderr, missing, "llm.codex.cli_path");
+    expect(msg).not.toBeNull();
+    expect(msg).toContain("configured path does not exist");
+  });
+
+  it("does NOT reclassify a generic error from an EXISTING binary's own work", () => {
+    // process.execPath exists → the generic stderr is the CLI's own output.
+    const msg = diagnoseCliNotFound(
+      "The system cannot find the file specified.",
+      process.execPath,
+    );
+    expect(msg).toBeNull();
   });
 });

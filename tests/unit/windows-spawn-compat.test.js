@@ -62,19 +62,24 @@ describe("cli.js — Windows-compatible spawn patterns", () => {
 });
 
 // ---------------------------------------------------------------------------
-// pair-programming.js — shell flag for Windows .cmd shims
+// pair-programming.js — Windows-safe CLI spawn helpers for .cmd shims
 // ---------------------------------------------------------------------------
 
-describe("pair-programming.js — Windows-compatible execFileSync calls", () => {
+describe("pair-programming.js — Windows-compatible rex CLI calls", () => {
   const source = readSource("packages/core/pair-programming.js");
 
-  it("execFileSync('rex', ...) includes shell: process.platform === \"win32\" for Windows .cmd shim support", () => {
-    // Find the execFileSync("rex", ...) call in buildPrdStatusExcerpt
-    const callIndex = source.indexOf('execFileSync("rex"');
+  it("routes the rex status call through execFileSyncCli (win-spawn.js), not bare execFileSync with shell:true", () => {
+    // The shell: "win32" + args pattern was superseded by the Windows-safe
+    // helper (cmd.exe /d /s /c + verbatim quoting) — see win-spawn.js and the
+    // DEP0190 guard in tests/e2e/architecture-policy.test.js.
+    const callIndex = source.indexOf('execFileSyncCli("rex"');
     expect(callIndex).toBeGreaterThan(-1);
 
-    // The next ~200 chars after the call should contain the shell option
-    const callContext = source.slice(callIndex, callIndex + 300);
-    expect(callContext).toContain('shell: process.platform === "win32"');
+    // No CLI spawn may reintroduce the deprecated shell:true+args form.
+    expect(source).not.toContain('execFileSync("rex"');
+  });
+
+  it("imports the Windows-safe helpers from win-spawn.js", () => {
+    expect(source).toContain('from "./win-spawn.js"');
   });
 });

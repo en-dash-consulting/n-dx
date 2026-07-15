@@ -18,7 +18,8 @@
  * @module n-dx/pair-programming
  */
 
-import { spawn, execFileSync } from "child_process";
+import { spawn, execFileSync } from "node:child_process";
+import { execFileSyncCli, spawnCli } from "./win-spawn.js";
 import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -65,10 +66,9 @@ export function buildPrdStatusExcerpt(dir) {
 
   if (existsSync(prdTreePath)) {
     try {
-      const out = execFileSync("rex", ["status", "--format=json", dir], {
+      const out = execFileSyncCli("rex", ["status", "--format=json", dir], {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
-        shell: process.platform === "win32",
       });
       doc = JSON.parse(out);
     } catch (err) {
@@ -224,11 +224,10 @@ export function resolveVendorCliPath(dir, vendor) {
  */
 export function checkReviewerAvailability(cliPath) {
   try {
-    execFileSync(cliPath, ["--version"], {
+    execFileSyncCli(cliPath, ["--version"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: "pipe",
-      shell: process.platform === "win32",
     });
     return { available: true };
   } catch {
@@ -346,16 +345,22 @@ export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_0
   return new Promise((resolve) => {
     let child;
     try {
-      const args = reviewer === "codex" ? ["review", prompt] : [prompt];
-      child = spawn(cliPath, args, {
+      // Deliver the prompt via stdin to avoid newline injection on Windows cmd.exe.
+      // claude: `-p -` reads the full prompt from stdin.
+      // codex:  `exec -` reads the prompt from stdin (matches codex-cli-adapter).
+      const args = reviewer === "codex" ? ["exec", "-"] : ["-p", "-"];
+      child = spawnCli(cliPath, args, {
         cwd: dir,
-        stdio: "inherit",
-        shell: process.platform === "win32",
+        stdio: ["pipe", "inherit", "inherit"],
       });
     } catch (err) {
       resolve({ exitCode: 1, timedOut: false, spawnError: err.message });
       return;
     }
+
+    child.stdin.on("error", () => { /* EPIPE guard — child may close stdin early */ });
+    child.stdin.write(prompt);
+    child.stdin.end();
 
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
@@ -391,16 +396,20 @@ export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeou
   return new Promise((resolve) => {
     let child;
     try {
-      const args = reviewer === "codex" ? ["review", prompt] : [prompt];
-      child = spawn(cliPath, args, {
+      // Deliver the prompt via stdin — same rationale as runReviewerLlm.
+      const args = reviewer === "codex" ? ["exec", "-"] : ["-p", "-"];
+      child = spawnCli(cliPath, args, {
         cwd: dir,
-        stdio: ["inherit", "pipe", "pipe"],
-        shell: process.platform === "win32",
+        stdio: ["pipe", "pipe", "pipe"],
       });
     } catch (err) {
       resolve({ exitCode: 1, timedOut: false, spawnError: err.message, output: "" });
       return;
     }
+
+    child.stdin.on("error", () => { /* EPIPE guard */ });
+    child.stdin.write(prompt);
+    child.stdin.end();
 
     let output = "";
     child.stdout.on("data", (chunk) => {

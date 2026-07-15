@@ -28,6 +28,7 @@ import {
   DEFAULT_EXECUTION_POLICY,
   createPromptEnvelope,
   classifyVendorError,
+  buildWindowsCliCommandLine,
 } from "../../../src/prd/llm-gateway.js";
 import type {
   PromptEnvelope,
@@ -118,16 +119,32 @@ describe("ClaudeCliAdapter: buildSpawnConfig", () => {
     const config = claudeCliAdapter.buildSpawnConfig(createMinimalEnvelope(), FULL_ACCESS_POLICY, {});
 
     // FULL_ACCESS_POLICY has allowedCommands: ["npm", "git", "node", "tsc"]
-    expect(config.args).toContain("Bash(npm:*)");
-    expect(config.args).toContain("Bash(git:*)");
-    expect(config.args).toContain("Bash(node:*)");
-    expect(config.args).toContain("Bash(tsc:*)");
-    // File tools always included
-    expect(config.args).toContain("Read");
-    expect(config.args).toContain("Edit");
-    expect(config.args).toContain("Write");
-    expect(config.args).toContain("Glob");
-    expect(config.args).toContain("Grep");
+    if (process.platform === "win32") {
+      // On Windows: tools are joined as a single comma-separated arg after --allowed-tools
+      const toolsIdx = config.args.indexOf("--allowed-tools");
+      expect(toolsIdx).toBeGreaterThan(-1);
+      const toolsToken = config.args[toolsIdx + 1];
+      expect(toolsToken).toContain("Bash(npm:*)");
+      expect(toolsToken).toContain("Bash(git:*)");
+      expect(toolsToken).toContain("Bash(node:*)");
+      expect(toolsToken).toContain("Bash(tsc:*)");
+      expect(toolsToken).toContain("Read");
+      expect(toolsToken).toContain("Edit");
+      expect(toolsToken).toContain("Write");
+      expect(toolsToken).toContain("Glob");
+      expect(toolsToken).toContain("Grep");
+    } else {
+      expect(config.args).toContain("Bash(npm:*)");
+      expect(config.args).toContain("Bash(git:*)");
+      expect(config.args).toContain("Bash(node:*)");
+      expect(config.args).toContain("Bash(tsc:*)");
+      // File tools always included
+      expect(config.args).toContain("Read");
+      expect(config.args).toContain("Edit");
+      expect(config.args).toContain("Write");
+      expect(config.args).toContain("Glob");
+      expect(config.args).toContain("Grep");
+    }
   });
 
   it("stdinContent contains task prompt (non-Windows)", () => {
@@ -648,7 +665,46 @@ describe("ClaudeCliAdapter: buildAllowedTools", () => {
   });
 });
 
-// ── 7. Integration: adapter end-to-end pipeline ─────────────────────────
+// ── 7. Windows --allowed-tools quoting (GH #37 regression) ──────────────
+
+describe("ClaudeCliAdapter: Windows --allowed-tools quoting (GH #37)", () => {
+  it("Windows: --allowed-tools token has no literal double-quote characters", () => {
+    if (process.platform !== "win32") return;
+
+    const { args } = buildClaudeCliArgs({
+      systemPrompt: "SP",
+      promptText: "TP",
+      allowedTools: ["Bash(npm:*)", "Bash(git:*)", "Read", "Edit"],
+    });
+
+    const toolsIdx = args.indexOf("--allowed-tools");
+    expect(toolsIdx).toBeGreaterThan(-1);
+    const toolsToken = args[toolsIdx + 1];
+    // spawnCli/quoteWindowsToken is the single quoting authority — no pre-quoting
+    expect(toolsToken).not.toContain('"');
+  });
+
+  it("Windows: round-trip through buildWindowsCliCommandLine quotes token exactly once", () => {
+    if (process.platform !== "win32") return;
+
+    const { args } = buildClaudeCliArgs({
+      systemPrompt: "SP",
+      promptText: "TP",
+      allowedTools: ["Bash(npm:*)", "Bash(git:*)", "Read"],
+    });
+
+    const toolsIdx = args.indexOf("--allowed-tools");
+    const toolsToken = args[toolsIdx + 1];
+
+    const cmdLine = buildWindowsCliCommandLine("claude", [toolsToken]);
+    // Token should appear wrapped in exactly one pair of double quotes
+    expect(cmdLine).toContain(`"${toolsToken}"`);
+    // No doubled outer quotes — that would indicate the pre-quoting bug
+    expect(cmdLine).not.toContain(`""${toolsToken}""`);
+  });
+});
+
+// ── 8. Integration: adapter end-to-end pipeline ─────────────────────────
 
 describe("ClaudeCliAdapter: end-to-end pipeline", () => {
   it("envelope → buildSpawnConfig → verify args are parseable", () => {

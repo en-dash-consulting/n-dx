@@ -1,0 +1,27 @@
+---
+id: "acf2fb32-29dd-495c-ba2c-f871fd21c1b9"
+level: "task"
+title: "Fix quoteWindowsToken: unconditional quoting + ArgvQuote backslash rules (both copies) with parity test"
+status: "completed"
+priority: "high"
+tags:
+  - "windows"
+  - "llm-client"
+  - "gh:37"
+  - "gh:68"
+  - "audit-remediation"
+source: "fable-audit-2026-07-10"
+startedAt: "2026-07-11T00:14:55.348Z"
+completedAt: "2026-07-11T00:21:56.808Z"
+endedAt: "2026-07-11T00:21:56.808Z"
+resolutionType: "code-change"
+resolutionDetail: "Rewrote quoteWindowsToken (exec.ts + config.js twin) to quote every token unconditionally, apply ArgvQuote backslash-doubling before quotes, and emit \"\" for empty tokens. Added cross-package parity test and %VAR% JSDoc limitation. New TDD edge-case tests pass; 6 pre-existing provider spawn failures untouched (owned by sibling not-found task)."
+acceptanceCriteria:
+  - "TDD: failing tests first for metachar token, empty-string arg, trailing-backslash-before-quote, and backslash-run-before-embedded-quote cases"
+  - "quoteWindowsToken quotes every token unconditionally and applies ArgvQuote backslash-doubling rules; empty token yields a quoted empty string"
+  - "config.js execFileSyncCli quoting updated identically; a parity test asserts identical output for an edge-case token table across both implementations"
+  - "exec.ts carries an 'update the twin in config.js' comment (two-way tie)"
+  - "%VAR% expansion limitation documented in JSDoc"
+  - "All existing exec/routing/provider tests still green (update assertions for now-always-quoted tokens where needed)"
+description: "Audit found three gaps in quoteWindowsToken (packages/llm-client/src/exec.ts ~731) and its intentional copy in packages/core/config.js execFileSyncCli (~683): (a) tokens containing cmd.exe metacharacters (& | < > ^ ( ) !) but no space/quote pass through UNQUOTED — e.g. a tmpdir output path under C:\\Users\\Tom&Jerry\\ splits at & and cmd executes the remainder; (b) empty-string args disappear entirely (join collapses them), shifting later positional args; (c) trailing backslashes before the appended closing quote are not doubled, violating CRT/CommandLineToArgvW parsing — a spaced path ending in a backslash merges with the next argument. Fix in BOTH copies: (1) quote EVERY token unconditionally (audit verified always-quoting is safe under cmd.exe /d /s /c with the outer-quote wrapper — cmd does not treat & | < > ( ) specially inside quotes, and CRT strips quotes so \"--print\" === --print through .cmd shim %* re-tokenization); (2) apply the Microsoft ArgvQuote / cross-spawn backslash rules: double any run of backslashes immediately preceding a double quote (embedded, now-doubled quotes AND the appended closing quote); (3) empty token becomes \"\". Note: %VAR% expansion survives quoting — cannot be fixed by quoting; document that limitation in the JSDoc. Also add a cross-package PARITY TEST (root tests/ or llm-client tests, which may import both packages) asserting a table of edge-case tokens (spaces, embedded quotes, trailing backslash, metachars, empty, %VAR%) produce IDENTICAL command lines through exec.ts buildWindowsCliCommandLine and config.js execFileSyncCli's builder — export or refactor config.js's builder just enough to make it testable. Add a two-way \"update the twin\" comment in exec.ts pointing at config.js. TDD: write the new edge-case tests first (they must fail on current code for metachars/trailing-backslash/empty), then implement."
+---

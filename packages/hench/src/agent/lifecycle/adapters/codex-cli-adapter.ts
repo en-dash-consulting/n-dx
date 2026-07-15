@@ -644,8 +644,14 @@ export const codexCliAdapter: VendorAdapter = {
   ): SpawnConfig {
     const { systemPrompt, taskPrompt } = assemblePrompt(envelope);
 
-    // Combine system and task prompts into a single prompt string,
-    // matching the format used by dispatchVendorSpawn in cli-loop.ts.
+    // Deliver the prompt via stdin (trailing "-" arg), never argv:
+    //   - Windows: cmd.exe treats embedded CR/LF in an argv token as a command
+    //     separator regardless of quoting (BatBadBut / CVE-2024-24576 class),
+    //     so multi-line prompt content in argv could execute as shell commands.
+    //   - All platforms: briefs are bounded at 400 KB (VENDOR_CONTEXT_CHAR_LIMITS
+    //     .codex), which exceeds ARG_MAX for a single argv element (E2BIG).
+    // Matches the claude adapter and the llm-client codex provider; cli-loop.ts
+    // pipes stdinContent when it is non-null.
     const prompt = `SYSTEM:\n${systemPrompt}\n\nTASK:\n${taskPrompt}`;
 
     // Compile explicit sandbox and approval flags from the n-dx policy.
@@ -655,26 +661,20 @@ export const codexCliAdapter: VendorAdapter = {
     // opts.permissionMode is intentionally ignored — it is a Claude-CLI
     // concept with no Codex equivalent; the run.ts caller drops it with a
     // warning before reaching this adapter.
-    //
-    // The prompt is delivered via stdin (trailing "-"), not as a positional
-    // argv argument. Briefs are bounded at 400 KB (VENDOR_CONTEXT_CHAR_LIMITS.codex),
-    // which exceeds the OS ARG_MAX for a single argv element and would crash the
-    // spawn with E2BIG. `codex exec … -` reads the prompt from stdin, matching
-    // the Claude adapter and the llm-client codex provider.
     const args = [
       "exec",
       ...policyFlags,
       "--json",
       "--skip-git-repo-check",
       ...(opts.model ? ["-m", opts.model] : []),
-      "-",
+      "-", // stdin sentinel — codex exec reads the prompt from stdin
     ];
 
     return {
       binary: "codex",
       args,
       env: {},
-      stdinContent: prompt, // Codex: prompt via stdin, not args (avoids E2BIG)
+      stdinContent: prompt,
       cwd: ".",
     };
   },

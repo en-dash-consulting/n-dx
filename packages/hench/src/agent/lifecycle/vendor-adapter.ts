@@ -66,7 +66,10 @@ export interface SpawnConfig {
    * Content to write to the process's stdin, or `null` if stdin is not used.
    *
    * - Claude: prompt text (and optionally system prompt on Windows) written to stdin
-   * - Codex: `null` — prompt is passed as a positional argument
+   * - Codex: combined SYSTEM+TASK prompt written to stdin; "-" is used as the
+   *   positional arg so `codex exec -` reads from stdin. This avoids the
+   *   cmd.exe newline-injection vector (BatBadBut / CVE-2024-24576 class) where
+   *   a multi-line argv token is split at CR/LF regardless of quoting.
    */
   readonly stdinContent: string | null;
 

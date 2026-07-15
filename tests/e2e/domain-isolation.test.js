@@ -398,7 +398,11 @@ describe("architecture policy: orchestration tier boundary", () => {
       if (!importMatch) continue;
 
       const source = importMatch[1];
-      if (!source.startsWith("node:")) {
+      // win-spawn.js is an intentional same-package helper: it holds the
+      // cmd.exe verbatim spawn recipe shared by config.js and pair-programming.js
+      // within the orchestration tier. It contains no domain-package imports.
+      const allowedLocalHelpers = new Set(["./win-spawn.js"]);
+      if (!source.startsWith("node:") && !allowedLocalHelpers.has(source)) {
         violations.push(`line ${i + 1}: import from "${source}"`);
       }
     }
@@ -406,7 +410,8 @@ describe("architecture policy: orchestration tier boundary", () => {
     if (violations.length > 0) {
       expect.fail(
         [
-          "config.js is spawn-exempt but must only import from node: builtins.",
+          "config.js is spawn-exempt but must only import from node: builtins",
+          "or permitted same-package helpers (./win-spawn.js).",
           "It should not accumulate library imports beyond config I/O.",
           "",
           "Non-node: imports found:",

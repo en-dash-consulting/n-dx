@@ -17,7 +17,8 @@ import {
   stat,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSyncCli } from "./win-spawn.js";
+export { quoteWindowsToken, buildWindowsCliCommandLine } from "./win-spawn.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
@@ -669,17 +670,17 @@ function validateGoogleApiKeyEnv(value) {
   }
 }
 
+
 /**
  * Validate CLI path by trying to run `<binary> --version`.
  * Returns { ok, version?, error? }.
  */
 function testCliPath(cliPath) {
   try {
-    const output = execFileSync(cliPath, ["--version"], {
+    const output = execFileSyncCli(cliPath, ["--version"], {
       encoding: "utf-8",
       timeout: 10000,
       stdio: "pipe",
-      shell: process.platform === "win32",
     });
     return { ok: true, version: output.trim() };
   } catch (err) {
@@ -834,18 +835,12 @@ async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
     legacyClaudeConfig,
   );
   try {
-    // On Windows, shell: true is needed to resolve .cmd shims, but cmd.exe
-    // re-parses arguments, splitting on spaces. Wrap args that contain spaces
-    // in double-quotes so they survive the shell layer.
-    const isWin = process.platform === "win32";
-    const safeArgs = isWin
-      ? args.map((a) => (a.includes(" ") ? `"${a}"` : a))
-      : args;
-    execFileSync(binary, safeArgs, {
+    // Windows-safe: routes .cmd shims through cmd.exe with a self-quoted
+    // verbatim command line (GH #37/#68/#69) — see execFileSyncCli.
+    execFileSyncCli(binary, args, {
       encoding: "utf-8",
       timeout: 15000,
       stdio: "pipe",
-      shell: isWin,
     });
     return { ok: true, binary, args };
   } catch (err) {

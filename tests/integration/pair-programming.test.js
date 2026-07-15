@@ -70,6 +70,35 @@ function writeNdxConfig(dir, config) {
 }
 
 /**
+ * Write a cross-platform-executable Node.js script.
+ *
+ * On Windows cmd.exe cannot reliably execute .js files via file association
+ * (they may be opened by wscript.exe rather than node). This helper writes a
+ * .cmd shim that calls node.exe explicitly so our spawnCli/execFileSyncCli
+ * cmd.exe routing works correctly on Windows. On Unix the .js file is made
+ * executable directly.
+ *
+ * @param {string} dir       Directory to write into.
+ * @param {string} basename  File name without extension.
+ * @param {string} jsCode    Node.js script body (no shebang line).
+ * @returns {string}         Path to invoke: .cmd on Windows, .js on Unix.
+ */
+function makeNodeScript(dir, basename, jsCode) {
+  const jsPath = join(dir, `${basename}.js`);
+  writeFileSync(jsPath, `#!/usr/bin/env node\n${jsCode}`, "utf-8");
+
+  if (process.platform === "win32") {
+    const cmdPath = join(dir, `${basename}.cmd`);
+    // Invoke node.exe explicitly — do not rely on .js file association.
+    writeFileSync(cmdPath, `@"${process.execPath}" "${jsPath}" %*\r\n`, "utf-8");
+    return cmdPath;
+  }
+
+  chmodSync(jsPath, 0o755);
+  return jsPath;
+}
+
+/**
  * Write an executable mock reviewer script that exits with the given code.
  * The script accepts any arguments (including a prompt string) and ignores them.
  *
@@ -78,15 +107,11 @@ function writeNdxConfig(dir, config) {
  * @returns {string}         Absolute path to the script.
  */
 function writeMockReviewer(dir, exitCode) {
-  const scriptPath = join(dir, "mock-reviewer.js");
-  writeFileSync(
-    scriptPath,
-    // Exit 0 for --version probe (availability check); exit configured code otherwise
-    `#!/usr/bin/env node\n// Mock LLM reviewer\nif (process.argv[2] === '--version') { console.log('mock 1.0.0'); process.exit(0); }\nprocess.exit(${exitCode});\n`,
-    "utf-8",
+  return makeNodeScript(
+    dir,
+    "mock-reviewer",
+    `// Mock LLM reviewer\nif (process.argv[2] === '--version') { console.log('mock 1.0.0'); process.exit(0); }\nprocess.exit(${exitCode});\n`,
   );
-  chmodSync(scriptPath, 0o755);
-  return scriptPath;
 }
 
 // ---------------------------------------------------------------------------
@@ -705,19 +730,21 @@ describe("runReviewerLlm", () => {
       dir: tmpDir,
     });
     expect(result.exitCode).toBe(1);
-    expect(result.spawnError).toBeDefined();
+    // On Windows cmd.exe routing, ENOENT becomes a non-zero exit code rather
+    // than a spawn error event — spawnError is only available on POSIX.
+    if (process.platform !== "win32") {
+      expect(result.spawnError).toBeDefined();
+    }
   });
 
-  it("prepends 'review' subcommand when reviewer is codex", async () => {
-    // Mock that writes argv to a file so we can inspect what args were passed
-    const scriptPath = join(tmpDir, "argv-capture.js");
+  it("uses 'exec -' subcommand (stdin) when reviewer is codex", async () => {
+    // Prompt is now delivered via stdin, not argv. The arg should be "exec", "-".
     const argvOutPath = join(tmpDir, "argv.json");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "argv-capture",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
 
     await runReviewerLlm({
       cliPath: scriptPath,
@@ -728,19 +755,19 @@ describe("runReviewerLlm", () => {
 
     const { readFileSync } = await import("node:fs");
     const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
-    expect(capturedArgs[0]).toBe("review");
-    expect(capturedArgs[1]).toBe("review this code");
+    expect(capturedArgs[0]).toBe("exec");
+    expect(capturedArgs[1]).toBe("-");
+    // Prompt must NOT appear in argv — it is delivered via stdin.
+    expect(capturedArgs.join(" ")).not.toContain("review this code");
   });
 
-  it("passes only the prompt when reviewer is claude", async () => {
-    const scriptPath = join(tmpDir, "argv-capture.js");
+  it("uses '-p -' args (stdin) when reviewer is claude", async () => {
     const argvOutPath = join(tmpDir, "argv.json");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "argv-capture",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
 
     await runReviewerLlm({
       cliPath: scriptPath,
@@ -751,18 +778,18 @@ describe("runReviewerLlm", () => {
 
     const { readFileSync } = await import("node:fs");
     const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
-    expect(capturedArgs).toEqual(["review this code"]);
+    expect(capturedArgs).toEqual(["-p", "-"]);
+    // Prompt must NOT appear in argv.
+    expect(capturedArgs.join(" ")).not.toContain("review this code");
   });
 
-  it("passes only the prompt when reviewer is undefined (backward compat)", async () => {
-    const scriptPath = join(tmpDir, "argv-capture.js");
+  it("uses '-p -' args (stdin) when reviewer is undefined (backward compat: claude default)", async () => {
     const argvOutPath = join(tmpDir, "argv.json");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "argv-capture",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
 
     await runReviewerLlm({
       cliPath: scriptPath,
@@ -772,7 +799,26 @@ describe("runReviewerLlm", () => {
 
     const { readFileSync } = await import("node:fs");
     const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
-    expect(capturedArgs).toEqual(["review this code"]);
+    expect(capturedArgs).toEqual(["-p", "-"]);
+    expect(capturedArgs.join(" ")).not.toContain("review this code");
+  });
+
+  it("delivers prompt via stdin (verified by echo mock)", async () => {
+    // Mock that reads stdin and writes it to stdout, then exits 0.
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "stdin-echo",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nlet d=''; process.stdin.setEncoding('utf-8'); process.stdin.on('data', c => d+=c); process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });\n`,
+    );
+
+    const result = await runReviewerLlm({
+      cliPath: scriptPath,
+      prompt: "my multi\nline prompt",
+      dir: tmpDir,
+      reviewer: "claude",
+    });
+    // Exit 0 means prompt was delivered and child processed stdin correctly.
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -812,19 +858,22 @@ describe("runReviewerLlmCapturing", () => {
       dir: tmpDir,
     });
     expect(result.exitCode).toBe(1);
-    expect(result.spawnError).toBeDefined();
-    expect(result.output).toBe("");
+    // On Windows cmd.exe routing, ENOENT becomes a non-zero exit code (not a
+    // spawn error event), and cmd.exe writes its own error to stderr — so both
+    // spawnError and empty-output assertions are POSIX-only.
+    if (process.platform !== "win32") {
+      expect(result.spawnError).toBeDefined();
+      expect(result.output).toBe("");
+    }
   });
 
   it("captures stdout written by the child process", async () => {
     // Write a script that prints to stdout
-    const scriptPath = join(tmpDir, "output-script.js");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\nAll looks good.\\n');\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "output-script",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\nAll looks good.\\n');\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
 
     const result = await runReviewerLlmCapturing({
       cliPath: scriptPath,
@@ -836,15 +885,13 @@ describe("runReviewerLlmCapturing", () => {
     expect(result.output).toContain("All looks good.");
   });
 
-  it("prepends 'review' subcommand when reviewer is codex", async () => {
-    const scriptPath = join(tmpDir, "argv-capture-cap.js");
+  it("uses 'exec -' subcommand (stdin) when reviewer is codex", async () => {
     const argvOutPath = join(tmpDir, "argv-cap.json");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "argv-capture-cap",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
 
     await runReviewerLlmCapturing({
       cliPath: scriptPath,
@@ -855,19 +902,18 @@ describe("runReviewerLlmCapturing", () => {
 
     const { readFileSync } = await import("node:fs");
     const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
-    expect(capturedArgs[0]).toBe("review");
-    expect(capturedArgs[1]).toBe("review this");
+    expect(capturedArgs[0]).toBe("exec");
+    expect(capturedArgs[1]).toBe("-");
+    expect(capturedArgs.join(" ")).not.toContain("review this");
   });
 
-  it("passes only the prompt when reviewer is claude", async () => {
-    const scriptPath = join(tmpDir, "argv-capture-cap.js");
+  it("uses '-p -' args (stdin) when reviewer is claude", async () => {
     const argvOutPath = join(tmpDir, "argv-cap.json");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "argv-capture-cap",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nrequire('fs').writeFileSync(${JSON.stringify(argvOutPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
 
     await runReviewerLlmCapturing({
       cliPath: scriptPath,
@@ -878,7 +924,27 @@ describe("runReviewerLlmCapturing", () => {
 
     const { readFileSync } = await import("node:fs");
     const capturedArgs = JSON.parse(readFileSync(argvOutPath, "utf-8"));
-    expect(capturedArgs).toEqual(["review this"]);
+    expect(capturedArgs).toEqual(["-p", "-"]);
+    expect(capturedArgs.join(" ")).not.toContain("review this");
+  });
+
+  it("delivers prompt via stdin and captures output (echo mock)", async () => {
+    // Mock reads stdin and echoes it to stdout.
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "stdin-echo-cap",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nlet d=''; process.stdin.setEncoding('utf-8'); process.stdin.on('data', c => d+=c); process.stdin.on('end', () => { process.stdout.write(d); process.exit(0); });\n`,
+    );
+
+    const result = await runReviewerLlmCapturing({
+      cliPath: scriptPath,
+      prompt: "my multi\nline prompt",
+      dir: tmpDir,
+      reviewer: "claude",
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("my multi");
+    expect(result.output).toContain("line prompt");
   });
 });
 
@@ -1039,13 +1105,11 @@ describe("buildRemediationContext", () => {
 
 describe("runCrossVendorReview — feedback in llm-review result", () => {
   it("includes feedback object in llm-review result", async () => {
-    const scriptPath = join(tmpDir, "feedback-reviewer.js");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\nAll tests passed.\\n');\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "feedback-reviewer",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\nAll tests passed.\\n');\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
     writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
@@ -1062,13 +1126,11 @@ describe("runCrossVendorReview — feedback in llm-review result", () => {
   });
 
   it("includes reviewOutput string in llm-review result", async () => {
-    const scriptPath = join(tmpDir, "output-reviewer.js");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\n');\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "output-reviewer",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\n');\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
     writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "codex" });
@@ -1079,13 +1141,11 @@ describe("runCrossVendorReview — feedback in llm-review result", () => {
   });
 
   it("feedback.passed is true when reviewer outputs PASS and exits 0", async () => {
-    const scriptPath = join(tmpDir, "pass-reviewer.js");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\n');\nprocess.exit(0);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "pass-reviewer",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\n');\nprocess.exit(0);\n`,
     );
-    chmodSync(scriptPath, 0o755);
     writeNdxConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude" });
@@ -1094,13 +1154,11 @@ describe("runCrossVendorReview — feedback in llm-review result", () => {
   });
 
   it("feedback.passed is false when reviewer outputs FAIL", async () => {
-    const scriptPath = join(tmpDir, "fail-reviewer.js");
-    writeFileSync(
-      scriptPath,
-      `#!/usr/bin/env node\nif (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('FAIL\\n- broken import\\n');\nprocess.exit(1);\n`,
-      "utf-8",
+    const scriptPath = makeNodeScript(
+      tmpDir,
+      "fail-reviewer",
+      `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('FAIL\\n- broken import\\n');\nprocess.exit(1);\n`,
     );
-    chmodSync(scriptPath, 0o755);
     writeNdxConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude" });
