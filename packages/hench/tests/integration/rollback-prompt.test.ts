@@ -240,7 +240,7 @@ describe("rollbackOnFailure express-prompt gate", () => {
     }
   });
 
-  it("auto-reverts tracked changes but preserves untracked files in autonomous mode, even on a TTY", async () => {
+  it("never reverts in autonomous mode, even on a TTY (no prompt, nothing discarded)", async () => {
     const { fakes } = installFakeReadline();
     vi.resetModules();
 
@@ -259,14 +259,14 @@ describe("rollbackOnFailure express-prompt gate", () => {
         autonomous: true,
       });
 
-      // No prompt was ever opened.
+      // Autonomous is non-interactive, so no confirmation prompt is opened...
       expect(fakes).toHaveLength(0);
 
-      // Autonomous behavior: tracked changes reverted...
+      // ...and nothing is discarded — tracked changes stay...
       const content = await readFile(join(projectDir, "src.ts"), "utf-8");
-      expect(content).toBe("export const x = 1;\n");
+      expect(content).toBe("export const x = 999;\n");
 
-      // ...but untracked work is never silently deleted.
+      // ...and untracked work stays too.
       const untracked = await readFile(join(projectDir, "scratch.ts"), "utf-8");
       expect(untracked).toBe("// untracked\n");
     } finally {

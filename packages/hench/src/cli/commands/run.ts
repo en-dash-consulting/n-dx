@@ -914,8 +914,12 @@ export async function cmdRun(
   const dryRun = flags["dry-run"] === "true";
   const review = flags.review === "true";
   // --no-rollback always wins; otherwise read config (defaults to true).
+  // Note: the failure rollback is prompt-only — it never runs without an
+  // interactive confirmation, so this flag only governs whether that prompt
+  // is offered at all.
   const rollbackOnFailure = flags["no-rollback"] === "true" ? false : (config.rollbackOnFailure ?? true);
-  // --yes suppresses the interactive confirmation prompt before rollback.
+  // --yes runs non-interactively, so no rollback prompt is shown (and thus no
+  // revert occurs on failure).
   const yes = flags["yes"] === "true";
   // --allow-dirty lets autonomous runs start against an uncommitted working
   // tree instead of aborting at the pre-run commit gate.

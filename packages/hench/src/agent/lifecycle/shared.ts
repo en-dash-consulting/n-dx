@@ -99,13 +99,16 @@ export interface SharedLoopOptions {
   /** Run records for computing prior attempts when task is auto-selected. */
   runHistory?: RunRecord[];
   /**
-   * Automatically revert uncommitted file changes on run failure.
-   * Default: true. Pass false (via --no-rollback) to leave changes in place.
+   * Offer to revert uncommitted file changes on run failure. Default: true.
+   * The revert is prompt-only — it never runs without an interactive
+   * confirmation. Pass false (via --no-rollback) to suppress the prompt
+   * entirely so a failed run always leaves changes in place.
    */
   rollbackOnFailure?: boolean;
   /**
-   * Skip the interactive rollback confirmation prompt and proceed automatically.
-   * Set when --yes is passed or when the caller knows it is running non-interactively.
+   * Skip interactive confirmation prompts and proceed non-interactively.
+   * Set when --yes is passed. Because the rollback is prompt-only, --yes
+   * runs never revert on failure (there is no prompt to answer).
    */
   yes?: boolean;
   /**
@@ -746,19 +749,23 @@ export interface FinalizeRunOptions {
   /** Whether in self-heal mode (triggers mandatory test gate). */
   selfHeal?: boolean;
   /**
-   * Automatically revert uncommitted file changes on run failure.
-   * Default: true. Pass false (via --no-rollback) to leave changes in place.
+   * Offer to revert uncommitted file changes on run failure. Default: true.
+   * The revert is prompt-only — it never runs without an interactive
+   * confirmation. Pass false (via --no-rollback) to suppress the prompt
+   * entirely so a failed run always leaves changes in place.
    */
   rollbackOnFailure?: boolean;
   /**
-   * Skip the interactive rollback confirmation prompt and proceed automatically.
-   * Set when --yes is passed or when the caller knows it is running non-interactively.
+   * Skip interactive confirmation prompts and proceed non-interactively.
+   * Set when --yes is passed. Because the rollback is prompt-only, --yes
+   * runs never revert on failure (there is no prompt to answer).
    */
   yes?: boolean;
   /**
    * True when the run is in a non-interactive autonomous mode (--auto or
    * --loop). Bypasses the interactive commit-message approval prompt so
-   * unattended runs do not stall waiting for input.
+   * unattended runs do not stall waiting for input. Autonomous runs are
+   * non-interactive, so they never revert on failure.
    */
   autonomous?: boolean;
   /**
@@ -951,18 +958,19 @@ async function promptRollbackConfirm(count: number): Promise<boolean> {
 }
 
 /**
- * Revert all uncommitted changes introduced during the run.
+ * Revert uncommitted changes introduced during a failed run — but only
+ * after an express, per-run confirmation. A revert NEVER occurs without the
+ * user explicitly saying yes each time.
+ *
  * Skips silently when the working tree is already clean.
  *
- * In interactive TTY mode (stdin is a terminal, --yes was not passed, and
- * the run is not autonomous), prompts the user to confirm before reverting;
- * the prompt defaults to No so a stray Enter never discards work.
- * In non-interactive mode (CI, pipe, --yes, or any autonomous mode) proceeds
- * without a prompt, preserving the unattended auto-revert behavior — but a
- * silent revert only discards tracked changes; untracked files are never
- * deleted without an express confirmation.
- *
- * Prints what was reverted on completion.
+ * The revert is prompt-only:
+ * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
+ *   prompts `Revert N uncommitted file(s)? [y/N]`, defaulting to No. Only an
+ *   explicit yes reverts (a full revert, including untracked files).
+ * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
+ *   channel for a per-run confirmation, so the working tree is left exactly
+ *   as-is and the uncommitted files are reported. Nothing is discarded.
  */
 interface PerformRollbackOptions {
   /** Skip the interactive confirmation prompt (--yes / non-interactive). */

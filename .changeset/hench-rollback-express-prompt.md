@@ -2,6 +2,6 @@
 "hench": patch
 ---
 
-Gate the `rollbackOnFailure` revert behind an express prompt in interactive runs, and never delete untracked files without confirmation. On a failed run with `rollbackOnFailure` enabled, an interactive TTY session now prompts `Revert N uncommitted file(s)? [y/N]` and **defaults to No** — a stray Enter preserves the working tree. Declining leaves everything untouched.
+Make the `rollbackOnFailure` revert **prompt-only** — a failed run never discards work without an express, per-run confirmation. On an interactive TTY, a failed run prompts `Revert N uncommitted file(s)? [y/N]` (defaults to **No**); only an explicit yes reverts (a full `git reset`/`checkout`/`clean -fd`). Declining preserves the working tree.
 
-Autonomous (`--auto`/`--loop`/`--epic-by-epic`), `--yes`, and non-TTY runs still auto-revert without prompting (no stdin hang), but a silent auto-revert now discards only **tracked** changes: `git clean -fd` (untracked-file removal) runs only after an express confirmation. `revertChanges` gains a `cleanUntracked` option (default `true`) to support this. `--no-rollback` / `hench.rollbackOnFailure: false` still disables the revert entirely.
+Non-interactive runs — autonomous (`--auto`/`--loop`/`--epic-by-epic`), `--yes`, and non-TTY/CI — have no channel for a per-run confirmation, so they **never** revert on failure: the working tree is left exactly as-is and the uncommitted files are reported. This replaces the previous unattended auto-revert. `--no-rollback` / `hench.rollbackOnFailure: false` still suppresses the prompt entirely. PRD status reset on failure is unchanged.

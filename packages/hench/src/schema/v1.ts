@@ -132,8 +132,10 @@ export interface HenchConfig {
   /** Discovered claude CLI path, persisted by ndx init to avoid re-discovery on every run. */
   claudePath?: string;
   /**
-   * Automatically revert uncommitted file changes when a run fails.
-   * Default: true. Set to false to keep changes in place on failure (equivalent to --no-rollback).
+   * Offer to revert uncommitted file changes when a run fails. Default: true.
+   * The revert is prompt-only — it never runs without an interactive
+   * confirmation, so non-interactive/autonomous/--yes runs never revert.
+   * Set to false to suppress the prompt entirely (equivalent to --no-rollback).
    * The --no-rollback CLI flag always overrides this setting for a single run.
    */
   rollbackOnFailure?: boolean;
