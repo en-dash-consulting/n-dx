@@ -104,6 +104,41 @@
   fill: var(--accent-strong, #2b7de9);
 }
 
+/* ── Connecting-only filter toggle (on expanded zones) ────────────── */
+
+.cg-zone-connfilter-btn {
+  cursor: pointer;
+}
+
+.cg-connfilter-btn-bg {
+  fill: var(--bg-hover, rgba(128, 128, 128, 0.1));
+  stroke: var(--border-strong, #888);
+  stroke-width: 1.5;
+  transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+.cg-zone-connfilter-btn:hover .cg-connfilter-btn-bg {
+  stroke: var(--accent, #4a9eff);
+  stroke-width: 2;
+}
+
+.cg-zone-connfilter-btn.active .cg-connfilter-btn-bg {
+  fill: var(--accent-bg, rgba(74, 158, 255, 0.15));
+  stroke: var(--accent, #4a9eff);
+}
+
+.cg-connfilter-btn-text {
+  font-size: 13px;
+  fill: var(--text-dim, #888);
+  pointer-events: none;
+  transition: fill 0.15s ease;
+}
+
+.cg-zone-connfilter-btn:hover .cg-connfilter-btn-text,
+.cg-zone-connfilter-btn.active .cg-connfilter-btn-text {
+  fill: var(--accent, #4a9eff);
+}
+
 /* ── Drill-down button (on zones with sub-zones) ──────────────────── */
 
 .cg-zone-drill-btn {
