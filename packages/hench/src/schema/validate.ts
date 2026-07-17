@@ -75,6 +75,12 @@ export const HenchConfigSchema = z.object({
   fullTestCommand: z.string().optional(),
   permissionMode: z.enum(["default", "acceptEdits", "bypassPermissions", "plan"]).optional(),
   commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(300_000),
+  git: z
+    .object({
+      checkpointThreshold: z.number().int().nonnegative().optional(),
+      requireCleanTree: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 const RunStatusSchema = z.enum([

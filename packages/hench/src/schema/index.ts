@@ -5,12 +5,14 @@ export {
   normalizeRunTokens,
   PERMISSION_MODES,
   isPermissionMode,
+  DEFAULT_CHECKPOINT_THRESHOLD,
 } from "./v1.js";
 
 export type {
   GuardConfig,
   PolicyLimitsConfig,
   RetryConfig,
+  GitSafetyConfig,
   HenchConfig,
   Provider,
   PermissionMode,

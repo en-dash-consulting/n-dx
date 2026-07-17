@@ -1165,6 +1165,18 @@ Hench settings (.hench/config.json):
                                      runs 'git commit' directly so no approval prompt interrupts
                                      the loop.
 
+Hench git-safety settings (pre-run commit gate):
+  hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run
+                                           commit gate escalates: the interactive prompt warns
+                                           about the change size and defaults to committing a
+                                           checkpoint instead of proceeding (default: 200,
+                                           0 disables escalation)
+  hench.git.requireCleanTree     boolean   Refuse to start runs against a dirty working tree:
+                                           interactive prompts drop the "proceed" option and
+                                           non-interactive runs abort (default: false)
+                                           The --allow-dirty flag overrides both settings for
+                                           one run (flag > config > defaults).
+
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths
                                            (default: .hench/**, .rex/**, .git/**, node_modules/**)

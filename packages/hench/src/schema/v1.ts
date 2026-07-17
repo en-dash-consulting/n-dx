@@ -70,6 +70,38 @@ export interface RetryConfig {
   maxDelayMs: number;
 }
 
+/**
+ * Git-safety configuration embedded in {@link HenchConfig}.
+ *
+ * Governs how checkpoint decisions (currently the pre-run commit gate) react
+ * to uncommitted changes in the working tree. Persisted in
+ * `.hench/config.json` and editable via `n-dx config hench.git.*`.
+ */
+export interface GitSafetyConfig {
+  /**
+   * Lines-changed threshold (insertions + deletions vs HEAD) at or above
+   * which the pre-run commit gate escalates: interactive prompts warn about
+   * the change size and default to committing instead of proceeding.
+   * Below the threshold, behavior is unchanged. 0 disables escalation.
+   * Default: {@link DEFAULT_CHECKPOINT_THRESHOLD}.
+   */
+  checkpointThreshold?: number;
+  /**
+   * When true, runs refuse to start against a dirty working tree: the
+   * interactive gate drops the "proceed" option (commit or stop only) and
+   * non-interactive runs (--yes, piped, autonomous) abort. The
+   * `--allow-dirty` CLI flag always overrides this setting for a single
+   * run. Default: false.
+   */
+  requireCleanTree?: boolean;
+}
+
+/**
+ * Default {@link GitSafetyConfig.checkpointThreshold}: escalate the pre-run
+ * gate when uncommitted changes reach 200 changed lines.
+ */
+export const DEFAULT_CHECKPOINT_THRESHOLD = 200;
+
 export type Provider = "cli" | "api";
 
 /**
@@ -193,6 +225,11 @@ export interface HenchConfig {
    * prompt. Set to 0 to disable auto-commit entirely. Default: 300000 (5 min).
    */
   commitMsgTimeoutMs?: number;
+  /**
+   * Git-safety settings for checkpoint decisions (pre-run commit gate).
+   * See {@link GitSafetyConfig} for field semantics and defaults.
+   */
+  git?: GitSafetyConfig;
 }
 
 // ── Language-specific guard defaults ──────────────────────────────────

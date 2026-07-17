@@ -1163,6 +1163,10 @@ export async function cmdRun(
       autonomous,
       allowDirty,
       dryRun,
+      // Size-aware escalation config (hench.git.*); --allow-dirty above
+      // takes precedence over both settings.
+      checkpointThreshold: config.git?.checkpointThreshold,
+      requireCleanTree: config.git?.requireCleanTree,
     });
     if (gate === "stop") {
       info("Stopped before running. Commit or discard your changes, then re-run.");

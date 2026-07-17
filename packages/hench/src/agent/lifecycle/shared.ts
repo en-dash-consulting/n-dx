@@ -18,6 +18,9 @@ import { randomUUID } from "node:crypto";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
+import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
+import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { getCurrentHead, execShellCmd, execStdout } from "../../process/exec.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
@@ -1062,19 +1065,50 @@ export type PreRunCommitChoice = "commit" | "stop" | "proceed";
 export type PreRunCommitGateResult = "proceed" | "stop";
 
 /**
- * Three-way prompt for the pre-run commit gate. Bare Enter proceeds (least
- * friction); Ctrl-C stops (treat an interrupt as "don't start the run").
- * Built on the same SIGINT-suspended readline core as the yes/no prompt.
+ * How the pre-run prompt should present its choices.
+ *
+ * - `escalate` — changes are at/above the checkpoint threshold: bare Enter
+ *   commits instead of proceeding.
+ * - `allowProceed` — false when `hench.git.requireCleanTree` is set (without
+ *   `--allow-dirty`): the "proceed" option is dropped entirely.
  */
-async function promptPreRunCommitChoice(): Promise<PreRunCommitChoice> {
-  const answer = await readLineWithSuspendedSigint(
-    "\nCommit these changes first? [c]ommit / [s]top / [p]roceed (default: proceed) ",
-  );
-  if (answer === null) return "stop";
+export interface PreRunPromptOptions {
+  escalate: boolean;
+  allowProceed: boolean;
+}
+
+/**
+ * Map a raw prompt answer to a {@link PreRunCommitChoice}. Bare Enter takes
+ * the default: "proceed" normally, "commit" when escalated or when proceeding
+ * is disallowed. A "proceed" answer while disallowed re-resolves to the
+ * default rather than sneaking past requireCleanTree. Exported for tests.
+ */
+export function resolvePreRunCommitAnswer(
+  answer: string | null,
+  { escalate, allowProceed }: PreRunPromptOptions,
+): PreRunCommitChoice {
+  if (answer === null) return "stop"; // Ctrl-C — don't start the run.
+  const fallback: PreRunCommitChoice = escalate || !allowProceed ? "commit" : "proceed";
   const trimmed = answer.trim().toLowerCase();
   if (trimmed === "c" || trimmed === "commit") return "commit";
   if (trimmed === "s" || trimmed === "stop") return "stop";
-  return "proceed";
+  if ((trimmed === "p" || trimmed === "proceed") && allowProceed) return "proceed";
+  return fallback;
+}
+
+/**
+ * Three-way prompt for the pre-run commit gate. Bare Enter takes the least
+ * dangerous default (proceed normally, commit when escalated); Ctrl-C stops
+ * (treat an interrupt as "don't start the run"). Built on the same
+ * SIGINT-suspended readline core as the yes/no prompt.
+ */
+async function promptPreRunCommitChoice(opts: PreRunPromptOptions): Promise<PreRunCommitChoice> {
+  const def = opts.escalate || !opts.allowProceed ? "commit" : "proceed";
+  const choices = opts.allowProceed ? "[c]ommit / [s]top / [p]roceed" : "[c]ommit / [s]top";
+  const answer = await readLineWithSuspendedSigint(
+    `\nCommit these changes first? ${choices} (default: ${def}) `,
+  );
+  return resolvePreRunCommitAnswer(answer, opts);
 }
 
 /**
@@ -1188,12 +1222,25 @@ export interface PreRunCommitGateOptions {
    */
   allowDirty?: boolean;
   dryRun?: boolean;
+  /**
+   * Lines-changed threshold at/above which an interactive gate escalates
+   * (from `hench.git.checkpointThreshold`). 0 disables escalation.
+   * Defaults to {@link DEFAULT_CHECKPOINT_THRESHOLD}.
+   */
+  checkpointThreshold?: number;
+  /**
+   * Refuse to start against a dirty tree (from `hench.git.requireCleanTree`):
+   * interactive prompts drop "proceed", non-interactive runs stop.
+   * `--allow-dirty` (allowDirty) takes precedence.
+   */
+  requireCleanTree?: boolean;
   /** Test seams — default to the real implementations. */
   deps?: {
     listDirty?: (dir: string) => Promise<string[]>;
+    measureMagnitude?: (dir: string) => Promise<ChangeMagnitude>;
     collectDiff?: (dir: string) => Promise<ReviewDiff>;
     proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string) => Promise<string>;
-    promptChoice?: () => Promise<PreRunCommitChoice>;
+    promptChoice?: (promptOpts: PreRunPromptOptions) => Promise<PreRunCommitChoice>;
     commit?: (dir: string, message: string) => Promise<void>;
     isTTY?: boolean;
   };
@@ -1209,7 +1256,15 @@ export interface PreRunCommitGateOptions {
  * Autonomous runs (--auto/--loop/--epic-by-epic) can't prompt without stalling
  * an unattended loop, so a dirty tree makes them *abort* by default rather than
  * silently absorb the pre-existing changes — pass `--allow-dirty` (allowDirty)
- * to proceed anyway. Other non-interactive runs (e.g. --yes, piped) proceed.
+ * to proceed anyway. Other non-interactive runs (e.g. --yes, piped) proceed
+ * unless `hench.git.requireCleanTree` is set (then they stop too, again
+ * unless --allow-dirty).
+ *
+ * The gate is size-aware: when the uncommitted changes reach the checkpoint
+ * threshold (`hench.git.checkpointThreshold` lines changed, default
+ * {@link DEFAULT_CHECKPOINT_THRESHOLD}), the interactive prompt escalates —
+ * it warns about the magnitude and defaults to committing instead of
+ * proceeding. Below the threshold, behavior is unchanged.
  *
  * Returns "stop" when the caller should abort before running, else "proceed".
  */
@@ -1219,17 +1274,27 @@ export async function performPreRunCommitGateIfNeeded(
   const { projectDir, henchDir, model, yes, autonomous, allowDirty, dryRun } = opts;
   const deps = opts.deps ?? {};
   const listDirty = deps.listDirty ?? listDirtyPaths;
+  const measureMagnitude = deps.measureMagnitude ?? measureChangeMagnitude;
   const collectDiff = deps.collectDiff ?? ((dir: string) => collectReviewDiff(dir));
   const proposeMessage = deps.proposeMessage ?? proposePreRunCommitMessage;
   const promptChoice = deps.promptChoice ?? promptPreRunCommitChoice;
   const commit = deps.commit ?? commitPreRunChanges;
   const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
+  const checkpointThreshold = opts.checkpointThreshold ?? DEFAULT_CHECKPOINT_THRESHOLD;
+  // --allow-dirty takes precedence over config: it suppresses both
+  // requireCleanTree and threshold escalation for this run.
+  const requireCleanTree = Boolean(opts.requireCleanTree) && !allowDirty;
 
   // Dry runs never touch the working tree; skip the gate entirely.
   if (dryRun) return "proceed";
 
   const dirty = await listDirty(projectDir);
   if (dirty.length === 0) return "proceed"; // Clean tree → start immediately, no prompt.
+
+  const magnitude = await measureMagnitude(projectDir);
+  const magnitudeLabel = `${dirty.length} uncommitted file(s), ${magnitude.linesChanged} line(s) changed`;
+  const escalate =
+    !allowDirty && checkpointThreshold > 0 && magnitude.linesChanged >= checkpointThreshold;
 
   // Only prompt in an attended TTY session. Autonomous (--auto/--loop/
   // --epic-by-epic) and --yes runs can't prompt without stalling.
@@ -1240,12 +1305,21 @@ export async function performPreRunCommitGateIfNeeded(
     // fast instead — unless the operator explicitly opted in with --allow-dirty.
     if (autonomous && !allowDirty) {
       info(
-        `⚠ Refusing to start an autonomous run with ${dirty.length} uncommitted file(s) in the working tree. ` +
+        `⚠ Refusing to start an autonomous run with ${magnitudeLabel} in the working tree. ` +
           `Commit or stash them, or pass --allow-dirty to proceed anyway.`,
       );
       return "stop";
     }
-    info(`Proceeding with ${dirty.length} uncommitted file(s) in the working tree.`);
+    // requireCleanTree extends the same fail-fast to all non-interactive runs
+    // (--yes, piped): there is no one attending who can commit first.
+    if (requireCleanTree) {
+      info(
+        `⚠ hench.git.requireCleanTree is set: refusing to start with ${magnitudeLabel} in the working tree. ` +
+          `Commit or stash them, or pass --allow-dirty to proceed anyway.`,
+      );
+      return "stop";
+    }
+    info(`Proceeding with ${magnitudeLabel} in the working tree.`);
     return "proceed";
   }
 
@@ -1255,10 +1329,19 @@ export async function performPreRunCommitGateIfNeeded(
   section("Uncommitted changes detected");
   subsection("Changes");
   info(diff.stat || `${dirty.length} file(s)`);
+  if (escalate) {
+    info(
+      `⚠ Large uncommitted change: ${magnitudeLabel} (threshold: ${checkpointThreshold}). ` +
+        `Committing a checkpoint before the run is strongly recommended.`,
+    );
+  }
+  if (requireCleanTree) {
+    info("hench.git.requireCleanTree is set: commit these changes or stop (pass --allow-dirty to override).");
+  }
   subsection("Proposed commit message");
   info(proposed);
 
-  const choice = await promptChoice();
+  const choice = await promptChoice({ escalate, allowProceed: !requireCleanTree });
   if (choice === "stop") return "stop";
   if (choice === "commit") {
     try {
