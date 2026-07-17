@@ -16,4 +16,4 @@ description: "The Zones graph already lets a user expand a zone node to reveal i
 | [Color-code the cross-zone indicator bar by target zone](./color-code-the-cross-zone-d593c6.md) | pending |
 | [Highlight a file's cross-zone connections on hover or select](./highlight-a-file-s-cross-zone-06071f.md) | pending |
 | [Prioritize and optionally filter connecting files in an expanded zone](./prioritize-and-optionally-f9c648.md) | completed |
-| [Show target zones per connecting file row](./show-target-zones-per-03fd3c.md) | pending |
+| [Show target zones per connecting file row](./show-target-zones-per-03fd3c.md) | completed |

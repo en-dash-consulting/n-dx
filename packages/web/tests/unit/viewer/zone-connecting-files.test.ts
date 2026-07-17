@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import type { ZoneData, FileInfo, FileConnectionMap } from "../../../src/viewer/views/zone-types.js";
-import { prioritizeConnectingFiles, applyConnectingFilesOrdering } from "../../../src/viewer/views/zones.js";
+import type { ZoneData, FileInfo, FileConnectionMap, FileZoneLink } from "../../../src/viewer/views/zone-types.js";
+import {
+  prioritizeConnectingFiles,
+  applyConnectingFilesOrdering,
+  buildConnectionsTooltip,
+} from "../../../src/viewer/views/zones.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -160,5 +164,62 @@ describe("applyConnectingFilesOrdering", () => {
     expect(zones[0].subZones?.[0].files.map((f) => f.path)).toEqual([
       "sub-internal.ts", "sub-bridge.ts",
     ]);
+  });
+});
+
+// ── buildConnectionsTooltip ──────────────────────────────────────────────────
+
+describe("buildConnectionsTooltip", () => {
+  const zoneNameById = new Map([
+    ["z-server", "Web Server"],
+    ["z-shared", "Web Shared"],
+    ["z-crash", "Crash"],
+  ]);
+
+  it("lists each target zone name with its weight, sorted by weight descending", () => {
+    const links: FileZoneLink[] = [
+      { targetZoneId: "z-shared", weight: 2 },
+      { targetZoneId: "z-server", weight: 9 },
+      { targetZoneId: "z-crash", weight: 5 },
+    ];
+    const tooltip = buildConnectionsTooltip(links, zoneNameById);
+    expect(tooltip).toBe(
+      "→ Web Server · 9 calls\n→ Crash · 5 calls\n→ Web Shared · 2 calls",
+    );
+  });
+
+  it("uses singular 'call' for weight 1", () => {
+    const tooltip = buildConnectionsTooltip(
+      [{ targetZoneId: "z-crash", weight: 1 }],
+      zoneNameById,
+    );
+    expect(tooltip).toBe("→ Crash · 1 call");
+  });
+
+  it("returns null for undefined or empty links", () => {
+    expect(buildConnectionsTooltip(undefined, zoneNameById)).toBeNull();
+    expect(buildConnectionsTooltip([], zoneNameById)).toBeNull();
+  });
+
+  it("omits links whose target zone is not in the rendered zone list", () => {
+    const links: FileZoneLink[] = [
+      { targetZoneId: "z-unknown", weight: 10 },
+      { targetZoneId: "z-shared", weight: 3 },
+    ];
+    expect(buildConnectionsTooltip(links, zoneNameById)).toBe("→ Web Shared · 3 calls");
+  });
+
+  it("returns null when no link resolves to a rendered zone", () => {
+    const links: FileZoneLink[] = [{ targetZoneId: "z-unknown", weight: 10 }];
+    expect(buildConnectionsTooltip(links, zoneNameById)).toBeNull();
+  });
+
+  it("does not mutate the input links array", () => {
+    const links: FileZoneLink[] = [
+      { targetZoneId: "z-shared", weight: 2 },
+      { targetZoneId: "z-server", weight: 9 },
+    ];
+    buildConnectionsTooltip(links, zoneNameById);
+    expect(links.map((l) => l.targetZoneId)).toEqual(["z-shared", "z-server"]);
   });
 });

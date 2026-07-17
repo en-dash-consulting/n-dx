@@ -31,6 +31,7 @@ import type {
   FileConnectionMap,
   FileToFileMap,
   FileInfo,
+  FileZoneLink,
   ZoneBreadcrumb,
   ExpandedSubZones,
 } from "./zone-types.js";
@@ -155,6 +156,26 @@ export function applyConnectingFilesOrdering(
     subZones: zone.subZones?.map((sz) => transform(sz, connectingOnly)),
   });
   return zones.map((z) => transform(z, connectingOnlyZones.has(z.id)));
+}
+
+/**
+ * Build the tooltip text for a connecting file row: one line per target zone
+ * ("→ <name> · <weight> call(s)"), sorted by weight descending. Links whose
+ * target zone is not in the rendered zone list are omitted so the tooltip
+ * never shows unknown-zone labels. Returns null when nothing resolves.
+ *
+ * @internal Exported for testing.
+ */
+export function buildConnectionsTooltip(
+  links: FileZoneLink[] | undefined,
+  zoneNameById: Map<string, string>,
+): string | null {
+  if (!links || links.length === 0) return null;
+  const lines = links
+    .filter((l) => zoneNameById.has(l.targetZoneId))
+    .sort((a, b) => b.weight - a.weight)
+    .map((l) => `→ ${zoneNameById.get(l.targetZoneId)} · ${l.weight} call${l.weight === 1 ? "" : "s"}`);
+  return lines.length > 0 ? lines.join("\n") : null;
 }
 
 /**
@@ -715,6 +736,7 @@ function FileRow({
   boxW,
   searchMatch,
   hasCrossZone,
+  tooltip,
   onClick,
   onDblClick,
 }: {
@@ -724,6 +746,7 @@ function FileRow({
   boxW: number;
   searchMatch: boolean;
   hasCrossZone: boolean;
+  tooltip?: string | null;
   onClick: () => void;
   onDblClick: () => void;
 }) {
@@ -738,6 +761,7 @@ function FileRow({
     onClick: (e: Event) => { e.stopPropagation(); onClick(); },
     onDblClick: (e: Event) => { e.stopPropagation(); onDblClick(); },
   },
+    tooltip ? h("title", null, tooltip) : null,
     h("rect", {
       class: "cg-file-bg",
       x: boxX + 8,
@@ -921,6 +945,7 @@ function ZoneBox({
   searchQ,
   matchingFiles,
   fileConnections,
+  zoneNameById,
   expandedSubZoneIds,
   connectingOnly,
   onToggle,
@@ -939,6 +964,7 @@ function ZoneBox({
   searchQ: string;
   matchingFiles: Set<string>;
   fileConnections: FileConnectionMap;
+  zoneNameById: Map<string, string>;
   expandedSubZoneIds?: Set<string>;
   connectingOnly: boolean;
   onToggle: () => void;
@@ -973,6 +999,7 @@ function ZoneBox({
           boxW: box.w,
           searchMatch: searchQ ? isMatch : false,
           hasCrossZone,
+          tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
           onClick: () => onSelectFile(file.path),
           onDblClick: () => onDblClickFile(file.path),
         });
@@ -1028,6 +1055,7 @@ function ZoneBox({
               boxW: box.w - SUBZONE_FILE_INDENT,
               searchMatch: searchQ ? matchingFiles.has(file.path) : false,
               hasCrossZone,
+              tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
               onClick: () => onSelectFile(file.path),
               onDblClick: () => onDblClickFile(file.path),
             }),
@@ -1284,6 +1312,7 @@ function ZoneDiagram({
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
 
   const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
+  const zoneNameById = useMemo(() => new Map(zones.map((z) => [z.id, z.name])), [zones]);
 
   // Layout computation
   const { boxes: baseBoxes, totalW, totalH } = useMemo(
@@ -1564,6 +1593,7 @@ function ZoneDiagram({
             searchQ,
             matchingFiles: matchingFilesByZone.get(zone.id) ?? new Set(),
             fileConnections,
+            zoneNameById,
             expandedSubZoneIds: expandedSubZones.get(zone.id),
             connectingOnly: connectingOnlyZones.has(zone.id),
             onToggle: () => onToggleZone(zone.id),
